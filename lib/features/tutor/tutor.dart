@@ -22,11 +22,11 @@ class _TutorState extends ConsumerState<Tutor> {
     super.initState();
 
     // Run once after mount
-    Future.microtask(() {
+    Future.microtask(() async {
       if (!mounted || _didInit) return;
       _didInit = true;
       final tutor = ref.read(tutorServiceProvider);
-      tutor.initializeSession();
+      await tutor.initializeSession();
     });
   }
 

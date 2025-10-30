@@ -26,7 +26,7 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
 });
 
 // Current user (FirebaseAuth)
-final firebaseUserProvider = StreamProvider<User?>((ref) {
+final firebaseUserProviderStream = StreamProvider<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
 });
 
@@ -40,7 +40,7 @@ final myAccountProviderFuture = FutureProvider<Account?>((ref) {
 });
 
 // Fetch any account by uid once (for lookups in teacher/admin views)
-final accountByUidProvider = FutureProvider.family<Account?, String>((
+final accountByUidProviderFuture = FutureProvider.family<Account?, String>((
   ref,
   uid,
 ) async {

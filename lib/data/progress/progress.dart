@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Progress {
   final String goalID;
-  final String progress;
+  final double progress;
   final DateTime? updatedAt;
 
   Progress({required this.goalID, required this.progress, this.updatedAt});
@@ -12,7 +12,7 @@ class Progress {
     final ts = data['updatedAt'];
     return Progress(
       goalID: doc.id,
-      progress: (data['progress'] as String?) ?? '0',
+      progress: (data['progress'] as double?) ?? 0.0,
       updatedAt: ts is Timestamp ? ts.toDate() : null,
     );
   }

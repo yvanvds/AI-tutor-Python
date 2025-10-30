@@ -9,7 +9,7 @@ final reportRepositoryProvider = Provider<ReportRepository>((ref) {
 });
 
 /// Load all status reports once (e.g., for initial decision logic in your Tutor).
-final statusReportListFutureProvider = FutureProvider<List<StatusReport>>((
+final statusReportListProviderFuture = FutureProvider<List<StatusReport>>((
   ref,
 ) async {
   final repo = ref.read(reportRepositoryProvider);
@@ -17,7 +17,7 @@ final statusReportListFutureProvider = FutureProvider<List<StatusReport>>((
 });
 
 /// Realtime stream of all status reports (use in UI if you want live updates).
-final statusReportListStreamProvider = StreamProvider<List<StatusReport>>((
+final statusReportListProviderStream = StreamProvider<List<StatusReport>>((
   ref,
 ) {
   final repo = ref.read(reportRepositoryProvider);
@@ -25,17 +25,15 @@ final statusReportListStreamProvider = StreamProvider<List<StatusReport>>((
 });
 
 /// Get a single goal’s status report once.
-final statusReportByGoalFutureProvider =
+final statusReportByGoalProviderFuture =
     FutureProvider.family<StatusReport?, String>((ref, goalID) {
       final repo = ref.read(reportRepositoryProvider);
       return repo.getByGoalId(goalID);
     });
 
 /// Upsert (create or update) a StatusReport doc.
-final upsertStatusReportProvider = FutureProvider.family<void, StatusReport>((
-  ref,
-  statusReport,
-) async {
-  final repo = ref.read(reportRepositoryProvider);
-  await repo.upsert(statusReport);
-});
+final upsertStatusReportProviderFuture =
+    FutureProvider.family<void, StatusReport>((ref, statusReport) async {
+      final repo = ref.read(reportRepositoryProvider);
+      await repo.upsert(statusReport);
+    });
