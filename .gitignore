@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+.env
 .atom/
 .build/
 .buildlog/
@@ -11,6 +12,9 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+
+# security sensitive files
+lib/services/tutor/env.g.dart
 
 # IntelliJ related
 *.iml

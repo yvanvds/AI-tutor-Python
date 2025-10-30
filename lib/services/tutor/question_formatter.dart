@@ -1,0 +1,60 @@
+import 'dart:convert';
+
+class QuestionFormatter {
+  static String generateExcercise(double progress) {
+    final request = {"request_type": "generate_exercise", "progress": progress};
+
+    return jsonEncode(request);
+  }
+
+  static String askHint(String currentCode, double progress) {
+    final request = {
+      "request_Type": "request_hint",
+      "current_code": currentCode,
+      "progress": progress,
+    };
+
+    return jsonEncode(request);
+  }
+
+  static String studentQuestion(
+    String question,
+    double progress,
+    String? code,
+  ) {
+    final request = {
+      "request_type": "student_question",
+      "question": question,
+      "code": code ?? "",
+      "progress": progress,
+    };
+
+    return jsonEncode(request);
+  }
+
+  static String submitCode(String code, double progress) {
+    final request = {
+      "request_type": "submit_code",
+      "code": code,
+      "progress": progress,
+    };
+
+    return jsonEncode(request);
+  }
+
+  static String answerMcq(String answer, double progress) {
+    final request = {
+      "request_type": "mcq_answer",
+      "answer": answer,
+      "progress": progress,
+    };
+
+    return jsonEncode(request);
+  }
+
+  static String checkStatus() {
+    final request = {"request_type": "status"};
+
+    return jsonEncode(request);
+  }
+}

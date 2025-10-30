@@ -194,7 +194,7 @@ class _InstructionsEditorPageState
 
   @override
   Widget build(BuildContext context) {
-    final docsAsync = ref.watch(instructionsListStreamProvider);
+    final docsAsync = ref.watch(instructionsListProviderStream);
 
     return Scaffold(
       appBar: AppBar(

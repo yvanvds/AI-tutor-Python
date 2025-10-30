@@ -11,12 +11,12 @@ final instructionsRepositoryProvider = Provider<InstructionsRepository>((ref) {
 });
 
 /// Streams the full list (live).
-final instructionsListStreamProvider = StreamProvider<List<Instruction>>((ref) {
+final instructionsListProviderStream = StreamProvider<List<Instruction>>((ref) {
   return ref.watch(instructionsRepositoryProvider).watchAll();
 });
 
 /// Stream a single doc by id (live).
-final instructionStreamProvider = StreamProvider.family<Instruction?, String>((
+final instructionProviderStream = StreamProvider.family<Instruction?, String>((
   ref,
   id,
 ) {
@@ -24,7 +24,7 @@ final instructionStreamProvider = StreamProvider.family<Instruction?, String>((
 });
 
 /// One-shot fetch helpers (optional)
-final instructionsListFutureProvider = FutureProvider<List<Instruction>>((ref) {
+final instructionsListProviderFuture = FutureProvider<List<Instruction>>((ref) {
   return ref.watch(instructionsRepositoryProvider).getAll();
 });
 
