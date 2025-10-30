@@ -1,25 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class Progress {
+class StatusReport {
   final String goalID;
-  final String progress;
+  final String statusReport;
   final DateTime? updatedAt;
 
-  Progress({required this.goalID, required this.progress, this.updatedAt});
+  StatusReport({
+    required this.goalID,
+    required this.statusReport,
+    this.updatedAt,
+  });
 
-  factory Progress.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory StatusReport.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const {};
     final ts = data['updatedAt'];
-    return Progress(
+    return StatusReport(
       goalID: doc.id,
-      progress: (data['progress'] as String?) ?? '0',
+      statusReport: (data['statusReport'] as String?) ?? '',
       updatedAt: ts is Timestamp ? ts.toDate() : null,
     );
   }
 
   Map<String, dynamic> toMap() => {
     // goalID is the doc id
-    'progress': progress,
+    'statusReport': statusReport,
     'updatedAt': FieldValue.serverTimestamp(),
   };
 }
