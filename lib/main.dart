@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'features/dashboard.dart';
 import 'firebase_options.dart';
 import 'features/auth/sign_in_page.dart';
+import 'home_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +18,6 @@ class GoalsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(accountRepositoryProvider);
-
     return MaterialApp(
       title: 'Python Course',
       home: StreamBuilder<User?>(
@@ -33,32 +31,8 @@ class GoalsApp extends ConsumerWidget {
           final user = snap.data;
           if (user == null) return const SignInPage();
 
-          // we're signed in
-          final accountAsync = ref.watch(myAccountProviderFuture);
-
-          // Build your title from the AsyncValue
-          final titleText = accountAsync.maybeWhen(
-            data: (acc) {
-              final fallback =
-                  user.displayName?.split(' ').first ?? user.email ?? 'user';
-              return 'Welcome back ${acc?.firstName ?? fallback}, let\'s learn!';
-            },
-            orElse: () => 'Welcome…', // small placeholder while loading
-          );
-
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(titleText),
-              actions: [
-                IconButton(
-                  tooltip: 'Sign out',
-                  onPressed: () => FirebaseAuth.instance.signOut(),
-                  icon: const Icon(Icons.logout),
-                ),
-              ],
-            ),
-            body: const Dashboard(),
-          );
+          // Signed in → hand off to the shell.
+          return const HomeShell();
         },
       ),
     );

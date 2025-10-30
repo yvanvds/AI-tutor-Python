@@ -34,5 +34,10 @@ class ChatService {
     );
   }
 
+  void clear() {
+    _id = 0;
+    controller.setMessages([]);
+  }
+
   void dispose() => controller.dispose();
 }

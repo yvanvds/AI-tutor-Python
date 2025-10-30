@@ -24,8 +24,7 @@ class TutorService {
   Future<void> initializeSession() async {
     final chat = ref.read(chatServiceProvider);
 
-    chat.addSystemMessage("Welcome to your tutoring session!");
-
+    chat.clear();
     // Resolve name & target using stable snapshots
     final userName = await _getUserFirstName();
     final hasTarget = await setTargetGoal(); // selects providers inside
@@ -46,8 +45,8 @@ class TutorService {
   /// Returns true if a selection was made, false otherwise.
   Future<bool> setTargetGoal() async {
     // Clear previous selection
-    ref.read(selectedRootGoalProvider.notifier).select(null);
-    ref.read(selectedChildGoalProvider.notifier).select(null);
+    ref.read(selectedRootGoalProviderNotifier.notifier).select(null);
+    ref.read(selectedChildGoalProviderNotifier.notifier).select(null);
 
     // Take stable snapshots
     final roots = await ref.read(rootGoalsProviderFuture.future); // List<Goal>
@@ -73,8 +72,10 @@ class TutorService {
         );
 
         if (targetChild != null) {
-          ref.read(selectedRootGoalProvider.notifier).select(root.id);
-          ref.read(selectedChildGoalProvider.notifier).select(targetChild.id);
+          ref.read(selectedRootGoalProviderNotifier.notifier).select(root.id);
+          ref
+              .read(selectedChildGoalProviderNotifier.notifier)
+              .select(targetChild.id);
           _currentRootGoal = root;
           _currentChildGoal = targetChild;
           return true;

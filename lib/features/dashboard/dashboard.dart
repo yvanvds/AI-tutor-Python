@@ -1,8 +1,8 @@
-import 'package:ai_tutor_python/features/controllers.dart';
-import 'package:ai_tutor_python/features/editor.dart';
-import 'package:ai_tutor_python/features/editor_controller.dart';
-import 'package:ai_tutor_python/features/output.dart';
-import 'package:ai_tutor_python/features/output_controller.dart';
+import 'package:ai_tutor_python/features/dashboard/controllers.dart';
+import 'package:ai_tutor_python/features/dashboard/editor.dart';
+import 'package:ai_tutor_python/features/dashboard/editor_controller.dart';
+import 'package:ai_tutor_python/features/dashboard/output.dart';
+import 'package:ai_tutor_python/features/dashboard/output_controller.dart';
 import 'package:ai_tutor_python/features/tutor/tutor.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

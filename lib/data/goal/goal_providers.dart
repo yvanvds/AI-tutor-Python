@@ -7,6 +7,41 @@ final goalsRepositoryProvider = Provider<GoalsRepository>((ref) {
   return GoalsRepository();
 });
 
+// Selected root goal id state
+class SelectedRootGoal extends Notifier<String?> {
+  @override
+  String? build() => null; // no selection initially
+  void select(String? id) => state = id;
+  void clear() => state = null;
+}
+
+/// Which goal is being edited in the drawer? (null = closed)
+class EditingGoalId extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void open(String id) => state = id;
+  void close() => state = null;
+}
+
+class SelectedChildGoal extends Notifier<String?> {
+  @override
+  String? build() => null; // no selection initially
+  void select(String? id) => state = id;
+  void clear() => state = null;
+}
+
+final selectedChildGoalProviderNotifier =
+    NotifierProvider<SelectedChildGoal, String?>(SelectedChildGoal.new);
+
+// Selected root goal id (for viewing its children)
+final selectedRootGoalProviderNotifier =
+    NotifierProvider<SelectedRootGoal, String?>(SelectedRootGoal.new);
+
+// Editing goal id state
+final editingGoalIdProviderNotifier = NotifierProvider<EditingGoalId, String?>(
+  EditingGoalId.new,
+);
+
 /// Stream of root goals (StreamProvider is fine to keep)
 final rootGoalsProviderStream = StreamProvider<List<Goal>>((ref) {
   final repo = ref.watch(goalsRepositoryProvider);
@@ -20,23 +55,10 @@ final rootGoalsProviderFuture = FutureProvider<List<Goal>>((ref) async {
   return roots;
 });
 
-// Selected root goal id state
-class SelectedRootGoal extends Notifier<String?> {
-  @override
-  String? build() => null; // no selection initially
-  void select(String? id) => state = id;
-  void clear() => state = null;
-}
-
-// Selected root goal id (for viewing its children)
-final selectedRootGoalProvider = NotifierProvider<SelectedRootGoal, String?>(
-  SelectedRootGoal.new,
-);
-
 /// Stream of children for the selected root
 final childGoalsProviderStream = StreamProvider<List<Goal>>((ref) {
   final repo = ref.watch(goalsRepositoryProvider);
-  final rootId = ref.watch(selectedRootGoalProvider);
+  final rootId = ref.watch(selectedRootGoalProviderNotifier);
   if (rootId == null) return const Stream<List<Goal>>.empty();
   return repo.streamChildren(rootId);
 });
@@ -55,13 +77,10 @@ final childGoalsByParentProviderFuture =
       return children;
     });
 
-class SelectedChildGoal extends Notifier<String?> {
-  @override
-  String? build() => null; // no selection initially
-  void select(String? id) => state = id;
-  void clear() => state = null;
-}
-
-final selectedChildGoalProvider = NotifierProvider<SelectedChildGoal, String?>(
-  SelectedChildGoal.new,
-);
+/// Stream the single goal being edited
+final editingGoalProviderStream = StreamProvider<Goal?>((ref) {
+  final id = ref.watch(editingGoalIdProviderNotifier);
+  if (id == null) return const Stream.empty();
+  final repo = ref.watch(goalsRepositoryProvider);
+  return repo.streamGoal(id); // ← direct single-doc stream
+});
