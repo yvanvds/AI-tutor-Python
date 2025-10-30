@@ -14,6 +14,10 @@ final firebaseFirestoreProvider = Provider<FirebaseFirestore>((ref) {
   return FirebaseFirestore.instance;
 });
 
+final firebaseCurrentUserProvider = Provider<User?>((ref) {
+  return ref.watch(firebaseAuthProvider).currentUser;
+});
+
 // Repository
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final fs = ref.watch(firebaseFirestoreProvider);
@@ -27,8 +31,12 @@ final firebaseUserProvider = StreamProvider<User?>((ref) {
 });
 
 // Current user's Account profile (Firestore)
-final myAccountProvider = StreamProvider<Account?>((ref) {
+final myAccountProviderStream = StreamProvider<Account?>((ref) {
   return ref.watch(accountRepositoryProvider).watchMyAccount();
+});
+
+final myAccountProviderFuture = FutureProvider<Account?>((ref) {
+  return ref.watch(accountRepositoryProvider).getMyAccount();
 });
 
 // Fetch any account by uid once (for lookups in teacher/admin views)

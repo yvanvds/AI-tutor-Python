@@ -10,6 +10,8 @@ class AccountRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
+  String? get currentUid => _auth.currentUser?.uid;
+
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('accounts');
 
@@ -61,6 +63,13 @@ class AccountRepository {
   /// Fetch one account once.
   Future<Account?> getAccount(String uid) async {
     final snap = await _doc(uid).get();
+    if (!snap.exists) return null;
+    return Account.fromDoc(snap);
+  }
+
+  /// Fetch one account once.
+  Future<Account?> getMyAccount() async {
+    final snap = await _doc(currentUid!).get();
     if (!snap.exists) return null;
     return Account.fromDoc(snap);
   }
