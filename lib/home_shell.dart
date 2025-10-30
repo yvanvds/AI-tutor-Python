@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/data/account/account_providers.dart';
 import 'package:ai_tutor_python/data/role/role_provider.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
+import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -52,6 +53,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           selectedIcon: Icon(Icons.flag),
           label: Text('Goals'),
         ),
+      if (isTeacher)
+        const NavigationRailDestination(
+          icon: Icon(Icons.integration_instructions_outlined),
+          selectedIcon: Icon(Icons.integration_instructions),
+          label: Text('Instructions'),
+        ),
     ];
 
     // Clamp index if teacher flag changes (e.g., on first load)
@@ -62,9 +69,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     Widget page;
     if (_selectedIndex == 0) {
       page = const Dashboard();
-    } else {
-      // index 1 only exists when isTeacher is true
+    } else if (_selectedIndex == 1 && isTeacher) {
       page = const GoalsPage();
+    } else if (_selectedIndex == 2 && isTeacher) {
+      page = const InstructionsEditorPage();
+    } else {
+      page = const Center(child: Text('Page not found'));
     }
 
     return Scaffold(
