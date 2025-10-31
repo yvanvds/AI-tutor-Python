@@ -39,6 +39,9 @@ class _TutorState extends ConsumerState<Tutor> {
       currentUserId: 'user1',
       onMessageSend: (text) {
         chat.addMessage(text);
+
+        final tutor = ref.read(tutorServiceProvider);
+        tutor.handleStudentMessage(text);
       },
       builders: Builders(
         chatAnimatedListBuilder: (context, itemBuilder) {

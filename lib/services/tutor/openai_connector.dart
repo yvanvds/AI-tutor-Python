@@ -4,36 +4,24 @@ import 'package:dart_openai/src/core/models/responses/responses.dart';
 
 class OpenaiConnector {
   final String _apiKey = Env.apiKey;
-  String _previousResponseId = "";
+  String? _previousResponseId;
 
-  Future<dynamic> startSession({
+  Future<dynamic> sendRequest({
     required String instructions,
     required String input,
+    bool newSession = false,
   }) async {
-    print("ai input: $input");
+    print("Starting OpenAI session with input: $input");
     OpenAI.apiKey = _apiKey;
     final response = await OpenAI.instance.responses.create(
       input: input,
       instructions: instructions,
       model: "gpt-5-mini-2025-08-07",
-      store: true,
-      truncation: "auto",
-      //maxOutputTokens: 600,
+      // if _previousResponseId is null, we start a new session anyway
+      previousResponseId: newSession ? null : _previousResponseId,
     );
     _previousResponseId = response.id;
     printResponseRaw(response);
-    return response.output;
-  }
-
-  Future<dynamic> continueSession({required String input}) async {
-    OpenAI.apiKey = _apiKey;
-    final response = await OpenAI.instance.responses.create(
-      input: input,
-      model: "gpt-5-mini-2025-08-07",
-      previousResponseId: _previousResponseId,
-      truncation: "auto",
-    );
-    _previousResponseId = response.id;
     return response.output;
   }
 

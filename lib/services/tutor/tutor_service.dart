@@ -1,13 +1,26 @@
+import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/data/account/account_providers.dart';
+import 'package:ai_tutor_python/data/code/code_provider.dart';
 import 'package:ai_tutor_python/data/goal/goal.dart';
 import 'package:ai_tutor_python/data/goal/goal_providers.dart';
-import 'package:ai_tutor_python/data/instructions/instruction.dart';
 import 'package:ai_tutor_python/data/progress/progress.dart';
 import 'package:ai_tutor_python/data/progress/progress_providers.dart';
+import 'package:ai_tutor_python/data/status_report/report_providers.dart';
+import 'package:ai_tutor_python/data/status_report/status_report.dart';
 import 'package:ai_tutor_python/services/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
+import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
+import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
+import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
+import 'package:ai_tutor_python/services/tutor/responses/exercise.dart';
+import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
+import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -16,15 +29,6 @@ final tutorServiceProvider = Provider<TutorService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
-
-enum ChatRequestType {
-  generateExercise,
-  submitCode,
-  mcqAnswer,
-  requestHint,
-  studentQuestion,
-  status,
-}
 
 class TutorService {
   final Ref ref;
@@ -37,6 +41,8 @@ class TutorService {
       InstructionGenerator(ref: ref);
 
   final OpenaiConnector _connector = OpenaiConnector();
+
+  String _currentExerciseType = '';
 
   // ---- Public API -----------------------------------------------------------
 
@@ -60,6 +66,251 @@ class TutorService {
     );
 
     queryTutor(type: ChatRequestType.generateExercise, newSession: true);
+  }
+
+  Future<void> queryTutor({
+    required ChatRequestType type,
+    String? code,
+    String? prompt,
+    bool newSession = false,
+  }) async {
+    final instructions = await _instructionGenerator.generateInstructions(
+      type,
+      _currentRootGoal!,
+      _currentChildGoal!,
+    );
+
+    String input = "";
+    final progress = await _getCurrentProgress();
+
+    switch (type) {
+      case ChatRequestType.generateExercise:
+        input = QuestionFormatter.generateExcercise(progress);
+        break;
+
+      case ChatRequestType.submitCode:
+        if (code == null) return;
+        input = QuestionFormatter.submitCode(code, progress);
+        break;
+
+      case ChatRequestType.mcqAnswer:
+        if (prompt == null) return;
+        input = QuestionFormatter.mcqAnswer(prompt, progress);
+        break;
+
+      case ChatRequestType.requestHint:
+        if (code == null) return;
+        input = QuestionFormatter.requestHint(code, progress);
+        break;
+
+      case ChatRequestType.studentQuestion:
+        if (prompt == null) return;
+        input = QuestionFormatter.studentQuestion(prompt, progress, code);
+        break;
+
+      case ChatRequestType.explainAnswer:
+        if (prompt == null) return;
+        input = QuestionFormatter.explainAnswer(prompt, progress, code);
+        break;
+
+      case ChatRequestType.socraticFeedback:
+        if (prompt == null) return;
+        input = QuestionFormatter.socraticFeedback(prompt, progress);
+        break;
+
+      case ChatRequestType.status:
+        input = QuestionFormatter.status();
+        break;
+    }
+
+    final result = await _connector.sendRequest(
+      input: input,
+      instructions: instructions,
+      newSession: newSession,
+    );
+    _handleResponse(result);
+  }
+
+  void handleStudentMessage(String message) {
+    if (_currentExerciseType == 'multiple_choice') {
+      queryTutor(type: ChatRequestType.mcqAnswer, prompt: message);
+    } else if (_currentExerciseType == 'socratic_question') {
+      queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
+    } else if (_currentExerciseType == 'explain_code') {
+      queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
+    } else {
+      queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
+    }
+  }
+
+  void dispose() {}
+
+  // ---- Private helpers ------------------------------------------------------
+
+  void _handleResponse(dynamic response) async {
+    final parsed = AIResponseParser.parse(
+      response,
+    ); // returns Exercise | Answer | ...
+
+    final chat = ref.read(chatServiceProvider);
+
+    if (parsed is Exercise) {
+      //
+      // The AI has sent a new Exercise
+      //
+      Exercise exercise = parsed;
+      // remember the current exercise type, so that
+      // we know what to do when the user asks a question.
+      _currentExerciseType = exercise.exerciseType;
+
+      if (exercise.code != null) {
+        // Update code provider
+        ref.read(codeProvider.notifier).state = exercise.code!;
+      }
+
+      if (exercise.prompt.isNotEmpty) {
+        chat.addTutorMessage(exercise.prompt);
+      }
+    } else if (parsed is Answer) {
+      //
+      // The AI answered a generic question
+      //
+      Answer answer = parsed;
+      if (answer.answer.isNotEmpty) {
+        chat.addTutorMessage(answer.answer);
+      }
+      await _evaluateProgress(progress: answer.progress);
+    } else if (parsed is Hint) {
+      //
+      // The AI has sent a Hint
+      //
+      Hint hint = parsed;
+      chat.addTutorMessage(hint.hint);
+
+      await _evaluateProgress(progress: hint.progress);
+    } else if (parsed is CodeFeedback) {
+      //
+      // The AI gives feedback on code
+      //
+      CodeFeedback feedback = parsed;
+      if (feedback.summary.isNotEmpty) chat.addTutorMessage(feedback.summary);
+      if (feedback.suggestion.isNotEmpty) {
+        chat.addTutorMessage(feedback.suggestion);
+      }
+
+      await _evaluateProgress(
+        progress: feedback.progress,
+        moveToNextQuestion: feedback.correct,
+      );
+    } else if (parsed is McqFeedback) {
+      //
+      // The AI gives feedback on MCQ answer
+      //
+      McqFeedback feedback = parsed;
+      chat.addTutorMessage(feedback.explanation);
+
+      if (feedback.correct) {
+        // TODO: hide MCQ panel
+      }
+      await _evaluateProgress(
+        progress: feedback.progress,
+        moveToNextQuestion: feedback.correct,
+      );
+    } else if (parsed is ExplainFeedback) {
+      //
+      // The AI gives feedback on explanation
+      //
+      ExplainFeedback explain = parsed;
+      if (explain.feedback.isNotEmpty) {
+        chat.addTutorMessage(explain.feedback);
+      }
+
+      if (explain.followUp != null && explain.followUp!.isNotEmpty) {
+        chat.addTutorMessage(explain.followUp!);
+      } else {
+        // only ask a new question if there is no follow up
+        if (explain.correct) {
+          queryTutor(type: ChatRequestType.generateExercise);
+        }
+      }
+      _evaluateProgress(
+        progress: explain.progress,
+        moveToNextQuestion: explain.correct && explain.followUp != null,
+      );
+    } else if (parsed is SocraticFeedback) {
+      //
+      // The AI gives feedback on an answer to a socratic question
+      //
+      SocraticFeedback feedback = parsed;
+      if (feedback.feedback.isNotEmpty) {
+        chat.addTutorMessage(feedback.feedback);
+      }
+
+      if (feedback.followUp != null && feedback.followUp!.isNotEmpty) {
+        chat.addTutorMessage(feedback.followUp!);
+      } else {
+        // only ask a new question if there is no follow up
+        if (feedback.correct) {
+          queryTutor(type: ChatRequestType.generateExercise);
+        }
+      }
+
+      _evaluateProgress(
+        progress: feedback.progress,
+        moveToNextQuestion: feedback.correct && feedback.followUp != null,
+      );
+    } else if (parsed is StatusSummary) {
+      //
+      // AI gives a status report when a goal is reached
+      //
+      StatusSummary status = parsed;
+      await _updateReport(status.summary);
+    } else if (parsed is ErrorResponse) {
+      ErrorResponse error = parsed;
+      chat.addSystemMessage(error.toJson().toString());
+    } else {
+      if (parsed is String) {
+        chat.addTutorMessage(parsed);
+      } else {
+        chat.addTutorMessage('Received unknown response from tutor.');
+      }
+    }
+  }
+
+  Future<void> _evaluateProgress({
+    required double progress,
+    bool moveToNextQuestion = false,
+  }) async {
+    final currentProgress = await _getCurrentProgress();
+    final newProgress = currentProgress + progress;
+    await _updateProgress(newProgress);
+
+    if (moveToNextQuestion) {
+      if (newProgress >= 1.0) {
+        // request a status report
+        await queryTutor(type: ChatRequestType.status);
+
+        // move to the next goal
+        final hasTarget = await _setTargetGoal(); // selects providers inside
+
+        if (!hasTarget) {
+          final chat = ref.read(chatServiceProvider);
+          chat.addSystemMessage(
+            "There are no more goals available to work on. Have fun!",
+          );
+          return;
+        }
+
+        // goal has changed, so request new session when starting an exercise
+        await queryTutor(
+          type: ChatRequestType.generateExercise,
+          newSession: true,
+        );
+      } else {
+        // next question, but not a new goal
+        await queryTutor(type: ChatRequestType.generateExercise);
+      }
+    }
   }
 
   /// Computes and selects the next target goal/subgoal.
@@ -109,83 +360,6 @@ class TutorService {
     return false;
   }
 
-  Future<void> queryTutor({
-    required ChatRequestType type,
-    String? code,
-    String? question,
-    bool? newSession,
-  }) async {
-    switch (type) {
-      case ChatRequestType.generateExercise:
-        if (newSession != null && newSession == true) {
-          final instructions = await _instructionGenerator.generateInstructions(
-            _currentRootGoal!,
-            _currentChildGoal!,
-          );
-          final progress = await _getCurrentProgress();
-          final result = await _connector.startSession(
-            input: QuestionFormatter.generateExcercise(progress),
-            instructions: instructions,
-          );
-          print(result);
-        } else {
-          final progress = await _getCurrentProgress();
-          final result = await _connector.continueSession(
-            input: QuestionFormatter.generateExcercise(progress),
-          );
-          print(result);
-        }
-        break;
-
-      case ChatRequestType.submitCode:
-        if (code == null) return;
-        final progress = await _getCurrentProgress();
-        final result = await _connector.continueSession(
-          input: QuestionFormatter.submitCode(code, progress),
-        );
-        print(result);
-        break;
-
-      case ChatRequestType.mcqAnswer:
-        if (question == null) return;
-        final progress = await _getCurrentProgress();
-        final result = await _connector.continueSession(
-          input: QuestionFormatter.answerMcq(question, progress),
-        );
-        print(result);
-        break;
-
-      case ChatRequestType.requestHint:
-        if (code == null) return;
-        final progress = await _getCurrentProgress();
-        final result = await _connector.continueSession(
-          input: QuestionFormatter.askHint(code, progress),
-        );
-        print(result);
-        break;
-
-      case ChatRequestType.studentQuestion:
-        if (question == null) return;
-        final progress = await _getCurrentProgress();
-        final result = await _connector.continueSession(
-          input: QuestionFormatter.studentQuestion(question, progress, code),
-        );
-        print(result);
-        break;
-
-      case ChatRequestType.status:
-        final result = await _connector.continueSession(
-          input: QuestionFormatter.checkStatus(),
-        );
-        print(result);
-        break;
-    }
-  }
-
-  void dispose() {}
-
-  // ---- Private helpers ------------------------------------------------------
-
   Future<String> _getUserFirstName() async {
     final acc = await ref.read(myAccountProviderFuture.future);
     return acc?.firstName ?? 'Student';
@@ -234,6 +408,17 @@ class TutorService {
     await ref.read(
       upsertProgressProviderFuture(
         Progress(goalID: _currentRootGoal!.id, progress: rootAvg),
+      ).future,
+    );
+  }
+
+  Future<void> _updateReport(String newReport) async {
+    if (_currentChildGoal == null) return;
+
+    // 1) Upsert child
+    await ref.read(
+      upsertStatusReportProviderFuture(
+        StatusReport(goalID: _currentChildGoal!.id, statusReport: newReport),
       ).future,
     );
   }

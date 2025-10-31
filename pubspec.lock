@@ -261,9 +261,9 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "8f3266f72515f7522f38244cb0a99c6b2727c8a4"
-      resolved-ref: "8f3266f72515f7522f38244cb0a99c6b2727c8a4"
-      url: "https://github.com/anasfik/openai.git"
+      ref: HEAD
+      resolved-ref: d88c20558a032003eb4b0ac8f994b4c645103e99
+      url: "https://github.com/yvanvds/openai.git"
     source: git
     version: "5.1.0"
   dart_style:

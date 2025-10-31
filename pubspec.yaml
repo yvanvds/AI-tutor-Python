@@ -30,8 +30,7 @@ dependencies:
   collection: ^1.19.1
   dart_openai:
     git:
-      url: https://github.com/anasfik/openai.git
-      ref: 8f3266f72515f7522f38244cb0a99c6b2727c8a4
+      url: https://github.com/yvanvds/openai.git
   envied: ^1.3.1
 
 dev_dependencies:
