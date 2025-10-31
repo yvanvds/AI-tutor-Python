@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
 import 'package:ai_tutor_python/features/dashboard/controllers.dart';
 import 'package:ai_tutor_python/features/dashboard/editor.dart';
 import 'package:ai_tutor_python/features/dashboard/editor_controller.dart';
@@ -33,7 +34,7 @@ class _DashboardState extends ConsumerState<Dashboard> {
   final MultiSplitViewController _innerCtrl = MultiSplitViewController(
     areas: [
       // Controllers bar (fixed height, non-resizable)
-      Area(size: 40, min: 40, max: 40, data: 'controllers'),
+      Area(size: 48, min: 48, max: 48, data: 'controllers'),
       // Editor
       Area(flex: 6, min: 2, data: 'editor'),
       // Output
@@ -71,6 +72,19 @@ class _DashboardState extends ConsumerState<Dashboard> {
                               onStopPressed: () async {
                                 await _outputCtrl.stop();
                               },
+                              onHintPressed: () async {
+                                final tutor = ref.read(tutorServiceProvider);
+                                await tutor.requestHint();
+                              },
+                              onSubmitPressed: () async {
+                                final tutor = ref.read(tutorServiceProvider);
+                                final code = await _editorCtrl.getCode();
+                                await tutor.submitCode(code);
+                              },
+                              onExercisePressed: () async {
+                                final tutor = ref.read(tutorServiceProvider);
+                                await tutor.requestExercise();
+                              },
                             ),
                           ),
                         ],
@@ -79,7 +93,9 @@ class _DashboardState extends ConsumerState<Dashboard> {
                   case 'output':
                     return Padding(
                       padding: EdgeInsets.all(8.0),
-                      child: Output(controller: _outputCtrl),
+                      child: SizedBox.expand(
+                        child: Output(controller: _outputCtrl),
+                      ),
                     );
                   default:
                     return const SizedBox.shrink();

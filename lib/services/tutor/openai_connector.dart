@@ -1,31 +1,63 @@
+import 'package:ai_tutor_python/data/config/global_config_providers.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:dart_openai/src/core/models/responses/responses.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class OpenaiConnector {
+  final Ref ref;
+  OpenaiConnector({required this.ref});
+
   final String _apiKey = Env.apiKey;
   String? _previousResponseId;
+
+  // in case request failed, we can resend it
+  String? _previousPreviousResponseId;
+  String? _previousInstuctions;
+  String? _previousInput;
 
   Future<dynamic> sendRequest({
     required String instructions,
     required String input,
     bool newSession = false,
   }) async {
-    print("Starting OpenAI session with input: $input");
+    //print("Starting OpenAI session with input: $input");
+    _previousPreviousResponseId = _previousResponseId;
+    _previousInput = input;
+    _previousInstuctions = instructions;
+
     OpenAI.apiKey = _apiKey;
-    final response = await OpenAI.instance.responses.create(
-      input: input,
-      instructions: instructions,
-      model: "gpt-5-mini-2025-08-07",
-      // if _previousResponseId is null, we start a new session anyway
-      previousResponseId: newSession ? null : _previousResponseId,
-    );
-    _previousResponseId = response.id;
-    printResponseRaw(response);
-    return response.output;
+
+    // Await the config once here
+    final cfg = await ref.read(globalConfigFutureProvider.future);
+    final model = (cfg?.model.isNotEmpty ?? false) ? cfg!.model : 'gpt-4o';
+
+    try {
+      final response = await OpenAI.instance.responses.create(
+        input: input,
+        instructions: instructions,
+        model: model,
+        // if _previousResponseId is null, we start a new session anyway
+        previousResponseId: newSession ? null : _previousResponseId,
+      );
+      _previousResponseId = response.id;
+      //_printResponseRaw(response);
+      return response.output;
+    } catch (e) {
+      return e;
+    }
   }
 
-  void printResponseRaw(OpenAiResponse response) {
+  Future<dynamic> resendRequest() async {
+    _previousResponseId = _previousPreviousResponseId;
+    final result = await sendRequest(
+      instructions: _previousInstuctions!,
+      input: _previousInput!,
+    );
+    return result;
+  }
+
+  void _printResponseRaw(OpenAiResponse response) {
     print("Background: ${response.background}");
     print("conversation: ${response.conversation}");
     print("CreatedAt: ${response.createdAt}");

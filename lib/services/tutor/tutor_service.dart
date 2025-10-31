@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/data/account/account_providers.dart';
+import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
 import 'package:ai_tutor_python/data/code/code_provider.dart';
 import 'package:ai_tutor_python/data/goal/goal.dart';
 import 'package:ai_tutor_python/data/goal/goal_providers.dart';
@@ -24,15 +25,11 @@ import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-final tutorServiceProvider = Provider<TutorService>((ref) {
-  final service = TutorService(ref: ref);
-  ref.onDispose(service.dispose);
-  return service;
-});
-
 class TutorService {
   final Ref ref;
-  TutorService({required this.ref});
+  TutorService({required this.ref}) {
+    _connector = OpenaiConnector(ref: ref);
+  }
 
   Goal? _currentRootGoal;
   Goal? _currentChildGoal;
@@ -40,7 +37,7 @@ class TutorService {
   InstructionGenerator get _instructionGenerator =>
       InstructionGenerator(ref: ref);
 
-  final OpenaiConnector _connector = OpenaiConnector();
+  late final OpenaiConnector _connector;
 
   String _currentExerciseType = '';
 
@@ -74,6 +71,10 @@ class TutorService {
     String? prompt,
     bool newSession = false,
   }) async {
+    final working = ref.read(tutorWorkingProvider.notifier);
+    if (working.state) return;
+    working.state = true;
+
     final instructions = await _instructionGenerator.generateInstructions(
       type,
       _currentRootGoal!,
@@ -123,24 +124,46 @@ class TutorService {
         break;
     }
 
-    final result = await _connector.sendRequest(
-      input: input,
-      instructions: instructions,
-      newSession: newSession,
-    );
-    _handleResponse(result);
+    dynamic result;
+    try {
+      result = await _connector.sendRequest(
+        input: input,
+        instructions: instructions,
+        newSession: newSession,
+      );
+    } finally {
+      working.state = false;
+    }
+    if (result != null) {
+      _handleResponse(result);
+    }
   }
 
-  void handleStudentMessage(String message) {
+  Future<void> handleStudentMessage(String message) async {
     if (_currentExerciseType == 'multiple_choice') {
-      queryTutor(type: ChatRequestType.mcqAnswer, prompt: message);
+      await queryTutor(type: ChatRequestType.mcqAnswer, prompt: message);
     } else if (_currentExerciseType == 'socratic_question') {
-      queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
+      await queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
     } else if (_currentExerciseType == 'explain_code') {
-      queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
+      await queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
     } else {
-      queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
+      await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
+  }
+
+  Future<void> requestHint() async {
+    await queryTutor(type: ChatRequestType.requestHint);
+  }
+
+  Future<void> submitCode(String code) async {
+    if (_currentExerciseType == 'complete_code' ||
+        _currentExerciseType == 'write_code') {
+      await queryTutor(type: ChatRequestType.submitCode, code: code);
+    }
+  }
+
+  Future<void> requestExercise() async {
+    await queryTutor(type: ChatRequestType.generateExercise);
   }
 
   void dispose() {}
@@ -170,6 +193,12 @@ class TutorService {
 
       if (exercise.prompt.isNotEmpty) {
         chat.addTutorMessage(exercise.prompt);
+      }
+
+      if (exercise.exerciseType == 'multiple_choice') {
+        for (final option in exercise.options) {
+          chat.addTutorMessage('- ${option.id} : ${option.text}');
+        }
       }
     } else if (parsed is Answer) {
       //
@@ -230,12 +259,12 @@ class TutorService {
       } else {
         // only ask a new question if there is no follow up
         if (explain.correct) {
-          queryTutor(type: ChatRequestType.generateExercise);
+          await queryTutor(type: ChatRequestType.generateExercise);
         }
       }
-      _evaluateProgress(
+      await _evaluateProgress(
         progress: explain.progress,
-        moveToNextQuestion: explain.correct && explain.followUp != null,
+        moveToNextQuestion: explain.correct && explain.followUp == null,
       );
     } else if (parsed is SocraticFeedback) {
       //
@@ -251,13 +280,13 @@ class TutorService {
       } else {
         // only ask a new question if there is no follow up
         if (feedback.correct) {
-          queryTutor(type: ChatRequestType.generateExercise);
+          await queryTutor(type: ChatRequestType.generateExercise);
         }
       }
 
-      _evaluateProgress(
+      await _evaluateProgress(
         progress: feedback.progress,
-        moveToNextQuestion: feedback.correct && feedback.followUp != null,
+        moveToNextQuestion: feedback.correct && feedback.followUp == null,
       );
     } else if (parsed is StatusSummary) {
       //
@@ -268,12 +297,19 @@ class TutorService {
     } else if (parsed is ErrorResponse) {
       ErrorResponse error = parsed;
       chat.addSystemMessage(error.toJson().toString());
+
+      // resend the request
+      final result = await _connector.resendRequest();
+      _handleResponse(result);
     } else {
       if (parsed is String) {
         chat.addTutorMessage(parsed);
       } else {
         chat.addTutorMessage('Received unknown response from tutor.');
       }
+      // resend the request
+      final result = await _connector.resendRequest();
+      _handleResponse(result);
     }
   }
 

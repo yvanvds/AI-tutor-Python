@@ -32,6 +32,7 @@ dependencies:
     git:
       url: https://github.com/yvanvds/openai.git
   envied: ^1.3.1
+  loading_animation_widget: ^1.3.0
 
 dev_dependencies:
   flutter_test:
