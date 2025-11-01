@@ -41,7 +41,10 @@ class _EditorState extends ConsumerState<Editor> {
   @override
   Widget build(BuildContext context) {
     final code = ref.watch(codeProvider);
-    _controller.text = code;
+    _controller.value = TextEditingValue(
+      text: code,
+      selection: TextSelection.collapsed(offset: -1),
+    );
 
     return CodeTheme(
       data: CodeThemeData(styles: monokaiSublimeTheme),

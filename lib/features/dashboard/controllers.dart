@@ -47,7 +47,7 @@ class Controllers extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: IconButton.outlined(
-            icon: const Icon(Icons.help_outline),
+            icon: const Icon(Icons.question_mark),
             tooltip: 'Request Hint',
             onPressed: onHintPressed,
           ),

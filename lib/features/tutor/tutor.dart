@@ -40,8 +40,9 @@ class _TutorState extends ConsumerState<Tutor> {
       children: [
         Expanded(
           child: Chat(
+            theme: ChatTheme.fromThemeData(Theme.of(context)),
             chatController: chat.controller,
-            currentUserId: 'user1',
+            currentUserId: 'You',
             onMessageSend: (text) async {
               chat.addMessage(text);
 
@@ -59,7 +60,20 @@ class _TutorState extends ConsumerState<Tutor> {
                     index, {
                     required bool isSentByMe,
                     MessageGroupStatus? groupStatus,
-                  }) => FlyerChatTextMessage(message: message, index: index),
+                  }) => FlyerChatTextMessage(
+                    index: index,
+                    message: message,
+                    sentTextStyle: Theme.of(context).textTheme.bodyMedium!
+                        .copyWith(
+                          fontSize: 20,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                    receivedTextStyle: Theme.of(context).textTheme.bodyMedium!
+                        .copyWith(
+                          fontSize: 20,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                  ),
 
               systemMessageBuilder:
                   (
@@ -68,7 +82,15 @@ class _TutorState extends ConsumerState<Tutor> {
                     index, {
                     required bool isSentByMe,
                     MessageGroupStatus? groupStatus,
-                  }) => FlyerChatSystemMessage(message: message, index: index),
+                  }) => FlyerChatSystemMessage(
+                    message: message,
+                    index: index,
+                    backgroundColor: Theme.of(context).canvasColor,
+                    textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
             ),
             resolveUser: (UserID id) async {
               // Simple user resolver
