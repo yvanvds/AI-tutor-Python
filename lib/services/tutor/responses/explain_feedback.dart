@@ -1,35 +1,56 @@
-class ExplainFeedback {
+import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+
+/*
+{
+  "type": "explain_feedback",
+  "quality": "wrong | partial | correct",
+  "feedback": "brief explanation of what's missing or why correct",
+  "follow_up": "optional new question or prompt to clarify thinking"
+}
+*/
+
+class ExplainFeedback implements ChatResponse {
   final String type;
-  final bool correct;
+  final AnswerQuality quality;
   final String feedback;
   final String? followUp;
-  final double progress;
 
   ExplainFeedback({
     required this.type,
-    required this.correct,
+    required this.quality,
     required this.feedback,
     this.followUp,
-    required this.progress,
   });
 
   factory ExplainFeedback.fromMap(Map<String, dynamic> map) {
     return ExplainFeedback(
       type: map['type'] ?? 'explain_feedback',
-      correct: map['correct'] ?? false,
+      quality: _stringToQuality(map['quality']),
       feedback: map['feedback'] ?? '',
-      followUp: map['follow up'] ?? map['follow_up'], // support both variants
-      progress: (map['progress'] is num)
-          ? (map['progress'] as num).toDouble()
-          : 0.0,
+      followUp: map['follow_up'],
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'type': type,
-    'correct': correct,
-    'feedback': feedback,
-    if (followUp != null) 'follow up': followUp,
-    'progress': progress,
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'quality': quality.name,
+      'feedback': feedback,
+      if (followUp != null) 'follow_up': followUp,
+    };
+  }
+
+  static AnswerQuality _stringToQuality(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'wrong':
+        return AnswerQuality.wrong;
+      case 'partial':
+        return AnswerQuality.partial;
+      case 'correct':
+        return AnswerQuality.correct;
+      default:
+        return AnswerQuality.wrong;
+    }
+  }
 }

@@ -1,52 +1,31 @@
 import 'dart:convert';
-
 import 'package:ai_tutor_python/core/chat_response_type.dart';
-import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
-import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
-import 'package:ai_tutor_python/services/tutor/responses/exercise.dart';
-import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
-import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 
 class AIResponseParser {
   /// Parse a single AI response payload and return the typed model instance.
   /// Accepts either a decoded structure (List/Map) or a JSON string.
-  static Object parse(dynamic jsonInput) {
+  static ChatResponse parse(dynamic jsonInput) {
     final textMap = extractFirstJsonMap(jsonInput);
     if (textMap != null) {
       final ChatResponseType t = _stringToType(
         textMap['type']?.toString() ?? '',
       );
 
-      switch (t) {
-        case ChatResponseType.exercise:
-          return Exercise.fromMap(textMap);
-        case ChatResponseType.answer:
-          return Answer.fromMap(textMap);
-        case ChatResponseType.hint:
-          return Hint.fromMap(textMap);
-        case ChatResponseType.codeFeedback:
-          return CodeFeedback.fromMap(textMap);
-        case ChatResponseType.mcqFeedback:
-          return McqFeedback.fromMap(textMap);
-        case ChatResponseType.explainFeedback:
-          return ExplainFeedback.fromMap(textMap);
-        case ChatResponseType.socraticFeedback:
-          return SocraticFeedback.fromMap(textMap);
-        case ChatResponseType.statusSummary:
-          return StatusSummary.fromMap(textMap);
-        case ChatResponseType.error:
-          return ErrorResponse.fromMap(textMap);
-      }
+      return ChatResponseFactory.fromMap(textMap);
     } else {
       final raw = extractFirstTextString(jsonInput);
       if (raw == null) {
-        return "No connection. I'll try again."; // truly missing content
+        return ErrorResponse(
+          type: "error",
+          message: "No connection. I'll try again.",
+        ); // truly missing content
       } else {
-        return raw;
+        return ErrorResponse(
+          type: "error",
+          message: "Unable to parse response: $raw",
+        ); // unparsable content
       }
     }
   }
@@ -55,8 +34,19 @@ class AIResponseParser {
 
   static ChatResponseType _stringToType(String value) {
     switch (value) {
-      case 'exercise':
-        return ChatResponseType.exercise;
+      // --- Exercise types ---
+      case 'socratic_question':
+        return ChatResponseType.socraticQuestion;
+      case 'multiple_choice':
+        return ChatResponseType.multipleChoice;
+      case 'explain_code':
+        return ChatResponseType.explainCode;
+      case 'complete_code':
+        return ChatResponseType.completeCode;
+      case 'write_code':
+        return ChatResponseType.writeCode;
+
+      // --- Feedback and system types ---
       case 'answer':
         return ChatResponseType.answer;
       case 'hint':
@@ -73,6 +63,7 @@ class AIResponseParser {
         return ChatResponseType.statusSummary;
       case 'error':
         return ChatResponseType.error;
+
       default:
         throw FormatException('Unknown response type: $value');
     }

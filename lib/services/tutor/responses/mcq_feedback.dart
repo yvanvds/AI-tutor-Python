@@ -1,31 +1,41 @@
-class McqFeedback {
+import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+
+class McqFeedback implements ChatResponse {
   final String type;
-  final bool correct;
+  final AnswerQuality quality;
   final String explanation;
-  final double progress;
 
   McqFeedback({
     required this.type,
-    required this.correct,
+    required this.quality,
     required this.explanation,
-    required this.progress,
   });
 
   factory McqFeedback.fromMap(Map<String, dynamic> map) {
     return McqFeedback(
       type: map['type'] ?? 'mcq_feedback',
-      correct: map['correct'] ?? false,
+      quality: _stringToQuality(map['quality']),
       explanation: map['explanation'] ?? '',
-      progress: (map['progress'] is num)
-          ? (map['progress'] as num).toDouble()
-          : 0.0,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'type': type,
-    'correct': correct,
+    'quality': quality.name,
     'explanation': explanation,
-    'progress': progress,
   };
+
+  static AnswerQuality _stringToQuality(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'wrong':
+        return AnswerQuality.wrong;
+      case 'partial':
+        return AnswerQuality.partial;
+      case 'correct':
+        return AnswerQuality.correct;
+      default:
+        return AnswerQuality.wrong;
+    }
+  }
 }

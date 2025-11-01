@@ -1,35 +1,45 @@
-class SocraticFeedback {
+import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+
+class SocraticFeedback implements ChatResponse {
   final String type;
-  final bool correct;
+  final AnswerQuality quality;
   final String feedback;
   final String? followUp;
-  final double progress;
 
   SocraticFeedback({
     required this.type,
-    required this.correct,
+    required this.quality,
     required this.feedback,
     this.followUp,
-    required this.progress,
   });
 
   factory SocraticFeedback.fromMap(Map<String, dynamic> map) {
     return SocraticFeedback(
       type: map['type'] ?? 'socratic_feedback',
-      correct: map['correct'] ?? false,
+      quality: _stringToQuality(map['quality']),
       feedback: map['feedback'] ?? '',
       followUp: map['follow up'] ?? map['follow_up'],
-      progress: (map['progress'] is num)
-          ? (map['progress'] as num).toDouble()
-          : 0.0,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'type': type,
-    'correct': correct,
+    'quality': quality.name,
     'feedback': feedback,
     if (followUp != null) 'follow up': followUp,
-    'progress': progress,
   };
+
+  static AnswerQuality _stringToQuality(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'wrong':
+        return AnswerQuality.wrong;
+      case 'partial':
+        return AnswerQuality.partial;
+      case 'correct':
+        return AnswerQuality.correct;
+      default:
+        return AnswerQuality.wrong;
+    }
+  }
 }

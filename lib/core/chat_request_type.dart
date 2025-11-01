@@ -1,5 +1,9 @@
 enum ChatRequestType {
-  generateExercise,
+  socraticQuestion,
+  mcQuestion,
+  explainCodeQuestion,
+  completeCodeQuestion,
+  writeCodeQuestion,
   submitCode,
   mcqAnswer,
   requestHint,
@@ -7,4 +11,5 @@ enum ChatRequestType {
   explainAnswer,
   socraticFeedback,
   status,
+  noResult,
 }

@@ -1,5 +1,12 @@
 enum ChatResponseType {
-  exercise,
+  // Exercise question types
+  socraticQuestion,
+  multipleChoice,
+  explainCode,
+  completeCode,
+  writeCode,
+
+  // Feedback and system types
   answer,
   hint,
   codeFeedback,

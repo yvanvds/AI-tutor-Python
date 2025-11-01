@@ -1,4 +1,6 @@
-class StatusSummary {
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+
+class StatusSummary implements ChatResponse {
   final String type;
   final String summary;
   final int hintsUsed;

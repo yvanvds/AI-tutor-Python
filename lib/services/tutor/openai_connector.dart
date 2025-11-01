@@ -1,47 +1,64 @@
+import 'dart:convert';
 import 'package:ai_tutor_python/data/config/global_config_providers.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:dart_openai/dart_openai.dart';
-import 'package:dart_openai/src/core/models/responses/responses.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+enum PreviousInputs { includeAll, includeSession, newSession }
 
 class OpenaiConnector {
   final Ref ref;
   OpenaiConnector({required this.ref});
 
   final String _apiKey = Env.apiKey;
-  String? _previousResponseId;
 
-  // in case request failed, we can resend it
-  String? _previousPreviousResponseId;
+  // for resend
   String? _previousInstuctions;
   String? _previousInput;
+
+  // Full history (spans sessions) and current-session history.
+  // Each entry is a Responses API content item: {"role": "...", "content": "..."}.
+  final List<Map<String, dynamic>> _allHistory = [];
+  final List<Map<String, dynamic>> _sessionHistory = [];
 
   Future<dynamic> sendRequest({
     required String instructions,
     required String input,
-    bool newSession = false,
+    PreviousInputs inputs = PreviousInputs.includeSession,
   }) async {
-    //print("Starting OpenAI session with input: $input");
-    _previousPreviousResponseId = _previousResponseId;
+    // store previous request info for possible resend
     _previousInput = input;
     _previousInstuctions = instructions;
 
     OpenAI.apiKey = _apiKey;
 
-    // Await the config once here
     final cfg = await ref.read(globalConfigFutureProvider.future);
     final model = (cfg?.model.isNotEmpty ?? false) ? cfg!.model : 'gpt-4o';
 
+    // Build a working copy of history and append THIS user turn
+    final workingHistory = _historyFor(inputs)
+      ..add({"role": "user", "content": input});
+
     try {
       final response = await OpenAI.instance.responses.create(
-        input: input,
-        instructions: instructions,
+        // IMPORTANT: pass message objects, not plain strings
+        input: workingHistory,
+        instructions: instructions, // must be resent each call
         model: model,
-        // if _previousResponseId is null, we start a new session anyway
-        previousResponseId: newSession ? null : _previousResponseId,
+        store: false, // you're managing state client-side
       );
-      _previousResponseId = response.id;
-      //_printResponseRaw(response);
+
+      // Only if the request succeeded, permanently record this user turn
+      // into the chosen scopes.
+      if (inputs != PreviousInputs.newSession) {
+        _sessionHistory.add({"role": "user", "content": input});
+      }
+      _allHistory.add({"role": "user", "content": input});
+
+      // Return the model output as-is for your caller;
+      // you’ll call addResponse(...) once you wrap it as ChatResponse.
       return response.output;
     } catch (e) {
       return e;
@@ -49,43 +66,50 @@ class OpenaiConnector {
   }
 
   Future<dynamic> resendRequest() async {
-    _previousResponseId = _previousPreviousResponseId;
-    final result = await sendRequest(
+    return sendRequest(
       instructions: _previousInstuctions!,
       input: _previousInput!,
     );
-    return result;
   }
 
-  void _printResponseRaw(OpenAiResponse response) {
-    print("Background: ${response.background}");
-    print("conversation: ${response.conversation}");
-    print("CreatedAt: ${response.createdAt}");
-    print("error: ${response.error}");
-    print("id: ${response.id}");
-    print("incompleteDetails: ${response.incompleteDetails?.reason}");
-    print("instructions: ${response.instructions}");
-    print("maxOutputTokens: ${response.maxOutputTokens}");
-    print("maxToolCalls: ${response.maxToolCalls}");
-    print("metadata: ${response.metadata}");
-    print("model: ${response.model}");
-    print("output: ${response.output}");
-    print("parallelToolCalls: ${response.parallelToolCalls}");
-    print("previousResponseId: ${response.previousResponseId}");
-    print("prompt: ${response.prompt}");
-    print("promptCacheKey: ${response.promptCacheKey}");
-    print("reasoning: ${response.reasoning}");
-    print("safetyIdentifier: ${response.safetyIdentifier}");
-    print("serviceTier: ${response.serviceTier}");
-    print("status: ${response.status}");
-    print("temperature: ${response.temperature}");
-    print("text: ${response.text}");
-    print("toolChoice: ${response.toolChoice}");
-    print("tools: ${response.tools}");
-    print("topLogprobs: ${response.topLogprobs}");
-    print("topP: ${response.topP}");
-    print("truncation: ${response.truncation}");
-    print("store: ${response.store}");
-    print("usage: ${response.usage}");
+  /// Record the assistant turn into history (skip errors).
+  /// This matches your request: user -> sendRequest(), agent -> addResponse().
+  void addResponse(ChatResponse response) {
+    if (response is! ErrorResponse) {
+      final jsonString = jsonEncode(response.toJson());
+      _allHistory.add({"role": "assistant", "content": jsonString});
+      _sessionHistory.add({"role": "assistant", "content": jsonString});
+    }
   }
+
+  /// Optional helpers if you ever want to add raw assistant text
+  /// (e.g., for debugging before you map to ChatResponse).
+  void addAssistantRaw(String text) {
+    _allHistory.add({"role": "assistant", "content": text});
+    _sessionHistory.add({"role": "assistant", "content": text});
+  }
+
+  /// If you need to manually start a fresh session boundary.
+  void startNewSession() {
+    _sessionHistory.clear();
+  }
+
+  /// Build a working copy of the history based on the requested scope.
+  List<Map<String, dynamic>> _historyFor(PreviousInputs scope) {
+    switch (scope) {
+      case PreviousInputs.includeAll:
+        return List<Map<String, dynamic>>.from(_allHistory);
+      case PreviousInputs.newSession:
+        // caller wants a fresh session for this call only
+        return <Map<String, dynamic>>[];
+      case PreviousInputs.includeSession:
+      default:
+        return List<Map<String, dynamic>>.from(_sessionHistory);
+    }
+  }
+
+  /// For debugging/inspection
+  List<Map<String, dynamic>> get allHistory => List.unmodifiable(_allHistory);
+  List<Map<String, dynamic>> get sessionHistory =>
+      List.unmodifiable(_sessionHistory);
 }

@@ -1,4 +1,6 @@
-class ErrorResponse {
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+
+class ErrorResponse implements ChatResponse {
   final String type;
   final String message;
 
