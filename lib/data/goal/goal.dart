@@ -9,6 +9,7 @@ class Goal {
   final int order;
   final bool optional;
   final List<String> suggestions;
+  final List<String> knownConcepts;
 
   // Constructor
   Goal({
@@ -19,6 +20,7 @@ class Goal {
     required this.order,
     this.optional = false,
     this.suggestions = const [],
+    this.knownConcepts = const [],
   });
 
   // Create a Goal from a Firestore document.
@@ -32,6 +34,7 @@ class Goal {
       order: d['order'] ?? 0,
       optional: d['optional'] ?? false,
       suggestions: List<String>.from(d['suggestions'] ?? []),
+      knownConcepts: List<String>.from(d['knownConcepts'] ?? []),
     );
   }
 
@@ -43,5 +46,6 @@ class Goal {
     'order': order,
     'optional': optional,
     'suggestions': suggestions,
+    'knownConcepts': knownConcepts,
   };
 }

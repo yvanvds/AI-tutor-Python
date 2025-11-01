@@ -30,7 +30,7 @@ class TutorService {
   TutorService({required this.ref}) {
     _connector = OpenaiConnector(ref: ref);
   }
-
+  bool _initialized = false;
   Goal? _currentRootGoal;
   Goal? _currentChildGoal;
 
@@ -44,6 +44,8 @@ class TutorService {
   // ---- Public API -----------------------------------------------------------
 
   Future<void> initializeSession() async {
+    if (_initialized) return;
+    _initialized = true;
     final chat = ref.read(chatServiceProvider);
 
     chat.clear();
@@ -188,6 +190,7 @@ class TutorService {
 
       if (exercise.code != null) {
         // Update code provider
+        print("We got code:\n ${exercise.code}");
         ref.read(codeProvider.notifier).state = exercise.code!;
       }
 
@@ -299,7 +302,7 @@ class TutorService {
       chat.addSystemMessage(error.toJson().toString());
 
       // resend the request
-      final result = await _connector.resendRequest();
+      final result = await _resendLastRequest();
       _handleResponse(result);
     } else {
       if (parsed is String) {
@@ -308,9 +311,23 @@ class TutorService {
         chat.addTutorMessage('Received unknown response from tutor.');
       }
       // resend the request
-      final result = await _connector.resendRequest();
+      final result = await _resendLastRequest();
       _handleResponse(result);
     }
+  }
+
+  Future<dynamic> _resendLastRequest() async {
+    final working = ref.read(tutorWorkingProvider.notifier);
+    if (working.state) return;
+    working.state = true;
+    dynamic result;
+    try {
+      result = await _connector.resendRequest();
+    } finally {
+      working.state = false;
+    }
+
+    return result;
   }
 
   Future<void> _evaluateProgress({
@@ -422,6 +439,8 @@ class TutorService {
         Progress(goalID: _currentChildGoal!.id, progress: newProgress),
       ).future,
     );
+
+    ref.invalidate(progressByGoalProviderFuture);
 
     if (_currentRootGoal == null) return;
 

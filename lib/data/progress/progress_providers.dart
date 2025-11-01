@@ -9,7 +9,9 @@ final progressRepositoryProvider = Provider<ProgressRepository>((ref) {
 });
 
 /// Load all progress once (e.g., for initial decision logic in your Tutor).
-final progressListProviderFuture = FutureProvider<List<Progress>>((ref) async {
+final progressListProviderFuture = FutureProvider.autoDispose<List<Progress>>((
+  ref,
+) async {
   final repo = ref.read(progressRepositoryProvider);
   return repo.getAll();
 });
@@ -21,13 +23,11 @@ final progressListProviderStream = StreamProvider<List<Progress>>((ref) {
 });
 
 /// Get a single goal’s progress once.
-final progressByGoalProviderFuture = FutureProvider.family<Progress?, String>((
-  ref,
-  goalID,
-) {
-  final repo = ref.read(progressRepositoryProvider);
-  return repo.getByGoalId(goalID);
-});
+final progressByGoalProviderFuture = FutureProvider.autoDispose
+    .family<Progress?, String>((ref, goalID) {
+      final repo = ref.read(progressRepositoryProvider);
+      return repo.getByGoalId(goalID);
+    });
 
 /// Upsert (create or update) a Progress doc.
 final upsertProgressProviderFuture = FutureProvider.family<void, Progress>((

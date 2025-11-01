@@ -44,7 +44,7 @@ class AIResponseParser {
     } else {
       final raw = extractFirstTextString(jsonInput);
       if (raw == null) {
-        return 'We got no answer'; // truly missing content
+        return "No connection. I'll try again."; // truly missing content
       } else {
         return raw;
       }

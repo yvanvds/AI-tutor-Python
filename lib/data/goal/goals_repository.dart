@@ -81,6 +81,9 @@ class GoalsRepository {
   Future<void> updateSuggestions(String id, List<String> suggestions) =>
       _collection.doc(id).update({'suggestions': suggestions});
 
+  Future<void> updateKnownConcepts(String id, List<String> knownConcepts) =>
+      _collection.doc(id).update({'knownConcepts': knownConcepts});
+
   /// Change the parent of a goal.
   Future<void> reparent(String id, String? newParentId) async {
     // place at end of new parent's list (or roots)

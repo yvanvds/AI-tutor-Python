@@ -24,13 +24,12 @@ final instructionProviderStream = StreamProvider.family<Instruction?, String>((
 });
 
 /// One-shot fetch helpers (optional)
-final instructionsListProviderFuture = FutureProvider<List<Instruction>>((ref) {
-  return ref.watch(instructionsRepositoryProvider).getAll();
-});
+final instructionsListProviderFuture =
+    FutureProvider.autoDispose<List<Instruction>>((ref) {
+      return ref.watch(instructionsRepositoryProvider).getAll();
+    });
 
-final instructionFutureProvider = FutureProvider.family<Instruction?, String>((
-  ref,
-  id,
-) {
-  return ref.watch(instructionsRepositoryProvider).getById(id);
-});
+final instructionFutureProvider = FutureProvider.autoDispose
+    .family<Instruction?, String>((ref, id) {
+      return ref.watch(instructionsRepositoryProvider).getById(id);
+    });

@@ -35,14 +35,12 @@ final myAccountProviderStream = StreamProvider<Account?>((ref) {
   return ref.watch(accountRepositoryProvider).watchMyAccount();
 });
 
-final myAccountProviderFuture = FutureProvider<Account?>((ref) {
+final myAccountProviderFuture = FutureProvider.autoDispose<Account?>((ref) {
   return ref.watch(accountRepositoryProvider).getMyAccount();
 });
 
 // Fetch any account by uid once (for lookups in teacher/admin views)
-final accountByUidProviderFuture = FutureProvider.family<Account?, String>((
-  ref,
-  uid,
-) async {
-  return ref.watch(accountRepositoryProvider).getAccount(uid);
-});
+final accountByUidProviderFuture = FutureProvider.autoDispose
+    .family<Account?, String>((ref, uid) async {
+      return ref.watch(accountRepositoryProvider).getAccount(uid);
+    });

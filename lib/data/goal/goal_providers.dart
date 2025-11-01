@@ -49,7 +49,9 @@ final rootGoalsProviderStream = StreamProvider<List<Goal>>((ref) {
 });
 
 // load goals once (e.g., for initial decision logic in your Tutor)
-final rootGoalsProviderFuture = FutureProvider<List<Goal>>((ref) async {
+final rootGoalsProviderFuture = FutureProvider.autoDispose<List<Goal>>((
+  ref,
+) async {
   final repo = ref.watch(goalsRepositoryProvider);
   final roots = await repo.streamRoots().first;
   return roots;
@@ -70,8 +72,8 @@ final childGoalsByParentProviderStream =
     });
 
 // load children once (e.g., for initial decision logic in your Tutor)
-final childGoalsByParentProviderFuture =
-    FutureProvider.family<List<Goal>, String>((ref, parentId) async {
+final childGoalsByParentProviderFuture = FutureProvider.autoDispose
+    .family<List<Goal>, String>((ref, parentId) async {
       final repo = ref.watch(goalsRepositoryProvider);
       final children = await repo.streamChildren(parentId).first;
       return children;
