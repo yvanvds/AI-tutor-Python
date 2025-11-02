@@ -15,7 +15,14 @@ class InstructionGenerator {
     Goal subGoal,
   ) async {
     // Implementation for generating instruction using OpenAI or other services
-    final instructions = await ref.read(instructionsListProviderFuture.future);
+    final repo = ref.read(instructionsRepositoryProvider);
+    final instructions = await repo.getAll();
+
+    // get local goal data to make sure it is up to date
+    final goalsRepo = ref.read(goalsRepositoryProvider);
+    final localGoal = await goalsRepo.streamGoal(goal.id).first;
+    final localSubGoal = await goalsRepo.streamGoal(subGoal.id).first;
+
     final knownConcepts = await _getMasteredConcepts();
 
     final typeString = _chatRequestTypeToString(type);
@@ -27,8 +34,8 @@ class InstructionGenerator {
         for (var content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            goal,
-            subGoal,
+            localGoal ?? goal,
+            localSubGoal ?? subGoal,
             knownConcepts,
           );
           output += "$processed\n";
@@ -49,7 +56,8 @@ class InstructionGenerator {
 
     // add the stuff we always want to include
     output += alwaysInclude;
-
+    print("Our instructions:");
+    print(output);
     return output;
   }
 

@@ -29,6 +29,15 @@ final progressByGoalProviderFuture = FutureProvider.autoDispose
       return repo.getByGoalId(goalID);
     });
 
+// Live progress for a single goal (stream)
+final progressByGoalProvider = StreamProvider.family<Progress?, String>((
+  ref,
+  goalID,
+) {
+  final repo = ref.read(progressRepositoryProvider);
+  return repo.streamByGoalId(goalID); // implement in your repo if missing
+});
+
 /// Upsert (create or update) a Progress doc.
 final upsertProgressProviderFuture = FutureProvider.family<void, Progress>((
   ref,

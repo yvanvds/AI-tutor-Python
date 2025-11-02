@@ -17,34 +17,46 @@ class Editor extends ConsumerStatefulWidget {
 
 class _EditorState extends ConsumerState<Editor> {
   late CodeController _controller;
-
-  // Prevent feedback loop when we programmatically set the text
-  bool _settingFromProvider = false;
+  late final ProviderSubscription<String> _codeSub;
 
   @override
   void initState() {
     super.initState();
-
-    final initial = ref.read(codeProvider);
-    _controller = CodeController(text: initial, language: python);
+    _controller = CodeController(
+      text: ref.read(codeProvider), // seed once
+      language: python, // your syntax
+    );
 
     // Keep the EditorController in sync
     widget.controller.bind(getValue: () => _controller.fullText);
+
+    // Provider → Controller (when codeProvider changes elsewhere)
+    _codeSub = ref.listenManual<String>(codeProvider, (prev, next) {
+      if (_controller.text != next) {
+        _controller.value = TextEditingValue(text: next);
+      }
+    }, fireImmediately: false);
+
+    // Controller → Provider (user types)
+    // _controller.addListener(() {
+    //   final current = ref.read(codeProvider);
+    //   final text = _controller.text;
+    //   if (current != text) {
+    //     ref.read(codeProvider.notifier).state = text; // or .set(text)
+    //   }
+    // });
   }
 
   @override
   void dispose() {
+    _codeSub.close();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final code = ref.watch(codeProvider);
-    _controller.value = TextEditingValue(
-      text: code,
-      selection: TextSelection.collapsed(offset: -1),
-    );
+    ref.watch(codeProvider);
 
     return CodeTheme(
       data: CodeThemeData(styles: monokaiSublimeTheme),

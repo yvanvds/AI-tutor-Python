@@ -2,6 +2,7 @@ import 'package:ai_tutor_python/data/account/account_providers.dart';
 import 'package:ai_tutor_python/data/role/role_provider.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
+import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -79,7 +80,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(titleText),
+        titleSpacing: 12,
+        title: Row(
+          children: [
+            // Left: welcome text
+            Flexible(
+              flex: 2,
+              child: Text(titleText, overflow: TextOverflow.ellipsis),
+            ),
+            // Middle: goal/subgoal/progress
+            Expanded(flex: 3, child: Center(child: const GoalCrumbInAppBar())),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Sign out',
@@ -88,6 +100,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ],
       ),
+
       body: Row(
         children: [
           NavigationRail(

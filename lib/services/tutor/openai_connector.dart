@@ -37,9 +37,20 @@ class OpenaiConnector {
     final cfg = await ref.read(globalConfigFutureProvider.future);
     final model = (cfg?.model.isNotEmpty ?? false) ? cfg!.model : 'gpt-4o';
 
+    if (inputs == PreviousInputs.newSession) {
+      // clear session history for this one-off fresh session
+      _sessionHistory.clear();
+    }
     // Build a working copy of history and append THIS user turn
     final workingHistory = _historyFor(inputs)
       ..add({"role": "user", "content": input});
+
+    assert(() {
+      print(const JsonEncoder.withIndent('  ').convert(workingHistory));
+      return true;
+    }());
+
+    OpenAI.requestsTimeOut = Duration(seconds: 60);
 
     try {
       final response = await OpenAI.instance.responses.create(

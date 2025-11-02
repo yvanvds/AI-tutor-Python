@@ -86,3 +86,9 @@ final editingGoalProviderStream = StreamProvider<Goal?>((ref) {
   final repo = ref.watch(goalsRepositoryProvider);
   return repo.streamGoal(id); // ← direct single-doc stream
 });
+
+// If you don’t already have a by-id stream, add this:
+final goalByIdProvider = StreamProvider.family<Goal?, String>((ref, id) {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.streamGoal(id); // implement in your repo if missing
+});

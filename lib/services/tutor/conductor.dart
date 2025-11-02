@@ -5,7 +5,6 @@ import 'package:ai_tutor_python/data/goal/goal.dart';
 import 'package:ai_tutor_python/data/goal/goal_providers.dart';
 import 'package:ai_tutor_python/data/progress/progress.dart';
 import 'package:ai_tutor_python/data/progress/progress_providers.dart';
-import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dart:math';
@@ -91,13 +90,13 @@ class Conductor {
     double baseDelta;
     switch (quality) {
       case AnswerQuality.wrong:
-        baseDelta = -0.03; // small setback for wrong answers
+        baseDelta = -0.05; // small setback for wrong answers
         break;
       case AnswerQuality.partial: // (typo kept to match your enum)
-        baseDelta = 0.03; // small gain for partial
+        baseDelta = 0.07; // small gain for partial
         break;
       case AnswerQuality.correct:
-        baseDelta = 0.07; // modest gain for correct
+        baseDelta = 0.14; // modest gain for correct
         break;
     }
 
@@ -106,13 +105,13 @@ class Conductor {
     double typeMult;
     switch (_currentQuestionType) {
       case ChatRequestType.mcQuestion:
-        typeMult = 0.6;
+        typeMult = 0.7;
         break;
       case ChatRequestType.explainCodeQuestion:
-        typeMult = 0.8;
+        typeMult = 0.9;
         break;
       case ChatRequestType.completeCodeQuestion:
-        typeMult = 1.0;
+        typeMult = 1.2;
         break;
       case ChatRequestType.socraticQuestion:
       case ChatRequestType.writeCodeQuestion:
@@ -135,7 +134,7 @@ class Conductor {
         diffMult = 1.0;
         break;
       case QuestionDifficulty.hard:
-        diffMult = 1.3;
+        diffMult = 1.5;
         break;
     }
 
@@ -218,6 +217,11 @@ class Conductor {
       }
     }
 
+    // limit the follow-up allowance
+    final chance = _rand.nextDouble();
+    if (chance < 0.35) {
+      followUpAllowed = false;
+    }
     return followUpAllowed;
   }
 

@@ -42,6 +42,14 @@ class ProgressRepository {
     return Progress.fromDoc(doc);
   }
 
+  // stream a single goal's progress
+  Stream<Progress?> streamByGoalId(String goalID) {
+    return _col(_uid).doc(goalID).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return Progress.fromDoc(doc);
+    });
+  }
+
   /// Create or update a progress doc.
   ///
   /// Uses goalID as the document id, so writes are idempotent.

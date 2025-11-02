@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
@@ -10,7 +12,6 @@ import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
-import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
@@ -181,10 +182,10 @@ class TutorService {
   }
 
   Future<void> submitCode(String code) async {
-    if (_currentExerciseType == 'complete_code' ||
-        _currentExerciseType == 'write_code') {
-      await queryTutor(type: ChatRequestType.submitCode, code: code);
-    }
+    //if (_currentExerciseType == 'complete_code' ||
+    //    _currentExerciseType == 'write_code') {
+    await queryTutor(type: ChatRequestType.submitCode, code: code);
+    //}
   }
 
   Future<void> requestExercise() async {
@@ -210,6 +211,13 @@ class TutorService {
       response,
     ); // returns Exercise | Answer | ...
 
+    assert(() {
+      print("We got a response: ${parsed.type}");
+      print(const JsonEncoder.withIndent('  ').convert(parsed.toJson()));
+      return true;
+    }());
+    _connector.addResponse(parsed);
+
     final chat = ref.read(chatServiceProvider);
 
     if (parsed is CompleteCode) {
@@ -219,35 +227,40 @@ class TutorService {
       CompleteCode exercise = parsed;
 
       // Update code provider
-      print("We got code:\n ${exercise.code}");
-      ref.read(codeProvider.notifier).state = exercise.code!;
+      ref.read(codeProvider.notifier).state = exercise.code;
       chat.addTutorMessage(exercise.prompt);
     } else if (parsed is ExplainCode) {
       //
       // The AI has sent Code to Explain
       //
       ExplainCode exercise = parsed;
-
-      print("We got code:\n ${exercise.code}");
-      ref.read(codeProvider.notifier).state = exercise.code!;
+      _currentExerciseType = exercise.type;
+      ref.read(codeProvider.notifier).state = exercise.code;
       chat.addTutorMessage(exercise.prompt);
     } else if (parsed is WriteCode) {
       //
       // The AI has sent instructions to write code
       //
       WriteCode exercise = parsed;
+      _currentExerciseType = exercise.type;
+      ref.read(codeProvider.notifier).state =
+          '# Start writing your code here\n';
       chat.addTutorMessage(exercise.prompt);
     } else if (parsed is SocraticQuestion) {
       //
       // The AI has sent a socratic question
       //
       SocraticQuestion exercise = parsed;
+      _currentExerciseType = exercise.type;
+      ref.read(codeProvider.notifier).state = '';
       chat.addTutorMessage(exercise.prompt);
     } else if (parsed is MultipleChoice) {
       //
       // the AI has sent a multiple choice question
       //
       MultipleChoice exercise = parsed;
+      _currentExerciseType = exercise.type;
+      ref.read(codeProvider.notifier).state = exercise.code;
       chat.addTutorMessage(exercise.prompt);
       for (final option in exercise.options) {
         chat.addTutorMessage(option);
@@ -333,7 +346,7 @@ class TutorService {
       await _updateReport(status.summary);
     } else if (parsed is ErrorResponse) {
       ErrorResponse error = parsed;
-      chat.addSystemMessage(error.toJson().toString());
+      chat.addSystemMessage(error.message);
 
       // resend the request
       final result = await _resendLastRequest();

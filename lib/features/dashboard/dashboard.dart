@@ -74,7 +74,8 @@ class _DashboardState extends ConsumerState<Dashboard> {
                               },
                               onHintPressed: () async {
                                 final tutor = ref.read(tutorServiceProvider);
-                                await tutor.requestHint();
+                                final code = await _editorCtrl.getCode();
+                                await tutor.requestHint(code);
                               },
                               onSubmitPressed: () async {
                                 final tutor = ref.read(tutorServiceProvider);
