@@ -1,7 +1,6 @@
 import 'package:ai_tutor_python/data/code/code_provider.dart';
 import 'package:ai_tutor_python/features/dashboard/editor_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:highlight/languages/python.dart';

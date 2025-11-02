@@ -1,5 +1,4 @@
 import 'package:ai_tutor_python/data/config/local_api_key_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'global_config.dart';
 import 'global_config_repository.dart';

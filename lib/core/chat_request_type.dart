@@ -1,4 +1,6 @@
 enum ChatRequestType {
+  guidingQuestion,
+  guidingAnswer,
   socraticQuestion,
   mcQuestion,
   explainCodeQuestion,

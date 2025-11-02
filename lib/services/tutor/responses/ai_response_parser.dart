@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:ai_tutor_python/core/chat_response_type.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 
@@ -9,10 +8,6 @@ class AIResponseParser {
   static ChatResponse parse(dynamic jsonInput) {
     final textMap = extractFirstJsonMap(jsonInput);
     if (textMap != null) {
-      final ChatResponseType t = _stringToType(
-        textMap['type']?.toString() ?? '',
-      );
-
       return ChatResponseFactory.fromMap(textMap);
     } else {
       final raw = extractFirstTextString(jsonInput);
@@ -27,45 +22,6 @@ class AIResponseParser {
           message: "Unable to parse response: $raw",
         ); // unparsable content
       }
-    }
-  }
-
-  // ---------- helpers ----------
-
-  static ChatResponseType _stringToType(String value) {
-    switch (value) {
-      // --- Exercise types ---
-      case 'socratic_question':
-        return ChatResponseType.socraticQuestion;
-      case 'multiple_choice':
-        return ChatResponseType.multipleChoice;
-      case 'explain_code':
-        return ChatResponseType.explainCode;
-      case 'complete_code':
-        return ChatResponseType.completeCode;
-      case 'write_code':
-        return ChatResponseType.writeCode;
-
-      // --- Feedback and system types ---
-      case 'answer':
-        return ChatResponseType.answer;
-      case 'hint':
-        return ChatResponseType.hint;
-      case 'code_feedback':
-        return ChatResponseType.codeFeedback;
-      case 'mcq_feedback':
-        return ChatResponseType.mcqFeedback;
-      case 'explain_feedback':
-        return ChatResponseType.explainFeedback;
-      case 'socratic_feedback':
-        return ChatResponseType.socraticFeedback;
-      case 'status_summary':
-        return ChatResponseType.statusSummary;
-      case 'error':
-        return ChatResponseType.error;
-
-      default:
-        throw FormatException('Unknown response type: $value');
     }
   }
 

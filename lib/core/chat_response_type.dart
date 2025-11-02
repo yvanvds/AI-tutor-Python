@@ -13,6 +13,7 @@ enum ChatResponseType {
   mcqFeedback,
   explainFeedback,
   socraticFeedback,
+  guidingFeedback,
   statusSummary,
   error,
 }
