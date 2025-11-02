@@ -122,9 +122,7 @@ class _InstructionsEditorPageState
       _refreshEditorFromSelection();
     });
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Document deleted')));
+      _showSnackBar(context, 'Document deleted');
     }
   }
 
@@ -137,9 +135,7 @@ class _InstructionsEditorPageState
       _original = toSave;
     });
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Saved')));
+      _showSnackBar(context, 'Saved');
     }
   }
 
@@ -156,9 +152,7 @@ class _InstructionsEditorPageState
 
     if (_workingSections.containsKey(k)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Section “$k” already exists')));
+      _showSnackBar(context, 'Section “$k” already exists');
       return;
     }
 
@@ -334,9 +328,7 @@ class _InstructionsEditorPageState
       _original = data;
     });
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Renamed to “$target”')));
+      _showSnackBar(context, 'Renamed to “$target”');
     }
   }
 
@@ -426,6 +418,12 @@ Future<bool?> _confirm(BuildContext context, String title, String body) async {
         ],
       );
     },
+  );
+}
+
+void _showSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
   );
 }
 

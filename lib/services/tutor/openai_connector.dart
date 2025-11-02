@@ -107,16 +107,13 @@ class OpenaiConnector {
 
   /// Build a working copy of the history based on the requested scope.
   List<Map<String, dynamic>> _historyFor(PreviousInputs scope) {
-    switch (scope) {
-      case PreviousInputs.includeAll:
-        return List<Map<String, dynamic>>.from(_allHistory);
-      case PreviousInputs.newSession:
-        // caller wants a fresh session for this call only
-        return <Map<String, dynamic>>[];
-      case PreviousInputs.includeSession:
-      default:
-        return List<Map<String, dynamic>>.from(_sessionHistory);
-    }
+    return List<Map<String, dynamic>>.from(
+      scope == PreviousInputs.includeAll
+          ? _allHistory
+          : scope == PreviousInputs.includeSession
+              ? _sessionHistory
+              : <Map<String, dynamic>>[],
+    );
   }
 
   /// For debugging/inspection

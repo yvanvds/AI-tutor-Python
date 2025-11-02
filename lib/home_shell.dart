@@ -67,13 +67,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (_selectedIndex > maxIndex) _selectedIndex = 0;
 
     // Pick the current page
-    Widget page;
-    if (_selectedIndex == 0) {
-      page = const Dashboard();
-    } else if (_selectedIndex == 1 && isTeacher) {
+    final Widget page;
+    if (isTeacher && _selectedIndex == 1) {
       page = const GoalsPage();
-    } else if (_selectedIndex == 2 && isTeacher) {
+    } else if (isTeacher && _selectedIndex == 2) {
       page = const InstructionsEditorPage();
+    } else if (_selectedIndex == 0) {
+      page = const Dashboard();
     } else {
       page = const Center(child: Text('Page not found'));
     }
