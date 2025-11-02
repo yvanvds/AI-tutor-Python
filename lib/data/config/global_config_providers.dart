@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/data/config/local_api_key_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'global_config.dart';
@@ -33,4 +34,9 @@ final apiKeyProvider = Provider<String?>((ref) {
       .watch(globalConfigFutureProvider)
       .maybeWhen(data: (c) => c, orElse: () => null);
   return cfg?.apiKey;
+});
+
+/// One-shot check: does a local API key exist?
+final localApiKeyExistsProvider = FutureProvider<bool>((ref) async {
+  return await LocalApiKeyStorage.hasKey();
 });
