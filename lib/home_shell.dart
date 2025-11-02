@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/data/account/account_providers.dart';
 import 'package:ai_tutor_python/data/role/role_provider.dart';
+import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
@@ -60,6 +61,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           selectedIcon: Icon(Icons.integration_instructions),
           label: Text('Instructions'),
         ),
+      if (isTeacher)
+        const NavigationRailDestination(
+          icon: Icon(Icons.account_circle_outlined),
+          selectedIcon: Icon(Icons.account_circle),
+          label: Text('Accounts'),
+        ),
     ];
 
     // Clamp index if teacher flag changes (e.g., on first load)
@@ -74,6 +81,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       page = const GoalsPage();
     } else if (_selectedIndex == 2 && isTeacher) {
       page = const InstructionsEditorPage();
+    } else if (_selectedIndex == 3 && isTeacher) {
+      page = const AccountsPage();
     } else {
       page = const Center(child: Text('Page not found'));
     }

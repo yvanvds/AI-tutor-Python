@@ -39,6 +39,7 @@ class AccountRepository {
         'firstName': firstName,
         'lastName': lastName,
         'email': email,
+        'mayUseGlobalKey': false, // default off
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -89,6 +90,58 @@ class AccountRepository {
       if (user == null) return Stream<Account?>.value(null);
       return watchAccount(user.uid);
     });
+  }
+
+  /// Watch just the `mayUseGlobalKey` flag for a given uid.
+  /// Missing doc/field => false.
+  Stream<bool> watchMayUseGlobalKey(String uid) {
+    return _doc(uid).snapshots().map((doc) {
+      final data = doc.data();
+      if (data == null) return false;
+      final v = data['mayUseGlobalKey'];
+      return v is bool ? v : false;
+    });
+  }
+
+  /// Watch the signed-in user's flag (emits false when signed out or missing).
+  Stream<bool> watchMyMayUseGlobalKey() {
+    return _auth.authStateChanges().switchMap((user) {
+      if (user == null) return Stream<bool>.value(false);
+      return watchMayUseGlobalKey(user.uid);
+    });
+  }
+
+  /// Toggle/assign the `mayUseGlobalKey` flag (for teacher UI).
+  Future<void> setMayUseGlobalKey({
+    required String uid,
+    required bool value,
+  }) async {
+    await _doc(uid).set({
+      'mayUseGlobalKey': value,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Stream all accounts, ordered by creation time (newest first).
+  Stream<List<Account>> streamAllAccounts() {
+    // If createdAt may be null in older docs, also add a secondary orderBy to avoid errors.
+    return _col
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((qs) => qs.docs.map(Account.fromDoc).toList());
+  }
+
+  /// Fetch all accounts once (for on-demand loads).
+  Future<List<Account>> getAllAccounts() async {
+    final qs = await _col.orderBy('createdAt', descending: true).get();
+    return qs.docs.map(Account.fromDoc).toList();
+  }
+
+  /// Delete a single account document.
+  /// NOTE: This deletes the *profile doc* in Firestore, not the FirebaseAuth user.
+  /// If your accounts have subcollections (e.g., progress), consider cascading delete with Cloud Functions.
+  Future<void> deleteAccountDoc(String uid) async {
+    await _doc(uid).delete();
   }
 }
 

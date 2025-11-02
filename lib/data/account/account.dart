@@ -5,6 +5,7 @@ class Account {
   final String email;
   final String firstName;
   final String lastName;
+  final bool mayUseGlobalKey;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
 
@@ -13,6 +14,7 @@ class Account {
     required this.email,
     required this.firstName,
     required this.lastName,
+    this.mayUseGlobalKey = false, // default to false for safety/back-compat
     this.createdAt,
     this.updatedAt,
   });
@@ -20,12 +22,16 @@ class Account {
   String get displayFirstName => firstName;
   String get fullName => '$firstName $lastName';
 
+  /// Convenience for your routing logic.
+  bool get requiresLocalKey => !mayUseGlobalKey;
+
   Map<String, dynamic> toMap({bool includeTimestamps = true}) {
     final map = <String, dynamic>{
       'uid': uid,
       'email': email,
       'firstName': firstName,
       'lastName': lastName,
+      'mayUseGlobalKey': mayUseGlobalKey, // NEW
     };
     if (includeTimestamps) {
       map['updatedAt'] = FieldValue.serverTimestamp();
@@ -40,6 +46,7 @@ class Account {
       email: data['email'] as String? ?? '',
       firstName: data['firstName'] as String? ?? '',
       lastName: data['lastName'] as String? ?? '',
+      mayUseGlobalKey: (data['mayUseGlobalKey'] as bool?) ?? false, // NEW
       createdAt: data['createdAt'] as Timestamp?,
       updatedAt: data['updatedAt'] as Timestamp?,
     );
@@ -57,6 +64,7 @@ class Account {
     String? email,
     String? firstName,
     String? lastName,
+    bool? mayUseGlobalKey,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) {
@@ -65,6 +73,7 @@ class Account {
       email: email ?? this.email,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
+      mayUseGlobalKey: mayUseGlobalKey ?? this.mayUseGlobalKey,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
