@@ -18,6 +18,8 @@ import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/guiding_exercise.dart';
+import 'package:ai_tutor_python/services/tutor/responses/guiding_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
@@ -25,6 +27,7 @@ import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart'
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
 import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
+import 'package:highlight/languages/elixir.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class TutorService {
@@ -91,11 +94,17 @@ class TutorService {
       case ChatRequestType.writeCodeQuestion:
         // All question types with difficulty parameter start a new session
         input = switch (type) {
-          ChatRequestType.socraticQuestion => QuestionFormatter.socraticQuestion(difficulty!),
-          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(difficulty!),
-          ChatRequestType.explainCodeQuestion => QuestionFormatter.explainCodeQuestion(difficulty!),
-          ChatRequestType.completeCodeQuestion => QuestionFormatter.completeCodeQuestion(difficulty!),
-          ChatRequestType.writeCodeQuestion => QuestionFormatter.writeCodeQuestion(difficulty!),
+          ChatRequestType.socraticQuestion =>
+            QuestionFormatter.socraticQuestion(difficulty!),
+          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
+            difficulty!,
+          ),
+          ChatRequestType.explainCodeQuestion =>
+            QuestionFormatter.explainCodeQuestion(difficulty!),
+          ChatRequestType.completeCodeQuestion =>
+            QuestionFormatter.completeCodeQuestion(difficulty!),
+          ChatRequestType.writeCodeQuestion =>
+            QuestionFormatter.writeCodeQuestion(difficulty!),
           _ => "", // unreachable
         };
         includeHistory = PreviousInputs.newSession;
@@ -131,6 +140,19 @@ class TutorService {
         input = QuestionFormatter.socraticFeedback(prompt);
         break;
 
+      case ChatRequestType.guidingQuestion:
+        input = QuestionFormatter.guidingQuestion();
+        includeHistory = PreviousInputs.newSession;
+        break;
+
+      case ChatRequestType.guidingAnswer:
+        if (prompt == null) return;
+        input = QuestionFormatter.guidingAnswer(
+          prompt,
+          _conductor.getGuidingUnderstanding(),
+        );
+        break;
+
       case ChatRequestType.status:
         input = QuestionFormatter.status();
         includeHistory = PreviousInputs.includeAll;
@@ -162,6 +184,9 @@ class TutorService {
       await queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
     } else if (_currentExerciseType == 'explain_code') {
       await queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
+    } else if (_currentExerciseType == 'guiding_feedback' ||
+        _currentExerciseType == 'guiding_exercise') {
+      await queryTutor(type: ChatRequestType.guidingAnswer, prompt: message);
     } else {
       await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
@@ -199,8 +224,8 @@ class TutorService {
     ); // returns Exercise | Answer | ...
 
     assert(() {
-      print("We got a response: ${parsed.type}");
-      print(const JsonEncoder.withIndent('  ').convert(parsed.toJson()));
+      // print("We got a response: ${parsed.type}");
+      // print(const JsonEncoder.withIndent('  ').convert(parsed.toJson()));
       return true;
     }());
     _connector.addResponse(parsed);
@@ -245,6 +270,34 @@ class TutorService {
       for (final option in parsed.options) {
         chat.addTutorMessage(option);
       }
+    } else if (parsed is GuidingExcercise) {
+      //
+      // The AI has sent a guiding question
+      //
+      _currentExerciseType = parsed.type;
+      ref.read(codeProvider.notifier).state = parsed.code;
+      chat.addTutorMessage(parsed.prompt);
+    } else if (parsed is GuidingFeedback) {
+      //
+      // The AI has sent feedback on a guiding answer
+      //
+      if (parsed.feedback.isNotEmpty) {
+        chat.addTutorMessage(parsed.feedback);
+      }
+
+      bool guidingComplete = await _conductor.guidingIsComplete(
+        parsed.understanding,
+      );
+      if (!guidingComplete) {
+        if (parsed.prompt.isNotEmpty) {
+          chat.addTutorMessage(parsed.prompt);
+        }
+        if (parsed.code.isNotEmpty) {
+          ref.read(codeProvider.notifier).state = parsed.code;
+        }
+      } else {
+        await requestExercise();
+      }
     } else if (parsed is Answer) {
       //
       // The AI answered a generic question
@@ -264,9 +317,7 @@ class TutorService {
       //
       if (parsed.summary.isNotEmpty) chat.addTutorMessage(parsed.summary);
 
-      final suggestionAllowed = await _conductor.updateProgress(
-        parsed.quality,
-      );
+      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
         chat.addTutorMessage(parsed.suggestion);
       } else {
@@ -288,9 +339,7 @@ class TutorService {
         chat.addTutorMessage(parsed.feedback);
       }
 
-      final suggestionAllowed = await _conductor.updateProgress(
-        parsed.quality,
-      );
+      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
         chat.addTutorMessage(parsed.followUp!);
       } else {
@@ -304,9 +353,7 @@ class TutorService {
         chat.addTutorMessage(parsed.feedback);
       }
 
-      final suggestionAllowed = await _conductor.updateProgress(
-        parsed.quality,
-      );
+      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
         chat.addTutorMessage(parsed.followUp!);
       } else {

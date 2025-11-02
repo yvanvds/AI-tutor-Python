@@ -5,6 +5,7 @@ enum ChatResponseType {
   explainCode,
   completeCode,
   writeCode,
+  guidingExercise,
 
   // Feedback and system types
   answer,

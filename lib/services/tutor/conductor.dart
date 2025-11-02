@@ -19,6 +19,8 @@ class Conductor {
   Goal? currentChildGoal;
 
   double _currentProgress = 0.0;
+  double _guidingUnderstanding = 0.0; // used to move on from guiding questions
+
   QuestionDifficulty _difficulty = QuestionDifficulty.easy;
   int _hintsUsed = 0;
   List<AnswerQuality> _answerHistory = [];
@@ -40,7 +42,9 @@ class Conductor {
 
     // Step 1: choose candidate pool based on progress band
     final List<ChatRequestType> candidates;
-    if (_currentProgress < 0.3) {
+    if (_currentProgress < 0.2) {
+      candidates = const [ChatRequestType.guidingQuestion];
+    } else if (_currentProgress < 0.4) {
       candidates = const [
         ChatRequestType.mcQuestion,
         ChatRequestType.explainCodeQuestion,
@@ -74,6 +78,26 @@ class Conductor {
     return (pick, _difficulty);
   }
 
+  double getGuidingUnderstanding() {
+    return _guidingUnderstanding;
+  }
+
+  Future<bool> guidingIsComplete(double understanding) async {
+    _guidingUnderstanding += understanding;
+
+    // updating progress here is just to give the student
+    // an indication that something progresses
+    // We divide the max value (1) by 5 so we can never get above 0.2 at this point
+    _currentProgress = _guidingUnderstanding / 5;
+    await _updateProgress(_currentProgress);
+    print('Updated guiding understanding: $_guidingUnderstanding');
+    if (_guidingUnderstanding >= 0.8) {
+      _currentProgress = 0.2;
+      return true;
+    }
+    return false;
+  }
+
   Future<bool> updateProgress(AnswerQuality quality) async {
     bool followUpAllowed = true; // we return this value if we allow follow-ups
 
@@ -90,7 +114,8 @@ class Conductor {
       ChatRequestType.mcQuestion => 0.7,
       ChatRequestType.explainCodeQuestion => 0.9,
       ChatRequestType.completeCodeQuestion => 1.2,
-      ChatRequestType.socraticQuestion || ChatRequestType.writeCodeQuestion => 1.4,
+      ChatRequestType.socraticQuestion ||
+      ChatRequestType.writeCodeQuestion => 1.4,
       _ => 1.0, // Non-exercise interactions: keep neutral weight
     };
 

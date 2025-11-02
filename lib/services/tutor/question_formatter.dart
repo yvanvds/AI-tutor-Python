@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 
 class QuestionFormatter {
-  static String _encodeRequest(String requestType, {QuestionDifficulty? difficulty, Map<String, dynamic>? additionalFields}) {
+  static String _encodeRequest(
+    String requestType, {
+    QuestionDifficulty? difficulty,
+    Map<String, dynamic>? additionalFields,
+  }) {
     final request = <String, dynamic>{"request_type": requestType};
     if (difficulty != null) {
       request["difficulty"] = difficulty.toString().split('.').last;
@@ -29,14 +33,24 @@ class QuestionFormatter {
   static String writeCodeQuestion(QuestionDifficulty difficulty) =>
       _encodeRequest("write_code", difficulty: difficulty);
 
-  static String requestHint(String currentCode) =>
-      _encodeRequest("request_hint", additionalFields: {"current_code": currentCode});
+  static String requestHint(String currentCode) => _encodeRequest(
+    "request_hint",
+    additionalFields: {"current_code": currentCode},
+  );
 
   static String studentQuestion(String question, String? code) =>
-      _encodeRequest("student_question", additionalFields: {
-        "question": question,
-        "code": code ?? "",
-      });
+      _encodeRequest(
+        "student_question",
+        additionalFields: {"question": question, "code": code ?? ""},
+      );
+
+  static String guidingQuestion() => _encodeRequest("guiding_question");
+
+  static String guidingAnswer(String answer, double understanding) =>
+      _encodeRequest(
+        "guiding_answer",
+        additionalFields: {"answer": answer, "understanding": understanding},
+      );
 
   static String explainAnswer(String answer) =>
       _encodeRequest("explain_answer", additionalFields: {"answer": answer});
