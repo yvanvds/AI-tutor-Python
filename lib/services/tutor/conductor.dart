@@ -70,15 +70,6 @@ class Conductor {
       pick = candidates[_rand.nextInt(candidates.length)];
     }
 
-    // Step 4: add light random variation in difficulty
-    // Occasionally (10%) bump or lower difficulty to keep engagement
-    // if (_rand.nextDouble() < 0.1) {
-    //   final change = _rand.nextBool() ? 1 : -1;
-    //   final newIndex = (_difficulty.index + change)
-    //       .clamp(0, Difficulty.values.length - 1);
-    //   _difficulty = Difficulty.values[newIndex];
-    // }
-
     _currentQuestionType = pick;
     return (pick, _difficulty);
   }

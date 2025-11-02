@@ -62,8 +62,6 @@ class TutorService {
       );
       return;
     }
-
-    //queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2, newSession: true);
   }
 
   Future<void> queryTutor({
@@ -174,10 +172,7 @@ class TutorService {
   }
 
   Future<void> submitCode(String code) async {
-    //if (_currentExerciseType == 'complete_code' ||
-    //    _currentExerciseType == 'write_code') {
     await queryTutor(type: ChatRequestType.submitCode, code: code);
-    //}
   }
 
   Future<void> requestExercise() async {
