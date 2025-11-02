@@ -1,0 +1,8 @@
+output: public/
+releases:
+  - name: windows
+    jobs:
+      - name: package-windows-exe
+        package:
+          platform: windows
+          target: exe 

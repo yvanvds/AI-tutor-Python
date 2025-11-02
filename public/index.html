@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Tutor — Python (Installer)</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet" />
+  <meta name="color-scheme" content="dark" />
+  <style>
+    :root{
+      --primary:#f1b3e6; --on-primary:#4c1f48; --primary-container:#663560; --on-primary-container:#ffd7f5;
+      --secondary:#dabfd2; --on-secondary:#3d2b3a; --secondary-container:#554151; --on-secondary-container:#f7daee;
+      --tertiary:#f5b8a7; --on-tertiary:#4c261a; --tertiary-container:#663c2f; --on-tertiary-container:#ffdbd1;
+      --error:#ffb4ab; --on-error:#690005;
+      --surface:#171216; --on-surface:#ecdfe5; --on-surface-variant:#d1c2cb; --outline:#9a8d95; --outline-variant:#4e444b;
+      --surface-bright:#3e373c; --surface-container:#241e22; --surface-container-high:#2f282d; --inverse-primary:#804d79;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:"Exo 2",system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 800px at 10% -10%, rgba(128,77,121,.25), transparent 60%),
+        radial-gradient(1200px 800px at 110% 10%, rgba(102,53,96,.25), transparent 60%),
+        var(--surface);
+      color:var(--on-surface); line-height:1.5;
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    header{
+      display:flex;align-items:center;gap:12px;padding:8px 0 18px;
+      border-bottom:1px solid var(--outline-variant);
+    }
+    .logo{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--tertiary));
+      box-shadow:0 0 0 2px rgba(241,179,230,.15),0 6px 20px rgba(0,0,0,.35)}
+    .title{font-weight:700;letter-spacing:.2px;font-size:1.1rem}
+
+    h1{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.4rem);margin:0 0 12px;font-weight:700}
+    .accent-underline{height:4px;width:160px;border-radius:999px;
+      background:linear-gradient(90deg,var(--primary),var(--tertiary));margin:12px 0 20px;
+      box-shadow:0 2px 20px rgba(241,179,230,.25)}
+    .card{
+      background:linear-gradient(180deg,var(--surface-container),var(--surface-container-high));
+      border:1px solid var(--outline-variant);border-radius:20px;padding:20px;
+      box-shadow:0 10px 40px rgba(0,0,0,.35); margin-top:24px;
+    }
+    .tagline{color:var(--on-surface-variant);margin:0 0 16px}
+    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+    .btn{
+      appearance:none;border:0;padding:14px 18px;border-radius:14px;font-weight:700;text-decoration:none;cursor:pointer;
+      display:inline-flex;align-items:center;gap:10px;transition:transform .04s ease,box-shadow .2s ease,background .2s ease;
+      box-shadow:0 6px 18px rgba(0,0,0,.35), 0 0 0 1px var(--outline-variant) inset; will-change:transform;
+    }
+    .btn:active{transform:translateY(1px) scale(.995)}
+    .btn-primary{color:var(--on-primary);background:linear-gradient(180deg,var(--primary),var(--primary-container))}
+    .btn-primary:hover{box-shadow:0 10px 28px rgba(241,179,230,.35),0 0 0 1px var(--primary) inset}
+    .btn-secondary{color:var(--on-secondary-container);background:linear-gradient(180deg,var(--secondary-container),#3a3338)}
+    .note{margin-top:12px;font-size:.95rem;color:var(--on-surface-variant)}
+    .screenshot{
+      margin-top:20px;border-radius:16px;overflow:hidden;border:1px solid var(--outline-variant);
+      background:var(--surface-bright);box-shadow:0 10px 40px rgba(0,0,0,.4)
+    }
+    .screenshot img{display:block;width:100%;height:auto}
+    .info-grid{display:grid;gap:16px;grid-template-columns:repeat(3,1fr);margin:22px 0 8px}
+    @media (max-width: 900px){.info-grid{grid-template-columns:1fr}}
+    .info{
+      border-left:3px solid var(--outline-variant);padding:12px 14px;
+      background:linear-gradient(180deg,rgba(85,65,81,.25),rgba(62,55,60,.15));border-radius:10px
+    }
+    .info h3{margin:0 0 6px;font-size:1rem}
+    .info p{margin:0;color:var(--on-surface-variant)}
+    footer{margin-top:28px;padding:18px 0 8px;border-top:1px solid var(--outline-variant);font-size:.92rem;color:var(--on-surface-variant)}
+    .icon{width:1.2em;height:1.2em;display:inline-block}
+    .icon-download{
+      background:conic-gradient(from 180deg at 50% 55%, var(--on-primary) 0 25%, transparent 0 100%);
+      border:2px solid var(--on-primary);border-top:transparent;border-radius:3px;width:1.1em;height:1.1em;transform:translateY(1px)
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo" aria-hidden="true"></div>
+      <div class="title">AI Tutor — Python</div>
+    </header>
+
+    <!-- FULL-WIDTH TOP PANEL -->
+    <section class="card" id="top">
+      <h1>Install the AI Tutor for Python</h1>
+      <div class="accent-underline" aria-hidden="true"></div>
+      <p class="tagline">
+        A classroom-focused app that helps students practice Python with guided exercises,
+        instant feedback, and teacher-controlled progress tracking.
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href="./python_teacher_install.exe" download>
+          <span class="icon icon-download" aria-hidden="true"></span>
+          Download installer (Windows)
+        </a>
+        <a class="btn btn-secondary" href="#notes">Read installation notes</a>
+      </div>
+      <p class="note">
+        The download is a single <code>.exe</code> and should start immediately. If your browser blocks it,
+        choose “Keep” or “Keep anyway”.
+      </p>
+    </section>
+
+    <!-- SCREENSHOT BELOW TOP PANEL -->
+    <aside class="screenshot" aria-label="App screenshot">
+      <img src="./screenshot.png" alt="AI Tutor — Python app screenshot" />
+    </aside>
+
+    <!-- THREE TEXT BLOCKS AFTER SCREENSHOT -->
+    <section class="info-grid" id="notes" aria-label="Installation notes and information">
+      <div class="info">
+        <h3>Who can use it?</h3>
+        <p>
+          Students can install the app freely. <strong>Sign-in will only work after your teacher enables your account</strong>
+          (they toggle access for your API key in the teacher dashboard). You don’t need prior permission to install—just
+          know that the app becomes usable once your teacher has switched you on.
+        </p>
+      </div>
+
+      <div class="info">
+        <h3>Windows SmartScreen</h3>
+        <p>
+          Because this is a new, unsigned app, Windows may show a warning that the publisher is unknown.
+          If you trust this source, click <em>More info</em> → <em>Run anyway</em> to continue.
+        </p>
+      </div>
+
+      <div class="info">
+        <h3>What it does</h3>
+        <p>
+          Generates tailored Python exercises, checks code, and provides hints—aligned with your class goals and
+          controlled by the teacher’s settings.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      © <span id="year"></span> AI Tutor — Python • Theme colors match the classroom app.
+    </footer>
+  </div>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

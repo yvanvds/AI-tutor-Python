@@ -15,6 +15,7 @@ dependencies:
   cloud_firestore: ^6.0.3
   hooks_riverpod: ^3.0.3
   firebase_auth: ^6.1.1
+  flutter_monaco: ^1.0.0
   multi_split_view: ^3.6.1
   path: ^1.9.1
   path_provider: ^2.1.5
@@ -34,6 +35,7 @@ dependencies:
   loading_animation_widget: ^1.3.0
   google_fonts: ^6.3.2
   shared_preferences: ^2.5.3
+  msix: ^3.16.12
 
 dev_dependencies:
   flutter_test:
@@ -87,3 +89,15 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
+msix_config:
+  display_name: AI Python Teacher
+  publisher_display_name: yvan vander sanden
+  identity_name: com.yvanvandersanden.ai-tutor-python
+  msix_version: 1.0.0.1    # script will bump the last number each run
+  logo_path: assets/python_icon.ico
+  start_menu_icon_path: assets/python_icon.ico
+  tile_icon_path: assets/python_icon.ico
+  sign_msix: true
+  # The script below will maintain these on disk and keep them in sync:
+  certificate_path: certs\dev_msix.pfx
+  certificate_password: System.Security.SecureString

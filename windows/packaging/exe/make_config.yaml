@@ -1,0 +1,14 @@
+# windows/packaging/exe/make_config.yaml
+app_id: 4B3F2E7A-9C41-4D92-BF5E-91D9B7D2A68C
+publisher: yvan vander sanden
+publisher_url: https://github.com/yvanvds/AI-tutor-Python
+display_name: Python Teacher
+create_desktop_icon: true
+# Explicit exe name avoids detection issues:
+executable_name: "ai_tutor_python.exe"
+
+# Name of the output installer file (no extension):
+output_base_file_name: "PythonTeacherSetup"
+setup_icon_file: windows\runner\resources\app_icon.ico
+locales:
+  - en

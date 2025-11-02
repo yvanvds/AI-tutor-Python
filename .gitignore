@@ -12,9 +12,11 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+public/*.exe
 
 # security sensitive files
 lib/services/tutor/env.g.dart
+
 
 # IntelliJ related
 *.iml
