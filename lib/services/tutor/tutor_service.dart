@@ -62,8 +62,6 @@ class TutorService {
       );
       return;
     }
-
-    //queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2, newSession: true);
   }
 
   Future<void> queryTutor({
@@ -87,27 +85,19 @@ class TutorService {
 
     switch (type) {
       case ChatRequestType.socraticQuestion:
-        input = QuestionFormatter.socraticQuestion(difficulty!);
-        includeHistory = PreviousInputs.newSession;
-        break;
-
       case ChatRequestType.mcQuestion:
-        input = QuestionFormatter.mcQuestion(difficulty!);
-        includeHistory = PreviousInputs.newSession;
-        break;
-
       case ChatRequestType.explainCodeQuestion:
-        input = QuestionFormatter.explainCodeQuestion(difficulty!);
-        includeHistory = PreviousInputs.newSession;
-        break;
-
       case ChatRequestType.completeCodeQuestion:
-        input = QuestionFormatter.completeCodeQuestion(difficulty!);
-        includeHistory = PreviousInputs.newSession;
-        break;
-
       case ChatRequestType.writeCodeQuestion:
-        input = QuestionFormatter.writeCodeQuestion(difficulty!);
+        // All question types with difficulty parameter start a new session
+        input = switch (type) {
+          ChatRequestType.socraticQuestion => QuestionFormatter.socraticQuestion(difficulty!),
+          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(difficulty!),
+          ChatRequestType.explainCodeQuestion => QuestionFormatter.explainCodeQuestion(difficulty!),
+          ChatRequestType.completeCodeQuestion => QuestionFormatter.completeCodeQuestion(difficulty!),
+          ChatRequestType.writeCodeQuestion => QuestionFormatter.writeCodeQuestion(difficulty!),
+          _ => "", // unreachable
+        };
         includeHistory = PreviousInputs.newSession;
         break;
 
@@ -182,10 +172,7 @@ class TutorService {
   }
 
   Future<void> submitCode(String code) async {
-    //if (_currentExerciseType == 'complete_code' ||
-    //    _currentExerciseType == 'write_code') {
     await queryTutor(type: ChatRequestType.submitCode, code: code);
-    //}
   }
 
   Future<void> requestExercise() async {
@@ -224,74 +211,64 @@ class TutorService {
       //
       // The AI has sent Code to Complete
       //
-      CompleteCode exercise = parsed;
-
-      // Update code provider
-      ref.read(codeProvider.notifier).state = exercise.code;
-      chat.addTutorMessage(exercise.prompt);
+      ref.read(codeProvider.notifier).state = parsed.code;
+      chat.addTutorMessage(parsed.prompt);
     } else if (parsed is ExplainCode) {
       //
       // The AI has sent Code to Explain
       //
-      ExplainCode exercise = parsed;
-      _currentExerciseType = exercise.type;
-      ref.read(codeProvider.notifier).state = exercise.code;
-      chat.addTutorMessage(exercise.prompt);
+      _currentExerciseType = parsed.type;
+      ref.read(codeProvider.notifier).state = parsed.code;
+      chat.addTutorMessage(parsed.prompt);
     } else if (parsed is WriteCode) {
       //
       // The AI has sent instructions to write code
       //
-      WriteCode exercise = parsed;
-      _currentExerciseType = exercise.type;
+      _currentExerciseType = parsed.type;
       ref.read(codeProvider.notifier).state =
           '# Start writing your code here\n';
-      chat.addTutorMessage(exercise.prompt);
+      chat.addTutorMessage(parsed.prompt);
     } else if (parsed is SocraticQuestion) {
       //
       // The AI has sent a socratic question
       //
-      SocraticQuestion exercise = parsed;
-      _currentExerciseType = exercise.type;
+      _currentExerciseType = parsed.type;
       ref.read(codeProvider.notifier).state = '';
-      chat.addTutorMessage(exercise.prompt);
+      chat.addTutorMessage(parsed.prompt);
     } else if (parsed is MultipleChoice) {
       //
       // the AI has sent a multiple choice question
       //
-      MultipleChoice exercise = parsed;
-      _currentExerciseType = exercise.type;
-      ref.read(codeProvider.notifier).state = exercise.code;
-      chat.addTutorMessage(exercise.prompt);
-      for (final option in exercise.options) {
+      _currentExerciseType = parsed.type;
+      ref.read(codeProvider.notifier).state = parsed.code;
+      chat.addTutorMessage(parsed.prompt);
+      for (final option in parsed.options) {
         chat.addTutorMessage(option);
       }
     } else if (parsed is Answer) {
       //
       // The AI answered a generic question
       //
-      Answer answer = parsed;
-      if (answer.answer.isNotEmpty) {
-        chat.addTutorMessage(answer.answer);
+      if (parsed.answer.isNotEmpty) {
+        chat.addTutorMessage(parsed.answer);
       }
     } else if (parsed is Hint) {
       //
       // The AI has sent a Hint
       //
-      Hint hint = parsed;
-      chat.addTutorMessage(hint.hint);
+      chat.addTutorMessage(parsed.hint);
       _conductor.hintProvided();
     } else if (parsed is CodeFeedback) {
       //
       // The AI gives feedback on code
       //
-      CodeFeedback feedback = parsed;
-      if (feedback.summary.isNotEmpty) chat.addTutorMessage(feedback.summary);
+      if (parsed.summary.isNotEmpty) chat.addTutorMessage(parsed.summary);
 
       final suggestionAllowed = await _conductor.updateProgress(
-        feedback.quality,
+        parsed.quality,
       );
-      if (feedback.suggestion.isNotEmpty && suggestionAllowed) {
-        chat.addTutorMessage(feedback.suggestion);
+      if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
+        chat.addTutorMessage(parsed.suggestion);
       } else {
         await requestExercise();
       }
@@ -299,25 +276,23 @@ class TutorService {
       //
       // The AI gives feedback on MCQ answer
       //
-      McqFeedback feedback = parsed;
-      chat.addTutorMessage(feedback.explanation);
+      chat.addTutorMessage(parsed.explanation);
 
-      await _conductor.updateProgress(feedback.quality);
+      await _conductor.updateProgress(parsed.quality);
       await requestExercise();
     } else if (parsed is ExplainFeedback) {
       //
       // The AI gives feedback on explanation
       //
-      ExplainFeedback explain = parsed;
-      if (explain.feedback.isNotEmpty) {
-        chat.addTutorMessage(explain.feedback);
+      if (parsed.feedback.isNotEmpty) {
+        chat.addTutorMessage(parsed.feedback);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(
-        explain.quality,
+        parsed.quality,
       );
-      if (explain.followUp != null && suggestionAllowed) {
-        chat.addTutorMessage(explain.followUp!);
+      if (parsed.followUp != null && suggestionAllowed) {
+        chat.addTutorMessage(parsed.followUp!);
       } else {
         await requestExercise();
       }
@@ -325,16 +300,15 @@ class TutorService {
       //
       // The AI gives feedback on an answer to a socratic question
       //
-      SocraticFeedback feedback = parsed;
-      if (feedback.feedback.isNotEmpty) {
-        chat.addTutorMessage(feedback.feedback);
+      if (parsed.feedback.isNotEmpty) {
+        chat.addTutorMessage(parsed.feedback);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(
-        feedback.quality,
+        parsed.quality,
       );
-      if (feedback.followUp != null && suggestionAllowed) {
-        chat.addTutorMessage(feedback.followUp!);
+      if (parsed.followUp != null && suggestionAllowed) {
+        chat.addTutorMessage(parsed.followUp!);
       } else {
         await requestExercise();
       }
@@ -342,11 +316,9 @@ class TutorService {
       //
       // AI gives a status report when a goal is reached
       //
-      StatusSummary status = parsed;
-      await _updateReport(status.summary);
+      await _updateReport(parsed.summary);
     } else if (parsed is ErrorResponse) {
-      ErrorResponse error = parsed;
-      chat.addSystemMessage(error.message);
+      chat.addSystemMessage(parsed.message);
 
       // resend the request
       final result = await _resendLastRequest();
