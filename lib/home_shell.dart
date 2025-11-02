@@ -22,6 +22,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Uncomment the following line to enable update checking on startup
+    WidgetsBinding.instance.addPostFrameCallback((_) => checkForUpdate());
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
     final accountAsync = ref.watch(myAccountProviderFuture);
