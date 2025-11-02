@@ -13,6 +13,8 @@
     - fastforge (dart pub global activate fastforge)
 #>
 
+
+
 [CmdletBinding()]
 param(
   # Optional Firebase Hosting site/target. If omitted, uses default from firebase.json.
@@ -42,11 +44,14 @@ $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..") | Select-Object -ExpandP
 Set-Location $RepoRoot
 
 $PublicDir = Join-Path $RepoRoot "public"
-$BuildDir = Join-Path $RepoRoot "build\windows\x64\runner\Release"
 $InstallerName = "python_teacher_install.exe"      # fixed output name per your Inno template
 $InstallerPath = Join-Path $PublicDir $InstallerName
-$MakeConfig = "windows\packaging\exe\make_config.yaml"  # already in your repo
-$InnoTemplate = "windows\packaging\exe\inno_setup.iss"  # uses OutputDir=public and OutputBaseFilename
+
+$Pubspec    = Join-Path $RepoRoot "pubspec.yaml"
+$VersionDart= Join-Path $RepoRoot "lib\version.dart"
+$PublicDir  = Join-Path $RepoRoot "public"
+$Manifest   = Join-Path $PublicDir "version.json"
+$Installer  = Join-Path $PublicDir "python_teacher_install.exe"
 
 # ---- Checks ----
 Write-Host "==> Checking prerequisites..." -ForegroundColor Cyan
@@ -74,6 +79,22 @@ if (-not (Test-Cmd "firebase")) {
 if (-not (Test-Cmd "ISCC.exe")) {
   Write-Host "WARNING: ISCC.exe (Inno Setup) not found on PATH. If Fastforge fails, add Inno to PATH." -ForegroundColor Yellow
 }
+
+# ---- Bump version in pubspec.yaml (simple +1 build; adapt as needed)
+$yaml = Get-Content $Pubspec -Raw
+if ($yaml -match "version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)") {
+  $ver     = $matches[1]
+  $build   = [int]$matches[2] + 1
+  $newYaml = $yaml -replace "version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)", "version: $ver+$build"
+  Set-Content $Pubspec $newYaml -Encoding UTF8
+  $fullVersion = "$ver+$build"
+} else { throw "Could not find version in pubspec.yaml" }
+
+# ---- Regenerate lib/version.dart
+@"
+/// Generated. Do not edit.
+const String kAppVersion = '$fullVersion';
+"@ | Set-Content $VersionDart -Encoding UTF8
 
 # ---- Read version from pubspec.yaml ----
 $Pubspec = Join-Path $RepoRoot "pubspec.yaml"
@@ -136,6 +157,16 @@ $SizeMB = [Math]::Round((Get-Item $InstallerPath).Length / 1MB, 2)
 
 Write-Host "==> Installer ready: $InstallerPath ($SizeMB MB)" -ForegroundColor Green
 Write-Host "==> SHA256: $Hash" -ForegroundColor Green
+
+# ---- Write version.json (last step before deploy)
+$domain = "https://ai-tutor-python.web.app" # e.g., ai-tutor.web.app
+@"
+{
+  "version": "$fullVersion",
+  "url": "https://$domain/python_teacher_install.exe",
+  "sha256": "$hash"
+}
+"@ | Set-Content $Manifest -Encoding UTF8
 
 # ---- Firebase deploy ----
 Write-Host "==> Deploying to Firebase Hosting..." -ForegroundColor Cyan

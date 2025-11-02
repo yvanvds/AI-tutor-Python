@@ -1,7 +1,7 @@
-name: ai_tutor_python
+﻿name: ai_tutor_python
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.9.2
@@ -34,6 +34,9 @@ dependencies:
   loading_animation_widget: ^1.3.0
   google_fonts: ^6.3.2
   shared_preferences: ^2.5.3
+  pub_semver: ^2.2.0
+  http: ^1.5.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
@@ -86,4 +89,5 @@ flutter:
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
 

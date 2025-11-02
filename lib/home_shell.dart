@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/data/account/account_providers.dart';
 import 'package:ai_tutor_python/data/role/role_provider.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
@@ -7,7 +8,7 @@ import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
+import 'version.dart';
 import 'features/dashboard/dashboard.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -124,5 +125,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ],
       ),
     );
+  }
+
+  Future<void> checkForUpdate() async {
+    final manifest = Uri.parse('https://ai-tutor-python.web.app/version.json');
+    final info = await fetchUpdateInfo(manifest);
+    if (info == null) return;
+
+    if (isNewer(info.version, kAppVersion)) {
+      // (Optional) Ask user for confirmation here
+      final file = await downloadToTemp(info.url);
+      if (file == null) return;
+
+      final ok = await verifySha256(file, info.sha256);
+      if (!ok) {
+        file.deleteSync();
+        return;
+      }
+
+      // Use silent flags if your installer supports it:
+      // NSIS: ['/S']  |  Inno: ['/VERYSILENT','/NORESTART']
+      await runInstallerAndExit(
+        file,
+        args: const ['/VERYSILENT', '/NORESTART'],
+      );
+    }
   }
 }

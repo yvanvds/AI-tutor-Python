@@ -35,7 +35,9 @@ class _OutputState extends State<Output> {
   @override
   void initState() {
     super.initState();
-    _initializePython();
+    _initializePython().then((_) {
+      _setupPythonPackages();
+    });
 
     // Register runner callback
     widget.controller.bind(run: _runCode, stop: () => _forceStop());
@@ -55,6 +57,19 @@ class _OutputState extends State<Output> {
           ..add(_Line('[Engine init failed] $e', isError: true));
       });
     }
+  }
+
+  Future<void> _setupPythonPackages() async {
+    if (!_initialized) return;
+
+    // Install essential packages
+    await PyEngineDesktop.pipInstall('numpy');
+    await PyEngineDesktop.pipInstall('pandas');
+    await PyEngineDesktop.pipInstall('requests');
+    await PyEngineDesktop.pipInstall('matplotlib');
+    await PyEngineDesktop.pipInstall('scikit-learn');
+
+    print('Packages installed successfully!');
   }
 
   Future<void> _runCode(String code) async {
