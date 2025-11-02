@@ -87,56 +87,28 @@ class Conductor {
     bool followUpAllowed = true; // we return this value if we allow follow-ups
 
     // --- 1) base delta by answer quality ---
-    double baseDelta;
-    switch (quality) {
-      case AnswerQuality.wrong:
-        baseDelta = -0.05; // small setback for wrong answers
-        break;
-      case AnswerQuality.partial: // (typo kept to match your enum)
-        baseDelta = 0.07; // small gain for partial
-        break;
-      case AnswerQuality.correct:
-        baseDelta = 0.14; // modest gain for correct
-        break;
-    }
+    final double baseDelta = switch (quality) {
+      AnswerQuality.wrong => -0.05, // small setback for wrong answers
+      AnswerQuality.partial => 0.07, // small gain for partial
+      AnswerQuality.correct => 0.14, // modest gain for correct
+    };
 
     // --- 2) scale by question type difficulty/effort ---
     // order from small to large: mc < explain < complete < (socratic|write)
-    double typeMult;
-    switch (_currentQuestionType) {
-      case ChatRequestType.mcQuestion:
-        typeMult = 0.7;
-        break;
-      case ChatRequestType.explainCodeQuestion:
-        typeMult = 0.9;
-        break;
-      case ChatRequestType.completeCodeQuestion:
-        typeMult = 1.2;
-        break;
-      case ChatRequestType.socraticQuestion:
-      case ChatRequestType.writeCodeQuestion:
-        typeMult = 1.4;
-        break;
-
-      // Non-exercise interactions: keep neutral weight
-      default:
-        typeMult = 1.0;
-        break;
-    }
+    final double typeMult = switch (_currentQuestionType) {
+      ChatRequestType.mcQuestion => 0.7,
+      ChatRequestType.explainCodeQuestion => 0.9,
+      ChatRequestType.completeCodeQuestion => 1.2,
+      ChatRequestType.socraticQuestion || ChatRequestType.writeCodeQuestion => 1.4,
+      _ => 1.0, // Non-exercise interactions: keep neutral weight
+    };
 
     // --- 3) scale by declared difficulty ---
-    double diffMult;
-    switch (_difficulty) {
-      case QuestionDifficulty.easy:
-        diffMult = 0.8;
-        break;
-      case QuestionDifficulty.medium:
-        diffMult = 1.0;
-        break;
-      case QuestionDifficulty.hard:
-        diffMult = 1.5;
-        break;
-    }
+    final double diffMult = switch (_difficulty) {
+      QuestionDifficulty.easy => 0.8,
+      QuestionDifficulty.medium => 1.0,
+      QuestionDifficulty.hard => 1.5,
+    };
 
     // --- 4) penalty for hints used (each hint slightly reduces gain) ---
     // Linear penalty; clamped so we don’t invert a positive delta purely by hints.
@@ -144,19 +116,15 @@ class Conductor {
 
     double delta = baseDelta * typeMult * diffMult;
     if (delta > 0) {
-      delta = (delta - hintPenalty);
-      if (delta < 0)
-        delta =
-            0; // don’t punish a correct/partial into negative solely by hints
+      // dont punish a correct/partial into negative solely by hints
+      delta = (delta - hintPenalty).clamp(0.0, double.infinity);
     } else {
-      // Wrong answers can be made *slightly* worse by heavy hint usage, but bounded.
+      // Wrong answers can be made slightly worse by heavy hint usage, but bounded.
       delta = delta - (hintPenalty * 0.5);
     }
 
     // Clamp and apply
-    double next = _currentProgress + delta;
-    if (next < 0.0) next = 0.0;
-    if (next > 1.0) next = 1.0;
+    final double next = (_currentProgress + delta).clamp(0.0, 1.0);
 
     if (_currentProgress < 0.3 && next >= 0.3) {
       // Crossing first milestone: deny follow-up question
