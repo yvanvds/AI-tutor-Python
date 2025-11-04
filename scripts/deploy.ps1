@@ -163,7 +163,7 @@ $domain = "https://ai-tutor-python.web.app" # e.g., ai-tutor.web.app
 @"
 {
   "version": "$fullVersion",
-  "url": "https://$domain/python_teacher_install.exe",
+  "url": "$domain/python_teacher_install.exe",
   "sha256": "$hash"
 }
 "@ | Set-Content $Manifest -Encoding UTF8

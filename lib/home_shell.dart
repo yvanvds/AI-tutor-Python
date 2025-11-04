@@ -140,7 +140,27 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (info == null) return;
 
     if (isNewer(info.version, kAppVersion)) {
-      // (Optional) Ask user for confirmation here
+      // Show dialog before proceeding
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // user cannot tap outside to close
+        builder: (context) => AlertDialog(
+          title: const Text('Update available'),
+          content: Text(
+            'A newer version (${info.version}) of the application is available. '
+            'The update will now be installed. You can open it again in a moment.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+      // Continue with update after pressing OK
       final file = await downloadToTemp(info.url);
       if (file == null) return;
 
@@ -150,8 +170,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         return;
       }
 
-      // Use silent flags if your installer supports it:
-      // NSIS: ['/S']  |  Inno: ['/VERYSILENT','/NORESTART']
       await runInstallerAndExit(
         file,
         args: const ['/VERYSILENT', '/NORESTART'],

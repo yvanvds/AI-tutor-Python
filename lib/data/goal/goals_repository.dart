@@ -1,35 +1,46 @@
+import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:ai_tutor_python/data/goal/goal.dart';
 import 'package:ai_tutor_python/data/goal/subtree_backup.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GoalsRepository {
-  // Make the collection strongly typed to avoid casts later:
+  // Strongly typed collection:
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection('goals');
 
-  Stream<List<Goal>> streamRoots() => _collection
-      .where('parentId', isNull: true)
-      .orderBy('order')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Goal.fromDoc(d)).toList());
+  // --- STREAMS -------------------------------------------------------------
 
-  Stream<Goal?> streamGoal(String id) =>
-      _collection.doc(id).snapshots().map((doc) {
-        if (!doc.exists) return null;
-        return Goal.fromDoc(doc);
-      });
+  Stream<List<Goal>> streamRoots() {
+    final q = _collection.where('parentId', isNull: true).orderBy('order');
+    return safeFirestoreStream(
+      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    );
+  }
 
-  Stream<List<Goal>> streamChildren(String parentId) => _collection
-      .where('parentId', isEqualTo: parentId)
-      .orderBy('order')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Goal.fromDoc(d)).toList());
+  Stream<Goal?> streamGoal(String id) {
+    final dref = _collection.doc(id);
+    return safeFirestoreStream(
+      dref.snapshots().map((doc) => doc.exists ? Goal.fromDoc(doc) : null),
+    );
+  }
 
-  /// For dropdown: we only need (id, title). With <=100 docs this is fine.
-  Stream<List<Goal>> streamAllGoals() => _collection
-      .orderBy('title')
-      .snapshots()
-      .map((s) => s.docs.map(Goal.fromDoc).toList());
+  Stream<List<Goal>> streamChildren(String parentId) {
+    final q = _collection
+        .where('parentId', isEqualTo: parentId)
+        .orderBy('order');
+    return safeFirestoreStream(
+      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    );
+  }
+
+  Stream<List<Goal>> streamAllGoals() {
+    final q = _collection.orderBy('title');
+    return safeFirestoreStream(
+      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    );
+  }
+
+  // --- ONE-SHOTS -----------------------------------------------------------
 
   /// Read children once (used to compute target list on drop)
   Future<List<Goal>> getChildrenOnce(String? parentId) async {
@@ -37,12 +48,13 @@ class GoalsRepository {
     q = parentId == null
         ? q.where('parentId', isNull: true)
         : q.where('parentId', isEqualTo: parentId);
-    final s = await q.get();
+
+    final s = await safeFirestore(() => q.get());
     return s.docs.map(Goal.fromDoc).toList();
   }
 
   Future<Goal?> getGoalOnce(String id) async {
-    final d = await _collection.doc(id).get();
+    final d = await safeFirestore(() => _collection.doc(id).get());
     if (!d.exists) return null;
     return Goal.fromDoc(d);
   }

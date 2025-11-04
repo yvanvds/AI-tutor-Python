@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -24,30 +25,34 @@ class ProgressRepository {
 
   /// Load all progress docs once (returns empty list if none exist).
   Future<List<Progress>> getAll() async {
-    final qs = await _col(_uid).get();
+    final qs = await safeFirestore(() => _col(_uid).get());
     return qs.docs.map((d) => Progress.fromDoc(d)).toList();
   }
 
   /// Realtime stream of all progress docs. Emits [] when none exist.
   Stream<List<Progress>> watchAll() {
-    return _col(
-      _uid,
-    ).snapshots().map((qs) => qs.docs.map((d) => Progress.fromDoc(d)).toList());
+    return safeFirestoreStream(
+      _col(_uid).snapshots().map(
+        (qs) => qs.docs.map((d) => Progress.fromDoc(d)).toList(),
+      ),
+    );
   }
 
   /// Get one goal’s progress (null if it doesn’t exist).
   Future<Progress?> getByGoalId(String goalID) async {
-    final doc = await _col(_uid).doc(goalID).get();
+    final doc = await safeFirestore(() => _col(_uid).doc(goalID).get());
     if (!doc.exists) return null;
     return Progress.fromDoc(doc);
   }
 
   // stream a single goal's progress
   Stream<Progress?> streamByGoalId(String goalID) {
-    return _col(_uid).doc(goalID).snapshots().map((doc) {
-      if (!doc.exists) return null;
-      return Progress.fromDoc(doc);
-    });
+    return safeFirestoreStream(
+      _col(_uid).doc(goalID).snapshots().map((doc) {
+        if (!doc.exists) return null;
+        return Progress.fromDoc(doc);
+      }),
+    );
   }
 
   /// Create or update a progress doc.

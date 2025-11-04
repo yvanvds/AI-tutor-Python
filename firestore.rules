@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers (now in the correct scope so $(database) is defined) ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // Your hard-coded admin UID
+      return isSignedIn() && request.auth.uid == "ld9nz1lmRUVMicutWMFzIusyxvE2";
+    }
+
+    function isTeacher() {
+      // role doc lives at roles/{uid} with { role: "teacher" | "admin" | ... }
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    function canReadAccount(userId) {
+      return isSignedIn() && (request.auth.uid == userId || isTeacher());
+    }
+
+    function canMutateOwn(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Global admin override (keep if you like this behavior) ---
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // User doc itself
+    match /accounts/{userId} {
+      allow read: if canReadAccount(userId);
+      allow create, update: if canMutateOwn(userId);
+      allow delete: if false;
+
+      // All nested subcollections & their descendants
+      match /{document=**} {
+        allow read: if canReadAccount(userId);
+        allow create, update: if canMutateOwn(userId);
+        allow delete: if false;
+      }
+    }
+
+    // --- Roles collection (locked down) ---
+    match /roles/{uid} {
+      allow read: if isSignedIn();
+      allow read, write: if isAdmin(); // or: allow read: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- Goals collection ---
+    // Everyone signed-in can read goals; only admin (or teacher, if you want) can write.
+    match /goals/{goalId} {
+      allow read: if isSignedIn();         // or `true` if you want fully public read
+      allow create, update, delete: if isAdmin() || isTeacher(); // tighten as you wish
+    }
+    
+    match /instructions/{docId} {
+      allow read: if request.auth != null;          // or even public if you prefer
+      allow write: if isTeacher();  // only you
+    }
+
+    match /config/{docId} {
+      allow read: if isSignedIn();         // or `true` if you want fully public read
+      allow create, update, delete: if isAdmin(); // tighten as you wish
+    }
+  }
+}

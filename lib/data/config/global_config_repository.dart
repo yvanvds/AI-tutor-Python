@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'global_config.dart';
 
@@ -16,13 +17,15 @@ class GlobalConfigRepository {
 
   /// Read once.
   Future<GlobalConfig?> getConfig() async {
-    final snap = await _docRef().get();
+    final snap = await safeFirestore(() => _docRef().get());
     if (!snap.exists) return null;
     return snap.data();
   }
 
   /// Listen for live updates.
   Stream<GlobalConfig?> watchConfig() {
-    return _docRef().snapshots().map((snap) => snap.data());
+    return safeFirestoreStream(
+      _docRef().snapshots().map((snap) => snap.data()),
+    );
   }
 }
