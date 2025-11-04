@@ -32,7 +32,7 @@ class _EditorState extends ConsumerState<Editor> {
     // Provider → Controller (when codeProvider changes elsewhere)
     _codeSub = ref.listenManual<String>(codeProvider, (prev, next) {
       if (_controller.text != next) {
-        _controller.value = TextEditingValue(text: next);
+        _setAllText(next);
       }
     }, fireImmediately: false);
 
@@ -46,6 +46,12 @@ class _EditorState extends ConsumerState<Editor> {
     // });
   }
 
+  void _setAllText(String next) {
+    _controller.fullText = next; // then optionally reset selection
+    _controller.selection = TextSelection.collapsed(offset: next.length);
+    _controller.clearComposing();
+  }
+
   @override
   void dispose() {
     _codeSub.close();
@@ -55,7 +61,7 @@ class _EditorState extends ConsumerState<Editor> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(codeProvider);
+    //ref.watch(codeProvider);
 
     return CodeTheme(
       data: CodeThemeData(styles: monokaiSublimeTheme),

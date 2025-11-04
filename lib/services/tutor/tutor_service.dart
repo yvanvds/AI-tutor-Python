@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
 import 'package:ai_tutor_python/data/code/code_provider.dart';
+import 'package:ai_tutor_python/data/session/code_timeline_provider.dart';
 import 'package:ai_tutor_python/data/status_report/report_providers.dart';
 import 'package:ai_tutor_python/data/status_report/status_report.dart';
 import 'package:ai_tutor_python/services/chat_service.dart';
@@ -27,7 +28,6 @@ import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart'
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
 import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
-import 'package:highlight/languages/elixir.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class TutorService {
@@ -230,70 +230,76 @@ class TutorService {
     }());
     _connector.addResponse(parsed);
 
-    final chat = ref.read(chatServiceProvider);
-
     if (parsed is CompleteCode) {
       //
       // The AI has sent Code to Complete
       //
-      ref.read(codeProvider.notifier).state = parsed.code;
-      chat.addTutorMessage(parsed.prompt);
+      // add code to timeline and editor
+      _startNewCode(parsed.code, true);
+
+      // add message to timeline and chat
+      _addTutorMessage(parsed.prompt, true);
     } else if (parsed is ExplainCode) {
       //
       // The AI has sent Code to Explain
       //
       _currentExerciseType = parsed.type;
-      ref.read(codeProvider.notifier).state = parsed.code;
-      chat.addTutorMessage(parsed.prompt);
+
+      // add code to timeline and editor
+      _startNewCode(parsed.code, true);
+
+      // add message to timeline and chat
+      _addTutorMessage(parsed.prompt, true);
     } else if (parsed is WriteCode) {
       //
       // The AI has sent instructions to write code
       //
       _currentExerciseType = parsed.type;
-      ref.read(codeProvider.notifier).state =
-          '# Start writing your code here\n';
-      chat.addTutorMessage(parsed.prompt);
+      _startNewCode('# Start writing your code here\n', true);
+      _addTutorMessage(parsed.prompt, true);
     } else if (parsed is SocraticQuestion) {
       //
       // The AI has sent a socratic question
       //
       _currentExerciseType = parsed.type;
-      ref.read(codeProvider.notifier).state = '';
-      chat.addTutorMessage(parsed.prompt);
+      _startNewCode('', true);
+
+      _addTutorMessage(parsed.prompt, true);
     } else if (parsed is MultipleChoice) {
       //
       // the AI has sent a multiple choice question
       //
       _currentExerciseType = parsed.type;
-      ref.read(codeProvider.notifier).state = parsed.code;
-      chat.addTutorMessage(parsed.prompt);
+      _startNewCode(parsed.code, true);
+
+      _addTutorMessage(parsed.prompt, true);
       for (final option in parsed.options) {
-        chat.addTutorMessage(option);
+        _addTutorMessage(option, true);
       }
     } else if (parsed is GuidingExcercise) {
       //
       // The AI has sent a guiding question
       //
       _currentExerciseType = parsed.type;
-      ref.read(codeProvider.notifier).state = parsed.code;
-      chat.addTutorMessage(parsed.prompt);
+      _startNewCode(parsed.code, true);
+      _addTutorMessage(parsed.prompt, true);
     } else if (parsed is GuidingFeedback) {
       //
       // The AI has sent feedback on a guiding answer
       //
       if (parsed.feedback.isNotEmpty) {
-        chat.addTutorMessage(parsed.feedback);
+        _addTutorMessage(parsed.feedback, true);
       }
 
       bool guidingComplete = await _conductor.guidingIsComplete(
         parsed.understanding,
       );
       if (!guidingComplete) {
-        if (parsed.prompt.isNotEmpty) {
-          chat.addTutorMessage(parsed.prompt);
-        }
         if (parsed.code.isNotEmpty) {
-          ref.read(codeProvider.notifier).state = parsed.code;
+          _startNewCode(parsed.code, false);
+        }
+        if (parsed.prompt.isNotEmpty) {
+          _addTutorMessage(parsed.prompt, false);
         }
       } else {
         await requestExercise();
@@ -303,23 +309,23 @@ class TutorService {
       // The AI answered a generic question
       //
       if (parsed.answer.isNotEmpty) {
-        chat.addTutorMessage(parsed.answer);
+        _addTutorMessage(parsed.answer, true);
       }
     } else if (parsed is Hint) {
       //
       // The AI has sent a Hint
       //
-      chat.addTutorMessage(parsed.hint);
+      _addTutorMessage(parsed.hint, true);
       _conductor.hintProvided();
     } else if (parsed is CodeFeedback) {
       //
       // The AI gives feedback on code
       //
-      if (parsed.summary.isNotEmpty) chat.addTutorMessage(parsed.summary);
+      if (parsed.summary.isNotEmpty) _addTutorMessage(parsed.summary, true);
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
-        chat.addTutorMessage(parsed.suggestion);
+        _addTutorMessage(parsed.suggestion, true);
       } else {
         await requestExercise();
       }
@@ -327,7 +333,7 @@ class TutorService {
       //
       // The AI gives feedback on MCQ answer
       //
-      chat.addTutorMessage(parsed.explanation);
+      _addTutorMessage(parsed.explanation, true);
 
       await _conductor.updateProgress(parsed.quality);
       await requestExercise();
@@ -336,12 +342,12 @@ class TutorService {
       // The AI gives feedback on explanation
       //
       if (parsed.feedback.isNotEmpty) {
-        chat.addTutorMessage(parsed.feedback);
+        _addTutorMessage(parsed.feedback, true);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
-        chat.addTutorMessage(parsed.followUp!);
+        _addTutorMessage(parsed.followUp!, true);
       } else {
         await requestExercise();
       }
@@ -350,12 +356,12 @@ class TutorService {
       // The AI gives feedback on an answer to a socratic question
       //
       if (parsed.feedback.isNotEmpty) {
-        chat.addTutorMessage(parsed.feedback);
+        _addTutorMessage(parsed.feedback, true);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
-        chat.addTutorMessage(parsed.followUp!);
+        _addTutorMessage(parsed.followUp!, true);
       } else {
         await requestExercise();
       }
@@ -365,13 +371,13 @@ class TutorService {
       //
       await _updateReport(parsed.summary);
     } else if (parsed is ErrorResponse) {
-      chat.addSystemMessage(parsed.message);
+      _addSystemMessage(parsed.message);
 
       // resend the request
       final result = await _resendLastRequest();
       _handleResponse(result);
     } else {
-      chat.addTutorMessage('Received unknown response from tutor.');
+      _addTutorMessage('Received unknown response from tutor.', false);
 
       // resend the request
       final result = await _resendLastRequest();
@@ -405,5 +411,35 @@ class TutorService {
         ),
       ).future,
     );
+  }
+
+  Future<void> _startNewCode(String code, bool updateEditor) async {
+    final timeline = ref.read(codeTimelineProvider.notifier);
+    timeline.startNewCode(code);
+    if (updateEditor) {
+      ref.read(codeProvider.notifier).state = code;
+    }
+  }
+
+  Future<void> _addTutorMessage(String message, bool sendToChat) async {
+    final timeline = ref.read(codeTimelineProvider.notifier);
+    timeline.addAiMessage(message);
+
+    if (sendToChat) {
+      final chat = ref.read(chatServiceProvider);
+      chat.addTutorMessage(message);
+    }
+  }
+
+  Future<void> _addSystemMessage(String message) async {
+    // we won't add system messages to the code timeline
+    final chat = ref.read(chatServiceProvider);
+    chat.addSystemMessage(message);
+  }
+
+  Future<void> _addUserMessage(String message) async {
+    // add only to timeline, already added to chat when user sent it
+    final timeline = ref.read(codeTimelineProvider.notifier);
+    timeline.addUserMessage(message);
   }
 }

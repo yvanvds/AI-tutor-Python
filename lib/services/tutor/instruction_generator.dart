@@ -56,8 +56,6 @@ class InstructionGenerator {
 
     // add the stuff we always want to include
     output += alwaysInclude;
-    print("Our instructions:");
-    print(output);
     return output;
   }
 

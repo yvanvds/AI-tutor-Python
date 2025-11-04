@@ -40,4 +40,6 @@ class ChatService {
   }
 
   void dispose() => controller.dispose();
+
+  Future<void> addSystem(String text) async {}
 }

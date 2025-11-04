@@ -8,14 +8,14 @@ import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
-class Tutor extends ConsumerStatefulWidget {
-  const Tutor({super.key});
+class ChatWidget extends ConsumerStatefulWidget {
+  const ChatWidget({super.key});
 
   @override
-  ConsumerState<Tutor> createState() => _TutorState();
+  ConsumerState<ChatWidget> createState() => _TutorState();
 }
 
-class _TutorState extends ConsumerState<Tutor> {
+class _TutorState extends ConsumerState<ChatWidget> {
   bool _didInit = false;
 
   @override

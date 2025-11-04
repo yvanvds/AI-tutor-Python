@@ -1,6 +1,8 @@
+import 'package:ai_tutor_python/data/session/code_timeline_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class Controllers extends StatelessWidget {
+class Controllers extends ConsumerWidget {
   const Controllers({
     super.key,
     required this.onRunPressed,
@@ -8,6 +10,8 @@ class Controllers extends StatelessWidget {
     required this.onHintPressed,
     required this.onSubmitPressed,
     required this.onExercisePressed,
+    required this.onPreviousPressed,
+    required this.onNextPressed,
   });
 
   final VoidCallback onRunPressed;
@@ -15,9 +19,11 @@ class Controllers extends StatelessWidget {
   final VoidCallback onHintPressed;
   final VoidCallback onSubmitPressed;
   final VoidCallback onExercisePressed;
+  final VoidCallback onPreviousPressed;
+  final VoidCallback onNextPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       children: [
         // Left-side buttons
@@ -37,6 +43,24 @@ class Controllers extends StatelessWidget {
             tooltip: 'Stop Code',
             onPressed: onStopPressed,
             color: Colors.red,
+          ),
+        ),
+
+        const Spacer(),
+
+        // middle buttons
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: OutlinedButton(
+            onPressed: ref.watch(canGoPrevProvider) ? onPreviousPressed : null,
+            child: const Text('Previous Code'),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: OutlinedButton(
+            onPressed: ref.watch(canGoNextProvider) ? onNextPressed : null,
+            child: const Text('Next Code'),
           ),
         ),
 
