@@ -35,15 +35,6 @@ class _EditorState extends ConsumerState<Editor> {
         _setAllText(next);
       }
     }, fireImmediately: false);
-
-    // Controller → Provider (user types)
-    // _controller.addListener(() {
-    //   final current = ref.read(codeProvider);
-    //   final text = _controller.text;
-    //   if (current != text) {
-    //     ref.read(codeProvider.notifier).state = text; // or .set(text)
-    //   }
-    // });
   }
 
   void _setAllText(String next) {

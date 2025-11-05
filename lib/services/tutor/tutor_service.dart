@@ -4,10 +4,10 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
 import 'package:ai_tutor_python/data/code/code_provider.dart';
-import 'package:ai_tutor_python/data/session/code_timeline_provider.dart';
 import 'package:ai_tutor_python/data/status_report/report_providers.dart';
 import 'package:ai_tutor_python/data/status_report/status_report.dart';
 import 'package:ai_tutor_python/services/chat_service.dart';
+import 'package:ai_tutor_python/services/timeline/timeline.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -190,6 +190,7 @@ class TutorService {
     } else {
       await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
+    _addUserMessage(message);
   }
 
   Future<void> requestHint(String? code) async {
@@ -414,21 +415,21 @@ class TutorService {
   }
 
   Future<void> _startNewCode(String code, bool updateEditor) async {
-    final timeline = ref.read(codeTimelineProvider.notifier);
-    timeline.startNewCode(code);
-    if (updateEditor) {
-      ref.read(codeProvider.notifier).state = code;
-    }
+    // final timeline = ref.read(timeLineProvider);
+    // timeline.startNewCode(code);
+    // if (updateEditor) {
+    ref.read(codeProvider.notifier).state = code;
+    // }
   }
 
   Future<void> _addTutorMessage(String message, bool sendToChat) async {
-    final timeline = ref.read(codeTimelineProvider.notifier);
-    timeline.addAiMessage(message);
+    // final timeline = ref.read(timeLineProvider);
+    // timeline.addAiMessage(message);
 
-    if (sendToChat) {
-      final chat = ref.read(chatServiceProvider);
-      chat.addTutorMessage(message);
-    }
+    // if (sendToChat) {
+    final chat = ref.read(chatServiceProvider);
+    chat.addTutorMessage(message);
+    // }
   }
 
   Future<void> _addSystemMessage(String message) async {
@@ -439,7 +440,7 @@ class TutorService {
 
   Future<void> _addUserMessage(String message) async {
     // add only to timeline, already added to chat when user sent it
-    final timeline = ref.read(codeTimelineProvider.notifier);
-    timeline.addUserMessage(message);
+    // final timeline = ref.read(timeLineProvider);
+    // timeline.addUserMessage(message);
   }
 }

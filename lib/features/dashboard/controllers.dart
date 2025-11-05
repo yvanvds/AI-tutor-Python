@@ -1,4 +1,4 @@
-import 'package:ai_tutor_python/data/session/code_timeline_provider.dart';
+import 'package:ai_tutor_python/services/timeline/timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -24,6 +24,9 @@ class Controllers extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // final canPrev = ref.watch(timeLineProvider.select((t) => t.canGoPrev));
+    // final canNext = ref.watch(timeLineProvider.select((t) => t.canGoNext));
+
     return Row(
       children: [
         // Left-side buttons
@@ -49,20 +52,20 @@ class Controllers extends ConsumerWidget {
         const Spacer(),
 
         // middle buttons
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: OutlinedButton(
-            onPressed: ref.watch(canGoPrevProvider) ? onPreviousPressed : null,
-            child: const Text('Previous Code'),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: OutlinedButton(
-            onPressed: ref.watch(canGoNextProvider) ? onNextPressed : null,
-            child: const Text('Next Code'),
-          ),
-        ),
+        // Padding(
+        //   padding: const EdgeInsets.all(8.0),
+        //   child: OutlinedButton(
+        //     onPressed: canPrev ? onPreviousPressed : null,
+        //     child: const Text('Previous Code'),
+        //   ),
+        // ),
+        // Padding(
+        //   padding: const EdgeInsets.all(8.0),
+        //   child: OutlinedButton(
+        //     onPressed: canNext ? onNextPressed : null,
+        //     child: const Text('Next Code'),
+        //   ),
+        // ),
 
         // Spacer pushes the next buttons to the right
         const Spacer(),
