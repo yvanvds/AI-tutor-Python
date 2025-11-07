@@ -1,24 +1,24 @@
 import 'package:ai_tutor_python/core/update_info.dart';
-import 'package:ai_tutor_python/data/account/account_providers.dart';
-import 'package:ai_tutor_python/data/role/role_provider.dart';
+import 'package:ai_tutor_python/services/account/account.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
+import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'version.dart';
 import 'features/dashboard/dashboard.dart';
 
-class HomeShell extends ConsumerStatefulWidget {
+class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
   @override
-  ConsumerState<HomeShell> createState() => _HomeShellState();
+  State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
   @override
@@ -30,107 +30,107 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser!;
-    final accountAsync = ref.watch(myAccountProviderFuture);
-    final isTeacherAsync = ref.watch(isTeacherProviderFuture(user.uid));
+    return MultiValueListenableBuilder(
+      listenables: [
+        DataService.role.isTeacher,
+        DataService.account.currentAccount,
+      ],
+      builder: (context, values) {
+        final isTeacher = values[0] as bool;
+        final currentAccount = values[1] as Account?;
 
-    // Title (same behavior you had)
-    final titleText = accountAsync.maybeWhen(
-      data: (acc) {
-        final fallback =
-            user.displayName?.split(' ').first ?? user.email ?? 'user';
-        return "Welcome back ${acc?.firstName ?? fallback}, let's learn!";
-      },
-      orElse: () => 'Welcome…',
-    );
+        // Title (same behavior you had)
+        final titleText = currentAccount != null
+            ? "Welcome back ${currentAccount.firstName}, let's learn!"
+            : 'Welcome…';
 
-    // Who can see the Goals Editor?
-    final isTeacher = isTeacherAsync.maybeWhen(
-      data: (v) => v,
-      orElse: () => false,
-    );
-
-    // Build destinations based on permissions
-    final destinations = <NavigationRailDestination>[
-      const NavigationRailDestination(
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: Text('Dashboard'),
-      ),
-      if (isTeacher)
-        const NavigationRailDestination(
-          icon: Icon(Icons.flag_outlined),
-          selectedIcon: Icon(Icons.flag),
-          label: Text('Goals'),
-        ),
-      if (isTeacher)
-        const NavigationRailDestination(
-          icon: Icon(Icons.integration_instructions_outlined),
-          selectedIcon: Icon(Icons.integration_instructions),
-          label: Text('Instructions'),
-        ),
-      if (isTeacher)
-        const NavigationRailDestination(
-          icon: Icon(Icons.account_circle_outlined),
-          selectedIcon: Icon(Icons.account_circle),
-          label: Text('Accounts'),
-        ),
-    ];
-
-    // Clamp index if teacher flag changes (e.g., on first load)
-    final maxIndex = destinations.length - 1;
-    if (_selectedIndex > maxIndex) _selectedIndex = 0;
-
-    // Pick the current page
-    final Widget page;
-    if (isTeacher && _selectedIndex == 1) {
-      page = const GoalsPage();
-    } else if (isTeacher && _selectedIndex == 2) {
-      page = const InstructionsEditorPage();
-    } else if (_selectedIndex == 0) {
-      page = const Dashboard();
-    } else if (_selectedIndex == 3 && isTeacher) {
-      page = const AccountsPage();
-    } else {
-      page = const Center(child: Text('Page not found'));
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 12,
-        title: Row(
-          children: [
-            // Left: welcome text
-            Flexible(
-              flex: 2,
-              child: Text(titleText, overflow: TextOverflow.ellipsis),
+        // Build destinations based on permissions
+        final destinations = <NavigationRailDestination>[
+          const NavigationRailDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: Text('Dashboard'),
+          ),
+          if (isTeacher)
+            const NavigationRailDestination(
+              icon: Icon(Icons.flag_outlined),
+              selectedIcon: Icon(Icons.flag),
+              label: Text('Goals'),
             ),
-            // Middle: goal/subgoal/progress
-            Expanded(flex: 3, child: Center(child: const GoalCrumbInAppBar())),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+          if (isTeacher)
+            const NavigationRailDestination(
+              icon: Icon(Icons.integration_instructions_outlined),
+              selectedIcon: Icon(Icons.integration_instructions),
+              label: Text('Instructions'),
+            ),
+          if (isTeacher)
+            const NavigationRailDestination(
+              icon: Icon(Icons.account_circle_outlined),
+              selectedIcon: Icon(Icons.account_circle),
+              label: Text('Accounts'),
+            ),
+        ];
 
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-            labelType: NavigationRailLabelType.selected,
-            leading: const SizedBox(height: 8),
-            destinations: destinations,
+        // Clamp index if teacher flag changes (e.g., on first load)
+        final maxIndex = destinations.length - 1;
+        if (_selectedIndex > maxIndex) _selectedIndex = 0;
+
+        // Pick the current page
+        final Widget page;
+        if (isTeacher && _selectedIndex == 1) {
+          page = const GoalsPage();
+        } else if (isTeacher && _selectedIndex == 2) {
+          page = const InstructionsEditorPage();
+        } else if (_selectedIndex == 0) {
+          page = const Dashboard();
+        } else if (_selectedIndex == 3 && isTeacher) {
+          page = const AccountsPage();
+        } else {
+          page = const Center(child: Text('Page not found'));
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            titleSpacing: 12,
+            title: Row(
+              children: [
+                // Left: welcome text
+                Flexible(
+                  flex: 2,
+                  child: Text(titleText, overflow: TextOverflow.ellipsis),
+                ),
+                // Middle: goal/subgoal/progress
+                Expanded(
+                  flex: 3,
+                  child: Center(child: const GoalCrumbInAppBar()),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Sign out',
+                onPressed: () => FirebaseAuth.instance.signOut(),
+                icon: const Icon(Icons.logout),
+              ),
+            ],
           ),
-          const VerticalDivider(width: 1),
-          Expanded(child: page),
-        ],
-      ),
+
+          body: Row(
+            children: [
+              NavigationRail(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (i) =>
+                    setState(() => _selectedIndex = i),
+                labelType: NavigationRailLabelType.selected,
+                leading: const SizedBox(height: 8),
+                destinations: destinations,
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: page),
+            ],
+          ),
+        );
+      },
     );
   }
 

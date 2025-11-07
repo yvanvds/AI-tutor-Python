@@ -1,16 +1,18 @@
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'goal_form.dart';
 
-class EditGoalPanel extends ConsumerWidget {
+class EditGoalPanel extends StatelessWidget {
   const EditGoalPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final editingId = ref.watch(editingGoalIdProviderNotifier);
-    final goalAsync = ref.watch(editingGoalProviderStream);
-    final repo = ref.watch(goalsRepositoryProvider);
+  Widget build(BuildContext context) {
+    final editingId = DataService.goals.editorSelectedGoal.value?.id;
+    Stream<Goal?>? goalAsync;
+    if (editingId != null) {
+      goalAsync = DataService.goals.streamGoal(editingId);
+    }
 
     final isOpen = editingId != null;
 
@@ -25,14 +27,26 @@ class EditGoalPanel extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surface,
       ),
       child: isOpen
-          ? goalAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (goal) {
+          ? StreamBuilder<Goal?>(
+              stream: goalAsync,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Error loading documents: ${snapshot.error}'),
+                    ),
+                  );
+                }
+                final goal = snapshot.data;
+
                 if (goal == null) {
                   return const Center(child: Text('No goal selected.'));
                 }
-                return GoalForm(goal: goal, repo: repo);
+                return GoalForm(goal: goal);
               },
             )
           : const SizedBox.shrink(),

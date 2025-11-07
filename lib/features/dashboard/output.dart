@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ai_tutor_python/features/dashboard/output_controller.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:py_engine_desktop/py_engine_desktop.dart';
 
 class Output extends StatefulWidget {
-  const Output({super.key, required this.controller});
-
-  final OutputController controller;
+  const Output({super.key});
 
   @override
   State<Output> createState() => _OutputState();
@@ -39,7 +37,7 @@ class _OutputState extends State<Output> {
     });
 
     // Register runner callback
-    widget.controller.bind(run: _runCode, stop: () => _forceStop());
+    DataService.output.controller.bind(run: _runCode, stop: () => _forceStop());
   }
 
   Future<void> _initializePython() async {

@@ -1,13 +1,4 @@
 import 'package:flutter_chat_core/flutter_chat_core.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-final chatServiceProvider = Provider<ChatService>((ref) {
-  final chatService = ChatService();
-  ref.onDispose(() {
-    chatService.dispose();
-  });
-  return chatService;
-});
 
 class ChatService {
   final ChatController controller = InMemoryChatController();

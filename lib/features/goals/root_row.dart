@@ -1,11 +1,10 @@
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dnd.dart';
 import 'drag_feedback.dart';
 
-class RootRow extends ConsumerWidget {
+class RootRow extends StatelessWidget {
   const RootRow({
     super.key,
     required this.goal,
@@ -17,7 +16,7 @@ class RootRow extends ConsumerWidget {
   final int index;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // Each root row is draggable (to reorder within roots).
     return LongPressDraggable<GoalDragData>(
       data: GoalDragData(goalId: goal.id, fromParentId: null),
@@ -38,8 +37,8 @@ class RootRow extends ConsumerWidget {
           ),
         ),
         onTap: () {
-          ref.read(selectedRootGoalProviderNotifier.notifier).select(goal.id);
-          ref.read(editingGoalIdProviderNotifier.notifier).open(goal.id);
+          DataService.goals.editorSelectedGoal.value = goal;
+          DataService.goals.editorSelectedRootGoal.value = goal;
         },
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

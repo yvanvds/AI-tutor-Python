@@ -1,63 +1,27 @@
-import 'package:ai_tutor_python/data/code/code_provider.dart';
-import 'package:ai_tutor_python/features/dashboard/editor_controller.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:highlight/languages/python.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 
-class Editor extends ConsumerStatefulWidget {
-  const Editor({super.key, required this.controller});
-  final EditorController controller;
+class Editor extends StatefulWidget {
+  const Editor({super.key});
 
   @override
-  ConsumerState<Editor> createState() => _EditorState();
+  State<Editor> createState() => _EditorState();
 }
 
-class _EditorState extends ConsumerState<Editor> {
-  late CodeController _controller;
-  late final ProviderSubscription<String> _codeSub;
-
+class _EditorState extends State<Editor> {
   @override
   void initState() {
     super.initState();
-    _controller = CodeController(
-      text: ref.read(codeProvider), // seed once
-      language: python, // your syntax
-    );
-
-    // Keep the EditorController in sync
-    widget.controller.bind(getValue: () => _controller.fullText);
-
-    // Provider → Controller (when codeProvider changes elsewhere)
-    _codeSub = ref.listenManual<String>(codeProvider, (prev, next) {
-      if (_controller.text != next) {
-        _setAllText(next);
-      }
-    }, fireImmediately: false);
-  }
-
-  void _setAllText(String next) {
-    _controller.fullText = next; // then optionally reset selection
-    _controller.selection = TextSelection.collapsed(offset: next.length);
-    _controller.clearComposing();
-  }
-
-  @override
-  void dispose() {
-    _codeSub.close();
-    _controller.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    //ref.watch(codeProvider);
-
     return CodeTheme(
       data: CodeThemeData(styles: monokaiSublimeTheme),
       child: CodeField(
-        controller: _controller,
+        controller: DataService.code.controller,
         textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 20),
         expands: true,
       ),

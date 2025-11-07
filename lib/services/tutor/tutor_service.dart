@@ -1,13 +1,7 @@
-import 'dart:convert';
-
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/data/ai/ai_response_provider.dart';
-import 'package:ai_tutor_python/data/code/code_provider.dart';
-import 'package:ai_tutor_python/data/status_report/report_providers.dart';
-import 'package:ai_tutor_python/data/status_report/status_report.dart';
-import 'package:ai_tutor_python/services/chat_service.dart';
-import 'package:ai_tutor_python/services/timeline/timeline.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/status_report/status_report.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -28,18 +22,18 @@ import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart'
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
 import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter/material.dart';
 
 class TutorService {
-  final Ref ref;
-  TutorService({required this.ref}) {
-    _connector = OpenaiConnector(ref: ref);
-    _conductor = Conductor(ref: ref);
+  final ValueNotifier<bool> isWorking = ValueNotifier<bool>(false);
+
+  TutorService() {
+    _connector = OpenaiConnector();
+    _conductor = Conductor();
   }
   bool _initialized = false;
 
-  InstructionGenerator get _instructionGenerator =>
-      InstructionGenerator(ref: ref);
+  InstructionGenerator get _instructionGenerator => InstructionGenerator();
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
@@ -51,16 +45,14 @@ class TutorService {
   Future<void> initializeSession() async {
     if (_initialized) return;
     _initialized = true;
-    final chat = ref.read(chatServiceProvider);
-
-    chat.clear();
+    DataService.chat.clear();
 
     await _conductor.initialize();
 
     final newQuestion = _conductor.getNextQuestion();
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
-      chat.addSystemMessage(
+      DataService.chat.addSystemMessage(
         "There are no goals available to work on. Have fun!",
       );
       return;
@@ -73,15 +65,10 @@ class TutorService {
     String? code,
     String? prompt,
   }) async {
-    final working = ref.read(tutorWorkingProvider.notifier);
-    if (working.state) return;
-    working.state = true;
+    if (isWorking.value) return;
+    isWorking.value = true;
 
-    final instructions = await _instructionGenerator.generateInstructions(
-      type,
-      _conductor.currentRootGoal!,
-      _conductor.currentChildGoal!,
-    );
+    final instructions = await _instructionGenerator.generateInstructions(type);
 
     String input = "";
     PreviousInputs includeHistory = PreviousInputs.includeSession;
@@ -170,7 +157,7 @@ class TutorService {
         inputs: includeHistory,
       );
     } finally {
-      working.state = false;
+      isWorking.value = false;
     }
     if (result != null) {
       _handleResponse(result);
@@ -205,8 +192,7 @@ class TutorService {
     final newQuestion = _conductor.getNextQuestion();
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
-      final chat = ref.read(chatServiceProvider);
-      chat.addSystemMessage(
+      DataService.chat.addSystemMessage(
         "There are no goals available to work on. Have fun!",
       );
       return;
@@ -387,30 +373,27 @@ class TutorService {
   }
 
   Future<dynamic> _resendLastRequest() async {
-    final working = ref.read(tutorWorkingProvider.notifier);
-    if (working.state) return;
-    working.state = true;
+    if (isWorking.value) return;
+    isWorking.value = true;
     dynamic result;
     try {
       result = await _connector.resendRequest();
     } finally {
-      working.state = false;
+      isWorking.value = false;
     }
 
     return result;
   }
 
   Future<void> _updateReport(String newReport) async {
-    if (_conductor.currentChildGoal == null) return;
+    if (DataService.goals.selectedChildGoal.value == null) return;
 
     // 1) Upsert child
-    await ref.read(
-      upsertStatusReportProviderFuture(
-        StatusReport(
-          goalID: _conductor.currentChildGoal!.id,
-          statusReport: newReport,
-        ),
-      ).future,
+    await DataService.report.upsert(
+      StatusReport(
+        goalID: DataService.goals.selectedChildGoal.value!.id,
+        statusReport: newReport,
+      ),
     );
   }
 
@@ -418,7 +401,7 @@ class TutorService {
     // final timeline = ref.read(timeLineProvider);
     // timeline.startNewCode(code);
     // if (updateEditor) {
-    ref.read(codeProvider.notifier).state = code;
+    DataService.code.setText(code);
     // }
   }
 
@@ -427,15 +410,13 @@ class TutorService {
     // timeline.addAiMessage(message);
 
     // if (sendToChat) {
-    final chat = ref.read(chatServiceProvider);
-    chat.addTutorMessage(message);
+    DataService.chat.addTutorMessage(message);
     // }
   }
 
   Future<void> _addSystemMessage(String message) async {
     // we won't add system messages to the code timeline
-    final chat = ref.read(chatServiceProvider);
-    chat.addSystemMessage(message);
+    DataService.chat.addSystemMessage(message);
   }
 
   Future<void> _addUserMessage(String message) async {

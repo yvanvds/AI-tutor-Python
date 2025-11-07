@@ -1,19 +1,17 @@
-import 'package:ai_tutor_python/data/config/global_config_providers.dart';
-import 'package:ai_tutor_python/data/config/local_api_key_storage.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Shown when user is logged in but does not have access to the global key
 /// AND has not yet provided a local key.
-class LocalKeyGateScreen extends ConsumerStatefulWidget {
+class LocalKeyGateScreen extends StatefulWidget {
   const LocalKeyGateScreen({super.key});
 
   @override
-  ConsumerState<LocalKeyGateScreen> createState() => _LocalKeyGateScreenState();
+  State<LocalKeyGateScreen> createState() => _LocalKeyGateScreenState();
 }
 
-class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
+class _LocalKeyGateScreenState extends State<LocalKeyGateScreen> {
   final _formKey = GlobalKey<FormState>();
   final _controller = TextEditingController();
   bool _obscure = true;
@@ -35,8 +33,7 @@ class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
     }
     setState(() => _saving = true);
     try {
-      await LocalApiKeyStorage.saveKey(text);
-      if (mounted) ref.invalidate(localApiKeyExistsProvider);
+      await DataService.globalConfig.localStorage.saveKey(text);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

@@ -1,18 +1,16 @@
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/account/account.dart';
 
-import '../../data/account/account.dart';
-import '../../data/account/account_providers.dart';
-
-class AccountsPage extends ConsumerStatefulWidget {
+class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
 
   @override
-  ConsumerState<AccountsPage> createState() => _AccountsPageState();
+  State<AccountsPage> createState() => _AccountsPageState();
 }
 
-class _AccountsPageState extends ConsumerState<AccountsPage> {
+class _AccountsPageState extends State<AccountsPage> {
   final TextEditingController _searchCtrl = TextEditingController();
 
   final ScrollController _hCtrl = ScrollController(); // horizontal
@@ -37,16 +35,24 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accountsAv = ref.watch(allAccountsProviderStream);
+    final accountStream = DataService.account.streamAllAccounts();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Accounts')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: accountsAv.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) => Center(child: Text('Error loading accounts:\n$e')),
-          data: (all) {
+        child: StreamBuilder<List<Account>>(
+          stream: accountStream,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Error loading accounts:\n${snapshot.error}'),
+              );
+            }
+            final all = snapshot.data ?? [];
             // Filter by search query (email, firstName, lastName)
             final q = _searchCtrl.text.trim().toLowerCase();
             List<Account> filtered = q.isEmpty
@@ -157,9 +163,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                                       Switch(
                                         value: a.mayUseGlobalKey,
                                         onChanged: (v) async {
-                                          await ref.read(
-                                            setMayUseGlobalKeyProvider,
-                                          )(a.uid, v);
+                                          await DataService.account
+                                              .setMayUseGlobalKey(
+                                                uid: a.uid,
+                                                value: v,
+                                              );
                                           // no need to refresh; stream updates
                                         },
                                       ),
@@ -284,7 +292,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     if (ok != true) return;
 
     try {
-      await ref.read(deleteAccountProvider)(a.uid);
+      await DataService.account.deleteAccountDoc(a.uid);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

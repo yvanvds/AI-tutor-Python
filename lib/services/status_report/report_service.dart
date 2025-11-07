@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'status_report.dart'; // your StatusReport class (shown in your message)
 
-class ReportRepository {
-  ReportRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
+class ReportService {
+  ReportService({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _db = firestore ?? FirebaseFirestore.instance,
       _auth = auth ?? FirebaseAuth.instance;
 

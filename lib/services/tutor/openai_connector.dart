@@ -1,17 +1,14 @@
 import 'dart:convert';
-import 'package:ai_tutor_python/data/config/global_config_providers.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:dart_openai/dart_openai.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter/material.dart';
 
 enum PreviousInputs { includeAll, includeSession, newSession }
 
 class OpenaiConnector {
-  final Ref ref;
-  OpenaiConnector({required this.ref});
-
   final String _apiKey = Env.apiKey;
 
   // for resend
@@ -34,7 +31,7 @@ class OpenaiConnector {
 
     OpenAI.apiKey = _apiKey;
 
-    final cfg = await ref.read(globalConfigFutureProvider.future);
+    final cfg = await DataService.globalConfig.getConfig();
     final model = (cfg?.model.isNotEmpty ?? false) ? cfg!.model : 'gpt-4o';
 
     if (inputs == PreviousInputs.newSession) {
@@ -46,7 +43,7 @@ class OpenaiConnector {
       ..add({"role": "user", "content": input});
 
     assert(() {
-      print(const JsonEncoder.withIndent('  ').convert(workingHistory));
+      debugPrint(const JsonEncoder.withIndent('  ').convert(workingHistory));
       return true;
     }());
 
@@ -111,8 +108,8 @@ class OpenaiConnector {
       scope == PreviousInputs.includeAll
           ? _allHistory
           : scope == PreviousInputs.includeSession
-              ? _sessionHistory
-              : <Map<String, dynamic>>[],
+          ? _sessionHistory
+          : <Map<String, dynamic>>[],
     );
   }
 
