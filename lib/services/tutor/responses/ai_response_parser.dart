@@ -49,8 +49,9 @@ class AIResponseParser {
             final dynamic t = contentItem['text'];
             if (t is String) results.add(t);
             // If some providers return { text: { ... } } you can add:
-            if (t is Map && t['value'] is String)
+            if (t is Map && t['value'] is String) {
               results.add(t['value'] as String);
+            }
           }
         }
       }

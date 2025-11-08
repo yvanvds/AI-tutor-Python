@@ -13,27 +13,27 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 class GuidingFeedback implements ChatResponse {
   @override
   final String type;
-  final String feedback;
-  final double understanding;
   final String prompt;
+  final double understanding;
+  final String followUp;
   final String code;
 
   GuidingFeedback({
     required this.type,
-    required this.feedback,
-    required this.understanding,
     required this.prompt,
+    required this.understanding,
+    required this.followUp,
     required this.code,
   });
 
   factory GuidingFeedback.fromMap(Map<String, dynamic> map) {
     return GuidingFeedback(
       type: map['type'] ?? '',
-      feedback: map['feedback'] ?? '',
+      prompt: map['prompt'] ?? '',
       understanding: (map['understanding'] is num)
           ? (map['understanding'] as num).toDouble()
           : 0.0,
-      prompt: map['prompt'] ?? '',
+      followUp: map['followUp'] ?? '',
       code: map['code'] ?? '',
     );
   }
@@ -41,9 +41,9 @@ class GuidingFeedback implements ChatResponse {
   @override
   Map<String, dynamic> toJson() => {
     'type': type,
-    'feedback': feedback,
-    'understanding': understanding,
     'prompt': prompt,
+    'understanding': understanding,
+    'followUp': followUp,
     'code': code,
   };
 }

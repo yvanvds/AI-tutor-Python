@@ -293,8 +293,8 @@ class TutorService {
       //
       // The AI has sent feedback on a guiding answer
       //
-      if (parsed.feedback.isNotEmpty) {
-        _addTutorMessage(parsed.feedback, true);
+      if (parsed.prompt.isNotEmpty) {
+        _addTutorMessage(parsed.prompt, true);
       }
 
       bool guidingComplete = await _conductor.guidingIsComplete(
@@ -306,8 +306,8 @@ class TutorService {
         if (parsed.code.isNotEmpty) {
           _nextCode = parsed.code;
         }
-        if (parsed.prompt.isNotEmpty) {
-          _nextMessage = parsed.prompt;
+        if (parsed.followUp.isNotEmpty) {
+          _nextMessage = parsed.followUp;
         }
         state.value = TutorState.hasFollowUp;
       } else {
@@ -317,20 +317,20 @@ class TutorService {
       //
       // The AI answered a generic question
       //
-      if (parsed.answer.isNotEmpty) {
-        _addTutorMessage(parsed.answer, true);
+      if (parsed.prompt.isNotEmpty) {
+        _addTutorMessage(parsed.prompt, true);
       }
     } else if (parsed is Hint) {
       //
       // The AI has sent a Hint
       //
-      _addTutorMessage(parsed.hint, true);
+      _addTutorMessage(parsed.prompt, true);
       _conductor.hintProvided();
     } else if (parsed is CodeFeedback) {
       //
       // The AI gives feedback on code
       //
-      if (parsed.summary.isNotEmpty) _addTutorMessage(parsed.summary, true);
+      if (parsed.prompt.isNotEmpty) _addTutorMessage(parsed.prompt, true);
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
@@ -344,7 +344,7 @@ class TutorService {
       //
       // The AI gives feedback on MCQ answer
       //
-      _addTutorMessage(parsed.explanation, true);
+      _addTutorMessage(parsed.prompt, true);
 
       await _conductor.updateProgress(parsed.quality);
       await requestExercise();
@@ -352,8 +352,8 @@ class TutorService {
       //
       // The AI gives feedback on explanation
       //
-      if (parsed.feedback.isNotEmpty) {
-        _addTutorMessage(parsed.feedback, true);
+      if (parsed.prompt.isNotEmpty) {
+        _addTutorMessage(parsed.prompt, true);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
@@ -368,8 +368,8 @@ class TutorService {
       //
       // The AI gives feedback on an answer to a socratic question
       //
-      if (parsed.feedback.isNotEmpty) {
-        _addTutorMessage(parsed.feedback, true);
+      if (parsed.prompt.isNotEmpty) {
+        _addTutorMessage(parsed.prompt, true);
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
@@ -384,7 +384,7 @@ class TutorService {
       //
       // AI gives a status report when a goal is reached
       //
-      await _updateReport(parsed.summary);
+      await _updateReport(parsed.prompt);
     } else if (parsed is ErrorResponse) {
       _addSystemMessage(parsed.message);
 

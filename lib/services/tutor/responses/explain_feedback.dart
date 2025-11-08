@@ -13,13 +13,13 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 class ExplainFeedback implements ChatResponse {
   final String type;
   final AnswerQuality quality;
-  final String feedback;
+  final String prompt;
   final String? followUp;
 
   ExplainFeedback({
     required this.type,
     required this.quality,
-    required this.feedback,
+    required this.prompt,
     this.followUp,
   });
 
@@ -27,8 +27,8 @@ class ExplainFeedback implements ChatResponse {
     return ExplainFeedback(
       type: map['type'] ?? 'explain_feedback',
       quality: _stringToQuality(map['quality']),
-      feedback: map['feedback'] ?? '',
-      followUp: map['follow_up'],
+      prompt: map['prompt'] ?? '',
+      followUp: map['followUp'],
     );
   }
 
@@ -36,8 +36,8 @@ class ExplainFeedback implements ChatResponse {
     return {
       'type': type,
       'quality': quality.name,
-      'feedback': feedback,
-      if (followUp != null) 'follow_up': followUp,
+      'feedback': prompt,
+      if (followUp != null) 'followUp': followUp,
     };
   }
 

@@ -4,13 +4,13 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 class SocraticFeedback implements ChatResponse {
   final String type;
   final AnswerQuality quality;
-  final String feedback;
+  final String prompt;
   final String? followUp;
 
   SocraticFeedback({
     required this.type,
     required this.quality,
-    required this.feedback,
+    required this.prompt,
     this.followUp,
   });
 
@@ -18,7 +18,7 @@ class SocraticFeedback implements ChatResponse {
     return SocraticFeedback(
       type: map['type'] ?? 'socratic_feedback',
       quality: _stringToQuality(map['quality']),
-      feedback: map['feedback'] ?? '',
+      prompt: map['prompt'] ?? '',
       followUp: map['follow up'] ?? map['follow_up'],
     );
   }
@@ -26,7 +26,7 @@ class SocraticFeedback implements ChatResponse {
   Map<String, dynamic> toJson() => {
     'type': type,
     'quality': quality.name,
-    'feedback': feedback,
+    'prompt': prompt,
     if (followUp != null) 'follow up': followUp,
   };
 

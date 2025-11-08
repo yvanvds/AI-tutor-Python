@@ -12,13 +12,13 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class CodeFeedback implements ChatResponse {
   final String type;
-  final String summary;
+  final String prompt;
   final String suggestion;
   final AnswerQuality quality;
 
   CodeFeedback({
     required this.type,
-    required this.summary,
+    required this.prompt,
     required this.suggestion,
     required this.quality,
   });
@@ -26,7 +26,7 @@ class CodeFeedback implements ChatResponse {
   factory CodeFeedback.fromMap(Map<String, dynamic> map) {
     return CodeFeedback(
       type: map['type'] ?? 'code_feedback',
-      summary: map['summary'] ?? '',
+      prompt: map['prompt'] ?? '',
       suggestion: map['suggestion'] ?? '',
       quality: _stringToQuality(map['quality']),
     );
@@ -35,7 +35,7 @@ class CodeFeedback implements ChatResponse {
   Map<String, dynamic> toJson() {
     return {
       'type': type,
-      'summary': summary,
+      'prompt': prompt,
       'suggestion': suggestion,
       'quality': quality.name,
     };

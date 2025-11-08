@@ -2,14 +2,14 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class StatusSummary implements ChatResponse {
   final String type;
-  final String summary;
+  final String prompt;
   final int hintsUsed;
   final List<String> commonIssues;
   final String lastExerciseType;
 
   StatusSummary({
     required this.type,
-    required this.summary,
+    required this.prompt,
     required this.hintsUsed,
     required this.commonIssues,
     required this.lastExerciseType,
@@ -19,7 +19,7 @@ class StatusSummary implements ChatResponse {
     final stats = map['stats'] ?? {};
     return StatusSummary(
       type: map['type'] ?? 'status_summary',
-      summary: map['summary'] ?? '',
+      prompt: map['prompt'] ?? '',
       hintsUsed: stats['hints_used'] ?? 0,
       commonIssues:
           (stats['common_issues'] as List?)
@@ -32,7 +32,7 @@ class StatusSummary implements ChatResponse {
 
   Map<String, dynamic> toJson() => {
     'type': type,
-    'summary': summary,
+    'prompt': prompt,
     'stats': {
       'hints_used': hintsUsed,
       'common_issues': commonIssues,

@@ -4,26 +4,26 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 class McqFeedback implements ChatResponse {
   final String type;
   final AnswerQuality quality;
-  final String explanation;
+  final String prompt;
 
   McqFeedback({
     required this.type,
     required this.quality,
-    required this.explanation,
+    required this.prompt,
   });
 
   factory McqFeedback.fromMap(Map<String, dynamic> map) {
     return McqFeedback(
       type: map['type'] ?? 'mcq_feedback',
       quality: _stringToQuality(map['quality']),
-      explanation: map['explanation'] ?? '',
+      prompt: map['prompt'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
     'type': type,
     'quality': quality.name,
-    'explanation': explanation,
+    'prompt': prompt,
   };
 
   static AnswerQuality _stringToQuality(String? value) {
