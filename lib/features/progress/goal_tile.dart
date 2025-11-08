@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:flutter/material.dart';
 
 class GoalTile extends StatelessWidget {
@@ -39,11 +40,33 @@ class GoalTile extends StatelessWidget {
                   Expanded(
                     child: Text(goal.title, style: theme.textTheme.titleMedium),
                   ),
+                  if (isSubgoal && progress < 1.0)
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final newProgress = (progress + 0.1).clamp(0.0, 1.0);
+                        await DataService.progress.upsert(
+                          Progress(goalID: goal.id, progress: newProgress),
+                        );
+                        DataService.progress.currentProgress.value =
+                            newProgress;
+                      },
+                      icon: const Icon(Icons.fast_forward),
+                      label: const Text('Ga sneller'),
+                    ),
                   if (isSubgoal)
                     ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         DataService.goals.preferredChildGoal.value = goal;
                         DataService.goals.preferredRootGoal.value = rootGoal;
+
+                        if (progress >= 1.0) {
+                          await DataService.progress.upsert(
+                            Progress(goalID: goal.id, progress: 0.5),
+                          );
+                          DataService.progress.currentProgress.value = 0.5;
+                        } else {
+                          DataService.progress.currentProgress.value = progress;
+                        }
 
                         DataService.tutor.initializeSession(force: true);
                       },

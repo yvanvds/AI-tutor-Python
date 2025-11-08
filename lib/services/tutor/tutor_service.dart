@@ -60,7 +60,7 @@ class TutorService {
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
       DataService.chat.addSystemMessage(
-        "There are no goals available to work on. Have fun!",
+        "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
       );
       return;
     }
@@ -203,11 +203,14 @@ class TutorService {
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
       DataService.chat.addSystemMessage(
-        "There are no goals available to work on. Have fun!",
+        "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
       );
       return;
     }
 
+    DataService.chat.addSystemMessage(
+      "Je volgende oefening wordt voorbereid...",
+    );
     await queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2);
   }
 
@@ -264,7 +267,7 @@ class TutorService {
       // The AI has sent instructions to write code
       //
       _currentExerciseType = parsed.type;
-      _startNewCode('# Start writing your code here\n', true);
+      _startNewCode('# Schrijf hier je code\n', true);
       _addTutorMessage(parsed.prompt, true);
     } else if (parsed is SocraticQuestion) {
       //
@@ -395,7 +398,7 @@ class TutorService {
       final result = await _resendLastRequest();
       _handleResponse(result);
     } else {
-      _addTutorMessage('Received unknown response from tutor.', false);
+      _addTutorMessage('Onbekend antwoord ontvangen.', false);
 
       // resend the request
       final result = await _resendLastRequest();
@@ -440,9 +443,17 @@ class TutorService {
     // final timeline = ref.read(timeLineProvider);
     // timeline.addAiMessage(message);
 
+    // Split message into lines
+    // final lines = message.split('\n').where((line) => line.trim().isNotEmpty);
+
+    // for (final line in lines) {
     // if (sendToChat) {
     DataService.chat.addTutorMessage(message);
     // }
+
+    // Small pause between lines
+    // await Future.delayed(const Duration(milliseconds: 500));
+    //}
   }
 
   Future<void> _addSystemMessage(String message) async {

@@ -72,6 +72,7 @@ class Controllers extends StatelessWidget {
             icon: const Icon(Icons.question_mark),
             tooltip: 'Request Hint',
             onPressed: () async {
+              DataService.chat.addMessage("Ik heb een hint nodig.");
               final code = DataService.code.getText();
               await DataService.tutor.requestHint(code);
             },
@@ -83,6 +84,7 @@ class Controllers extends StatelessWidget {
             icon: const Icon(Icons.send),
             tooltip: 'Submit Code',
             onPressed: () async {
+              DataService.chat.addMessage("Hier is mijn code.");
               final code = DataService.code.getText();
               await DataService.tutor.submitCode(code);
             },
@@ -95,6 +97,7 @@ class Controllers extends StatelessWidget {
             icon: const Icon(Icons.school),
             tooltip: 'Request Exercise',
             onPressed: () async {
+              DataService.chat.addMessage("Geef me een nieuwe oefening.");
               await DataService.tutor.requestExercise();
             },
             color: Colors.orange,

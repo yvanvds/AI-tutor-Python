@@ -35,7 +35,7 @@ class CrashRecoveryScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () async {
-                    await resetAuthAndCache();
+                    await resetAuthAndCacheAndExit();
                     exit(0);
 
                     // if (context.mounted) {

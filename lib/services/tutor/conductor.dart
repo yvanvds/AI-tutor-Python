@@ -80,22 +80,35 @@ class Conductor {
   }
 
   Future<bool> guidingIsComplete(double understanding) async {
+    _currentProgress = DataService.progress.currentProgress.value;
     _guidingUnderstanding += understanding;
 
     // updating progress here is just to give the student
     // an indication that something progresses
     // We divide the max value (1) by 5 so we can never get above 0.2 at this point
-    _currentProgress = _guidingUnderstanding / 5;
-    await _updateProgress(_currentProgress);
-    print('Updated guiding understanding: $_guidingUnderstanding');
+    final previousProgress = _currentProgress;
+
     if (_guidingUnderstanding >= 0.8) {
       _currentProgress = 0.2;
+    } else {
+      _currentProgress = (_guidingUnderstanding / 5);
+    }
+
+    DataService.chat.addSystemMessage(
+      'Vooruitgang: ${(previousProgress * 100).toStringAsFixed(1)}% -> ${(_currentProgress * 100).toStringAsFixed(1)}%',
+    );
+
+    await _updateProgress(_currentProgress);
+
+    if (_guidingUnderstanding >= 0.8) {
+      _guidingUnderstanding = 0.0;
       return true;
     }
     return false;
   }
 
   Future<bool> updateProgress(AnswerQuality quality) async {
+    _currentProgress = DataService.progress.currentProgress.value;
     bool followUpAllowed = true; // we return this value if we allow follow-ups
 
     // --- 1) base delta by answer quality ---
@@ -150,9 +163,13 @@ class Conductor {
       followUpAllowed = false;
     }
 
+    DataService.chat.addSystemMessage(
+      'Vooruitgang: ${(_currentProgress * 100).toStringAsFixed(1)}% -> ${(next * 100).toStringAsFixed(1)}%',
+    );
     _currentProgress = next;
 
     // --- 5) track history & adapt difficulty ---
+    final previousDifficulty = _difficulty;
     _answerHistory.add(quality);
     const int window = 5;
     if (_answerHistory.length > 10) {
@@ -181,6 +198,11 @@ class Conductor {
     if ((wrongCount >= 3 || (wrongCount + partialCount) >= 4) &&
         _difficulty != QuestionDifficulty.easy) {
       _difficulty = QuestionDifficulty.values[_difficulty.index - 1];
+    }
+    if (previousDifficulty != _difficulty) {
+      DataService.chat.addSystemMessage(
+        'Moeilijkheid aangepast: ${previousDifficulty.name} -> ${_difficulty.name}',
+      );
     }
 
     // --- 6) reset hints used for next question cycle ---
@@ -245,6 +267,9 @@ class Conductor {
           DataService.goals.selectedRootGoal.value = root;
           DataService.goals.selectedChildGoal.value = targetChild;
           DataService.progress.currentProgress.value = progressFor(targetChild);
+          DataService.chat.addSystemMessage(
+            'Nieuw doel geselecteerd: ${targetChild.title}',
+          );
           return true;
         }
         // else: all children complete -> try next root

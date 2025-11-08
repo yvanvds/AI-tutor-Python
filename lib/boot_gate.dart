@@ -46,19 +46,20 @@ class _BootGateState extends State<BootGate> {
           title: const Text('Safe Mode'),
           content: const Text(
             'You started the app with Shift held.\n\n'
-            'Use this to recover from permission or cache issues.',
+            'Use this to recover from permission or cache issues.\n\n'
+            'The application will close after you choose an option below.',
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Continue without reset
               },
-              child: const Text('Continue'),
+              child: const Text('Don\'t Reset'),
             ),
             FilledButton(
               onPressed: () async {
                 // Run your hard reset
-                await resetAuthAndCache();
+                await resetAuthAndCacheAndExit();
 
                 if (context.mounted) {
                   Navigator.of(context).pop(); // close dialog
@@ -70,7 +71,7 @@ class _BootGateState extends State<BootGate> {
                   // );
                 }
               },
-              child: const Text('Reset & Sign out'),
+              child: const Text('Reset & Exit'),
             ),
           ],
         );
