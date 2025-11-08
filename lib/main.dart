@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart'; // for kDebugMode
 import 'firebase_options.dart';
 import 'features/auth/sign_in_page.dart';
 import 'home_shell.dart';

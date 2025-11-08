@@ -65,7 +65,7 @@ class GoalsService {
 
   Future<List<Goal>> getRootGoalsOnce() async {
     final s = await safeFirestore(
-      () => _collection.where('parentId', isNull: true).get(),
+      () => _collection.where('parentId', isNull: true).orderBy('order').get(),
     );
     return s.docs.map(Goal.fromDoc).toList();
   }

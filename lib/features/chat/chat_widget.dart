@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
@@ -45,6 +46,13 @@ class _TutorState extends State<ChatWidget> {
                   await DataService.tutor.handleStudentMessage(text);
                 },
                 builders: Builders(
+                  composerBuilder: (context) {
+                    if (DataService.tutor.isWorking.value) {
+                      return ComposerWaitWidget();
+                    } else {
+                      return Composer();
+                    }
+                  },
                   chatAnimatedListBuilder: (context, itemBuilder) {
                     return ChatAnimatedListReversed(itemBuilder: itemBuilder);
                   },
@@ -94,21 +102,6 @@ class _TutorState extends State<ChatWidget> {
                   // Simple user resolver
                   return User(id: id, name: id == 'user1' ? 'You' : 'Tutor');
                 },
-              ),
-            ),
-            SizedBox(
-              height: 36,
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: DataService.tutor.isWorking.value
-                      ? LoadingAnimationWidget.staggeredDotsWave(
-                          key: const ValueKey('loader'),
-                          color: Colors.blue,
-                          size: 36,
-                        )
-                      : const SizedBox.shrink(key: ValueKey('no-loader')),
-                ),
               ),
             ),
           ],

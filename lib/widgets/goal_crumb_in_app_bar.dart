@@ -1,17 +1,22 @@
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
+import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 
 class GoalCrumbInAppBar extends StatelessWidget {
   const GoalCrumbInAppBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: DataService.progress.currentProgress,
-      builder: (context, vm, child) {
-        final root = DataService.goals.selectedRootGoal.value?.title ?? "";
-        final child = DataService.goals.selectedChildGoal.value?.title ?? "";
-        final progress = DataService.progress.currentProgress.value;
+    return MultiValueListenableBuilder(
+      listenables: [
+        DataService.goals.selectedRootGoal,
+        DataService.goals.selectedChildGoal,
+        DataService.progress.currentProgress,
+      ],
+      builder: (context, values) {
+        final root = values[0]?.title ?? "";
+        final child = values[1]?.title ?? "";
+        final progress = values[2] ?? 0.0;
 
         if (root == "" && child == "") {
           return const SizedBox.shrink(); // nothing selected yet

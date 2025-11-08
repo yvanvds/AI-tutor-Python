@@ -5,15 +5,6 @@ import 'package:ai_tutor_python/services/instructions/instruction.dart';
 
 class InstructionGenerator {
   late final Stream<List<Instruction>> instructionsStream;
-  List<Instruction> _latestInstructions = [];
-
-  InstructionGenerator() {
-    instructionsStream = DataService.instructions.watchAll();
-
-    instructionsStream.listen((instructions) {
-      _latestInstructions = instructions;
-    });
-  }
 
   Future<String> generateInstructions(ChatRequestType type) async {
     if (DataService.goals.selectedRootGoal.value == null ||
@@ -22,7 +13,7 @@ class InstructionGenerator {
     }
 
     // Implementation for generating instruction using OpenAI or other services
-    final instructions = _latestInstructions;
+    final instructions = await DataService.instructions.getAll();
 
     final knownConcepts = await _getMasteredConcepts();
 

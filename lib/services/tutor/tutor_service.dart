@@ -42,8 +42,8 @@ class TutorService {
 
   // ---- Public API -----------------------------------------------------------
 
-  Future<void> initializeSession() async {
-    if (_initialized) return;
+  Future<void> initializeSession({bool force = false}) async {
+    if (_initialized && !force) return;
     _initialized = true;
     DataService.chat.clear();
 

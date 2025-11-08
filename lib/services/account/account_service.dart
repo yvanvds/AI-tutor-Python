@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,10 @@ class AccountService {
   AccountService() {
     _subscription = watchMyAccount().listen((account) {
       currentAccount.value = account;
+      // if account is changed, we need to check progress again
+      if (account != null) {
+        DataService.tutor.initializeSession(force: true);
+      }
     });
   }
 
