@@ -11,12 +11,14 @@ class GoalCrumbInAppBar extends StatelessWidget {
       listenables: [
         DataService.goals.selectedRootGoal,
         DataService.goals.selectedChildGoal,
+        DataService.goals.preferredRootGoal,
+        DataService.goals.preferredChildGoal,
         DataService.progress.currentProgress,
       ],
       builder: (context, values) {
-        final root = values[0]?.title ?? "";
-        final child = values[1]?.title ?? "";
-        final progress = values[2] ?? 0.0;
+        final root = values[2]?.title ?? values[0]?.title ?? "";
+        final child = values[3]?.title ?? values[1]?.title ?? "";
+        final progress = values[4] ?? 0.0;
 
         if (root == "" && child == "") {
           return const SizedBox.shrink(); // nothing selected yet

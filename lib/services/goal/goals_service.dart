@@ -14,6 +14,9 @@ class GoalsService {
   final ValueNotifier<Goal?> editorSelectedRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> editorSelectedGoal = ValueNotifier(null);
 
+  final ValueNotifier<Goal?> preferredRootGoal = ValueNotifier(null);
+  final ValueNotifier<Goal?> preferredChildGoal = ValueNotifier(null);
+
   Stream<List<Goal>>? get streamRoots {
     final q = _collection.where('parentId', isNull: true).orderBy('order');
     return safeFirestoreStream(

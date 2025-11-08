@@ -21,16 +21,19 @@ class Conductor {
 
   ChatRequestType? _currentQuestionType;
 
-  Future<void> initialize() async {
-    // 1. Set target goal
-    await _setTargetGoal();
+  Future<void> setTarget() async {
+    if (DataService.goals.preferredChildGoal.value == null) {
+      // 1. Set target goal
+      await _setTargetGoal();
+    }
 
     // 2. Get the current progress
     _currentProgress = await _getCurrentProgress();
   }
 
   (ChatRequestType, QuestionDifficulty) getNextQuestion() {
-    if (DataService.goals.selectedChildGoal.value == null) {
+    if (DataService.goals.selectedChildGoal.value == null &&
+        DataService.goals.preferredChildGoal.value == null) {
       return (ChatRequestType.noResult, _difficulty);
     }
 
@@ -186,6 +189,11 @@ class Conductor {
 
     // 7. check for goal completion
     if (_currentProgress >= 1.0) {
+      // if a prefered goal is set, it should now be marked as complete
+      if (DataService.goals.preferredChildGoal.value != null) {
+        DataService.goals.preferredChildGoal.value = null;
+        DataService.goals.preferredRootGoal.value = null;
+      }
       // mark goal as complete and select next
       await _setTargetGoal();
 
@@ -249,7 +257,9 @@ class Conductor {
   // --- helpers / progress ---
 
   Future<double> _getCurrentProgress() async {
-    final currentChildGoal = DataService.goals.selectedChildGoal.value;
+    final currentChildGoal =
+        DataService.goals.preferredChildGoal.value ??
+        DataService.goals.selectedChildGoal.value;
     final progress = await DataService.progress.getByGoalId(
       currentChildGoal?.id ?? '',
     );
@@ -262,10 +272,14 @@ class Conductor {
   }
 
   Future<void> _updateProgress(double newProgress) async {
-    if (DataService.goals.selectedChildGoal.value == null) return;
+    if (DataService.goals.selectedChildGoal.value == null &&
+        DataService.goals.preferredChildGoal.value == null)
+      return;
 
     // 1) Upsert child
-    final currentChildGoal = DataService.goals.selectedChildGoal.value;
+    final currentChildGoal =
+        DataService.goals.preferredChildGoal.value ??
+        DataService.goals.selectedChildGoal.value;
     await DataService.progress.upsert(
       Progress(goalID: currentChildGoal!.id, progress: newProgress),
     );
@@ -273,7 +287,9 @@ class Conductor {
 
     if (DataService.goals.selectedRootGoal.value == null) return;
 
-    final currentRootGoal = DataService.goals.selectedRootGoal.value;
+    final currentRootGoal =
+        DataService.goals.preferredRootGoal.value ??
+        DataService.goals.selectedRootGoal.value;
 
     // 2) Read child goals under the current root (provider names are examples)
     final children = await DataService.goals.getChildrenOnce(

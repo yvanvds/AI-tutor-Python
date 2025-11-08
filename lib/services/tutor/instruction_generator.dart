@@ -15,7 +15,11 @@ class InstructionGenerator {
     // Implementation for generating instruction using OpenAI or other services
     final instructions = await DataService.instructions.getAll();
 
-    final knownConcepts = await _getMasteredConcepts();
+    final targetGoal =
+        DataService.goals.preferredRootGoal.value ??
+        DataService.goals.selectedRootGoal.value!;
+
+    final knownConcepts = await _getMasteredConcepts(targetGoal);
 
     final typeString = _chatRequestTypeToString(type);
 
@@ -26,8 +30,10 @@ class InstructionGenerator {
         for (var content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            DataService.goals.selectedRootGoal.value!,
-            DataService.goals.selectedChildGoal.value!,
+            DataService.goals.preferredRootGoal.value ??
+                DataService.goals.selectedRootGoal.value!,
+            DataService.goals.preferredChildGoal.value ??
+                DataService.goals.selectedChildGoal.value!,
             knownConcepts,
           );
           output += "$processed\n";
@@ -67,7 +73,7 @@ class InstructionGenerator {
       'goal': goal.title,
       'subgoal': subGoal.title,
       'suggestions': subGoal.suggestions.join("\n"),
-      'knownConcepts': knownConcepts.join("\n"),
+      'known concepts': knownConcepts.join("\n"),
     };
 
     for (final entry in replacements.entries) {
@@ -81,22 +87,19 @@ class InstructionGenerator {
     return output;
   }
 
-  Future<List<String>> _getMasteredConcepts() async {
-    // Retrieve all root goals
+  Future<List<String>> _getMasteredConcepts(Goal targetGoal) async {
+    // Ordered by `order`
     final rootGoals = await DataService.goals.getRootGoalsOnce();
-    // Retrieve all progress records
-    final progressList = await DataService.progress.getAll();
 
-    // Create a map for quick lookup of progress by goalID
-    final progressMap = {for (var p in progressList) p.goalID: p.progress};
+    final masteredConcepts = <String>{};
 
-    final Set<String> masteredConcepts = {};
-
+    // Collect concepts from all root goals that come *before* the target goal.
     for (final goal in rootGoals) {
-      final goalProgress = progressMap[goal.id] ?? 0.0;
-      if (goalProgress >= 1.0) {
-        masteredConcepts.addAll(goal.knownConcepts);
+      // Stop once we reach (or pass) the target position.
+      if (goal.order >= targetGoal.order || goal.id == targetGoal.id) {
+        break;
       }
+      masteredConcepts.addAll(goal.knownConcepts);
     }
 
     return masteredConcepts.toList();

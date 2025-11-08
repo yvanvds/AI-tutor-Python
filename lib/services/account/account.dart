@@ -5,6 +5,7 @@ class Account {
   final String email;
   final String firstName;
   final String lastName;
+  final String targetGoal;
   final bool mayUseGlobalKey;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
@@ -14,6 +15,7 @@ class Account {
     required this.email,
     required this.firstName,
     required this.lastName,
+    required this.targetGoal,
     this.mayUseGlobalKey = false, // default to false for safety/back-compat
     this.createdAt,
     this.updatedAt,
@@ -31,6 +33,7 @@ class Account {
       'email': email,
       'firstName': firstName,
       'lastName': lastName,
+      'targetGoal': targetGoal,
       'mayUseGlobalKey': mayUseGlobalKey, // NEW
     };
     if (includeTimestamps) {
@@ -46,6 +49,7 @@ class Account {
       email: data['email'] as String? ?? '',
       firstName: data['firstName'] as String? ?? '',
       lastName: data['lastName'] as String? ?? '',
+      targetGoal: data['targetGoal'] as String? ?? '',
       mayUseGlobalKey: (data['mayUseGlobalKey'] as bool?) ?? false, // NEW
       createdAt: data['createdAt'] as Timestamp?,
       updatedAt: data['updatedAt'] as Timestamp?,
@@ -64,6 +68,7 @@ class Account {
     String? email,
     String? firstName,
     String? lastName,
+    String? targetGoal,
     bool? mayUseGlobalKey,
     Timestamp? createdAt,
     Timestamp? updatedAt,
@@ -73,6 +78,7 @@ class Account {
     if (email != null) updates['email'] = email;
     if (firstName != null) updates['firstName'] = firstName;
     if (lastName != null) updates['lastName'] = lastName;
+    if (targetGoal != null) updates['targetGoal'] = targetGoal;
     if (mayUseGlobalKey != null) updates['mayUseGlobalKey'] = mayUseGlobalKey;
     if (createdAt != null) updates['createdAt'] = createdAt;
     if (updatedAt != null) updates['updatedAt'] = updatedAt;

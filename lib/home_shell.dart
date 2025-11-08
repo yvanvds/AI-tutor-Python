@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
@@ -51,6 +52,11 @@ class _HomeShellState extends State<HomeShell> {
             selectedIcon: Icon(Icons.dashboard),
             label: Text('Dashboard'),
           ),
+          const NavigationRailDestination(
+            icon: Icon(Icons.flag_outlined),
+            selectedIcon: Icon(Icons.flag),
+            label: Text('Progress'),
+          ),
           if (isTeacher)
             const NavigationRailDestination(
               icon: Icon(Icons.flag_outlined),
@@ -77,13 +83,15 @@ class _HomeShellState extends State<HomeShell> {
 
         // Pick the current page
         final Widget page;
-        if (isTeacher && _selectedIndex == 1) {
-          page = const GoalsPage();
-        } else if (isTeacher && _selectedIndex == 2) {
-          page = const InstructionsEditorPage();
-        } else if (_selectedIndex == 0) {
+        if (_selectedIndex == 0) {
           page = const Dashboard();
-        } else if (_selectedIndex == 3 && isTeacher) {
+        } else if (_selectedIndex == 1) {
+          page = const StudentProgressList();
+        } else if (isTeacher && _selectedIndex == 2) {
+          page = const GoalsPage();
+        } else if (isTeacher && _selectedIndex == 3) {
+          page = const InstructionsEditorPage();
+        } else if (_selectedIndex == 4 && isTeacher) {
           page = const AccountsPage();
         } else {
           page = const Center(child: Text('Page not found'));

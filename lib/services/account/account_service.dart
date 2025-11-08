@@ -123,6 +123,13 @@ class AccountService {
     });
   }
 
+  Future<void> setTargetGoal({required String targetGoal}) async {
+    await _doc(currentUid!).set({
+      'targetGoal': targetGoal,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Toggle/assign the `mayUseGlobalKey` flag (for teacher UI).
   Future<void> setMayUseGlobalKey({
     required String uid,

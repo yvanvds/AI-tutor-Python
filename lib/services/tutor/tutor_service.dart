@@ -54,7 +54,7 @@ class TutorService {
     _initialized = true;
     DataService.chat.clear();
 
-    await _conductor.initialize();
+    await _conductor.setTarget();
 
     final newQuestion = _conductor.getNextQuestion();
 
@@ -155,6 +155,9 @@ class TutorService {
       case ChatRequestType.noResult:
         return;
     }
+
+    // debugPrint(instructions);
+    // debugPrint(input);
 
     dynamic result;
     try {
