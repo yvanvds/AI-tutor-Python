@@ -7,6 +7,8 @@ import 'package:ai_tutor_python/services/instructions/instructions_service.dart'
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/role/role_service.dart';
+import 'package:ai_tutor_python/services/sound/sound_service.dart';
+import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:get_it/get_it.dart';
@@ -26,6 +28,8 @@ class DataService {
     _locator.registerLazySingleton(() => TutorService());
     _locator.registerLazySingleton(() => CodeService());
     _locator.registerLazySingleton(() => OutputService());
+    _locator.registerLazySingleton(() => SplashService());
+    _locator.registerLazySingleton(() => SoundService());
   }
 
   static AccountService get account => _locator<AccountService>();
@@ -41,4 +45,6 @@ class DataService {
   static TutorService get tutor => _locator<TutorService>();
   static CodeService get code => _locator<CodeService>();
   static OutputService get output => _locator<OutputService>();
+  static SplashService get splash => _locator<SplashService>();
+  static SoundService get sound => _locator<SoundService>();
 }

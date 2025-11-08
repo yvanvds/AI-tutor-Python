@@ -39,6 +39,8 @@ class Conductor {
 
     // Step 1: choose candidate pool based on progress band
     final List<ChatRequestType> candidates;
+    _currentProgress = DataService.progress.currentProgress.value;
+
     if (_currentProgress < 0.2) {
       candidates = const [ChatRequestType.guidingQuestion];
     } else if (_currentProgress < 0.4) {
@@ -102,6 +104,7 @@ class Conductor {
 
     if (_guidingUnderstanding >= 0.8) {
       _guidingUnderstanding = 0.0;
+      DataService.sound.guidingComplete();
       return true;
     }
     return false;
@@ -110,6 +113,10 @@ class Conductor {
   Future<bool> updateProgress(AnswerQuality quality) async {
     _currentProgress = DataService.progress.currentProgress.value;
     bool followUpAllowed = true; // we return this value if we allow follow-ups
+
+    if (quality == AnswerQuality.correct) {
+      DataService.sound.correctAnswer();
+    }
 
     // --- 1) base delta by answer quality ---
     final double baseDelta = switch (quality) {
@@ -211,6 +218,17 @@ class Conductor {
 
     // 7. check for goal completion
     if (_currentProgress >= 1.0) {
+      final goal =
+          DataService.goals.preferredChildGoal.value ??
+          DataService.goals.selectedChildGoal.value;
+
+      // show splash
+      DataService.splash.showGoalReached(
+        goalTitle: goal?.title ?? 'Onbekend doel',
+        description: goal?.description ?? '',
+      );
+      DataService.sound.playGoalReached();
+
       // if a prefered goal is set, it should now be marked as complete
       if (DataService.goals.preferredChildGoal.value != null) {
         DataService.goals.preferredChildGoal.value = null;

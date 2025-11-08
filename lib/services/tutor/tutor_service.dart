@@ -251,6 +251,7 @@ class TutorService {
 
       // add message to timeline and chat
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
     } else if (parsed is ExplainCode) {
       //
       // The AI has sent Code to Explain
@@ -262,6 +263,7 @@ class TutorService {
 
       // add message to timeline and chat
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
     } else if (parsed is WriteCode) {
       //
       // The AI has sent instructions to write code
@@ -269,6 +271,7 @@ class TutorService {
       _currentExerciseType = parsed.type;
       _startNewCode('# Schrijf hier je code\n', true);
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
     } else if (parsed is SocraticQuestion) {
       //
       // The AI has sent a socratic question
@@ -277,6 +280,7 @@ class TutorService {
       _startNewCode('', true);
 
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
     } else if (parsed is MultipleChoice) {
       //
       // the AI has sent a multiple choice question
@@ -288,6 +292,7 @@ class TutorService {
       for (final option in parsed.options) {
         _addTutorMessage(option, true);
       }
+      DataService.sound.askQuestion();
     } else if (parsed is GuidingExcercise) {
       //
       // The AI has sent a guiding question
@@ -295,12 +300,14 @@ class TutorService {
       _currentExerciseType = parsed.type;
       _startNewCode(parsed.code, true);
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
     } else if (parsed is GuidingFeedback) {
       //
       // The AI has sent feedback on a guiding answer
       //
       if (parsed.prompt.isNotEmpty) {
         _addTutorMessage(parsed.prompt, true);
+        DataService.sound.askQuestion();
       }
 
       bool guidingComplete = await _conductor.guidingIsComplete(
@@ -325,18 +332,23 @@ class TutorService {
       //
       if (parsed.prompt.isNotEmpty) {
         _addTutorMessage(parsed.prompt, true);
+        DataService.sound.askQuestion();
       }
     } else if (parsed is Hint) {
       //
       // The AI has sent a Hint
       //
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
       _conductor.hintProvided();
     } else if (parsed is CodeFeedback) {
       //
       // The AI gives feedback on code
       //
-      if (parsed.prompt.isNotEmpty) _addTutorMessage(parsed.prompt, true);
+      if (parsed.prompt.isNotEmpty) {
+        _addTutorMessage(parsed.prompt, true);
+        DataService.sound.askQuestion();
+      }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
@@ -351,6 +363,7 @@ class TutorService {
       // The AI gives feedback on MCQ answer
       //
       _addTutorMessage(parsed.prompt, true);
+      DataService.sound.askQuestion();
 
       await _conductor.updateProgress(parsed.quality);
       await requestExercise();
@@ -360,6 +373,7 @@ class TutorService {
       //
       if (parsed.prompt.isNotEmpty) {
         _addTutorMessage(parsed.prompt, true);
+        DataService.sound.askQuestion();
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
@@ -376,6 +390,7 @@ class TutorService {
       //
       if (parsed.prompt.isNotEmpty) {
         _addTutorMessage(parsed.prompt, true);
+        DataService.sound.askQuestion();
       }
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
@@ -449,7 +464,6 @@ class TutorService {
     // for (final line in lines) {
     // if (sendToChat) {
     DataService.chat.addTutorMessage(message);
-    // }
 
     // Small pause between lines
     // await Future.delayed(const Duration(milliseconds: 500));

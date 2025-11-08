@@ -1,7 +1,7 @@
 ﻿name: ai_tutor_python
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.1+13
+version: 1.0.1+14
 
 environment:
   sdk: ^3.9.2
@@ -39,6 +39,8 @@ dependencies:
   uuid: ^4.5.2
   get_it: ^9.0.5
   provider: ^6.1.5+1
+  lottie: ^3.2.0
+  audioplayers: ^6.5.1
 
 dev_dependencies:
   flutter_test:
@@ -55,8 +57,12 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - google_fonts/
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+    - assets/images/Confetti.json
+    - assets/sounds/goal_reached.mp3
+    - assets/sounds/note.mp3
+    - assets/sounds/question.mp3
+    - assets/sounds/chime.mp3
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -91,6 +97,7 @@ flutter:
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
 
 
 

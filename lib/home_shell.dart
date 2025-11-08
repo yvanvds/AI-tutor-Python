@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
+import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -31,114 +32,119 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiValueListenableBuilder(
-      listenables: [
-        DataService.role.isTeacher,
-        DataService.account.currentAccount,
+    return Stack(
+      children: [
+        MultiValueListenableBuilder(
+          listenables: [
+            DataService.role.isTeacher,
+            DataService.account.currentAccount,
+          ],
+          builder: (context, values) {
+            final isTeacher = values[0] as bool;
+            final currentAccount = values[1] as Account?;
+
+            // Title (same behavior you had)
+            final titleText = currentAccount != null
+                ? "Welcome back ${currentAccount.firstName}, let's learn!"
+                : 'Welcome…';
+
+            // Build destinations based on permissions
+            final destinations = <NavigationRailDestination>[
+              const NavigationRailDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: Text('Dashboard'),
+              ),
+              const NavigationRailDestination(
+                icon: Icon(Icons.flag_outlined),
+                selectedIcon: Icon(Icons.flag),
+                label: Text('Progress'),
+              ),
+              if (isTeacher)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.flag_outlined),
+                  selectedIcon: Icon(Icons.flag),
+                  label: Text('Goals'),
+                ),
+              if (isTeacher)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.integration_instructions_outlined),
+                  selectedIcon: Icon(Icons.integration_instructions),
+                  label: Text('Instructions'),
+                ),
+              if (isTeacher)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.account_circle_outlined),
+                  selectedIcon: Icon(Icons.account_circle),
+                  label: Text('Accounts'),
+                ),
+            ];
+
+            // Clamp index if teacher flag changes (e.g., on first load)
+            final maxIndex = destinations.length - 1;
+            if (_selectedIndex > maxIndex) _selectedIndex = 0;
+
+            // Pick the current page
+            final Widget page;
+            if (_selectedIndex == 0) {
+              page = const Dashboard();
+            } else if (_selectedIndex == 1) {
+              page = const StudentProgressList();
+            } else if (isTeacher && _selectedIndex == 2) {
+              page = const GoalsPage();
+            } else if (isTeacher && _selectedIndex == 3) {
+              page = const InstructionsEditorPage();
+            } else if (_selectedIndex == 4 && isTeacher) {
+              page = const AccountsPage();
+            } else {
+              page = const Center(child: Text('Page not found'));
+            }
+
+            return Scaffold(
+              appBar: AppBar(
+                titleSpacing: 12,
+                title: Row(
+                  children: [
+                    // Left: welcome text
+                    Flexible(
+                      flex: 2,
+                      child: Text(titleText, overflow: TextOverflow.ellipsis),
+                    ),
+                    // Middle: goal/subgoal/progress
+                    Expanded(
+                      flex: 3,
+                      child: Center(child: const GoalCrumbInAppBar()),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Sign out',
+                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    icon: const Icon(Icons.logout),
+                  ),
+                ],
+              ),
+
+              body: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: (i) =>
+                        setState(() => _selectedIndex = i),
+                    labelType: NavigationRailLabelType.selected,
+                    leading: const SizedBox(height: 8),
+                    destinations: destinations,
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: page),
+                ],
+              ),
+            );
+          },
+        ),
+        const GoalSplashOverlay(),
       ],
-      builder: (context, values) {
-        final isTeacher = values[0] as bool;
-        final currentAccount = values[1] as Account?;
-
-        // Title (same behavior you had)
-        final titleText = currentAccount != null
-            ? "Welcome back ${currentAccount.firstName}, let's learn!"
-            : 'Welcome…';
-
-        // Build destinations based on permissions
-        final destinations = <NavigationRailDestination>[
-          const NavigationRailDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: Text('Dashboard'),
-          ),
-          const NavigationRailDestination(
-            icon: Icon(Icons.flag_outlined),
-            selectedIcon: Icon(Icons.flag),
-            label: Text('Progress'),
-          ),
-          if (isTeacher)
-            const NavigationRailDestination(
-              icon: Icon(Icons.flag_outlined),
-              selectedIcon: Icon(Icons.flag),
-              label: Text('Goals'),
-            ),
-          if (isTeacher)
-            const NavigationRailDestination(
-              icon: Icon(Icons.integration_instructions_outlined),
-              selectedIcon: Icon(Icons.integration_instructions),
-              label: Text('Instructions'),
-            ),
-          if (isTeacher)
-            const NavigationRailDestination(
-              icon: Icon(Icons.account_circle_outlined),
-              selectedIcon: Icon(Icons.account_circle),
-              label: Text('Accounts'),
-            ),
-        ];
-
-        // Clamp index if teacher flag changes (e.g., on first load)
-        final maxIndex = destinations.length - 1;
-        if (_selectedIndex > maxIndex) _selectedIndex = 0;
-
-        // Pick the current page
-        final Widget page;
-        if (_selectedIndex == 0) {
-          page = const Dashboard();
-        } else if (_selectedIndex == 1) {
-          page = const StudentProgressList();
-        } else if (isTeacher && _selectedIndex == 2) {
-          page = const GoalsPage();
-        } else if (isTeacher && _selectedIndex == 3) {
-          page = const InstructionsEditorPage();
-        } else if (_selectedIndex == 4 && isTeacher) {
-          page = const AccountsPage();
-        } else {
-          page = const Center(child: Text('Page not found'));
-        }
-
-        return Scaffold(
-          appBar: AppBar(
-            titleSpacing: 12,
-            title: Row(
-              children: [
-                // Left: welcome text
-                Flexible(
-                  flex: 2,
-                  child: Text(titleText, overflow: TextOverflow.ellipsis),
-                ),
-                // Middle: goal/subgoal/progress
-                Expanded(
-                  flex: 3,
-                  child: Center(child: const GoalCrumbInAppBar()),
-                ),
-              ],
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'Sign out',
-                onPressed: () => FirebaseAuth.instance.signOut(),
-                icon: const Icon(Icons.logout),
-              ),
-            ],
-          ),
-
-          body: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (i) =>
-                    setState(() => _selectedIndex = i),
-                labelType: NavigationRailLabelType.selected,
-                leading: const SizedBox(height: 8),
-                destinations: destinations,
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(child: page),
-            ],
-          ),
-        );
-      },
     );
   }
 
