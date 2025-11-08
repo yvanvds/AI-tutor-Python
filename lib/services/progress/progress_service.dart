@@ -1,16 +1,19 @@
 import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import 'progress.dart'; // your Progress class (shown in your message)
 
-class ProgressRepository {
-  ProgressRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
+class ProgressService {
+  ProgressService({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _db = firestore ?? FirebaseFirestore.instance,
       _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
+
+  final ValueNotifier<double> currentProgress = ValueNotifier(0.0);
 
   String get _uid {
     final uid = _auth.currentUser?.uid;

@@ -1,7 +1,6 @@
-import 'package:ai_tutor_python/data/account/account_repository.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// A sign-in page that toggles into a register mode on first Register click.
 class SignInPage extends StatefulWidget {
@@ -89,8 +88,7 @@ class _SignInPageState extends State<SignInPage> with TickerProviderStateMixin {
 
       await cred.user?.updateDisplayName('$first $last');
 
-      final repo = AccountRepository(FirebaseFirestore.instance, auth);
-      await repo.upsertAccount(
+      await DataService.account.upsertAccount(
         uid: cred.user!.uid,
         firstName: first,
         lastName: last,

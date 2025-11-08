@@ -1,14 +1,26 @@
 import 'dart:async';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import 'account.dart';
 
-class AccountRepository {
-  AccountRepository(this._firestore, this._auth);
+class AccountService {
+  AccountService() {
+    _subscription = watchMyAccount().listen((account) {
+      currentAccount.value = account;
+      // if account is changed, we need to check progress again
+      if (account != null) {
+        DataService.tutor.initializeSession(force: true);
+      }
+    });
+  }
 
-  final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  late final StreamSubscription<Account?> _subscription;
+  final ValueNotifier<Account?> currentAccount = ValueNotifier<Account?>(null);
 
   String? get currentUid => _auth.currentUser?.uid;
 
@@ -142,6 +154,10 @@ class AccountRepository {
   /// If your accounts have subcollections (e.g., progress), consider cascading delete with Cloud Functions.
   Future<void> deleteAccountDoc(String uid) async {
     await _doc(uid).delete();
+  }
+
+  void dispose() {
+    _subscription.cancel();
   }
 }
 

@@ -1,6 +1,6 @@
 // lib/features/instructions/instructions_editor_page.dart
-import 'package:ai_tutor_python/data/instructions/instruction.dart';
-import 'package:ai_tutor_python/data/instructions/instructions_provider.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/features/instructions/doc_header.dart';
 import 'package:ai_tutor_python/features/instructions/doc_list.dart';
 import 'package:ai_tutor_python/features/instructions/editor_pane.dart';
@@ -8,19 +8,16 @@ import 'package:ai_tutor_python/features/instructions/section_header.dart';
 import 'package:ai_tutor_python/features/instructions/sections_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:highlight/languages/markdown.dart';
 
-class InstructionsEditorPage extends ConsumerStatefulWidget {
+class InstructionsEditorPage extends StatefulWidget {
   const InstructionsEditorPage({super.key});
 
   @override
-  ConsumerState<InstructionsEditorPage> createState() =>
-      _InstructionsEditorPageState();
+  State<InstructionsEditorPage> createState() => _InstructionsEditorPageState();
 }
 
-class _InstructionsEditorPageState
-    extends ConsumerState<InstructionsEditorPage> {
+class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
   String? _selectedDocId;
   Instruction? _original; // last fetched/saved version
   Map<String, String> _workingSections = {};
@@ -106,14 +103,15 @@ class _InstructionsEditorPageState
 
   Future<void> _deleteDocument() async {
     if (!_hasDocSelected) return;
-    final repo = ref.read(instructionsRepositoryProvider);
+
     final confirm = await _confirm(
       context,
       'Delete “${_selectedDocId!}”?',
       'This will permanently delete the document.',
     );
     if (confirm != true) return;
-    await repo.delete(_selectedDocId!);
+    await DataService.instructions.delete(_selectedDocId!);
+
     setState(() {
       _selectedDocId = null;
       _original = null;
@@ -128,9 +126,9 @@ class _InstructionsEditorPageState
 
   Future<void> _saveDocument() async {
     if (!_hasDocSelected) return;
-    final repo = ref.read(instructionsRepositoryProvider);
     final toSave = Instruction(id: _selectedDocId!, sections: _workingSections);
-    await repo.upsert(toSave);
+    await DataService.instructions.upsert(toSave);
+
     setState(() {
       _original = toSave;
     });
@@ -188,7 +186,8 @@ class _InstructionsEditorPageState
 
   @override
   Widget build(BuildContext context) {
-    final docsAsync = ref.watch(instructionsListProviderStream);
+    final Stream<List<Instruction>> docsAsync = DataService.instructions
+        .watchAll();
 
     return Scaffold(
       appBar: AppBar(
@@ -218,19 +217,27 @@ class _InstructionsEditorPageState
           // Left: documents list
           SizedBox(
             width: 280,
-            child: docsAsync.when(
-              data: (docs) => DocsList(
-                docs: docs,
-                selectedId: _selectedDocId,
-                onSelect: (doc) => _selectDocument(doc),
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('Error loading documents: $e'),
-                ),
-              ),
+            child: StreamBuilder<List<Instruction>>(
+              stream: docsAsync,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Error loading documents: ${snapshot.error}'),
+                    ),
+                  );
+                }
+                final docs = snapshot.data ?? [];
+                return DocsList(
+                  docs: docs,
+                  selectedId: _selectedDocId,
+                  onSelect: (doc) => _selectDocument(doc),
+                );
+              },
             ),
           ),
 
@@ -318,10 +325,9 @@ class _InstructionsEditorPageState
     if (target.isEmpty || target == _selectedDocId) return;
 
     // Implement "rename" by copy + delete for simplicity.
-    final repo = ref.read(instructionsRepositoryProvider);
     final data = Instruction(id: target, sections: _workingSections);
-    await repo.upsert(data);
-    await repo.delete(_selectedDocId!);
+    await DataService.instructions.upsert(data);
+    await DataService.instructions.delete(_selectedDocId!);
 
     setState(() {
       _selectedDocId = target;
@@ -422,9 +428,7 @@ Future<bool?> _confirm(BuildContext context, String title, String body) async {
 }
 
 void _showSnackBar(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
 bool _mapEquals(Map<String, String> a, Map<String, String> b) {

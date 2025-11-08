@@ -1,27 +1,19 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
-import 'package:ai_tutor_python/data/instructions/instructions_provider.dart';
-import 'package:ai_tutor_python/data/progress/progress_providers.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/instructions/instruction.dart';
 
 class InstructionGenerator {
-  InstructionGenerator({required this.ref});
-  final Ref ref;
+  late final Stream<List<Instruction>> instructionsStream;
 
-  Future<String> generateInstructions(
-    ChatRequestType type,
-    Goal goal,
-    Goal subGoal,
-  ) async {
+  Future<String> generateInstructions(ChatRequestType type) async {
+    if (DataService.goals.selectedRootGoal.value == null ||
+        DataService.goals.selectedChildGoal.value == null) {
+      return "";
+    }
+
     // Implementation for generating instruction using OpenAI or other services
-    final repo = ref.read(instructionsRepositoryProvider);
-    final instructions = await repo.getAll();
-
-    // get local goal data to make sure it is up to date
-    final goalsRepo = ref.read(goalsRepositoryProvider);
-    final localGoal = await goalsRepo.streamGoal(goal.id).first;
-    final localSubGoal = await goalsRepo.streamGoal(subGoal.id).first;
+    final instructions = await DataService.instructions.getAll();
 
     final knownConcepts = await _getMasteredConcepts();
 
@@ -34,8 +26,8 @@ class InstructionGenerator {
         for (var content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            localGoal ?? goal,
-            localSubGoal ?? subGoal,
+            DataService.goals.selectedRootGoal.value!,
+            DataService.goals.selectedChildGoal.value!,
             knownConcepts,
           );
           output += "$processed\n";
@@ -45,8 +37,8 @@ class InstructionGenerator {
         for (var content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            goal,
-            subGoal,
+            DataService.goals.selectedRootGoal.value!,
+            DataService.goals.selectedChildGoal.value!,
             knownConcepts,
           );
           alwaysInclude += "$processed\n";
@@ -91,9 +83,9 @@ class InstructionGenerator {
 
   Future<List<String>> _getMasteredConcepts() async {
     // Retrieve all root goals
-    final rootGoals = await ref.read(rootGoalsProviderFuture.future);
+    final rootGoals = await DataService.goals.getRootGoalsOnce();
     // Retrieve all progress records
-    final progressList = await ref.read(progressListProviderFuture.future);
+    final progressList = await DataService.progress.getAll();
 
     // Create a map for quick lookup of progress by goalID
     final progressMap = {for (var p in progressList) p.goalID: p.progress};

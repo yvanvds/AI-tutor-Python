@@ -48,4 +48,32 @@ class Goal {
     'suggestions': suggestions,
     'knownConcepts': knownConcepts,
   };
+
+  factory Goal.fromMap({
+    required String id,
+    required Map<String, dynamic> map,
+  }) {
+    return Goal(
+      id: id,
+      title: map['title'] ?? '',
+      description: map['description'],
+      parentId: map['parentId'],
+      order: map['order'] ?? 0,
+      optional: map['optional'] ?? false,
+      suggestions: List<String>.from(map['suggestions'] ?? []),
+      knownConcepts: List<String>.from(map['knownConcepts'] ?? []),
+    );
+  }
+
+  static List<Goal> fromFirebase(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    return snapshot.docs.map((data) {
+      return Goal.fromMap(id: data.id, map: data.data());
+    }).toList();
+  }
+
+  factory Goal.fromFirebaseDocument(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    return Goal.fromMap(id: snapshot.id, map: snapshot.data()!);
+  }
 }

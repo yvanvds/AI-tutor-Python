@@ -1,11 +1,10 @@
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dnd.dart';
 import 'drag_feedback.dart';
 
-class ChildRow extends ConsumerWidget {
+class ChildRow extends StatelessWidget {
   const ChildRow({
     super.key,
     required this.goal,
@@ -18,7 +17,7 @@ class ChildRow extends ConsumerWidget {
   final int index;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return LongPressDraggable<GoalDragData>(
       key: ValueKey('child_${goal.id}'),
       data: GoalDragData(goalId: goal.id, fromParentId: selectedRootId),
@@ -35,7 +34,7 @@ class ChildRow extends ConsumerWidget {
           ),
         ),
         onTap: () {
-          ref.read(editingGoalIdProviderNotifier.notifier).open(goal.id);
+          DataService.goals.editorSelectedGoal.value = goal;
         },
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

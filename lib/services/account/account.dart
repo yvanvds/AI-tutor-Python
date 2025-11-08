@@ -59,7 +59,7 @@ class Account {
     return Account.fromMap(data);
   }
 
-  Account copyWith({
+  static Future<void> update({
     String? uid,
     String? email,
     String? firstName,
@@ -67,15 +67,31 @@ class Account {
     bool? mayUseGlobalKey,
     Timestamp? createdAt,
     Timestamp? updatedAt,
-  }) {
-    return Account(
-      uid: uid ?? this.uid,
-      email: email ?? this.email,
-      firstName: firstName ?? this.firstName,
-      lastName: lastName ?? this.lastName,
-      mayUseGlobalKey: mayUseGlobalKey ?? this.mayUseGlobalKey,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
+  }) async {
+    var updates = <String, dynamic>{};
+    if (uid != null) updates['uid'] = uid;
+    if (email != null) updates['email'] = email;
+    if (firstName != null) updates['firstName'] = firstName;
+    if (lastName != null) updates['lastName'] = lastName;
+    if (mayUseGlobalKey != null) updates['mayUseGlobalKey'] = mayUseGlobalKey;
+    if (createdAt != null) updates['createdAt'] = createdAt;
+    if (updatedAt != null) updates['updatedAt'] = updatedAt;
+
+    if (updates.isEmpty) return Future.value();
+
+    Future updateTransaction(Transaction tx) async {
+      final DocumentSnapshot ds = await tx.get(
+        FirebaseFirestore.instance.collection('accounts').doc(uid),
+      );
+      tx.update(ds.reference, updates);
+      return {'updated': true};
+    }
+
+    return FirebaseFirestore.instance
+        .runTransaction(updateTransaction)
+        .then((result) => result['updated'])
+        .catchError((error) {
+          return false;
+        });
   }
 }

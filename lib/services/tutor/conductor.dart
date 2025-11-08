@@ -1,22 +1,16 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
-import 'package:ai_tutor_python/data/progress/progress.dart';
-import 'package:ai_tutor_python/data/progress/progress_providers.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:collection/collection.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dart:math';
 
 class Conductor {
-  final Ref ref;
-  Conductor({required this.ref});
+  Conductor();
 
   final _rand = Random();
-
-  Goal? currentRootGoal;
-  Goal? currentChildGoal;
 
   double _currentProgress = 0.0;
   double _guidingUnderstanding = 0.0; // used to move on from guiding questions
@@ -36,7 +30,7 @@ class Conductor {
   }
 
   (ChatRequestType, QuestionDifficulty) getNextQuestion() {
-    if (currentChildGoal == null) {
+    if (DataService.goals.selectedChildGoal.value == null) {
       return (ChatRequestType.noResult, _difficulty);
     }
 
@@ -195,7 +189,7 @@ class Conductor {
       // mark goal as complete and select next
       await _setTargetGoal();
 
-      if (currentChildGoal != null) {
+      if (DataService.goals.selectedChildGoal.value != null) {
         // reset progress for new goal
         _currentProgress = await _getCurrentProgress();
       }
@@ -217,14 +211,12 @@ class Conductor {
   /// Returns true if a selection was made, false otherwise.
   Future<bool> _setTargetGoal() async {
     // Clear previous selection
-    ref.read(selectedRootGoalProviderNotifier.notifier).select(null);
-    ref.read(selectedChildGoalProviderNotifier.notifier).select(null);
+    DataService.goals.selectedRootGoal.value = null;
+    DataService.goals.selectedChildGoal.value = null;
 
     // Take stable snapshots
-    final roots = await ref.read(rootGoalsProviderFuture.future); // List<Goal>
-    final progressList = await ref.read(
-      progressListProviderFuture.future,
-    ); // List<Progress>
+    final roots = await DataService.goals.getRootGoalsOnce(); // List<Goal>
+    final progressList = await DataService.progress.getAll(); // List<Progress>
 
     double progressFor(Goal g) {
       final p = progressList.firstWhereOrNull((x) => x.goalID == g.id);
@@ -234,9 +226,7 @@ class Conductor {
     for (final root in roots) {
       if (progressFor(root) < 1.0) {
         // Load children for this root on demand (family provider)
-        final subgoals = await ref.read(
-          childGoalsByParentProviderFuture(root.id).future,
-        );
+        final subgoals = await DataService.goals.getChildrenOnce(root.id);
 
         // Pick first incomplete subgoal (if any)
         final targetChild = subgoals.firstWhereOrNull(
@@ -244,29 +234,24 @@ class Conductor {
         );
 
         if (targetChild != null) {
-          ref.read(selectedRootGoalProviderNotifier.notifier).select(root.id);
-          ref
-              .read(selectedChildGoalProviderNotifier.notifier)
-              .select(targetChild.id);
-          currentRootGoal = root;
-          currentChildGoal = targetChild;
+          DataService.goals.selectedRootGoal.value = root;
+          DataService.goals.selectedChildGoal.value = targetChild;
+          DataService.progress.currentProgress.value = progressFor(targetChild);
           return true;
         }
         // else: all children complete -> try next root
       }
     }
-
-    // Nothing to select
-    currentChildGoal = null;
-    currentRootGoal = null;
+    DataService.progress.currentProgress.value = 0.0;
     return false;
   }
 
   // --- helpers / progress ---
 
   Future<double> _getCurrentProgress() async {
-    final progress = await ref.read(
-      progressByGoalProviderFuture(currentChildGoal?.id ?? '').future,
+    final currentChildGoal = DataService.goals.selectedChildGoal.value;
+    final progress = await DataService.progress.getByGoalId(
+      currentChildGoal?.id ?? '',
     );
 
     if (progress == null) {
@@ -277,39 +262,35 @@ class Conductor {
   }
 
   Future<void> _updateProgress(double newProgress) async {
-    if (currentChildGoal == null) return;
+    if (DataService.goals.selectedChildGoal.value == null) return;
 
     // 1) Upsert child
-    await ref.read(
-      upsertProgressProviderFuture(
-        Progress(goalID: currentChildGoal!.id, progress: newProgress),
-      ).future,
+    final currentChildGoal = DataService.goals.selectedChildGoal.value;
+    await DataService.progress.upsert(
+      Progress(goalID: currentChildGoal!.id, progress: newProgress),
     );
+    DataService.progress.currentProgress.value = newProgress;
 
-    ref.invalidate(progressByGoalProviderFuture);
+    if (DataService.goals.selectedRootGoal.value == null) return;
 
-    if (currentRootGoal == null) return;
+    final currentRootGoal = DataService.goals.selectedRootGoal.value;
 
     // 2) Read child goals under the current root (provider names are examples)
-    final children = await ref.read(
-      childGoalsByParentProviderFuture(currentRootGoal!.id).future,
+    final children = await DataService.goals.getChildrenOnce(
+      currentRootGoal!.id,
     );
 
     // 3) Sum each child’s progress (missing -> 0.0)
     double sum = 0.0;
     for (final g in children) {
-      final p = await ref.read(
-        progressByGoalProviderFuture(g.id).future,
-      ); // Progress?
+      final p = await DataService.progress.getByGoalId(g.id);
       sum += (p?.progress ?? 0.0);
     }
     final rootAvg = sum / children.length;
 
     // 4) Upsert root
-    await ref.read(
-      upsertProgressProviderFuture(
-        Progress(goalID: currentRootGoal!.id, progress: rootAvg),
-      ).future,
+    await DataService.progress.upsert(
+      Progress(goalID: currentRootGoal.id, progress: rootAvg),
     );
   }
 }

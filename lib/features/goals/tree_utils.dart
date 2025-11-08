@@ -1,4 +1,4 @@
-import 'package:ai_tutor_python/data/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 
 /// Build quick parent lookup.
 Map<String, String?> buildParentMap(Iterable<Goal> goals) => {

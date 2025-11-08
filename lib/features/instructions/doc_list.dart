@@ -1,8 +1,9 @@
-import 'package:ai_tutor_python/data/instructions/instruction.dart';
+import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:flutter/material.dart';
 
 class DocsList extends StatelessWidget {
   const DocsList({
+    super.key,
     required this.docs,
     required this.selectedId,
     required this.onSelect,

@@ -1,16 +1,20 @@
 import 'package:ai_tutor_python/core/firestore_safety.dart';
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/subtree_backup.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/widgets.dart';
 
-class GoalsRepository {
-  // Strongly typed collection:
+class GoalsService {
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection('goals');
 
-  // --- STREAMS -------------------------------------------------------------
+  final ValueNotifier<Goal?> selectedRootGoal = ValueNotifier(null);
+  final ValueNotifier<Goal?> selectedChildGoal = ValueNotifier(null);
 
-  Stream<List<Goal>> streamRoots() {
+  final ValueNotifier<Goal?> editorSelectedRootGoal = ValueNotifier(null);
+  final ValueNotifier<Goal?> editorSelectedGoal = ValueNotifier(null);
+
+  Stream<List<Goal>>? get streamRoots {
     final q = _collection.where('parentId', isNull: true).orderBy('order');
     return safeFirestoreStream(
       q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
@@ -57,6 +61,13 @@ class GoalsRepository {
     final d = await safeFirestore(() => _collection.doc(id).get());
     if (!d.exists) return null;
     return Goal.fromDoc(d);
+  }
+
+  Future<List<Goal>> getRootGoalsOnce() async {
+    final s = await safeFirestore(
+      () => _collection.where('parentId', isNull: true).orderBy('order').get(),
+    );
+    return s.docs.map(Goal.fromDoc).toList();
   }
 
   /// ---- Create --------------------------------------------------------------

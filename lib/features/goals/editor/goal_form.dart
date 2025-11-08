@@ -1,22 +1,19 @@
-import 'package:ai_tutor_python/data/goal/goal.dart';
-import 'package:ai_tutor_python/data/goal/goal_providers.dart';
-import 'package:ai_tutor_python/data/goal/goals_repository.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
 import 'package:ai_tutor_python/widgets/chips_editor.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class GoalForm extends ConsumerStatefulWidget {
-  const GoalForm({required this.goal, required this.repo});
+class GoalForm extends StatefulWidget {
+  const GoalForm({super.key, required this.goal});
   final Goal goal;
-  final GoalsRepository repo;
 
   @override
-  ConsumerState<GoalForm> createState() => GoalFormState();
+  State<GoalForm> createState() => GoalFormState();
 }
 
-class GoalFormState extends ConsumerState<GoalForm> {
+class GoalFormState extends State<GoalForm> {
   late final TextEditingController _title;
   late final TextEditingController _desc;
   bool _optional = false;
@@ -60,11 +57,11 @@ class GoalFormState extends ConsumerState<GoalForm> {
               final messenger = ScaffoldMessenger.of(
                 context,
               ); // <-- capture BEFORE awaits/closing
-              final repo = widget.repo;
               final id = widget.goal.id;
 
               // Count children for safety messaging
-              final count = await repo.countDescendants(id);
+              final count = DataService.goals.countDescendants(id);
+
               final confirmed =
                   await showDialog<bool>(
                     context: context,
@@ -99,12 +96,12 @@ class GoalFormState extends ConsumerState<GoalForm> {
               if (!confirmed) return;
 
               // Backup → delete → Undo
-              final backup = await repo.backupSubtree(id);
-              await repo.deleteSubtree(id);
+              final backup = await DataService.goals.backupSubtree(id);
+              await DataService.goals.deleteSubtree(id);
 
               // Close the editor if we just deleted the opened node
               if (mounted) {
-                ref.read(editingGoalIdProviderNotifier.notifier).close();
+                DataService.goals.editorSelectedGoal.value = null;
               }
 
               showUndoSnackBar(
@@ -113,15 +110,14 @@ class GoalFormState extends ConsumerState<GoalForm> {
                     ? 'Deleted "${widget.goal.title}".'
                     : 'Deleted "${widget.goal.title}" (+$count).',
                 onUndo: () async {
-                  await repo.restoreSubtree(backup);
+                  await DataService.goals.restoreSubtree(backup);
                 },
               );
             },
           ),
           IconButton(
             tooltip: 'Close',
-            onPressed: () =>
-                ref.read(editingGoalIdProviderNotifier.notifier).close(),
+            onPressed: () => DataService.goals.editorSelectedGoal.value = null,
             icon: const Icon(Icons.close),
           ),
         ],
@@ -135,7 +131,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
               labelText: 'Title',
               border: OutlineInputBorder(),
             ),
-            onSubmitted: (t) => widget.repo.updateTitle(
+            onSubmitted: (t) => DataService.goals.updateTitle(
               widget.goal.id,
               t.trim().isEmpty ? 'Untitled' : t.trim(),
             ),
@@ -146,7 +142,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
           ),
           const SizedBox(height: 12),
           widget.goal.parentId != null
-              ? ParentField(goal: widget.goal, repo: widget.repo)
+              ? ParentField(goal: widget.goal)
               : const SizedBox.shrink(),
           const SizedBox(height: 12),
 
@@ -157,7 +153,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
               labelText: 'Describe this goal for students.',
               border: OutlineInputBorder(),
             ),
-            onChanged: (t) => widget.repo.updateDescription(
+            onChanged: (t) => DataService.goals.updateDescription(
               widget.goal.id,
               t.isEmpty ? null : t,
             ),
@@ -168,7 +164,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
             value: _optional,
             onChanged: (v) {
               setState(() => _optional = v);
-              widget.repo.updateOptional(widget.goal.id, v);
+              DataService.goals.updateOptional(widget.goal.id, v);
             },
             title: const Text('Optional'),
             contentPadding: EdgeInsets.zero,
@@ -182,14 +178,16 @@ class GoalFormState extends ConsumerState<GoalForm> {
                   values: widget.goal.suggestions,
                   hintText: 'Type a suggestion and hit Enter',
                   onChanged: (vals) =>
-                      widget.repo.updateSuggestions(widget.goal.id, vals),
+                      DataService.goals.updateSuggestions(widget.goal.id, vals),
                 )
               : ChipsEditor(
                   label: 'Known Concepts After Completion',
                   values: widget.goal.knownConcepts,
                   hintText: 'Type a concept and hit Enter',
-                  onChanged: (vals) =>
-                      widget.repo.updateKnownConcepts(widget.goal.id, vals),
+                  onChanged: (vals) => DataService.goals.updateKnownConcepts(
+                    widget.goal.id,
+                    vals,
+                  ),
                 ),
           const SizedBox(height: 12),
         ],

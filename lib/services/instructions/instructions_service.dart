@@ -3,9 +3,9 @@ import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'instruction.dart';
 
-class InstructionsRepository {
-  InstructionsRepository(FirebaseFirestore db)
-    : _col = db
+class InstructionsService {
+  InstructionsService()
+    : _col = FirebaseFirestore.instance
           .collection('instructions')
           .withConverter<Instruction>(
             fromFirestore: (snap, _) =>

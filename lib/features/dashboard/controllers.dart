@@ -1,29 +1,19 @@
-import 'package:ai_tutor_python/services/timeline/timeline.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class Controllers extends ConsumerWidget {
+class Controllers extends StatelessWidget {
   const Controllers({
     super.key,
-    required this.onRunPressed,
-    required this.onStopPressed,
-    required this.onHintPressed,
-    required this.onSubmitPressed,
-    required this.onExercisePressed,
+
     required this.onPreviousPressed,
     required this.onNextPressed,
   });
 
-  final VoidCallback onRunPressed;
-  final VoidCallback onStopPressed;
-  final VoidCallback onHintPressed;
-  final VoidCallback onSubmitPressed;
-  final VoidCallback onExercisePressed;
   final VoidCallback onPreviousPressed;
   final VoidCallback onNextPressed;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // final canPrev = ref.watch(timeLineProvider.select((t) => t.canGoPrev));
     // final canNext = ref.watch(timeLineProvider.select((t) => t.canGoNext));
 
@@ -35,7 +25,10 @@ class Controllers extends ConsumerWidget {
           child: IconButton.outlined(
             icon: const Icon(Icons.play_arrow),
             tooltip: 'Run Code',
-            onPressed: onRunPressed,
+            onPressed: () async {
+              final code = DataService.code.getText();
+              await DataService.output.run(code);
+            },
             color: Colors.green,
           ),
         ),
@@ -44,7 +37,9 @@ class Controllers extends ConsumerWidget {
           child: IconButton.outlined(
             icon: const Icon(Icons.stop),
             tooltip: 'Stop Code',
-            onPressed: onStopPressed,
+            onPressed: () async {
+              await DataService.output.stop();
+            },
             color: Colors.red,
           ),
         ),
@@ -76,7 +71,10 @@ class Controllers extends ConsumerWidget {
           child: IconButton.outlined(
             icon: const Icon(Icons.question_mark),
             tooltip: 'Request Hint',
-            onPressed: onHintPressed,
+            onPressed: () async {
+              final code = DataService.code.getText();
+              await DataService.tutor.requestHint(code);
+            },
           ),
         ),
         Padding(
@@ -84,7 +82,10 @@ class Controllers extends ConsumerWidget {
           child: IconButton.outlined(
             icon: const Icon(Icons.send),
             tooltip: 'Submit Code',
-            onPressed: onSubmitPressed,
+            onPressed: () async {
+              final code = DataService.code.getText();
+              await DataService.tutor.submitCode(code);
+            },
             color: Colors.blue,
           ),
         ),
@@ -93,7 +94,9 @@ class Controllers extends ConsumerWidget {
           child: IconButton.outlined(
             icon: const Icon(Icons.school),
             tooltip: 'Request Exercise',
-            onPressed: onExercisePressed,
+            onPressed: () async {
+              await DataService.tutor.requestExercise();
+            },
             color: Colors.orange,
           ),
         ),
