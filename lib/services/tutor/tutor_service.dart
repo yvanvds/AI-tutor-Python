@@ -24,8 +24,12 @@ import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
 import 'package:flutter/material.dart';
 
+enum TutorState { idle, working, hasFollowUp }
+
 class TutorService {
-  final ValueNotifier<bool> isWorking = ValueNotifier<bool>(false);
+  final ValueNotifier<TutorState> state = ValueNotifier<TutorState>(
+    TutorState.idle,
+  );
 
   TutorService() {
     _connector = OpenaiConnector();
@@ -39,6 +43,9 @@ class TutorService {
   late final Conductor _conductor;
 
   String _currentExerciseType = '';
+
+  String? _nextMessage;
+  String? _nextCode;
 
   // ---- Public API -----------------------------------------------------------
 
@@ -65,8 +72,8 @@ class TutorService {
     String? code,
     String? prompt,
   }) async {
-    if (isWorking.value) return;
-    isWorking.value = true;
+    if (state.value != TutorState.idle) return;
+    state.value = TutorState.working;
 
     final instructions = await _instructionGenerator.generateInstructions(type);
 
@@ -157,7 +164,7 @@ class TutorService {
         inputs: includeHistory,
       );
     } finally {
-      isWorking.value = false;
+      state.value = TutorState.idle;
     }
     if (result != null) {
       _handleResponse(result);
@@ -199,6 +206,18 @@ class TutorService {
     }
 
     await queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2);
+  }
+
+  void moveToFollowUp() {
+    if (_nextMessage != null) {
+      _addTutorMessage(_nextMessage!, true);
+      _nextMessage = null;
+    }
+    if (_nextCode != null) {
+      _startNewCode(_nextCode!, true);
+      _nextCode = null;
+    }
+    state.value = TutorState.idle;
   }
 
   void dispose() {}
@@ -282,12 +301,15 @@ class TutorService {
         parsed.understanding,
       );
       if (!guidingComplete) {
+        _nextCode = null;
+        _nextMessage = null;
         if (parsed.code.isNotEmpty) {
-          _startNewCode(parsed.code, false);
+          _nextCode = parsed.code;
         }
         if (parsed.prompt.isNotEmpty) {
-          _addTutorMessage(parsed.prompt, false);
+          _nextMessage = parsed.prompt;
         }
+        state.value = TutorState.hasFollowUp;
       } else {
         await requestExercise();
       }
@@ -312,7 +334,9 @@ class TutorService {
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
-        _addTutorMessage(parsed.suggestion, true);
+        _nextMessage = parsed.suggestion;
+        _nextCode = null;
+        state.value = TutorState.hasFollowUp;
       } else {
         await requestExercise();
       }
@@ -334,7 +358,9 @@ class TutorService {
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
-        _addTutorMessage(parsed.followUp!, true);
+        _nextMessage = parsed.followUp!;
+        _nextCode = null;
+        state.value = TutorState.hasFollowUp;
       } else {
         await requestExercise();
       }
@@ -348,7 +374,9 @@ class TutorService {
 
       final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
       if (parsed.followUp != null && suggestionAllowed) {
-        _addTutorMessage(parsed.followUp!, true);
+        _nextMessage = parsed.followUp!;
+        _nextCode = null;
+        state.value = TutorState.hasFollowUp;
       } else {
         await requestExercise();
       }
@@ -373,13 +401,13 @@ class TutorService {
   }
 
   Future<dynamic> _resendLastRequest() async {
-    if (isWorking.value) return;
-    isWorking.value = true;
+    if (state.value != TutorState.idle) return;
+    state.value = TutorState.working;
     dynamic result;
     try {
       result = await _connector.resendRequest();
     } finally {
-      isWorking.value = false;
+      state.value = TutorState.idle;
     }
 
     return result;

@@ -1,11 +1,12 @@
+import 'package:ai_tutor_python/features/chat/composer_continue_widget.dart';
 import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flyer_chat_system_message/flyer_chat_system_message.dart';
 import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class ChatWidget extends StatefulWidget {
   const ChatWidget({super.key});
@@ -32,7 +33,7 @@ class _TutorState extends State<ChatWidget> {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
-      valueListenable: DataService.tutor.isWorking,
+      valueListenable: DataService.tutor.state,
       builder: (context, value, child) {
         return Column(
           children: [
@@ -47,8 +48,11 @@ class _TutorState extends State<ChatWidget> {
                 },
                 builders: Builders(
                   composerBuilder: (context) {
-                    if (DataService.tutor.isWorking.value) {
+                    if (DataService.tutor.state.value == TutorState.working) {
                       return ComposerWaitWidget();
+                    } else if (DataService.tutor.state.value ==
+                        TutorState.hasFollowUp) {
+                      return ComposerContinueWidget();
                     } else {
                       return Composer();
                     }
