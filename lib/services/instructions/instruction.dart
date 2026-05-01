@@ -1,10 +1,7 @@
-// lib/data/instructions/instruction.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Instruction {
   Instruction({required this.id, required this.sections, this.updatedAt});
 
-  /// Firestore doc id, e.g. "system_prompt"
+  /// Cosmos doc id, e.g. "system_prompt"
   final String id;
 
   /// Flexible bag of text sections. Example keys:
@@ -26,18 +23,35 @@ class Instruction {
     );
   }
 
+  /// Serialize for Cosmos. The caller writes this map under the doc's
+  /// `id` and partition-key (`type: "instruction"`); both fields are
+  /// added here so callers don't have to re-add them.
   Map<String, dynamic> toMap() => {
+    'id': id,
+    'type': 'instruction',
     'sections': sections,
-    'updatedAt': FieldValue.serverTimestamp(),
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
   };
 
   static Instruction fromMap(String id, Map<String, dynamic> data) {
+    final raw = data['updatedAt'];
+    DateTime? parsedAt;
+    if (raw is String && raw.isNotEmpty) {
+      parsedAt = DateTime.tryParse(raw);
+    }
     return Instruction(
       id: id,
       sections:
-          (data['sections'] as Map?)?.cast<String, String>() ??
+          (data['sections'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+          ) ??
           <String, String>{},
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      updatedAt: parsedAt,
     );
+  }
+
+  /// Build from a Cosmos document (which already contains its own `id`).
+  factory Instruction.fromCosmos(Map<String, dynamic> doc) {
+    return Instruction.fromMap(doc['id'] as String, doc);
   }
 }

@@ -1,70 +1,89 @@
-import 'package:ai_tutor_python/core/firestore_paths.dart';
-import 'package:ai_tutor_python/core/firestore_safety.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// Cosmos-backed ProgressService (Step 3 of the migration).
+//
+// Doc-id change vs Firestore: the old subcollection
+// `accounts/{uid}/progress/{goalId}` becomes a flat `progress` container
+// with composite doc id `${uid}_${goalId}` and partition key = uid.
+
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/core/cosmos_paths.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 
-import 'progress.dart'; // your Progress class (shown in your message)
+import 'progress.dart';
 
 class ProgressService {
-  ProgressService({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance;
-
-  final FirebaseAuth _auth;
+  ProgressService();
 
   final ValueNotifier<double> currentProgress = ValueNotifier(0.0);
 
+  CosmosContainer get _container => CosmosPaths.progress();
+
   String get _uid {
-    final uid = _auth.currentUser?.uid;
+    final uid = DataService.auth.currentUser.value?.oid;
     if (uid == null) {
       throw StateError('No authenticated user.');
     }
     return uid;
   }
 
-  CollectionReference<Map<String, dynamic>> _col(String uid) =>
-      FsPaths.progress(uid);
-
-  /// Load all progress docs once (returns empty list if none exist).
-  Future<List<Progress>> getAll() async {
-    final qs = await safeFirestore(() => _col(_uid).get());
-    return qs.docs.map((d) => Progress.fromDoc(d)).toList();
+  Future<List<Progress>> getAll() {
+    final uid = _uid;
+    return safeCosmos(() => _fetchAll(uid));
   }
 
-  /// Realtime stream of all progress docs. Emits [] when none exist.
   Stream<List<Progress>> watchAll() {
-    return safeFirestoreStream(
-      _col(_uid).snapshots().map(
-        (qs) => qs.docs.map((d) => Progress.fromDoc(d)).toList(),
+    final uid = _uid;
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchAll(uid))),
+    );
+  }
+
+  Future<Progress?> getByGoalId(String goalID) {
+    final uid = _uid;
+    return safeCosmos(() => _fetchOne(uid, goalID));
+  }
+
+  Stream<Progress?> streamByGoalId(String goalID) {
+    final uid = _uid;
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchOne(uid, goalID))),
+    );
+  }
+
+  Future<void> upsert(Progress p) async {
+    final uid = _uid;
+    await safeCosmos(
+      () => _container.upsert(p.toMap(uid: uid), partitionKey: uid),
+    );
+  }
+
+  Future<void> delete(String goalID) async {
+    final uid = _uid;
+    await safeCosmos(
+      () => _container.delete(
+        CosmosDocId.progress(uid, goalID),
+        partitionKey: uid,
       ),
     );
   }
 
-  /// Get one goal’s progress (null if it doesn’t exist).
-  Future<Progress?> getByGoalId(String goalID) async {
-    final doc = await safeFirestore(() => _col(_uid).doc(goalID).get());
-    if (!doc.exists) return null;
-    return Progress.fromDoc(doc);
-  }
-
-  // stream a single goal's progress
-  Stream<Progress?> streamByGoalId(String goalID) {
-    return safeFirestoreStream(
-      _col(_uid).doc(goalID).snapshots().map((doc) {
-        if (!doc.exists) return null;
-        return Progress.fromDoc(doc);
-      }),
+  Future<List<Progress>> _fetchAll(String uid) async {
+    final docs = await _container.query(
+      'SELECT * FROM c WHERE c.uid = @uid',
+      parameters: {'@uid': uid},
+      partitionKey: uid,
     );
+    return docs.map(Progress.fromCosmos).toList();
   }
 
-  /// Create or update a progress doc.
-  ///
-  /// Uses goalID as the document id, so writes are idempotent.
-  Future<void> upsert(Progress p) async {
-    await _col(_uid).doc(p.goalID).set(p.toMap(), SetOptions(merge: true));
-  }
-
-  /// Delete a progress doc (optional helper).
-  Future<void> delete(String goalID) async {
-    await _col(_uid).doc(goalID).delete();
+  Future<Progress?> _fetchOne(String uid, String goalID) async {
+    final doc = await _container.read(
+      CosmosDocId.progress(uid, goalID),
+      partitionKey: uid,
+    );
+    if (doc == null) return null;
+    return Progress.fromCosmos(doc);
   }
 }

@@ -1,61 +1,62 @@
-import 'package:ai_tutor_python/core/firestore_paths.dart';
-import 'package:ai_tutor_python/core/firestore_safety.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// Cosmos-backed ReportService (Step 3 of the migration).
+//
+// Doc-id change vs Firestore: the old subcollection
+// `accounts/{uid}/status_reports/{goalId}` becomes a flat `status_reports`
+// container with composite doc id `${uid}_${goalId}` and partition key = uid.
 
-import 'status_report.dart'; // your StatusReport class (shown in your message)
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/core/cosmos_paths.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
+
+import 'status_report.dart';
 
 class ReportService {
-  ReportService({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance;
+  ReportService();
 
-  final FirebaseAuth _auth;
+  CosmosContainer get _container => CosmosPaths.statusReports();
 
   String get _uid {
-    final uid = _auth.currentUser?.uid;
+    final uid = DataService.auth.currentUser.value?.oid;
     if (uid == null) {
       throw StateError('No authenticated user.');
     }
     return uid;
   }
 
-  CollectionReference<Map<String, dynamic>> _col(String uid) =>
-      FsPaths.statusReports(uid);
-
-  /// Load all status report docs once (returns empty list if none exist).
-  Future<List<StatusReport>> getAll() async {
-    final qs = await safeFirestore(() => _col(_uid).get());
-    return qs.docs.map((d) => StatusReport.fromDoc(d)).toList();
+  Future<List<StatusReport>> getAll() {
+    final uid = _uid;
+    return safeCosmos(() => _fetchAll(uid));
   }
 
-  /// Realtime stream of all status report docs. Emits [] when none exist.
   Stream<List<StatusReport>> watchAll() {
-    return safeFirestoreStream(
-      _col(_uid).snapshots().map(
-        (qs) => qs.docs.map((d) => StatusReport.fromDoc(d)).toList(),
+    final uid = _uid;
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchAll(uid))),
+    );
+  }
+
+  Future<StatusReport?> getByGoalId(String goalID) {
+    final uid = _uid;
+    return safeCosmos(() => _fetchOne(uid, goalID));
+  }
+
+  Future<void> upsert(StatusReport p) async {
+    final uid = _uid;
+    await safeCosmos(
+      () => _container.upsert(p.toMap(uid: uid), partitionKey: uid),
+    );
+  }
+
+  Future<void> delete(String goalID) async {
+    final uid = _uid;
+    await safeCosmos(
+      () => _container.delete(
+        CosmosDocId.statusReport(uid, goalID),
+        partitionKey: uid,
       ),
     );
-  }
-
-  /// Get one goal’s status report (null if it doesn’t exist).
-  Future<StatusReport?> getByGoalId(String goalID) async {
-    final doc = await safeFirestore(() => _col(_uid).doc(goalID).get());
-    if (!doc.exists) return null;
-    return StatusReport.fromDoc(doc);
-  }
-
-  /// Create or update a status report doc.
-  ///
-  /// Uses goalID as the document id, so writes are idempotent.
-  Future<void> upsert(StatusReport p) async {
-    await safeFirestore(
-      () => _col(_uid).doc(p.goalID).set(p.toMap(), SetOptions(merge: true)),
-    );
-  }
-
-  /// Delete a status report doc (optional helper).
-  Future<void> delete(String goalID) async {
-    await safeFirestore(() => _col(_uid).doc(goalID).delete());
   }
 
   /// Upsert a status report for the currently selected child goal.
@@ -64,5 +65,23 @@ class ReportService {
     final goal = DataService.goals.selectedChildGoal.value;
     if (goal == null) return;
     await upsert(StatusReport(goalID: goal.id, statusReport: newReport));
+  }
+
+  Future<List<StatusReport>> _fetchAll(String uid) async {
+    final docs = await _container.query(
+      'SELECT * FROM c WHERE c.uid = @uid',
+      parameters: {'@uid': uid},
+      partitionKey: uid,
+    );
+    return docs.map(StatusReport.fromCosmos).toList();
+  }
+
+  Future<StatusReport?> _fetchOne(String uid, String goalID) async {
+    final doc = await _container.read(
+      CosmosDocId.statusReport(uid, goalID),
+      partitionKey: uid,
+    );
+    if (doc == null) return null;
+    return StatusReport.fromCosmos(doc);
   }
 }

@@ -1,15 +1,16 @@
 import 'dart:async';
 
-import 'package:ai_tutor_python/core/firestore_paths.dart';
-import 'package:ai_tutor_python/core/firestore_safety.dart';
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/core/cosmos_paths.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 import 'global_config.dart';
 
 class GlobalConfigService {
   GlobalConfigService() {
-    // Start watching immediately and keep ValueNotifier in sync
     _subscription = watchConfig().listen((cfg) {
       config.value = cfg;
     });
@@ -17,7 +18,10 @@ class GlobalConfigService {
 
   final LocalApiKeyStorage localStorage = LocalApiKeyStorage();
 
-  final DocumentReference _globalConfigDoc = FsPaths.config().doc('global');
+  static const String _pk = CosmosPartitions.config;
+  static const String _docId = CosmosDocId.globalConfig;
+
+  CosmosContainer get _container => CosmosPaths.config();
 
   /// Exposed latest config (null until first load or if doc missing).
   final ValueNotifier<GlobalConfig?> config = ValueNotifier<GlobalConfig?>(
@@ -26,31 +30,22 @@ class GlobalConfigService {
 
   late final StreamSubscription<GlobalConfig?> _subscription;
 
-  /// Typed reference to the single config document.
-  DocumentReference<GlobalConfig> _docRef() {
-    return _globalConfigDoc.withConverter<GlobalConfig>(
-      fromFirestore: (snap, _) => GlobalConfig.fromDoc(snap),
-      toFirestore: (cfg, _) => cfg.toMap(),
-    );
-  }
+  Future<GlobalConfig?> getConfig() => safeCosmos(_fetchOnce);
 
-  /// Read once.
-  Future<GlobalConfig?> getConfig() async {
-    final snap = await safeFirestore(() => _docRef().get());
-    if (!snap.exists) return null;
-    return snap.data();
-  }
-
-  /// Listen for live updates.
   Stream<GlobalConfig?> watchConfig() {
-    return safeFirestoreStream(
-      _docRef().snapshots().map((snap) => snap.data()),
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(_fetchOnce)),
     );
   }
 
-  /// Call when you're done with this service (e.g. on app shutdown).
   void dispose() {
     _subscription.cancel();
     config.dispose();
+  }
+
+  Future<GlobalConfig?> _fetchOnce() async {
+    final doc = await _container.read(_docId, partitionKey: _pk);
+    if (doc == null) return null;
+    return GlobalConfig.fromMap(doc);
   }
 }

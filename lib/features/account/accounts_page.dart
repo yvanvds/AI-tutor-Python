@@ -1,6 +1,5 @@
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/account/account.dart';
 
 class AccountsPage extends StatefulWidget {
@@ -248,14 +247,14 @@ class _AccountsPageState extends State<AccountsPage> {
     );
   }
 
-  Timestamp? _resolveLastActive(Account a) {
+  DateTime? _resolveLastActive(Account a) {
     // If you later add `lastLoginAt` to the Account map, prefer it here.
     // For now, fall back to updatedAt or createdAt.
     return a.updatedAt ?? a.createdAt;
   }
 
-  String _formatTs(Timestamp ts) {
-    final dt = ts.toDate().toLocal();
+  String _formatTs(DateTime ts) {
+    final dt = ts.toLocal();
     // Simple readable format without extra deps:
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');
@@ -273,7 +272,7 @@ class _AccountsPageState extends State<AccountsPage> {
         content: Text(
           'This will delete the account profile for:\n\n'
           '${a.email}\n\n'
-          'This does NOT delete the FirebaseAuth user. Continue?',
+          'This does NOT remove the user from the school account directory. Continue?',
         ),
         actions: [
           TextButton(

@@ -1,12 +1,16 @@
-import 'package:ai_tutor_python/core/firestore_paths.dart';
-import 'package:ai_tutor_python/core/firestore_safety.dart';
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/cosmos_paths.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
+import 'package:uuid/uuid.dart';
 
 class GoalsService {
-  final CollectionReference<Map<String, dynamic>> _collection = FsPaths.goals();
+  static const String _pk = CosmosPartitions.goal;
+  static const Uuid _uuid = Uuid();
+
+  CosmosContainer get _container => CosmosPaths.goals();
 
   final ValueNotifier<Goal?> selectedRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> selectedChildGoal = ValueNotifier(null);
@@ -17,85 +21,78 @@ class GoalsService {
   final ValueNotifier<Goal?> preferredRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> preferredChildGoal = ValueNotifier(null);
 
+  // --- STREAMS -------------------------------------------------------------
+
   Stream<List<Goal>>? get streamRoots {
-    final q = _collection.where('parentId', isNull: true).orderBy('order');
-    return safeFirestoreStream(
-      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(_fetchRoots)),
     );
   }
 
   Stream<Goal?> streamGoal(String id) {
-    final dref = _collection.doc(id);
-    return safeFirestoreStream(
-      dref.snapshots().map((doc) => doc.exists ? Goal.fromDoc(doc) : null),
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchGoal(id))),
     );
   }
 
   Stream<List<Goal>> streamChildren(String parentId) {
-    final q = _collection
-        .where('parentId', isEqualTo: parentId)
-        .orderBy('order');
-    return safeFirestoreStream(
-      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchChildren(parentId))),
     );
   }
 
   Stream<List<Goal>> streamAllGoals() {
-    final q = _collection.orderBy('title');
-    return safeFirestoreStream(
-      q.snapshots().map((s) => s.docs.map(Goal.fromDoc).toList()),
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(_fetchAllByTitle)),
     );
   }
 
   // --- ONE-SHOTS -----------------------------------------------------------
 
-  /// Read children once (used to compute target list on drop)
-  Future<List<Goal>> getChildrenOnce(String? parentId) async {
-    Query<Map<String, dynamic>> q = _collection.orderBy('order');
-    q = parentId == null
-        ? q.where('parentId', isNull: true)
-        : q.where('parentId', isEqualTo: parentId);
+  /// Read children once (used to compute target list on drop).
+  Future<List<Goal>> getChildrenOnce(String? parentId) =>
+      safeCosmos(() => _fetchChildrenOrRoots(parentId));
 
-    final s = await safeFirestore(() => q.get());
-    return s.docs.map(Goal.fromDoc).toList();
-  }
+  Future<Goal?> getGoalOnce(String id) => safeCosmos(() => _fetchGoal(id));
 
-  Future<Goal?> getGoalOnce(String id) async {
-    final d = await safeFirestore(() => _collection.doc(id).get());
-    if (!d.exists) return null;
-    return Goal.fromDoc(d);
-  }
-
-  Future<List<Goal>> getRootGoalsOnce() async {
-    final s = await safeFirestore(
-      () => _collection.where('parentId', isNull: true).orderBy('order').get(),
-    );
-    return s.docs.map(Goal.fromDoc).toList();
-  }
+  Future<List<Goal>> getRootGoalsOnce() => safeCosmos(_fetchRoots);
 
   /// Fetch every goal once. Used for export.
-  Future<List<Goal>> getAllGoalsOnce() async {
-    final s = await safeFirestore(() => _collection.get());
-    return s.docs.map(Goal.fromDoc).toList();
-  }
+  Future<List<Goal>> getAllGoalsOnce() => safeCosmos(_fetchAll);
 
-  /// ---- Create --------------------------------------------------------------
+  // --- CREATE --------------------------------------------------------------
 
   Future<void> createRoot(String title) async {
     final next = await _nextOrder(parentId: null);
-    await _collection.add({'title': title, 'order': next, 'parentId': null});
+    await safeCosmos(
+      () => _container.create(
+        _docMap(
+          id: _uuid.v4(),
+          title: title,
+          parentId: null,
+          order: next,
+        ),
+        partitionKey: _pk,
+      ),
+    );
   }
 
   Future<void> createChild(String parentId, String title) async {
     final next = await _nextOrder(parentId: parentId);
-    await _collection.add({
-      'title': title,
-      'parentId': parentId,
-      'order': next,
-    });
+    await safeCosmos(
+      () => _container.create(
+        _docMap(
+          id: _uuid.v4(),
+          title: title,
+          parentId: parentId,
+          order: next,
+        ),
+        partitionKey: _pk,
+      ),
+    );
   }
 
-  /// Create a goal with all fields populated. Returns the new Firestore id.
+  /// Create a goal with all fields populated. Returns the new Cosmos id.
   /// Used for import where we want to preserve every field except the id.
   Future<String> createGoalWithFields({
     required String title,
@@ -106,105 +103,187 @@ class GoalsService {
     List<String> suggestions = const [],
     List<String> knownConcepts = const [],
   }) async {
-    final ref = await _collection.add({
-      'title': title,
-      'description': description,
-      'parentId': parentId,
-      'order': order,
-      'optional': optional,
-      'suggestions': suggestions,
-      'knownConcepts': knownConcepts,
-    });
-    return ref.id;
+    final id = _uuid.v4();
+    await safeCosmos(
+      () => _container.create(
+        _docMap(
+          id: id,
+          title: title,
+          description: description,
+          parentId: parentId,
+          order: order,
+          optional: optional,
+          suggestions: suggestions,
+          knownConcepts: knownConcepts,
+        ),
+        partitionKey: _pk,
+      ),
+    );
+    return id;
   }
 
-  /// ---- Update --------------------------------------------------------------
+  // --- UPDATE --------------------------------------------------------------
 
-  Future<void> updateTitle(String id, String title) async {
-    await _collection.doc(id).update({'title': title});
-  }
+  Future<void> updateTitle(String id, String title) =>
+      _patch(id, {'title': title});
 
   Future<void> updateDescription(String id, String? description) =>
-      _collection.doc(id).update({'description': description});
+      _patch(id, {'description': description});
 
   Future<void> updateOptional(String id, bool optional) =>
-      _collection.doc(id).update({'optional': optional});
+      _patch(id, {'optional': optional});
 
   Future<void> updateTags(String id, List<String> tags) =>
-      _collection.doc(id).update({'tags': tags});
+      _patch(id, {'tags': tags});
 
   Future<void> updateSuggestions(String id, List<String> suggestions) =>
-      _collection.doc(id).update({'suggestions': suggestions});
+      _patch(id, {'suggestions': suggestions});
 
   Future<void> updateKnownConcepts(String id, List<String> knownConcepts) =>
-      _collection.doc(id).update({'knownConcepts': knownConcepts});
+      _patch(id, {'knownConcepts': knownConcepts});
 
-  /// Change the parent of a goal.
+  /// Change the parent of a goal. Place at end of new parent's list.
   Future<void> reparent(String id, String? newParentId) async {
-    // place at end of new parent's list (or roots)
     final next = await _nextOrder(parentId: newParentId);
-    await _collection.doc(id).update({'parentId': newParentId, 'order': next});
+    await _patch(id, {'parentId': newParentId, 'order': next});
   }
 
+  /// Atomically rewrite order/parentId on a contiguous list. All ops share
+  /// the same logical partition (`/type = "goal"`), so a Cosmos transactional
+  /// batch covers them in one call.
   Future<void> applyOrder(String? parentId, List<String> orderedIds) async {
-    final batch = FirebaseFirestore.instance.batch();
-    // compact with spacing 1000 to keep room for future inserts
+    if (orderedIds.isEmpty) return;
+    final ops = <BatchOperation>[];
     for (var i = 0; i < orderedIds.length; i++) {
       final id = orderedIds[i];
-      final doc = _collection.doc(id);
-      batch.update(doc, {'order': (i + 1) * 1000, 'parentId': parentId});
+      final doc = await safeCosmos(
+        () => _container.read(id, partitionKey: _pk),
+      );
+      if (doc == null) continue;
+      doc['order'] = (i + 1) * 1000;
+      doc['parentId'] = parentId;
+      ops.add(BatchOperation.upsert(doc));
     }
-    await batch.commit();
+    if (ops.isEmpty) return;
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
   }
 
-  /// ---- Helpers -------------------------------------------------------------
+  // --- HELPERS -------------------------------------------------------------
 
-  /// Get the next order value for a new child under [parentId].
   Future<int> _nextOrder({String? parentId}) async {
-    try {
-      Query<Map<String, dynamic>> q = _collection
-          .orderBy('order', descending: true)
-          .limit(1);
-      q = parentId == null
-          ? q.where('parentId', isNull: true)
-          : q.where('parentId', isEqualTo: parentId);
-
-      final snap = await q.get();
-      final currentMax = snap.docs.isEmpty
-          ? 0
-          : (snap.docs.first.data()['order'] as int? ?? 0);
-      return currentMax + 1000;
-    } on FirebaseException catch (e) {
-      if (e.code == 'failed-precondition') {
-        // Fallback: put new item at end with a safe default
-        // (still unique; we’ll normalize during drag-reorder later)
-        return DateTime.now().millisecondsSinceEpoch;
-      }
-      rethrow;
-    }
+    final sql = parentId == null
+        ? 'SELECT TOP 1 c["order"] AS o FROM c '
+              'WHERE NOT IS_DEFINED(c.parentId) OR IS_NULL(c.parentId) '
+              'ORDER BY c["order"] DESC'
+        : 'SELECT TOP 1 c["order"] AS o FROM c '
+              'WHERE c.parentId = @parentId '
+              'ORDER BY c["order"] DESC';
+    final results = await safeCosmos(
+      () => _container.query(
+        sql,
+        parameters: parentId == null ? const {} : {'@parentId': parentId},
+        partitionKey: _pk,
+      ),
+    );
+    if (results.isEmpty) return 1000;
+    final current = (results.first['o'] as int?) ?? 0;
+    return current + 1000;
   }
+
+  Future<void> _patch(String id, Map<String, Object?> changes) async {
+    final doc = await safeCosmos(
+      () => _container.read(id, partitionKey: _pk),
+    );
+    if (doc == null) return;
+    doc.addAll(changes);
+    await safeCosmos(
+      () => _container.replace(id, doc, partitionKey: _pk),
+    );
+  }
+
+  Future<List<Goal>> _fetchRoots() async {
+    final docs = await _container.query(
+      'SELECT * FROM c '
+      'WHERE NOT IS_DEFINED(c.parentId) OR IS_NULL(c.parentId) '
+      'ORDER BY c["order"]',
+      partitionKey: _pk,
+    );
+    return docs.map(Goal.fromCosmos).toList();
+  }
+
+  Future<List<Goal>> _fetchChildren(String parentId) async {
+    final docs = await _container.query(
+      'SELECT * FROM c WHERE c.parentId = @parentId ORDER BY c["order"]',
+      parameters: {'@parentId': parentId},
+      partitionKey: _pk,
+    );
+    return docs.map(Goal.fromCosmos).toList();
+  }
+
+  Future<List<Goal>> _fetchChildrenOrRoots(String? parentId) =>
+      parentId == null ? _fetchRoots() : _fetchChildren(parentId);
+
+  Future<List<Goal>> _fetchAll() async {
+    final docs = await _container.query(
+      'SELECT * FROM c',
+      partitionKey: _pk,
+    );
+    return docs.map(Goal.fromCosmos).toList();
+  }
+
+  Future<List<Goal>> _fetchAllByTitle() async {
+    final docs = await _container.query(
+      'SELECT * FROM c ORDER BY c.title',
+      partitionKey: _pk,
+    );
+    return docs.map(Goal.fromCosmos).toList();
+  }
+
+  Future<Goal?> _fetchGoal(String id) async {
+    final doc = await _container.read(id, partitionKey: _pk);
+    if (doc == null) return null;
+    return Goal.fromCosmos(doc);
+  }
+
+  /// Build a Cosmos doc map for a goal. Includes the partition-key field.
+  Map<String, Object?> _docMap({
+    required String id,
+    required String title,
+    String? description,
+    String? parentId,
+    required int order,
+    bool optional = false,
+    List<String> suggestions = const [],
+    List<String> knownConcepts = const [],
+  }) => {
+    'id': id,
+    'type': _pk,
+    'title': title,
+    'description': description,
+    'parentId': parentId,
+    'order': order,
+    'optional': optional,
+    'suggestions': suggestions,
+    'knownConcepts': knownConcepts,
+  };
 
   /// Load *all* goals once (≤100 so it's fine) and build a map by id.
   Future<Map<String, Goal>> _getAllGoalsMap() async {
-    final s = await _collection.get();
-    final map = <String, Goal>{};
-    for (final d in s.docs) {
-      map[d.id] = Goal.fromDoc(d);
-    }
-    return map;
+    final all = await _fetchAll();
+    return {for (final g in all) g.id: g};
   }
 
-  /// Collect the subtree (root+descendants) under [rootId].
   Future<List<Goal>> _collectSubtree(String rootId) async {
     final all = await _getAllGoalsMap();
-    final List<Goal> out = [];
+    final out = <Goal>[];
     final q = <String>[rootId];
     while (q.isNotEmpty) {
       final id = q.removeLast();
       final node = all[id];
       if (node == null) continue;
       out.add(node);
-      // push children
       for (final g in all.values) {
         if (g.parentId == id) q.add(g.id);
       }
@@ -222,7 +301,7 @@ class GoalsService {
         {
           'title': g.title,
           'description': g.description,
-          'parentId': g.parentId, // may be null
+          'parentId': g.parentId,
           'order': g.order,
           'optional': g.optional,
           'suggestions': g.suggestions,
@@ -232,23 +311,34 @@ class GoalsService {
     return SubtreeBackup(out);
   }
 
-  /// Delete every node in the subtree (root first/last doesn't matter in batch).
+  /// Delete every node in the subtree.
   Future<void> deleteSubtree(String rootId) async {
     final nodes = await _collectSubtree(rootId);
-    final batch = FirebaseFirestore.instance.batch();
-    for (final g in nodes) {
-      batch.delete(_collection.doc(g.id));
-    }
-    await batch.commit();
+    if (nodes.isEmpty) return;
+    final ops = nodes
+        .map((g) => BatchOperation.delete(g.id))
+        .toList(growable: false);
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
   }
 
   /// Restore a previously backed-up subtree (same ids).
   Future<void> restoreSubtree(SubtreeBackup backup) async {
-    final batch = FirebaseFirestore.instance.batch();
+    if (backup.nodes.isEmpty) return;
+    final ops = <BatchOperation>[];
     for (final (id, data) in backup.nodes) {
-      batch.set(_collection.doc(id), data, SetOptions(merge: false));
+      ops.add(
+        BatchOperation.upsert({
+          'id': id,
+          'type': _pk,
+          ...data,
+        }),
+      );
     }
-    await batch.commit();
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
   }
 
   /// Convenience: count descendants (excludes the root).

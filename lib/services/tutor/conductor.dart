@@ -300,15 +300,11 @@ class Conductor {
     final currentChildGoal =
         DataService.goals.preferredChildGoal.value ??
         DataService.goals.selectedChildGoal.value;
+    if (currentChildGoal == null) return 0.0;
     final progress = await DataService.progress.getByGoalId(
-      currentChildGoal?.id ?? '',
+      currentChildGoal.id,
     );
-
-    if (progress == null) {
-      return 0.0;
-    } else {
-      return progress.progress;
-    }
+    return progress?.progress ?? 0.0;
   }
 
   Future<void> _updateProgress(double newProgress) async {

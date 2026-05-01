@@ -8,7 +8,6 @@ import 'package:ai_tutor_python/features/instructions/instructions_editor_page.d
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'version.dart';
 import 'features/dashboard/dashboard.dart';
@@ -120,7 +119,7 @@ class _HomeShellState extends State<HomeShell> {
                 actions: [
                   IconButton(
                     tooltip: 'Sign out',
-                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    onPressed: () => DataService.auth.signOut(),
                     icon: const Icon(Icons.logout),
                   ),
                 ],

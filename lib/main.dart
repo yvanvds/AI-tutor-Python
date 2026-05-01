@@ -3,22 +3,18 @@ import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/create_text_theme.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'firebase_options.dart';
 import 'features/auth/sign_in_page.dart';
 import 'home_shell.dart';
 import 'theme.dart';
-import 'features/auth/local_key_gate_screen.dart'; // LocalKeyGateScreen
+import 'features/auth/local_key_gate_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Global error routing (optional)
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.dumpErrorToConsole(details);
     appNavigatorKey.currentState?.push(
@@ -30,6 +26,10 @@ Future<void> main() async {
   };
 
   DataService.init();
+
+  // Try to restore the previous Entra session before the first frame so a
+  // returning user lands on HomeShell instead of flashing SignInPage.
+  await DataService.auth.tryAcquireTokenSilent();
 
   runApp(GoalsApp());
 }
@@ -45,46 +45,39 @@ class GoalsApp extends StatelessWidget {
 
     return MultiValueListenableBuilder(
       listenables: [
+        DataService.auth.currentUser,
         DataService.account.currentAccount,
         DataService.globalConfig.localStorage.isKeyPresent,
       ],
       builder: (context, values) {
         return BootGate(
-          // checks for Shift key on startup
           child: MaterialApp(
             navigatorKey: appNavigatorKey,
             title: 'Python Course',
             theme: brightness == Brightness.light
                 ? theme.light()
                 : theme.dark(),
-            home: StreamBuilder<User?>(
-              stream: FirebaseAuth.instance.authStateChanges(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final user = snap.data;
-                if (user == null) return const SignInPage();
+            home: Builder(
+              builder: (context) {
+                final identity = values[0] as AccountIdentity?;
+                if (identity == null) return const SignInPage();
 
-                // If either async value is loading, keep a simple loader.
-                if (values[0] == null || values[1] == null) {
+                // Account doc still loading (poll interval can be a few
+                // seconds on first sign-in) — show a spinner.
+                if (values[1] == null || values[2] == null) {
                   return const Scaffold(
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
 
                 final hasGlobalPermission =
-                    values[0] != null && (values[0] as Account).mayUseGlobalKey;
-                final hasLocalKey = values[1] as bool;
+                    (values[1] as Account).mayUseGlobalKey;
+                final hasLocalKey = values[2] as bool;
 
-                // Gate: show LocalKeyGateScreen until user has global permission OR a local key.
                 if (!hasGlobalPermission && !hasLocalKey) {
                   return const LocalKeyGateScreen();
                 }
 
-                // Signed in & passed the gate → dashboard shell
                 return const HomeShell();
               },
             ),

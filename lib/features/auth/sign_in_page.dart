@@ -1,246 +1,80 @@
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-/// A sign-in page that toggles into a register mode on first Register click.
+/// Single "Sign in with school account" button. The Entra app registration
+/// owns identity now, so the old register/email/password flow is gone —
+/// new users are provisioned automatically the first time they sign in (see
+/// AccountService._ensureProfile).
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
+
   @override
   State<SignInPage> createState() => _SignInPageState();
 }
 
-class _SignInPageState extends State<SignInPage> with TickerProviderStateMixin {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _firstName = TextEditingController();
-  final _lastName = TextEditingController();
-
-  final _signInFocus = FocusNode(debugLabel: 'signInBtn');
-  final _registerFocus = FocusNode(debugLabel: 'registerBtn');
-
+class _SignInPageState extends State<SignInPage> {
   bool _busy = false;
   String? _error;
 
-  /// Controls whether we’re in “register” UI mode (shows name fields, emphasizes Register)
-  bool _registerMode = false;
-
   Future<void> _signIn() async {
-    if (_registerMode) {
-      // Flip back to sign-in mode instead of submitting.
-      setState(() {
-        _registerMode = false;
-        _error = null;
-      });
-      // Move focus to the Sign in button.
-      FocusScope.of(context).requestFocus(_signInFocus);
-      return;
-    }
-
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Login failed');
+      await DataService.auth.signIn();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Sign in failed: $e');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _register() async {
-    if (!_registerMode) {
-      // First click just turns on register mode and focuses the button.
-      setState(() {
-        _registerMode = true;
-        _error = null;
-      });
-      FocusScope.of(context).requestFocus(_registerFocus);
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    // Require names on registration
-    final first = _firstName.text.trim();
-    final last = _lastName.text.trim();
-    if (first.isEmpty || last.isEmpty) {
-      setState(() {
-        _busy = false;
-        _error = 'Please enter your first name and last name to register.';
-      });
-      return;
-    }
-
-    try {
-      final auth = FirebaseAuth.instance;
-      final cred = await auth.createUserWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
-
-      await cred.user?.updateDisplayName('$first $last');
-
-      await DataService.account.upsertAccount(
-        uid: cred.user!.uid,
-        firstName: first,
-        lastName: last,
-        email: _email.text.trim(),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Register failed');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    _firstName.dispose();
-    _lastName.dispose();
-    _signInFocus.dispose();
-    _registerFocus.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Button visual states
-    final activeButtonPadding = const EdgeInsets.symmetric(vertical: 16);
-    final inactiveButtonPadding = const EdgeInsets.symmetric(vertical: 12);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Sign in')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _email,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  keyboardType: TextInputType.emailAddress,
+                const Text(
+                  'Sign in with your school Microsoft account to continue.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(height: 1.4),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _password,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                ),
-                // Animated appearance of first/last name when in register mode.
-                AnimatedCrossFade(
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: Column(
-                    children: [
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _firstName,
-                        decoration: const InputDecoration(
-                          labelText: 'First name',
-                        ),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _lastName,
-                        decoration: const InputDecoration(
-                          labelText: 'Last name',
-                        ),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                    ],
-                  ),
-                  crossFadeState: _registerMode
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 220),
-                  sizeCurve: Curves.easeInOut,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
                       _error!,
                       style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                // Buttons with animated emphasis swap
-                Row(
-                  children: [
-                    // Sign in button (active when !_registerMode)
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeInOut,
-                        padding: _registerMode
-                            ? inactiveButtonPadding
-                            : activeButtonPadding,
-                        child: _registerMode
-                            ? OutlinedButton(
-                                focusNode: _signInFocus,
-                                onPressed: _busy ? null : _signIn,
-                                child: const Text('Sign in'),
-                              )
-                            : FilledButton(
-                                focusNode: _signInFocus,
-                                onPressed: _busy ? null : _signIn,
-                                child: _busy
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text('Sign in'),
-                              ),
-                      ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _signIn,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.login),
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      _busy ? 'Signing in…' : 'Sign in with school account',
                     ),
-                    const SizedBox(width: 12),
-                    // Register button (active when _registerMode)
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeInOut,
-                        padding: _registerMode
-                            ? activeButtonPadding
-                            : inactiveButtonPadding,
-                        child: _registerMode
-                            ? FilledButton.tonal(
-                                // tonal variant for visual contrast; still "active"
-                                focusNode: _registerFocus,
-                                onPressed: _busy ? null : _register,
-                                child: _busy
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text('Register'),
-                              )
-                            : TextButton(
-                                focusNode: _registerFocus,
-                                onPressed: _busy ? null : _register,
-                                child: const Text('Register'),
-                              ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

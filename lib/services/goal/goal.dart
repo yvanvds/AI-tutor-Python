@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 // Model class representing a Goal.
 class Goal {
   final String id;
@@ -11,7 +9,6 @@ class Goal {
   final List<String> suggestions;
   final List<String> knownConcepts;
 
-  // Constructor
   Goal({
     required this.id,
     required this.title,
@@ -23,22 +20,6 @@ class Goal {
     this.knownConcepts = const [],
   });
 
-  // Create a Goal from a Firestore document.
-  factory Goal.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data()!;
-    return Goal(
-      id: doc.id,
-      title: d['title'] ?? '',
-      description: d['description'],
-      parentId: d['parentId'],
-      order: d['order'] ?? 0,
-      optional: d['optional'] ?? false,
-      suggestions: List<String>.from(d['suggestions'] ?? []),
-      knownConcepts: List<String>.from(d['knownConcepts'] ?? []),
-    );
-  }
-
-  // Convert a Goal to a map for Firestore storage.
   Map<String, dynamic> toMap() => {
     'title': title,
     'description': description,
@@ -65,15 +46,8 @@ class Goal {
     );
   }
 
-  static List<Goal> fromFirebase(QuerySnapshot<Map<String, dynamic>> snapshot) {
-    return snapshot.docs.map((data) {
-      return Goal.fromMap(id: data.id, map: data.data());
-    }).toList();
-  }
-
-  factory Goal.fromFirebaseDocument(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    return Goal.fromMap(id: snapshot.id, map: snapshot.data()!);
+  /// Build from a Cosmos document. The doc carries its own `id` field.
+  factory Goal.fromCosmos(Map<String, dynamic> doc) {
+    return Goal.fromMap(id: doc['id'] as String, map: doc);
   }
 }

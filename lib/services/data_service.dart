@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
@@ -17,6 +18,7 @@ class DataService {
   static GetIt _locator = GetIt.instance;
 
   static void init() {
+    _locator.registerLazySingleton(() => AuthService());
     _locator.registerLazySingleton(() => AccountService());
     _locator.registerLazySingleton(() => GlobalConfigService());
     _locator.registerLazySingleton(() => InstructionsService());
@@ -32,6 +34,7 @@ class DataService {
     _locator.registerLazySingleton(() => SoundService());
   }
 
+  static AuthService get auth => _locator<AuthService>();
   static AccountService get account => _locator<AccountService>();
   static GlobalConfigService get globalConfig =>
       _locator<GlobalConfigService>();

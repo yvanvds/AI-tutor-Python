@@ -1,38 +1,27 @@
-import 'dart:async';
-
-import 'package:ai_tutor_python/core/firestore_paths.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/widgets.dart';
 
+/// Tracks whether the signed-in user is a teacher.
+///
+/// Step 3 of the migration: roles are no longer stored as Firestore docs —
+/// they ride on the Entra access token's `roles` app-role claim. The
+/// AuthService parses that out into `AccountIdentity.isTeacher`; this service
+/// just mirrors it into a notifier so feature widgets keep their existing
+/// `DataService.role.isTeacher` API.
 class RoleService {
   RoleService() {
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      // No user: definitely not a teacher
-      if (user == null) {
-        isTeacher.value = false;
-        await _roleSub?.cancel();
-        _roleSub = null;
-        return;
-      }
-
-      // Optional: live updates on role doc
-      await _roleSub?.cancel();
-      _roleSub = FsPaths.role(user.uid).snapshots().listen((snapshot) {
-        final role = snapshot.data()?['role'] as String?;
-        isTeacher.value = role == 'teacher';
-      });
-    });
+    DataService.auth.currentUser.addListener(_update);
+    _update();
   }
 
   final ValueNotifier<bool> isTeacher = ValueNotifier<bool>(false);
 
-  late final StreamSubscription<User?> _authSub;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSub;
+  void _update() {
+    isTeacher.value = DataService.auth.currentUser.value?.isTeacher ?? false;
+  }
 
-  Future<void> dispose() async {
-    await _authSub.cancel();
-    await _roleSub?.cancel();
+  void dispose() {
+    DataService.auth.currentUser.removeListener(_update);
     isTeacher.dispose();
   }
 }

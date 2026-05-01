@@ -21,6 +21,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 // safety files coexist. Step 4 (Firebase removal) will move the declaration.
 import 'package:ai_tutor_python/core/firestore_safety.dart' show appNavigatorKey;
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
+import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 
 /// Default polling cadence. Tuned for one global rate — fast enough that
@@ -116,16 +117,19 @@ Stream<T> pollingStream<T>(
   return controller.stream;
 }
 
-/// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`. Step 1
-/// is too early to wire up — MSAL doesn't exist yet (Step 3) and we don't
-/// keep a local Cosmos response cache. The skeleton is here so Step 4 can
-/// flip the call sites in `crash_recovery_screen.dart` and `boot_gate.dart`
-/// without a churn of adding the function.
+/// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`.
+/// Step 4 (Firebase removal) will redirect `boot_gate.dart` and
+/// `crash_recovery_screen.dart` away from the firestore_safety version onto
+/// this one.
 Future<void> resetAuthAndCacheAndExit() async {
-  // Step 3 fills this in: AuthService.instance.signOut() to drop the MSAL
-  // account record and any cached tokens.
+  try {
+    await DataService.auth.signOut();
+  } catch (e) {
+    // Best-effort — going nuclear regardless.
+    debugPrint('resetAuthAndCacheAndExit: signOut threw: $e');
+  }
 
-  // No local Cosmos cache to clear today. If/when we add one, wipe it here.
+  // No local Cosmos response cache today. If/when we add one, wipe it here.
 
   exit(0);
 }

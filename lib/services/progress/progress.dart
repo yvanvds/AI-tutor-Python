@@ -1,5 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+/// One row of the `progress` Cosmos container. Flattened from the old
+/// `accounts/{uid}/progress/{goalId}` Firestore subcollection — each doc now
+/// carries its own `uid` and `goalId`, with composite id `${uid}_${goalId}`
+/// and the user's uid as the partition key.
 class Progress {
   final String goalID;
   final double progress;
@@ -7,19 +9,23 @@ class Progress {
 
   Progress({required this.goalID, required this.progress, this.updatedAt});
 
-  factory Progress.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? const {};
-    final ts = data['updatedAt'];
+  /// Build a Cosmos doc map. The container partition key is `/uid`, so
+  /// every doc must carry the owner's uid; the composite id keeps doc-id
+  /// uniqueness across users in a single container.
+  Map<String, dynamic> toMap({required String uid}) => {
+    'id': '${uid}_$goalID',
+    'uid': uid,
+    'goalId': goalID,
+    'progress': progress,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
+
+  factory Progress.fromCosmos(Map<String, dynamic> doc) {
+    final raw = doc['updatedAt'];
     return Progress(
-      goalID: doc.id,
-      progress: (data['progress'] as double?) ?? 0.0,
-      updatedAt: ts is Timestamp ? ts.toDate() : null,
+      goalID: (doc['goalId'] as String?) ?? '',
+      progress: (doc['progress'] as num?)?.toDouble() ?? 0.0,
+      updatedAt: raw is String ? DateTime.tryParse(raw) : null,
     );
   }
-
-  Map<String, dynamic> toMap() => {
-    // goalID is the doc id
-    'progress': progress,
-    'updatedAt': FieldValue.serverTimestamp(),
-  };
 }

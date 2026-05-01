@@ -42,7 +42,7 @@ dependencies:
   lottie: ^3.2.0
   audioplayers: ^6.5.1
   file_picker: ^8.1.6
-  aad_oauth: ^1.0.1
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

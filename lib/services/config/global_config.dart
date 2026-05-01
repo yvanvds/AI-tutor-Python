@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class GlobalConfig {
   final String model;
   final String apiKey;
@@ -13,13 +11,13 @@ class GlobalConfig {
     );
   }
 
-  factory GlobalConfig.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    return GlobalConfig.fromMap(data);
-  }
-
+  /// Serialize for Cosmos. Always written under the single `global` doc id
+  /// in the `config` container; both `id` and the partition-key field
+  /// (`type: "config"`) are included so callers can pass the map directly
+  /// to upsert.
   Map<String, dynamic> toMap() => {
-    // kept for withConverter symmetry, not for writes
+    'id': 'global',
+    'type': 'config',
     'Model': model,
     'ApiKey': apiKey,
   };
