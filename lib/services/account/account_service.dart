@@ -1,15 +1,3 @@
-// Cosmos-backed AccountService (Step 3 of the migration).
-//
-// Public API matches the prior FirebaseAuth + Firestore version exactly so
-// nothing in `features/` needs to change. The internals subscribe to
-// `AuthService.currentUser` instead of `FirebaseAuth.authStateChanges()`,
-// and persist to the `accounts` Cosmos container via `CosmosPaths`.
-//
-// Container shape:
-//   - container = `accounts`
-//   - partition key = `/uid` (the Entra Object ID)
-//   - doc id == uid (one doc per user)
-
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';

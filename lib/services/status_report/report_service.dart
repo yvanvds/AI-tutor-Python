@@ -1,8 +1,5 @@
-// Cosmos-backed ReportService (Step 3 of the migration).
-//
-// Doc-id change vs Firestore: the old subcollection
-// `accounts/{uid}/status_reports/{goalId}` becomes a flat `status_reports`
-// container with composite doc id `${uid}_${goalId}` and partition key = uid.
+// Reads/writes the `status_reports` Cosmos container. Composite doc id
+// `${uid}_${goalId}` with partition key = uid.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';

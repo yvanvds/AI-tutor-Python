@@ -1,5 +1,5 @@
 import 'package:ai_tutor_python/boot_gate.dart';
-import 'package:ai_tutor_python/core/firestore_safety.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/create_text_theme.dart';
 import 'package:ai_tutor_python/services/account/account.dart';

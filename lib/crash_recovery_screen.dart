@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:ai_tutor_python/core/firestore_safety.dart';
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:flutter/material.dart';
 
 class CrashRecoveryScreen extends StatelessWidget {

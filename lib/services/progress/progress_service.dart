@@ -1,8 +1,5 @@
-// Cosmos-backed ProgressService (Step 3 of the migration).
-//
-// Doc-id change vs Firestore: the old subcollection
-// `accounts/{uid}/progress/{goalId}` becomes a flat `progress` container
-// with composite doc id `${uid}_${goalId}` and partition key = uid.
+// Reads/writes the `progress` Cosmos container. Composite doc id
+// `${uid}_${goalId}` with partition key = uid.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';

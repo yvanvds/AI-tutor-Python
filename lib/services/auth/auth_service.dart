@@ -1,10 +1,9 @@
 // Microsoft Entra ID auth via the OAuth 2.0 authorization code + PKCE flow,
-// driven from the system browser (Step 3 of the Firebase → Azure migration).
+// driven from the system browser.
 //
 // We rolled this by hand instead of depending on `aad_oauth` because the
 // latter wraps `webview_flutter`, which has no Windows desktop platform
-// implementation — the migration plan's third open question anticipated
-// this and named the hand-rolled fallback as the path of last resort.
+// implementation.
 //
 // Flow per sign-in:
 //   1. Generate a PKCE code_verifier + code_challenge and a random state.

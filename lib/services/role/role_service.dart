@@ -3,11 +3,10 @@ import 'package:flutter/widgets.dart';
 
 /// Tracks whether the signed-in user is a teacher.
 ///
-/// Step 3 of the migration: roles are no longer stored as Firestore docs —
-/// they ride on the Entra access token's `roles` app-role claim. The
-/// AuthService parses that out into `AccountIdentity.isTeacher`; this service
-/// just mirrors it into a notifier so feature widgets keep their existing
-/// `DataService.role.isTeacher` API.
+/// Roles ride on the Entra access token's `roles` app-role claim. The
+/// AuthService parses that into `AccountIdentity.isTeacher`; this service
+/// just mirrors it into a notifier so feature widgets keep using
+/// `DataService.role.isTeacher`.
 class RoleService {
   RoleService() {
     DataService.auth.currentUser.addListener(_update);

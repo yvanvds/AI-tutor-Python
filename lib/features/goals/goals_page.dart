@@ -154,7 +154,7 @@ class _GoalsPageState extends State<GoalsPage> {
         content: Text(
           'This will add $rootCount root goal(s) and $total total node(s) '
           'to your existing goals. Existing goals will not be touched. '
-          'New Firestore ids are assigned to every imported goal.',
+          'New ids are assigned to every imported goal.',
         ),
         actions: [
           TextButton(

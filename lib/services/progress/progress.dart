@@ -1,7 +1,6 @@
-/// One row of the `progress` Cosmos container. Flattened from the old
-/// `accounts/{uid}/progress/{goalId}` Firestore subcollection — each doc now
-/// carries its own `uid` and `goalId`, with composite id `${uid}_${goalId}`
-/// and the user's uid as the partition key.
+/// One row of the `progress` Cosmos container. Each doc carries its own
+/// `uid` and `goalId`, with composite id `${uid}_${goalId}` and the user's
+/// uid as the partition key.
 class Progress {
   final String goalID;
   final double progress;

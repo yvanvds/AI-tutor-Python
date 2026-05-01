@@ -1,7 +1,6 @@
-/// One row of the `status_reports` Cosmos container. Flattened from the old
-/// `accounts/{uid}/status_reports/{goalId}` Firestore subcollection — each
-/// doc now carries its own `uid` and `goalId`, with composite id
-/// `${uid}_${goalId}` and the user's uid as the partition key.
+/// One row of the `status_reports` Cosmos container. Each doc carries its
+/// own `uid` and `goalId`, with composite id `${uid}_${goalId}` and the
+/// user's uid as the partition key.
 class StatusReport {
   final String goalID;
   final String statusReport;

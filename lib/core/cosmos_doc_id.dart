@@ -1,14 +1,11 @@
-// Doc-id conventions for Cosmos. Two containers (`progress`, `status_reports`)
-// flatten what used to be Firestore subcollections into composite ids — keep
-// the format in one place so reads, writes, and the Step 5 migration script
-// can't drift.
+// Composite doc-id conventions for Cosmos containers that combine multiple
+// keys into a single id. Keep in one place so reads and writes can't drift.
 
 class CosmosDocId {
-  /// `accounts/{uid}/progress/{goalId}` → `progress` doc with this id.
+  /// Doc id for the `progress` container.
   static String progress(String uid, String goalId) => '${uid}_$goalId';
 
-  /// `accounts/{uid}/status_reports/{goalId}` → `status_reports` doc with
-  /// this id.
+  /// Doc id for the `status_reports` container.
   static String statusReport(String uid, String goalId) => '${uid}_$goalId';
 
   /// Single global config doc.

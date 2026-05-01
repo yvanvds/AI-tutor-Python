@@ -31,7 +31,6 @@ class _ChipsEditorState extends State<ChipsEditor> {
   @override
   void didUpdateWidget(covariant ChipsEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // refresh local view if parent updates (e.g., from Firestore)
     if (oldWidget.values != widget.values) {
       _items = [...widget.values];
     }

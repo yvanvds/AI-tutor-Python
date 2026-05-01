@@ -1,14 +1,13 @@
-// Cosmos-side analogue of `firestore_safety.dart`. Three concerns:
+// Cosmos safety wrappers. Three concerns:
 //
 //   1. `safeCosmos` — wraps a one-shot async op; on auth failure (401/403)
 //      pushes the CrashRecoveryScreen so the user can reset and re-sign-in.
 //   2. `safeCosmosStream` — passive guard that logs auth/throttle errors
 //      flowing through a stream without swallowing them (StreamBuilder still
 //      sees the error).
-//   3. `pollingStream` — replacement for Firestore `snapshots()`. Cosmos has
-//      a change feed but consuming it from a desktop client is awkward; we
-//      poll on a fixed cadence instead. Decision and rationale are in
-//      TODO.md, "Real-time updates: replacement strategy".
+//   3. `pollingStream` — periodic-fetch stream. Cosmos has a change feed but
+//      consuming it from a desktop client is awkward; we poll on a fixed
+//      cadence instead.
 //
 // Polling cadence and 429 retry policy are decided here, once. Don't
 // relitigate inside individual services.
@@ -17,12 +16,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
-// Reusing the navigator key declared in firestore_safety.dart while both
-// safety files coexist. Step 4 (Firebase removal) will move the declaration.
-import 'package:ai_tutor_python/core/firestore_safety.dart' show appNavigatorKey;
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Default polling cadence. Tuned for one global rate — fast enough that
 /// teacher-side edits to goals/instructions show up "soon", slow enough that
@@ -118,9 +116,6 @@ Stream<T> pollingStream<T>(
 }
 
 /// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`.
-/// Step 4 (Firebase removal) will redirect `boot_gate.dart` and
-/// `crash_recovery_screen.dart` away from the firestore_safety version onto
-/// this one.
 Future<void> resetAuthAndCacheAndExit() async {
   try {
     await DataService.auth.signOut();

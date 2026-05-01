@@ -1,10 +1,4 @@
-// Single source of truth for Cosmos container handles. Mirrors the shape of
-// `FsPaths` so service migrations from Firestore are mechanical: replace
-// `FsPaths.goals()` with `CosmosPaths.goals()` and the API surface above it
-// stays the same.
-//
-// Container/partition-key spec lives in TODO.md (the migration plan). The
-// `_pk*` constants below match that spec — change one, change the other.
+// Single source of truth for Cosmos container handles.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 
