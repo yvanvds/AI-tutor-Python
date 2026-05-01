@@ -1,4 +1,6 @@
 // lib/features/instructions/instructions_editor_page.dart
+import 'dart:io';
+
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/features/instructions/doc_header.dart';
@@ -9,6 +11,8 @@ import 'package:ai_tutor_python/features/instructions/sections_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:highlight/languages/markdown.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class InstructionsEditorPage extends StatefulWidget {
   const InstructionsEditorPage({super.key});
@@ -203,6 +207,11 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
             icon: const Icon(Icons.delete_outline),
             onPressed: _hasDocSelected ? _deleteDocument : null,
           ),
+          IconButton(
+            tooltip: 'Export all to Markdown',
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: _exportAllToMarkdown,
+          ),
           const SizedBox(width: 12),
           FilledButton.icon(
             icon: const Icon(Icons.save),
@@ -310,6 +319,30 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportAllToMarkdown() async {
+    try {
+      final docs = await DataService.instructions.getAll();
+      if (docs.isEmpty) {
+        if (mounted) _showSnackBar(context, 'No documents to export');
+        return;
+      }
+
+      final sortedDocs = [...docs]
+        ..sort((a, b) => a.id.toLowerCase().compareTo(b.id.toLowerCase()));
+      final markdown = _buildMarkdownExport(sortedDocs);
+
+      final dir =
+          await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final stamp = DateTime.now().toIso8601String().split('T').first;
+      final file = File(p.join(dir.path, 'instructions-export-$stamp.md'));
+      await file.writeAsString(markdown);
+
+      if (mounted) _showSnackBar(context, 'Exported to ${file.path}');
+    } catch (e) {
+      if (mounted) _showSnackBar(context, 'Export failed: $e');
+    }
   }
 
   Future<void> _renameDocument() async {
@@ -429,6 +462,89 @@ Future<bool?> _confirm(BuildContext context, String title, String body) async {
 
 void _showSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+String _buildMarkdownExport(List<Instruction> docs) {
+  final buf = StringBuffer();
+  for (var i = 0; i < docs.length; i++) {
+    final doc = docs[i];
+    if (i > 0) buf.writeln();
+    buf.writeln('# ${doc.id}');
+
+    final sectionKeys = doc.sections.keys.toList()..sort(_compareSectionKeys);
+    for (final key in sectionKeys) {
+      buf.writeln();
+      buf.writeln('## $key');
+      buf.writeln();
+      final body = _bumpHeadersToMin3(doc.sections[key] ?? '');
+      buf.writeln(body.trimRight());
+    }
+  }
+  return buf.toString();
+}
+
+int _compareSectionKeys(String a, String b) {
+  final na = _leadingNumber(a);
+  final nb = _leadingNumber(b);
+  if (na != null && nb != null && na != nb) return na.compareTo(nb);
+  if (na != null && nb == null) return -1;
+  if (na == null && nb != null) return 1;
+  return a.toLowerCase().compareTo(b.toLowerCase());
+}
+
+int? _leadingNumber(String key) {
+  final match = RegExp(r'^\s*(\d+)').firstMatch(key);
+  if (match == null) return null;
+  return int.tryParse(match.group(1)!);
+}
+
+/// Shifts all ATX headings in [text] so the smallest level becomes at least 3,
+/// preserving the relative hierarchy. Lines inside fenced code blocks are
+/// left untouched.
+String _bumpHeadersToMin3(String text) {
+  final lines = text.split('\n');
+  final headerRe = RegExp(r'^(#{1,6})(\s|$)');
+  final fenceRe = RegExp(r'^\s*(```|~~~)');
+
+  int? minLevel;
+  var inFence = false;
+  for (final line in lines) {
+    if (fenceRe.hasMatch(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    final m = headerRe.firstMatch(line);
+    if (m == null) continue;
+    final level = m.group(1)!.length;
+    if (minLevel == null || level < minLevel) minLevel = level;
+  }
+
+  if (minLevel == null || minLevel >= 3) return text;
+  final shift = 3 - minLevel;
+
+  inFence = false;
+  final out = <String>[];
+  for (final line in lines) {
+    if (fenceRe.hasMatch(line)) {
+      inFence = !inFence;
+      out.add(line);
+      continue;
+    }
+    if (inFence) {
+      out.add(line);
+      continue;
+    }
+    final m = headerRe.firstMatch(line);
+    if (m == null) {
+      out.add(line);
+      continue;
+    }
+    final level = m.group(1)!.length;
+    final newLevel = (level + shift).clamp(1, 6);
+    out.add('${'#' * newLevel}${line.substring(level)}');
+  }
+  return out.join('\n');
 }
 
 bool _mapEquals(Map<String, String> a, Map<String, String> b) {
