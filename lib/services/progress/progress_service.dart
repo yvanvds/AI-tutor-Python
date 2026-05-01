@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,11 +7,8 @@ import 'package:flutter/material.dart';
 import 'progress.dart'; // your Progress class (shown in your message)
 
 class ProgressService {
-  ProgressService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _db = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  ProgressService({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance;
 
-  final FirebaseFirestore _db;
   final FirebaseAuth _auth;
 
   final ValueNotifier<double> currentProgress = ValueNotifier(0.0);
@@ -24,7 +22,7 @@ class ProgressService {
   }
 
   CollectionReference<Map<String, dynamic>> _col(String uid) =>
-      _db.collection('accounts').doc(uid).collection('progress');
+      FsPaths.progress(uid);
 
   /// Load all progress docs once (returns empty list if none exist).
   Future<List<Progress>> getAll() async {

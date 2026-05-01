@@ -8,20 +8,20 @@
 
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
-class GuidingExcercise implements ChatResponse {
+class GuidingExercise implements ChatResponse {
   @override
   final String type;
   final String prompt;
   final String code;
 
-  GuidingExcercise.guidingExcercise({
+  GuidingExercise.guidingExercise({
     required this.type,
     required this.prompt,
     required this.code,
   });
 
-  factory GuidingExcercise.fromMap(Map<String, dynamic> map) {
-    return GuidingExcercise.guidingExcercise(
+  factory GuidingExercise.fromMap(Map<String, dynamic> map) {
+    return GuidingExercise.guidingExercise(
       type: map['type'] ?? '',
       prompt: map['prompt'] ?? '',
       code: map['code'] ?? '',

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
@@ -17,14 +18,10 @@ class RoleService {
 
       // Optional: live updates on role doc
       await _roleSub?.cancel();
-      _roleSub = FirebaseFirestore.instance
-          .collection('roles')
-          .doc(user.uid)
-          .snapshots()
-          .listen((snapshot) {
-            final role = snapshot.data()?['role'] as String?;
-            isTeacher.value = role == 'teacher';
-          });
+      _roleSub = FsPaths.role(user.uid).snapshots().listen((snapshot) {
+        final role = snapshot.data()?['role'] as String?;
+        isTeacher.value = role == 'teacher';
+      });
     });
   }
 

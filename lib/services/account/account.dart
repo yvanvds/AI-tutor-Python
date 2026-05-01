@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Account {
@@ -86,9 +87,7 @@ class Account {
     if (updates.isEmpty) return Future.value();
 
     Future updateTransaction(Transaction tx) async {
-      final DocumentSnapshot ds = await tx.get(
-        FirebaseFirestore.instance.collection('accounts').doc(uid),
-      );
+      final DocumentSnapshot ds = await tx.get(FsPaths.accounts().doc(uid));
       tx.update(ds.reference, updates);
       return {'updated': true};
     }

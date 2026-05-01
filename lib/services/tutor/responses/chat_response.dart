@@ -40,7 +40,7 @@ class ChatResponseFactory {
       case 'write_code':
         return WriteCode.fromMap(map);
       case 'guiding_exercise':
-        return GuidingExcercise.fromMap(map);
+        return GuidingExercise.fromMap(map);
 
       // Feedback / system types
       case 'answer':

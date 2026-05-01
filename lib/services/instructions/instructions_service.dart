@@ -1,17 +1,16 @@
 // lib/data/instructions/instructions_repository.dart
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'instruction.dart';
 
 class InstructionsService {
   InstructionsService()
-    : _col = FirebaseFirestore.instance
-          .collection('instructions')
-          .withConverter<Instruction>(
-            fromFirestore: (snap, _) =>
-                Instruction.fromMap(snap.id, snap.data() ?? {}),
-            toFirestore: (instruction, _) => instruction.toMap(),
-          );
+    : _col = FsPaths.instructions().withConverter<Instruction>(
+        fromFirestore: (snap, _) =>
+            Instruction.fromMap(snap.id, snap.data() ?? {}),
+        toFirestore: (instruction, _) => instruction.toMap(),
+      );
 
   final CollectionReference<Instruction> _col;
 

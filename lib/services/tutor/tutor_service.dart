@@ -1,27 +1,12 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
-import 'package:ai_tutor_python/services/status_report/status_report.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
-import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
-import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
-import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
-import 'package:ai_tutor_python/services/tutor/responses/explain_code.dart';
-import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_exercise.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
-import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
-import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
-import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
-import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
+import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
 import 'package:flutter/material.dart';
 
 enum TutorState { idle, working, hasFollowUp }
@@ -34,6 +19,16 @@ class TutorService {
   TutorService() {
     _connector = OpenaiConnector();
     _conductor = Conductor();
+    _ctx = TutorContext(
+      conductor: _conductor,
+      startNewCode: _startNewCode,
+      addTutorMessage: _addTutorMessage,
+      addSystemMessage: _addSystemMessage,
+      setExerciseType: (type) => _currentExerciseType = type,
+      setFollowUp: _setFollowUp,
+      requestExercise: requestExercise,
+      maybeRetry: _maybeRetry,
+    );
   }
   bool _initialized = false;
 
@@ -41,11 +36,15 @@ class TutorService {
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
+  late final TutorContext _ctx;
 
   String _currentExerciseType = '';
 
   String? _nextMessage;
   String? _nextCode;
+
+  static const int _maxRetriesPerRequest = 1;
+  int _retriesLeft = 0;
 
   // ---- Public API -----------------------------------------------------------
 
@@ -74,6 +73,7 @@ class TutorService {
   }) async {
     if (state.value != TutorState.idle) return;
     state.value = TutorState.working;
+    _retriesLeft = _maxRetriesPerRequest;
 
     final instructions = await _instructionGenerator.generateInstructions(type);
 
@@ -156,10 +156,7 @@ class TutorService {
         return;
     }
 
-    // debugPrint(instructions);
-    // debugPrint(input);
-
-    dynamic result;
+    final ConnectorResult result;
     try {
       result = await _connector.sendRequest(
         input: input,
@@ -169,9 +166,25 @@ class TutorService {
     } finally {
       state.value = TutorState.idle;
     }
-    if (result != null) {
-      _handleResponse(result);
+    await _processResult(result);
+  }
+
+  Future<void> _processResult(ConnectorResult result) async {
+    switch (result) {
+      case ConnectorOk(:final output):
+        await _handleResponse(output);
+      case ConnectorFailure(:final message):
+        _addSystemMessage('Er ging iets mis bij de tutor: $message');
+        await _maybeRetry();
     }
+  }
+
+  Future<void> _maybeRetry() async {
+    if (_retriesLeft <= 0) return;
+    _retriesLeft--;
+    final result = await _resendLastRequest();
+    if (result == null) return;
+    await _processResult(result);
   }
 
   Future<void> handleStudentMessage(String message) async {
@@ -187,7 +200,6 @@ class TutorService {
     } else {
       await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
-    _addUserMessage(message);
   }
 
   Future<void> requestHint(String? code) async {
@@ -216,268 +228,54 @@ class TutorService {
 
   void moveToFollowUp() {
     if (_nextMessage != null) {
-      _addTutorMessage(_nextMessage!, true);
+      _addTutorMessage(_nextMessage!);
       _nextMessage = null;
     }
     if (_nextCode != null) {
-      _startNewCode(_nextCode!, true);
+      _startNewCode(_nextCode!);
       _nextCode = null;
     }
     state.value = TutorState.idle;
   }
 
-  void dispose() {}
-
   // ---- Private helpers ------------------------------------------------------
 
-  void _handleResponse(dynamic response) async {
-    final parsed = AIResponseParser.parse(
-      response,
-    ); // returns Exercise | Answer | ...
-
-    assert(() {
-      // print("We got a response: ${parsed.type}");
-      // print(const JsonEncoder.withIndent('  ').convert(parsed.toJson()));
-      return true;
-    }());
+  Future<void> _handleResponse(dynamic response) async {
+    final parsed = AIResponseParser.parse(response);
     _connector.addResponse(parsed);
 
-    if (parsed is CompleteCode) {
-      //
-      // The AI has sent Code to Complete
-      //
-      // add code to timeline and editor
-      _startNewCode(parsed.code, true);
-
-      // add message to timeline and chat
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-    } else if (parsed is ExplainCode) {
-      //
-      // The AI has sent Code to Explain
-      //
-      _currentExerciseType = parsed.type;
-
-      // add code to timeline and editor
-      _startNewCode(parsed.code, true);
-
-      // add message to timeline and chat
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-    } else if (parsed is WriteCode) {
-      //
-      // The AI has sent instructions to write code
-      //
-      _currentExerciseType = parsed.type;
-      _startNewCode('# Schrijf hier je code\n', true);
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-    } else if (parsed is SocraticQuestion) {
-      //
-      // The AI has sent a socratic question
-      //
-      _currentExerciseType = parsed.type;
-      _startNewCode('', true);
-
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-    } else if (parsed is MultipleChoice) {
-      //
-      // the AI has sent a multiple choice question
-      //
-      _currentExerciseType = parsed.type;
-      _startNewCode(parsed.code, true);
-
-      _addTutorMessage(parsed.prompt, true);
-      for (final option in parsed.options) {
-        _addTutorMessage(option, true);
-      }
-      DataService.sound.askQuestion();
-    } else if (parsed is GuidingExcercise) {
-      //
-      // The AI has sent a guiding question
-      //
-      _currentExerciseType = parsed.type;
-      _startNewCode(parsed.code, true);
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-    } else if (parsed is GuidingFeedback) {
-      //
-      // The AI has sent feedback on a guiding answer
-      //
-      if (parsed.prompt.isNotEmpty) {
-        _addTutorMessage(parsed.prompt, true);
-        DataService.sound.askQuestion();
-      }
-
-      bool guidingComplete = await _conductor.guidingIsComplete(
-        parsed.understanding,
-      );
-      if (!guidingComplete) {
-        _nextCode = null;
-        _nextMessage = null;
-        if (parsed.code.isNotEmpty) {
-          _nextCode = parsed.code;
-        }
-        if (parsed.followUp.isNotEmpty) {
-          _nextMessage = parsed.followUp;
-        }
-        state.value = TutorState.hasFollowUp;
-      } else {
-        await requestExercise();
-      }
-    } else if (parsed is Answer) {
-      //
-      // The AI answered a generic question
-      //
-      if (parsed.prompt.isNotEmpty) {
-        _addTutorMessage(parsed.prompt, true);
-        DataService.sound.askQuestion();
-      }
-    } else if (parsed is Hint) {
-      //
-      // The AI has sent a Hint
-      //
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-      _conductor.hintProvided();
-    } else if (parsed is CodeFeedback) {
-      //
-      // The AI gives feedback on code
-      //
-      if (parsed.prompt.isNotEmpty) {
-        _addTutorMessage(parsed.prompt, true);
-        DataService.sound.askQuestion();
-      }
-
-      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
-      if (parsed.suggestion.isNotEmpty && suggestionAllowed) {
-        _nextMessage = parsed.suggestion;
-        _nextCode = null;
-        state.value = TutorState.hasFollowUp;
-      } else {
-        await requestExercise();
-      }
-    } else if (parsed is McqFeedback) {
-      //
-      // The AI gives feedback on MCQ answer
-      //
-      _addTutorMessage(parsed.prompt, true);
-      DataService.sound.askQuestion();
-
-      await _conductor.updateProgress(parsed.quality);
-      await requestExercise();
-    } else if (parsed is ExplainFeedback) {
-      //
-      // The AI gives feedback on explanation
-      //
-      if (parsed.prompt.isNotEmpty) {
-        _addTutorMessage(parsed.prompt, true);
-        DataService.sound.askQuestion();
-      }
-
-      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
-      if (parsed.followUp != null && suggestionAllowed) {
-        _nextMessage = parsed.followUp!;
-        _nextCode = null;
-        state.value = TutorState.hasFollowUp;
-      } else {
-        await requestExercise();
-      }
-    } else if (parsed is SocraticFeedback) {
-      //
-      // The AI gives feedback on an answer to a socratic question
-      //
-      if (parsed.prompt.isNotEmpty) {
-        _addTutorMessage(parsed.prompt, true);
-        DataService.sound.askQuestion();
-      }
-
-      final suggestionAllowed = await _conductor.updateProgress(parsed.quality);
-      if (parsed.followUp != null && suggestionAllowed) {
-        _nextMessage = parsed.followUp!;
-        _nextCode = null;
-        state.value = TutorState.hasFollowUp;
-      } else {
-        await requestExercise();
-      }
-    } else if (parsed is StatusSummary) {
-      //
-      // AI gives a status report when a goal is reached
-      //
-      await _updateReport(parsed.prompt);
-    } else if (parsed is ErrorResponse) {
-      _addSystemMessage(parsed.message);
-
-      // resend the request
-      final result = await _resendLastRequest();
-      _handleResponse(result);
-    } else {
-      _addTutorMessage('Onbekend antwoord ontvangen.', false);
-
-      // resend the request
-      final result = await _resendLastRequest();
-      _handleResponse(result);
+    final dispatched = await dispatchResponse(parsed, _ctx);
+    if (!dispatched) {
+      _addTutorMessage('Onbekend antwoord ontvangen.');
+      await _maybeRetry();
     }
   }
 
-  Future<dynamic> _resendLastRequest() async {
-    if (state.value != TutorState.idle) return;
+  Future<ConnectorResult?> _resendLastRequest() async {
+    if (state.value != TutorState.idle) return null;
     state.value = TutorState.working;
-    dynamic result;
     try {
-      result = await _connector.resendRequest();
+      return await _connector.resendRequest();
     } finally {
       state.value = TutorState.idle;
     }
-
-    return result;
   }
 
-  Future<void> _updateReport(String newReport) async {
-    if (DataService.goals.selectedChildGoal.value == null) return;
-
-    // 1) Upsert child
-    await DataService.report.upsert(
-      StatusReport(
-        goalID: DataService.goals.selectedChildGoal.value!.id,
-        statusReport: newReport,
-      ),
-    );
+  void _setFollowUp({String? message, String? code}) {
+    _nextMessage = message;
+    _nextCode = code;
+    state.value = TutorState.hasFollowUp;
   }
 
-  Future<void> _startNewCode(String code, bool updateEditor) async {
-    // final timeline = ref.read(timeLineProvider);
-    // timeline.startNewCode(code);
-    // if (updateEditor) {
+  void _startNewCode(String code) {
     DataService.code.setText(code);
-    // }
   }
 
-  Future<void> _addTutorMessage(String message, bool sendToChat) async {
-    // final timeline = ref.read(timeLineProvider);
-    // timeline.addAiMessage(message);
-
-    // Split message into lines
-    // final lines = message.split('\n').where((line) => line.trim().isNotEmpty);
-
-    // for (final line in lines) {
-    // if (sendToChat) {
+  void _addTutorMessage(String message) {
     DataService.chat.addTutorMessage(message);
-
-    // Small pause between lines
-    // await Future.delayed(const Duration(milliseconds: 500));
-    //}
   }
 
-  Future<void> _addSystemMessage(String message) async {
-    // we won't add system messages to the code timeline
+  void _addSystemMessage(String message) {
     DataService.chat.addSystemMessage(message);
-  }
-
-  Future<void> _addUserMessage(String message) async {
-    // add only to timeline, already added to chat when user sent it
-    // final timeline = ref.read(timeLineProvider);
-    // timeline.addUserMessage(message);
   }
 }

@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
@@ -5,8 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
 
 class GoalsService {
-  final CollectionReference<Map<String, dynamic>> _collection =
-      FirebaseFirestore.instance.collection('goals');
+  final CollectionReference<Map<String, dynamic>> _collection = FsPaths.goals();
 
   final ValueNotifier<Goal?> selectedRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> selectedChildGoal = ValueNotifier(null);

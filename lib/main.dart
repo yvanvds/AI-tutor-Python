@@ -8,7 +8,6 @@ import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'features/auth/sign_in_page.dart';
 import 'home_shell.dart';
@@ -18,12 +17,6 @@ import 'features/auth/local_key_gate_screen.dart'; // LocalKeyGateScreen
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // if (kDebugMode) {
-  //   await _connectToFirebaseEmulator();
-  // }
-
-  // await _awaitFreshAuth();
 
   // Global error routing (optional)
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -39,23 +32,6 @@ Future<void> main() async {
   DataService.init();
 
   runApp(GoalsApp());
-}
-
-Future<void> _connectToFirebaseEmulator() async {
-  const host = 'localhost';
-
-  // Auth
-  await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-
-  // Firestore
-  FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-
-  // Optional: disable persistence to avoid conflicts with real DB
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: false,
-  );
-
-  debugPrint('Connected to Firebase emulators');
 }
 
 class GoalsApp extends StatelessWidget {
@@ -116,20 +92,5 @@ class GoalsApp extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-Future<void> _awaitFreshAuth() async {
-  final auth = FirebaseAuth.instance;
-
-  // Wait for the first auth emission (null or a User)
-  // This makes sure Firebase finished initializing the currentUser.
-  await auth.authStateChanges().first;
-
-  final user = auth.currentUser;
-  if (user != null) {
-    // Ensure the user object and ID token (claims) are up-to-date
-    await user.reload();
-    await user.getIdToken(true); // <- force refresh claims/permissions
   }
 }

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:ai_tutor_python/core/firestore_paths.dart';
+import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,17 +19,15 @@ class AccountService {
     });
   }
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late final StreamSubscription<Account?> _subscription;
   final ValueNotifier<Account?> currentAccount = ValueNotifier<Account?>(null);
 
   String? get currentUid => _auth.currentUser?.uid;
 
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _firestore.collection('accounts');
+  CollectionReference<Map<String, dynamic>> get _col => FsPaths.accounts();
 
-  DocumentReference<Map<String, dynamic>> _doc(String uid) => _col.doc(uid);
+  DocumentReference<Map<String, dynamic>> _doc(String uid) => FsPaths.account(uid);
 
   /// Create or update the account profile for a given uid.
   Future<void> upsertAccount({
@@ -37,24 +37,28 @@ class AccountService {
     required String email,
   }) async {
     final ref = _doc(uid);
-    final snap = await ref.get();
+    final snap = await safeFirestore(() => ref.get());
     if (snap.exists) {
-      await ref.update({
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await safeFirestore(
+        () => ref.update({
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
     } else {
-      await ref.set({
-        'uid': uid,
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'mayUseGlobalKey': false, // default off
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await safeFirestore(
+        () => ref.set({
+          'uid': uid,
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'mayUseGlobalKey': false, // default off
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
     }
   }
 
@@ -75,24 +79,26 @@ class AccountService {
 
   /// Fetch one account once.
   Future<Account?> getAccount(String uid) async {
-    final snap = await _doc(uid).get();
+    final snap = await safeFirestore(() => _doc(uid).get());
     if (!snap.exists) return null;
     return Account.fromDoc(snap);
   }
 
   /// Fetch one account once.
   Future<Account?> getMyAccount() async {
-    final snap = await _doc(currentUid!).get();
+    final snap = await safeFirestore(() => _doc(currentUid!).get());
     if (!snap.exists) return null;
     return Account.fromDoc(snap);
   }
 
   /// Watch one account by uid.
   Stream<Account?> watchAccount(String uid) {
-    return _doc(uid).snapshots().map((doc) {
-      if (!doc.exists) return null;
-      return Account.fromDoc(doc);
-    });
+    return safeFirestoreStream(
+      _doc(uid).snapshots().map((doc) {
+        if (!doc.exists) return null;
+        return Account.fromDoc(doc);
+      }),
+    );
   }
 
   /// Watch the signed-in user's account (null if signed out or doc missing).
@@ -107,12 +113,14 @@ class AccountService {
   /// Watch just the `mayUseGlobalKey` flag for a given uid.
   /// Missing doc/field => false.
   Stream<bool> watchMayUseGlobalKey(String uid) {
-    return _doc(uid).snapshots().map((doc) {
-      final data = doc.data();
-      if (data == null) return false;
-      final v = data['mayUseGlobalKey'];
-      return v is bool ? v : false;
-    });
+    return safeFirestoreStream(
+      _doc(uid).snapshots().map((doc) {
+        final data = doc.data();
+        if (data == null) return false;
+        final v = data['mayUseGlobalKey'];
+        return v is bool ? v : false;
+      }),
+    );
   }
 
   /// Watch the signed-in user's flag (emits false when signed out or missing).
@@ -124,10 +132,12 @@ class AccountService {
   }
 
   Future<void> setTargetGoal({required String targetGoal}) async {
-    await _doc(currentUid!).set({
-      'targetGoal': targetGoal,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await safeFirestore(
+      () => _doc(currentUid!).set({
+        'targetGoal': targetGoal,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)),
+    );
   }
 
   /// Toggle/assign the `mayUseGlobalKey` flag (for teacher UI).
@@ -135,24 +145,30 @@ class AccountService {
     required String uid,
     required bool value,
   }) async {
-    await _doc(uid).set({
-      'mayUseGlobalKey': value,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await safeFirestore(
+      () => _doc(uid).set({
+        'mayUseGlobalKey': value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)),
+    );
   }
 
   /// Stream all accounts, ordered by creation time (newest first).
   Stream<List<Account>> streamAllAccounts() {
     // If createdAt may be null in older docs, also add a secondary orderBy to avoid errors.
-    return _col
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((qs) => qs.docs.map(Account.fromDoc).toList());
+    return safeFirestoreStream(
+      _col
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map((qs) => qs.docs.map(Account.fromDoc).toList()),
+    );
   }
 
   /// Fetch all accounts once (for on-demand loads).
   Future<List<Account>> getAllAccounts() async {
-    final qs = await _col.orderBy('createdAt', descending: true).get();
+    final qs = await safeFirestore(
+      () => _col.orderBy('createdAt', descending: true).get(),
+    );
     return qs.docs.map(Account.fromDoc).toList();
   }
 
@@ -160,7 +176,7 @@ class AccountService {
   /// NOTE: This deletes the *profile doc* in Firestore, not the FirebaseAuth user.
   /// If your accounts have subcollections (e.g., progress), consider cascading delete with Cloud Functions.
   Future<void> deleteAccountDoc(String uid) async {
-    await _doc(uid).delete();
+    await safeFirestore(() => _doc(uid).delete());
   }
 
   void dispose() {

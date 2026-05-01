@@ -81,15 +81,17 @@ Future<void> _deleteWindowsFirebaseCaches() async {
   }
 }
 
-/// Lightweight stream guard: on permission-denied, trigger a reset (async)
-/// and rethrow so the UI can react (e.g., route to SignInPage).
+/// Lightweight stream guard: on permission-denied, surface the failure via
+/// debugPrint so it is visible during development. The error continues to
+/// propagate so StreamBuilder can show a fallback. Promote to
+/// `resetAuthAndCacheAndExit()` once the recovery flow is wired up for
+/// streams.
 Stream<T> safeFirestoreStream<T>(Stream<T> source) {
   return source.handleError((error, stack) {
     if (error is FirebaseException && error.code == 'permission-denied') {
-      // Fire and forget; don't block the stream’s error pathway.
-      // ignore: discarded_futures
-      // resetAuthAndCacheAndExit();
-      // Let the error continue so your UI (StreamBuilder) can show a fallback.
+      debugPrint(
+        'safeFirestoreStream: permission-denied on Firestore stream: $error',
+      );
     }
   });
 }

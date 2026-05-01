@@ -8,11 +8,27 @@ import 'package:flutter/material.dart';
 
 enum PreviousInputs { includeAll, includeSession, newSession }
 
+sealed class ConnectorResult {
+  const ConnectorResult();
+}
+
+class ConnectorOk extends ConnectorResult {
+  final dynamic output;
+  const ConnectorOk(this.output);
+}
+
+class ConnectorFailure extends ConnectorResult {
+  final Object error;
+  final StackTrace stack;
+  final String message;
+  const ConnectorFailure(this.error, this.stack, this.message);
+}
+
 class OpenaiConnector {
   final String _apiKey = Env.apiKey;
 
   // for resend
-  String? _previousInstuctions;
+  String? _previousInstructions;
   String? _previousInput;
 
   // Full history (spans sessions) and current-session history.
@@ -20,14 +36,14 @@ class OpenaiConnector {
   final List<Map<String, dynamic>> _allHistory = [];
   final List<Map<String, dynamic>> _sessionHistory = [];
 
-  Future<dynamic> sendRequest({
+  Future<ConnectorResult> sendRequest({
     required String instructions,
     required String input,
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) async {
     // store previous request info for possible resend
     _previousInput = input;
-    _previousInstuctions = instructions;
+    _previousInstructions = instructions;
 
     OpenAI.apiKey = _apiKey;
 
@@ -65,18 +81,26 @@ class OpenaiConnector {
       }
       _allHistory.add({"role": "user", "content": input});
 
-      // Return the model output as-is for your caller;
-      // you’ll call addResponse(...) once you wrap it as ChatResponse.
-      return response.output;
-    } catch (e) {
-      return e;
+      return ConnectorOk(response.output);
+    } catch (e, stack) {
+      debugPrint('OpenaiConnector.sendRequest failed: $e\n$stack');
+      return ConnectorFailure(e, stack, e.toString());
     }
   }
 
-  Future<dynamic> resendRequest() async {
+  Future<ConnectorResult> resendRequest() async {
+    final prevInstructions = _previousInstructions;
+    final prevInput = _previousInput;
+    if (prevInstructions == null || prevInput == null) {
+      return ConnectorFailure(
+        StateError('No previous request to resend'),
+        StackTrace.current,
+        'Geen vorige aanvraag om opnieuw te proberen.',
+      );
+    }
     return sendRequest(
-      instructions: _previousInstuctions!,
-      input: _previousInput!,
+      instructions: prevInstructions,
+      input: prevInput,
     );
   }
 

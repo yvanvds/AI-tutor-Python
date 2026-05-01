@@ -2,21 +2,10 @@ import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 
 class Controllers extends StatelessWidget {
-  const Controllers({
-    super.key,
-
-    required this.onPreviousPressed,
-    required this.onNextPressed,
-  });
-
-  final VoidCallback onPreviousPressed;
-  final VoidCallback onNextPressed;
+  const Controllers({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // final canPrev = ref.watch(timeLineProvider.select((t) => t.canGoPrev));
-    // final canNext = ref.watch(timeLineProvider.select((t) => t.canGoNext));
-
     return Row(
       children: [
         // Left-side buttons
@@ -44,25 +33,6 @@ class Controllers extends StatelessWidget {
           ),
         ),
 
-        const Spacer(),
-
-        // middle buttons
-        // Padding(
-        //   padding: const EdgeInsets.all(8.0),
-        //   child: OutlinedButton(
-        //     onPressed: canPrev ? onPreviousPressed : null,
-        //     child: const Text('Previous Code'),
-        //   ),
-        // ),
-        // Padding(
-        //   padding: const EdgeInsets.all(8.0),
-        //   child: OutlinedButton(
-        //     onPressed: canNext ? onNextPressed : null,
-        //     child: const Text('Next Code'),
-        //   ),
-        // ),
-
-        // Spacer pushes the next buttons to the right
         const Spacer(),
 
         // Right-side buttons

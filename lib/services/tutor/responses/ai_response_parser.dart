@@ -14,13 +14,13 @@ class AIResponseParser {
       if (raw == null) {
         return ErrorResponse(
           type: "error",
-          message: "No connection. I'll try again.",
-        ); // truly missing content
+          message: "Lege respons van de tutor.",
+        ); // model returned no text content
       } else {
         return ErrorResponse(
           type: "error",
-          message: "Unable to parse response: $raw",
-        ); // unparsable content
+          message: "Kon respons niet verwerken: $raw",
+        ); // model text was not parsable JSON
       }
     }
   }

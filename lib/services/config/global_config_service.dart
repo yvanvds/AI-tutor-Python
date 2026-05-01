@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/firestore_paths.dart';
 import 'package:ai_tutor_python/core/firestore_safety.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,9 +17,7 @@ class GlobalConfigService {
 
   final LocalApiKeyStorage localStorage = LocalApiKeyStorage();
 
-  final DocumentReference _globalConfigDoc = FirebaseFirestore.instance
-      .collection('config')
-      .doc('global');
+  final DocumentReference _globalConfigDoc = FsPaths.config().doc('global');
 
   /// Exposed latest config (null until first load or if doc missing).
   final ValueNotifier<GlobalConfig?> config = ValueNotifier<GlobalConfig?>(

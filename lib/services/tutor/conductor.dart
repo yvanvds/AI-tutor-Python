@@ -10,6 +10,8 @@ import 'dart:math';
 class Conductor {
   Conductor();
 
+  static const double _followUpDenialChance = 0.35;
+
   final _rand = Random();
 
   double _currentProgress = 0.0;
@@ -111,21 +113,36 @@ class Conductor {
   }
 
   Future<bool> updateProgress(AnswerQuality quality) async {
-    _currentProgress = DataService.progress.currentProgress.value;
-    bool followUpAllowed = true; // we return this value if we allow follow-ups
-
     if (quality == AnswerQuality.correct) {
       DataService.sound.correctAnswer();
     }
 
-    // --- 1) base delta by answer quality ---
+    final double start = DataService.progress.currentProgress.value;
+    final double delta = _computeDelta(quality);
+    final double next = (start + delta).clamp(0.0, 1.0);
+    bool followUpAllowed = !_crossesMilestone(start, next);
+
+    DataService.chat.addSystemMessage(
+      'Vooruitgang: ${(start * 100).toStringAsFixed(1)}% -> ${(next * 100).toStringAsFixed(1)}%',
+    );
+    _currentProgress = next;
+    _adaptDifficulty(quality);
+    _hintsUsed = 0;
+    await _updateProgress(next);
+
+    if (next >= 1.0) await _handleGoalCompletion();
+    return _rollFollowUpAllowance(followUpAllowed);
+  }
+
+  /// Returns the signed progress delta for [quality], scaled by question
+  /// type, declared difficulty, and a hint-usage penalty.
+  double _computeDelta(AnswerQuality quality) {
     final double baseDelta = switch (quality) {
-      AnswerQuality.wrong => -0.05, // small setback for wrong answers
-      AnswerQuality.partial => 0.07, // small gain for partial
-      AnswerQuality.correct => 0.14, // modest gain for correct
+      AnswerQuality.wrong => -0.05,
+      AnswerQuality.partial => 0.07,
+      AnswerQuality.correct => 0.14,
     };
 
-    // --- 2) scale by question type difficulty/effort ---
     // order from small to large: mc < explain < complete < (socratic|write)
     final double typeMult = switch (_currentQuestionType) {
       ChatRequestType.mcQuestion => 0.7,
@@ -133,49 +150,37 @@ class Conductor {
       ChatRequestType.completeCodeQuestion => 1.2,
       ChatRequestType.socraticQuestion ||
       ChatRequestType.writeCodeQuestion => 1.4,
-      _ => 1.0, // Non-exercise interactions: keep neutral weight
+      _ => 1.0, // non-exercise interactions: neutral weight
     };
 
-    // --- 3) scale by declared difficulty ---
     final double diffMult = switch (_difficulty) {
       QuestionDifficulty.easy => 0.8,
       QuestionDifficulty.medium => 1.0,
       QuestionDifficulty.hard => 1.5,
     };
 
-    // --- 4) penalty for hints used (each hint slightly reduces gain) ---
-    // Linear penalty; clamped so we don’t invert a positive delta purely by hints.
     final double hintPenalty = 0.02 * _hintsUsed;
 
     double delta = baseDelta * typeMult * diffMult;
     if (delta > 0) {
-      // dont punish a correct/partial into negative solely by hints
+      // don't punish a correct/partial into negative solely by hints
       delta = (delta - hintPenalty).clamp(0.0, double.infinity);
     } else {
-      // Wrong answers can be made slightly worse by heavy hint usage, but bounded.
+      // wrong answers can be made slightly worse by heavy hint usage, bounded
       delta = delta - (hintPenalty * 0.5);
     }
+    return delta;
+  }
 
-    // Clamp and apply
-    final double next = (_currentProgress + delta).clamp(0.0, 1.0);
+  /// True when [from] -> [to] newly crosses any of the {0.3, 0.7, 1.0} thresholds.
+  bool _crossesMilestone(double from, double to) {
+    const milestones = [0.3, 0.7, 1.0];
+    return milestones.any((m) => from < m && to >= m);
+  }
 
-    if (_currentProgress < 0.3 && next >= 0.3) {
-      // Crossing first milestone: deny follow-up question
-      followUpAllowed = false;
-    } else if (_currentProgress < 0.7 && next >= 0.7) {
-      // Crossing second milestone: deny follow-up question
-      followUpAllowed = false;
-    } else if (_currentProgress < 1.0 && next >= 1.0) {
-      // wrapping to completion: deny follow-up question
-      followUpAllowed = false;
-    }
-
-    DataService.chat.addSystemMessage(
-      'Vooruitgang: ${(_currentProgress * 100).toStringAsFixed(1)}% -> ${(next * 100).toStringAsFixed(1)}%',
-    );
-    _currentProgress = next;
-
-    // --- 5) track history & adapt difficulty ---
+  /// Records [quality] in the recent-answer window and applies up/down
+  /// difficulty rules, emitting a system message when difficulty changes.
+  void _adaptDifficulty(AnswerQuality quality) {
     final previousDifficulty = _difficulty;
     _answerHistory.add(quality);
     const int window = 5;
@@ -194,14 +199,14 @@ class Conductor {
         .where((q) => q == AnswerQuality.partial)
         .length;
 
-    // Up-difficulty rule: doing very well recently (≥4/5 correct) and not spamming hints
+    // Up-difficulty: doing very well recently (≥4/5 correct) without spamming hints
     if (correctCount >= 4 &&
         _difficulty != QuestionDifficulty.hard &&
         _hintsUsed <= 1) {
       _difficulty = QuestionDifficulty.values[_difficulty.index + 1];
     }
 
-    // Down-difficulty rule: struggling (≥3 wrong) or (≥4 not-correct) recently
+    // Down-difficulty: struggling (≥3 wrong) or (≥4 not-correct) recently
     if ((wrongCount >= 3 || (wrongCount + partialCount) >= 4) &&
         _difficulty != QuestionDifficulty.easy) {
       _difficulty = QuestionDifficulty.values[_difficulty.index - 1];
@@ -211,44 +216,36 @@ class Conductor {
         'Moeilijkheid aangepast: ${previousDifficulty.name} -> ${_difficulty.name}',
       );
     }
+  }
 
-    // --- 6) reset hints used for next question cycle ---
-    _hintsUsed = 0;
-    await _updateProgress(_currentProgress);
+  /// Plays the goal-completion feedback, clears any preferred goal, picks the
+  /// next target goal, and resets [_currentProgress] to that goal's progress.
+  Future<void> _handleGoalCompletion() async {
+    final goal =
+        DataService.goals.preferredChildGoal.value ??
+        DataService.goals.selectedChildGoal.value;
 
-    // 7. check for goal completion
-    if (_currentProgress >= 1.0) {
-      final goal =
-          DataService.goals.preferredChildGoal.value ??
-          DataService.goals.selectedChildGoal.value;
+    DataService.splash.showGoalReached(
+      goalTitle: goal?.title ?? 'Onbekend doel',
+      description: goal?.description ?? '',
+    );
+    DataService.sound.playGoalReached();
 
-      // show splash
-      DataService.splash.showGoalReached(
-        goalTitle: goal?.title ?? 'Onbekend doel',
-        description: goal?.description ?? '',
-      );
-      DataService.sound.playGoalReached();
-
-      // if a prefered goal is set, it should now be marked as complete
-      if (DataService.goals.preferredChildGoal.value != null) {
-        DataService.goals.preferredChildGoal.value = null;
-        DataService.goals.preferredRootGoal.value = null;
-      }
-      // mark goal as complete and select next
-      await _setTargetGoal();
-
-      if (DataService.goals.selectedChildGoal.value != null) {
-        // reset progress for new goal
-        _currentProgress = await _getCurrentProgress();
-      }
+    if (DataService.goals.preferredChildGoal.value != null) {
+      DataService.goals.preferredChildGoal.value = null;
+      DataService.goals.preferredRootGoal.value = null;
     }
+    await _setTargetGoal();
 
-    // limit the follow-up allowance
-    final chance = _rand.nextDouble();
-    if (chance < 0.35) {
-      followUpAllowed = false;
+    if (DataService.goals.selectedChildGoal.value != null) {
+      _currentProgress = await _getCurrentProgress();
     }
-    return followUpAllowed;
+  }
+
+  /// Probabilistically denies an otherwise-allowed follow-up to keep variety.
+  bool _rollFollowUpAllowance(bool currentlyAllowed) {
+    if (_rand.nextDouble() < _followUpDenialChance) return false;
+    return currentlyAllowed;
   }
 
   void hintProvided() {

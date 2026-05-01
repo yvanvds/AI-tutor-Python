@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --version)",
+      "Bash(flutter --version)",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}

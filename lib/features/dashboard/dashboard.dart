@@ -56,19 +56,7 @@ class _DashboardState extends State<Dashboard> {
                       color: Theme.of(context).colorScheme.surface,
                       child: Row(
                         children: [
-                          Expanded(
-                            child: Controllers(
-                              onPreviousPressed: () async {
-                                // final timeline = ref.read(timeLineProvider);
-                                // timeline.goPrev();
-                              },
-
-                              onNextPressed: () async {
-                                // final timeline = ref.read(timeLineProvider);
-                                // timeline.goNext();
-                              },
-                            ),
-                          ),
+                          const Expanded(child: Controllers()),
                         ],
                       ),
                     );
