@@ -11,6 +11,7 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 */
 
 class ExplainFeedback implements ChatResponse {
+  @override
   final String type;
   final AnswerQuality quality;
   final String prompt;
@@ -32,6 +33,7 @@ class ExplainFeedback implements ChatResponse {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'type': type,

@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class StatusSummary implements ChatResponse {
+  @override
   final String type;
   final String prompt;
   final int hintsUsed;
@@ -30,6 +31,7 @@ class StatusSummary implements ChatResponse {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() => {
     'type': type,
     'prompt': prompt,

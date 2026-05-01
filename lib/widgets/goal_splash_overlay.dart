@@ -25,7 +25,7 @@ class GoalSplashOverlay extends StatelessWidget {
               children: [
                 // Dim background
                 Positioned.fill(
-                  child: Container(color: Colors.black.withOpacity(0.6)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.6)),
                 ),
                 // Center card
                 Center(
@@ -44,7 +44,7 @@ class GoalSplashOverlay extends StatelessWidget {
                           blurRadius: 24,
                           spreadRadius: 4,
                           offset: const Offset(0, 12),
-                          color: Colors.black.withOpacity(0.4),
+                          color: Colors.black.withValues(alpha: 0.4),
                         ),
                       ],
                     ),

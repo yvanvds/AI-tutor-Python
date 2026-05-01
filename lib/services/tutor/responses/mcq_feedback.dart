@@ -2,6 +2,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class McqFeedback implements ChatResponse {
+  @override
   final String type;
   final AnswerQuality quality;
   final String prompt;
@@ -20,6 +21,7 @@ class McqFeedback implements ChatResponse {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() => {
     'type': type,
     'quality': quality.name,

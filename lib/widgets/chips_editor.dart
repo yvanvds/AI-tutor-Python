@@ -101,7 +101,8 @@ class _MultiLineChip extends StatelessWidget {
     return Container(
       decoration: ShapeDecoration(
         color:
-            theme.chipTheme.backgroundColor ?? theme.colorScheme.surfaceVariant,
+            theme.chipTheme.backgroundColor ??
+            theme.colorScheme.surfaceContainerHighest,
         shape: const StadiumBorder(),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -123,7 +124,7 @@ class _MultiLineChip extends StatelessWidget {
             child: Icon(
               Icons.cancel,
               size: 18,
-              color: theme.iconTheme.color?.withOpacity(0.6),
+              color: theme.iconTheme.color?.withValues(alpha: 0.6),
             ),
           ),
         ],

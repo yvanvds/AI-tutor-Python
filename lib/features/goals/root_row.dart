@@ -20,7 +20,7 @@ class RootRow extends StatelessWidget {
     // Each root row is draggable (to reorder within roots).
     return LongPressDraggable<GoalDragData>(
       data: GoalDragData(goalId: goal.id, fromParentId: null),
-      feedback: DragFeedback(context, goal.title),
+      feedback: dragFeedback(context, goal.title),
 
       child: ListTile(
         selected: selected,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class SectionsList extends StatelessWidget {
   const SectionsList({
+    super.key,
     required this.sections,
     required this.selectedKey,
     required this.onSelect,

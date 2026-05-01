@@ -60,7 +60,8 @@ class GoalFormState extends State<GoalForm> {
               final id = widget.goal.id;
 
               // Count children for safety messaging
-              final count = DataService.goals.countDescendants(id);
+              final count = await DataService.goals.countDescendants(id);
+              if (!context.mounted) return;
 
               final confirmed =
                   await showDialog<bool>(

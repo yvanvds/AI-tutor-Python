@@ -66,7 +66,7 @@ class _OutputState extends State<Output> {
     await PyEngineDesktop.pipInstall('matplotlib');
     await PyEngineDesktop.pipInstall('scikit-learn');
 
-    print('Packages installed successfully!');
+    debugPrint('Packages installed successfully!');
   }
 
   Future<void> _runCode(String code) async {

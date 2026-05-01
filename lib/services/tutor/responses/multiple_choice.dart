@@ -14,6 +14,7 @@
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class MultipleChoice implements ChatResponse {
+  @override
   final String type;
   final String prompt;
   final String code;
@@ -39,6 +40,7 @@ class MultipleChoice implements ChatResponse {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() => {
     'type': type,
     'prompt': prompt,

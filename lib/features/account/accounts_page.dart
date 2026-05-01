@@ -265,6 +265,7 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   Future<void> _confirmDelete(BuildContext context, Account a) async {
+    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -292,15 +293,11 @@ class _AccountsPageState extends State<AccountsPage> {
 
     try {
       await DataService.account.deleteAccountDoc(a.uid);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Deleted account: ${a.email}')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Deleted account: ${a.email}')),
+      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
     }
   }
 }

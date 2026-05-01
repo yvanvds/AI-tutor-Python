@@ -19,7 +19,7 @@ class Conductor {
 
   QuestionDifficulty _difficulty = QuestionDifficulty.easy;
   int _hintsUsed = 0;
-  List<AnswerQuality> _answerHistory = [];
+  final List<AnswerQuality> _answerHistory = [];
 
   ChatRequestType? _currentQuestionType;
 
@@ -309,8 +309,9 @@ class Conductor {
 
   Future<void> _updateProgress(double newProgress) async {
     if (DataService.goals.selectedChildGoal.value == null &&
-        DataService.goals.preferredChildGoal.value == null)
+        DataService.goals.preferredChildGoal.value == null) {
       return;
+    }
 
     // 1) Upsert child
     final currentChildGoal =

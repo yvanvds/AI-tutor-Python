@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-Widget DragFeedback(BuildContext context, String title) {
+Widget dragFeedback(BuildContext context, String title) {
   return Material(
     elevation: 6,
     child: Container(

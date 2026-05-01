@@ -15,7 +15,7 @@ import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:get_it/get_it.dart';
 
 class DataService {
-  static GetIt _locator = GetIt.instance;
+  static final GetIt _locator = GetIt.instance;
 
   static void init() {
     _locator.registerLazySingleton(() => AuthService());

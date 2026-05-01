@@ -21,7 +21,7 @@ class ChildRow extends StatelessWidget {
     return LongPressDraggable<GoalDragData>(
       key: ValueKey('child_${goal.id}'),
       data: GoalDragData(goalId: goal.id, fromParentId: selectedRootId),
-      feedback: DragFeedback(context, goal.title),
+      feedback: dragFeedback(context, goal.title),
 
       child: ListTile(
         title: Text(goal.title, style: const TextStyle(fontSize: 18)),

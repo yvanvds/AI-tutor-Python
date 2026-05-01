@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:provider/provider.dart';
 
 /// The message composer widget positioned at the bottom of the chat screen.

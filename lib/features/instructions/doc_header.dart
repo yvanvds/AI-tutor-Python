@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 class DocHeader extends StatelessWidget {
-  const DocHeader({required this.selectedDocId, required this.onRename});
+  const DocHeader({
+    super.key,
+    required this.selectedDocId,
+    required this.onRename,
+  });
   final String? selectedDocId;
   final VoidCallback onRename;
 

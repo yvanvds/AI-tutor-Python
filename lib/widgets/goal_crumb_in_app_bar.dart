@@ -42,7 +42,7 @@ class GoalCrumbInAppBar extends StatelessWidget {
               Text(
                 child,
                 style: textTheme.bodyMedium?.copyWith(
-                  color: textTheme.bodyMedium?.color?.withOpacity(0.85),
+                  color: textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
                   overflow: TextOverflow.ellipsis,
                 ),
                 maxLines: 1,
@@ -54,7 +54,7 @@ class GoalCrumbInAppBar extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 3,
-                backgroundColor: accent.withOpacity(0.18),
+                backgroundColor: accent.withValues(alpha: 0.18),
                 valueColor: AlwaysStoppedAnimation<Color>(accent),
                 semanticsLabel: 'Goal progress',
               ),

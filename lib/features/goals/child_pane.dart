@@ -63,12 +63,11 @@ class ChildPane extends StatelessWidget {
                     if (newIndex > oldIndex) newIndex -= 1;
                     final item = list.removeAt(oldIndex);
                     list.insert(newIndex, item);
+                    final messenger = ScaffoldMessenger.of(context);
                     await DataService.goals.applyOrder(
                       selectedRootId,
                       list.map((g) => g.id).toList(),
                     );
-
-                    final messenger = ScaffoldMessenger.of(context);
 
                     showUndoSnackBar(
                       messenger,

@@ -8,6 +8,7 @@
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class WriteCode implements ChatResponse {
+  @override
   final String type;
   final String prompt;
 
@@ -17,5 +18,6 @@ class WriteCode implements ChatResponse {
     return WriteCode(type: map['type'] ?? '', prompt: map['prompt'] ?? '');
   }
 
+  @override
   Map<String, dynamic> toJson() => {'type': type, 'prompt': prompt};
 }

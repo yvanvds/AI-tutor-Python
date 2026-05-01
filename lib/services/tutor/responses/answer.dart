@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 
 class Answer implements ChatResponse {
+  @override
   final String type;
   final String prompt;
 
@@ -10,5 +11,6 @@ class Answer implements ChatResponse {
     return Answer(type: map['type'] ?? 'answer', prompt: map['prompt'] ?? '');
   }
 
+  @override
   Map<String, dynamic> toJson() => {'type': type, 'prompt': prompt};
 }
