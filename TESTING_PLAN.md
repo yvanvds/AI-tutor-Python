@@ -88,11 +88,13 @@ These dominate the Sonar coverage score: large statement counts, deep branching,
 - **Verify:** `_replaceTags` substitutes `{goal}`, `{subgoal}`, `{suggestions}`, `{known concepts}` case-insensitively and tolerates whitespace inside braces (`{ Goal }`). Per-type instructions come first, `alwaysInclude` appended last. Mastered-concepts loop stops at the first goal whose `order >= target.order` (so the target's own concepts are NOT mastered). Empty when no goal selected.
 - **Mocks:** `GoalsService`, `InstructionsService`.
 - **Why:** A subtle off-by-one in the order check leaks the target goal's own concepts as "already mastered" and breaks every prompt.
+- **Status:** [test/services/tutor/instruction_generator_test.dart](test/services/tutor/instruction_generator_test.dart), 10 tests passing.
 
 #### 1B.2 [services/tutor/question_formatter.dart](lib/services/tutor/question_formatter.dart)
 - **Verify:** Each formatter (~13 thin functions) emits the expected JSON shape for its `ChatRequestType` (`request_type`, optional `difficulty` enum-name, optional payload fields). `studentQuestion` with `code = null` produces `"code": ""`.
 - **Mocks:** none.
 - **Why:** Prompt-format drift silently changes what the model sees. Cheap, broad coverage.
+- **Status:** [test/services/tutor/question_formatter_test.dart](test/services/tutor/question_formatter_test.dart), 18 tests passing.
 
 ### Tier 1C — low-leverage, batch last
 
@@ -102,35 +104,49 @@ These are small files; high coverage % but low absolute statement contribution t
 - **Verify:** `buildParentMap`, `isAncestor`, `wouldCreateCycle`. Self-parent → cycle. Moving to root → safe. Move to descendant → cycle.
 - **Mocks:** none. No Flutter deps.
 - **Why:** DnD reparent uses this to gate drops. A goal becoming its own ancestor is unrecoverable in the UI.
+- **Status:** [test/features/goals/tree_utils_test.dart](test/features/goals/tree_utils_test.dart), 13 tests passing.
 
 #### 1C.2 [core/debounce.dart](lib/core/debounce.dart)
 - **Verify:** Two `run()` calls inside `delay` only fire the second action; `dispose()` cancels a pending action. Use `fake_async`.
 - **Mocks:** none.
 - **Why:** Used wherever search/typing triggers Cosmos reads. A regression to "fire immediately" multiplies read costs.
+- **Status:** [test/core/debounce_test.dart](test/core/debounce_test.dart), 5 tests passing.
 
-### Tier 2 — service orchestration (mostly unblocked)
+### Tier 2 — service orchestration
+
+Two minimal architectural changes unblocked the whole tier:
+- `TutorService` now takes optional `OpenaiConnector` / `Conductor` / `InstructionGenerator` constructor params (default to `new` as before — production behaviour unchanged).
+- `ProgressService` / `GoalsService` / `AccountService` now take an optional `CosmosContainer` constructor param that overrides the `CosmosPaths.X()` lookup. Production wiring is unchanged.
 
 #### 2.1 [services/tutor/tutor_service.dart](lib/services/tutor/tutor_service.dart)
-- **Verify:** `state` transitions `idle → working → idle/hasFollowUp` per request kind. `handleStudentMessage` routes by `_currentExerciseType` to the right `ChatRequestType`. `_processResult` retry path on `ConnectorFailure` — exactly one retry, then gives up. `requestExercise` short-circuits on `noResult`. `moveToFollowUp` flushes `_nextMessage`/`_nextCode` and returns to `idle`.
-- **Mocks:** `OpenaiConnector`, `Conductor`, `ChatService`, `CodeService`. (`InstructionGenerator` is `new`'d inline; we let it run with mocked `GoalsService`/`InstructionsService` returning empty.)
-- **Why:** Stuck-in-`working` would freeze the chat composer. ~280 LOC, branchy switch.
+- **Verify:** `state` transitions `idle → working → idle/hasFollowUp` per request kind. `handleStudentMessage` routes by `_currentExerciseType` to the right `ChatRequestType` (verified by decoding the captured `request_type` field). `_processResult` retry path on `ConnectorFailure` — exactly one retry, then gives up. `requestExercise` short-circuits on `noResult` and posts the congrats message. `moveToFollowUp` flushes `_nextMessage`/`_nextCode` and returns to `idle`. `requestHint`/`submitCode` convenience wrappers format the right payload.
+- **Mocks:** `OpenaiConnector`, `Conductor`, `InstructionGenerator` injected via the new constructor params. `ChatService`, `CodeService`, `SoundService`, `ReportService` registered at the locator.
+- **Bug fixed in this pass:** `queryTutor` would leave `state` stuck at `working` when an early `return` fired from inside the switch (missing required arg, or `noResult`). The whole working block is now wrapped in a `try/finally` that always restores `idle`. Tests assert state-returns-to-idle on every short-circuit path.
+- **Status:** [test/services/tutor/tutor_service_test.dart](test/services/tutor/tutor_service_test.dart), 23 tests passing.
 
-#### 2.2 [services/progress/progress_service.dart](lib/services/progress/progress_service.dart) 🚫 **BLOCKED**
-- **Blocker:** `CosmosPaths.progress()` is static; `CosmosContainer` is not injected. To run this test we'd refactor `ProgressService` to accept a container (constructor param or a `get_it` factory). Architectural — paused for your call.
-- **Verify (when unblocked):** `getAll`/`getByGoalId`/`upsert`/`delete` build the right Cosmos doc-id and partition-key, throw `StateError` when no signed-in user. `currentProgress` notifier emits.
+#### 2.2 [services/progress/progress_service.dart](lib/services/progress/progress_service.dart)
+- **Verify:** `getAll`/`getByGoalId`/`upsert`/`delete` build the right Cosmos doc-id (`${uid}_${goalId}`) and use uid as the partition key; all four throw `StateError` when no user is signed in.
+- **Mocks:** `CosmosContainer` via constructor; `AuthService` at the locator (real `ValueNotifier<AccountIdentity?>`).
+- **Status:** [test/services/progress/progress_service_test.dart](test/services/progress/progress_service_test.dart), 6 tests passing.
 
-#### 2.3 [services/goal/goals_service.dart](lib/services/goal/goals_service.dart) 🚫 **BLOCKED** (same Cosmos-injection blocker)
-- **Verify (when unblocked):** `applyOrder` produces 1000-spaced `order` values and one batch op per id; `reparent` patches `parentId` + bumps `order` to end-of-list; `backupSubtree` → `deleteSubtree` → `restoreSubtree` round-trip preserves ids and fields; `_nextOrder` returns 1000 when empty and `current+1000` otherwise.
+#### 2.3 [services/goal/goals_service.dart](lib/services/goal/goals_service.dart)
+- **Verify:** `_nextOrder` returns 1000 on empty and `current+1000` otherwise (driven through `createRoot`/`createChild`); `createChild` scopes the order query by `parentId`. `reparent` patches `parentId` and bumps `order` to end-of-list. `applyOrder` produces 1000-spaced order values with one Upsert op per id in a single batch; missing ids are skipped; empty input is a no-op. `backupSubtree` → `restoreSubtree` round-trip preserves ids and the partition-key field; `deleteSubtree` fires one Delete op per node; `countDescendants` = subtree size − 1.
+- **Mocks:** `CosmosContainer` via constructor.
+- **Status:** [test/services/goal/goals_service_test.dart](test/services/goal/goals_service_test.dart), 11 tests passing.
 
-#### 2.4 [services/account/account_service.dart](lib/services/account/account_service.dart) 🚫 **BLOCKED** (same Cosmos-injection blocker)
-- **Verify (when unblocked):** Listening to `AuthService.currentUser`: null → `currentAccount = null`; new identity → `_ensureProfile` upserts a doc only if absent; identity change with the same `oid` does NOT re-init the tutor session (the `_lastInitedUid` dedupe). `upsertAccount` preserves existing `mayUseGlobalKey`/`targetGoal`/`createdAt`. `setTargetGoal` throws when signed out.
+#### 2.4 [services/account/account_service.dart](lib/services/account/account_service.dart)
+- **Verify:** `getAccount` maps Cosmos rows to `Account` and returns null on miss. `upsertAccount` on first insert stamps `createdAt`/`updatedAt` and defaults `mayUseGlobalKey=false`/`targetGoal=''`; on update preserves existing `mayUseGlobalKey`/`targetGoal`/`createdAt` and refreshes `updatedAt`. `setTargetGoal` throws `StateError` when signed out, otherwise patches the doc with a new `updatedAt`. `setMayUseGlobalKey` patches the requested uid; missing doc is a silent no-op. Auth listener: signing out clears `currentAccount`; signing in calls `_ensureProfile` which upserts only when no doc exists.
+- **Mocks:** `CosmosContainer` via constructor; `AuthService` (real `ValueNotifier<AccountIdentity?>`) and `TutorService` at the locator.
+- **Status:** [test/services/account/account_service_test.dart](test/services/account/account_service_test.dart), 11 tests passing.
 
 ### Tier 3 — widgets with real logic
 
 #### 3.1 [features/chat/chat_widget.dart](lib/features/chat/chat_widget.dart)
-- **Verify:** The composer swap driven by `TutorService.state` (idle → default; working → `composer_wait_widget`; hasFollowUp → `composer_continue_widget`).
+- **Verify:** The composer swap driven by `TutorService.state` (idle → default; working → `composer_wait_widget`; hasFollowUp → `composer_continue_widget`). Plus: state transitions across all three values rebuild the composer; `initializeSession` fires once after mount.
 - **Mocks:** `TutorService` (real `ValueNotifier<TutorState>` for state), `ChatService` with a real `InMemoryChatController`.
 - **Why:** A frozen "Continue" button is one of the easiest regressions to ship and the hardest to notice in dev.
+- **Note for future widget tests:** The chat is seeded with one message in `setUp` so `ChatAnimatedList` doesn't mount its `EmptyChatList` (whose `Future.delayed` Timer survives widget disposal and trips the flutter_test "pending Timer" invariant). Each test ends by re-pumping `SizedBox.shrink()` so the tree disposes (cancelling animation tickers from `LoadingAnimationWidget` and timers in `ChatAnimatedList`) before invariant checks.
+- **Status:** [test/features/chat/chat_widget_test.dart](test/features/chat/chat_widget_test.dart), 5 tests passing.
 
 #### 3.2 [features/dashboard/output.dart](lib/features/dashboard/output.dart) 🚫 **BLOCKED**
 - **Blocker:** the widget calls `PyEngineDesktop.init/pipInstall/startScript/stopScript` directly. To run a widget test headless on `windows-latest` CI, the engine surface must move behind an interface (e.g. a `PythonRunner` service registered in `get_it`, with a `FakePythonRunner` for tests). Architectural — paused for your call.
@@ -237,5 +253,7 @@ Each mock exposes real `ValueNotifier`s through stubbed getters (so the conducto
 - [x] `flutter test --coverage` produces `coverage/lcov.info` at the default path.
 - [x] `flutter analyze lib test` is clean (`No issues found!`).
 - [x] Tier 1A.2–1A.4 implemented (97 tests added, 107 total green; `flutter analyze lib test` clean).
-- [ ] Tier 1B / Tier 1C tests **not yet implemented**.
-- [ ] Tier 2.2 / 2.3 / 2.4 and Tier 3.2 require an architectural decision (Cosmos-injection and `py_engine_desktop` wrapper) — **paused pending your call**.
+- [x] Tier 1B / Tier 1C implemented (45 tests added, 152 total green; `flutter analyze lib test` clean). `fake_async: ^1.3.1` added to `dev_dependencies` for `Debouncer` tests.
+- [x] Tier 2 implemented (51 tests added, 203 total green; `flutter analyze lib test` clean). Two minimal refactors landed to unblock: optional constructor params for `OpenaiConnector`/`Conductor`/`InstructionGenerator` in `TutorService`, and an optional `CosmosContainer` constructor param on `ProgressService`/`GoalsService`/`AccountService`. Production wiring untouched.
+- [x] Tier 3.1 implemented (5 tests added, 208 total green; `flutter analyze lib test` clean). No production refactor needed — mocks at the existing locator boundary.
+- [ ] Tier 3.2 ([features/dashboard/output.dart](lib/features/dashboard/output.dart)) still requires the `py_engine_desktop` wrapper refactor — **paused pending your call**.

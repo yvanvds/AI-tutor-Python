@@ -6,7 +6,10 @@
       "Bash(flutter analyze *)",
       "WebFetch(domain:pub.dev)",
       "Bash(flutter pub *)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "Bash(dir test\\\\features\\\\goals)",
+      "Bash(dir test\\\\core)",
+      "PowerShell(\"---\")"
     ]
   }
 }

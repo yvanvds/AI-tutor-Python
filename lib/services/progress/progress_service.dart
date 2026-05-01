@@ -11,11 +11,15 @@ import 'package:flutter/material.dart';
 import 'progress.dart';
 
 class ProgressService {
-  ProgressService();
+  ProgressService({CosmosContainer? container})
+      : _containerOverride = container;
+
+  final CosmosContainer? _containerOverride;
 
   final ValueNotifier<double> currentProgress = ValueNotifier(0.0);
 
-  CosmosContainer get _container => CosmosPaths.progress();
+  CosmosContainer get _container =>
+      _containerOverride ?? CosmosPaths.progress();
 
   String get _uid {
     final uid = DataService.auth.currentUser.value?.oid;

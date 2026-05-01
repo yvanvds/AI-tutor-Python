@@ -10,10 +10,12 @@ import 'package:flutter/material.dart';
 import 'account.dart';
 
 class AccountService {
-  AccountService() {
+  AccountService({CosmosContainer? container}) : _containerOverride = container {
     DataService.auth.currentUser.addListener(_onAuthChanged);
     _onAuthChanged();
   }
+
+  final CosmosContainer? _containerOverride;
 
   final ValueNotifier<Account?> currentAccount = ValueNotifier<Account?>(null);
 
@@ -24,7 +26,8 @@ class AccountService {
   /// here and only re-init when the *user* actually changes.
   String? _lastInitedUid;
 
-  CosmosContainer get _container => CosmosPaths.accounts();
+  CosmosContainer get _container =>
+      _containerOverride ?? CosmosPaths.accounts();
 
   String? get currentUid => DataService.auth.currentUser.value?.oid;
 

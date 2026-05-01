@@ -16,9 +16,14 @@ class TutorService {
     TutorState.idle,
   );
 
-  TutorService() {
-    _connector = OpenaiConnector();
-    _conductor = Conductor();
+  TutorService({
+    OpenaiConnector? connector,
+    Conductor? conductor,
+    InstructionGenerator? instructionGenerator,
+  }) {
+    _connector = connector ?? OpenaiConnector();
+    _conductor = conductor ?? Conductor();
+    _instructionGeneratorOverride = instructionGenerator;
     _ctx = TutorContext(
       conductor: _conductor,
       startNewCode: _startNewCode,
@@ -32,7 +37,10 @@ class TutorService {
   }
   bool _initialized = false;
 
-  InstructionGenerator get _instructionGenerator => InstructionGenerator();
+  InstructionGenerator? _instructionGeneratorOverride;
+
+  InstructionGenerator get _instructionGenerator =>
+      _instructionGeneratorOverride ?? InstructionGenerator();
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
@@ -75,89 +83,91 @@ class TutorService {
     state.value = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
 
-    final instructions = await _instructionGenerator.generateInstructions(type);
-
-    String input = "";
-    PreviousInputs includeHistory = PreviousInputs.includeSession;
-
-    switch (type) {
-      case ChatRequestType.socraticQuestion:
-      case ChatRequestType.mcQuestion:
-      case ChatRequestType.explainCodeQuestion:
-      case ChatRequestType.completeCodeQuestion:
-      case ChatRequestType.writeCodeQuestion:
-        // All question types with difficulty parameter start a new session
-        input = switch (type) {
-          ChatRequestType.socraticQuestion =>
-            QuestionFormatter.socraticQuestion(difficulty!),
-          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
-            difficulty!,
-          ),
-          ChatRequestType.explainCodeQuestion =>
-            QuestionFormatter.explainCodeQuestion(difficulty!),
-          ChatRequestType.completeCodeQuestion =>
-            QuestionFormatter.completeCodeQuestion(difficulty!),
-          ChatRequestType.writeCodeQuestion =>
-            QuestionFormatter.writeCodeQuestion(difficulty!),
-          _ => "", // unreachable
-        };
-        includeHistory = PreviousInputs.newSession;
-        break;
-
-      case ChatRequestType.submitCode:
-        if (code == null) return;
-        input = QuestionFormatter.submitCode(code);
-        break;
-
-      case ChatRequestType.mcqAnswer:
-        if (prompt == null) return;
-        input = QuestionFormatter.mcqAnswer(prompt);
-        break;
-
-      case ChatRequestType.requestHint:
-        if (code == null) return;
-        input = QuestionFormatter.requestHint(code);
-        break;
-
-      case ChatRequestType.studentQuestion:
-        if (prompt == null) return;
-        input = QuestionFormatter.studentQuestion(prompt, code);
-        break;
-
-      case ChatRequestType.explainAnswer:
-        if (prompt == null) return;
-        input = QuestionFormatter.explainAnswer(prompt);
-        break;
-
-      case ChatRequestType.socraticFeedback:
-        if (prompt == null) return;
-        input = QuestionFormatter.socraticFeedback(prompt);
-        break;
-
-      case ChatRequestType.guidingQuestion:
-        input = QuestionFormatter.guidingQuestion();
-        includeHistory = PreviousInputs.newSession;
-        break;
-
-      case ChatRequestType.guidingAnswer:
-        if (prompt == null) return;
-        input = QuestionFormatter.guidingAnswer(
-          prompt,
-          _conductor.getGuidingUnderstanding(),
-        );
-        break;
-
-      case ChatRequestType.status:
-        input = QuestionFormatter.status();
-        includeHistory = PreviousInputs.includeAll;
-        break;
-
-      case ChatRequestType.noResult:
-        return;
-    }
-
-    final ConnectorResult result;
+    ConnectorResult? result;
     try {
+      final instructions = await _instructionGenerator.generateInstructions(
+        type,
+      );
+
+      String input = "";
+      PreviousInputs includeHistory = PreviousInputs.includeSession;
+
+      switch (type) {
+        case ChatRequestType.socraticQuestion:
+        case ChatRequestType.mcQuestion:
+        case ChatRequestType.explainCodeQuestion:
+        case ChatRequestType.completeCodeQuestion:
+        case ChatRequestType.writeCodeQuestion:
+          // All question types with difficulty parameter start a new session
+          input = switch (type) {
+            ChatRequestType.socraticQuestion =>
+              QuestionFormatter.socraticQuestion(difficulty!),
+            ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
+              difficulty!,
+            ),
+            ChatRequestType.explainCodeQuestion =>
+              QuestionFormatter.explainCodeQuestion(difficulty!),
+            ChatRequestType.completeCodeQuestion =>
+              QuestionFormatter.completeCodeQuestion(difficulty!),
+            ChatRequestType.writeCodeQuestion =>
+              QuestionFormatter.writeCodeQuestion(difficulty!),
+            _ => "", // unreachable
+          };
+          includeHistory = PreviousInputs.newSession;
+          break;
+
+        case ChatRequestType.submitCode:
+          if (code == null) return;
+          input = QuestionFormatter.submitCode(code);
+          break;
+
+        case ChatRequestType.mcqAnswer:
+          if (prompt == null) return;
+          input = QuestionFormatter.mcqAnswer(prompt);
+          break;
+
+        case ChatRequestType.requestHint:
+          if (code == null) return;
+          input = QuestionFormatter.requestHint(code);
+          break;
+
+        case ChatRequestType.studentQuestion:
+          if (prompt == null) return;
+          input = QuestionFormatter.studentQuestion(prompt, code);
+          break;
+
+        case ChatRequestType.explainAnswer:
+          if (prompt == null) return;
+          input = QuestionFormatter.explainAnswer(prompt);
+          break;
+
+        case ChatRequestType.socraticFeedback:
+          if (prompt == null) return;
+          input = QuestionFormatter.socraticFeedback(prompt);
+          break;
+
+        case ChatRequestType.guidingQuestion:
+          input = QuestionFormatter.guidingQuestion();
+          includeHistory = PreviousInputs.newSession;
+          break;
+
+        case ChatRequestType.guidingAnswer:
+          if (prompt == null) return;
+          input = QuestionFormatter.guidingAnswer(
+            prompt,
+            _conductor.getGuidingUnderstanding(),
+          );
+          break;
+
+        case ChatRequestType.status:
+          input = QuestionFormatter.status();
+          includeHistory = PreviousInputs.includeAll;
+          break;
+
+        case ChatRequestType.noResult:
+          return;
+      }
+
       result = await _connector.sendRequest(
         input: input,
         instructions: instructions,

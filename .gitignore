@@ -116,3 +116,6 @@ coverage/
 
 # Symbols
 app.*.symbols
+
+# docs
+PROCJECT_OVERVIEW.md

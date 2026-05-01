@@ -7,10 +7,15 @@ import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 class GoalsService {
+  GoalsService({CosmosContainer? container}) : _containerOverride = container;
+
   static const String _pk = CosmosPartitions.goal;
   static const Uuid _uuid = Uuid();
 
-  CosmosContainer get _container => CosmosPaths.goals();
+  final CosmosContainer? _containerOverride;
+
+  CosmosContainer get _container =>
+      _containerOverride ?? CosmosPaths.goals();
 
   final ValueNotifier<Goal?> selectedRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> selectedChildGoal = ValueNotifier(null);
