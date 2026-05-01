@@ -4,7 +4,8 @@
       "Bash(cmake --version)",
       "Bash(flutter --version)",
       "Bash(flutter analyze *)",
-      "WebFetch(domain:pub.dev)"
+      "WebFetch(domain:pub.dev)",
+      "Bash(flutter pub *)"
     ]
   }
 }

@@ -1,0 +1,131 @@
+// Cosmos-side analogue of `firestore_safety.dart`. Three concerns:
+//
+//   1. `safeCosmos` — wraps a one-shot async op; on auth failure (401/403)
+//      pushes the CrashRecoveryScreen so the user can reset and re-sign-in.
+//   2. `safeCosmosStream` — passive guard that logs auth/throttle errors
+//      flowing through a stream without swallowing them (StreamBuilder still
+//      sees the error).
+//   3. `pollingStream` — replacement for Firestore `snapshots()`. Cosmos has
+//      a change feed but consuming it from a desktop client is awkward; we
+//      poll on a fixed cadence instead. Decision and rationale are in
+//      TODO.md, "Real-time updates: replacement strategy".
+//
+// Polling cadence and 429 retry policy are decided here, once. Don't
+// relitigate inside individual services.
+
+import 'dart:async';
+import 'dart:io';
+
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+// Reusing the navigator key declared in firestore_safety.dart while both
+// safety files coexist. Step 4 (Firebase removal) will move the declaration.
+import 'package:ai_tutor_python/core/firestore_safety.dart' show appNavigatorKey;
+import 'package:ai_tutor_python/crash_recovery_screen.dart';
+import 'package:flutter/material.dart';
+
+/// Default polling cadence. Tuned for one global rate — fast enough that
+/// teacher-side edits to goals/instructions show up "soon", slow enough that
+/// it isn't a load problem with serverless RU/s billing.
+const Duration kCosmosPollInterval = Duration(seconds: 5);
+
+/// One-shot guard. On 401/403 routes to the recovery screen and rethrows;
+/// the caller's UI still sees the failure so it can render an error state.
+Future<T> safeCosmos<T>(Future<T> Function() op) async {
+  try {
+    return await op();
+  } on CosmosException catch (e) {
+    if (e.isAuthError) {
+      debugPrint('safeCosmos: auth error from Cosmos: $e');
+      appNavigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => const CrashRecoveryScreen(
+            message: 'Permission denied while reading data.',
+          ),
+        ),
+      );
+    }
+    rethrow;
+  }
+}
+
+/// Stream guard. Logs auth/throttle errors but lets them propagate so
+/// StreamBuilder can react.
+Stream<T> safeCosmosStream<T>(Stream<T> source) {
+  return source.handleError((Object error, StackTrace stack) {
+    if (error is CosmosException &&
+        (error.isAuthError || error.isThrottled)) {
+      debugPrint(
+        'safeCosmosStream: ${error.statusCode} from Cosmos stream: $error',
+      );
+    }
+  });
+}
+
+/// Polls [fetch] on [interval], emitting each result on the returned stream.
+///
+/// Contract:
+///   - The first emission happens **synchronously after subscribe**, not
+///     after one full interval. Goal-tree screens assume a value within the
+///     first frame; without this they'd flash a spinner on every navigation.
+///   - Errors thrown by [fetch] surface on the stream as errors but do NOT
+///     stop polling — a transient 429 or network blip shouldn't kill the
+///     subscription.
+///   - Single-subscription stream. Cancelling the subscription cancels the
+///     timer and aborts any in-flight fetch result.
+///   - If a fetch is still running when the timer fires, the tick is
+///     skipped — no overlapping requests per stream.
+///
+/// Services compose this with `safeCosmos` inside the [fetch] closure when
+/// they want auth-error routing:
+///
+///     pollingStream(() => safeCosmos(() => container.query(...)))
+Stream<T> pollingStream<T>(
+  Future<T> Function() fetch, {
+  Duration interval = kCosmosPollInterval,
+}) {
+  late StreamController<T> controller;
+  Timer? timer;
+  bool cancelled = false;
+  bool inFlight = false;
+
+  Future<void> tick() async {
+    if (cancelled || inFlight) return;
+    inFlight = true;
+    try {
+      final value = await fetch();
+      if (!cancelled) controller.add(value);
+    } catch (error, stack) {
+      if (!cancelled) controller.addError(error, stack);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  controller = StreamController<T>(
+    onListen: () {
+      tick();
+      timer = Timer.periodic(interval, (_) => tick());
+    },
+    onCancel: () async {
+      cancelled = true;
+      timer?.cancel();
+      timer = null;
+    },
+  );
+
+  return controller.stream;
+}
+
+/// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`. Step 1
+/// is too early to wire up — MSAL doesn't exist yet (Step 3) and we don't
+/// keep a local Cosmos response cache. The skeleton is here so Step 4 can
+/// flip the call sites in `crash_recovery_screen.dart` and `boot_gate.dart`
+/// without a churn of adding the function.
+Future<void> resetAuthAndCacheAndExit() async {
+  // Step 3 fills this in: AuthService.instance.signOut() to drop the MSAL
+  // account record and any cached tokens.
+
+  // No local Cosmos cache to clear today. If/when we add one, wipe it here.
+
+  exit(0);
+}
