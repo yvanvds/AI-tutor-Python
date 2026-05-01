@@ -8,6 +8,7 @@ import 'package:ai_tutor_python/features/instructions/doc_list.dart';
 import 'package:ai_tutor_python/features/instructions/editor_pane.dart';
 import 'package:ai_tutor_python/features/instructions/section_header.dart';
 import 'package:ai_tutor_python/features/instructions/sections_list.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:highlight/languages/markdown.dart';
@@ -212,6 +213,11 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
             icon: const Icon(Icons.file_download_outlined),
             onPressed: _exportAllToMarkdown,
           ),
+          IconButton(
+            tooltip: 'Import from Markdown (adds, does not overwrite)',
+            icon: const Icon(Icons.file_upload_outlined),
+            onPressed: _importFromMarkdown,
+          ),
           const SizedBox(width: 12),
           FilledButton.icon(
             icon: const Icon(Icons.save),
@@ -345,6 +351,94 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     }
   }
 
+  Future<void> _importFromMarkdown() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Select Markdown file to import',
+        type: FileType.custom,
+        allowedExtensions: ['md', 'markdown'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) {
+        if (mounted) _showSnackBar(context, 'Could not read selected file');
+        return;
+      }
+
+      final content = await File(path).readAsString();
+      final parsed = _parseMarkdownImport(content);
+      if (parsed.isEmpty) {
+        if (mounted) _showSnackBar(context, 'No documents found in file');
+        return;
+      }
+
+      final existing = await DataService.instructions.getAll();
+      final byId = {for (final d in existing) d.id: d};
+
+      var addedSections = 0;
+      var newDocs = 0;
+      var updatedDocs = 0;
+      var refreshSelected = false;
+
+      for (final entry in parsed.entries) {
+        final id = entry.key;
+        final importedSections = entry.value;
+
+        final current = byId[id];
+        if (current == null) {
+          if (importedSections.isEmpty) continue;
+          await DataService.instructions.upsert(
+            Instruction(id: id, sections: importedSections),
+          );
+          newDocs++;
+          addedSections += importedSections.length;
+          if (id == _selectedDocId) refreshSelected = true;
+        } else {
+          final merged = Map<String, String>.from(current.sections);
+          var changed = 0;
+          for (final s in importedSections.entries) {
+            if (!merged.containsKey(s.key)) {
+              merged[s.key] = s.value;
+              changed++;
+            }
+          }
+          if (changed > 0) {
+            await DataService.instructions.upsert(
+              Instruction(id: id, sections: merged),
+            );
+            updatedDocs++;
+            addedSections += changed;
+            if (id == _selectedDocId) refreshSelected = true;
+          }
+        }
+      }
+
+      if (refreshSelected && _selectedDocId != null) {
+        final refreshed = await DataService.instructions.getAll();
+        Instruction? doc;
+        for (final d in refreshed) {
+          if (d.id == _selectedDocId) {
+            doc = d;
+            break;
+          }
+        }
+        if (doc != null) _selectDocument(doc);
+      }
+
+      if (!mounted) return;
+      if (addedSections == 0) {
+        _showSnackBar(context, 'Nothing imported (all sections already exist)');
+      } else {
+        final parts = <String>['Imported $addedSections section(s)'];
+        if (newDocs > 0) parts.add('$newDocs new doc(s)');
+        if (updatedDocs > 0) parts.add('$updatedDocs updated');
+        _showSnackBar(context, parts.join(', '));
+      }
+    } catch (e) {
+      if (mounted) _showSnackBar(context, 'Import failed: $e');
+    }
+  }
+
   Future<void> _renameDocument() async {
     if (!_hasDocSelected) return;
     final newId = await _promptForText(
@@ -462,6 +556,71 @@ Future<bool?> _confirm(BuildContext context, String title, String body) async {
 
 void _showSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Parses the inverse of [_buildMarkdownExport]: top-level `# id` blocks
+/// containing `## section` blocks. Section bodies are preserved verbatim
+/// (no header un-bumping) so the parser also works on hand-written files.
+Map<String, Map<String, String>> _parseMarkdownImport(String md) {
+  final lines = md.split('\n');
+  final result = <String, Map<String, String>>{};
+  String? currentDoc;
+  String? currentSection;
+  final body = StringBuffer();
+  var inFence = false;
+
+  final fenceRe = RegExp(r'^\s*(```|~~~)');
+  // `^# ` matches level-1 only (level-2 has `#` where `\s` is required).
+  final h1Re = RegExp(r'^#\s+(.+?)\s*$');
+  final h2Re = RegExp(r'^##\s+(.+?)\s*$');
+
+  void flushSection() {
+    final doc = currentDoc;
+    final section = currentSection;
+    if (doc != null && section != null) {
+      final text = body.toString().replaceFirst(RegExp(r'^\n+'), '').trimRight();
+      result.putIfAbsent(doc, () => <String, String>{})[section] = text;
+    }
+    body.clear();
+  }
+
+  for (final raw in lines) {
+    final line = raw.endsWith('\r')
+        ? raw.substring(0, raw.length - 1)
+        : raw;
+
+    if (fenceRe.hasMatch(line)) {
+      inFence = !inFence;
+      if (currentSection != null) body.writeln(line);
+      continue;
+    }
+
+    if (!inFence) {
+      final m2 = h2Re.firstMatch(line);
+      if (m2 != null) {
+        flushSection();
+        currentSection = m2.group(1)!.trim();
+        final doc = currentDoc;
+        if (doc != null) {
+          result.putIfAbsent(doc, () => <String, String>{});
+        }
+        continue;
+      }
+      final m1 = h1Re.firstMatch(line);
+      if (m1 != null) {
+        flushSection();
+        final id = m1.group(1)!.trim();
+        currentDoc = id;
+        currentSection = null;
+        result.putIfAbsent(id, () => <String, String>{});
+        continue;
+      }
+    }
+
+    if (currentSection != null) body.writeln(line);
+  }
+  flushSection();
+  return result;
 }
 
 String _buildMarkdownExport(List<Instruction> docs) {
