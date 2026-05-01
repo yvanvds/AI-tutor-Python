@@ -32,6 +32,21 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Create dummy .env for analysis
+        shell: pwsh
+        run: |
+          @"
+          OPEN_AI_API_KEY=dummy
+          COSMOS_ENDPOINT=https://dummy.documents.azure.com:443/
+          COSMOS_KEY=dummy
+          ENTRA_TENANT_ID=00000000-0000-0000-0000-000000000000
+          ENTRA_CLIENT_ID=00000000-0000-0000-0000-000000000000
+          ENTRA_REDIRECT_URI=http://localhost
+          "@ | Out-File -FilePath .env -Encoding utf8 -NoNewline
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - name: Analyze
         run: flutter analyze lib test
 
