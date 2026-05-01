@@ -31,7 +31,7 @@ Future<void> main() async {
   // returning user lands on HomeShell instead of flashing SignInPage.
   await DataService.auth.tryAcquireTokenSilent();
 
-  runApp(GoalsApp());
+  runApp(const GoalsApp());
 }
 
 class GoalsApp extends StatelessWidget {

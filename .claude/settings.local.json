@@ -9,7 +9,8 @@
       "Bash(flutter test *)",
       "Bash(dir test\\\\features\\\\goals)",
       "Bash(dir test\\\\core)",
-      "PowerShell(\"---\")"
+      "PowerShell(\"---\")",
+      "mcp__sonarqube__search_sonar_issues_in_projects"
     ]
   }
 }

@@ -11,6 +11,15 @@ import 'package:flutter/material.dart';
 
 enum TutorState { idle, working, hasFollowUp }
 
+class _RequestInput {
+  const _RequestInput(
+    this.input, [
+    this.history = PreviousInputs.includeSession,
+  ]);
+  final String input;
+  final PreviousInputs history;
+}
+
 class TutorService {
   final ValueNotifier<TutorState> state = ValueNotifier<TutorState>(
     TutorState.idle,
@@ -89,94 +98,101 @@ class TutorService {
         type,
       );
 
-      String input = "";
-      PreviousInputs includeHistory = PreviousInputs.includeSession;
-
-      switch (type) {
-        case ChatRequestType.socraticQuestion:
-        case ChatRequestType.mcQuestion:
-        case ChatRequestType.explainCodeQuestion:
-        case ChatRequestType.completeCodeQuestion:
-        case ChatRequestType.writeCodeQuestion:
-          // All question types with difficulty parameter start a new session
-          input = switch (type) {
-            ChatRequestType.socraticQuestion =>
-              QuestionFormatter.socraticQuestion(difficulty!),
-            ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
-              difficulty!,
-            ),
-            ChatRequestType.explainCodeQuestion =>
-              QuestionFormatter.explainCodeQuestion(difficulty!),
-            ChatRequestType.completeCodeQuestion =>
-              QuestionFormatter.completeCodeQuestion(difficulty!),
-            ChatRequestType.writeCodeQuestion =>
-              QuestionFormatter.writeCodeQuestion(difficulty!),
-            _ => "", // unreachable
-          };
-          includeHistory = PreviousInputs.newSession;
-          break;
-
-        case ChatRequestType.submitCode:
-          if (code == null) return;
-          input = QuestionFormatter.submitCode(code);
-          break;
-
-        case ChatRequestType.mcqAnswer:
-          if (prompt == null) return;
-          input = QuestionFormatter.mcqAnswer(prompt);
-          break;
-
-        case ChatRequestType.requestHint:
-          if (code == null) return;
-          input = QuestionFormatter.requestHint(code);
-          break;
-
-        case ChatRequestType.studentQuestion:
-          if (prompt == null) return;
-          input = QuestionFormatter.studentQuestion(prompt, code);
-          break;
-
-        case ChatRequestType.explainAnswer:
-          if (prompt == null) return;
-          input = QuestionFormatter.explainAnswer(prompt);
-          break;
-
-        case ChatRequestType.socraticFeedback:
-          if (prompt == null) return;
-          input = QuestionFormatter.socraticFeedback(prompt);
-          break;
-
-        case ChatRequestType.guidingQuestion:
-          input = QuestionFormatter.guidingQuestion();
-          includeHistory = PreviousInputs.newSession;
-          break;
-
-        case ChatRequestType.guidingAnswer:
-          if (prompt == null) return;
-          input = QuestionFormatter.guidingAnswer(
-            prompt,
-            _conductor.getGuidingUnderstanding(),
-          );
-          break;
-
-        case ChatRequestType.status:
-          input = QuestionFormatter.status();
-          includeHistory = PreviousInputs.includeAll;
-          break;
-
-        case ChatRequestType.noResult:
-          return;
-      }
+      final request = _buildRequestInput(
+        type: type,
+        difficulty: difficulty,
+        code: code,
+        prompt: prompt,
+      );
+      if (request == null) return;
 
       result = await _connector.sendRequest(
-        input: input,
+        input: request.input,
         instructions: instructions,
-        inputs: includeHistory,
+        inputs: request.history,
       );
     } finally {
       state.value = TutorState.idle;
     }
     await _processResult(result);
+  }
+
+  _RequestInput? _buildRequestInput({
+    required ChatRequestType type,
+    QuestionDifficulty? difficulty,
+    String? code,
+    String? prompt,
+  }) {
+    switch (type) {
+      case ChatRequestType.socraticQuestion:
+      case ChatRequestType.mcQuestion:
+      case ChatRequestType.explainCodeQuestion:
+      case ChatRequestType.completeCodeQuestion:
+      case ChatRequestType.writeCodeQuestion:
+        final input = switch (type) {
+          ChatRequestType.socraticQuestion =>
+            QuestionFormatter.socraticQuestion(difficulty!),
+          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
+            difficulty!,
+          ),
+          ChatRequestType.explainCodeQuestion =>
+            QuestionFormatter.explainCodeQuestion(difficulty!),
+          ChatRequestType.completeCodeQuestion =>
+            QuestionFormatter.completeCodeQuestion(difficulty!),
+          ChatRequestType.writeCodeQuestion =>
+            QuestionFormatter.writeCodeQuestion(difficulty!),
+          _ => "",
+        };
+        return _RequestInput(input, PreviousInputs.newSession);
+
+      case ChatRequestType.submitCode:
+        if (code == null) return null;
+        return _RequestInput(QuestionFormatter.submitCode(code));
+
+      case ChatRequestType.mcqAnswer:
+        if (prompt == null) return null;
+        return _RequestInput(QuestionFormatter.mcqAnswer(prompt));
+
+      case ChatRequestType.requestHint:
+        if (code == null) return null;
+        return _RequestInput(QuestionFormatter.requestHint(code));
+
+      case ChatRequestType.studentQuestion:
+        if (prompt == null) return null;
+        return _RequestInput(QuestionFormatter.studentQuestion(prompt, code));
+
+      case ChatRequestType.explainAnswer:
+        if (prompt == null) return null;
+        return _RequestInput(QuestionFormatter.explainAnswer(prompt));
+
+      case ChatRequestType.socraticFeedback:
+        if (prompt == null) return null;
+        return _RequestInput(QuestionFormatter.socraticFeedback(prompt));
+
+      case ChatRequestType.guidingQuestion:
+        return _RequestInput(
+          QuestionFormatter.guidingQuestion(),
+          PreviousInputs.newSession,
+        );
+
+      case ChatRequestType.guidingAnswer:
+        if (prompt == null) return null;
+        return _RequestInput(
+          QuestionFormatter.guidingAnswer(
+            prompt,
+            _conductor.getGuidingUnderstanding(),
+          ),
+        );
+
+      case ChatRequestType.status:
+        return _RequestInput(
+          QuestionFormatter.status(),
+          PreviousInputs.includeAll,
+        );
+
+      case ChatRequestType.noResult:
+        return null;
+    }
   }
 
   Future<void> _processResult(ConnectorResult result) async {

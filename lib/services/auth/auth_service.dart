@@ -95,6 +95,8 @@ class AuthService {
   /// gives us a cheap escape hatch if the shape ever changes.
   static const String _prefsKey = 'azure_auth_tokens_v1';
 
+  static const String _signInFailedTitle = 'Sign-in failed';
+
   String get _authorizeUrl =>
       'https://login.microsoftonline.com/${AzureConfig.tenantId}/oauth2/v2.0/authorize';
   String get _tokenUrl =>
@@ -223,17 +225,17 @@ class AuthService {
       request.response.headers.contentType = ContentType.html;
       if (error != null) {
         request.response.write(_browserBody(
-          title: 'Sign-in failed',
+          title: _signInFailedTitle,
           body: errorDesc ?? error,
         ));
       } else if (code == null) {
         request.response.write(_browserBody(
-          title: 'Sign-in failed',
+          title: _signInFailedTitle,
           body: 'No authorization code returned.',
         ));
       } else if (returnedState != expectedState) {
         request.response.write(_browserBody(
-          title: 'Sign-in failed',
+          title: _signInFailedTitle,
           body: 'State mismatch — possible CSRF, please try again.',
         ));
       } else {

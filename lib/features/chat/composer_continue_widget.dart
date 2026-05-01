@@ -96,7 +96,7 @@ class _ComposerContinueWidgetState extends State<ComposerContinueWidget> {
                 DataService.tutor.moveToFollowUp();
               },
               icon: const Icon(Icons.next_plan),
-              label: Text('Continue'),
+              label: const Text('Continue'),
             ),
           ),
         ],

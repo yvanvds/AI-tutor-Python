@@ -104,27 +104,9 @@ class _GoalsPageState extends State<GoalsPage> {
   Future<void> _importGoals() async {
     setState(() => _busy = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        dialogTitle: 'Select goals JSON to import',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
+      final tree = await _pickAndParseGoalsFile();
+      if (tree == null) return;
 
-      final path = result.files.single.path;
-      if (path == null) {
-        if (mounted) _showSnack('Could not read selected file');
-        return;
-      }
-
-      final raw = await File(path).readAsString();
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic> || decoded['goals'] is! List) {
-        if (mounted) _showSnack('Invalid goals file');
-        return;
-      }
-
-      final tree = (decoded['goals'] as List).cast<Map<String, dynamic>>();
       final totalCount = _countNodes(tree);
       if (totalCount == 0) {
         if (mounted) _showSnack('File contained no goals');
@@ -144,6 +126,30 @@ class _GoalsPageState extends State<GoalsPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<List<Map<String, dynamic>>?> _pickAndParseGoalsFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Select goals JSON to import',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (result == null || result.files.isEmpty) return null;
+
+    final path = result.files.single.path;
+    if (path == null) {
+      if (mounted) _showSnack('Could not read selected file');
+      return null;
+    }
+
+    final raw = await File(path).readAsString();
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, dynamic> || decoded['goals'] is! List) {
+      if (mounted) _showSnack('Invalid goals file');
+      return null;
+    }
+
+    return (decoded['goals'] as List).cast<Map<String, dynamic>>();
   }
 
   Future<bool> _confirmImport(int total, int rootCount) async {

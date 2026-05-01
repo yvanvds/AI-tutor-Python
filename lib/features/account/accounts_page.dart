@@ -84,10 +84,10 @@ class _AccountsPageState extends State<AccountsPage> {
                     Expanded(
                       child: TextField(
                         controller: _searchCtrl,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
                           hintText: 'Search by name or email…',
-                          border: const OutlineInputBorder(),
+                          border: OutlineInputBorder(),
                           isDense: true,
                         ),
                         onChanged: (_) => setState(_resetPaging),

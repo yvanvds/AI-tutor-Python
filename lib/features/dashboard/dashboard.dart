@@ -49,19 +49,19 @@ class _DashboardState extends State<Dashboard> {
               builder: (context, area) {
                 switch (area.data) {
                   case 'editor':
-                    return Editor();
+                    return const Editor();
                   case 'controllers':
                     return Material(
                       // keep it visible and themed
                       color: Theme.of(context).colorScheme.surface,
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Expanded(child: Controllers()),
+                          Expanded(child: Controllers()),
                         ],
                       ),
                     );
                   case 'output':
-                    return Padding(
+                    return const Padding(
                       padding: EdgeInsets.all(8.0),
                       child: SizedBox.expand(child: Output()),
                     );
@@ -71,7 +71,7 @@ class _DashboardState extends State<Dashboard> {
               },
             );
           case 'right':
-            return ChatWidget();
+            return const ChatWidget();
           default:
             return const SizedBox.shrink();
         }

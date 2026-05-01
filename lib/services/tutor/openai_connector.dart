@@ -63,7 +63,7 @@ class OpenaiConnector {
       return true;
     }());
 
-    OpenAI.requestsTimeOut = Duration(seconds: 60);
+    OpenAI.requestsTimeOut = const Duration(seconds: 60);
 
     try {
       final response = await OpenAI.instance.responses.create(
@@ -128,13 +128,18 @@ class OpenaiConnector {
 
   /// Build a working copy of the history based on the requested scope.
   List<Map<String, dynamic>> _historyFor(PreviousInputs scope) {
-    return List<Map<String, dynamic>>.from(
-      scope == PreviousInputs.includeAll
-          ? _allHistory
-          : scope == PreviousInputs.includeSession
-          ? _sessionHistory
-          : <Map<String, dynamic>>[],
-    );
+    final List<Map<String, dynamic>> source;
+    switch (scope) {
+      case PreviousInputs.includeAll:
+        source = _allHistory;
+        break;
+      case PreviousInputs.includeSession:
+        source = _sessionHistory;
+        break;
+      default:
+        source = const <Map<String, dynamic>>[];
+    }
+    return List<Map<String, dynamic>>.from(source);
   }
 
   /// For debugging/inspection

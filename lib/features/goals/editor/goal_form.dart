@@ -53,68 +53,7 @@ class GoalFormState extends State<GoalForm> {
           IconButton(
             tooltip: 'Delete',
             icon: const Icon(Icons.delete),
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(
-                context,
-              ); // <-- capture BEFORE awaits/closing
-              final id = widget.goal.id;
-
-              // Count children for safety messaging
-              final count = await DataService.goals.countDescendants(id);
-              if (!context.mounted) return;
-
-              final confirmed =
-                  await showDialog<bool>(
-                    context: context,
-                    builder: (dCtx) {
-                      return AlertDialog(
-                        title: const Text('Delete goal'),
-                        content: Text(
-                          count == 0
-                              ? 'Delete “${widget.goal.title}”?'
-                              : 'Delete “${widget.goal.title}” and its $count descendant(s)?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dCtx, false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                            onPressed: () => Navigator.pop(dCtx, true),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      );
-                    },
-                  ) ??
-                  false;
-
-              if (!confirmed) return;
-
-              // Backup → delete → Undo
-              final backup = await DataService.goals.backupSubtree(id);
-              await DataService.goals.deleteSubtree(id);
-
-              // Close the editor if we just deleted the opened node
-              if (mounted) {
-                DataService.goals.editorSelectedGoal.value = null;
-              }
-
-              showUndoSnackBar(
-                messenger,
-                message: count == 0
-                    ? 'Deleted "${widget.goal.title}".'
-                    : 'Deleted "${widget.goal.title}" (+$count).',
-                onUndo: () async {
-                  await DataService.goals.restoreSubtree(backup);
-                },
-              );
-            },
+            onPressed: () => _handleDelete(context),
           ),
           IconButton(
             tooltip: 'Close',
@@ -194,5 +133,63 @@ class GoalFormState extends State<GoalForm> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleDelete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final id = widget.goal.id;
+
+    final count = await DataService.goals.countDescendants(id);
+    if (!context.mounted) return;
+
+    final confirmed = await _confirmDelete(context, count);
+    if (!confirmed) return;
+
+    final backup = await DataService.goals.backupSubtree(id);
+    await DataService.goals.deleteSubtree(id);
+
+    if (mounted) {
+      DataService.goals.editorSelectedGoal.value = null;
+    }
+
+    showUndoSnackBar(
+      messenger,
+      message: count == 0
+          ? 'Deleted "${widget.goal.title}".'
+          : 'Deleted "${widget.goal.title}" (+$count).',
+      onUndo: () async {
+        await DataService.goals.restoreSubtree(backup);
+      },
+    );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context, int count) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) {
+        return AlertDialog(
+          title: const Text('Delete goal'),
+          content: Text(
+            count == 0
+                ? 'Delete “${widget.goal.title}”?'
+                : 'Delete “${widget.goal.title}” and its $count descendant(s)?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 }

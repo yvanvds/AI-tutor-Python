@@ -194,11 +194,15 @@ class _OutputState extends State<Output> {
                 itemCount: _lines.length,
                 itemBuilder: (context, i) {
                   final line = _lines[i];
-                  final color = line.isMeta
-                      ? Theme.of(context).hintColor
-                      : line.isError
-                      ? Theme.of(context).colorScheme.error
-                      : Theme.of(context).textTheme.bodyMedium?.color;
+                  final theme = Theme.of(context);
+                  final Color? color;
+                  if (line.isMeta) {
+                    color = theme.hintColor;
+                  } else if (line.isError) {
+                    color = theme.colorScheme.error;
+                  } else {
+                    color = theme.textTheme.bodyMedium?.color;
+                  }
                   return SelectableText(
                     line.text,
                     style: TextStyle(fontFamily: 'monospace', color: color),

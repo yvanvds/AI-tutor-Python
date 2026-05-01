@@ -657,44 +657,48 @@ int? _leadingNumber(String key) {
   return int.tryParse(match.group(1)!);
 }
 
+final _headerRe = RegExp(r'^(#{1,6})(\s|$)');
+final _fenceRe = RegExp(r'^\s*(```|~~~)');
+
 /// Shifts all ATX headings in [text] so the smallest level becomes at least 3,
 /// preserving the relative hierarchy. Lines inside fenced code blocks are
 /// left untouched.
 String _bumpHeadersToMin3(String text) {
   final lines = text.split('\n');
-  final headerRe = RegExp(r'^(#{1,6})(\s|$)');
-  final fenceRe = RegExp(r'^\s*(```|~~~)');
+  final minLevel = _minHeaderLevel(lines);
+  if (minLevel == null || minLevel >= 3) return text;
+  final shift = 3 - minLevel;
 
+  return _rewriteHeaders(lines, shift).join('\n');
+}
+
+int? _minHeaderLevel(List<String> lines) {
   int? minLevel;
   var inFence = false;
   for (final line in lines) {
-    if (fenceRe.hasMatch(line)) {
+    if (_fenceRe.hasMatch(line)) {
       inFence = !inFence;
       continue;
     }
     if (inFence) continue;
-    final m = headerRe.firstMatch(line);
+    final m = _headerRe.firstMatch(line);
     if (m == null) continue;
     final level = m.group(1)!.length;
     if (minLevel == null || level < minLevel) minLevel = level;
   }
+  return minLevel;
+}
 
-  if (minLevel == null || minLevel >= 3) return text;
-  final shift = 3 - minLevel;
-
-  inFence = false;
+List<String> _rewriteHeaders(List<String> lines, int shift) {
   final out = <String>[];
+  var inFence = false;
   for (final line in lines) {
-    if (fenceRe.hasMatch(line)) {
+    if (_fenceRe.hasMatch(line)) {
       inFence = !inFence;
       out.add(line);
       continue;
     }
-    if (inFence) {
-      out.add(line);
-      continue;
-    }
-    final m = headerRe.firstMatch(line);
+    final m = inFence ? null : _headerRe.firstMatch(line);
     if (m == null) {
       out.add(line);
       continue;
@@ -703,7 +707,7 @@ String _bumpHeadersToMin3(String text) {
     final newLevel = (level + shift).clamp(1, 6);
     out.add('${'#' * newLevel}${line.substring(level)}');
   }
-  return out.join('\n');
+  return out;
 }
 
 bool _mapEquals(Map<String, String> a, Map<String, String> b) {

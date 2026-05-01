@@ -34,45 +34,43 @@ class StudentProgressList extends StatelessWidget {
 
         return StreamBuilder<List<Progress>>(
           stream: DataService.progress.watchAll(),
-          builder: (context, progressSnap) {
-            final progressList = progressSnap.data ?? const <Progress>[];
-
-            // Map goalId -> Progress
-            final progressById = <String, Progress>{
-              for (final p in progressList) p.goalID: p,
-            };
-
-            // Separate roots and children
-            final roots = goals.where((g) => g.parentId == null).toList()
-              ..sort((a, b) => a.order.compareTo(b.order));
-
-            final childrenByParent = <String, List<Goal>>{};
-            for (final g in goals.where((g) => g.parentId != null)) {
-              childrenByParent.putIfAbsent(g.parentId!, () => []).add(g);
-            }
-            for (final list in childrenByParent.values) {
-              list.sort((a, b) => a.order.compareTo(b.order));
-            }
-
-            // Flatten tree into tiles
-            final tiles = <Widget>[];
-            for (final root in roots) {
-              tiles.addAll(
-                _buildGoalTiles(
-                  root,
-                  null,
-                  childrenByParent,
-                  progressById,
-                  depth: 0,
-                ),
-              );
-            }
-
-            return ListView(padding: const EdgeInsets.all(16), children: tiles);
-          },
+          builder: (context, progressSnap) =>
+              _buildProgressList(goals, progressSnap.data ?? const []),
         );
       },
     );
+  }
+
+  Widget _buildProgressList(List<Goal> goals, List<Progress> progressList) {
+    final progressById = <String, Progress>{
+      for (final p in progressList) p.goalID: p,
+    };
+
+    final roots = goals.where((g) => g.parentId == null).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    final childrenByParent = <String, List<Goal>>{};
+    for (final g in goals.where((g) => g.parentId != null)) {
+      childrenByParent.putIfAbsent(g.parentId!, () => []).add(g);
+    }
+    for (final list in childrenByParent.values) {
+      list.sort((a, b) => a.order.compareTo(b.order));
+    }
+
+    final tiles = <Widget>[];
+    for (final root in roots) {
+      tiles.addAll(
+        _buildGoalTiles(
+          root,
+          null,
+          childrenByParent,
+          progressById,
+          depth: 0,
+        ),
+      );
+    }
+
+    return ListView(padding: const EdgeInsets.all(16), children: tiles);
   }
 
   List<Widget> _buildGoalTiles(

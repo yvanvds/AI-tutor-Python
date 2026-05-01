@@ -49,12 +49,12 @@ class _TutorState extends State<ChatWidget> {
                 builders: Builders(
                   composerBuilder: (context) {
                     if (DataService.tutor.state.value == TutorState.working) {
-                      return ComposerWaitWidget();
+                      return const ComposerWaitWidget();
                     } else if (DataService.tutor.state.value ==
                         TutorState.hasFollowUp) {
-                      return ComposerContinueWidget();
+                      return const ComposerContinueWidget();
                     } else {
-                      return Composer();
+                      return const Composer();
                     }
                   },
                   chatAnimatedListBuilder: (context, itemBuilder) {

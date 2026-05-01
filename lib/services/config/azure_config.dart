@@ -22,17 +22,17 @@ part 'azure_config.g.dart';
 @Envied(path: ".env")
 abstract class AzureConfig {
   @EnviedField(varName: 'COSMOS_ENDPOINT')
-  static final String cosmosEndpoint = _AzureConfig.cosmosEndpoint;
+  static const String cosmosEndpoint = _AzureConfig.cosmosEndpoint;
 
   @EnviedField(varName: 'COSMOS_KEY', obfuscate: true)
   static final String cosmosKey = _AzureConfig.cosmosKey;
 
   @EnviedField(varName: 'ENTRA_TENANT_ID')
-  static final String tenantId = _AzureConfig.tenantId;
+  static const String tenantId = _AzureConfig.tenantId;
 
   @EnviedField(varName: 'ENTRA_CLIENT_ID')
-  static final String clientId = _AzureConfig.clientId;
+  static const String clientId = _AzureConfig.clientId;
 
   @EnviedField(varName: 'ENTRA_REDIRECT_URI')
-  static final String redirectUri = _AzureConfig.redirectUri;
+  static const String redirectUri = _AzureConfig.redirectUri;
 }

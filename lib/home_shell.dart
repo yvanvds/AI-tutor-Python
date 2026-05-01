@@ -41,110 +41,106 @@ class _HomeShellState extends State<HomeShell> {
           builder: (context, values) {
             final isTeacher = values[0] as bool;
             final currentAccount = values[1] as Account?;
-
-            // Title (same behavior you had)
-            final titleText = currentAccount != null
-                ? "Welcome back ${currentAccount.firstName}, let's learn!"
-                : 'Welcome…';
-
-            // Build destinations based on permissions
-            final destinations = <NavigationRailDestination>[
-              const NavigationRailDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: Text('Dashboard'),
-              ),
-              const NavigationRailDestination(
-                icon: Icon(Icons.flag_outlined),
-                selectedIcon: Icon(Icons.flag),
-                label: Text('Progress'),
-              ),
-              if (isTeacher)
-                const NavigationRailDestination(
-                  icon: Icon(Icons.flag_outlined),
-                  selectedIcon: Icon(Icons.flag),
-                  label: Text('Goals'),
-                ),
-              if (isTeacher)
-                const NavigationRailDestination(
-                  icon: Icon(Icons.integration_instructions_outlined),
-                  selectedIcon: Icon(Icons.integration_instructions),
-                  label: Text('Instructions'),
-                ),
-              if (isTeacher)
-                const NavigationRailDestination(
-                  icon: Icon(Icons.account_circle_outlined),
-                  selectedIcon: Icon(Icons.account_circle),
-                  label: Text('Accounts'),
-                ),
-            ];
-
-            // Clamp index if teacher flag changes (e.g., on first load)
-            final maxIndex = destinations.length - 1;
-            if (_selectedIndex > maxIndex) _selectedIndex = 0;
-
-            // Pick the current page
-            final Widget page;
-            if (_selectedIndex == 0) {
-              page = const Dashboard();
-            } else if (_selectedIndex == 1) {
-              page = const StudentProgressList();
-            } else if (isTeacher && _selectedIndex == 2) {
-              page = const GoalsPage();
-            } else if (isTeacher && _selectedIndex == 3) {
-              page = const InstructionsEditorPage();
-            } else if (_selectedIndex == 4 && isTeacher) {
-              page = const AccountsPage();
-            } else {
-              page = const Center(child: Text('Page not found'));
-            }
-
-            return Scaffold(
-              appBar: AppBar(
-                titleSpacing: 12,
-                title: Row(
-                  children: [
-                    // Left: welcome text
-                    Flexible(
-                      flex: 2,
-                      child: Text(titleText, overflow: TextOverflow.ellipsis),
-                    ),
-                    // Middle: goal/subgoal/progress
-                    Expanded(
-                      flex: 3,
-                      child: Center(child: const GoalCrumbInAppBar()),
-                    ),
-                  ],
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Sign out',
-                    onPressed: () => DataService.auth.signOut(),
-                    icon: const Icon(Icons.logout),
-                  ),
-                ],
-              ),
-
-              body: Row(
-                children: [
-                  NavigationRail(
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: (i) =>
-                        setState(() => _selectedIndex = i),
-                    labelType: NavigationRailLabelType.selected,
-                    leading: const SizedBox(height: 8),
-                    destinations: destinations,
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: page),
-                ],
-              ),
-            );
+            return _buildShell(isTeacher, currentAccount);
           },
         ),
         const GoalSplashOverlay(),
       ],
     );
+  }
+
+  Scaffold _buildShell(bool isTeacher, Account? currentAccount) {
+    final titleText = currentAccount != null
+        ? "Welcome back ${currentAccount.firstName}, let's learn!"
+        : 'Welcome…';
+
+    final destinations = _destinations(isTeacher);
+
+    final maxIndex = destinations.length - 1;
+    if (_selectedIndex > maxIndex) _selectedIndex = 0;
+
+    final page = _pageFor(_selectedIndex, isTeacher);
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 12,
+        title: Row(
+          children: [
+            Flexible(
+              flex: 2,
+              child: Text(titleText, overflow: TextOverflow.ellipsis),
+            ),
+            const Expanded(
+              flex: 3,
+              child: Center(child: GoalCrumbInAppBar()),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () => DataService.auth.signOut(),
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+            labelType: NavigationRailLabelType.selected,
+            leading: const SizedBox(height: 8),
+            destinations: destinations,
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(child: page),
+        ],
+      ),
+    );
+  }
+
+  List<NavigationRailDestination> _destinations(bool isTeacher) {
+    return [
+      const NavigationRailDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard),
+        label: Text('Dashboard'),
+      ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.flag_outlined),
+        selectedIcon: Icon(Icons.flag),
+        label: Text('Progress'),
+      ),
+      if (isTeacher)
+        const NavigationRailDestination(
+          icon: Icon(Icons.flag_outlined),
+          selectedIcon: Icon(Icons.flag),
+          label: Text('Goals'),
+        ),
+      if (isTeacher)
+        const NavigationRailDestination(
+          icon: Icon(Icons.integration_instructions_outlined),
+          selectedIcon: Icon(Icons.integration_instructions),
+          label: Text('Instructions'),
+        ),
+      if (isTeacher)
+        const NavigationRailDestination(
+          icon: Icon(Icons.account_circle_outlined),
+          selectedIcon: Icon(Icons.account_circle),
+          label: Text('Accounts'),
+        ),
+    ];
+  }
+
+  Widget _pageFor(int index, bool isTeacher) {
+    if (index == 0) return const Dashboard();
+    if (index == 1) return const StudentProgressList();
+    if (isTeacher && index == 2) return const GoalsPage();
+    if (isTeacher && index == 3) return const InstructionsEditorPage();
+    if (isTeacher && index == 4) return const AccountsPage();
+    return const Center(child: Text('Page not found'));
   }
 
   Future<void> checkForUpdate() async {

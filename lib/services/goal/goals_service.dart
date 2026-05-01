@@ -69,31 +69,22 @@ class GoalsService {
 
   Future<void> createRoot(String title) async {
     final next = await _nextOrder(parentId: null);
+    final goal = Goal(id: _uuid.v4(), title: title, order: next);
     await safeCosmos(
-      () => _container.create(
-        _docMap(
-          id: _uuid.v4(),
-          title: title,
-          parentId: null,
-          order: next,
-        ),
-        partitionKey: _pk,
-      ),
+      () => _container.create(_docMap(goal), partitionKey: _pk),
     );
   }
 
   Future<void> createChild(String parentId, String title) async {
     final next = await _nextOrder(parentId: parentId);
+    final goal = Goal(
+      id: _uuid.v4(),
+      title: title,
+      parentId: parentId,
+      order: next,
+    );
     await safeCosmos(
-      () => _container.create(
-        _docMap(
-          id: _uuid.v4(),
-          title: title,
-          parentId: parentId,
-          order: next,
-        ),
-        partitionKey: _pk,
-      ),
+      () => _container.create(_docMap(goal), partitionKey: _pk),
     );
   }
 
@@ -108,23 +99,20 @@ class GoalsService {
     List<String> suggestions = const [],
     List<String> knownConcepts = const [],
   }) async {
-    final id = _uuid.v4();
-    await safeCosmos(
-      () => _container.create(
-        _docMap(
-          id: id,
-          title: title,
-          description: description,
-          parentId: parentId,
-          order: order,
-          optional: optional,
-          suggestions: suggestions,
-          knownConcepts: knownConcepts,
-        ),
-        partitionKey: _pk,
-      ),
+    final goal = Goal(
+      id: _uuid.v4(),
+      title: title,
+      description: description,
+      parentId: parentId,
+      order: order,
+      optional: optional,
+      suggestions: suggestions,
+      knownConcepts: knownConcepts,
     );
-    return id;
+    await safeCosmos(
+      () => _container.create(_docMap(goal), partitionKey: _pk),
+    );
+    return goal.id;
   }
 
   // --- UPDATE --------------------------------------------------------------
@@ -253,25 +241,16 @@ class GoalsService {
   }
 
   /// Build a Cosmos doc map for a goal. Includes the partition-key field.
-  Map<String, Object?> _docMap({
-    required String id,
-    required String title,
-    String? description,
-    String? parentId,
-    required int order,
-    bool optional = false,
-    List<String> suggestions = const [],
-    List<String> knownConcepts = const [],
-  }) => {
-    'id': id,
+  Map<String, Object?> _docMap(Goal goal) => {
+    'id': goal.id,
     'type': _pk,
-    'title': title,
-    'description': description,
-    'parentId': parentId,
-    'order': order,
-    'optional': optional,
-    'suggestions': suggestions,
-    'knownConcepts': knownConcepts,
+    'title': goal.title,
+    'description': goal.description,
+    'parentId': goal.parentId,
+    'order': goal.order,
+    'optional': goal.optional,
+    'suggestions': goal.suggestions,
+    'knownConcepts': goal.knownConcepts,
   };
 
   /// Load *all* goals once (≤100 so it's fine) and build a map by id.

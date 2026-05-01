@@ -240,42 +240,46 @@ class ErrorResponseHandler extends ResponseHandler<ErrorResponse> {
   }
 }
 
+class _DispatchEntry {
+  const _DispatchEntry(this.matches, this.handle);
+  final bool Function(ChatResponse parsed) matches;
+  final Future<void> Function(ChatResponse parsed, TutorContext ctx) handle;
+}
+
+_DispatchEntry _entry<R extends ChatResponse>(ResponseHandler<R> handler) {
+  return _DispatchEntry(
+    (parsed) => parsed is R,
+    (parsed, ctx) => handler.handle(parsed as R, ctx),
+  );
+}
+
+final List<_DispatchEntry> _dispatchTable = [
+  _entry(const CompleteCodeHandler()),
+  _entry(const ExplainCodeHandler()),
+  _entry(const WriteCodeHandler()),
+  _entry(const SocraticQuestionHandler()),
+  _entry(const MultipleChoiceHandler()),
+  _entry(const GuidingExerciseHandler()),
+  _entry(const GuidingFeedbackHandler()),
+  _entry(const AnswerHandler()),
+  _entry(const HintHandler()),
+  _entry(const CodeFeedbackHandler()),
+  _entry(const McqFeedbackHandler()),
+  _entry(const ExplainFeedbackHandler()),
+  _entry(const SocraticFeedbackHandler()),
+  _entry(const StatusSummaryHandler()),
+  _entry(const ErrorResponseHandler()),
+];
+
 /// Dispatches a parsed [ChatResponse] to the matching handler.
 /// Returns false when the response type has no handler — caller decides
 /// what fallback (e.g. retry) to apply.
 Future<bool> dispatchResponse(ChatResponse parsed, TutorContext ctx) async {
-  if (parsed is CompleteCode) {
-    await const CompleteCodeHandler().handle(parsed, ctx);
-  } else if (parsed is ExplainCode) {
-    await const ExplainCodeHandler().handle(parsed, ctx);
-  } else if (parsed is WriteCode) {
-    await const WriteCodeHandler().handle(parsed, ctx);
-  } else if (parsed is SocraticQuestion) {
-    await const SocraticQuestionHandler().handle(parsed, ctx);
-  } else if (parsed is MultipleChoice) {
-    await const MultipleChoiceHandler().handle(parsed, ctx);
-  } else if (parsed is GuidingExercise) {
-    await const GuidingExerciseHandler().handle(parsed, ctx);
-  } else if (parsed is GuidingFeedback) {
-    await const GuidingFeedbackHandler().handle(parsed, ctx);
-  } else if (parsed is Answer) {
-    await const AnswerHandler().handle(parsed, ctx);
-  } else if (parsed is Hint) {
-    await const HintHandler().handle(parsed, ctx);
-  } else if (parsed is CodeFeedback) {
-    await const CodeFeedbackHandler().handle(parsed, ctx);
-  } else if (parsed is McqFeedback) {
-    await const McqFeedbackHandler().handle(parsed, ctx);
-  } else if (parsed is ExplainFeedback) {
-    await const ExplainFeedbackHandler().handle(parsed, ctx);
-  } else if (parsed is SocraticFeedback) {
-    await const SocraticFeedbackHandler().handle(parsed, ctx);
-  } else if (parsed is StatusSummary) {
-    await const StatusSummaryHandler().handle(parsed, ctx);
-  } else if (parsed is ErrorResponse) {
-    await const ErrorResponseHandler().handle(parsed, ctx);
-  } else {
-    return false;
+  for (final entry in _dispatchTable) {
+    if (entry.matches(parsed)) {
+      await entry.handle(parsed, ctx);
+      return true;
+    }
   }
-  return true;
+  return false;
 }
