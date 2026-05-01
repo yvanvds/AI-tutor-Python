@@ -9,11 +9,9 @@ class RootPane extends StatelessWidget {
   const RootPane({
     super.key,
     required this.rootsAsync,
-    required this.selectedRootId,
   });
 
   final Stream<List<Goal>> rootsAsync;
-  final String? selectedRootId;
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +36,13 @@ class RootPane extends StatelessWidget {
               } else if (snapshot.hasData) {
                 final roots = snapshot.data!;
                 // auto-select first
-                if (selectedRootId == null && roots.isNotEmpty) {
-                  Future.microtask(
-                    () =>
-                        DataService.goals.selectedRootGoal.value = roots.first,
-                  );
+                if (DataService.goals.editorSelectedRootGoal.value == null &&
+                    roots.isNotEmpty) {
+                  Future.microtask(() {
+                    DataService.goals.editorSelectedRootGoal.value =
+                        roots.first;
+                    DataService.goals.editorSelectedGoal.value = roots.first;
+                  });
                 }
                 if (roots.isEmpty) {
                   return const Center(
@@ -78,13 +78,15 @@ class RootPane extends StatelessWidget {
                   itemCount: roots.length,
                   itemBuilder: (_, i) {
                     final g = roots[i];
-                    final selected =
-                        g.id == DataService.goals.selectedRootGoal.value?.id;
-                    return RootRow(
+                    return ValueListenableBuilder<Goal?>(
                       key: ValueKey(g.id),
-                      goal: g,
-                      selected: selected,
-                      index: i,
+                      valueListenable:
+                          DataService.goals.editorSelectedRootGoal,
+                      builder: (_, sel, _) => RootRow(
+                        goal: g,
+                        selected: g.id == sel?.id,
+                        index: i,
+                      ),
                     );
                   },
                 );

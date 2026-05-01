@@ -10,15 +10,26 @@ class ChildPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedRootId = DataService.goals.editorSelectedRootGoal.value?.id;
+    return ValueListenableBuilder<Goal?>(
+      valueListenable: DataService.goals.editorSelectedRootGoal,
+      builder: (context, selectedRoot, _) {
+        final selectedRootId = selectedRoot?.id;
+        if (selectedRootId == null) {
+          return const Center(
+            child: Text('Select a root goal to see its children.'),
+          );
+        }
+        final childrenAsync = DataService.goals.streamChildren(selectedRootId);
+        return _buildList(context, selectedRootId, childrenAsync);
+      },
+    );
+  }
 
-    if (selectedRootId == null) {
-      return const Center(
-        child: Text('Select a root goal to see its children.'),
-      );
-    }
-
-    final childrenAsync = DataService.goals.streamChildren(selectedRootId);
+  Widget _buildList(
+    BuildContext context,
+    String selectedRootId,
+    Stream<List<Goal>> childrenAsync,
+  ) {
     return Column(
       children: [
         Padding(

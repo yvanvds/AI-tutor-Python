@@ -1,36 +1,247 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'child_pane.dart';
 import 'editor/edit_goal_panel.dart';
 import 'root_pane.dart';
 
-class GoalsPage extends StatelessWidget {
+class GoalsPage extends StatefulWidget {
   const GoalsPage({super.key});
+
+  @override
+  State<GoalsPage> createState() => _GoalsPageState();
+}
+
+class _GoalsPageState extends State<GoalsPage> {
+  bool _busy = false;
 
   @override
   Widget build(BuildContext context) {
     final rootsAsync = DataService.goals.streamRoots!;
-    final selectedRootId = DataService.goals.editorSelectedRootGoal.value?.id;
 
-    return Row(
+    return Column(
       children: [
-        // LEFT: Roots + root drop zone
         Expanded(
-          child: RootPane(
-            rootsAsync: rootsAsync,
-            selectedRootId: selectedRootId,
+          child: Row(
+            children: [
+              Expanded(child: RootPane(rootsAsync: rootsAsync)),
+              const VerticalDivider(width: 1),
+              const Expanded(child: ChildPane()),
+              const VerticalDivider(width: 1),
+              const SizedBox(width: 720, child: EditGoalPanel()),
+            ],
           ),
         ),
-
-        const VerticalDivider(width: 1),
-
-        // RIGHT: Children of selected root
-        Expanded(child: ChildPane()),
-        const VerticalDivider(width: 1),
-
-        SizedBox(width: 720, child: const EditGoalPanel()),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('Export goals'),
+                onPressed: _busy ? null : _exportGoals,
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.file_upload_outlined),
+                label: const Text('Import goals'),
+                onPressed: _busy ? null : _importGoals,
+              ),
+              if (_busy) ...const [
+                SizedBox(width: 12),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
+
+  Future<void> _exportGoals() async {
+    setState(() => _busy = true);
+    try {
+      final goals = await DataService.goals.getAllGoalsOnce();
+      if (goals.isEmpty) {
+        if (mounted) _showSnack('No goals to export');
+        return;
+      }
+
+      final tree = _buildTree(goals);
+      final payload = {
+        'version': 1,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'goals': tree,
+      };
+      final json = const JsonEncoder.withIndent('  ').convert(payload);
+
+      final dir = await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
+      final stamp = DateTime.now().toIso8601String().split('T').first;
+      final file = File(p.join(dir.path, 'goals-export-$stamp.json'));
+      await file.writeAsString(json);
+
+      if (mounted) _showSnack('Exported to ${file.path}');
+    } catch (e) {
+      if (mounted) _showSnack('Export failed: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _importGoals() async {
+    setState(() => _busy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Select goals JSON to import',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final path = result.files.single.path;
+      if (path == null) {
+        if (mounted) _showSnack('Could not read selected file');
+        return;
+      }
+
+      final raw = await File(path).readAsString();
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> || decoded['goals'] is! List) {
+        if (mounted) _showSnack('Invalid goals file');
+        return;
+      }
+
+      final tree = (decoded['goals'] as List).cast<Map<String, dynamic>>();
+      final totalCount = _countNodes(tree);
+      if (totalCount == 0) {
+        if (mounted) _showSnack('File contained no goals');
+        return;
+      }
+
+      final confirmed = await _confirmImport(totalCount, tree.length);
+      if (!confirmed) return;
+
+      await _insertTree(tree, parentId: null);
+
+      if (mounted) {
+        _showSnack('Imported $totalCount goal(s)');
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Import failed: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<bool> _confirmImport(int total, int rootCount) async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import goals?'),
+        content: Text(
+          'This will add $rootCount root goal(s) and $total total node(s) '
+          'to your existing goals. Existing goals will not be touched. '
+          'New Firestore ids are assigned to every imported goal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
+  }
+
+  Future<void> _insertTree(
+    List<Map<String, dynamic>> nodes, {
+    required String? parentId,
+  }) async {
+    for (final node in nodes) {
+      final newId = await DataService.goals.createGoalWithFields(
+        title: (node['title'] as String?) ?? '',
+        description: node['description'] as String?,
+        parentId: parentId,
+        order: (node['order'] as num?)?.toInt() ?? 0,
+        optional: node['optional'] as bool? ?? false,
+        suggestions: _stringList(node['suggestions']),
+        knownConcepts: _stringList(node['knownConcepts']),
+      );
+      final children = node['children'];
+      if (children is List && children.isNotEmpty) {
+        await _insertTree(
+          children.cast<Map<String, dynamic>>(),
+          parentId: newId,
+        );
+      }
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+List<Map<String, dynamic>> _buildTree(List<Goal> goals) {
+  final byParent = <String?, List<Goal>>{};
+  for (final g in goals) {
+    byParent.putIfAbsent(g.parentId, () => []).add(g);
+  }
+  for (final list in byParent.values) {
+    list.sort((a, b) => a.order.compareTo(b.order));
+  }
+
+  Map<String, dynamic> nodeFor(Goal g) {
+    final children = byParent[g.id] ?? const <Goal>[];
+    return {
+      'title': g.title,
+      'description': g.description,
+      'order': g.order,
+      'optional': g.optional,
+      'suggestions': g.suggestions,
+      'knownConcepts': g.knownConcepts,
+      'children': children.map(nodeFor).toList(),
+    };
+  }
+
+  final roots = byParent[null] ?? const <Goal>[];
+  return roots.map(nodeFor).toList();
+}
+
+int _countNodes(List<Map<String, dynamic>> nodes) {
+  var n = 0;
+  for (final node in nodes) {
+    n += 1;
+    final children = node['children'];
+    if (children is List && children.isNotEmpty) {
+      n += _countNodes(children.cast<Map<String, dynamic>>());
+    }
+  }
+  return n;
+}
+
+List<String> _stringList(dynamic v) {
+  if (v is List) {
+    return v.map((e) => e?.toString() ?? '').toList();
+  }
+  return const [];
 }

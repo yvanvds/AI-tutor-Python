@@ -8,7 +8,13 @@ class EditGoalPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final editingId = DataService.goals.editorSelectedGoal.value?.id;
+    return ValueListenableBuilder<Goal?>(
+      valueListenable: DataService.goals.editorSelectedGoal,
+      builder: (context, editing, _) => _buildPanel(context, editing?.id),
+    );
+  }
+
+  Widget _buildPanel(BuildContext context, String? editingId) {
     Stream<Goal?>? goalAsync;
     if (editingId != null) {
       goalAsync = DataService.goals.streamGoal(editingId);

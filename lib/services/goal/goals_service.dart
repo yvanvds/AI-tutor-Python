@@ -73,6 +73,12 @@ class GoalsService {
     return s.docs.map(Goal.fromDoc).toList();
   }
 
+  /// Fetch every goal once. Used for export.
+  Future<List<Goal>> getAllGoalsOnce() async {
+    final s = await safeFirestore(() => _collection.get());
+    return s.docs.map(Goal.fromDoc).toList();
+  }
+
   /// ---- Create --------------------------------------------------------------
 
   Future<void> createRoot(String title) async {
@@ -87,6 +93,29 @@ class GoalsService {
       'parentId': parentId,
       'order': next,
     });
+  }
+
+  /// Create a goal with all fields populated. Returns the new Firestore id.
+  /// Used for import where we want to preserve every field except the id.
+  Future<String> createGoalWithFields({
+    required String title,
+    String? description,
+    String? parentId,
+    required int order,
+    bool optional = false,
+    List<String> suggestions = const [],
+    List<String> knownConcepts = const [],
+  }) async {
+    final ref = await _collection.add({
+      'title': title,
+      'description': description,
+      'parentId': parentId,
+      'order': order,
+      'optional': optional,
+      'suggestions': suggestions,
+      'knownConcepts': knownConcepts,
+    });
+    return ref.id;
   }
 
   /// ---- Update --------------------------------------------------------------
