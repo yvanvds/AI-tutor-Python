@@ -873,6 +873,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  py_runner:
+    dependency: "direct main"
+    description:
+      path: "packages/py_runner"
+      relative: true
+    source: path
+    version: "0.1.0"
   recase:
     dependency: transitive
     description:

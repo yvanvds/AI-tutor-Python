@@ -14,6 +14,7 @@ import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:get_it/get_it.dart';
+import 'package:py_runner/py_runner.dart';
 
 class DataService {
   static final GetIt _locator = GetIt.instance;
@@ -30,7 +31,12 @@ class DataService {
     _locator.registerLazySingleton(() => ChatService());
     _locator.registerLazySingleton(() => TutorService());
     _locator.registerLazySingleton(() => CodeService());
-    _locator.registerLazySingleton(() => OutputService());
+    _locator.registerLazySingleton(
+      () => PyRunner(locator: const InstallerPyHostLocator()),
+    );
+    _locator.registerLazySingleton(
+      () => OutputService(pyRunner: _locator<PyRunner>()),
+    );
     _locator.registerLazySingleton(() => SplashService());
     _locator.registerLazySingleton(() => SoundService());
     _locator.registerLazySingleton(() => DebugSessionRecorder());
@@ -49,6 +55,7 @@ class DataService {
   static ChatService get chat => _locator<ChatService>();
   static TutorService get tutor => _locator<TutorService>();
   static CodeService get code => _locator<CodeService>();
+  static PyRunner get pyRunner => _locator<PyRunner>();
   static OutputService get output => _locator<OutputService>();
   static SplashService get splash => _locator<SplashService>();
   static SoundService get sound => _locator<SoundService>();
