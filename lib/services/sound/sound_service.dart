@@ -2,6 +2,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 class SoundService {
+  final AudioPlayer _player = AudioPlayer();
+
   Future<void> correctAnswer() async {
     await _playAsset('sounds/note.mp3', volume: 0.5);
   }
@@ -10,7 +12,6 @@ class SoundService {
     await _playAsset('sounds/question.mp3', volume: 0.5);
   }
 
-  /// Plays the goal-reached sound
   Future<void> playGoalReached() async {
     await _playAsset('sounds/goal_reached.mp3');
   }
@@ -19,12 +20,15 @@ class SoundService {
     await _playAsset('sounds/chime.mp3');
   }
 
-  /// General-purpose method for later use
+  Future<void> dispose() async {
+    await _player.dispose();
+  }
+
   Future<void> _playAsset(String path, {double volume = 1.0}) async {
     try {
-      final player = AudioPlayer();
-      await player.setVolume(volume);
-      await player.play(AssetSource(path));
+      await _player.stop();
+      await _player.setVolume(volume);
+      await _player.play(AssetSource(path));
     } catch (e) {
       if (kDebugMode) {
         print('⚠️ Could not play asset sound: $e');
