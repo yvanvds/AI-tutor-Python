@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/chat/composer_continue_widget.dart';
 import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
+import 'package:ai_tutor_python/features/chat/mcq_options_widget.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
@@ -129,6 +130,20 @@ class _TutorState extends State<ChatWidget> {
                               color: Theme.of(context).colorScheme.error,
                             ),
                       ),
+
+                  customMessageBuilder:
+                      (
+                        context,
+                        message,
+                        index, {
+                        required bool isSentByMe,
+                        MessageGroupStatus? groupStatus,
+                      }) {
+                        if (message.metadata?['kind'] == 'mcq_options') {
+                          return McqOptionsWidget(message: message);
+                        }
+                        return const SizedBox.shrink();
+                      },
                 ),
                 resolveUser: (UserID id) async {
                   // Simple user resolver

@@ -35,6 +35,37 @@ class ChatService {
     );
   }
 
+  /// Insert a clickable multiple-choice options block. The chat widget renders
+  /// it as a row of buttons; tapping one routes through the same path as
+  /// keyboard input.
+  void addMcqOptions(List<String> options) {
+    _id++;
+    controller.insertMessage(
+      CustomMessage(
+        id: _id.toString(),
+        authorId: 'Teacher',
+        createdAt: DateTime.now(),
+        metadata: {
+          'kind': 'mcq_options',
+          'options': options,
+          'selected': null,
+        },
+      ),
+    );
+  }
+
+  /// Mark an mcq-options message as answered so its buttons rebuild as
+  /// disabled with the picked one highlighted. Persisted on the controller
+  /// so it survives scroll-induced rebuilds.
+  void markMcqAnswered(CustomMessage message, String picked) {
+    controller.updateMessage(
+      message,
+      message.copyWith(
+        metadata: {...?message.metadata, 'selected': picked},
+      ),
+    );
+  }
+
   /// Start a streaming tutor message. Inserts a [TextStreamMessage] in the
   /// loading state. Subsequent text deltas are passed via [updateStream];
   /// finalize with [completeStream] (which swaps the placeholder for a

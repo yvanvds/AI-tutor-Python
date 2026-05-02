@@ -31,7 +31,9 @@
       "Bash(where gh *)",
       "Bash(gh --version)",
       "PowerShell($cmd = Get-Command gh -ErrorAction SilentlyContinue; if \\($cmd\\) { Write-Output \"Found: $\\($cmd.Source\\)\"; gh --version } else { Write-Output \"Not on PATH\" })",
-      "PowerShell($paths = @\\( \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\GitHub CLI\\\\gh.exe\" \\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Write-Output \"Found: $p\" } }; winget list --name \"GitHub CLI\" 2>&1 | Select-String -Pattern \"GitHub\" | Select-Object -First 5)"
+      "PowerShell($paths = @\\( \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\GitHub CLI\\\\gh.exe\" \\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Write-Output \"Found: $p\" } }; winget list --name \"GitHub CLI\" 2>&1 | Select-String -Pattern \"GitHub\" | Select-Object -First 5)",
+      "Read(//c/Users/yvan/AppData/Local/Pub/Cache/hosted/**)",
+      "Read(//tmp/**)"
     ]
   }
 }

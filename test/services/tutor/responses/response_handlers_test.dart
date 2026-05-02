@@ -14,6 +14,7 @@
 // asks us to.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
@@ -61,6 +62,7 @@ void main() {
   late MockConductor conductor;
   late MockSoundService sound;
   late MockReportService report;
+  late MockChatService chat;
   late _Recorder rec;
   late TutorContext ctx;
 
@@ -72,9 +74,11 @@ void main() {
     conductor = MockConductor();
     sound = MockSoundService();
     report = MockReportService();
+    chat = MockChatService();
     rec = _Recorder();
 
     when(() => sound.askQuestion()).thenAnswer((_) async {});
+    when(() => chat.addMcqOptions(any())).thenReturn(null);
     when(() => conductor.hintProvided()).thenReturn(null);
     when(() => conductor.updateProgress(any<AnswerQuality>()))
         .thenAnswer((_) async => true);
@@ -87,6 +91,7 @@ void main() {
 
     registerMock<SoundService>(sound);
     registerMock<ReportService>(report);
+    registerMock<ChatService>(chat);
     registerMock<DebugSessionRecorder>(DebugSessionRecorder());
 
     ctx = TutorContext(
@@ -158,8 +163,7 @@ void main() {
       expect(rec.tutorMessages, ['why?']);
     });
 
-    test('MultipleChoice posts prompt + each option as a separate message',
-        () async {
+    test('MultipleChoice posts prompt + clickable options block', () async {
       final ok = await dispatchResponse(
         MultipleChoice(
           type: 'multiple_choice',
@@ -171,7 +175,8 @@ void main() {
       );
       expect(ok, isTrue);
       expect(rec.startedCode, ['print(1)']);
-      expect(rec.tutorMessages, ['pick', 'A', 'B', 'C']);
+      expect(rec.tutorMessages, ['pick']);
+      verify(() => chat.addMcqOptions(['A', 'B', 'C'])).called(1);
       verify(() => sound.askQuestion()).called(1);
     });
 

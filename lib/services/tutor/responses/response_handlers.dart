@@ -95,9 +95,7 @@ class MultipleChoiceHandler extends ResponseHandler<MultipleChoice> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode(r.code);
     ctx.addTutorMessage(r.prompt);
-    for (final option in r.options) {
-      ctx.addTutorMessage(option);
-    }
+    DataService.chat.addMcqOptions(r.options);
     DataService.sound.askQuestion();
   }
 }
