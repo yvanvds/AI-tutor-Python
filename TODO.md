@@ -1,11 +1,5 @@
 # TODO
 
-## Installer and website migration
-We're moving away from firebase. But the hosting is still used. We can use github pages for the website. And github releases for the binary. Also explore if we can add a release easily to the microsoft store for our tennant only.
-
-## Update readme
-Make a proper project description. Other people could also use this project if we have clear instructions on how to generate a binary. They don't even have to be good coders. Just explain what to setup and what to put in the .env file.
-
 ## multiple choice
 Qnswers should be clickable
 
