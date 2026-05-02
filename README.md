@@ -9,7 +9,6 @@ A Windows desktop application that acts as a personal AI tutor for Python studen
 
 The tutor follows a teacher-defined goal tree, picks the type of exercise (multiple choice, explain-this-code, complete-the-code, write-code, Socratic question, …), and only marks a sub-goal as mastered once the student answers correctly across several different question types. UI is in Dutch.
 
-Built by a Python teacher (Yvan, [@yvanvds](https://github.com/yvanvds)) for his own classroom.
 
 ---
 
@@ -206,4 +205,6 @@ This is a personal classroom project, not a product. Issues and PRs are welcome 
 
 ## License
 
-No license file is included yet. Until one is added, treat this code as "all rights reserved" by the author for legal purposes, but feel free to fork for non-commercial educational use; open an issue if you want clarification.
+Licensed under the GNU General Public License v3.0 — see [LICENSE.md](LICENSE.md) for the full text.
+
+In short: you are free to use, study, modify, and redistribute this code, including for your own classroom. If you distribute a modified version, you must do so under the same license and make your source available. This means the project (and any forks) cannot be turned into a closed-source commercial product.
