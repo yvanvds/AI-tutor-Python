@@ -1,5 +1,5 @@
 <!-- META
-last_updated_commit: ffbb3bf8f29ffc8451d8a8ed5962d48e29462f3c
+last_updated_commit: a026da3c60bbe3cc060b4cc5ecc8fb278651850f
 last_updated_at: 2026-05-02
 -->
 
@@ -26,7 +26,7 @@ last_updated_at: 2026-05-02
 - `shared_preferences` — persists the Entra token bundle and the per-user OpenAI key.
 
 **AI / LLM**
-- `dart_openai` — pinned to a fork at `https://github.com/yvanvds/openai.git` (Responses API support).
+- `dart_openai` — pinned to a fork at `https://github.com/yvanvds/openai.git`. The connector uses `chat.completions` (`OpenAI.instance.chat.create` / `createStream`) — the Responses-API plumbing was replaced by streaming chat completions plus a hand-rolled `<TEXT>...</TEXT><META>{...}</META>` envelope (see [services/tutor/responses/envelope_assembler.dart](lib/services/tutor/responses/envelope_assembler.dart)).
 - `envied` (+ `envied_generator`) — obfuscates `OPEN_AI_API_KEY` and `COSMOS_KEY` from `.env` into [services/tutor/env.g.dart](lib/services/tutor/env.g.dart) and [services/config/azure_config.g.dart](lib/services/config/azure_config.g.dart).
 
 **Code execution**
@@ -34,7 +34,8 @@ last_updated_at: 2026-05-02
 
 **Editor / UI**
 - `flutter_code_editor`, `flutter_highlight`, `highlight` — the Python editor and its theming.
-- `flutter_chat_ui`, `flutter_chat_core`, `flyer_chat_text_message`, `flyer_chat_system_message`, `flyer_chat_text_stream_message` — the chat panel.
+- `flutter_chat_ui`, `flutter_chat_core`, `flyer_chat_text_message`, `flyer_chat_system_message`, `flyer_chat_text_stream_message` — the chat panel; the stream-message variant renders the in-flight tutor reply while it's still arriving.
+- `fl_chart` — line charts in the teacher's per-student detail drawer.
 - `multi_split_view` — resizable panels in the Dashboard.
 - `lottie`, `loading_animation_widget`, `audioplayers` — confetti splash, spinner, sound effects.
 - `google_fonts`, `file_picker`.
@@ -51,9 +52,11 @@ Embedded Python via `py_engine_desktop` (a Flutter desktop plugin). On first mou
 
 ### AI provider
 
-OpenAI's Responses API, called via `dart_openai` (forked) in [services/tutor/openai_connector.dart](lib/services/tutor/openai_connector.dart). The model name comes from the Cosmos `config/global` doc (field `Model`), defaulting to `gpt-4o`. The API key is the build-time obfuscated `Env.apiKey`; per-user override via locally-stored OpenAI key in `SharedPreferences` (see [features/auth/local_key_gate_screen.dart](lib/features/auth/local_key_gate_screen.dart)) — note: that local key is *saved* but is not actually wired into `OpenaiConnector`, which always uses `Env.apiKey`. Worth confirming whether this is intentional.
+OpenAI's chat.completions API, called via `dart_openai` (forked) in [services/tutor/openai_connector.dart](lib/services/tutor/openai_connector.dart). Both a non-streaming `sendRequest` and a streaming `sendRequestStream` (emitting `StreamTextDelta` / `StreamCompleted` / `StreamFailed` chunks) are exposed; the tutor service prefers streaming for student-facing turns and falls back to non-streaming for `status_summary` (which has no visible message). The connector also carries an opt-in `reasoning_effort` (currently hard-coded to `'low'`) for gpt-5 / o-series models. The model name comes from the Cosmos `config/global` doc (field `Model`), defaulting to `gpt-4o`. The API key is the build-time obfuscated `Env.apiKey`; per-user override via locally-stored OpenAI key in `SharedPreferences` (see [features/auth/local_key_gate_screen.dart](lib/features/auth/local_key_gate_screen.dart)) — note: that local key is *saved* but is not actually wired into `OpenaiConnector`, which always uses `Env.apiKey`. Worth confirming whether this is intentional.
 
-History is managed client-side (the connector passes `store: false`) with two parallel logs: `_allHistory` (across sessions) and `_sessionHistory` (current question chain). Each `sendRequest` chooses one of `includeAll | includeSession | newSession`.
+History is managed client-side with two parallel logs capped at 50 entries each: `_allHistory` (across sessions) and `_sessionHistory` (current question chain). Each `sendRequest` chooses one of `includeAll | includeSession | newSession`. `instructions` is passed as a system message on every call; the user-turn content is a JSON string built by `QuestionFormatter`.
+
+The model is required to wrap every reply in a `<TEXT>...</TEXT><META>{...}</META>` envelope (`<TEXT>` carries the student-facing markdown, `<META>` carries the typed JSON payload — type, options, quality, suspected_concepts, etc.). [EnvelopeAssembler](lib/services/tutor/responses/envelope_assembler.dart) parses this incrementally so the streaming path can flush visible text before `<META>` arrives. The legacy JSON-only output path is still supported as a fallback when an older model ignores the envelope contract (handled in [ai_response_parser.dart](lib/services/tutor/responses/ai_response_parser.dart)).
 
 ## 3. Project structure
 
@@ -74,7 +77,7 @@ lib/
 │   ├── answer_quality.dart      # wrong | partial | correct
 │   ├── cosmos_client.dart       # Hand-rolled Cosmos REST client + BatchOperation
 │   ├── cosmos_paths.dart        # Single source of truth for container handles
-│   ├── cosmos_doc_id.dart       # Composite id conventions ({uid}_{goalId}, …)
+│   ├── cosmos_doc_id.dart       # Composite id conventions ({uid}_{goalId}, progress_history ids, …)
 │   ├── cosmos_safety.dart       # safeCosmos / safeCosmosStream / pollingStream
 │   ├── update_info.dart         # In-app installer-update helpers
 │   └── debounce.dart            # Generic debounce util
@@ -90,21 +93,29 @@ lib/
 │   ├── goal/                    # Goal model, GoalsService, SubtreeBackup
 │   ├── instructions/            # Instruction (sections map) + InstructionsService
 │   ├── output/                  # OutputService + OutputController (binds widget)
-│   ├── progress/                # Progress model + ProgressService
+│   ├── progress/                # Progress model + ProgressService + helpers
+│   │   ├── progress.dart                # Per-(uid, goalId) row: progress, difficulty,
+│   │   │                                #   recentAnswers, lastSessionAt, recentConceptAttributions
+│   │   ├── progress_service.dart        # Reads/writes `progress` + best-effort `progress_history` samples
+│   │   ├── progress_sample.dart         # One row of `progress_history` (time series)
+│   │   ├── concept_attribution.dart     # AI-emitted suspected-concept tag w/ at + quality
+│   │   └── teacher_signals.dart         # Pure helpers: StudentStatus, isStruggling, rankConceptAttributions
 │   ├── role/role_service.dart   # Mirrors AuthService.currentUser.isTeacher
 │   ├── sound/sound_service.dart # Plays goal_reached/note/question/chime mp3s
 │   ├── splash/splash_service.dart # Goal-reached overlay state
 │   ├── status_report/           # StatusReport model + ReportService
 │   └── tutor/
-│       ├── tutor_service.dart           # Public API + request orchestration
-│       ├── conductor.dart               # Picks next question type, updates progress
-│       ├── openai_connector.dart        # OpenAI Responses-API client + history
-│       ├── instruction_generator.dart   # Assembles system prompt
+│       ├── tutor_service.dart           # Public API + request orchestration; streaming-first
+│       ├── conductor.dart               # Mastery-streak progression, warm-up, diagnostic, difficulty
+│       ├── openai_connector.dart        # chat.completions client (sync + streaming) + history
+│       ├── instruction_generator.dart   # Assembles system prompt + envelope contract
 │       ├── question_formatter.dart      # JSON-encodes user-turn payloads
 │       ├── env.dart / env.g.dart        # Envied-obfuscated OPEN_AI_API_KEY
 │       └── responses/                   # Typed AI-response models + dispatch
 │           ├── chat_response.dart       # Sealed-ish interface + factory by "type"
-│           ├── ai_response_parser.dart  # Pulls JSON map from Responses API output
+│           ├── ai_response_parser.dart  # Envelope-first parser, legacy-JSON fallback
+│           ├── envelope_assembler.dart  # Incremental <TEXT>/<META> parser for streaming
+│           ├── suspected_concepts.dart  # Shared parser for the optional META field
 │           ├── response_handlers.dart   # Per-type ResponseHandler + dispatchResponse()
 │           ├── answer.dart, hint.dart, code_feedback.dart, mcq_feedback.dart,
 │           │ explain_feedback.dart, socratic_feedback.dart, guiding_feedback.dart,
@@ -135,10 +146,16 @@ lib/
 │   │   ├── instructions_editor_page.dart   # + Markdown import/export via file_picker
 │   │   ├── doc_list.dart, doc_header.dart, sections_list.dart,
 │   │   │ section_header.dart, editor_pane.dart
-│   ├── progress/                       # Student: see all goals + progress bars
-│   │   ├── student_progress_list.dart
-│   │   └── goal_tile.dart
-│   └── account/accounts_page.dart      # Teacher: paginated table, toggle mayUseGlobalKey, delete profile
+│   ├── progress/                       # Student & teacher peek: all goals + progress bars
+│   │   ├── student_progress_list.dart  # Optional `uid` arg flips into read-only/teacher mode
+│   │   └── goal_tile.dart              # `readOnly` mode reveals difficulty + recentAnswers strip
+│   └── account/
+│       ├── accounts_page.dart          # Teacher: paginated table w/ status dot, drawer trigger
+│       └── detail/                     # Right-hand peek drawer for one student
+│           ├── student_detail_drawer.dart    # Drawer shell, streams progress/goals
+│           ├── student_status_summary.dart   # Status dot + "lijkt te haperen op …" line
+│           ├── status_reports_section.dart   # Per-subgoal AI status reports, collapsible
+│           └── progress_history_charts.dart  # Per-root-goal `fl_chart` line charts (30-day window)
 │
 └── widgets/                            # Reusable building blocks
     ├── multi_value_listenable_builder.dart  # Combine N ValueListenables in one builder
@@ -146,8 +163,7 @@ lib/
     ├── goal_splash_overlay.dart             # Full-screen splash on goal completion
     ├── add_input.dart, chips_editor.dart, inline_title.dart
 
-test/                                  # mocktail-based unit tests (~20 files)
-docs/                                  # Markdown specs (data, UX, security, roadmap, etc.)
+test/                                  # mocktail-based unit tests (conductor, tutor_service, progress, accounts, etc.)
 public/version.json                    # Update manifest hosted at ai-tutor-python.web.app
 firebase.json                          # Firebase Hosting config (no Firestore/Auth)
 distribute_options.yaml                # flutter_distributor windows-exe job
@@ -170,9 +186,18 @@ All Cosmos container handles funnel through [core/cosmos_paths.dart](lib/core/co
 - `createdAt: string` (ISO 8601), `updatedAt: string` (ISO 8601)
 
 **`progress`** — flattened from the old subcollection. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/progress/progress.dart](lib/services/progress/progress.dart).
-- `id: string`, `uid: string`, `goalID: string`
+- `id: string`, `uid: string`, `goalId: string`
 - `progress: double` (0.0–1.0)
-- `updatedAt: string`
+- `updatedAt: string`, `lastSessionAt: string` — both refreshed on every write
+- `difficulty: string` — last calibrated difficulty (`easy | medium | hard`); restored on subgoal resume
+- `recentAnswers: string[]` — rolling answer-quality window (length ≤ 5, oldest-first)
+- `recentConceptAttributions: object[]` — last ≤ 20 AI-emitted suspected-concept tags `{concept, at, quality}` (purely for teacher signals; nothing reads this in the student loop)
+
+**`progress_history`** — append-only time series. Doc id is an ISO-timestamp + random suffix from [CosmosDocId.progressHistory](lib/core/cosmos_doc_id.dart); partition key `uid`. Model: [services/progress/progress_sample.dart](lib/services/progress/progress_sample.dart). Written best-effort by `ProgressService.upsert` whenever the persisted progress value actually changes (so the root-goal recompute writes are skipped). Drives the per-root-goal line charts in the teacher detail drawer.
+- `id: string`, `uid: string`, `goalId: string`
+- `progress: double`, `difficulty: string`
+- `quality: string?` — optional `wrong | partial | correct`
+- `isWarmUp: bool`, `at: string` (ISO 8601)
 
 **`status_reports`** — flattened similarly. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/status_report/status_report.dart](lib/services/status_report/status_report.dart).
 - `id: string`, `uid: string`, `goalID: string`
@@ -233,18 +258,19 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 ### AI chat panel
 
 - [features/chat/chat_widget.dart](lib/features/chat/chat_widget.dart) hosts `flutter_chat_ui`'s `Chat`, bound to `ChatService.controller`. Composer swaps based on `TutorService.state` (`idle | working | hasFollowUp`) between the default composer, [composer_wait_widget.dart](lib/features/chat/composer_wait_widget.dart) (spinner), and [composer_continue_widget.dart](lib/features/chat/composer_continue_widget.dart) (Continue button). Student-typed messages route through `TutorService.handleStudentMessage(...)`.
+- Streaming render: in-flight tutor replies use a `TextStreamMessage` placeholder (`flyer_chat_text_stream_message`). [ChatService](lib/services/chat/chat_service.dart) exposes a `streamState` `ValueNotifier` that the message builder watches; `startStream` / `updateStream` / `completeStream` / `failStream` drive it. On completion the placeholder is swapped for a regular `TextMessage` (or removed if no visible text was emitted).
 
 ### Student progression / level system
 
-- Tile list view: [features/progress/student_progress_list.dart](lib/features/progress/student_progress_list.dart) + [features/progress/goal_tile.dart](lib/features/progress/goal_tile.dart).
-- Conductor logic: [services/tutor/conductor.dart](lib/services/tutor/conductor.dart) — picks question types by progress band (<0.2 guiding, <0.4 mc/explain, <0.7 complete/socratic, ≥0.7 write/socratic), avoids back-to-back repeats of the same type, applies an `AnswerQuality`-based delta scaled by question type & difficulty (with a hint-usage penalty), adapts difficulty over a 5-answer window, and recomputes the parent root's progress as the average of its children. Goal completion clears selection, advances to the next incomplete root/subgoal, fires sound + splash.
-- Per-user persistence: `progress` container via [services/progress/progress_service.dart](lib/services/progress/progress_service.dart). Each `ProgressService` write upserts the child progress, then re-reads sibling children to recompute and upsert root progress.
+- Tile list view: [features/progress/student_progress_list.dart](lib/features/progress/student_progress_list.dart) + [features/progress/goal_tile.dart](lib/features/progress/goal_tile.dart). Both accept an optional `uid`/`readOnly` to render the same widgets in the teacher detail drawer with action buttons hidden and per-subgoal teacher annotations (calibrated difficulty pill + colour-coded recent-answers dots) revealed.
+- Conductor logic: [services/tutor/conductor.dart](lib/services/tutor/conductor.dart) — runs three phases per subgoal: **guiding** (single `guidingQuestion` request whose `understanding` accumulates to ≥ 0.8 to advance), **warm-up** (1–3 questions on resumed sessions where progress ≥ 0.5; correct answers do *not* re-credit a streak the student already earned, but wrong/partial answers and difficulty adaptation behave normally), and **practice**. Practice picks a random `_practiceTypes` entry (excluding the previous one) and considers the subgoal mastered after a streak of 3 correct answers spanning ≥ 2 distinct question types. Mastery triggers a one-shot **diagnostic** `writeCodeQuestion` on the *next* subgoal — answering it correctly fast-forwards past that subgoal too. Difficulty adapts on a 5-answer window (4 correct + ≤ 1 hint → up; 3 wrong or 4 wrong+partial → down). Hint usage gates the upgrade. Persisted per-subgoal state (`difficulty`, `recentAnswers`, `lastSessionAt`, `recentConceptAttributions`) survives restarts and is restored in `_resetSubgoalState`. Concept attributions from feedback turns are filtered through `GoalsService.getKnownConceptsInScope` (current root + earlier roots' `knownConcepts`) before being persisted; out-of-scope tags are logged and dropped.
+- Per-user persistence: `progress` container via [services/progress/progress_service.dart](lib/services/progress/progress_service.dart). Each upsert that *changes* the persisted progress value also writes a `progress_history` sample (best-effort — failures are logged so the user-visible upsert isn't poisoned). Root-progress recomputes set `recordHistory: false` to avoid duplicating child trajectories.
 
 ### Teacher dashboard
 
 - Goal authoring: [features/goals/goals_page.dart](lib/features/goals/goals_page.dart) — three-pane layout (roots / children / editor) with drag-and-drop reparent and reorder ([dnd.dart](lib/features/goals/dnd.dart), [tree_utils.dart](lib/features/goals/tree_utils.dart)). Subtree backup/restore for safe deletes lives in [goals_service.dart](lib/services/goal/goals_service.dart) (`backupSubtree` / `deleteSubtree` / `restoreSubtree`); the data shape is captured in [services/goal/subtree_backup.dart](lib/services/goal/subtree_backup.dart). Reorder and subtree-delete use a Cosmos transactional batch since every doc shares the `/type = "goal"` partition.
 - AI-instruction authoring: [features/instructions/instructions_editor_page.dart](lib/features/instructions/instructions_editor_page.dart) — left pane lists `instructions/{docId}` documents, middle pane lists named sections, right pane is a markdown `CodeField` editor. Save persists the whole `sections` map back to Cosmos. The page also supports importing/exporting Markdown via `file_picker`.
-- Account admin: [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable`, search, toggle `mayUseGlobalKey`, delete account profile (does NOT delete the Entra user — that's a tenant-admin operation).
+- Account admin: [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable` with a status dot per student (active / idle / struggling, computed by [teacher_signals.dart](lib/services/progress/teacher_signals.dart)), search, toggle `mayUseGlobalKey`, delete account profile (does NOT delete the Entra user — that's a tenant-admin operation). Tapping a row opens [features/account/detail/student_detail_drawer.dart](lib/features/account/detail/student_detail_drawer.dart), an end-drawer that streams the student's progress docs, the read-only goal/progress list, the per-subgoal AI status reports, and 30 days of progress-history line charts (one chart per root goal via `fl_chart`, with the root's average overlaid on the children).
 
 ### Crash recovery & safe mode
 
@@ -265,8 +291,10 @@ Notable `ValueNotifier`s:
 - `RoleService.isTeacher` (mirrored from `AuthService`)
 - `GlobalConfigService.config` + `LocalApiKeyStorage.isKeyPresent`
 - `GoalsService.{selected,preferred}{Root,Child}Goal` and `editorSelectedRootGoal` / `editorSelectedGoal` — six notifiers tracking the active goal in different contexts
+- `GoalsService.cachedRoots` and `InstructionsService.cachedAll` — last polling-watcher snapshot for hot, latency-sensitive callers (the AI-request loop) so they don't await a Cosmos round-trip every turn
 - `ProgressService.currentProgress` (the active subgoal)
 - `TutorService.state` (`idle | working | hasFollowUp`)
+- `ChatService.streamState` (`StreamState` for the in-flight `TextStreamMessage`)
 - `SplashService.state` (goal-reached overlay payload)
 
 ### Cosmos REST + polling
@@ -292,28 +320,29 @@ Cosmos has a change feed but consuming it from a desktop client is awkward, so r
 
 1. Student answers a question via the chat composer.
 2. `ChatWidget.onMessageSend` → `TutorService.handleStudentMessage(text)` routes to the appropriate `ChatRequestType` based on `_currentExerciseType`.
-3. `TutorService.queryTutor(...)` builds an `input` JSON via `QuestionFormatter`, fetches instructions via `InstructionGenerator.generateInstructions(type)`, and calls `OpenaiConnector.sendRequest(...)`.
-4. The connector returns `ConnectorOk(output) | ConnectorFailure(error, stack, message)`. On failure the tutor surfaces a system message and may retry once (`_maybeRetry`).
-5. On success the response is parsed by `AIResponseParser.parse(...)` into a typed `ChatResponse`, then dispatched by `dispatchResponse(parsed, ctx)` ([services/tutor/responses/response_handlers.dart](lib/services/tutor/responses/response_handlers.dart)) to the matching `*Handler`. Each handler receives a `TutorContext` of small callbacks (`startNewCode`, `addTutorMessage`, `setExerciseType`, `setFollowUp`, `requestExercise`, `maybeRetry`) so the strategy code stays free of `DataService` knowledge.
-6. Feedback handlers (`CodeFeedbackHandler`, `McqFeedbackHandler`, `SocraticFeedbackHandler`, `ExplainFeedbackHandler`) call `Conductor.updateProgress(quality)`, which:
-   - Computes a delta scaled by question type, difficulty, and hint usage.
-   - `clamp`s to [0,1] and writes via `ProgressService.upsert(Progress(goalID, progress))` to the `progress` container.
-   - Re-reads sibling children and upserts the root's average progress.
-   - Probabilistically denies an otherwise-allowed follow-up (35 %) to keep variety.
-   - On crossing 1.0, plays the goal-reached splash + sound and advances to the next incomplete subgoal via `_setTargetGoal()`.
-7. `StatusSummary` responses route through `ReportService.updateForCurrentChildGoal(...)` and persist to the `status_reports` container.
+3. `TutorService.queryTutor(...)` builds an `input` JSON via `QuestionFormatter`, fetches instructions via `InstructionGenerator.generateInstructions(type)`, and picks the streaming or non-streaming connector path. Streamable types call `OpenaiConnector.sendRequestStream(...)`; `status_summary` (and any other type with `streamable: false`) goes through `sendRequest(...)`.
+4. **Streaming path:** `_runStream` opens the chunk stream, appends each `StreamTextDelta` to a buffer rendered via `ChatService.updateStream`, then on `StreamCompleted` calls `ChatService.completeStream` (which swaps the placeholder for a final `TextMessage`) and dispatches the parsed `ChatResponse`. The first `addTutorMessage` from a handler is suppressed in the streaming context because the prompt has already been shown via the stream. Transport / parse failures yield a `StreamFailed` chunk, surface as a system message, and retry once (`_maybeRetryStream`).
+5. **Non-streaming path:** the connector returns `ConnectorOk(output) | ConnectorFailure(error, stack, message)`; `AIResponseParser.parse(...)` handles both the envelope output (`<TEXT>...</TEXT><META>{...}</META>`) and legacy JSON-only output. On failure the tutor surfaces a system message and may retry once (`_maybeRetry`).
+6. Either way the parsed response is dispatched by `dispatchResponse(parsed, ctx)` ([services/tutor/responses/response_handlers.dart](lib/services/tutor/responses/response_handlers.dart)) to the matching `*Handler`. Each handler receives a `TutorContext` of small callbacks (`startNewCode`, `addTutorMessage`, `addSystemMessage`, `setExerciseType`, `setFollowUp`, `requestExercise`, `maybeRetry`) so the strategy code stays free of `DataService` knowledge.
+7. Feedback handlers (`CodeFeedbackHandler`, `McqFeedbackHandler`, `SocraticFeedbackHandler`, `ExplainFeedbackHandler`) call `Conductor.updateProgress(quality)` and then `Conductor.recordConceptAttributions(suspectedConcepts)`. The conductor:
+   - Updates the mastery streak (`+1` on correct, reset on wrong, no-op on partial), tracks the set of distinct question types in the streak, and adapts difficulty over a 5-answer window. Hint usage is reset on every answer.
+   - Mastery (streak ≥ 3 across ≥ 2 distinct types) writes `progress: 1.0`, recomputes the parent root, fires sound + splash, advances to the next incomplete subgoal, and arms a one-shot diagnostic `writeCodeQuestion` for that next subgoal. Otherwise it persists the current "display" progress (a function of the streak position).
+   - Filters AI-emitted suspected concepts against `getKnownConceptsInScope(rootGoal)` and appends accepted tags to `Progress.recentConceptAttributions` (window of 20).
+   - On warm-up, suppresses the positive streak bump for correct answers (the student already earned this last session) but still applies wrong/partial flow and difficulty adaptation.
+   - Returns whether a follow-up message is allowed; if no, the handler chains into `requestExercise` to pick the next exercise type.
+8. `ProgressService.upsert` writes the `progress` doc and, on actual change, also writes a `progress_history` sample tagged with `quality` and `isWarmUp`. `StatusSummary` responses route through `ReportService.updateForCurrentChildGoal(...)` and persist to the `status_reports` container.
 
 ### Teacher-authored AI instructions → runtime prompt
 
 1. Teacher edits `instructions/{docId}.sections{key: text}` in [InstructionsEditorPage](lib/features/instructions/instructions_editor_page.dart). Each `docId` is named after a `ChatRequestType` (e.g. `socraticQuestion`, `submitCode`); a special `alwaysInclude` doc holds shared instructions.
-2. On every tutor request, [InstructionGenerator.generateInstructions(type)](lib/services/tutor/instruction_generator.dart) loads all instruction docs once (`InstructionsService.getAll()`), finds the doc whose id matches the `ChatRequestType` name, concatenates its sections, then appends the `alwaysInclude` sections at the end.
+2. On every tutor request, [InstructionGenerator.generateInstructions(type)](lib/services/tutor/instruction_generator.dart) reads instruction docs from `InstructionsService.cachedAll` (the polling watcher's last snapshot, falling back to a Cosmos round-trip on cold start), finds the doc whose id matches the `ChatRequestType` name, concatenates its sections, then assembles the prompt as `envelopeContract + alwaysInclude + typeSpecific`. The order is deliberate: the envelope contract is identical on every request (best cache prefix), `alwaysInclude` is stable across types (second-best), and the type-specific block varies.
 3. Each section is run through `_replaceTags(...)` which substitutes `{goal}`, `{subgoal}`, `{suggestions}`, and `{known concepts}` (case-insensitive, whitespace-tolerant) using the currently selected (or preferred) root/child goal and the concepts from all earlier root goals (computed in `_getMasteredConcepts`).
-4. The assembled string is passed to `OpenaiConnector.sendRequest` as `instructions`. The user-turn payload is a JSON object built by [QuestionFormatter](lib/services/tutor/question_formatter.dart), e.g. `{"request_type":"socratic_question","difficulty":"medium"}`.
-5. The connector keeps two history lists (`_allHistory`, `_sessionHistory`) of `{role, content}` items and includes one of them per call based on `PreviousInputs.includeAll | includeSession | newSession`. `instructions` is re-sent on every call (Responses API does not retain it). `store: false` so OpenAI does not retain state server-side.
+4. The assembled string is sent to `OpenaiConnector` as the system message. The user-turn payload is a JSON object built by [QuestionFormatter](lib/services/tutor/question_formatter.dart), e.g. `{"request_type":"socratic_question","difficulty":"medium"}`.
+5. The connector keeps two history lists (`_allHistory`, `_sessionHistory`) of `{role, content}` items capped at 50 entries each, and includes one of them per call based on `PreviousInputs.includeAll | includeSession | newSession`. Instructions are re-sent on every call. The streaming path only records the user turn into history once the stream finalises successfully and the parsed response isn't an `ErrorResponse` — so a failed stream doesn't poison history.
 
 ## 7. Known limitations / TODOs / rough edges
 
-See [TODO.md](TODO.md) and [TESTING_PLAN.md](TESTING_PLAN.md) for the current planning docs. Notable rough edges visible in the code itself:
+See [TODO.md](TODO.md) for the current planning doc. The previous `docs/` folder of Markdown specs (data, UX, security, roadmap, etc.) was deleted in commit `29a21e6` — historical context lives in git only. Notable rough edges visible in the code itself:
 
 - **Cosmos auth is master-key.** [cosmos_client.dart](lib/core/cosmos_client.dart) already has an `AadTokenAuth` stub for the eventual swap to per-user AAD RBAC ("Step 3" in the comments); until then every authenticated student holds the database master key. The migration plan in [TODO.md](TODO.md) tracks this.
 - **No realtime listeners.** All cross-device updates rely on a 5 s `pollingStream` tick. Teacher-edits-while-student-is-active have a brief lag, and the polling cost on serverless RU/s billing is real but small at our scale.

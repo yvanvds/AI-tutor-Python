@@ -23,7 +23,9 @@
       "PowerShell(flutter test test/services/tutor/conductor_test.dart 2>&1)",
       "PowerShell(flutter analyze 2>&1)",
       "PowerShell(flutter test 2>&1)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(echo \"TODO.md exists: $?\")",
+      "Bash(echo \"TESTING_PLAN.md exists: $?\")"
     ]
   }
 }
