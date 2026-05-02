@@ -12,9 +12,11 @@ import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'version.dart';
 import 'features/dashboard/dashboard.dart';
+import 'features/dashboard/debug_dialog.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -102,6 +104,27 @@ class _HomeShellState extends State<HomeShell> {
             labelType: NavigationRailLabelType.selected,
             leading: const SizedBox(height: 8),
             destinations: destinations,
+            trailing: kDebugMode
+                ? Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: IconButton(
+                          tooltip: 'Debug',
+                          icon: const Icon(Icons.bug_report),
+                          color: Colors.purple,
+                          onPressed: () {
+                            showDialog<void>(
+                              context: context,
+                              builder: (_) => const DebugDialog(),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
           ),
           const VerticalDivider(width: 1),
           Expanded(child: page),

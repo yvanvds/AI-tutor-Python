@@ -12,6 +12,11 @@ class ChatService {
   final ValueNotifier<StreamState> streamState =
       ValueNotifier<StreamState>(const StreamStateLoading());
 
+  /// True while a multiple-choice options block is awaiting a tap. The chat
+  /// widget swaps to a wait composer in this state so students must click an
+  /// option rather than typing.
+  final ValueNotifier<bool> mcqPending = ValueNotifier<bool>(false);
+
   TextStreamMessage? _activeStream;
 
   void addMessage(String text) {
@@ -52,6 +57,7 @@ class ChatService {
         },
       ),
     );
+    mcqPending.value = true;
   }
 
   /// Mark an mcq-options message as answered so its buttons rebuild as
@@ -64,6 +70,7 @@ class ChatService {
         metadata: {...?message.metadata, 'selected': picked},
       ),
     );
+    mcqPending.value = false;
   }
 
   /// Start a streaming tutor message. Inserts a [TextStreamMessage] in the
@@ -127,11 +134,13 @@ class ChatService {
     _id = 0;
     _activeStream = null;
     streamState.value = const StreamStateLoading();
+    mcqPending.value = false;
     controller.setMessages([]);
   }
 
   void dispose() {
     streamState.dispose();
+    mcqPending.dispose();
     controller.dispose();
   }
 }

@@ -17,17 +17,18 @@ class McqOptionsWidget extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final option in options)
+          for (final option in options) ...[
             _OptionButton(
               label: option,
               isSelected: option == selected,
               isDisabled: answered,
               onTap: () => _onTap(option),
             ),
+            const SizedBox(height: 8),
+          ],
         ],
       ),
     );

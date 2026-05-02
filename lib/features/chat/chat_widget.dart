@@ -1,8 +1,10 @@
 import 'package:ai_tutor_python/features/chat/composer_continue_widget.dart';
+import 'package:ai_tutor_python/features/chat/composer_mcq_wait_widget.dart';
 import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
 import 'package:ai_tutor_python/features/chat/mcq_options_widget.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
@@ -34,9 +36,9 @@ class _TutorState extends State<ChatWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: DataService.tutor.state,
-      builder: (context, value, child) {
+    return MultiValueListenableBuilder(
+      listenables: [DataService.tutor.state, DataService.chat.mcqPending],
+      builder: (context, _) {
         return Column(
           children: [
             Expanded(
@@ -55,6 +57,8 @@ class _TutorState extends State<ChatWidget> {
                     } else if (DataService.tutor.state.value ==
                         TutorState.hasFollowUp) {
                       return const ComposerContinueWidget();
+                    } else if (DataService.chat.mcqPending.value) {
+                      return const ComposerMcqWaitWidget();
                     } else {
                       return const Composer();
                     }

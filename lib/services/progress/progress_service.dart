@@ -117,6 +117,38 @@ class ProgressService {
     );
   }
 
+  /// Debug-only wipe: removes every `progress` and `progress_history` doc
+  /// belonging to the signed-in user. Used by the debug dialog so a tester
+  /// can re-run the conductor from a clean slate without manually clearing
+  /// rows. Resets `currentProgress` to 0 so the UI reflects the wipe.
+  Future<void> deleteAllForCurrentUser() async {
+    final uid = _uid;
+    await safeCosmos(() async {
+      final progressDocs = await _container.query(
+        'SELECT c.id FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      for (final doc in progressDocs) {
+        final id = doc['id'] as String?;
+        if (id == null) continue;
+        await _container.delete(id, partitionKey: uid);
+      }
+
+      final historyDocs = await _historyContainer.query(
+        'SELECT c.id FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      for (final doc in historyDocs) {
+        final id = doc['id'] as String?;
+        if (id == null) continue;
+        await _historyContainer.delete(id, partitionKey: uid);
+      }
+    });
+    currentProgress.value = 0.0;
+  }
+
   // ---- teacher-scoped reads ----------------------------------------------
 
   /// Cross-partition read of every `progress` doc, grouped by uid. Used by
