@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "PowerShell(*)",
+      "Bash(*)",
       "Bash(cmake --version)",
       "Bash(flutter --version)",
       "Bash(flutter analyze *)",
@@ -49,6 +51,7 @@
     ],
     "additionalDirectories": [
       "C:\\Users\\yvan\\AppData\\Local\\Temp"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }
