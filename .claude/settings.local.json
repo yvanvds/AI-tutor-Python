@@ -27,7 +27,11 @@
       "Bash(echo \"TODO.md exists: $?\")",
       "Bash(echo \"TESTING_PLAN.md exists: $?\")",
       "Skill(schedule)",
-      "Skill(schedule:*)"
+      "Skill(schedule:*)",
+      "Bash(where gh *)",
+      "Bash(gh --version)",
+      "PowerShell($cmd = Get-Command gh -ErrorAction SilentlyContinue; if \\($cmd\\) { Write-Output \"Found: $\\($cmd.Source\\)\"; gh --version } else { Write-Output \"Not on PATH\" })",
+      "PowerShell($paths = @\\( \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\GitHub CLI\\\\gh.exe\" \\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Write-Output \"Found: $p\" } }; winget list --name \"GitHub CLI\" 2>&1 | Select-String -Pattern \"GitHub\" | Select-Object -First 5)"
     ]
   }
 }

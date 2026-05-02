@@ -180,7 +180,9 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> checkForUpdate() async {
-    final manifest = Uri.parse('https://ai-tutor-python.web.app/version.json');
+    final manifest = Uri.parse(
+      'https://yvanvds.github.io/AI-tutor-Python/version.json',
+    );
     final info = await fetchUpdateInfo(manifest);
     if (info == null) return;
 
