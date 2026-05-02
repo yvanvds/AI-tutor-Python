@@ -32,7 +32,7 @@ class OutputService {
     }
     _runSubs.clear();
 
-    lines.value = [];
+    lines.value = [const OutputLine('▶ Running…', isMeta: true)];
     isRunning.value = true;
 
     try {
