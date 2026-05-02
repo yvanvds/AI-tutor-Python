@@ -357,7 +357,7 @@ void main() {
 
   group('updateProgress — fast-forward diagnostic', () {
     test('after mastery, getNextQuestion returns a writeCodeQuestion at '
-        'medium for the new subgoal (the diagnostic)', () async {
+        'hard for the new subgoal (the diagnostic)', () async {
       selectedRoot.value = makeGoal('root-1');
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
@@ -388,7 +388,114 @@ void main() {
 
       final (type, difficulty) = c.getNextQuestion();
       expect(type, ChatRequestType.writeCodeQuestion);
-      expect(difficulty, QuestionDifficulty.medium);
+      expect(difficulty, QuestionDifficulty.hard);
+    });
+
+    test('diagnostic difficulty is hard even when the new subgoal has a '
+        'persisted easy/medium calibrated difficulty', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      when(() => goals.getRootGoalsOnce())
+          .thenAnswer((_) async => [makeGoal('root-1')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [makeGoal('child-1'), makeGoal('child-2')],
+      );
+      when(() => progress.getAll()).thenAnswer(
+        (_) async => [Progress(goalID: 'child-1', progress: 1.0)],
+      );
+      // child-2 carries a previously-calibrated `easy` difficulty.
+      when(() => progress.getByGoalId('child-2')).thenAnswer(
+        (_) async => Progress(
+          goalID: 'child-2',
+          progress: 0.0,
+          difficulty: QuestionDifficulty.easy,
+        ),
+      );
+
+      final c = Conductor();
+      await completeGuiding(c);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+
+      expect(selectedChild.value?.id, 'child-2');
+
+      final (type, difficulty) = c.getNextQuestion();
+      expect(type, ChatRequestType.writeCodeQuestion);
+      // Forced to hard regardless of the persisted easy calibration.
+      expect(difficulty, QuestionDifficulty.hard);
+    });
+
+    test('correct diagnostic does NOT chain another diagnostic on the '
+        'subgoal after — N+2 starts in the normal practice/guiding flow at '
+        'its own restored difficulty', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      when(() => goals.getRootGoalsOnce())
+          .thenAnswer((_) async => [makeGoal('root-1')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [
+          makeGoal('child-1'),
+          makeGoal('child-2'),
+          makeGoal('child-3'),
+        ],
+      );
+      // Track which children are mastered as the test progresses; this
+      // determines which subgoal `_setTargetGoal` picks next.
+      final mastered = <String>{};
+      when(() => progress.getAll()).thenAnswer(
+        (_) async => mastered
+            .map((id) => Progress(goalID: id, progress: 1.0))
+            .toList(),
+      );
+      when(() => progress.upsert(any<Progress>(), quality: any(named: 'quality'), isWarmUp: any(named: 'isWarmUp'), recordHistory: any(named: 'recordHistory'))).thenAnswer((inv) async {
+        final p = inv.positionalArguments.first as Progress;
+        if (p.progress >= 1.0) mastered.add(p.goalID);
+      });
+      // child-3 has a persisted medium calibration that must survive the
+      // diagnostic on child-2 untouched, and must be the difficulty of the
+      // first (non-diagnostic) practice question on child-3.
+      when(() => progress.getByGoalId('child-3')).thenAnswer(
+        (_) async => Progress(
+          goalID: 'child-3',
+          progress: 0.0,
+          difficulty: QuestionDifficulty.medium,
+        ),
+      );
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      // Practice-master child-1 → arms a diagnostic on child-2.
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      expect(selectedChild.value?.id, 'child-2');
+
+      // Diagnostic on child-2 — pull and answer correctly.
+      final (diag, diagDiff) = c.getNextQuestion();
+      expect(diag, ChatRequestType.writeCodeQuestion);
+      expect(diagDiff, QuestionDifficulty.hard);
+      await c.updateProgress(AnswerQuality.correct);
+
+      // child-2 is fast-forwarded; child-3 is now active.
+      expect(selectedChild.value?.id, 'child-3');
+
+      // The CORE bug fix: child-3's first exercise must be a normal
+      // guiding/practice exercise, NOT another diagnostic. Diagnostics may
+      // only be armed by practice-phase mastery.
+      final (next, nextDiff) = c.getNextQuestion();
+      expect(next, isNot(ChatRequestType.writeCodeQuestion),
+          reason: 'child-3 should not have a diagnostic armed');
+      // Fresh subgoal → guiding phase first; difficulty is easy until
+      // calibrated again. (If guiding is skipped because of resume state,
+      // it would still be a normal practice type, not the diagnostic.)
+      expect(next, ChatRequestType.guidingQuestion);
+      expect(nextDiff, QuestionDifficulty.easy);
     });
 
     test('correct diagnostic answer fast-forwards: marks the new subgoal '

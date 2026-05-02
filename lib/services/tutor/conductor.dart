@@ -81,8 +81,11 @@ class Conductor {
   int _hintsUsed = 0;
   ChatRequestType? _currentQuestionType;
 
-  // Set after mastering subgoal X to issue one diagnostic on subgoal Y. If
-  // the student nails it, Y is also marked mastered (fast-forward).
+  // Set after PRACTICE mastery on subgoal X to issue one diagnostic on
+  // subgoal Y. If the student nails it, Y is also marked mastered
+  // (fast-forward) but the diagnostic is NOT re-armed for subgoal Z —
+  // only practice mastery arms a diagnostic, otherwise a single correct
+  // answer would chain through the curriculum.
   bool _diagnosingNext = false;
 
   /// Whether the conductor is currently running warm-up questions. Exposed
@@ -185,8 +188,12 @@ class Conductor {
         DataService.goals.preferredChildGoal.value == null) {
       result = (ChatRequestType.noResult, _difficulty);
     } else if (_diagnosingNext) {
+      // Diagnostic is always at hard, regardless of `_difficulty` (the
+      // calibrated difficulty for the new subgoal). The calibrated value
+      // is left untouched so a wrong/partial diagnostic doesn't bias
+      // future practice on this subgoal.
       _currentQuestionType = ChatRequestType.writeCodeQuestion;
-      result = (_currentQuestionType!, QuestionDifficulty.medium);
+      result = (_currentQuestionType!, QuestionDifficulty.hard);
     } else if (!_guidingDone) {
       _currentQuestionType = ChatRequestType.guidingQuestion;
       result = (_currentQuestionType!, QuestionDifficulty.easy);
@@ -288,7 +295,12 @@ class Conductor {
     );
 
     if (mastered) {
-      await _markMasteredAndAdvance(quality: quality, isWarmUp: inWarmup);
+      // Practice mastery: arm a diagnostic for the next subgoal.
+      await _markMasteredAndAdvance(
+        quality: quality,
+        isWarmUp: inWarmup,
+        armDiagnostic: true,
+      );
       return false;
     }
 
@@ -304,7 +316,15 @@ class Conductor {
       DataService.chat.addSystemMessage(
         'Diagnostisch antwoord goed — dit subdoel wordt overgeslagen.',
       );
-      await _markMasteredAndAdvance(quality: quality, isWarmUp: false);
+      // Diagnostic mastery: fast-forward past this subgoal but DO NOT
+      // arm another diagnostic on the next subgoal — only practice
+      // mastery is allowed to do that, otherwise a single correct
+      // diagnostic answer would chain across subgoals indefinitely.
+      await _markMasteredAndAdvance(
+        quality: quality,
+        isWarmUp: false,
+        armDiagnostic: false,
+      );
     } else {
       DataService.chat.addSystemMessage('We pakken dit subdoel rustig op.');
     }
@@ -318,12 +338,14 @@ class Conductor {
   Future<void> _markMasteredAndAdvance({
     AnswerQuality? quality,
     bool isWarmUp = false,
+    required bool armDiagnostic,
   }) async {
     final goal = _activeChildGoal;
     DataService.debug.recordEvent('conductor.mastered_and_advanced', {
       'goalId': goal?.id,
       'quality': quality?.name,
       'isWarmup': isWarmUp,
+      'armDiagnostic': armDiagnostic,
     });
     if (goal != null) {
       await DataService.progress.upsert(
@@ -341,7 +363,7 @@ class Conductor {
       await _recomputeRoot();
     }
     await _handleGoalCompletion();
-    if (_activeChildGoal != null) {
+    if (_activeChildGoal != null && armDiagnostic) {
       _diagnosingNext = true;
     }
   }
