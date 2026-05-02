@@ -865,14 +865,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
-  py_engine_desktop:
-    dependency: "direct main"
-    description:
-      name: py_engine_desktop
-      sha256: d3cf8063f0b0b47132a79710b1578a25833130f81909c4ea095c0ec3a1d25172
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.0"
   py_runner:
     dependency: "direct main"
     description:

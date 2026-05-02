@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  py_engine_desktop: ^1.1.0
   py_runner:
     path: packages/py_runner
   multi_split_view: ^3.6.1
