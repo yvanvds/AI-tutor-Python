@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 
 const String _accountsContainer = 'accounts';
 const String _progressContainer = 'progress';
+const String _progressHistoryContainer = 'progress_history';
 const String _statusReportsContainer = 'status_reports';
 const String _goalsContainer = 'goals';
 const String _instructionsContainer = 'instructions';
@@ -27,6 +28,11 @@ class CosmosPaths {
   /// `/uid` partition. Doc id `${uid}_${goalId}`. Flattened from the old
   /// `accounts/{uid}/progress/{goalId}` subcollection.
   static CosmosContainer progress() => _client.container(_progressContainer);
+
+  /// `/uid` partition. One doc per progress sample, time-ordered. Time
+  /// series for the teacher detail panel; not read in the student flow.
+  static CosmosContainer progressHistory() =>
+      _client.container(_progressHistoryContainer);
 
   /// `/uid` partition. Doc id `${uid}_${goalId}`. Flattened from the old
   /// `accounts/{uid}/status_reports/{goalId}` subcollection.

@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/suspected_concepts.dart';
 
 class SocraticFeedback implements ChatResponse {
   @override
@@ -7,12 +8,14 @@ class SocraticFeedback implements ChatResponse {
   final AnswerQuality quality;
   final String prompt;
   final String? followUp;
+  final List<String>? suspectedConcepts;
 
   SocraticFeedback({
     required this.type,
     required this.quality,
     required this.prompt,
     this.followUp,
+    this.suspectedConcepts,
   });
 
   factory SocraticFeedback.fromMap(Map<String, dynamic> map) {
@@ -21,6 +24,7 @@ class SocraticFeedback implements ChatResponse {
       quality: _stringToQuality(map['quality']),
       prompt: map['prompt'] ?? '',
       followUp: map['follow up'] ?? map['follow_up'],
+      suspectedConcepts: parseSuspectedConcepts(map['suspected_concepts']),
     );
   }
 
@@ -30,6 +34,7 @@ class SocraticFeedback implements ChatResponse {
     'quality': quality.name,
     'prompt': prompt,
     if (followUp != null) 'follow up': followUp,
+    if (suspectedConcepts != null) 'suspected_concepts': suspectedConcepts,
   };
 
   static AnswerQuality _stringToQuality(String? value) {

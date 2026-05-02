@@ -5,8 +5,10 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/progress/concept_attribution.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 
 class Conductor {
   Conductor();
@@ -19,6 +21,25 @@ class Conductor {
   // session can detect prior progress and skip guiding.
   static const double _guidingDoneMarker = 0.05;
 
+  /// A "new session" for a subgoal starts when the persisted lastSessionAt
+  /// is null or older than this. Bump this down (e.g. to 1 minute) when
+  /// manually testing the warm-up flow, then restore.
+  static const Duration sessionResumeThreshold = Duration(minutes: 1);
+
+  /// When the gap to lastSessionAt exceeds this, the warm-up gets +1
+  /// question on top of the success-ratio derived count.
+  static const Duration staleSessionThreshold = Duration(days: 14);
+
+  static const int _maxWarmupQuestions = 3;
+
+  /// Short Dutch system messages emitted before the first warm-up question
+  /// of a session. Public so tests can match them.
+  static const List<String> warmupGreetings = [
+    'Welkom terug! Laten we even kijken of dit nog vlot zit.',
+    'Hé, daar ben je weer. Eerst even kort opfrissen.',
+    'Even een korte herhaling om in te komen.',
+  ];
+
   static const List<ChatRequestType> _practiceTypes = [
     ChatRequestType.mcQuestion,
     ChatRequestType.explainCodeQuestion,
@@ -29,21 +50,44 @@ class Conductor {
 
   final _rand = Random();
 
-  // Per-subgoal state — reset whenever the active subgoal changes.
+  // Per-subgoal state — reset (and reseeded from persisted progress) whenever
+  // the active subgoal changes. `_difficulty` and `_answerHistory` live on
+  // the (uid, goalId) progress doc so they survive app restarts.
   bool _guidingDone = false;
   double _guidingConfidence = 0.0;
   int _correctStreak = 0;
   final Set<ChatRequestType> _typesInStreak = {};
+  QuestionDifficulty _difficulty = QuestionDifficulty.easy;
+  final List<AnswerQuality> _answerHistory = [];
+
+  // AI-emitted suspected-concept attributions for the active subgoal,
+  // oldest-first. Reseeded from persisted progress on subgoal change and
+  // appended to in `recordConceptAttributions`. Trimmed on write.
+  final List<ConceptAttribution> _attributions = [];
+
+  // Quality of the most recent answer routed through `updateProgress`. The
+  // feedback handlers always call `recordConceptAttributions` immediately
+  // after `updateProgress`, so this field captures the quality to attach to
+  // the attribution entries from the same turn.
+  AnswerQuality? _lastQuality;
+
+  // Countdown of warm-up questions left for the active subgoal. While > 0,
+  // correct answers do not advance progress (the student already earned it
+  // last session) but wrong/partial answers and difficulty adaptation
+  // behave as in normal practice.
+  int _warmupRemaining = 0;
 
   // Cross-subgoal state — survives advancement.
-  QuestionDifficulty _difficulty = QuestionDifficulty.easy;
   int _hintsUsed = 0;
-  final List<AnswerQuality> _answerHistory = [];
   ChatRequestType? _currentQuestionType;
 
   // Set after mastering subgoal X to issue one diagnostic on subgoal Y. If
   // the student nails it, Y is also marked mastered (fast-forward).
   bool _diagnosingNext = false;
+
+  /// Whether the conductor is currently running warm-up questions. Exposed
+  /// for tests; production code shouldn't need to read this.
+  bool get isInWarmup => _warmupRemaining > 0;
 
   // ---- Lifecycle ----------------------------------------------------------
 
@@ -51,21 +95,81 @@ class Conductor {
     if (DataService.goals.preferredChildGoal.value == null) {
       await _setTargetGoal();
     }
-    final persisted = await _getCurrentProgress();
-    _resetSubgoalState(persistedProgress: persisted);
+    final persisted = await _getActiveProgress();
+    _resetSubgoalState(persisted: persisted);
   }
 
-  /// Resets per-subgoal state. Recovers `_guidingDone` and `_correctStreak`
-  /// from [persistedProgress] so a resumed session doesn't visually rewind.
-  void _resetSubgoalState({double persistedProgress = 0.0}) {
-    _guidingDone = persistedProgress > 0.0;
+  /// Resets per-subgoal state. Recovers streak position, calibrated
+  /// difficulty, and recent-answer window from [persisted] so a resumed
+  /// session doesn't visually rewind or lose calibration. Also evaluates
+  /// whether to start a warm-up for the new subgoal.
+  void _resetSubgoalState({Progress? persisted}) {
+    final pct = persisted?.progress ?? 0.0;
+    _guidingDone = pct > 0.0;
     _guidingConfidence = 0.0;
-    _correctStreak = (persistedProgress * _streakNeeded)
-        .round()
-        .clamp(0, _streakNeeded - 1);
+    _correctStreak = (pct * _streakNeeded).round().clamp(0, _streakNeeded - 1);
     _typesInStreak.clear();
     _currentQuestionType = null;
     _diagnosingNext = false;
+    _difficulty = persisted?.difficulty ?? QuestionDifficulty.easy;
+    _answerHistory
+      ..clear()
+      ..addAll(persisted?.recentAnswers ?? const []);
+    _attributions
+      ..clear()
+      ..addAll(persisted?.recentConceptAttributions ?? const []);
+    _lastQuality = null;
+    _warmupRemaining = _computeWarmupCount(persisted);
+    if (_warmupRemaining > 0) {
+      DataService.chat.addSystemMessage(
+        warmupGreetings[_rand.nextInt(warmupGreetings.length)],
+      );
+    }
+  }
+
+  int _computeWarmupCount(Progress? persisted) {
+    if (persisted == null) return 0;
+    if (persisted.progress < 0.5) return 0;
+
+    final last = persisted.lastSessionAt;
+    final now = DateTime.now().toUtc();
+    if (last != null && now.difference(last) <= sessionResumeThreshold) {
+      return 0;
+    }
+
+    final history = persisted.recentAnswers;
+    int count;
+    if (history.length < 2) {
+      count = 1;
+    } else {
+      var score = 0.0;
+      for (final q in history) {
+        switch (q) {
+          case AnswerQuality.correct:
+            score += 1.0;
+          case AnswerQuality.partial:
+            score += 0.5;
+          case AnswerQuality.wrong:
+            break;
+        }
+      }
+      final ratio = score / history.length;
+      if (ratio >= 0.8) {
+        count = 1;
+      } else if (ratio >= 0.5) {
+        count = 2;
+      } else {
+        count = 3;
+      }
+    }
+
+    if (last != null && now.difference(last) > staleSessionThreshold) {
+      count += 1;
+    }
+    if (count > _maxWarmupQuestions) {
+      count = _maxWarmupQuestions;
+    }
+    return count;
   }
 
   // ---- Question selection -------------------------------------------------
@@ -118,6 +222,7 @@ class Conductor {
   /// Records [quality] and returns whether a follow-up message should be
   /// shown (instead of immediately advancing to a new exercise).
   Future<bool> updateProgress(AnswerQuality quality) async {
+    _lastQuality = quality;
     if (quality == AnswerQuality.correct) {
       DataService.sound.correctAnswer();
     }
@@ -126,8 +231,20 @@ class Conductor {
       return _handleDiagnosticAnswer(quality);
     }
 
+    // Warm-up: a correct answer is a recheck — the student already earned
+    // this ground last session, so suppress the positive streak bump.
+    // Wrong/partial flow through normally so the existing negative delta
+    // and difficulty adaptation still apply.
+    final inWarmup = _warmupRemaining > 0;
+    final suppressPositive = inWarmup && quality == AnswerQuality.correct;
+    if (inWarmup) {
+      _warmupRemaining -= 1;
+    }
+
     final from = _displayProgress();
-    _adaptStreak(quality);
+    if (!suppressPositive) {
+      _adaptStreak(quality);
+    }
     _adaptDifficulty(quality);
     _hintsUsed = 0;
     final to = _displayProgress();
@@ -137,11 +254,11 @@ class Conductor {
     );
 
     if (_isMastered()) {
-      await _markMasteredAndAdvance();
+      await _markMasteredAndAdvance(quality: quality, isWarmUp: inWarmup);
       return false;
     }
 
-    await _persistDisplayProgress();
+    await _persistDisplayProgress(quality: quality, isWarmUp: inWarmup);
     return _allowFollowUp(quality);
   }
 
@@ -153,11 +270,9 @@ class Conductor {
       DataService.chat.addSystemMessage(
         'Diagnostisch antwoord goed — dit subdoel wordt overgeslagen.',
       );
-      await _markMasteredAndAdvance();
+      await _markMasteredAndAdvance(quality: quality, isWarmUp: false);
     } else {
-      DataService.chat.addSystemMessage(
-        'We pakken dit subdoel rustig op.',
-      );
+      DataService.chat.addSystemMessage('We pakken dit subdoel rustig op.');
     }
     return false;
   }
@@ -166,11 +281,22 @@ class Conductor {
       _correctStreak >= _streakNeeded &&
       _typesInStreak.length >= _distinctTypesNeeded;
 
-  Future<void> _markMasteredAndAdvance() async {
+  Future<void> _markMasteredAndAdvance({
+    AnswerQuality? quality,
+    bool isWarmUp = false,
+  }) async {
     final goal = _activeChildGoal;
     if (goal != null) {
       await DataService.progress.upsert(
-        Progress(goalID: goal.id, progress: 1.0),
+        Progress(
+          goalID: goal.id,
+          progress: 1.0,
+          difficulty: _difficulty,
+          recentAnswers: List.unmodifiable(_answerHistory),
+          recentConceptAttributions: List.unmodifiable(_attributions),
+        ),
+        quality: quality,
+        isWarmUp: isWarmUp,
       );
       DataService.progress.currentProgress.value = 1.0;
       await _recomputeRoot();
@@ -226,11 +352,9 @@ class Conductor {
         ? List<AnswerQuality>.from(_answerHistory)
         : _answerHistory.sublist(_answerHistory.length - window);
 
-    final correctCount =
-        recent.where((q) => q == AnswerQuality.correct).length;
+    final correctCount = recent.where((q) => q == AnswerQuality.correct).length;
     final wrongCount = recent.where((q) => q == AnswerQuality.wrong).length;
-    final partialCount =
-        recent.where((q) => q == AnswerQuality.partial).length;
+    final partialCount = recent.where((q) => q == AnswerQuality.partial).length;
 
     if (correctCount >= 4 &&
         _difficulty != QuestionDifficulty.hard &&
@@ -268,8 +392,8 @@ class Conductor {
       DataService.goals.preferredRootGoal.value = null;
     }
     await _setTargetGoal();
-    final persisted = await _getCurrentProgress();
-    _resetSubgoalState(persistedProgress: persisted);
+    final persisted = await _getActiveProgress();
+    _resetSubgoalState(persisted: persisted);
   }
 
   Future<bool> _setTargetGoal() async {
@@ -287,8 +411,9 @@ class Conductor {
     for (final root in roots) {
       if (progressFor(root) < 1.0) {
         final subgoals = await DataService.goals.getChildrenOnce(root.id);
-        final targetChild =
-            subgoals.firstWhereOrNull((g) => progressFor(g) < 1.0);
+        final targetChild = subgoals.firstWhereOrNull(
+          (g) => progressFor(g) < 1.0,
+        );
 
         if (targetChild != null) {
           DataService.goals.selectedRootGoal.value = root;
@@ -311,27 +436,93 @@ class Conductor {
       DataService.goals.preferredChildGoal.value ??
       DataService.goals.selectedChildGoal.value;
 
-  Future<double> _getCurrentProgress() async {
+  Future<Progress?> _getActiveProgress() async {
     final goal = _activeChildGoal;
-    if (goal == null) return 0.0;
-    final p = await DataService.progress.getByGoalId(goal.id);
-    return p?.progress ?? 0.0;
+    if (goal == null) return null;
+    return DataService.progress.getByGoalId(goal.id);
   }
 
-  Future<void> _persistDisplayProgress() async {
+  Future<void> _persistDisplayProgress({
+    AnswerQuality? quality,
+    bool isWarmUp = false,
+  }) async {
     final goal = _activeChildGoal;
     if (goal == null) return;
     final pct = _displayProgress();
     await DataService.progress.upsert(
-      Progress(goalID: goal.id, progress: pct),
+      Progress(
+        goalID: goal.id,
+        progress: pct,
+        difficulty: _difficulty,
+        recentAnswers: List.unmodifiable(_answerHistory),
+        recentConceptAttributions: List.unmodifiable(_attributions),
+      ),
+      quality: quality,
+      isWarmUp: isWarmUp,
     );
     DataService.progress.currentProgress.value = pct;
     await _recomputeRoot();
   }
 
+  // ---- Concept attribution -----------------------------------------------
+
+  /// Append AI-emitted suspected-concept tags from the most recent feedback
+  /// turn to the active subgoal's [Progress.recentConceptAttributions].
+  /// Tags not in the validation set (current root + earlier roots'
+  /// `knownConcepts`) are dropped — we log them so drift stays visible in
+  /// dev. No-ops on null/empty input. The list is trimmed on write.
+  Future<void> recordConceptAttributions(List<String>? concepts) async {
+    if (concepts == null || concepts.isEmpty) return;
+
+    final goal = _activeChildGoal;
+    if (goal == null) return;
+
+    final rootGoal = DataService.goals.preferredRootGoal.value ??
+        DataService.goals.selectedRootGoal.value;
+    final allowed = rootGoal == null
+        ? const <String>[]
+        : await DataService.goals.getKnownConceptsInScope(rootGoal);
+    final allowedSet = allowed.toSet();
+
+    final accepted = <String>[];
+    final dropped = <String>[];
+    for (final raw in concepts) {
+      final tag = raw.trim();
+      if (tag.isEmpty) continue;
+      if (allowedSet.contains(tag)) {
+        accepted.add(tag);
+      } else {
+        dropped.add(tag);
+      }
+    }
+    if (dropped.isNotEmpty) {
+      debugPrint(
+        'Conductor: dropped suspected_concepts not in scope: $dropped',
+      );
+    }
+    if (accepted.isEmpty) return;
+
+    final now = DateTime.now().toUtc();
+    final quality = _lastQuality ?? AnswerQuality.wrong;
+    for (final tag in accepted) {
+      _attributions.add(
+        ConceptAttribution(concept: tag, at: now, quality: quality),
+      );
+    }
+    if (_attributions.length > Progress.recentConceptAttributionsWindow) {
+      _attributions.removeRange(
+        0,
+        _attributions.length - Progress.recentConceptAttributionsWindow,
+      );
+    }
+
+    await _persistDisplayProgress();
+  }
+
   Future<void> _recomputeRoot() async {
     if (DataService.goals.selectedRootGoal.value == null) return;
-    final root = DataService.goals.preferredRootGoal.value ??
+    final root =
+        DataService.goals.preferredRootGoal.value ??
         DataService.goals.selectedRootGoal.value;
     if (root == null) return;
     final children = await DataService.goals.getChildrenOnce(root.id);
@@ -343,6 +534,7 @@ class Conductor {
     }
     await DataService.progress.upsert(
       Progress(goalID: root.id, progress: sum / children.length),
+      recordHistory: false,
     );
   }
 }

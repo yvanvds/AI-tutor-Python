@@ -4,14 +4,25 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:flutter/material.dart';
 
-/// Displays all goals & subgoals for the current student.
+/// Displays all goals & subgoals for a student.
 ///
 /// - Roots: parentId == null
 /// - Subgoals: indented below their parent
 /// - Each row: title, description, LinearProgressIndicator
-/// - Subgoals only: “Work on this” button (callback provided by parent)
+/// - Subgoals only: "Work on this" button (callback provided by parent)
+///
+/// When [uid] is null the list is for the signed-in student and the action
+/// buttons on subgoals are wired to the conductor. When [uid] is provided
+/// the list is for *that* student (teacher-side detail drawer): the same
+/// per-uid `Progress` is read but every action is suppressed and the
+/// per-subgoal teacher annotations (recent-answers strip, persisted
+/// difficulty label) are revealed.
 class StudentProgressList extends StatelessWidget {
-  const StudentProgressList({super.key});
+  const StudentProgressList({super.key, this.uid});
+
+  final String? uid;
+
+  bool get _readOnly => uid != null;
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +44,20 @@ class StudentProgressList extends StatelessWidget {
         }
 
         return StreamBuilder<List<Progress>>(
-          stream: DataService.progress.watchAll(),
+          stream: _progressStream(),
           builder: (context, progressSnap) =>
               _buildProgressList(goals, progressSnap.data ?? const []),
         );
       },
     );
+  }
+
+  Stream<List<Progress>> _progressStream() {
+    final pinned = uid;
+    if (pinned == null) {
+      return DataService.progress.watchAll();
+    }
+    return DataService.progress.watchProgressForUser(pinned);
   }
 
   Widget _buildProgressList(List<Goal> goals, List<Progress> progressList) {
@@ -81,14 +100,17 @@ class StudentProgressList extends StatelessWidget {
     required int depth,
   }) {
     final widgets = <Widget>[];
+    final progressDoc = progressById[goal.id];
 
     widgets.add(
       GoalTile(
         goal: goal,
-        progress: progressById[goal.id]?.progress ?? 0.0,
+        progress: progressDoc?.progress ?? 0.0,
         depth: depth,
         isSubgoal: goal.parentId != null,
         rootGoal: rootGoal,
+        readOnly: _readOnly,
+        progressDoc: progressDoc,
       ),
     );
 

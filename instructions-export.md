@@ -100,6 +100,10 @@ Task: evaluate the student's explanation of a code snippet and guide understandi
 
 { suggestions }
 
+### MASTERED KNOWLEDGE
+
+{ known concepts }
+
 ## 02 Output Format
 
 ### TEXT section
@@ -111,10 +115,12 @@ The brief why-correct / what's-missing message (the value that would have gone i
 {
   "type": "explain_feedback",
   "quality": "wrong | partial | correct",
-  "followUp": "optional new question or prompt to clarify thinking"
+  "followUp": "optional new question or prompt to clarify thinking",
+  "suspected_concepts": ["optional", "tags"]
 }
 
 Omit the "followUp" key entirely if there is no follow-up.
+Omit the "suspected_concepts" key entirely if no prior concept is suspected.
 
 ## 03 Rules
 
@@ -128,6 +134,7 @@ Mark as correct if the concept is understood; only wrong if the idea is wrong.
 Never reveal full solution.
 Stay within current subgoal.
 Keep one clear step at a time.
+If the student's mistake appears to stem from a previously-learned concept rather than the current subgoal, list one or more concept tags in `suspected_concepts`. Use only tags from this list: { known concepts }. Omit the field entirely if the mistake is on the current subgoal itself or you're not confident.
 
 # explainCodeQuestion
 
@@ -334,6 +341,9 @@ Focus on understanding.
 ### TEACHING TIPS
 { suggestions }
 
+### MASTERED KNOWLEDGE
+{ known concepts }
+
 ## 03 Output
 
 ### TEXT section
@@ -344,8 +354,11 @@ Why the choice is correct or not.
 
 {
   "type": "mcq_feedback",
-  "quality": "wrong | partial | correct"
+  "quality": "wrong | partial | correct",
+  "suspected_concepts": ["optional", "tags"]
 }
+
+Omit the "suspected_concepts" key entirely if no prior concept is suspected.
 
 ## 04 Rules
 
@@ -356,6 +369,7 @@ If incorrect: identify the misconception; give a nudge, not the full solution.
 Keep tone friendly and instructional.
 Stay within the current subgoal.
 Assess answer quality: wrong, partially ok, or correct.
+If the student's mistake appears to stem from a previously-learned concept rather than the current subgoal, list one or more concept tags in `suspected_concepts`. Use only tags from this list: { known concepts }. Omit the field entirely if the mistake is on the current subgoal itself or you're not confident.
 
 # mcQuestion
 
@@ -497,6 +511,10 @@ Goal: deepen understanding without giving full solution.
 
 { suggestions }
 
+### MASTERED KNOWLEDGE
+
+{ known concepts }
+
 ## 03 Output Format
 
 ### TEXT section
@@ -508,10 +526,12 @@ Brief why-correct / what's-missing.
 {
   "type": "socratic_feedback",
   "quality": "wrong | partial | correct",
-  "follow_up": "in case we still can improve understanding"
+  "follow_up": "in case we still can improve understanding",
+  "suspected_concepts": ["optional", "tags"]
 }
 
 Omit the "follow_up" key entirely if there is no follow-up.
+Omit the "suspected_concepts" key entirely if no prior concept is suspected.
 
 ## 04 Rules
 
@@ -524,6 +544,7 @@ Follow current subgoal; keep one clear step at a time.
 Be lenient with minor slips (typos, off-by-one values, harmless format changes).
 Mark as correct if the concept is understood; only wrong if the idea is wrong.
 Assess answer quality: wrong, partially ok, or correct.
+If the student's mistake appears to stem from a previously-learned concept rather than the current subgoal, list one or more concept tags in `suspected_concepts`. Use only tags from this list: { known concepts }. Omit the field entirely if the mistake is on the current subgoal itself or you're not confident.
 
 # socraticQuestion
 
@@ -709,6 +730,9 @@ Encourage understanding, not just fixing syntax.
 ### TEACHING TIPS
 { suggestions }
 
+### MASTERED KNOWLEDGE
+{ known concepts }
+
 ## 03 Output
 
 ### TEXT section
@@ -720,8 +744,11 @@ Brief explanation of correctness or errors.
 {
   "type": "code_feedback",
   "quality": "wrong | partial | correct",
-  "suggestion": "next step to improve or think about"
+  "suggestion": "next step to improve or think about",
+  "suspected_concepts": ["optional", "tags"]
 }
+
+Omit the "suspected_concepts" key entirely if no prior concept is suspected.
 
 ## 04 Rules
 
@@ -735,6 +762,7 @@ If multiple errors: focus on most educational ones.
 Be lenient with minor slips (typos, off-by-one values, harmless format changes).
 Mark as correct if the concept is understood; only wrong if the idea is wrong.
 Assess answer quality: wrong, partially ok, or correct.
+If the student's mistake appears to stem from a previously-learned concept rather than the current subgoal, list one or more concept tags in `suspected_concepts`. Use only tags from this list: { known concepts }. Omit the field entirely if the mistake is on the current subgoal itself or you're not confident.
 
 # writeCodeQuestion
 

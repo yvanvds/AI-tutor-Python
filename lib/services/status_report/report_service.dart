@@ -10,9 +10,12 @@ import 'package:ai_tutor_python/services/data_service.dart';
 import 'status_report.dart';
 
 class ReportService {
-  ReportService();
+  ReportService({CosmosContainer? container}) : _containerOverride = container;
 
-  CosmosContainer get _container => CosmosPaths.statusReports();
+  final CosmosContainer? _containerOverride;
+
+  CosmosContainer get _container =>
+      _containerOverride ?? CosmosPaths.statusReports();
 
   String get _uid {
     final uid = DataService.auth.currentUser.value?.oid;
@@ -37,6 +40,20 @@ class ReportService {
   Future<StatusReport?> getByGoalId(String goalID) {
     final uid = _uid;
     return safeCosmos(() => _fetchOne(uid, goalID));
+  }
+
+  // ---- teacher-scoped reads ----------------------------------------------
+
+  /// All status reports for one student (teacher-side). Same partition as
+  /// the signed-in-user reads, but addressed by an explicit uid.
+  Future<List<StatusReport>> getStatusReportsForUser(String uid) {
+    return safeCosmos(() => _fetchAll(uid));
+  }
+
+  Stream<List<StatusReport>> watchStatusReportsForUser(String uid) {
+    return safeCosmosStream(
+      pollingStream(() => safeCosmos(() => _fetchAll(uid))),
+    );
   }
 
   Future<void> upsert(StatusReport p) async {

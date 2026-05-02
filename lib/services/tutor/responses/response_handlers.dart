@@ -168,6 +168,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
+    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
     if (r.suggestion.isNotEmpty && suggestionAllowed) {
       ctx.setFollowUp(message: r.suggestion);
     } else {
@@ -183,6 +184,7 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
     ctx.addTutorMessage(r.prompt);
     DataService.sound.askQuestion();
     await ctx.conductor.updateProgress(r.quality);
+    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
     await ctx.requestExercise();
   }
 }
@@ -197,6 +199,7 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
+    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
     if (r.followUp != null && suggestionAllowed) {
       ctx.setFollowUp(message: r.followUp);
     } else {
@@ -215,6 +218,7 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
+    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
     if (r.followUp != null && suggestionAllowed) {
       ctx.setFollowUp(message: r.followUp);
     } else {

@@ -135,6 +135,8 @@ void main() {
         .thenAnswer((_) async => true);
     when(() => conductor.guidingIsComplete(any<double>()))
         .thenAnswer((_) async => false);
+    when(() => conductor.recordConceptAttributions(any()))
+        .thenAnswer((_) async {});
     when(() => conductor.hintProvided()).thenReturn(null);
 
     when(() => chat.clear()).thenReturn(null);

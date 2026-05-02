@@ -79,6 +79,8 @@ void main() {
         .thenAnswer((_) async => true);
     when(() => conductor.guidingIsComplete(any<double>()))
         .thenAnswer((_) async => false);
+    when(() => conductor.recordConceptAttributions(any()))
+        .thenAnswer((_) async {});
     when(() => report.updateForCurrentChildGoal(any<String>()))
         .thenAnswer((_) async {});
 
@@ -416,6 +418,83 @@ void main() {
 
       expect(rec.followUps, [(message: 'why does that work?', code: null)]);
       expect(rec.requestExerciseCalls, 0);
+    });
+  });
+
+  group('suspectedConcepts forwarding', () {
+    List<String>? lastConceptArg() {
+      final captured =
+          verify(() => conductor.recordConceptAttributions(captureAny()))
+              .captured;
+      return captured.single as List<String>?;
+    }
+
+    test('CodeFeedback with suspectedConcepts → conductor records them',
+        () async {
+      await dispatchResponse(
+        CodeFeedback(
+          type: 'code_feedback',
+          prompt: 'p',
+          suggestion: '',
+          quality: AnswerQuality.wrong,
+          suspectedConcepts: const ['variables', 'loops'],
+        ),
+        ctx,
+      );
+      expect(lastConceptArg(), ['variables', 'loops']);
+    });
+
+    test('CodeFeedback without suspectedConcepts → conductor is called with '
+        'null', () async {
+      await dispatchResponse(
+        CodeFeedback(
+          type: 'code_feedback',
+          prompt: 'p',
+          suggestion: '',
+          quality: AnswerQuality.wrong,
+        ),
+        ctx,
+      );
+      expect(lastConceptArg(), isNull);
+    });
+
+    test('McqFeedback forwards the list when present', () async {
+      await dispatchResponse(
+        McqFeedback(
+          type: 'mcq_feedback',
+          quality: AnswerQuality.wrong,
+          prompt: 'try again',
+          suspectedConcepts: const ['variables'],
+        ),
+        ctx,
+      );
+      expect(lastConceptArg(), ['variables']);
+    });
+
+    test('ExplainFeedback forwards the list when present', () async {
+      await dispatchResponse(
+        ExplainFeedback(
+          type: 'explain_feedback',
+          quality: AnswerQuality.partial,
+          prompt: 'half',
+          suspectedConcepts: const ['conditionals'],
+        ),
+        ctx,
+      );
+      expect(lastConceptArg(), ['conditionals']);
+    });
+
+    test('SocraticFeedback forwards the list when present', () async {
+      await dispatchResponse(
+        SocraticFeedback(
+          type: 'socratic_feedback',
+          quality: AnswerQuality.wrong,
+          prompt: 'p',
+          suspectedConcepts: const ['loops'],
+        ),
+        ctx,
+      );
+      expect(lastConceptArg(), ['loops']);
     });
   });
 

@@ -96,6 +96,27 @@ class GoalsService {
 
   Future<List<Goal>> getRootGoalsOnce() => safeCosmos(_fetchRoots);
 
+  /// Validation set for AI-emitted concept attributions: union of
+  /// `knownConcepts` from [targetRootGoal] and every earlier root goal
+  /// (those with a strictly smaller `order`). Wider than the
+  /// `{known concepts}` text the instruction generator substitutes into
+  /// prompts, since the AI may sometimes tag a concept the student is
+  /// currently working on rather than a strictly mastered one — we accept
+  /// either, then filter out the rest as drift.
+  Future<List<String>> getKnownConceptsInScope(Goal targetRootGoal) async {
+    final cached = cachedRoots.value;
+    final roots = cached.isNotEmpty ? cached : await getRootGoalsOnce();
+    final out = <String>{};
+    for (final root in roots) {
+      // Roots are ordered by `order`; bound the scan so we don't pick up
+      // future roots if [targetRootGoal] isn't in the cache.
+      if (root.order > targetRootGoal.order) break;
+      out.addAll(root.knownConcepts);
+      if (root.id == targetRootGoal.id) break;
+    }
+    return out.toList();
+  }
+
   /// Fetch every goal once. Used for export.
   Future<List<Goal>> getAllGoalsOnce() => safeCosmos(_fetchAll);
 

@@ -19,7 +19,7 @@ class _DashboardState extends State<Dashboard> {
       // Left stack (editor/controllers/output)
       Area(flex: 3, min: 1, data: 'left'),
       // Right column (exercises)
-      Area(flex: 1, min: 1, data: 'right'),
+      Area(flex: 3, min: 1, data: 'right'),
     ],
   );
 
@@ -55,9 +55,7 @@ class _DashboardState extends State<Dashboard> {
                       // keep it visible and themed
                       color: Theme.of(context).colorScheme.surface,
                       child: const Row(
-                        children: [
-                          Expanded(child: Controllers()),
-                        ],
+                        children: [Expanded(child: Controllers())],
                       ),
                     );
                   case 'output':

@@ -1,12 +1,14 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/suspected_concepts.dart';
 
 /*
 {
   "type": "explain_feedback",
   "quality": "wrong | partial | correct",
   "feedback": "brief explanation of what's missing or why correct",
-  "follow_up": "optional new question or prompt to clarify thinking"
+  "follow_up": "optional new question or prompt to clarify thinking",
+  "suspected_concepts": ["optional", "tags"]
 }
 */
 
@@ -16,12 +18,14 @@ class ExplainFeedback implements ChatResponse {
   final AnswerQuality quality;
   final String prompt;
   final String? followUp;
+  final List<String>? suspectedConcepts;
 
   ExplainFeedback({
     required this.type,
     required this.quality,
     required this.prompt,
     this.followUp,
+    this.suspectedConcepts,
   });
 
   factory ExplainFeedback.fromMap(Map<String, dynamic> map) {
@@ -30,6 +34,7 @@ class ExplainFeedback implements ChatResponse {
       quality: _stringToQuality(map['quality']),
       prompt: map['prompt'] ?? '',
       followUp: map['followUp'],
+      suspectedConcepts: parseSuspectedConcepts(map['suspected_concepts']),
     );
   }
 
@@ -40,6 +45,7 @@ class ExplainFeedback implements ChatResponse {
       'quality': quality.name,
       'feedback': prompt,
       if (followUp != null) 'followUp': followUp,
+      if (suspectedConcepts != null) 'suspected_concepts': suspectedConcepts,
     };
   }
 
