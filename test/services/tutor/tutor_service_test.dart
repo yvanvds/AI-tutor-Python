@@ -147,6 +147,7 @@ void main() {
     when(() => conductor.recordConceptAttributions(any()))
         .thenAnswer((_) async {});
     when(() => conductor.hintProvided()).thenReturn(null);
+    when(() => conductor.takePendingStatusReportGoalId()).thenReturn(null);
 
     when(() => chat.clear()).thenReturn(null);
     when(() => chat.addSystemMessage(any<String>())).thenReturn(null);

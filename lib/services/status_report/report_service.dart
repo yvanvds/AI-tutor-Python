@@ -81,6 +81,13 @@ class ReportService {
     await upsert(StatusReport(goalID: goal.id, statusReport: newReport));
   }
 
+  /// Upsert a status report against an explicit subgoal id. Used by the
+  /// post-mastery status flow, where the active child goal has already
+  /// advanced by the time the AI response comes back.
+  Future<void> updateForGoal(String goalID, String newReport) async {
+    await upsert(StatusReport(goalID: goalID, statusReport: newReport));
+  }
+
   Future<List<StatusReport>> _fetchAll(String uid) async {
     final docs = await _container.query(
       'SELECT * FROM c WHERE c.uid = @uid',

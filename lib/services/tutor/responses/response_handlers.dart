@@ -27,6 +27,7 @@ class TutorContext {
     required this.setFollowUp,
     required this.requestExercise,
     required this.maybeRetry,
+    this.statusReportGoalIdOverride,
   });
 
   final Conductor conductor;
@@ -37,6 +38,12 @@ class TutorContext {
   final void Function({String? message, String? code}) setFollowUp;
   final Future<void> Function() requestExercise;
   final Future<void> Function() maybeRetry;
+
+  /// Goal id the StatusSummaryHandler should write against. Set by
+  /// TutorService when firing a post-mastery status query so the report
+  /// lands on the just-mastered subgoal rather than the now-current one.
+  /// Null for the legacy path (writes against the selected child goal).
+  final String? statusReportGoalIdOverride;
 }
 
 abstract class ResponseHandler<R extends ChatResponse> {
@@ -229,6 +236,11 @@ class StatusSummaryHandler extends ResponseHandler<StatusSummary> {
   const StatusSummaryHandler();
   @override
   Future<void> handle(StatusSummary r, TutorContext ctx) async {
+    final override = ctx.statusReportGoalIdOverride;
+    if (override != null) {
+      await DataService.report.updateForGoal(override, r.prompt);
+      return;
+    }
     await DataService.report.updateForCurrentChildGoal(r.prompt);
   }
 }

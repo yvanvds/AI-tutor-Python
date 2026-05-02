@@ -66,6 +66,11 @@ class TutorService {
   String? _nextMessage;
   String? _nextCode;
 
+  // Set by [_runStatusReportFor] for the duration of a single status
+  // request so [StatusSummaryHandler] can write the report against the
+  // just-mastered subgoal instead of the (already advanced) current one.
+  String? _statusReportGoalIdOverride;
+
   static const int _maxRetriesPerRequest = 1;
   int _retriesLeft = 0;
 
@@ -339,6 +344,7 @@ class TutorService {
       setFollowUp: _trackedSetFollowUp,
       requestExercise: requestExercise,
       maybeRetry: _maybeRetry,
+      statusReportGoalIdOverride: _statusReportGoalIdOverride,
     );
   }
 
@@ -417,6 +423,12 @@ class TutorService {
 
   Future<void> requestExercise() async {
     DataService.debug.recordEvent('tutor.request_exercise.entered');
+
+    final pendingStatusGoalId = _conductor.takePendingStatusReportGoalId();
+    if (pendingStatusGoalId != null) {
+      await _runStatusReportFor(pendingStatusGoalId);
+    }
+
     final newQuestion = _conductor.getNextQuestion();
     DataService.debug.recordEvent('tutor.request_exercise.next', {
       'type': newQuestion.$1.name,
@@ -442,6 +454,23 @@ class TutorService {
     }
 
     await queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2);
+  }
+
+  /// Fires a one-off non-streaming `status` query whose AI response will
+  /// be written to Cosmos against [goalID] (the just-mastered subgoal).
+  /// Releases the working state first so the inner [queryTutor] call
+  /// doesn't short-circuit on its idle guard — same dance as the chained
+  /// queries in `requestExercise`.
+  Future<void> _runStatusReportFor(String goalID) async {
+    if (state.value == TutorState.working) {
+      state.value = TutorState.idle;
+    }
+    _statusReportGoalIdOverride = goalID;
+    try {
+      await queryTutor(type: ChatRequestType.status);
+    } finally {
+      _statusReportGoalIdOverride = null;
+    }
   }
 
   void moveToFollowUp() {

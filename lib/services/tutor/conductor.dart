@@ -88,6 +88,13 @@ class Conductor {
   // answer would chain through the curriculum.
   bool _diagnosingNext = false;
 
+  // Holds the id of the just-mastered subgoal so the TutorService can
+  // request an AI status_summary against it before the active child goal
+  // is swapped to the next subgoal. Only set on practice mastery —
+  // diagnostic skips don't carry enough activity to summarise. Read &
+  // cleared via [takePendingStatusReportGoalId].
+  String? _pendingStatusReportGoalId;
+
   /// Whether the conductor is currently running warm-up questions. Exposed
   /// for tests; production code shouldn't need to read this.
   bool get isInWarmup => _warmupRemaining > 0;
@@ -362,10 +369,26 @@ class Conductor {
       DataService.progress.currentProgress.value = 1.0;
       await _recomputeRoot();
     }
+    // Practice mastery only: queue a status_summary request keyed to the
+    // just-mastered subgoal. Captured BEFORE _handleGoalCompletion swaps
+    // the active child goal so the AI write lands on the right doc.
+    if (armDiagnostic && goal != null) {
+      _pendingStatusReportGoalId = goal.id;
+    }
     await _handleGoalCompletion();
     if (_activeChildGoal != null && armDiagnostic) {
       _diagnosingNext = true;
     }
+  }
+
+  /// Returns the id of the most recently mastered subgoal (practice
+  /// mastery only) and clears the slot. The TutorService calls this in
+  /// `requestExercise` to fire a one-off AI status request before the
+  /// next exercise. Returns null when there's nothing pending.
+  String? takePendingStatusReportGoalId() {
+    final id = _pendingStatusReportGoalId;
+    _pendingStatusReportGoalId = null;
+    return id;
   }
 
   void _adaptStreak(AnswerQuality quality) {
