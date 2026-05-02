@@ -16,6 +16,7 @@ import io
 import json
 import os
 import platform
+import queue
 import sys
 import threading
 import time
@@ -48,7 +49,8 @@ def _log(level: str, message: str) -> None:
 
 
 class _RunState:
-    __slots__ = ("id", "code", "cwd", "thread", "cancelled", "start_ns")
+    __slots__ = ("id", "code", "cwd", "thread", "cancelled", "start_ns",
+                 "input_queue", "_next_req_id", "_req_lock")
 
     def __init__(self, run_id: str, code: str, cwd: str | None):
         self.id = run_id
@@ -57,6 +59,15 @@ class _RunState:
         self.thread: threading.Thread | None = None
         self.cancelled = False
         self.start_ns = 0
+        self.input_queue: queue.Queue[dict] = queue.Queue()
+        self._next_req_id = 0
+        self._req_lock = threading.Lock()
+
+    def next_request_id(self) -> int:
+        with self._req_lock:
+            req_id = self._next_req_id
+            self._next_req_id += 1
+            return req_id
 
 
 _state_lock = threading.Lock()
@@ -127,6 +138,37 @@ def _student_traceback(exc: BaseException) -> str:
     return "".join(lines)
 
 
+# ---- input() override --------------------------------------------------
+
+
+def _make_input_fn(state: _RunState):
+    """Return a replacement for builtins.input bound to *state*.
+
+    Emits an ``input_request`` frame then blocks the worker thread on the
+    run's queue until a matching ``input_response`` arrives (or the run is
+    cancelled, in which case KeyboardInterrupt is raised).
+    """
+    def _input(prompt: str = "") -> str:
+        req_id = state.next_request_id()
+        _emit({
+            "type": "input_request",
+            "id": state.id,
+            "request_id": req_id,
+            "prompt": str(prompt),
+        })
+        while True:
+            try:
+                response = state.input_queue.get(timeout=0.1)
+                if response.get("request_id") == req_id:
+                    return str(response.get("value", ""))
+                # Wrong request_id — re-enqueue and loop (shouldn't happen in v1).
+                state.input_queue.put(response)
+            except queue.Empty:
+                if state.cancelled:
+                    raise KeyboardInterrupt
+    return _input
+
+
 # ---- worker ------------------------------------------------------------
 
 
@@ -150,6 +192,7 @@ def _run_worker(state: _RunState) -> None:
             "__spec__": None,
             "__builtins__": __builtins__,
             "__file__": _STUDENT_FILE,
+            "input": _make_input_fn(state),
         }
 
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -286,8 +329,16 @@ def _handle_cancel(frame: dict) -> None:
 
 
 def _handle_input_response(frame: dict) -> None:
-    # v1: protocol-accepted no-op. Step 10 wires this up.
-    return
+    run_id = frame.get("id")
+    request_id = frame.get("request_id")
+    value = frame.get("value", "")
+    if not isinstance(run_id, str) or not isinstance(request_id, int):
+        return
+    with _state_lock:
+        state = _active
+    if state is None or state.id != run_id:
+        return
+    state.input_queue.put({"request_id": request_id, "value": str(value)})
 
 
 _HANDLERS = {
@@ -308,7 +359,7 @@ def _ready() -> None:
         "type": "ready",
         "python_version": f"{py.major}.{py.minor}.{py.micro}",
         "platform": f"{sysname}_{arch}",
-        "capabilities": ["exec", "cancel"],
+        "capabilities": ["exec", "cancel", "input"],
         "protocol_version": _PROTOCOL_VERSION,
     })
 

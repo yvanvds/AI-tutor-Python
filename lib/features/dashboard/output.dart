@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:flutter/material.dart';
+import 'package:py_runner/py_runner.dart';
 
 class Output extends StatefulWidget {
   const Output({super.key});
@@ -11,11 +12,14 @@ class Output extends StatefulWidget {
 
 class _OutputState extends State<Output> {
   final _scrollCtrl = ScrollController();
+  final _inputCtrl = TextEditingController();
+  final _inputFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
     DataService.output.lines.addListener(_onLinesChanged);
+    DataService.output.pendingInputRequest.addListener(_onInputRequestChanged);
   }
 
   void _onLinesChanged() {
@@ -26,10 +30,27 @@ class _OutputState extends State<Output> {
     });
   }
 
+  void _onInputRequestChanged() {
+    if (DataService.output.pendingInputRequest.value != null) {
+      _inputCtrl.clear();
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _inputFocus.requestFocus(),
+      );
+    }
+  }
+
+  void _submitInput() {
+    DataService.output.submitInput(_inputCtrl.text);
+    _inputCtrl.clear();
+  }
+
   @override
   void dispose() {
     DataService.output.lines.removeListener(_onLinesChanged);
+    DataService.output.pendingInputRequest.removeListener(_onInputRequestChanged);
     _scrollCtrl.dispose();
+    _inputCtrl.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
@@ -90,6 +111,48 @@ class _OutputState extends State<Output> {
                 ),
               ),
             ),
+          ),
+          ValueListenableBuilder<InputRequest?>(
+            valueListenable: DataService.output.pendingInputRequest,
+            builder: (context, req, _) {
+              if (req == null) return const SizedBox.shrink();
+              return _buildInputRow(context, req);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputRow(BuildContext context, InputRequest req) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          if (req.prompt.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                req.prompt,
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
+            ),
+          Expanded(
+            child: TextField(
+              controller: _inputCtrl,
+              focusNode: _inputFocus,
+              style: const TextStyle(fontFamily: 'monospace'),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _submitInput(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _submitInput,
+            child: const Text('Send'),
           ),
         ],
       ),

@@ -22,6 +22,7 @@ class OutputService {
 
   final ValueNotifier<List<OutputLine>> lines = ValueNotifier([]);
   final ValueNotifier<bool> isRunning = ValueNotifier(false);
+  final ValueNotifier<InputRequest?> pendingInputRequest = ValueNotifier(null);
 
   RunHandle? _currentHandle;
   final List<StreamSubscription<dynamic>> _runSubs = [];
@@ -48,6 +49,9 @@ class OutputService {
 
     _runSubs.add(handle.stdout.listen(_addLine));
     _runSubs.add(handle.stderr.listen((t) => _addLine(t, isError: true)));
+    _runSubs.add(handle.inputRequests.listen((req) {
+      pendingInputRequest.value = req;
+    }));
 
     final capturedHandle = handle;
     unawaited(() async {
@@ -57,16 +61,26 @@ class OutputService {
         if (result.exception != null) {
           _addLine(result.exception!.traceback, isError: true);
         }
+        pendingInputRequest.value = null;
         isRunning.value = false;
       } catch (_) {
         if (!identical(_currentHandle, capturedHandle)) return;
+        pendingInputRequest.value = null;
         isRunning.value = false;
       }
     }());
   }
 
   Future<void> stop() async {
+    pendingInputRequest.value = null;
     await _currentHandle?.cancel();
+  }
+
+  void submitInput(String value) {
+    final req = pendingInputRequest.value;
+    if (req == null) return;
+    pendingInputRequest.value = null;
+    _currentHandle?.respondToInput(req.requestId, value);
   }
 
   void _addLine(String text, {bool isError = false}) {
