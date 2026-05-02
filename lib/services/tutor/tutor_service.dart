@@ -41,6 +41,15 @@ class TutorService {
     _connector = connector ?? OpenaiConnector();
     _conductor = conductor ?? Conductor();
     _instructionGeneratorOverride = instructionGenerator;
+    var lastState = state.value;
+    state.addListener(() {
+      final next = state.value;
+      DataService.debug.recordEvent('tutor.state_change', {
+        'from': lastState.name,
+        'to': next.name,
+      });
+      lastState = next;
+    });
   }
   bool _initialized = false;
 
@@ -67,6 +76,15 @@ class TutorService {
     _initialized = true;
     DataService.chat.clear();
 
+    if (force) {
+      final user = DataService.auth.currentUser.value;
+      DataService.debug.resetSession(
+        uid: user?.oid,
+        email: user?.email,
+        modelName: DataService.globalConfig.cachedConfig?.model,
+      );
+    }
+
     await _conductor.setTarget();
 
     final newQuestion = _conductor.getNextQuestion();
@@ -89,6 +107,7 @@ class TutorService {
     state.value = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
 
+    var turnOpened = false;
     try {
       final instructions = await _instructionGenerator.generateInstructions(
         type,
@@ -104,6 +123,24 @@ class TutorService {
         state.value = TutorState.idle;
         return;
       }
+
+      DataService.debug.beginTurn(
+        requestType: type.name,
+        currentExerciseTypeAtStart: _currentExerciseType,
+        tutorStateAtStart: state.value.name,
+        selectedRootGoalId: DataService.goals.selectedRootGoal.value?.id,
+        selectedChildGoalId: DataService.goals.selectedChildGoal.value?.id,
+        preferredRootGoalId: DataService.goals.preferredRootGoal.value?.id,
+        preferredChildGoalId: DataService.goals.preferredChildGoal.value?.id,
+        streamable: request.streamable,
+        previousInputsMode: request.history.name,
+      );
+      turnOpened = true;
+      DataService.debug.recordRequestPayload(
+        userInput: request.input,
+        instructions: instructions,
+        instructionsDocId: type.name,
+      );
 
       if (request.streamable) {
         await _runStream(
@@ -125,6 +162,9 @@ class TutorService {
       DataService.chat.failStream();
       _addSystemMessage('Er ging iets mis bij de tutor: $e');
     } finally {
+      if (turnOpened) {
+        DataService.debug.endTurn();
+      }
       if (state.value == TutorState.working) {
         state.value = TutorState.idle;
       }
@@ -282,8 +322,8 @@ class TutorService {
         _addTutorMessage(message);
       },
       addSystemMessage: _addSystemMessage,
-      setExerciseType: (type) => _currentExerciseType = type,
-      setFollowUp: _setFollowUp,
+      setExerciseType: _trackedSetExerciseType,
+      setFollowUp: _trackedSetFollowUp,
       requestExercise: requestExercise,
       maybeRetry: _maybeRetryStream,
     );
@@ -295,11 +335,28 @@ class TutorService {
       startNewCode: _startNewCode,
       addTutorMessage: _addTutorMessage,
       addSystemMessage: _addSystemMessage,
-      setExerciseType: (type) => _currentExerciseType = type,
-      setFollowUp: _setFollowUp,
+      setExerciseType: _trackedSetExerciseType,
+      setFollowUp: _trackedSetFollowUp,
       requestExercise: requestExercise,
       maybeRetry: _maybeRetry,
     );
+  }
+
+  void _trackedSetExerciseType(String type) {
+    final from = _currentExerciseType;
+    _currentExerciseType = type;
+    DataService.debug.recordEvent('tutor.exercise_type_set', {
+      'from': from,
+      'to': type,
+    });
+  }
+
+  void _trackedSetFollowUp({String? message, String? code}) {
+    _setFollowUp(message: message, code: code);
+    DataService.debug.recordEvent('tutor.follow_up_set', {
+      'hasMessage': message != null,
+      'hasCode': code != null,
+    });
   }
 
   Future<void> _processNonStreamingResult(ConnectorResult result) async {
@@ -313,6 +370,9 @@ class TutorService {
   }
 
   Future<void> _maybeRetry() async {
+    DataService.debug.recordEvent('tutor.maybe_retry', {
+      'retriesLeft': _retriesLeft,
+    });
     if (_retriesLeft <= 0) return;
     _retriesLeft--;
     final result = await _resendLastRequest();
@@ -321,6 +381,9 @@ class TutorService {
   }
 
   Future<void> _maybeRetryStream() async {
+    DataService.debug.recordEvent('tutor.maybe_retry', {
+      'retriesLeft': _retriesLeft,
+    });
     if (_retriesLeft <= 0) return;
     _retriesLeft--;
     if (state.value != TutorState.working) {
@@ -353,7 +416,12 @@ class TutorService {
   }
 
   Future<void> requestExercise() async {
+    DataService.debug.recordEvent('tutor.request_exercise.entered');
     final newQuestion = _conductor.getNextQuestion();
+    DataService.debug.recordEvent('tutor.request_exercise.next', {
+      'type': newQuestion.$1.name,
+      'difficulty': newQuestion.$2.name,
+    });
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
       DataService.chat.addSystemMessage(

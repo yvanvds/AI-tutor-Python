@@ -103,7 +103,9 @@ class OpenaiConnector {
         extraParams: _extraParams(),
       );
       _recordUserTurn(input, inputs);
-      return ConnectorOk(_extractText(response));
+      final text = _extractText(response);
+      DataService.debug.recordRawOutput(text);
+      return ConnectorOk(text);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequest failed: $e');
       return ConnectorFailure(e, stack, e.toString());
@@ -155,6 +157,8 @@ class OpenaiConnector {
       final tail = assembler.close();
       if (tail.isNotEmpty) yield StreamTextDelta(tail);
 
+      DataService.debug.recordRawOutput(raw.toString());
+
       final ChatResponse parsed = assembler.sawOpenTag
           ? AIResponseParser.fromEnvelopePieces(
               assembler.text,
@@ -168,6 +172,7 @@ class OpenaiConnector {
       yield StreamCompleted(parsed);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequestStream failed: $e');
+      DataService.debug.recordStreamFailure(e.toString());
       yield StreamFailed(e, stack, e.toString());
     }
   }

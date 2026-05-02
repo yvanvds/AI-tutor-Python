@@ -19,12 +19,15 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart' hide Answer;
 
@@ -84,6 +87,7 @@ void main() {
   late MockCodeService code;
   late MockSoundService sound;
   late MockReportService report;
+  late MockGoalsService goals;
 
   setUpAll(() {
     registerFallbackValue(_FakeChatResponse());
@@ -100,6 +104,11 @@ void main() {
     code = MockCodeService();
     sound = MockSoundService();
     report = MockReportService();
+    goals = MockGoalsService();
+    when(() => goals.selectedRootGoal).thenReturn(ValueNotifier(null));
+    when(() => goals.selectedChildGoal).thenReturn(ValueNotifier(null));
+    when(() => goals.preferredRootGoal).thenReturn(ValueNotifier(null));
+    when(() => goals.preferredChildGoal).thenReturn(ValueNotifier(null));
 
     when(() => instrGen.generateInstructions(any<ChatRequestType>()))
         .thenAnswer((_) async => '');
@@ -156,6 +165,8 @@ void main() {
     registerMock<CodeService>(code);
     registerMock<SoundService>(sound);
     registerMock<ReportService>(report);
+    registerMock<GoalsService>(goals);
+    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
   });
 
   tearDown(() async {

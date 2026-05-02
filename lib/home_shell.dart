@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
@@ -8,6 +11,7 @@ import 'package:ai_tutor_python/features/instructions/instructions_editor_page.d
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'version.dart';
 import 'features/dashboard/dashboard.dart';
@@ -78,6 +82,11 @@ class _HomeShellState extends State<HomeShell> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Debug-sessie exporteren',
+            onPressed: _exportDebugSession,
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
+          IconButton(
             tooltip: 'Sign out',
             onPressed: () => DataService.auth.signOut(),
             icon: const Icon(Icons.logout),
@@ -141,6 +150,33 @@ class _HomeShellState extends State<HomeShell> {
     if (isTeacher && index == 3) return const InstructionsEditorPage();
     if (isTeacher && index == 4) return const AccountsPage();
     return const Center(child: Text('Page not found'));
+  }
+
+  Future<void> _exportDebugSession() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final json = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(DataService.debug.exportJson());
+      final stamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Debug-sessie exporteren',
+        fileName: 'ai-tutor-debug-$stamp.json',
+      );
+      if (path == null) return;
+      await File(path).writeAsString(json);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Debug-sessie opgeslagen: $path')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Exporteren mislukt: $e')),
+      );
+    }
   }
 
   Future<void> checkForUpdate() async {

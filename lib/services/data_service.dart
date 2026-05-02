@@ -3,6 +3,7 @@ import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
@@ -32,6 +33,7 @@ class DataService {
     _locator.registerLazySingleton(() => OutputService());
     _locator.registerLazySingleton(() => SplashService());
     _locator.registerLazySingleton(() => SoundService());
+    _locator.registerLazySingleton(() => DebugSessionRecorder());
   }
 
   static AuthService get auth => _locator<AuthService>();
@@ -50,4 +52,5 @@ class DataService {
   static OutputService get output => _locator<OutputService>();
   static SplashService get splash => _locator<SplashService>();
   static SoundService get sound => _locator<SoundService>();
+  static DebugSessionRecorder get debug => _locator<DebugSessionRecorder>();
 }

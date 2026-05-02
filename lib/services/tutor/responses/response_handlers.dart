@@ -279,11 +279,13 @@ final List<_DispatchEntry> _dispatchTable = [
 /// Returns false when the response type has no handler — caller decides
 /// what fallback (e.g. retry) to apply.
 Future<bool> dispatchResponse(ChatResponse parsed, TutorContext ctx) async {
+  DataService.debug.recordParsedResponse(parsed);
   for (final entry in _dispatchTable) {
     if (entry.matches(parsed)) {
       await entry.handle(parsed, ctx);
       return true;
     }
   }
+  DataService.debug.recordEvent('dispatch.unhandled', {'type': parsed.type});
   return false;
 }

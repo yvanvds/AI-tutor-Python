@@ -24,7 +24,7 @@ class Conductor {
   /// A "new session" for a subgoal starts when the persisted lastSessionAt
   /// is null or older than this. Bump this down (e.g. to 1 minute) when
   /// manually testing the warm-up flow, then restore.
-  static const Duration sessionResumeThreshold = Duration(minutes: 1);
+  static const Duration sessionResumeThreshold = Duration(hours: 12);
 
   /// When the gap to lastSessionAt exceeds this, the warm-up gets +1
   /// question on top of the success-ratio derived count.
@@ -125,6 +125,11 @@ class Conductor {
         warmupGreetings[_rand.nextInt(warmupGreetings.length)],
       );
     }
+    DataService.debug.recordEvent('conductor.subgoal_set', {
+      'goalId': _activeChildGoal?.id,
+      'persistedProgress': persisted?.progress ?? 0.0,
+      'warmupRemaining': _warmupRemaining,
+    });
   }
 
   int _computeWarmupCount(Progress? persisted) {
@@ -175,28 +180,32 @@ class Conductor {
   // ---- Question selection -------------------------------------------------
 
   (ChatRequestType, QuestionDifficulty) getNextQuestion() {
+    late final (ChatRequestType, QuestionDifficulty) result;
     if (DataService.goals.selectedChildGoal.value == null &&
         DataService.goals.preferredChildGoal.value == null) {
-      return (ChatRequestType.noResult, _difficulty);
-    }
-
-    if (_diagnosingNext) {
+      result = (ChatRequestType.noResult, _difficulty);
+    } else if (_diagnosingNext) {
       _currentQuestionType = ChatRequestType.writeCodeQuestion;
-      return (_currentQuestionType!, QuestionDifficulty.medium);
-    }
-
-    if (!_guidingDone) {
+      result = (_currentQuestionType!, QuestionDifficulty.medium);
+    } else if (!_guidingDone) {
       _currentQuestionType = ChatRequestType.guidingQuestion;
-      return (_currentQuestionType!, QuestionDifficulty.easy);
+      result = (_currentQuestionType!, QuestionDifficulty.easy);
+    } else {
+      final filtered = _practiceTypes
+          .where((t) => t != _currentQuestionType)
+          .toList(growable: false);
+      final pool = filtered.isEmpty ? _practiceTypes : filtered;
+      final pick = pool[_rand.nextInt(pool.length)];
+      _currentQuestionType = pick;
+      result = (pick, _difficulty);
     }
-
-    final filtered = _practiceTypes
-        .where((t) => t != _currentQuestionType)
-        .toList(growable: false);
-    final pool = filtered.isEmpty ? _practiceTypes : filtered;
-    final pick = pool[_rand.nextInt(pool.length)];
-    _currentQuestionType = pick;
-    return (pick, _difficulty);
+    DataService.debug.recordEvent('conductor.next_question', {
+      'type': result.$1.name,
+      'difficulty': result.$2.name,
+      'diagnosingNext': _diagnosingNext,
+      'guidingDone': _guidingDone,
+    });
+    return result;
   }
 
   // ---- Guiding phase ------------------------------------------------------
@@ -205,8 +214,14 @@ class Conductor {
 
   Future<bool> guidingIsComplete(double understanding) async {
     _guidingConfidence = (_guidingConfidence + understanding).clamp(0.0, 1.0);
+    final completed = _guidingConfidence >= 0.8;
+    DataService.debug.recordEvent('conductor.guiding_progress', {
+      'delta': understanding,
+      'total': _guidingConfidence,
+      'completed': completed,
+    });
 
-    if (_guidingConfidence >= 0.8) {
+    if (completed) {
       _guidingDone = true;
       _guidingConfidence = 0.0;
       DataService.sound.guidingComplete();
@@ -241,6 +256,8 @@ class Conductor {
       _warmupRemaining -= 1;
     }
 
+    final streakBefore = _correctStreak;
+    final difficultyBefore = _difficulty;
     final from = _displayProgress();
     if (!suppressPositive) {
       _adaptStreak(quality);
@@ -248,12 +265,29 @@ class Conductor {
     _adaptDifficulty(quality);
     _hintsUsed = 0;
     final to = _displayProgress();
+    final mastered = _isMastered();
+    final allowFollowUp = !mastered && _allowFollowUp(quality);
+
+    DataService.debug.recordEvent('conductor.update_progress', {
+      'quality': quality.name,
+      'isWarmup': inWarmup,
+      'suppressPositive': suppressPositive,
+      'streakBefore': streakBefore,
+      'streakAfter': _correctStreak,
+      'typesInStreak': _typesInStreak.map((t) => t.name).toList(),
+      'difficultyBefore': difficultyBefore.name,
+      'difficultyAfter': _difficulty.name,
+      'displayFrom': from,
+      'displayTo': to,
+      'mastered': mastered,
+      'allowFollowUp': allowFollowUp,
+    });
 
     DataService.chat.addSystemMessage(
       'Vooruitgang: ${(from * 100).toStringAsFixed(0)}% -> ${(to * 100).toStringAsFixed(0)}%',
     );
 
-    if (_isMastered()) {
+    if (mastered) {
       await _markMasteredAndAdvance(quality: quality, isWarmUp: inWarmup);
       return false;
     }
@@ -286,6 +320,11 @@ class Conductor {
     bool isWarmUp = false,
   }) async {
     final goal = _activeChildGoal;
+    DataService.debug.recordEvent('conductor.mastered_and_advanced', {
+      'goalId': goal?.id,
+      'quality': quality?.name,
+      'isWarmup': isWarmUp,
+    });
     if (goal != null) {
       await DataService.progress.upsert(
         Progress(
@@ -374,6 +413,7 @@ class Conductor {
 
   void hintProvided() {
     _hintsUsed += 1;
+    DataService.debug.recordEvent('conductor.hint_provided');
   }
 
   // ---- Goal advancement ---------------------------------------------------
@@ -477,7 +517,8 @@ class Conductor {
     final goal = _activeChildGoal;
     if (goal == null) return;
 
-    final rootGoal = DataService.goals.preferredRootGoal.value ??
+    final rootGoal =
+        DataService.goals.preferredRootGoal.value ??
         DataService.goals.selectedRootGoal.value;
     final allowed = rootGoal == null
         ? const <String>[]
@@ -495,6 +536,11 @@ class Conductor {
         dropped.add(tag);
       }
     }
+    DataService.debug.recordEvent('conductor.record_concepts', {
+      'input': concepts,
+      'accepted': accepted,
+      'dropped': dropped,
+    });
     if (dropped.isNotEmpty) {
       debugPrint(
         'Conductor: dropped suspected_concepts not in scope: $dropped',

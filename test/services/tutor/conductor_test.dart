@@ -13,6 +13,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/concept_attribution.dart';
@@ -90,6 +91,7 @@ void main() {
     registerMock<ChatService>(chat);
     registerMock<SoundService>(sound);
     registerMock<SplashService>(splash);
+    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
   });
 
   tearDown(() async {

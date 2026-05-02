@@ -14,6 +14,7 @@
 // asks us to.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
@@ -86,6 +87,7 @@ void main() {
 
     registerMock<SoundService>(sound);
     registerMock<ReportService>(report);
+    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
 
     ctx = TutorContext(
       conductor: conductor,
