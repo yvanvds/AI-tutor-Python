@@ -30,6 +30,26 @@ void main() {
       expect(decoded.cwd, isNull);
     });
 
+    test('exec round-trips with timeout_ms', () {
+      const frame = ExecFrame(id: 'abc', code: 'pass', timeoutMs: 5000);
+      final encoded = frame.encode();
+      expect(jsonDecode(encoded), {
+        'type': 'exec',
+        'id': 'abc',
+        'code': 'pass',
+        'timeout_ms': 5000,
+      });
+      final decoded = HostInboundFrame.decode(encoded) as ExecFrame;
+      expect(decoded.timeoutMs, 5000);
+    });
+
+    test('exec without timeout_ms omits the field and decodes as null', () {
+      const frame = ExecFrame(id: 'abc', code: 'pass');
+      final decoded = HostInboundFrame.decode(frame.encode()) as ExecFrame;
+      expect(decoded.timeoutMs, isNull);
+      expect(frame.encode(), isNot(contains('timeout_ms')));
+    });
+
     test('cancel round-trips', () {
       const frame = CancelFrame(id: '7f1c-bbbb');
       final decoded = HostInboundFrame.decode(frame.encode()) as CancelFrame;
@@ -244,6 +264,16 @@ void main() {
             '{"type":"ready","python_version":"3.14.0","platform":"win_amd64","capabilities":["exec"],"protocol_version":"1"}';
         final decoded = HostOutboundFrame.decode(json) as ReadyFrame;
         expect(decoded.protocolVersion, isNull);
+      },
+    );
+
+    test(
+      'optional timeout_ms of wrong type is treated as absent (lenient)',
+      () {
+        final decoded = HostInboundFrame.decode(
+          '{"type":"exec","id":"x","code":"pass","timeout_ms":"5000"}',
+        ) as ExecFrame;
+        expect(decoded.timeoutMs, isNull);
       },
     );
   });

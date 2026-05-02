@@ -3,20 +3,35 @@
 Wire protocol: newline-delimited UTF-8 JSON frames over stdin/stdout.
 See PYTHON_IMPLEMENTATION.md section 2.2 for the full frame catalogue.
 
+Run modes
+---------
+Orchestrator (default, no flags):
+    Long-lived process reading frames from Flutter's stdin and routing them to
+    per-run worker subprocesses.  Cancellation and timeouts are handled at OS
+    level by killing the subprocess — no GIL contention, so even
+    ``math.factorial(5_000_000)`` (a GIL-holding C call) is terminated promptly.
+
+Worker (``--worker`` flag):
+    Short-lived process spawned once per run.  Reads an exec context frame from
+    stdin line 1, executes the student code, and writes protocol frames to its
+    own stdout (which the orchestrator relays verbatim to Flutter).
+    ``input()`` is replaced by a function that emits an ``input_request`` frame
+    and blocks reading the next line from the worker's stdin; the orchestrator
+    feeds ``input_response`` frames written by Flutter into that pipe.
+
 Expected to be spawned with:
-    python.exe -s -X utf8 -u host.py
+    python.exe -s -X utf8 -u host.py [--worker]
 and env: PYTHONIOENCODING=utf-8, PYTHONUNBUFFERED=1, PYTHONNOUSERSITE=1.
 """
 
 from __future__ import annotations
 
 import contextlib
-import ctypes
 import io
 import json
 import os
 import platform
-import queue
+import subprocess
 import sys
 import threading
 import time
@@ -24,8 +39,8 @@ import traceback
 
 
 _PROTOCOL_VERSION = 1
-_HARD_KILL_GRACE_S = 0.250
 _STUDENT_FILE = "<student>"
+_SCRIPT_PATH = os.path.abspath(__file__)
 
 # Frames are written here. Captured BEFORE any redirect_stdout the worker
 # installs, so emission stays on the real stdout regardless of redirects.
@@ -45,36 +60,7 @@ def _log(level: str, message: str) -> None:
     _emit({"type": "host_log", "level": level, "message": message})
 
 
-# ---- run state ---------------------------------------------------------
-
-
-class _RunState:
-    __slots__ = ("id", "code", "cwd", "thread", "cancelled", "start_ns",
-                 "input_queue", "_next_req_id", "_req_lock")
-
-    def __init__(self, run_id: str, code: str, cwd: str | None):
-        self.id = run_id
-        self.code = code
-        self.cwd = cwd
-        self.thread: threading.Thread | None = None
-        self.cancelled = False
-        self.start_ns = 0
-        self.input_queue: queue.Queue[dict] = queue.Queue()
-        self._next_req_id = 0
-        self._req_lock = threading.Lock()
-
-    def next_request_id(self) -> int:
-        with self._req_lock:
-            req_id = self._next_req_id
-            self._next_req_id += 1
-            return req_id
-
-
-_state_lock = threading.Lock()
-_active: _RunState | None = None
-
-
-# ---- streamed stdout/stderr from student code --------------------------
+# ---- shared helpers -------------------------------------------------------
 
 
 class _StreamWriter(io.TextIOBase):
@@ -99,30 +85,12 @@ class _StreamWriter(io.TextIOBase):
         pass
 
 
-# ---- async cancel ------------------------------------------------------
-
-
-def _async_raise(thread: threading.Thread, exc: type[BaseException]) -> None:
-    """Raise ``exc`` asynchronously in ``thread``."""
-    tid = thread.ident
-    if tid is None:
-        return
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-        ctypes.c_ulong(tid), ctypes.py_object(exc)
-    )
-    if res == 0:
-        _log("warn", f"async_raise: invalid thread id {tid}")
-    elif res > 1:
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(tid), None)
-        _log("error", "async_raise: PyThreadState_SetAsyncExc affected >1 thread")
-
-
 def _duration_ms(start_ns: int) -> int:
     return max(0, int((time.monotonic_ns() - start_ns) / 1_000_000))
 
 
 def _student_traceback(exc: BaseException) -> str:
-    """Format ``exc``'s traceback starting at the first ``<student>`` frame.
+    """Format exc's traceback starting at the first <student> frame.
 
     Without this, every traceback shows host.py's ``exec(compiled, globs)``
     frame, which is irrelevant noise for students.
@@ -138,117 +106,243 @@ def _student_traceback(exc: BaseException) -> str:
     return "".join(lines)
 
 
-# ---- input() override --------------------------------------------------
+# ===========================================================================
+# Worker mode
+# ===========================================================================
 
 
-def _make_input_fn(state: _RunState):
-    """Return a replacement for builtins.input bound to *state*.
+def _make_worker_input_fn(run_id: str, stdin_reader: io.TextIOWrapper):
+    """Return a builtins.input replacement for the worker subprocess.
 
-    Emits an ``input_request`` frame then blocks the worker thread on the
-    run's queue until a matching ``input_response`` arrives (or the run is
-    cancelled, in which case KeyboardInterrupt is raised).
+    Emits an ``input_request`` frame then blocks reading stdin until the
+    orchestrator writes back a matching ``input_response`` frame.
     """
+    next_req_id = 0
+    req_lock = threading.Lock()
+
     def _input(prompt: str = "") -> str:
-        req_id = state.next_request_id()
+        nonlocal next_req_id
+        with req_lock:
+            req_id = next_req_id
+            next_req_id += 1
         _emit({
             "type": "input_request",
-            "id": state.id,
+            "id": run_id,
             "request_id": req_id,
             "prompt": str(prompt),
         })
         while True:
+            line = stdin_reader.readline()
+            if not line:
+                raise KeyboardInterrupt  # stdin closed = run cancelled
+            line = line.strip()
+            if not line:
+                continue
             try:
-                response = state.input_queue.get(timeout=0.1)
-                if response.get("request_id") == req_id:
-                    return str(response.get("value", ""))
-                # Wrong request_id — re-enqueue and loop (shouldn't happen in v1).
-                state.input_queue.put(response)
-            except queue.Empty:
-                if state.cancelled:
-                    raise KeyboardInterrupt
+                resp = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                resp.get("type") == "input_response"
+                and resp.get("request_id") == req_id
+            ):
+                return str(resp.get("value", ""))
+
     return _input
 
 
-# ---- worker ------------------------------------------------------------
+def _worker_main() -> int:
+    """Entry point for a per-run worker subprocess (launched with --worker)."""
+    stdin = io.TextIOWrapper(
+        sys.stdin.buffer, encoding="utf-8", errors="replace", newline="\n"
+    )
 
+    raw = stdin.readline()
+    if not raw:
+        return 1
+    try:
+        ctx = json.loads(raw.strip())
+    except json.JSONDecodeError as exc:
+        _log("error", f"worker: bad exec context: {exc.msg}")
+        return 1
 
-def _run_worker(state: _RunState) -> None:
-    out = _StreamWriter(state.id, "stdout")
-    err = _StreamWriter(state.id, "stderr")
+    run_id = ctx.get("id")
+    code = ctx.get("code")
+    cwd = ctx.get("cwd")
+    if not isinstance(run_id, str) or not isinstance(code, str):
+        _log("error", "worker: exec context missing id or code")
+        return 1
+
+    start_ns = time.monotonic_ns()
+    out = _StreamWriter(run_id, "stdout")
+    err = _StreamWriter(run_id, "stderr")
     status = "ok"
 
-    try:
-        if state.cwd:
-            try:
-                os.chdir(state.cwd)
-            except OSError as exc:
-                _log("warn", f"chdir failed: {exc!r}")
+    if isinstance(cwd, str):
+        try:
+            os.chdir(cwd)
+        except OSError as exc:
+            _log("warn", f"chdir failed: {exc!r}")
 
-        globs: dict = {
-            "__name__": "__main__",
-            "__doc__": None,
-            "__package__": None,
-            "__loader__": None,
-            "__spec__": None,
-            "__builtins__": __builtins__,
-            "__file__": _STUDENT_FILE,
-            "input": _make_input_fn(state),
-        }
+    globs: dict = {
+        "__name__": "__main__",
+        "__doc__": None,
+        "__package__": None,
+        "__loader__": None,
+        "__spec__": None,
+        "__builtins__": __builtins__,
+        "__file__": _STUDENT_FILE,
+        "input": _make_worker_input_fn(run_id, stdin),
+    }
 
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            try:
-                compiled = compile(state.code, _STUDENT_FILE, "exec")
-                exec(compiled, globs)
-            except KeyboardInterrupt:
-                status = "cancelled"
-            except SystemExit as exc:  # NOSONAR python:S5754
-                # Don't reraise: SystemExit from student code must end the
-                # *run*, not the host. The host process services many runs
-                # in one session. sys.exit() / sys.exit(0) is treated as a
-                # clean run end, matching what `python script.py` does.
-                code = exc.code
-                if code in (None, 0):
-                    status = "ok"
-                else:
-                    status = "error"
-                    _emit({
-                        "type": "exception",
-                        "id": state.id,
-                        "exc_type": "SystemExit",
-                        "message": str(code),
-                        "traceback": _student_traceback(exc),
-                    })
-            except BaseException as exc:  # noqa: BLE001
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            compiled = compile(code, _STUDENT_FILE, "exec")
+            exec(compiled, globs)
+        except KeyboardInterrupt:
+            status = "cancelled"
+        except SystemExit as exc:  # NOSONAR python:S5754
+            # SystemExit from student code must end the run, not the worker
+            # subprocess.  sys.exit(0) / sys.exit(None) is a clean finish.
+            exit_code = exc.code
+            if exit_code in (None, 0):
+                status = "ok"
+            else:
                 status = "error"
                 _emit({
                     "type": "exception",
-                    "id": state.id,
-                    "exc_type": type(exc).__name__,
-                    "message": str(exc),
+                    "id": run_id,
+                    "exc_type": "SystemExit",
+                    "message": str(exit_code),
                     "traceback": _student_traceback(exc),
                 })
+        except BaseException as exc:  # noqa: BLE001
+            status = "error"
+            _emit({
+                "type": "exception",
+                "id": run_id,
+                "exc_type": type(exc).__name__,
+                "message": str(exc),
+                "traceback": _student_traceback(exc),
+            })
+
+    _emit({
+        "type": "done",
+        "id": run_id,
+        "status": status,
+        "duration_ms": _duration_ms(start_ns),
+    })
+    return 0
+
+
+# ===========================================================================
+# Orchestrator mode
+# ===========================================================================
+
+
+class _RunState:
+    __slots__ = ("id", "start_ns", "proc", "timer", "thread")
+
+    def __init__(self, run_id: str, start_ns: int):
+        self.id = run_id
+        self.start_ns = start_ns
+        self.proc: subprocess.Popen | None = None
+        self.timer: threading.Timer | None = None
+        self.thread: threading.Thread | None = None  # pump thread
+
+
+_state_lock = threading.Lock()
+_active: _RunState | None = None
+
+
+def _kill_run(state: _RunState) -> None:
+    """Kill the worker subprocess at OS level. The pump thread emits done."""
+    if state.timer is not None:
+        state.timer.cancel()
+        state.timer = None
+    if state.proc is not None:
+        try:
+            state.proc.kill()
+        except ProcessLookupError:
+            pass  # already dead
+
+
+def _drain_stderr(proc: subprocess.Popen, run_id: str) -> None:
+    """Drain subprocess stderr continuously so the OS pipe buffer can't fill."""
+    try:
+        reader = io.TextIOWrapper(
+            proc.stderr, encoding="utf-8", errors="replace"
+        )
+        for line in reader:
+            line = line.strip()
+            if line:
+                _log("warn", f"worker[{run_id[:8]}] stderr: {line}")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _pump_worker(proc: subprocess.Popen, state: _RunState) -> None:
+    """Read frames from the worker subprocess stdout and relay to Flutter."""
+    saw_done = False
+    try:
+        reader = io.TextIOWrapper(
+            proc.stdout, encoding="utf-8", errors="replace", newline="\n"
+        )
+        for raw_line in reader:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                frame = json.loads(line)
+            except json.JSONDecodeError:
+                _log("warn", f"worker emitted bad JSON: {line[:80]!r}")
+                continue
+            if frame.get("type") == "done":
+                saw_done = True
+            _emit(frame)
+    except Exception as exc:  # noqa: BLE001
+        _log("warn", f"pump error for run {state.id[:8]}: {exc!r}")
     finally:
-        if state.cancelled and status != "error":
-            status = "cancelled"
-        _emit({
-            "type": "done",
-            "id": state.id,
-            "status": status,
-            "duration_ms": _duration_ms(state.start_ns),
-        })
+        if state.timer is not None:
+            state.timer.cancel()
+            state.timer = None
+        if not saw_done:
+            _emit({
+                "type": "done",
+                "id": state.id,
+                "status": "cancelled",
+                "duration_ms": _duration_ms(state.start_ns),
+            })
         with _state_lock:
             global _active
             if _active is state:
                 _active = None
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            proc.wait(timeout=2.0)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            proc.stdin.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
-# ---- frame handlers ----------------------------------------------------
+# ---- frame handlers -------------------------------------------------------
 
 
 def _handle_exec(frame: dict) -> None:
     run_id = frame.get("id")
     code = frame.get("code")
     cwd = frame.get("cwd")
+    timeout_ms_raw = frame.get("timeout_ms")
+    timeout_s: float | None = None
+    if isinstance(timeout_ms_raw, (int, float)) and timeout_ms_raw > 0:
+        timeout_s = timeout_ms_raw / 1000.0
+
     if not isinstance(run_id, str) or not isinstance(code, str):
         _log("error", "exec frame missing id or code")
         return
@@ -271,31 +365,92 @@ def _handle_exec(frame: dict) -> None:
                 "duration_ms": 0,
             })
             return
-        state = _RunState(run_id, code, cwd if isinstance(cwd, str) else None)
-        state.start_ns = time.monotonic_ns()
-        thread = threading.Thread(
-            target=_run_worker,
-            args=(state,),
-            name=f"py-run-{run_id[:8]}",
-            daemon=True,
-        )
-        state.thread = thread
+        state = _RunState(run_id, time.monotonic_ns())
         _active = state
 
-    thread.start()
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONNOUSERSITE": "1",
+    }
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-s", "-X", "utf8", "-u", _SCRIPT_PATH, "--worker"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+    except OSError as exc:
+        _log("error", f"failed to spawn worker: {exc!r}")
+        _emit({
+            "type": "exception",
+            "id": run_id,
+            "exc_type": "OSError",
+            "message": str(exc),
+            "traceback": "",
+        })
+        _emit({
+            "type": "done",
+            "id": run_id,
+            "status": "error",
+            "duration_ms": 0,
+        })
+        with _state_lock:
+            if _active is state:
+                _active = None
+        return
+
+    state.proc = proc
+
+    context_line = (
+        json.dumps(
+            {"type": "exec", "id": run_id, "code": code, "cwd": cwd},
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
+    proc.stdin.write(context_line.encode("utf-8"))
+    proc.stdin.flush()
+
+    pump = threading.Thread(
+        target=_pump_worker,
+        args=(proc, state),
+        daemon=True,
+        name=f"py-pump-{run_id[:8]}",
+    )
+    pump.start()
+    state.thread = pump
+
+    threading.Thread(
+        target=_drain_stderr,
+        args=(proc, run_id),
+        daemon=True,
+        name=f"py-stderr-{run_id[:8]}",
+    ).start()
+
+    if timeout_s is not None:
+        timer = threading.Timer(timeout_s, _handle_timeout, args=(state,))
+        timer.daemon = True
+        timer.start()
+        state.timer = timer
+
+
+def _handle_timeout(state: _RunState) -> None:
+    with _state_lock:
+        if _active is not state:
+            return  # run already finished before the timer fired
+    _log("warn", f"timeout reached for run {state.id[:8]}")
+    _kill_run(state)
 
 
 def _handle_cancel(frame: dict) -> None:
-    """Cancel the active run.
+    """Cancel the active run by killing its worker subprocess at OS level.
 
-    Best-effort under the v1 single-process design: PyThreadState_SetAsyncExc
-    only fires at the worker's next bytecode boundary, so a worker stuck in a
-    long C call that doesn't release the GIL (e.g. ``math.factorial(5_000_000)``)
-    will defeat both the async exception AND the watchdog (the watchdog thread
-    can't acquire the GIL to run). Step 11 of PYTHON_IMPLEMENTATION.md replaces
-    this with a per-run subprocess that we can kill at the OS level. Cooperative
-    code (anything that yields the GIL — ``time.sleep``, I/O, pure-Python loops)
-    cancels promptly.
+    Because the student code runs in a separate subprocess, even GIL-holding C
+    calls (e.g. ``math.factorial(5_000_000)``) are terminated immediately by the
+    OS without waiting for the GIL.
     """
     run_id = frame.get("id")
     if not isinstance(run_id, str):
@@ -304,28 +459,7 @@ def _handle_cancel(frame: dict) -> None:
         state = _active
     if state is None or state.id != run_id:
         return
-    state.cancelled = True
-    if state.thread is not None and state.thread.is_alive():
-        _async_raise(state.thread, KeyboardInterrupt)
-
-    def _watchdog() -> None:
-        deadline = time.monotonic() + _HARD_KILL_GRACE_S
-        while time.monotonic() < deadline:
-            if state.thread is None or not state.thread.is_alive():
-                return
-            time.sleep(0.01)
-        _emit({
-            "type": "done",
-            "id": state.id,
-            "status": "cancelled",
-            "duration_ms": _duration_ms(state.start_ns),
-        })
-        _log("warn", f"hard-kill after cancel grace: run {state.id}")
-        os._exit(0)
-
-    threading.Thread(
-        target=_watchdog, name="py-cancel-watchdog", daemon=True
-    ).start()
+    _kill_run(state)
 
 
 def _handle_input_response(frame: dict) -> None:
@@ -336,9 +470,26 @@ def _handle_input_response(frame: dict) -> None:
         return
     with _state_lock:
         state = _active
-    if state is None or state.id != run_id:
+    if state is None or state.id != run_id or state.proc is None:
         return
-    state.input_queue.put({"request_id": request_id, "value": str(value)})
+    if state.proc.poll() is not None:
+        return  # subprocess already dead
+    try:
+        response_line = (
+            json.dumps(
+                {
+                    "type": "input_response",
+                    "request_id": request_id,
+                    "value": str(value),
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+        state.proc.stdin.write(response_line.encode("utf-8"))
+        state.proc.stdin.flush()
+    except OSError:
+        pass  # subprocess stdin closed
 
 
 _HANDLERS = {
@@ -348,7 +499,7 @@ _HANDLERS = {
 }
 
 
-# ---- main loop ---------------------------------------------------------
+# ---- main loop ------------------------------------------------------------
 
 
 def _ready() -> None:
@@ -359,7 +510,7 @@ def _ready() -> None:
         "type": "ready",
         "python_version": f"{py.major}.{py.minor}.{py.micro}",
         "platform": f"{sysname}_{arch}",
-        "capabilities": ["exec", "cancel", "input"],
+        "capabilities": ["exec", "cancel", "input", "timeout"],
         "protocol_version": _PROTOCOL_VERSION,
     })
 
@@ -388,7 +539,7 @@ def _dispatch_line(line: str) -> None:
 
 
 def _await_active_run() -> None:
-    """Block until any active run finishes, so its done frame is emitted."""
+    """Block until any active run's pump thread finishes."""
     with _state_lock:
         pending = _active.thread if _active is not None else None
     if pending is not None:
@@ -404,9 +555,9 @@ def main() -> int:
     while True:
         line = stdin.readline()
         if not line:
-            # EOF on stdin -> graceful shutdown. Wait for any active run to
-            # finish so its `done` frame is emitted before we exit (daemon
-            # workers would otherwise be killed during interpreter shutdown).
+            # EOF on stdin -> graceful shutdown.  Wait for any active run so
+            # its `done` frame is emitted before we exit (pump thread is a
+            # daemon, so the interpreter would otherwise kill it mid-frame).
             _await_active_run()
             break
         _dispatch_line(line)
@@ -415,4 +566,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    if "--worker" in sys.argv:
+        sys.exit(_worker_main())
+    else:
+        sys.exit(main())

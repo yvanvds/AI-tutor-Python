@@ -77,17 +77,21 @@ class FrameDecodeException implements Exception {
 
 @immutable
 final class ExecFrame extends HostInboundFrame {
-  const ExecFrame({required this.id, required this.code, this.cwd});
+  const ExecFrame({required this.id, required this.code, this.cwd, this.timeoutMs});
 
   factory ExecFrame._fromJson(Map<String, Object?> json) => ExecFrame(
         id: _requireString(json, 'id'),
         code: _requireString(json, 'code'),
         cwd: _optionalString(json, 'cwd'),
+        timeoutMs: _optionalInt(json, 'timeout_ms'),
       );
 
   final String id;
   final String code;
   final String? cwd;
+
+  /// Optional run timeout in milliseconds. Null means no timeout.
+  final int? timeoutMs;
 
   @override
   String get type => 'exec';
@@ -98,6 +102,7 @@ final class ExecFrame extends HostInboundFrame {
         'id': id,
         'code': code,
         if (cwd != null) 'cwd': cwd,
+        if (timeoutMs != null) 'timeout_ms': timeoutMs,
       };
 }
 

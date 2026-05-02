@@ -152,7 +152,10 @@ class PyRunner {
 
   /// Start a Python run. Cancels any currently in-flight run before sending
   /// the new `exec`. Returns immediately; observe progress via the handle.
-  RunHandle run(String code, {String? cwd}) {
+  ///
+  /// [timeout] is forwarded to the host as `timeout_ms`; the host kills the
+  /// worker subprocess when it elapses. Null means no timeout.
+  RunHandle run(String code, {String? cwd, Duration? timeout}) {
     if (_status != PyRunnerStatus.ready || _host == null) {
       throw StateError(
         'PyRunner is not ready (status: $_status); call start() first.',
@@ -172,7 +175,7 @@ class PyRunner {
       prior._requestCancel();
     }
 
-    unawaited(_scheduleStart(ctrl, prior, code, cwd));
+    unawaited(_scheduleStart(ctrl, prior, code, cwd, timeout));
 
     return ctrl.handle;
   }
@@ -182,6 +185,7 @@ class PyRunner {
     _RunController? prior,
     String code,
     String? cwd,
+    Duration? timeout,
   ) async {
     if (prior != null) {
       try {
@@ -213,7 +217,12 @@ class PyRunner {
 
     _activeRuns[ctrl.id] = ctrl;
     ctrl._markExecSent();
-    _host!.send(ExecFrame(id: ctrl.id, code: code, cwd: cwd));
+    _host!.send(ExecFrame(
+      id: ctrl.id,
+      code: code,
+      cwd: cwd,
+      timeoutMs: timeout?.inMilliseconds,
+    ));
 
     unawaited(ctrl.handle.done.whenComplete(() {
       _activeRuns.remove(ctrl.id);
