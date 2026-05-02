@@ -113,19 +113,64 @@ class _GoalsPageState extends State<GoalsPage> {
         return;
       }
 
-      final confirmed = await _confirmImport(totalCount, tree.length);
-      if (!confirmed) return;
+      final mode = await _askImportMode(totalCount, tree.length);
+      if (mode == null) return;
+
+      var deletedCount = 0;
+      if (mode == _ImportMode.replace) {
+        deletedCount = await _deleteAllGoals();
+      }
 
       await _insertTree(tree, parentId: null);
 
       if (mounted) {
-        _showSnack('Imported $totalCount goal(s)');
+        final suffix = mode == _ImportMode.replace
+            ? ' (replaced $deletedCount existing)'
+            : '';
+        _showSnack('Imported $totalCount goal(s)$suffix');
       }
     } catch (e) {
       if (mounted) _showSnack('Import failed: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<int> _deleteAllGoals() async {
+    final all = await DataService.goals.getAllGoalsOnce();
+    final roots = await DataService.goals.getRootGoalsOnce();
+    for (final root in roots) {
+      await DataService.goals.deleteSubtree(root.id);
+    }
+    return all.length;
+  }
+
+  Future<_ImportMode?> _askImportMode(int total, int rootCount) async {
+    return showDialog<_ImportMode>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import goals'),
+        content: Text(
+          'The file contains $rootCount root goal(s) and $total total node(s).\n\n'
+          '• Add: append to your existing goals (new ids assigned).\n'
+          '• Replace: delete all current goals first, then import.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_ImportMode.add),
+            child: const Text('Add'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(_ImportMode.replace),
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<List<Map<String, dynamic>>?> _pickAndParseGoalsFile() async {
@@ -150,31 +195,6 @@ class _GoalsPageState extends State<GoalsPage> {
     }
 
     return (decoded['goals'] as List).cast<Map<String, dynamic>>();
-  }
-
-  Future<bool> _confirmImport(int total, int rootCount) async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import goals?'),
-        content: Text(
-          'This will add $rootCount root goal(s) and $total total node(s) '
-          'to your existing goals. Existing goals will not be touched. '
-          'New ids are assigned to every imported goal.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Import'),
-          ),
-        ],
-      ),
-    );
-    return answer ?? false;
   }
 
   Future<void> _insertTree(
@@ -251,3 +271,5 @@ List<String> _stringList(dynamic v) {
   }
   return const [];
 }
+
+enum _ImportMode { add, replace }

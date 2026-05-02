@@ -214,7 +214,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
             onPressed: _exportAllToMarkdown,
           ),
           IconButton(
-            tooltip: 'Import from Markdown (adds, does not overwrite)',
+            tooltip: 'Import from Markdown',
             icon: const Icon(Icons.file_upload_outlined),
             onPressed: _importFromMarkdown,
           ),
@@ -362,14 +362,49 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
         return;
       }
 
-      final stats = await _applyMarkdownImport(parsed);
+      final mode = await _askInstructionsImportMode(parsed.length);
+      if (mode == null) return;
+
+      final stats = await _applyMarkdownImport(parsed, mode);
       if (stats.refreshSelected) await _reloadSelectedDocument();
 
       if (!mounted) return;
-      _showSnackBar(context, _formatImportSummary(stats));
+      _showSnackBar(context, _formatImportSummary(stats, mode));
     } catch (e) {
       if (mounted) _showSnackBar(context, 'Import failed: $e');
     }
+  }
+
+  Future<_InstructionsImportMode?> _askInstructionsImportMode(
+    int docCount,
+  ) async {
+    return showDialog<_InstructionsImportMode>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import instructions'),
+        content: Text(
+          'The file contains $docCount document(s).\n\n'
+          '• Add: only insert sections that don’t already exist; keep current values.\n'
+          '• Replace: overwrite each imported document’s sections with the file’s contents. Documents not in the file are left alone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_InstructionsImportMode.add),
+            child: const Text('Add'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_InstructionsImportMode.replace),
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<String?> _pickMarkdownPath() async {
@@ -389,13 +424,15 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
   Future<_ImportStats> _applyMarkdownImport(
     Map<String, Map<String, String>> parsed,
+    _InstructionsImportMode mode,
   ) async {
     final existing = await DataService.instructions.getAll();
     final byId = {for (final d in existing) d.id: d};
 
     final stats = _ImportStats();
     for (final entry in parsed.entries) {
-      final touched = await _importDocEntry(entry.key, entry.value, byId, stats);
+      final touched =
+          await _importDocEntry(entry.key, entry.value, byId, stats, mode);
       if (touched && entry.key == _selectedDocId) stats.refreshSelected = true;
     }
     return stats;
@@ -406,6 +443,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     Map<String, String> importedSections,
     Map<String, Instruction> byId,
     _ImportStats stats,
+    _InstructionsImportMode mode,
   ) async {
     final current = byId[id];
     if (current == null) {
@@ -415,6 +453,17 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       );
       stats.newDocs++;
       stats.addedSections += importedSections.length;
+      return true;
+    }
+
+    if (mode == _InstructionsImportMode.replace) {
+      // Wholesale overwrite: imported sections become the document's sections.
+      if (_mapEquals(current.sections, importedSections)) return false;
+      await DataService.instructions.upsert(
+        Instruction(id: id, sections: importedSections),
+      );
+      stats.updatedDocs++;
+      stats.replacedSections += importedSections.length;
       return true;
     }
 
@@ -447,7 +496,27 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     }
   }
 
-  String _formatImportSummary(_ImportStats stats) {
+  String _formatImportSummary(
+    _ImportStats stats,
+    _InstructionsImportMode mode,
+  ) {
+    if (mode == _InstructionsImportMode.replace) {
+      if (stats.replacedSections == 0 && stats.newDocs == 0) {
+        return 'Nothing changed (file matched existing content)';
+      }
+      final parts = <String>[];
+      if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
+      if (stats.updatedDocs > 0) {
+        parts.add('${stats.updatedDocs} replaced');
+      }
+      if (stats.addedSections > 0) {
+        parts.add('${stats.addedSections} added section(s)');
+      }
+      if (stats.replacedSections > 0) {
+        parts.add('${stats.replacedSections} replaced section(s)');
+      }
+      return parts.join(', ');
+    }
     if (stats.addedSections == 0) {
       return 'Nothing imported (all sections already exist)';
     }
@@ -742,10 +811,13 @@ List<String> _rewriteHeaders(List<String> lines, int shift) {
 
 class _ImportStats {
   int addedSections = 0;
+  int replacedSections = 0;
   int newDocs = 0;
   int updatedDocs = 0;
   bool refreshSelected = false;
 }
+
+enum _InstructionsImportMode { add, replace }
 
 bool _mapEquals(Map<String, String> a, Map<String, String> b) {
   if (identical(a, b)) return true;

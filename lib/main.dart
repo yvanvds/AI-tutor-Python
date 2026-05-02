@@ -1,4 +1,3 @@
-import 'package:ai_tutor_python/boot_gate.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/create_text_theme.dart';
@@ -50,37 +49,35 @@ class GoalsApp extends StatelessWidget {
         DataService.globalConfig.localStorage.isKeyPresent,
       ],
       builder: (context, values) {
-        return BootGate(
-          child: MaterialApp(
-            navigatorKey: appNavigatorKey,
-            title: 'Python Course',
-            theme: brightness == Brightness.light
-                ? theme.light()
-                : theme.dark(),
-            home: Builder(
-              builder: (context) {
-                final identity = values[0] as AccountIdentity?;
-                if (identity == null) return const SignInPage();
+        return MaterialApp(
+          navigatorKey: appNavigatorKey,
+          title: 'Python Course',
+          theme: brightness == Brightness.light
+              ? theme.light()
+              : theme.dark(),
+          home: Builder(
+            builder: (context) {
+              final identity = values[0] as AccountIdentity?;
+              if (identity == null) return const SignInPage();
 
-                // Account doc still loading (poll interval can be a few
-                // seconds on first sign-in) — show a spinner.
-                if (values[1] == null || values[2] == null) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
+              // Account doc still loading (poll interval can be a few
+              // seconds on first sign-in) — show a spinner.
+              if (values[1] == null || values[2] == null) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
 
-                final hasGlobalPermission =
-                    (values[1] as Account).mayUseGlobalKey;
-                final hasLocalKey = values[2] as bool;
+              final hasGlobalPermission =
+                  (values[1] as Account).mayUseGlobalKey;
+              final hasLocalKey = values[2] as bool;
 
-                if (!hasGlobalPermission && !hasLocalKey) {
-                  return const LocalKeyGateScreen();
-                }
+              if (!hasGlobalPermission && !hasLocalKey) {
+                return const LocalKeyGateScreen();
+              }
 
-                return const HomeShell();
-              },
-            ),
+              return const HomeShell();
+            },
           ),
         );
       },
