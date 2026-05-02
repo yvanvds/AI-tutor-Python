@@ -353,90 +353,108 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
   Future<void> _importFromMarkdown() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        dialogTitle: 'Select Markdown file to import',
-        type: FileType.custom,
-        allowedExtensions: ['md', 'markdown'],
-      );
-      if (result == null || result.files.isEmpty) return;
-      final path = result.files.single.path;
-      if (path == null) {
-        if (mounted) _showSnackBar(context, 'Could not read selected file');
-        return;
-      }
+      final path = await _pickMarkdownPath();
+      if (path == null) return;
 
-      final content = await File(path).readAsString();
-      final parsed = _parseMarkdownImport(content);
+      final parsed = _parseMarkdownImport(await File(path).readAsString());
       if (parsed.isEmpty) {
         if (mounted) _showSnackBar(context, 'No documents found in file');
         return;
       }
 
-      final existing = await DataService.instructions.getAll();
-      final byId = {for (final d in existing) d.id: d};
-
-      var addedSections = 0;
-      var newDocs = 0;
-      var updatedDocs = 0;
-      var refreshSelected = false;
-
-      for (final entry in parsed.entries) {
-        final id = entry.key;
-        final importedSections = entry.value;
-
-        final current = byId[id];
-        if (current == null) {
-          if (importedSections.isEmpty) continue;
-          await DataService.instructions.upsert(
-            Instruction(id: id, sections: importedSections),
-          );
-          newDocs++;
-          addedSections += importedSections.length;
-          if (id == _selectedDocId) refreshSelected = true;
-        } else {
-          final merged = Map<String, String>.from(current.sections);
-          var changed = 0;
-          for (final s in importedSections.entries) {
-            if (!merged.containsKey(s.key)) {
-              merged[s.key] = s.value;
-              changed++;
-            }
-          }
-          if (changed > 0) {
-            await DataService.instructions.upsert(
-              Instruction(id: id, sections: merged),
-            );
-            updatedDocs++;
-            addedSections += changed;
-            if (id == _selectedDocId) refreshSelected = true;
-          }
-        }
-      }
-
-      if (refreshSelected && _selectedDocId != null) {
-        final refreshed = await DataService.instructions.getAll();
-        Instruction? doc;
-        for (final d in refreshed) {
-          if (d.id == _selectedDocId) {
-            doc = d;
-            break;
-          }
-        }
-        if (doc != null) _selectDocument(doc);
-      }
+      final stats = await _applyMarkdownImport(parsed);
+      if (stats.refreshSelected) await _reloadSelectedDocument();
 
       if (!mounted) return;
-      if (addedSections == 0) {
-        _showSnackBar(context, 'Nothing imported (all sections already exist)');
-      } else {
-        final parts = <String>['Imported $addedSections section(s)'];
-        if (newDocs > 0) parts.add('$newDocs new doc(s)');
-        if (updatedDocs > 0) parts.add('$updatedDocs updated');
-        _showSnackBar(context, parts.join(', '));
-      }
+      _showSnackBar(context, _formatImportSummary(stats));
     } catch (e) {
       if (mounted) _showSnackBar(context, 'Import failed: $e');
     }
+  }
+
+  Future<String?> _pickMarkdownPath() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Select Markdown file to import',
+      type: FileType.custom,
+      allowedExtensions: ['md', 'markdown'],
+    );
+    if (result == null || result.files.isEmpty) return null;
+    final path = result.files.single.path;
+    if (path == null) {
+      if (mounted) _showSnackBar(context, 'Could not read selected file');
+      return null;
+    }
+    return path;
+  }
+
+  Future<_ImportStats> _applyMarkdownImport(
+    Map<String, Map<String, String>> parsed,
+  ) async {
+    final existing = await DataService.instructions.getAll();
+    final byId = {for (final d in existing) d.id: d};
+
+    final stats = _ImportStats();
+    for (final entry in parsed.entries) {
+      final touched = await _importDocEntry(entry.key, entry.value, byId, stats);
+      if (touched && entry.key == _selectedDocId) stats.refreshSelected = true;
+    }
+    return stats;
+  }
+
+  Future<bool> _importDocEntry(
+    String id,
+    Map<String, String> importedSections,
+    Map<String, Instruction> byId,
+    _ImportStats stats,
+  ) async {
+    final current = byId[id];
+    if (current == null) {
+      if (importedSections.isEmpty) return false;
+      await DataService.instructions.upsert(
+        Instruction(id: id, sections: importedSections),
+      );
+      stats.newDocs++;
+      stats.addedSections += importedSections.length;
+      return true;
+    }
+
+    final merged = Map<String, String>.from(current.sections);
+    var changed = 0;
+    for (final s in importedSections.entries) {
+      if (!merged.containsKey(s.key)) {
+        merged[s.key] = s.value;
+        changed++;
+      }
+    }
+    if (changed == 0) return false;
+    await DataService.instructions.upsert(
+      Instruction(id: id, sections: merged),
+    );
+    stats.updatedDocs++;
+    stats.addedSections += changed;
+    return true;
+  }
+
+  Future<void> _reloadSelectedDocument() async {
+    final id = _selectedDocId;
+    if (id == null) return;
+    final refreshed = await DataService.instructions.getAll();
+    for (final d in refreshed) {
+      if (d.id == id) {
+        _selectDocument(d);
+        return;
+      }
+    }
+  }
+
+  String _formatImportSummary(_ImportStats stats) {
+    if (stats.addedSections == 0) {
+      return 'Nothing imported (all sections already exist)';
+    }
+    final parts = <String>['Imported ${stats.addedSections} section(s)'];
+    if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
+    if (stats.updatedDocs > 0) parts.add('${stats.updatedDocs} updated');
+    return parts.join(', ');
   }
 
   Future<void> _renameDocument() async {
@@ -562,65 +580,77 @@ void _showSnackBar(BuildContext context, String message) {
 /// containing `## section` blocks. Section bodies are preserved verbatim
 /// (no header un-bumping) so the parser also works on hand-written files.
 Map<String, Map<String, String>> _parseMarkdownImport(String md) {
-  final lines = md.split('\n');
+  return _MarkdownImportParser().parse(md);
+}
+
+class _MarkdownImportParser {
+  static final _fenceRe = RegExp(r'^\s*(```|~~~)');
+  // `^# ` matches level-1 only (level-2 has `#` where `\s` is required).
+  static final _h1Re = RegExp(r'^#\s+(.+?)\s*$');
+  static final _h2Re = RegExp(r'^##\s+(.+?)\s*$');
+  static final _leadingNewlinesRe = RegExp(r'^\n+');
+
   final result = <String, Map<String, String>>{};
+  final body = StringBuffer();
   String? currentDoc;
   String? currentSection;
-  final body = StringBuffer();
-  var inFence = false;
+  bool inFence = false;
 
-  final fenceRe = RegExp(r'^\s*(```|~~~)');
-  // `^# ` matches level-1 only (level-2 has `#` where `\s` is required).
-  final h1Re = RegExp(r'^#\s+(.+?)\s*$');
-  final h2Re = RegExp(r'^##\s+(.+?)\s*$');
+  Map<String, Map<String, String>> parse(String md) {
+    for (final raw in md.split('\n')) {
+      _processLine(raw.endsWith('\r') ? raw.substring(0, raw.length - 1) : raw);
+    }
+    _flushSection();
+    return result;
+  }
 
-  void flushSection() {
+  void _processLine(String line) {
+    if (_fenceRe.hasMatch(line)) {
+      inFence = !inFence;
+      if (currentSection != null) body.writeln(line);
+      return;
+    }
+    if (!inFence && _tryHandleHeader(line)) return;
+    if (currentSection != null) body.writeln(line);
+  }
+
+  bool _tryHandleHeader(String line) {
+    final m2 = _h2Re.firstMatch(line);
+    if (m2 != null) {
+      _startSection(m2.group(1)!.trim());
+      return true;
+    }
+    final m1 = _h1Re.firstMatch(line);
+    if (m1 != null) {
+      _startDocument(m1.group(1)!.trim());
+      return true;
+    }
+    return false;
+  }
+
+  void _startSection(String key) {
+    _flushSection();
+    currentSection = key;
+    final doc = currentDoc;
+    if (doc != null) result.putIfAbsent(doc, () => <String, String>{});
+  }
+
+  void _startDocument(String id) {
+    _flushSection();
+    currentDoc = id;
+    currentSection = null;
+    result.putIfAbsent(id, () => <String, String>{});
+  }
+
+  void _flushSection() {
     final doc = currentDoc;
     final section = currentSection;
     if (doc != null && section != null) {
-      final text = body.toString().replaceFirst(RegExp(r'^\n+'), '').trimRight();
+      final text = body.toString().replaceFirst(_leadingNewlinesRe, '').trimRight();
       result.putIfAbsent(doc, () => <String, String>{})[section] = text;
     }
     body.clear();
   }
-
-  for (final raw in lines) {
-    final line = raw.endsWith('\r')
-        ? raw.substring(0, raw.length - 1)
-        : raw;
-
-    if (fenceRe.hasMatch(line)) {
-      inFence = !inFence;
-      if (currentSection != null) body.writeln(line);
-      continue;
-    }
-
-    if (!inFence) {
-      final m2 = h2Re.firstMatch(line);
-      if (m2 != null) {
-        flushSection();
-        currentSection = m2.group(1)!.trim();
-        final doc = currentDoc;
-        if (doc != null) {
-          result.putIfAbsent(doc, () => <String, String>{});
-        }
-        continue;
-      }
-      final m1 = h1Re.firstMatch(line);
-      if (m1 != null) {
-        flushSection();
-        final id = m1.group(1)!.trim();
-        currentDoc = id;
-        currentSection = null;
-        result.putIfAbsent(id, () => <String, String>{});
-        continue;
-      }
-    }
-
-    if (currentSection != null) body.writeln(line);
-  }
-  flushSection();
-  return result;
 }
 
 String _buildMarkdownExport(List<Instruction> docs) {
@@ -708,6 +738,13 @@ List<String> _rewriteHeaders(List<String> lines, int shift) {
     out.add('${'#' * newLevel}${line.substring(level)}');
   }
   return out;
+}
+
+class _ImportStats {
+  int addedSections = 0;
+  int newDocs = 0;
+  int updatedDocs = 0;
+  bool refreshSelected = false;
 }
 
 bool _mapEquals(Map<String, String> a, Map<String, String> b) {

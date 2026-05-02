@@ -1,12 +1,11 @@
-// 2.1 — Tests `TutorService`. The service's job is to drive a request
-// through the OpenAI connector, route the parsed response to a handler, and
-// keep a `state` notifier in sync. We mock the connector and conductor at
-// the constructor boundary (added in this pass) and the chat/code/sound/
-// report services at the locator. The InstructionGenerator is mocked too —
-// its real impl is covered by 1B.1.
+// 2.1 — Tests `TutorService`. The service drives a request through the
+// OpenAI connector (streaming for student-facing turns, one-shot for
+// `status`), routes the parsed response to a handler, and keeps a `state`
+// notifier in sync. We mock the connector and conductor at the constructor
+// boundary and the chat/code/sound/report services at the locator.
 //
-// State checks "during sendRequest" use a Completer so we can pause inside
-// the request and observe the working state, then complete it and continue.
+// State checks "during sendRequest" use a Completer to pause inside the
+// request and observe the working state, then complete it and continue.
 //
 // Routing checks decode the input string the connector receives — every
 // formatter encodes a `request_type` field, so we can assert the route
@@ -23,6 +22,7 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,16 +33,48 @@ import '../../helpers/mocks.dart';
 
 class _FakeChatResponse extends Fake implements ChatResponse {}
 
-/// Build a Responses API output payload whose first message contains the
-/// JSON-encoded body for one of our typed responses.
-List<Map<String, dynamic>> _outputFor(Map<String, dynamic> body) => [
-      {
-        'type': 'message',
-        'content': [
-          {'type': 'output_text', 'text': jsonEncode(body)},
-        ],
-      },
-    ];
+class _EmptyError implements ChatResponse {
+  const _EmptyError();
+  @override
+  String get type => 'error';
+  @override
+  Map<String, dynamic> toJson() => const {'type': 'error', 'message': ''};
+}
+
+/// Build an envelope-formatted assistant string from a typed-response body.
+/// `body` must contain a `type` and a `prompt` (or, for errors, a `message`).
+/// The prompt/message is moved into the `<TEXT>` section and every other
+/// field stays in `<META>`.
+String _envelopeFor(Map<String, dynamic> body) {
+  final meta = Map<String, dynamic>.from(body);
+  final text = meta.remove('prompt') ?? meta.remove('message') ?? '';
+  return '<TEXT>$text</TEXT><META>${jsonEncode(meta)}</META>';
+}
+
+/// Stream that emits a single completed response with optional text deltas.
+Stream<StreamChunk> _streamOf(Map<String, dynamic> body) async* {
+  final text = (body['prompt'] ?? body['message'] ?? '') as String;
+  if (text.isNotEmpty) yield StreamTextDelta(text);
+  yield StreamCompleted(AIResponseParser.parse(_envelopeFor(body)));
+}
+
+Stream<StreamChunk> _emptyStream() async* {
+  // No deltas, parser returns ErrorResponse for empty input → routes through
+  // ErrorResponseHandler → maybeRetry → resendRequestStream.
+  yield const StreamCompleted(_EmptyError());
+}
+
+/// Convenience to capture the input string passed to sendRequestStream.
+String _capturedStreamInput(MockOpenaiConnector connector) {
+  final captured = verify(
+    () => connector.sendRequestStream(
+      input: captureAny<String>(named: 'input'),
+      instructions: any<String>(named: 'instructions'),
+      inputs: any<PreviousInputs>(named: 'inputs'),
+    ),
+  ).captured.single as String;
+  return captured;
+}
 
 void main() {
   late MockOpenaiConnector connector;
@@ -72,10 +104,29 @@ void main() {
     when(() => instrGen.generateInstructions(any<ChatRequestType>()))
         .thenAnswer((_) async => '');
     when(() => connector.addResponse(any<ChatResponse>())).thenReturn(null);
-    // Default stub: empty output decodes to ErrorResponse → ErrorResponseHandler
-    // calls maybeRetry → _resendLastRequest. Tests can override.
+
+    // Default stub: empty stream → ErrorResponse → ErrorResponseHandler →
+    // maybeRetry → resendRequestStream. Tests can override.
+    when(
+      () => connector.sendRequestStream(
+        input: any<String>(named: 'input'),
+        instructions: any<String>(named: 'instructions'),
+        inputs: any<PreviousInputs>(named: 'inputs'),
+      ),
+    ).thenAnswer((_) => _emptyStream());
+    when(() => connector.resendRequestStream())
+        .thenAnswer((_) => _emptyStream());
+    // Status uses non-streaming sendRequest.
+    when(
+      () => connector.sendRequest(
+        input: any<String>(named: 'input'),
+        instructions: any<String>(named: 'instructions'),
+        inputs: any<PreviousInputs>(named: 'inputs'),
+      ),
+    ).thenAnswer((_) async => const ConnectorOk(''));
     when(() => connector.resendRequest())
-        .thenAnswer((_) async => const ConnectorOk(<dynamic>[]));
+        .thenAnswer((_) async => const ConnectorOk(''));
+
     when(() => conductor.setTarget()).thenAnswer((_) async {});
     when(() => conductor.getNextQuestion())
         .thenReturn((ChatRequestType.noResult, QuestionDifficulty.easy));
@@ -90,6 +141,10 @@ void main() {
     when(() => chat.addSystemMessage(any<String>())).thenReturn(null);
     when(() => chat.addTutorMessage(any<String>())).thenReturn(null);
     when(() => chat.addMessage(any<String>())).thenReturn(null);
+    when(() => chat.startStream()).thenReturn(null);
+    when(() => chat.updateStream(any<String>())).thenReturn(null);
+    when(() => chat.completeStream(any<String>())).thenReturn(null);
+    when(() => chat.failStream()).thenReturn(null);
     when(() => code.setText(any<String>())).thenReturn(null);
     when(() => sound.askQuestion()).thenAnswer((_) async {});
     when(() => report.updateForCurrentChildGoal(any<String>()))
@@ -112,43 +167,44 @@ void main() {
       );
 
   group('queryTutor — state transitions', () {
-    test('idle → working while the connector is in-flight, idle after success',
-        () async {
-      final completer = Completer<ConnectorResult>();
-      when(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).thenAnswer((_) => completer.future);
+    test(
+      'idle → working while the connector is in-flight, idle after success',
+      () async {
+        final controller = StreamController<StreamChunk>();
+        when(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        ).thenAnswer((_) => controller.stream);
 
-      final tutor = build();
-      expect(tutor.state.value, TutorState.idle);
+        final tutor = build();
+        expect(tutor.state.value, TutorState.idle);
 
-      // Fire-and-forget — we want to inspect state mid-flight.
-      final pending =
-          tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
-      // Let queryTutor reach the `await _connector.sendRequest(...)` point.
-      await Future<void>.delayed(Duration.zero);
-      expect(tutor.state.value, TutorState.working);
+        // Fire-and-forget — we want to inspect state mid-flight.
+        final pending =
+            tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
+        await Future<void>.delayed(Duration.zero);
+        expect(tutor.state.value, TutorState.working);
 
-      // Complete with an unparseable empty output → ErrorResponse → no follow-up.
-      completer.complete(const ConnectorOk([]));
-      await pending;
-      expect(tutor.state.value, TutorState.idle);
-    });
+        // Complete with an empty/error stream → ErrorResponse → no follow-up.
+        controller.add(const StreamCompleted(_EmptyError()));
+        await controller.close();
+        await pending;
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
 
     test('queryTutor short-circuits when state is not idle', () async {
-      // Pre-load with a stuck request to leave state != idle.
-      final stuck = Completer<ConnectorResult>();
+      final stuck = StreamController<StreamChunk>();
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer((_) => stuck.future);
+      ).thenAnswer((_) => stuck.stream);
 
       final tutor = build();
       // Drive into working.
@@ -157,80 +213,89 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(tutor.state.value, TutorState.working);
 
-      // A second call must short-circuit (no new sendRequest invocation).
+      // A second call must short-circuit (no new stream invocation).
       await tutor.queryTutor(
         type: ChatRequestType.studentQuestion,
         prompt: 'hi',
       );
       verify(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
       ).called(1);
 
-      stuck.complete(const ConnectorOk([])); // unblock the first one
+      stuck.add(const StreamCompleted(_EmptyError()));
+      await stuck.close();
     });
 
-    test('a CodeFeedback with allowed suggestion drives state to hasFollowUp',
-        () async {
-      when(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).thenAnswer((_) async => ConnectorOk(_outputFor({
+    test(
+      'a CodeFeedback with allowed suggestion drives state to hasFollowUp',
+      () async {
+        when(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        ).thenAnswer(
+          (_) => _streamOf({
             'type': 'code_feedback',
             'prompt': 'nice',
             'suggestion': 'try a list comp',
             'quality': 'correct',
-          })));
-      when(() => conductor.updateProgress(AnswerQuality.correct))
-          .thenAnswer((_) async => true);
+          }),
+        );
+        when(() => conductor.updateProgress(AnswerQuality.correct))
+            .thenAnswer((_) async => true);
 
-      final tutor = build();
-      await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
+        final tutor = build();
+        await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
 
-      expect(tutor.state.value, TutorState.hasFollowUp);
-    });
+        expect(tutor.state.value, TutorState.hasFollowUp);
+      },
+    );
   });
 
   group('queryTutor — required-arg short-circuits', () {
-    test('submitCode without code: no request, state restored to idle',
-        () async {
-      final tutor = build();
-      await tutor.queryTutor(type: ChatRequestType.submitCode);
-      verifyNever(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      );
-      expect(tutor.state.value, TutorState.idle);
-    });
+    test(
+      'submitCode without code: no request, state restored to idle',
+      () async {
+        final tutor = build();
+        await tutor.queryTutor(type: ChatRequestType.submitCode);
+        verifyNever(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        );
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
 
-    test('mcqAnswer without prompt: no request, state restored to idle',
-        () async {
-      final tutor = build();
-      await tutor.queryTutor(type: ChatRequestType.mcqAnswer);
-      verifyNever(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      );
-      expect(tutor.state.value, TutorState.idle);
-    });
+    test(
+      'mcqAnswer without prompt: no request, state restored to idle',
+      () async {
+        final tutor = build();
+        await tutor.queryTutor(type: ChatRequestType.mcqAnswer);
+        verifyNever(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        );
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
 
     test('noResult: no request, state restored to idle', () async {
       final tutor = build();
       await tutor.queryTutor(type: ChatRequestType.noResult);
       verifyNever(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
@@ -241,34 +306,12 @@ void main() {
   });
 
   group('queryTutor — input formatting per request type', () {
-    /// Returns (input, scope) for the single sendRequest call recorded so far.
-    (String, PreviousInputs) captureSendRequest() {
-      final captured = verify(
-        () => connector.sendRequest(
-          input: captureAny<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: captureAny<PreviousInputs>(named: 'inputs'),
-        ),
-      ).captured;
-      return (captured[0] as String, captured[1] as PreviousInputs);
-    }
-
-    setUp(() {
-      when(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).thenAnswer((_) async => const ConnectorOk([]));
-    });
-
     test('submitCode wraps the code in a submit_code payload', () async {
       await build().queryTutor(
         type: ChatRequestType.submitCode,
         code: 'print(1)',
       );
-      final (input, _) = captureSendRequest();
+      final input = _capturedStreamInput(connector);
       final json = jsonDecode(input) as Map<String, dynamic>;
       expect(json['request_type'], 'submit_code');
       expect(json['code'], 'print(1)');
@@ -279,17 +322,32 @@ void main() {
         type: ChatRequestType.mcQuestion,
         difficulty: QuestionDifficulty.medium,
       );
-      final (input, scope) = captureSendRequest();
+      final captured = verify(
+        () => connector.sendRequestStream(
+          input: captureAny<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: captureAny<PreviousInputs>(named: 'inputs'),
+        ),
+      ).captured;
+      final input = captured[0] as String;
+      final scope = captured[1] as PreviousInputs;
       final json = jsonDecode(input) as Map<String, dynamic>;
       expect(json['request_type'], 'multiple_choice');
       expect(json['difficulty'], 'medium');
       expect(scope, PreviousInputs.newSession);
     });
 
-    test('status request uses includeAll history scope', () async {
+    test('status request uses non-streaming sendRequest with includeAll',
+        () async {
       await build().queryTutor(type: ChatRequestType.status);
-      final (_, scope) = captureSendRequest();
-      expect(scope, PreviousInputs.includeAll);
+      final captured = verify(
+        () => connector.sendRequest(
+          input: captureAny<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: captureAny<PreviousInputs>(named: 'inputs'),
+        ),
+      ).captured;
+      expect(captured[1] as PreviousInputs, PreviousInputs.includeAll);
     });
 
     test('guidingAnswer reads understanding from the conductor', () async {
@@ -298,7 +356,7 @@ void main() {
         type: ChatRequestType.guidingAnswer,
         prompt: 'because',
       );
-      final (input, _) = captureSendRequest();
+      final input = _capturedStreamInput(connector);
       final json = jsonDecode(input) as Map<String, dynamic>;
       expect(json['request_type'], 'guiding_answer');
       expect(json['answer'], 'because');
@@ -307,30 +365,9 @@ void main() {
   });
 
   group('handleStudentMessage routing', () {
-    String capturedInput() {
-      final captured = verify(
-        () => connector.sendRequest(
-          input: captureAny<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).captured.single as String;
-      return captured;
-    }
-
-    setUp(() {
-      when(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).thenAnswer((_) async => const ConnectorOk([]));
-    });
-
     /// Drives a previous query whose response sets `_currentExerciseType` via
     /// the matching handler, then resets the connector mock so the next
-    /// captured call corresponds to the actual student message under test.
+    /// captured call corresponds to the student message under test.
     Future<TutorService> primeWithExerciseType(String type) async {
       final body = <String, dynamic>{
         'type': type,
@@ -339,12 +376,12 @@ void main() {
         if (type == 'multiple_choice') 'options': const <Map>[],
       };
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer((_) async => ConnectorOk(_outputFor(body)));
+      ).thenAnswer((_) => _streamOf(body));
 
       final tutor = build();
       await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
@@ -352,19 +389,20 @@ void main() {
       clearInteractions(connector);
       // The next call needs a stub again.
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer((_) async => const ConnectorOk([]));
+      ).thenAnswer((_) => _emptyStream());
       return tutor;
     }
 
     test('default (no exercise primed) → student_question', () async {
       final tutor = build();
       await tutor.handleStudentMessage('hello');
-      final json = jsonDecode(capturedInput()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'student_question');
       expect(json['question'], 'hello');
     });
@@ -372,7 +410,8 @@ void main() {
     test('after MultipleChoice → mcq_answer', () async {
       final tutor = await primeWithExerciseType('multiple_choice');
       await tutor.handleStudentMessage('A');
-      final json = jsonDecode(capturedInput()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'mcq_answer');
       expect(json['answer'], 'A');
     });
@@ -380,121 +419,124 @@ void main() {
     test('after SocraticQuestion → socratic_feedback', () async {
       final tutor = await primeWithExerciseType('socratic_question');
       await tutor.handleStudentMessage('because');
-      final json = jsonDecode(capturedInput()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'socratic_feedback');
     });
 
     test('after ExplainCode → explain_answer', () async {
       final tutor = await primeWithExerciseType('explain_code');
       await tutor.handleStudentMessage('it loops');
-      final json = jsonDecode(capturedInput()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'explain_answer');
     });
 
     test('after GuidingExercise → guiding_answer', () async {
       final tutor = await primeWithExerciseType('guiding_exercise');
       await tutor.handleStudentMessage('idea');
-      final json = jsonDecode(capturedInput()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'guiding_answer');
     });
   });
 
-  group('_processResult retry policy', () {
-    test('a single ConnectorFailure triggers exactly one resendRequest, then '
-        'gives up', () async {
+  group('streaming retry policy', () {
+    test('a stream failure triggers exactly one resendRequestStream', () async {
+      var calls = 0;
+      Stream<StreamChunk> fail() async* {
+        calls++;
+        yield StreamFailed(StateError('boom'), StackTrace.current, 'boom');
+      }
+
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer(
-        (_) async =>
-            ConnectorFailure(StateError('boom'), StackTrace.current, 'boom'),
-      );
-      when(() => connector.resendRequest()).thenAnswer(
-        (_) async =>
-            ConnectorFailure(StateError('boom'), StackTrace.current, 'boom'),
-      );
+      ).thenAnswer((_) => fail());
+      when(() => connector.resendRequestStream())
+          .thenAnswer((_) => fail());
 
       await build().queryTutor(
         type: ChatRequestType.submitCode,
         code: 'x',
       );
 
-      verify(() => connector.resendRequest()).called(1);
-      // System message "Er ging iets mis" was added on each failure (2 in total
-      // — one for the original, one for the retry).
+      verify(() => connector.resendRequestStream()).called(1);
+      // Both attempts produced a system error message.
       verify(() => chat.addSystemMessage(any<String>())).called(2);
+      expect(calls, 2);
     });
 
-    test('a successful resend is processed normally (no second retry)',
+    test('a successful resend completes the stream with the recovered text',
         () async {
+      Stream<StreamChunk> failing() async* {
+        yield StreamFailed(StateError('boom'), StackTrace.current, 'boom');
+      }
+
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer(
-        (_) async =>
-            ConnectorFailure(StateError('boom'), StackTrace.current, 'boom'),
-      );
-      when(() => connector.resendRequest()).thenAnswer(
-        (_) async => ConnectorOk(_outputFor({
-          'type': 'answer',
-          'prompt': 'recovered',
-        })),
+      ).thenAnswer((_) => failing());
+      when(() => connector.resendRequestStream()).thenAnswer(
+        (_) => _streamOf({'type': 'answer', 'prompt': 'recovered'}),
       );
 
       await build().queryTutor(
         type: ChatRequestType.submitCode,
         code: 'x',
       );
-      verify(() => connector.resendRequest()).called(1);
-      verify(() => chat.addTutorMessage('recovered')).called(1);
+      verify(() => connector.resendRequestStream()).called(1);
+      verify(() => chat.completeStream('recovered')).called(1);
     });
   });
 
   group('requestExercise', () {
-    test('noResult posts the congrats system message and skips the request',
-        () async {
-      when(() => conductor.getNextQuestion())
-          .thenReturn((ChatRequestType.noResult, QuestionDifficulty.easy));
+    test(
+      'noResult posts the congrats system message and skips the request',
+      () async {
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.noResult, QuestionDifficulty.easy));
 
-      await build().requestExercise();
+        await build().requestExercise();
 
-      verify(
-        () => chat.addSystemMessage(
-          any<String>(
-            that: predicate<String>((s) => s.contains('Gefeliciteerd')),
+        verify(
+          () => chat.addSystemMessage(
+            any<String>(
+              that: predicate<String>((s) => s.contains('Gefeliciteerd')),
+            ),
           ),
-        ),
-      ).called(1);
-      verifyNever(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      );
-    });
+        ).called(1);
+        verifyNever(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        );
+      },
+    );
 
     test('a real next-question kicks off queryTutor with that type', () async {
       when(() => conductor.getNextQuestion())
           .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.hard));
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer((_) async => const ConnectorOk([]));
+      ).thenAnswer((_) => _emptyStream());
 
       await build().requestExercise();
 
       final captured = verify(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: captureAny<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
@@ -506,45 +548,302 @@ void main() {
     });
   });
 
-  group('moveToFollowUp', () {
-    test('flushes the buffered tutor message + code and returns to idle',
-        () async {
+  group('requestExercise — chained from feedback handlers', () {
+    /// Feeds the connector a queue of streams so we can simulate
+    /// "first call returns a feedback response, second call returns the
+    /// follow-up exercise". Useful for verifying the chained queryTutor
+    /// from inside a feedback handler actually fires.
+    void stubSendStreamSequence(List<Map<String, dynamic>> bodies) {
+      var index = 0;
       when(
-        () => connector.sendRequest(
+        () => connector.sendRequestStream(
           input: any<String>(named: 'input'),
           instructions: any<String>(named: 'instructions'),
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
-      ).thenAnswer((_) async => ConnectorOk(_outputFor({
+      ).thenAnswer((_) {
+        final body = index < bodies.length
+            ? bodies[index]
+            : <String, dynamic>{'type': 'answer', 'prompt': ''};
+        index++;
+        return _streamOf(body);
+      });
+    }
+
+    /// Captures every input string passed to `sendRequestStream` across all
+    /// calls, decoded back to a JSON map. Order matches call order.
+    List<Map<String, dynamic>> capturedRequests() {
+      final captured = verify(
+        () => connector.sendRequestStream(
+          input: captureAny<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      ).captured;
+      return captured
+          .cast<String>()
+          .map((s) => jsonDecode(s) as Map<String, dynamic>)
+          .toList();
+    }
+
+    test(
+      'mcq_feedback chains a fresh exercise (regression: "voorbereid..." stall)',
+      () async {
+        // First sendRequestStream is the mcqAnswer turn → mcq_feedback.
+        // Second is the next-exercise turn requested by the handler.
+        stubSendStreamSequence([
+          {'type': 'mcq_feedback', 'prompt': 'Goed!', 'quality': 'correct'},
+          {
+            'type': 'multiple_choice',
+            'prompt': 'wat print dit?',
+            'code': 'print(1)',
+            'options': const <Map>[],
+          },
+        ]);
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.mcqAnswer,
+          prompt: 'A',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[0]['request_type'], 'mcq_answer');
+        expect(reqs[1]['request_type'], 'multiple_choice');
+        expect(tutor.state.value, TutorState.idle);
+        verify(
+          () => chat.addSystemMessage(
+            any<String>(
+              that: predicate<String>((s) => s.contains('voorbereid')),
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
+      'code_feedback without a follow-up suggestion chains a fresh exercise',
+      () async {
+        stubSendStreamSequence([
+          {
+            'type': 'code_feedback',
+            'prompt': 'klopt',
+            'suggestion': '',
+            'quality': 'correct',
+          },
+          {
+            'type': 'write_code',
+            'prompt': 'schrijf nu zelf',
+            'code': '',
+          },
+        ]);
+        when(() => conductor.updateProgress(AnswerQuality.correct))
+            .thenAnswer((_) async => true);
+        when(() => conductor.getNextQuestion()).thenReturn(
+          (ChatRequestType.writeCodeQuestion, QuestionDifficulty.medium),
+        );
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.submitCode,
+          code: 'print(1)',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[0]['request_type'], 'submit_code');
+        expect(reqs[1]['request_type'], 'write_code');
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
+
+    test(
+      'code_feedback with a denied suggestion still chains a fresh exercise',
+      () async {
+        stubSendStreamSequence([
+          {
+            'type': 'code_feedback',
+            'prompt': 'klopt',
+            'suggestion': 'probeer iets anders',
+            'quality': 'correct',
+          },
+          {
+            'type': 'write_code',
+            'prompt': 'volgende',
+            'code': '',
+          },
+        ]);
+        // Denying the follow-up forces the requestExercise branch.
+        when(() => conductor.updateProgress(AnswerQuality.correct))
+            .thenAnswer((_) async => false);
+        when(() => conductor.getNextQuestion()).thenReturn(
+          (ChatRequestType.writeCodeQuestion, QuestionDifficulty.medium),
+        );
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.submitCode,
+          code: 'print(1)',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[1]['request_type'], 'write_code');
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
+
+    test(
+      'explain_feedback without follow-up chains a fresh exercise',
+      () async {
+        stubSendStreamSequence([
+          {
+            'type': 'explain_feedback',
+            'prompt': 'goed uitgelegd',
+            'quality': 'correct',
+          },
+          {
+            'type': 'multiple_choice',
+            'prompt': 'volgende',
+            'code': '',
+            'options': const <Map>[],
+          },
+        ]);
+        when(() => conductor.updateProgress(AnswerQuality.correct))
+            .thenAnswer((_) async => true);
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.explainAnswer,
+          prompt: 'het loopt',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[0]['request_type'], 'explain_answer');
+        expect(reqs[1]['request_type'], 'multiple_choice');
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
+
+    test(
+      'socratic_feedback without follow-up chains a fresh exercise',
+      () async {
+        stubSendStreamSequence([
+          {
+            'type': 'socratic_feedback',
+            'prompt': 'mooi',
+            'quality': 'correct',
+          },
+          {
+            'type': 'multiple_choice',
+            'prompt': 'volgende',
+            'code': '',
+            'options': const <Map>[],
+          },
+        ]);
+        when(() => conductor.updateProgress(AnswerQuality.correct))
+            .thenAnswer((_) async => true);
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.socraticFeedback,
+          prompt: 'omdat',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[0]['request_type'], 'socratic_feedback');
+        expect(reqs[1]['request_type'], 'multiple_choice');
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
+
+    test(
+      'guiding_feedback marked complete chains a fresh exercise',
+      () async {
+        stubSendStreamSequence([
+          {
+            'type': 'guiding_feedback',
+            'prompt': '',
+            'understanding': 0.9,
+            'followUp': '',
+            'code': '',
+          },
+          {
+            'type': 'multiple_choice',
+            'prompt': 'volgende',
+            'code': '',
+            'options': const <Map>[],
+          },
+        ]);
+        when(() => conductor.guidingIsComplete(0.9))
+            .thenAnswer((_) async => true);
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
+
+        final tutor = build();
+        await tutor.queryTutor(
+          type: ChatRequestType.guidingAnswer,
+          prompt: 'idee',
+        );
+
+        final reqs = capturedRequests();
+        expect(reqs, hasLength(2));
+        expect(reqs[1]['request_type'], 'multiple_choice');
+        expect(tutor.state.value, TutorState.idle);
+      },
+    );
+  });
+
+  group('moveToFollowUp', () {
+    test(
+      'flushes the buffered tutor message + code and returns to idle',
+      () async {
+        when(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        ).thenAnswer(
+          (_) => _streamOf({
             'type': 'guiding_feedback',
             'prompt': '',
             'understanding': 0.2,
             'followUp': 'next q',
             'code': 'print(1)',
-          })));
-      when(() => conductor.guidingIsComplete(0.2))
-          .thenAnswer((_) async => false);
+          }),
+        );
+        when(() => conductor.guidingIsComplete(0.2))
+            .thenAnswer((_) async => false);
 
-      final tutor = build();
-      await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
-      expect(tutor.state.value, TutorState.hasFollowUp);
+        final tutor = build();
+        await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
+        expect(tutor.state.value, TutorState.hasFollowUp);
 
-      // Reset interaction counters so we can verify *only* the flush calls.
-      clearInteractions(chat);
-      clearInteractions(code);
+        clearInteractions(chat);
+        clearInteractions(code);
 
-      tutor.moveToFollowUp();
-      expect(tutor.state.value, TutorState.idle);
-      verify(() => chat.addTutorMessage('next q')).called(1);
-      verify(() => code.setText('print(1)')).called(1);
+        tutor.moveToFollowUp();
+        expect(tutor.state.value, TutorState.idle);
+        verify(() => chat.addTutorMessage('next q')).called(1);
+        verify(() => code.setText('print(1)')).called(1);
 
-      // Calling moveToFollowUp a second time must not re-emit the same buffer.
-      clearInteractions(chat);
-      clearInteractions(code);
-      tutor.moveToFollowUp();
-      verifyNever(() => chat.addTutorMessage(any<String>()));
-      verifyNever(() => code.setText(any<String>()));
-    });
+        clearInteractions(chat);
+        clearInteractions(code);
+        tutor.moveToFollowUp();
+        verifyNever(() => chat.addTutorMessage(any<String>()));
+        verifyNever(() => code.setText(any<String>()));
+      },
+    );
 
     test('with no buffered follow-up, just returns state to idle', () {
       final tutor = build();
@@ -554,40 +853,18 @@ void main() {
   });
 
   group('requestHint / submitCode convenience wrappers', () {
-    setUp(() {
-      when(
-        () => connector.sendRequest(
-          input: any<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).thenAnswer((_) async => const ConnectorOk([]));
-    });
-
     test('requestHint formats a request_hint payload', () async {
       await build().requestHint('print(1)');
-      final captured = verify(
-        () => connector.sendRequest(
-          input: captureAny<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).captured.single as String;
-      final json = jsonDecode(captured) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'request_hint');
       expect(json['current_code'], 'print(1)');
     });
 
     test('submitCode delegates to queryTutor with the code', () async {
       await build().submitCode('x = 1');
-      final captured = verify(
-        () => connector.sendRequest(
-          input: captureAny<String>(named: 'input'),
-          instructions: any<String>(named: 'instructions'),
-          inputs: any<PreviousInputs>(named: 'inputs'),
-        ),
-      ).captured.single as String;
-      final json = jsonDecode(captured) as Map<String, dynamic>;
+      final json =
+          jsonDecode(_capturedStreamInput(connector)) as Map<String, dynamic>;
       expect(json['request_type'], 'submit_code');
       expect(json['code'], 'x = 1');
     });

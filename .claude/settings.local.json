@@ -10,7 +10,15 @@
       "Bash(dir test\\\\features\\\\goals)",
       "Bash(dir test\\\\core)",
       "PowerShell(\"---\")",
-      "mcp__sonarqube__search_sonar_issues_in_projects"
+      "mcp__sonarqube__search_sonar_issues_in_projects",
+      "mcp__sonarqube__get_project_quality_gate_status",
+      "mcp__sonarqube__get_component_measures",
+      "mcp__sonarqube__search_security_hotspots",
+      "mcp__sonarqube__search_files_by_coverage",
+      "Bash(findstr /R \"dart_openai\")",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\git\" -Directory -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\git\", \"$env:APPDATA\\\\Pub\\\\Cache\\\\git\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\git\", \"$env:USERPROFILE\\\\AppData\\\\Roaming\\\\Pub\\\\Cache\\\\git\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Get-ChildItem $p -Directory | ForEach-Object { \"$\\($p\\)\\\\$\\($_.Name\\)\" } } else { \"missing: $p\" } })",
+      "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:APPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\"\\); foreach \\($p in $paths\\) { Write-Output \"==> $p\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Directory | Select-Object Name } })"
     ]
   }
 }

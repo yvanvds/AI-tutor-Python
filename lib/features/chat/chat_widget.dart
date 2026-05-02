@@ -7,6 +7,7 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flyer_chat_system_message/flyer_chat_system_message.dart';
 import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
+import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 
 class ChatWidget extends StatefulWidget {
   const ChatWidget({super.key});
@@ -81,6 +82,33 @@ class _TutorState extends State<ChatWidget> {
                             .copyWith(
                               fontSize: 20,
                               color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                      ),
+
+                  textStreamMessageBuilder:
+                      (
+                        context,
+                        message,
+                        index, {
+                        required bool isSentByMe,
+                        MessageGroupStatus? groupStatus,
+                      }) => ValueListenableBuilder<StreamState>(
+                        valueListenable: DataService.chat.streamState,
+                        builder: (context, streamState, _) =>
+                            FlyerChatTextStreamMessage(
+                              index: index,
+                              message: message,
+                              streamState: streamState,
+                              mode: TextStreamMessageMode.instantMarkdown,
+                              receivedTextStyle: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium!
+                                  .copyWith(
+                                    fontSize: 20,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                              loadingText: 'Aan het denken...',
                             ),
                       ),
 

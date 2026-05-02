@@ -1,90 +1,106 @@
 import 'dart:convert';
+
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/envelope_assembler.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 
 class AIResponseParser {
-  /// Parse a single AI response payload and return the typed model instance.
-  /// Accepts either a decoded structure (List/Map) or a JSON string.
-  static ChatResponse parse(dynamic jsonInput) {
-    final textMap = extractFirstJsonMap(jsonInput);
-    if (textMap != null) {
-      return ChatResponseFactory.fromMap(textMap);
-    } else {
-      final raw = extractFirstTextString(jsonInput);
-      if (raw == null) {
-        return ErrorResponse(
-          type: "error",
-          message: "Lege respons van de tutor.",
-        ); // model returned no text content
-      } else {
-        return ErrorResponse(
-          type: "error",
-          message: "Kon respons niet verwerken: $raw",
-        ); // model text was not parsable JSON
-      }
+  /// Parse a complete assistant message into a typed [ChatResponse].
+  ///
+  /// Tries the `<TEXT>...</TEXT><META>{...}</META>` envelope first (the
+  /// streaming contract), then falls back to legacy JSON-only output for
+  /// older instructions or non-compliant responses.
+  static ChatResponse parse(String raw) {
+    if (raw.trim().isEmpty) {
+      return ErrorResponse(type: 'error', message: 'Lege respons van de tutor.');
     }
+
+    final assembler = EnvelopeAssembler()
+      ..add(raw)
+      ..close();
+
+    if (assembler.sawOpenTag) {
+      return _fromEnvelope(assembler.text, assembler.metaRaw, raw);
+    }
+    return _fromLegacyJson(raw);
   }
 
-  /// Get the FIRST text chunk as a raw String (most common case).
-  static String? extractFirstTextString(dynamic jsonInput) {
-    final all = extractAllTextStrings(jsonInput);
-    return all.isEmpty ? null : all.first;
-  }
+  /// Build a [ChatResponse] from envelope pieces. Injects [text] under the
+  /// `prompt` key (and `message` for error type) so the existing per-type
+  /// `fromMap` factories keep working unchanged.
+  static ChatResponse fromEnvelopePieces(String text, String metaRaw) =>
+      _fromEnvelope(text, metaRaw, '$text<META>$metaRaw</META>');
 
-  /// Get ALL text chunks as raw Strings.
-  static List<String> extractAllTextStrings(dynamic jsonInput) {
-    final dynamic data = (jsonInput is String)
-        ? json.decode(jsonInput)
-        : jsonInput;
-
-    final List<dynamic> items = (data is List) ? data : [data];
-    final List<String> results = [];
-
-    for (final item in items) {
-      if (item is! Map) continue;
-      if (item['type'] == 'message' && item['content'] is List) {
-        for (final contentItem in (item['content'] as List)) {
-          if (contentItem is! Map) continue;
-          if (contentItem['type'] == 'output_text') {
-            final dynamic t = contentItem['text'];
-            if (t is String) results.add(t);
-            // If some providers return { text: { ... } } you can add:
-            if (t is Map && t['value'] is String) {
-              results.add(t['value'] as String);
-            }
-          }
+  static ChatResponse _fromEnvelope(String text, String metaRaw, String raw) {
+    final cleanedMeta = _stripCodeFences(metaRaw).trim();
+    Map<String, dynamic>? metaMap;
+    if (cleanedMeta.isNotEmpty) {
+      try {
+        final decoded = json.decode(cleanedMeta);
+        if (decoded is Map<String, dynamic>) {
+          metaMap = decoded;
         }
+      } catch (_) {
+        // fall through
       }
     }
-    return results;
+
+    if (metaMap == null) {
+      // META missing or malformed. If we at least have streamed text, try
+      // legacy JSON parsing of that text (it may be raw JSON sent inside
+      // <TEXT> by a confused model). Otherwise surface the raw text.
+      final fromText = _tryLegacyJson(text);
+      if (fromText != null) return fromText;
+      return ErrorResponse(
+        type: 'error',
+        message: text.isNotEmpty
+            ? text
+            : 'Kon respons niet verwerken: $raw',
+      );
+    }
+
+    final type = (metaMap['type'] as String?)?.toLowerCase() ?? '';
+    final merged = <String, dynamic>{...metaMap};
+    if (type == 'error') {
+      merged['message'] = text;
+    } else {
+      merged['prompt'] = text;
+    }
+    try {
+      return ChatResponseFactory.fromMap(merged);
+    } catch (e) {
+      return ErrorResponse(type: 'error', message: e.toString());
+    }
   }
 
-  /// Try to parse the FIRST text chunk as JSON Map.
-  /// - Strips ```json fences
-  /// - Accepts either object or array (returns first object if array)
-  static Map<String, dynamic>? extractFirstJsonMap(dynamic jsonInput) {
-    final text = extractFirstTextString(jsonInput);
-    if (text == null) return null;
+  static ChatResponse _fromLegacyJson(String raw) {
+    final parsed = _tryLegacyJson(raw);
+    if (parsed != null) return parsed;
+    return ErrorResponse(
+      type: 'error',
+      message: 'Kon respons niet verwerken: $raw',
+    );
+  }
 
-    final cleaned = _stripCodeFences(text).trim();
-
-    // Quick guard: only try JSON if it looks like it.
+  static ChatResponse? _tryLegacyJson(String raw) {
+    final cleaned = _stripCodeFences(raw).trim();
     if (!(cleaned.startsWith('{') || cleaned.startsWith('['))) return null;
-
     try {
       final decoded = json.decode(cleaned);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is List && decoded.isNotEmpty && decoded.first is Map) {
-        return decoded.first as Map<String, dynamic>;
+      Map<String, dynamic>? map;
+      if (decoded is Map<String, dynamic>) {
+        map = decoded;
+      } else if (decoded is List && decoded.isNotEmpty && decoded.first is Map) {
+        map = (decoded.first as Map).cast<String, dynamic>();
       }
+      if (map == null) return null;
+      return ChatResponseFactory.fromMap(map);
     } catch (_) {
-      // ignore parse errors; caller can fall back to raw text
+      return null;
     }
-    return null;
   }
 
   static String _stripCodeFences(String s) {
-    // Remove ```json ... ``` or ``` ... ```
     final fence = RegExp(
       r'^```(?:json)?\s*([\s\S]*?)\s*```$',
       multiLine: false,

@@ -34,216 +34,217 @@ class _AccountsPageState extends State<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accountStream = DataService.account.streamAllAccounts();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Accounts')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: StreamBuilder<List<Account>>(
-          stream: accountStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Error loading accounts:\n${snapshot.error}'),
-              );
-            }
-            final all = snapshot.data ?? [];
-            // Filter by search query (email, firstName, lastName)
-            final q = _searchCtrl.text.trim().toLowerCase();
-            List<Account> filtered = q.isEmpty
-                ? all
-                : all.where((a) {
-                    final email = a.email.toLowerCase();
-                    final fn = a.firstName.toLowerCase();
-                    final ln = a.lastName.toLowerCase();
-                    return email.contains(q) ||
-                        fn.contains(q) ||
-                        ln.contains(q);
-                  }).toList();
-
-            // Pagination
-            final total = filtered.length;
-            final maxPage = (total == 0) ? 0 : ((total - 1) ~/ _rowsPerPage);
-            if (_pageIndex > maxPage) _pageIndex = 0;
-            final start = _pageIndex * _rowsPerPage;
-            final end = (start + _rowsPerPage).clamp(0, total);
-            final pageItems = (total == 0)
-                ? <Account>[]
-                : filtered.sublist(start, end);
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Search + rows-per-page
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Search by name or email…',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onChanged: (_) => setState(_resetPaging),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    DropdownButton<int>(
-                      value: _rowsPerPage,
-                      onChanged: (v) {
-                        if (v == null) return;
-                        setState(() {
-                          _rowsPerPage = v;
-                          _pageIndex = 0;
-                        });
-                      },
-                      items: const [10, 25, 50, 100]
-                          .map(
-                            (v) => DropdownMenuItem(
-                              value: v,
-                              child: Text('$v / page'),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Table header + rows
-                Expanded(
-                  child: Scrollbar(
-                    controller: _hCtrl,
-                    thumbVisibility: true,
-                    notificationPredicate: (n) =>
-                        n.metrics.axis == Axis.horizontal,
-                    child: SingleChildScrollView(
-                      controller: _hCtrl,
-                      primary: false,
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(minWidth: 900),
-                        child: Scrollbar(
-                          controller: _vCtrl,
-                          thumbVisibility: true,
-                          notificationPredicate: (n) =>
-                              n.metrics.axis == Axis.vertical,
-                          child: SingleChildScrollView(
-                            controller: _vCtrl,
-                            primary: false,
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(label: Text('Email')),
-                                DataColumn(label: Text('First name')),
-                                DataColumn(label: Text('Last name')),
-                                DataColumn(label: Text('Last active')),
-                                DataColumn(label: Text('Global key')),
-                                DataColumn(label: Text('Actions')),
-                              ],
-                              rows: pageItems.map((a) {
-                                final lastActive = _resolveLastActive(a);
-                                final lastActiveStr = lastActive == null
-                                    ? '—'
-                                    : _formatTs(lastActive);
-
-                                return DataRow(
-                                  cells: [
-                                    DataCell(SelectableText(a.email)),
-                                    DataCell(Text(a.firstName)),
-                                    DataCell(Text(a.lastName)),
-                                    DataCell(Text(lastActiveStr)),
-                                    DataCell(
-                                      Switch(
-                                        value: a.mayUseGlobalKey,
-                                        onChanged: (v) async {
-                                          await DataService.account
-                                              .setMayUseGlobalKey(
-                                                uid: a.uid,
-                                                value: v,
-                                              );
-                                          // no need to refresh; stream updates
-                                        },
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'Delete account',
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                            ),
-                                            onPressed: () =>
-                                                _confirmDelete(context, a),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Pagination controls
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Showing ${total == 0 ? 0 : start + 1}–$end of $total',
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          tooltip: 'First page',
-                          onPressed: (_pageIndex > 0)
-                              ? () => setState(() => _pageIndex = 0)
-                              : null,
-                          icon: const Icon(Icons.first_page),
-                        ),
-                        IconButton(
-                          tooltip: 'Previous page',
-                          onPressed: (_pageIndex > 0)
-                              ? () => setState(() => _pageIndex -= 1)
-                              : null,
-                          icon: const Icon(Icons.chevron_left),
-                        ),
-                        Text('Page ${(_pageIndex + 1)} / ${maxPage + 1}'),
-                        IconButton(
-                          tooltip: 'Next page',
-                          onPressed: (_pageIndex < maxPage)
-                              ? () => setState(() => _pageIndex += 1)
-                              : null,
-                          icon: const Icon(Icons.chevron_right),
-                        ),
-                        IconButton(
-                          tooltip: 'Last page',
-                          onPressed: (_pageIndex < maxPage)
-                              ? () => setState(() => _pageIndex = maxPage)
-                              : null,
-                          icon: const Icon(Icons.last_page),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
+          stream: DataService.account.streamAllAccounts(),
+          builder: _buildStreamContent,
         ),
       ),
+    );
+  }
+
+  Widget _buildStreamContent(
+    BuildContext context,
+    AsyncSnapshot<List<Account>> snapshot,
+  ) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (snapshot.hasError) {
+      return Center(
+        child: Text('Error loading accounts:\n${snapshot.error}'),
+      );
+    }
+    final filtered = _filterAccounts(snapshot.data ?? []);
+    final page = _paginate(filtered);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSearchAndPageSizeRow(),
+        const SizedBox(height: 12),
+        Expanded(child: _buildAccountsTable(page.items)),
+        _buildPaginationBar(page),
+      ],
+    );
+  }
+
+  List<Account> _filterAccounts(List<Account> all) {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all.where((a) {
+      return a.email.toLowerCase().contains(q) ||
+          a.firstName.toLowerCase().contains(q) ||
+          a.lastName.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  _PageView _paginate(List<Account> filtered) {
+    final total = filtered.length;
+    final maxPage = (total == 0) ? 0 : ((total - 1) ~/ _rowsPerPage);
+    if (_pageIndex > maxPage) _pageIndex = 0;
+    final start = _pageIndex * _rowsPerPage;
+    final end = (start + _rowsPerPage).clamp(0, total);
+    final items = (total == 0) ? <Account>[] : filtered.sublist(start, end);
+    return _PageView(
+      items: items,
+      total: total,
+      start: start,
+      end: end,
+      maxPage: maxPage,
+    );
+  }
+
+  Widget _buildSearchAndPageSizeRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Search by name or email…',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (_) => setState(_resetPaging),
+          ),
+        ),
+        const SizedBox(width: 12),
+        DropdownButton<int>(
+          value: _rowsPerPage,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() {
+              _rowsPerPage = v;
+              _pageIndex = 0;
+            });
+          },
+          items: const [10, 25, 50, 100]
+              .map(
+                (v) => DropdownMenuItem(
+                  value: v,
+                  child: Text('$v / page'),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountsTable(List<Account> pageItems) {
+    return Scrollbar(
+      controller: _hCtrl,
+      thumbVisibility: true,
+      notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
+      child: SingleChildScrollView(
+        controller: _hCtrl,
+        primary: false,
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 900),
+          child: Scrollbar(
+            controller: _vCtrl,
+            thumbVisibility: true,
+            notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+            child: SingleChildScrollView(
+              controller: _vCtrl,
+              primary: false,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Email')),
+                  DataColumn(label: Text('First name')),
+                  DataColumn(label: Text('Last name')),
+                  DataColumn(label: Text('Last active')),
+                  DataColumn(label: Text('Global key')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: pageItems.map(_buildAccountRow).toList(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  DataRow _buildAccountRow(Account a) {
+    final lastActive = _resolveLastActive(a);
+    final lastActiveStr = lastActive == null ? '—' : _formatTs(lastActive);
+    return DataRow(
+      cells: [
+        DataCell(SelectableText(a.email)),
+        DataCell(Text(a.firstName)),
+        DataCell(Text(a.lastName)),
+        DataCell(Text(lastActiveStr)),
+        DataCell(
+          Switch(
+            value: a.mayUseGlobalKey,
+            onChanged: (v) => DataService.account
+                .setMayUseGlobalKey(uid: a.uid, value: v),
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Delete account',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _confirmDelete(context, a),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaginationBar(_PageView page) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Showing ${page.total == 0 ? 0 : page.start + 1}–${page.end} of ${page.total}',
+        ),
+        Row(
+          children: [
+            IconButton(
+              tooltip: 'First page',
+              onPressed: _pageIndex > 0
+                  ? () => setState(() => _pageIndex = 0)
+                  : null,
+              icon: const Icon(Icons.first_page),
+            ),
+            IconButton(
+              tooltip: 'Previous page',
+              onPressed: _pageIndex > 0
+                  ? () => setState(() => _pageIndex -= 1)
+                  : null,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Text('Page ${_pageIndex + 1} / ${page.maxPage + 1}'),
+            IconButton(
+              tooltip: 'Next page',
+              onPressed: _pageIndex < page.maxPage
+                  ? () => setState(() => _pageIndex += 1)
+                  : null,
+              icon: const Icon(Icons.chevron_right),
+            ),
+            IconButton(
+              tooltip: 'Last page',
+              onPressed: _pageIndex < page.maxPage
+                  ? () => setState(() => _pageIndex = page.maxPage)
+                  : null,
+              icon: const Icon(Icons.last_page),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -300,4 +301,19 @@ class _AccountsPageState extends State<AccountsPage> {
       messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
     }
   }
+}
+
+class _PageView {
+  final List<Account> items;
+  final int total;
+  final int start;
+  final int end;
+  final int maxPage;
+  const _PageView({
+    required this.items,
+    required this.total,
+    required this.start,
+    required this.end,
+    required this.maxPage,
+  });
 }

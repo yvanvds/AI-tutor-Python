@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
@@ -7,7 +9,20 @@ import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 class GoalsService {
-  GoalsService({CosmosContainer? container}) : _containerOverride = container;
+  GoalsService({CosmosContainer? container}) : _containerOverride = container {
+    // In production (no container override) prime an in-memory cache of root
+    // goals from the polling watcher so the AI request hot-path can read it
+    // synchronously. Tests inject a container override and don't want a
+    // subscription kicking off rogue queries during setup.
+    if (container == null) {
+      final s = streamRoots;
+      if (s != null) {
+        _rootsSubscription = s.listen((list) {
+          cachedRoots.value = List.unmodifiable(list);
+        });
+      }
+    }
+  }
 
   static const String _pk = CosmosPartitions.goal;
   static const Uuid _uuid = Uuid();
@@ -25,6 +40,25 @@ class GoalsService {
 
   final ValueNotifier<Goal?> preferredRootGoal = ValueNotifier(null);
   final ValueNotifier<Goal?> preferredChildGoal = ValueNotifier(null);
+
+  /// Latest list of root goals from the polling watcher. Empty until first
+  /// fetch. Hot callers (the AI request loop) should prefer this over the
+  /// async [getRootGoalsOnce].
+  final ValueNotifier<List<Goal>> cachedRoots =
+      ValueNotifier<List<Goal>>(const []);
+
+  StreamSubscription<List<Goal>>? _rootsSubscription;
+
+  void dispose() {
+    _rootsSubscription?.cancel();
+    cachedRoots.dispose();
+    selectedRootGoal.dispose();
+    selectedChildGoal.dispose();
+    editorSelectedRootGoal.dispose();
+    editorSelectedGoal.dispose();
+    preferredRootGoal.dispose();
+    preferredChildGoal.dispose();
+  }
 
   // --- STREAMS -------------------------------------------------------------
 

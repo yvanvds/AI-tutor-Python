@@ -32,6 +32,11 @@ class GlobalConfigService {
 
   Future<GlobalConfig?> getConfig() => safeCosmos(_fetchOnce);
 
+  /// Latest config from the polling watcher, or null if not yet fetched.
+  /// Synchronous fast-path for hot callers (e.g. the AI request loop) that
+  /// must not block on a Cosmos round-trip every call.
+  GlobalConfig? get cachedConfig => config.value;
+
   Stream<GlobalConfig?> watchConfig() {
     return safeCosmosStream(
       pollingStream(() => safeCosmos(_fetchOnce)),

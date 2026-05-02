@@ -1,13 +1,18 @@
+<!-- META
+last_updated_commit: ffbb3bf8f29ffc8451d8a8ed5962d48e29462f3c
+last_updated_at: 2026-05-02
+-->
+
 # PROJECT_OVERVIEW
 
 ## 1. High-level summary
 
-`ai_tutor_python` is a Flutter desktop application that acts as a personalised Python tutor for students. A single window combines an embedded Python code editor + runner, a chat panel that talks to an LLM-backed tutor, and a teacher-authoring side (goals, AI instructions, accounts). The tutor adapts the type of exercise (guiding question, multiple choice, explain code, complete code, write code, Socratic) to the student's progress on a tree of teacher-defined "goals", stores per-student progress and status reports in Firestore, and lets teachers edit the prompts that shape the tutor's behaviour. Built and used by a Python teacher (Yvan) for his own classroom; UI is in Dutch.
+`ai_tutor_python` is a Flutter desktop application that acts as a personalised Python tutor for students. A single window combines an embedded Python code editor + runner, a chat panel that talks to an LLM-backed tutor, and a teacher-authoring side (goals, AI instructions, accounts). The tutor adapts the type of exercise (guiding question, multiple choice, explain code, complete code, write code, Socratic) to the student's progress on a tree of teacher-defined "goals", stores per-student progress and status reports in Azure Cosmos DB, and lets teachers edit the prompts that shape the tutor's behaviour. Identity is tied to the school's Microsoft Entra tenant (formerly Azure AD). Built and used by a Python teacher (Yvan) for his own classroom; UI is in Dutch.
 
 ## 2. Tech stack
 
-- **Flutter SDK constraint:** Dart `^3.9.2` (see [pubspec.yaml](pubspec.yaml)). No explicit Flutter version pin.
-- **Target platforms:** Windows desktop only. `firebase_options.dart` only configures Windows; all other platforms throw `UnsupportedError`. `distribute_options.yaml` packages a Windows `.exe` installer; an in-app updater fetches a manifest from `ai-tutor-python.web.app/version.json` and re-runs the installer ([core/update_info.dart](lib/core/update_info.dart)).
+- **Flutter SDK constraint:** Dart `^3.10.1` (see [pubspec.yaml](pubspec.yaml)). No explicit Flutter version pin.
+- **Target platforms:** Windows desktop only. `distribute_options.yaml` packages a Windows `.exe` installer; an in-app updater fetches a manifest from `ai-tutor-python.web.app/version.json` (Firebase Hosting — the only piece of Firebase still in play) and re-runs the installer ([core/update_info.dart](lib/core/update_info.dart)).
 
 ### Key packages (from [pubspec.yaml](pubspec.yaml))
 
@@ -15,12 +20,14 @@
 - `get_it` — service locator; all singletons registered in [services/data_service.dart](lib/services/data_service.dart).
 - `provider` — used only inside `flutter_chat_ui`'s custom-composer contract (`ComposerHeightNotifier`); not project-wide.
 
-**Firebase**
-- `firebase_core`, `firebase_auth`, `cloud_firestore` — auth + Firestore document store.
+**Backend**
+- `http` + `crypto` — used by the hand-rolled [core/cosmos_client.dart](lib/core/cosmos_client.dart) to talk to Azure Cosmos DB's REST API (no third-party Cosmos SDK).
+- `url_launcher` — opens the system browser for the Microsoft Entra OAuth flow (see auth section).
+- `shared_preferences` — persists the Entra token bundle and the per-user OpenAI key.
 
 **AI / LLM**
-- `dart_openai` — pinned to a fork at `https://github.com/yvanvds/openai.git`.
-- `envied` (+ `envied_generator`) — obfuscates the build-time API key from `.env` into [services/tutor/env.g.dart](lib/services/tutor/env.g.dart).
+- `dart_openai` — pinned to a fork at `https://github.com/yvanvds/openai.git` (Responses API support).
+- `envied` (+ `envied_generator`) — obfuscates `OPEN_AI_API_KEY` and `COSMOS_KEY` from `.env` into [services/tutor/env.g.dart](lib/services/tutor/env.g.dart) and [services/config/azure_config.g.dart](lib/services/config/azure_config.g.dart).
 
 **Code execution**
 - `py_engine_desktop` — embedded Python interpreter for desktop. Used in [features/dashboard/output.dart](lib/features/dashboard/output.dart) to `init()`, `pipInstall(...)`, and `startScript(path)` against a temp file.
@@ -30,10 +37,13 @@
 - `flutter_chat_ui`, `flutter_chat_core`, `flyer_chat_text_message`, `flyer_chat_system_message`, `flyer_chat_text_stream_message` — the chat panel.
 - `multi_split_view` — resizable panels in the Dashboard.
 - `lottie`, `loading_animation_widget`, `audioplayers` — confetti splash, spinner, sound effects.
-- `google_fonts`.
+- `google_fonts`, `file_picker`.
 
 **Misc**
-- `path`, `path_provider`, `shared_preferences`, `pub_semver`, `http`, `crypto`, `uuid`, `collection`.
+- `path`, `path_provider`, `pub_semver`, `uuid`, `collection`.
+
+**Dev**
+- `flutter_test`, `mocktail`, `fake_async`, `flutter_lints`, `build_runner`.
 
 ### Python execution approach
 
@@ -41,7 +51,7 @@ Embedded Python via `py_engine_desktop` (a Flutter desktop plugin). On first mou
 
 ### AI provider
 
-OpenAI's Responses API, called via `dart_openai` (forked) in [services/tutor/openai_connector.dart](lib/services/tutor/openai_connector.dart). The model name comes from the Firestore `config/global` document (field `Model`), defaulting to `gpt-4o`. The API key is the build-time obfuscated `Env.apiKey`; per-user override via locally-stored OpenAI key in `SharedPreferences` (see [features/auth/local_key_gate_screen.dart](lib/features/auth/local_key_gate_screen.dart)) — note: that local key is *saved* but is not actually wired into `OpenaiConnector`, which always uses `Env.apiKey`. Worth confirming whether this is intentional.
+OpenAI's Responses API, called via `dart_openai` (forked) in [services/tutor/openai_connector.dart](lib/services/tutor/openai_connector.dart). The model name comes from the Cosmos `config/global` doc (field `Model`), defaulting to `gpt-4o`. The API key is the build-time obfuscated `Env.apiKey`; per-user override via locally-stored OpenAI key in `SharedPreferences` (see [features/auth/local_key_gate_screen.dart](lib/features/auth/local_key_gate_screen.dart)) — note: that local key is *saved* but is not actually wired into `OpenaiConnector`, which always uses `Env.apiKey`. Worth confirming whether this is intentional.
 
 History is managed client-side (the connector passes `store: false`) with two parallel logs: `_allHistory` (across sessions) and `_sessionHistory` (current question chain). Each `sendRequest` chooses one of `includeAll | includeSession | newSession`.
 
@@ -49,11 +59,10 @@ History is managed client-side (the connector passes `store: false`) with two pa
 
 ```
 lib/
-├── main.dart                    # App entry, Firebase init, auth gate, theme
+├── main.dart                    # App entry, silent token refresh, auth + key gate
 ├── boot_gate.dart               # Shift-on-startup → safe-mode reset dialog
-├── home_shell.dart              # NavigationRail shell, app bar, update check
-├── crash_recovery_screen.dart   # Shown on FlutterError or permission-denied
-├── firebase_options.dart        # Generated; Windows-only config
+├── home_shell.dart              # NavigationRail shell, sign-out, update check
+├── crash_recovery_screen.dart   # Shown on FlutterError or Cosmos auth failure
 ├── theme.dart                   # Material 3 light/dark color schemes
 ├── create_text_theme.dart       # Google Fonts text-theme helper
 ├── version.dart                 # const String kAppVersion
@@ -63,30 +72,34 @@ lib/
 │   ├── chat_response_type.dart  # (parallel enum; declared but lightly used)
 │   ├── question_difficulty.dart # easy | medium | hard
 │   ├── answer_quality.dart      # wrong | partial | correct
-│   ├── firestore_paths.dart     # Single source of truth for collection refs
-│   ├── firestore_safety.dart    # safeFirestore wrapper, cache-reset, NavigatorKey
+│   ├── cosmos_client.dart       # Hand-rolled Cosmos REST client + BatchOperation
+│   ├── cosmos_paths.dart        # Single source of truth for container handles
+│   ├── cosmos_doc_id.dart       # Composite id conventions ({uid}_{goalId}, …)
+│   ├── cosmos_safety.dart       # safeCosmos / safeCosmosStream / pollingStream
 │   ├── update_info.dart         # In-app installer-update helpers
 │   └── debounce.dart            # Generic debounce util
 │
 ├── services/                    # All registered as get_it lazy singletons
 │   ├── data_service.dart        # The locator + typed getters
-│   ├── account/                 # Account model + AccountService (Firestore)
+│   ├── auth/auth_service.dart   # Entra OAuth (PKCE + loopback) + token cache
+│   ├── account/                 # Account model + AccountService (Cosmos)
 │   ├── chat/chat_service.dart   # Wraps flutter_chat InMemoryChatController
 │   ├── code/code_service.dart   # Wraps flutter_code_editor CodeController
-│   ├── config/                  # GlobalConfigService + LocalApiKeyStorage
-│   ├── goal/                    # Goal model, GoalsService (CRUD + reparent + subtree backup)
+│   ├── config/                  # GlobalConfigService, AzureConfig (envied),
+│   │                            #   LocalApiKeyStorage
+│   ├── goal/                    # Goal model, GoalsService, SubtreeBackup
 │   ├── instructions/            # Instruction (sections map) + InstructionsService
-│   ├── output/                  # OutputService + OutputController (binds to widget)
-│   ├── progress/                # Progress model + ProgressService (per-user subcollection)
-│   ├── role/role_service.dart   # Watches roles/{uid}, exposes ValueNotifier<bool> isTeacher
+│   ├── output/                  # OutputService + OutputController (binds widget)
+│   ├── progress/                # Progress model + ProgressService
+│   ├── role/role_service.dart   # Mirrors AuthService.currentUser.isTeacher
 │   ├── sound/sound_service.dart # Plays goal_reached/note/question/chime mp3s
 │   ├── splash/splash_service.dart # Goal-reached overlay state
 │   ├── status_report/           # StatusReport model + ReportService
 │   └── tutor/
-│       ├── tutor_service.dart           # queryTutor() request builder + orchestrator
-│       ├── conductor.dart               # Picks next question type, updates progress, adapts difficulty
+│       ├── tutor_service.dart           # Public API + request orchestration
+│       ├── conductor.dart               # Picks next question type, updates progress
 │       ├── openai_connector.dart        # OpenAI Responses-API client + history
-│       ├── instruction_generator.dart   # Assembles system prompt from Firestore instructions + goal context
+│       ├── instruction_generator.dart   # Assembles system prompt
 │       ├── question_formatter.dart      # JSON-encodes user-turn payloads
 │       ├── env.dart / env.g.dart        # Envied-obfuscated OPEN_AI_API_KEY
 │       └── responses/                   # Typed AI-response models + dispatch
@@ -97,11 +110,11 @@ lib/
 │           │ explain_feedback.dart, socratic_feedback.dart, guiding_feedback.dart,
 │           │ status_summary.dart, error_summary.dart   # Feedback/system payloads
 │           └── socratic_question.dart, multiple_choice.dart, explain_code.dart,
-│             complete_code.dart, write_code.dart, guiding_exercise.dart  # Exercise payloads
+│             complete_code.dart, write_code.dart, guiding_exercise.dart  # Exercises
 │
 ├── features/
 │   ├── auth/
-│   │   ├── sign_in_page.dart           # Sign in / register (email+password)
+│   │   ├── sign_in_page.dart           # Single "sign in with school account" button
 │   │   └── local_key_gate_screen.dart  # Asks for OpenAI key if mayUseGlobalKey == false
 │   ├── dashboard/                      # Default page: editor + run buttons + output + chat
 │   │   ├── dashboard.dart              # MultiSplitView layout
@@ -119,7 +132,7 @@ lib/
 │   │   ├── editor/{edit_goal_panel,goal_form,parent_field}.dart
 │   │   ├── dnd.dart, drag_feedback.dart, tree_utils.dart
 │   ├── instructions/                   # Teacher: doc/section editor over instructions/{id}.sections{}
-│   │   ├── instructions_editor_page.dart
+│   │   ├── instructions_editor_page.dart   # + Markdown import/export via file_picker
 │   │   ├── doc_list.dart, doc_header.dart, sections_list.dart,
 │   │   │ section_header.dart, editor_pane.dart
 │   ├── progress/                       # Student: see all goals + progress bars
@@ -131,125 +144,164 @@ lib/
     ├── multi_value_listenable_builder.dart  # Combine N ValueListenables in one builder
     ├── goal_crumb_in_app_bar.dart           # Title-bar crumb for current goal/subgoal
     ├── goal_splash_overlay.dart             # Full-screen splash on goal completion
-    ├── add_input.dart, chips_editor.dart, inline_title.dart, undo_snackbar.dart
+    ├── add_input.dart, chips_editor.dart, inline_title.dart
 
+test/                                  # mocktail-based unit tests (~20 files)
 docs/                                  # Markdown specs (data, UX, security, roadmap, etc.)
 public/version.json                    # Update manifest hosted at ai-tutor-python.web.app
-firestore.rules                        # Auth + role-based rules
-firestore.indexes.json                 # Composite indexes for goals(parentId, order)
-firebase.json                          # Hosting + emulator config
+firebase.json                          # Firebase Hosting config (no Firestore/Auth)
 distribute_options.yaml                # flutter_distributor windows-exe job
 windows/                               # Windows runner + packaging/Inno Setup config
+TODO.md, TESTING_PLAN.md               # In-tree planning docs (worth reading)
 ```
 
 ## 4. Data model
 
-All Firestore paths funnel through [core/firestore_paths.dart](lib/core/firestore_paths.dart) (`FsPaths`).
+All Cosmos container handles funnel through [core/cosmos_paths.dart](lib/core/cosmos_paths.dart). The database is `python-tutor`. Composite doc ids are minted in [core/cosmos_doc_id.dart](lib/core/cosmos_doc_id.dart).
 
-### Top-level collections
+### Containers (per-user partition: `/uid`)
 
-**`accounts/{uid}`** — student or teacher profile, mirrored by [services/account/account.dart](lib/services/account/account.dart).
-- `uid: string` (matches doc id and Auth uid)
+**`accounts/{uid}`** — student or teacher profile. One doc per user, doc id == partition key == Entra Object ID. Model: [services/account/account.dart](lib/services/account/account.dart).
+- `id: string`, `uid: string`
 - `email: string`
-- `firstName: string`
-- `lastName: string`
-- `targetGoal: string` (a goal id; appears written but not read in current flow)
+- `firstName: string`, `lastName: string`
+- `targetGoal: string` (a goal id; written but not currently read by selection logic)
 - `mayUseGlobalKey: bool` — gate for using the bundled API key vs requiring a per-user local key
-- `createdAt: Timestamp`, `updatedAt: Timestamp`
+- `createdAt: string` (ISO 8601), `updatedAt: string` (ISO 8601)
 
-  **Subcollections:**
-  - `accounts/{uid}/progress/{goalId}` — per-goal progress, model in [services/progress/progress.dart](lib/services/progress/progress.dart). Doc id is the goal id.
-    - `progress: double` (0.0–1.0)
-    - `updatedAt: Timestamp` (server timestamp)
-  - `accounts/{uid}/status_reports/{goalId}` — short tutor-written notes per goal, model in [services/status_report/status_report.dart](lib/services/status_report/status_report.dart).
-    - `statusReport: string`
-    - `updatedAt: Timestamp`
+**`progress`** — flattened from the old subcollection. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/progress/progress.dart](lib/services/progress/progress.dart).
+- `id: string`, `uid: string`, `goalID: string`
+- `progress: double` (0.0–1.0)
+- `updatedAt: string`
 
-**`goals/{goalId}`** — flat collection forming a tree via `parentId`. Model: [services/goal/goal.dart](lib/services/goal/goal.dart).
-- `title: string`
-- `description: string?`
+**`status_reports`** — flattened similarly. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/status_report/status_report.dart](lib/services/status_report/status_report.dart).
+- `id: string`, `uid: string`, `goalID: string`
+- `statusReport: string`
+- `updatedAt: string`
+
+### Containers (single-partition: `/type`)
+
+The tree of goals and the prompt fragments are tiny shared resources, so they live in one logical partition keyed by a constant `type` field (see `CosmosPartitions`).
+
+**`goals`** — flat collection forming a tree via `parentId`. `type: "goal"`. Model: [services/goal/goal.dart](lib/services/goal/goal.dart).
+- `id: string`, `type: "goal"`
+- `title: string`, `description: string?`
 - `parentId: string?` — null for roots
-- `order: int` — manual ordering, spaced by 1000 in [goals_service.dart:127](lib/services/goal/goals_service.dart#L127)
+- `order: int` — manual ordering, spaced by 1000 (and rewritten transactionally on reorder; see [goals_service.dart#L147](lib/services/goal/goals_service.dart#L147))
 - `optional: bool`
 - `suggestions: string[]` — interpolated into AI instructions as `{suggestions}`
 - `knownConcepts: string[]` — earlier-root concepts treated as "mastered" when prompting
 
-**`instructions/{docId}`** — teacher-edited prompt fragments. Model: [services/instructions/instruction.dart](lib/services/instructions/instruction.dart).
+**`instructions`** — teacher-edited prompt fragments. `type: "instruction"`. Model: [services/instructions/instruction.dart](lib/services/instructions/instruction.dart).
+- `id: string` (matches a `ChatRequestType` enum name, e.g. `socraticQuestion`, `submitCode`, plus a special `alwaysInclude`)
 - `sections: map<string, string>` — flexible bag of named text sections
-- `updatedAt: Timestamp`
+- `updatedAt: string`
 
-The `docId` matches a `ChatRequestType` enum name (e.g. `socraticQuestion`, `mcQuestion`, `submitCode`, …) plus a special `alwaysInclude` doc whose sections are appended to every system prompt.
-
-**`roles/{uid}`** — read by [role_service.dart](lib/services/role/role_service.dart). Single field `role: string`; `'teacher'` enables teacher-only nav destinations.
-
-**`config/global`** — single doc, model [services/config/global_config.dart](lib/services/config/global_config.dart).
+**`config`** — single doc with id `global`. `type: "config"`. Model: [services/config/global_config.dart](lib/services/config/global_config.dart).
 - `Model: string` (OpenAI model id, e.g. `gpt-4o`)
-- `ApiKey: string` (defined on the model but not used by `OpenaiConnector` — confirm whether this is dead).
+- `ApiKey: string` (parsed but not used by `OpenaiConnector` — see TODOs)
+
+### Identity & roles
+
+There is no `roles/{uid}` container. The teacher flag rides on the Entra access token's `roles` app-role claim and is decoded once in [auth_service.dart#L386-L390](lib/services/auth/auth_service.dart#L386-L390). [RoleService](lib/services/role/role_service.dart) just mirrors `AuthService.currentUser.isTeacher` into a `ValueNotifier<bool>` so feature widgets keep using `DataService.role.isTeacher`.
 
 ### Local persistence
 
-- `SharedPreferences` key `local_api_key`: a per-device OpenAI key set via the `LocalKeyGateScreen` ([services/config/local_api_key_storage.dart](lib/services/config/local_api_key_storage.dart)).
-
-### Local DTOs that mirror Firestore
-
-`Account`, `Goal`, `Progress`, `StatusReport`, `Instruction`, `GlobalConfig` — each provides `fromDoc/fromMap` and `toMap` (or equivalent) and is the only thing the rest of the app sees. `safeFirestore` ([core/firestore_safety.dart](lib/core/firestore_safety.dart)) wraps all reads/writes to push `permission-denied` to a `CrashRecoveryScreen`.
+- **`shared_preferences` key `azure_auth_tokens_v1`** — JSON bundle of `{access_token, refresh_token, id_token, access_token_expiry}` written by [auth_service.dart](lib/services/auth/auth_service.dart). The school's stance is "students tampering is OK" (see TODO.md), so no OS keychain.
+- **`shared_preferences` key `local_api_key`** — per-device OpenAI key set via [LocalKeyGateScreen](lib/features/auth/local_key_gate_screen.dart) ([services/config/local_api_key_storage.dart](lib/services/config/local_api_key_storage.dart)).
 
 ## 5. Core features & their entry points
 
+### Authentication (Microsoft Entra ID, OAuth 2.0 + PKCE)
+
+The old Firebase Auth flow is gone. Identity is now hand-rolled against Entra because the Microsoft-supplied Flutter packages (`aad_oauth`) wrap `webview_flutter`, which has no Windows desktop platform implementation. See [services/auth/auth_service.dart](lib/services/auth/auth_service.dart) for the full flow:
+
+1. `AuthService.signIn()` generates a PKCE verifier/challenge and a random `state`, binds a `dart:io` `HttpServer` on a random localhost port, opens the Entra `/authorize` endpoint in the system browser via `url_launcher`.
+2. Entra redirects to `http://localhost:<port>/?code=…&state=…`. The local server captures the request, returns a small "you can close this tab" HTML page, and surfaces the code.
+3. POST to `/token` with the code + verifier → `{access_token, refresh_token, id_token, expires_in}`.
+4. Persist the bundle in `shared_preferences`, decode the id_token JWT to populate `currentUser` (ValueNotifier<AccountIdentity?>) with `oid` (partition key), display name, email, given/family name, and an `isTeacher` flag derived from the `roles` claim.
+5. On startup, [main.dart](lib/main.dart) calls `tryAcquireTokenSilent()` *before the first frame* so a returning user lands on `HomeShell` instead of flashing `SignInPage`. Silent refresh uses the stored refresh_token; on failure the cache is cleared and the user goes back to sign-in.
+
+The Entra app registration must declare `http://localhost` (no port) under "Mobile and desktop applications"; Microsoft accepts any matching loopback port (see comment in [auth_service.dart#L24-L30](lib/services/auth/auth_service.dart#L24-L30)).
+
 ### Python code panel (editor + execution)
+
 - Editor: [features/dashboard/editor.dart](lib/features/dashboard/editor.dart) renders `CodeField` bound to the singleton `CodeService.controller` ([services/code/code_service.dart](lib/services/code/code_service.dart)). `CodeService.setText(...)` is how the tutor pushes new starter code.
 - Toolbar (Run/Stop/Hint/Submit/Request-exercise): [features/dashboard/controllers.dart](lib/features/dashboard/controllers.dart).
 - Runner: [features/dashboard/output.dart](lib/features/dashboard/output.dart) — initialises `py_engine_desktop`, pip-installs a fixed set of packages on first mount, writes code to `student_script.py`, and tails `stdout`/`stderr`. The runner registers `_runCode`/`_forceStop` callbacks on `OutputService.controller.bind(...)` so other widgets call `DataService.output.run(code)` without knowing about the widget tree.
 
 ### AI chat panel
+
 - [features/chat/chat_widget.dart](lib/features/chat/chat_widget.dart) hosts `flutter_chat_ui`'s `Chat`, bound to `ChatService.controller`. Composer swaps based on `TutorService.state` (`idle | working | hasFollowUp`) between the default composer, [composer_wait_widget.dart](lib/features/chat/composer_wait_widget.dart) (spinner), and [composer_continue_widget.dart](lib/features/chat/composer_continue_widget.dart) (Continue button). Student-typed messages route through `TutorService.handleStudentMessage(...)`.
 
 ### Student progression / level system
+
 - Tile list view: [features/progress/student_progress_list.dart](lib/features/progress/student_progress_list.dart) + [features/progress/goal_tile.dart](lib/features/progress/goal_tile.dart).
-- Conductor logic: [services/tutor/conductor.dart](lib/services/tutor/conductor.dart) — picks question types by progress band (<0.2 guiding, <0.4 mc/explain, <0.7 complete/socratic, ≥0.7 write/socratic), applies an `AnswerQuality`-based delta scaled by question type & difficulty, adapts difficulty over a 5-answer window, and recomputes the parent root's progress as the average of its children. Goal completion clears selection, advances to the next incomplete root/subgoal, fires sound + splash.
-- Per-user persistence in `accounts/{uid}/progress/{goalId}` via [services/progress/progress_service.dart](lib/services/progress/progress_service.dart).
+- Conductor logic: [services/tutor/conductor.dart](lib/services/tutor/conductor.dart) — picks question types by progress band (<0.2 guiding, <0.4 mc/explain, <0.7 complete/socratic, ≥0.7 write/socratic), avoids back-to-back repeats of the same type, applies an `AnswerQuality`-based delta scaled by question type & difficulty (with a hint-usage penalty), adapts difficulty over a 5-answer window, and recomputes the parent root's progress as the average of its children. Goal completion clears selection, advances to the next incomplete root/subgoal, fires sound + splash.
+- Per-user persistence: `progress` container via [services/progress/progress_service.dart](lib/services/progress/progress_service.dart). Each `ProgressService` write upserts the child progress, then re-reads sibling children to recompute and upsert root progress.
 
 ### Teacher dashboard
 
-- Goal authoring: [features/goals/goals_page.dart](lib/features/goals/goals_page.dart) — three-pane layout (roots / children / editor) with drag-and-drop reparent and reorder ([dnd.dart](lib/features/goals/dnd.dart), [tree_utils.dart](lib/features/goals/tree_utils.dart)). Subtree backup/restore for safe deletes lives in [goals_service.dart](lib/services/goal/goals_service.dart) (`backupSubtree` / `deleteSubtree` / `restoreSubtree`).
-- AI-instruction authoring: [features/instructions/instructions_editor_page.dart](lib/features/instructions/instructions_editor_page.dart) — left pane lists `instructions/{docId}` documents, middle pane lists named sections, right pane is a markdown `CodeField` editor. Save persists the whole `sections` map back to Firestore.
-- Account admin: [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable`, search, toggle `mayUseGlobalKey`, delete account profile (does NOT delete the FirebaseAuth user).
+- Goal authoring: [features/goals/goals_page.dart](lib/features/goals/goals_page.dart) — three-pane layout (roots / children / editor) with drag-and-drop reparent and reorder ([dnd.dart](lib/features/goals/dnd.dart), [tree_utils.dart](lib/features/goals/tree_utils.dart)). Subtree backup/restore for safe deletes lives in [goals_service.dart](lib/services/goal/goals_service.dart) (`backupSubtree` / `deleteSubtree` / `restoreSubtree`); the data shape is captured in [services/goal/subtree_backup.dart](lib/services/goal/subtree_backup.dart). Reorder and subtree-delete use a Cosmos transactional batch since every doc shares the `/type = "goal"` partition.
+- AI-instruction authoring: [features/instructions/instructions_editor_page.dart](lib/features/instructions/instructions_editor_page.dart) — left pane lists `instructions/{docId}` documents, middle pane lists named sections, right pane is a markdown `CodeField` editor. Save persists the whole `sections` map back to Cosmos. The page also supports importing/exporting Markdown via `file_picker`.
+- Account admin: [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable`, search, toggle `mayUseGlobalKey`, delete account profile (does NOT delete the Entra user — that's a tenant-admin operation).
 
-### Authentication
-- Email + password, Firebase Auth.
-- [features/auth/sign_in_page.dart](lib/features/auth/sign_in_page.dart) is a single page that toggles into a register mode (extra first/last-name fields). On register it calls `AccountService.upsertAccount(...)` to seed the Firestore profile.
-- [main.dart](lib/main.dart) wraps `MaterialApp.home` in a `StreamBuilder<User?>` + the global-key gate: signed-in users without `mayUseGlobalKey == true` and without a local key are routed to [LocalKeyGateScreen](lib/features/auth/local_key_gate_screen.dart).
-- [boot_gate.dart](lib/boot_gate.dart) — holding Shift at startup opens a Safe Mode dialog that calls `resetAuthAndCacheAndExit()` ([core/firestore_safety.dart](lib/core/firestore_safety.dart)) to sign out, terminate Firestore, and delete `%LOCALAPPDATA%\firestore`/`firebase`/etc.
+### Crash recovery & safe mode
+
+- [boot_gate.dart](lib/boot_gate.dart) — holding Shift at startup opens a Safe Mode dialog whose "Reset & Exit" button calls `resetAuthAndCacheAndExit()` ([core/cosmos_safety.dart](lib/core/cosmos_safety.dart)) to sign out (clearing the token bundle in `shared_preferences`) and `exit(0)`.
+- [crash_recovery_screen.dart](lib/crash_recovery_screen.dart) — pushed onto the navigator by `safeCosmos` on Cosmos 401/403, and by `FlutterError.onError` for unhandled errors. Single button calls `resetAuthAndCacheAndExit()`.
 
 ## 6. State management & data flow
 
 ### Pattern
 
-`get_it` for DI; `ValueNotifier` + `ValueListenableBuilder` for reactivity. A custom [widgets/multi_value_listenable_builder.dart](lib/widgets/multi_value_listenable_builder.dart) combines several notifiers in a single builder. There is no Riverpod, Bloc, or `provider` outside the `flutter_chat_ui` composer contract (which requires reading a `ComposerHeightNotifier` injected by the package itself).
+`get_it` for DI; `ValueNotifier` + `ValueListenableBuilder` for reactivity. A custom [widgets/multi_value_listenable_builder.dart](lib/widgets/multi_value_listenable_builder.dart) combines several notifiers in a single builder. There is no Riverpod, Bloc, or `provider` outside the `flutter_chat_ui` composer contract.
 
-All services are registered as lazy singletons in [services/data_service.dart](lib/services/data_service.dart) and accessed through static getters on `DataService` (e.g. `DataService.tutor`, `DataService.goals`).
+All services are registered as lazy singletons in [services/data_service.dart](lib/services/data_service.dart) and accessed through static getters on `DataService` (e.g. `DataService.tutor`, `DataService.goals`, `DataService.auth`).
 
 Notable `ValueNotifier`s:
-- `AccountService.currentAccount` (the signed-in profile)
-- `RoleService.isTeacher`
+- `AuthService.currentUser` (`AccountIdentity?` — Entra claims after silent refresh / interactive sign-in / sign-out)
+- `AccountService.currentAccount` (the Cosmos account doc, polled)
+- `RoleService.isTeacher` (mirrored from `AuthService`)
 - `GlobalConfigService.config` + `LocalApiKeyStorage.isKeyPresent`
-- `GoalsService.{selected,preferred,editorSelected}{Root,Child}Goal` — six notifiers tracking the active goal in different contexts
+- `GoalsService.{selected,preferred}{Root,Child}Goal` and `editorSelectedRootGoal` / `editorSelectedGoal` — six notifiers tracking the active goal in different contexts
 - `ProgressService.currentProgress` (the active subgoal)
 - `TutorService.state` (`idle | working | hasFollowUp`)
 - `SplashService.state` (goal-reached overlay payload)
 
-### Student progress: UI → Firebase
+### Cosmos REST + polling
+
+[core/cosmos_client.dart](lib/core/cosmos_client.dart) is a hand-rolled REST client (~420 lines) that signs requests with HMAC-SHA256 over the canonical Cosmos auth payload (`MasterKeyAuth`). It supports `read`, `query` (with continuation-token pagination), `create`, `upsert`, `replace`, `delete`, and atomic `executeBatch` for multi-doc transactions within a single partition. 429s are retried internally up to 3 times honouring `x-ms-retry-after-ms`, capped at 5 s; 401/403 surface as `CosmosException` with `isAuthError == true`.
+
+Cosmos has a change feed but consuming it from a desktop client is awkward, so reactivity is built on **polling**: [`pollingStream`](lib/core/cosmos_safety.dart#L81) emits an immediate first fetch on subscribe, then ticks on `kCosmosPollInterval` (5 s) without overlapping requests. `safeCosmos` wraps one-shots and pushes `CrashRecoveryScreen` on auth errors; `safeCosmosStream` logs auth/throttle errors flowing through a stream without swallowing them. Every service that exposes a `watchX` stream stacks them as `safeCosmosStream(pollingStream(() => safeCosmos(() => fetch())))`.
+
+### Boot flow
+
+1. `WidgetsFlutterBinding.ensureInitialized()` and `FlutterError.onError` wired to the recovery screen.
+2. `DataService.init()` registers every lazy singleton.
+3. `AuthService.tryAcquireTokenSilent()` runs *before* `runApp`, so the first frame already knows whether a returning user has a valid refresh token.
+4. `GoalsApp` builds a `MultiValueListenableBuilder` over `auth.currentUser`, `account.currentAccount`, and `localStorage.isKeyPresent`.
+   - `currentUser == null` → `SignInPage`.
+   - account doc still loading on first sign-in → spinner.
+   - `!mayUseGlobalKey && !hasLocalKey` → `LocalKeyGateScreen`.
+   - else → `HomeShell`.
+5. `HomeShell.initState` schedules `checkForUpdate()` once after the first frame.
+6. `AccountService` listens to `auth.currentUser`. On a new identity it calls `_ensureProfile` (fire-and-forget create), subscribes to `watchAccount(uid)`, and on the first non-null emission calls `TutorService.initializeSession(force: true)` once per uid (deduped via `_lastInitedUid`).
+
+### Student progress: UI → Cosmos
 
 1. Student answers a question via the chat composer.
 2. `ChatWidget.onMessageSend` → `TutorService.handleStudentMessage(text)` routes to the appropriate `ChatRequestType` based on `_currentExerciseType`.
 3. `TutorService.queryTutor(...)` builds an `input` JSON via `QuestionFormatter`, fetches instructions via `InstructionGenerator.generateInstructions(type)`, and calls `OpenaiConnector.sendRequest(...)`.
-4. The returned response is parsed by `AIResponseParser.parse(...)` into a typed `ChatResponse`, then dispatched by `dispatchResponse(parsed, ctx)` ([services/tutor/responses/response_handlers.dart](lib/services/tutor/responses/response_handlers.dart)) to the matching `*Handler`.
-5. Feedback handlers (`CodeFeedbackHandler`, `McqFeedbackHandler`, `SocraticFeedbackHandler`, `ExplainFeedbackHandler`) call `Conductor.updateProgress(quality)`, which:
+4. The connector returns `ConnectorOk(output) | ConnectorFailure(error, stack, message)`. On failure the tutor surfaces a system message and may retry once (`_maybeRetry`).
+5. On success the response is parsed by `AIResponseParser.parse(...)` into a typed `ChatResponse`, then dispatched by `dispatchResponse(parsed, ctx)` ([services/tutor/responses/response_handlers.dart](lib/services/tutor/responses/response_handlers.dart)) to the matching `*Handler`. Each handler receives a `TutorContext` of small callbacks (`startNewCode`, `addTutorMessage`, `setExerciseType`, `setFollowUp`, `requestExercise`, `maybeRetry`) so the strategy code stays free of `DataService` knowledge.
+6. Feedback handlers (`CodeFeedbackHandler`, `McqFeedbackHandler`, `SocraticFeedbackHandler`, `ExplainFeedbackHandler`) call `Conductor.updateProgress(quality)`, which:
    - Computes a delta scaled by question type, difficulty, and hint usage.
-   - `clamp`s to [0,1] and writes via `ProgressService.upsert(Progress(goalID, progress))` to `accounts/{uid}/progress/{goalId}`.
-   - Recomputes the root goal's progress as the average of its children and upserts that too.
+   - `clamp`s to [0,1] and writes via `ProgressService.upsert(Progress(goalID, progress))` to the `progress` container.
+   - Re-reads sibling children and upserts the root's average progress.
+   - Probabilistically denies an otherwise-allowed follow-up (35 %) to keep variety.
    - On crossing 1.0, plays the goal-reached splash + sound and advances to the next incomplete subgoal via `_setTargetGoal()`.
-6. `StatusSummary` responses route through `ReportService.updateForCurrentChildGoal(...)` and persist to `accounts/{uid}/status_reports/{goalId}`.
+7. `StatusSummary` responses route through `ReportService.updateForCurrentChildGoal(...)` and persist to the `status_reports` container.
 
 ### Teacher-authored AI instructions → runtime prompt
 
@@ -261,40 +313,51 @@ Notable `ValueNotifier`s:
 
 ## 7. Known limitations / TODOs / rough edges
 
-No `// TODO` / `// FIXME` markers exist in `lib/`. Notable rough edges visible in the current code:
+See [TODO.md](TODO.md) and [TESTING_PLAN.md](TESTING_PLAN.md) for the current planning docs. Notable rough edges visible in the code itself:
 
+- **Cosmos auth is master-key.** [cosmos_client.dart](lib/core/cosmos_client.dart) already has an `AadTokenAuth` stub for the eventual swap to per-user AAD RBAC ("Step 3" in the comments); until then every authenticated student holds the database master key. The migration plan in [TODO.md](TODO.md) tracks this.
+- **No realtime listeners.** All cross-device updates rely on a 5 s `pollingStream` tick. Teacher-edits-while-student-is-active have a brief lag, and the polling cost on serverless RU/s billing is real but small at our scale.
 - **Local API key not used.** `LocalApiKeyStorage.saveKey(...)` writes to `SharedPreferences`, the gate screen requires it, but `OpenaiConnector._apiKey = Env.apiKey` always uses the build-time obfuscated key. Either the gate is purely informational or the wiring is incomplete.
 - **`config/global` ApiKey field unused.** `GlobalConfig.apiKey` is parsed but never read by `OpenaiConnector` either. Only `GlobalConfig.model` is consumed.
+- **Tokens stored unencrypted.** The Entra token bundle lives in `shared_preferences` (per the school's "I don't care if students tamper" stance, see [auth_service.dart#L18-L21](lib/services/auth/auth_service.dart#L18-L21)). Students with shell access can read another student's refresh token from `%APPDATA%\com.example\ai_tutor_python\shared_preferences.json`.
 - **Dead file.** [features/dashboard/editor_controller.dart](lib/features/dashboard/editor_controller.dart) is entirely commented out.
-- **Commented-out fallback in [crash_recovery_screen.dart:41-47](lib/crash_recovery_screen.dart#L41-L47)** kept "in case".
-- **Stream error handler is intentionally a no-op.** [firestore_safety.dart:89-97](lib/core/firestore_safety.dart#L89-L97) only `debugPrint`s on `permission-denied`; the comment notes that this should eventually call `resetAuthAndCacheAndExit()` once the stream-recovery flow is in place.
-- **`pip install` runs every time the Output widget is mounted.** [output.dart:59-70](lib/features/dashboard/output.dart#L59-L70) unconditionally pip-installs `numpy`, `pandas`, `requests`, `matplotlib`, `scikit-learn`. Likely a no-op after the first run, but adds startup latency.
+- **Dead branch in `crash_recovery_screen.dart`.** [crash_recovery_screen.dart#L38-L47](lib/crash_recovery_screen.dart#L38-L47) has both `await resetAuthAndCacheAndExit(); exit(0);` and a commented-out fallback. The `exit(0)` is unreachable because the helper already exits.
+- **`pip install` runs every time the Output widget is mounted.** [output.dart#L59-L70](lib/features/dashboard/output.dart#L59-L70) unconditionally pip-installs `numpy`, `pandas`, `requests`, `matplotlib`, `scikit-learn`. Likely a no-op after the first run, but adds startup latency.
 - **No sandboxing of student code.** The script runs in-process via `py_engine_desktop` with full host access.
 - **`AccountService.dispose()` is never called.** Service is a `lazySingleton`; its auth subscription lives for the app's lifetime, which is fine but the `dispose()` is dead.
-- **`_SwitchMap` extension** is reimplemented inside [account_service.dart](lib/services/account/account_service.dart) to avoid an `rxdart` dependency — duplicated logic could move to a shared util if used elsewhere.
-- **Hard-coded admin UID** in [firestore.rules:12](firestore.rules#L12).
-- **Windows-only.** No iOS/Android/macOS/Linux/Web Firebase configuration; web is not supported by `py_engine_desktop` anyway.
-- **All UI text is Dutch and hard-coded** throughout services and widgets; no i18n layer.
-- **`ChatRequestType.completeCodeQuestion` flow.** `CompleteCodeHandler` does set `_currentExerciseType` (so follow-up student replies route correctly), but worth re-verifying — earlier audit notes flagged the inverse and the file has been refactored since.
 - **`dart_openai` is pinned to a personal fork** (`https://github.com/yvanvds/openai.git`) — any upstream changes need to be merged manually.
-- **No automated tests.** `test/` directory is absent; only `flutter_test` is a dev-dep.
-- **Background context.** Memory notes from a 2026-05-01 audit flagged a god-object `TutorService` (~483 lines) and a `lib/services/timeline/` of commented-out code; both have already been cleaned up. `TutorService` is now ~280 lines and dispatches via a per-type strategy in [response_handlers.dart](lib/services/tutor/responses/response_handlers.dart). The audit note in `memory/code_quality_audit.md` is partially stale.
+- **Windows-only.** `py_engine_desktop` is desktop-only and the launcher is Windows-flavoured (`.exe` installer, `%LOCALAPPDATA%` reset path). No iOS/Android/macOS/Linux/Web.
+- **All UI text is Dutch and hard-coded** throughout services and widgets; no i18n layer.
 
 ## 8. Build & run
 
 ### Required config files
 
-- **`.env`** at the repo root with `OPEN_AI_API_KEY=sk-...`. Consumed at build time by `envied` (see [services/tutor/env.dart](lib/services/tutor/env.dart)) and codegen'd into `env.g.dart`. Not committed.
-- **`lib/firebase_options.dart`** — already committed (Windows config only). To re-target a different Firebase project, run `flutterfire configure`.
-- **`firestore.rules`** + **`firestore.indexes.json`** — deploy via `firebase deploy --only firestore`.
+- **`.env`** at the repo root (gitignored). Required entries:
+  ```
+  OPEN_AI_API_KEY=sk-...
+  COSMOS_ENDPOINT=https://<account>.documents.azure.com:443/
+  COSMOS_KEY=<primary-master-key>
+  ENTRA_TENANT_ID=<tenant-guid>
+  ENTRA_CLIENT_ID=<app-registration-client-id>
+  ENTRA_REDIRECT_URI=http://localhost
+  ```
+  `OPEN_AI_API_KEY` and `COSMOS_KEY` are obfuscated at build time via `envied`; the others are not secrets (Microsoft's OAuth model treats client_id/tenant_id/redirect_uri as public).
+
+- **Entra app registration prerequisites** (Azure Portal → App registrations → your app):
+  - "Authentication" → add `http://localhost` as a redirect URI under "Mobile and desktop applications".
+  - "App roles" → define a `Teacher` role and assign it to teacher accounts.
+  - "API permissions" → `openid`, `profile`, `email`, `offline_access` (delegated, Microsoft Graph).
+
+- **Cosmos DB** account with database `python-tutor` and containers `accounts` (`/uid`), `progress` (`/uid`), `status_reports` (`/uid`), `goals` (`/type`), `instructions` (`/type`), `config` (`/type`).
 
 ### Commands
 
-```bash
+```powershell
 # Get dependencies
 flutter pub get
 
-# Generate envied + any other build-runner outputs (run after editing .env or @Envied fields)
+# Generate envied + any other build-runner outputs (run after editing .env)
 dart run build_runner build --delete-conflicting-outputs
 
 # Run on Windows desktop (only supported platform)
@@ -303,7 +366,7 @@ flutter run -d windows
 # Static analysis
 flutter analyze
 
-# Tests (none currently exist, but the dependency is configured)
+# Tests (mocktail-based unit tests under test/)
 flutter test
 
 # Build a release Windows executable
@@ -314,10 +377,6 @@ flutter pub global activate flutter_distributor
 flutter_distributor release --name=windows
 ```
 
-### Firebase emulator (configured but not auto-used)
-
-`firebase.json` declares Auth (port 9099) and Firestore (port 8080) emulators; the app does not currently call `useFirestoreEmulator` / `useAuthEmulator` on startup. Wire those in if you want to develop against the emulators.
-
 ### Update channel
 
-A release build hosts `public/version.json` at `https://ai-tutor-python.web.app/version.json` (deployed via `firebase deploy --only hosting`). On launch, [home_shell.dart:151-192](lib/home_shell.dart#L151-L192) fetches that manifest and, if newer, downloads `python_teacher_install.exe`, verifies SHA-256, and runs it `/VERYSILENT /NORESTART` before exiting.
+A release build hosts `public/version.json` at `https://ai-tutor-python.web.app/version.json` (deployed via `firebase deploy --only hosting` — Firebase Hosting is the only piece of Firebase still used). On launch, [home_shell.dart#L146-L187](lib/home_shell.dart#L146-L187) fetches that manifest and, if newer, downloads `python_teacher_install.exe`, verifies SHA-256, and runs it `/VERYSILENT /NORESTART` before exiting.

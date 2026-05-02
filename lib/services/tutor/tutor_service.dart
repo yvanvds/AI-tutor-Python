@@ -6,6 +6,8 @@ import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
+import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
 import 'package:flutter/material.dart';
 
@@ -15,9 +17,15 @@ class _RequestInput {
   const _RequestInput(
     this.input, [
     this.history = PreviousInputs.includeSession,
+    this.streamable = true,
   ]);
   final String input;
   final PreviousInputs history;
+
+  /// Some request types (e.g. status_summary) don't produce a student-
+  /// facing message, so streaming them just adds visual noise. Those use
+  /// the non-streaming path.
+  final bool streamable;
 }
 
 class TutorService {
@@ -33,16 +41,6 @@ class TutorService {
     _connector = connector ?? OpenaiConnector();
     _conductor = conductor ?? Conductor();
     _instructionGeneratorOverride = instructionGenerator;
-    _ctx = TutorContext(
-      conductor: _conductor,
-      startNewCode: _startNewCode,
-      addTutorMessage: _addTutorMessage,
-      addSystemMessage: _addSystemMessage,
-      setExerciseType: (type) => _currentExerciseType = type,
-      setFollowUp: _setFollowUp,
-      requestExercise: requestExercise,
-      maybeRetry: _maybeRetry,
-    );
   }
   bool _initialized = false;
 
@@ -53,7 +51,6 @@ class TutorService {
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
-  late final TutorContext _ctx;
 
   String _currentExerciseType = '';
 
@@ -92,7 +89,6 @@ class TutorService {
     state.value = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
 
-    ConnectorResult? result;
     try {
       final instructions = await _instructionGenerator.generateInstructions(
         type,
@@ -104,17 +100,35 @@ class TutorService {
         code: code,
         prompt: prompt,
       );
-      if (request == null) return;
+      if (request == null) {
+        state.value = TutorState.idle;
+        return;
+      }
 
-      result = await _connector.sendRequest(
-        input: request.input,
-        instructions: instructions,
-        inputs: request.history,
-      );
+      if (request.streamable) {
+        await _runStream(
+          () => _connector.sendRequestStream(
+            input: request.input,
+            instructions: instructions,
+            inputs: request.history,
+          ),
+        );
+      } else {
+        final result = await _connector.sendRequest(
+          input: request.input,
+          instructions: instructions,
+          inputs: request.history,
+        );
+        await _processNonStreamingResult(result);
+      }
+    } catch (e) {
+      DataService.chat.failStream();
+      _addSystemMessage('Er ging iets mis bij de tutor: $e');
     } finally {
-      state.value = TutorState.idle;
+      if (state.value == TutorState.working) {
+        state.value = TutorState.idle;
+      }
     }
-    await _processResult(result);
   }
 
   _RequestInput? _buildRequestInput({
@@ -129,21 +143,7 @@ class TutorService {
       case ChatRequestType.explainCodeQuestion:
       case ChatRequestType.completeCodeQuestion:
       case ChatRequestType.writeCodeQuestion:
-        final input = switch (type) {
-          ChatRequestType.socraticQuestion =>
-            QuestionFormatter.socraticQuestion(difficulty!),
-          ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
-            difficulty!,
-          ),
-          ChatRequestType.explainCodeQuestion =>
-            QuestionFormatter.explainCodeQuestion(difficulty!),
-          ChatRequestType.completeCodeQuestion =>
-            QuestionFormatter.completeCodeQuestion(difficulty!),
-          ChatRequestType.writeCodeQuestion =>
-            QuestionFormatter.writeCodeQuestion(difficulty!),
-          _ => "",
-        };
-        return _RequestInput(input, PreviousInputs.newSession);
+        return _buildQuestionRequest(type, difficulty);
 
       case ChatRequestType.submitCode:
         if (code == null) return null;
@@ -188,6 +188,7 @@ class TutorService {
         return _RequestInput(
           QuestionFormatter.status(),
           PreviousInputs.includeAll,
+          false, // not streamable: result is stored, not shown
         );
 
       case ChatRequestType.noResult:
@@ -195,7 +196,113 @@ class TutorService {
     }
   }
 
-  Future<void> _processResult(ConnectorResult result) async {
+  _RequestInput _buildQuestionRequest(
+    ChatRequestType type,
+    QuestionDifficulty? difficulty,
+  ) {
+    final input = switch (type) {
+      ChatRequestType.socraticQuestion =>
+        QuestionFormatter.socraticQuestion(difficulty!),
+      ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(difficulty!),
+      ChatRequestType.explainCodeQuestion =>
+        QuestionFormatter.explainCodeQuestion(difficulty!),
+      ChatRequestType.completeCodeQuestion =>
+        QuestionFormatter.completeCodeQuestion(difficulty!),
+      ChatRequestType.writeCodeQuestion =>
+        QuestionFormatter.writeCodeQuestion(difficulty!),
+      _ => "",
+    };
+    return _RequestInput(input, PreviousInputs.newSession);
+  }
+
+  Future<void> _runStream(Stream<StreamChunk> Function() open) async {
+    DataService.chat.startStream();
+    final accumulated = StringBuffer();
+    ChatResponse? completed;
+    StreamFailed? failed;
+
+    await for (final chunk in open()) {
+      switch (chunk) {
+        case StreamTextDelta(:final text):
+          accumulated.write(text);
+          DataService.chat.updateStream(accumulated.toString());
+        case StreamCompleted(:final response):
+          completed = response;
+        case StreamFailed():
+          failed = chunk;
+      }
+    }
+
+    if (failed != null) {
+      DataService.chat.failStream();
+      _addSystemMessage('Er ging iets mis bij de tutor: ${failed.message}');
+      await _maybeRetryStream();
+      return;
+    }
+
+    final response = completed ??
+        AIResponseParser.parse(accumulated.toString());
+    _connector.addResponse(response);
+
+    DataService.chat.completeStream(_finalTextFor(response, accumulated));
+
+    final dispatched = await dispatchResponse(
+      response,
+      _streamingContext(),
+    );
+    if (!dispatched) {
+      _addTutorMessage('Onbekend antwoord ontvangen.');
+      await _maybeRetryStream();
+    }
+  }
+
+  /// What we actually want to leave on screen after the stream finalises.
+  /// For most types the streamed text already matches the model's `prompt`
+  /// field. For [ErrorResponse] the model wrote the error in TEXT, but we
+  /// don't want it lingering as a tutor message — clear it; the dispatcher
+  /// will add a system message.
+  String _finalTextFor(ChatResponse response, StringBuffer accumulated) {
+    if (response is ErrorResponse) return '';
+    return accumulated.toString();
+  }
+
+  /// Build a TutorContext whose first `addTutorMessage` is a no-op (the
+  /// prompt was already shown via the stream). Subsequent calls — for
+  /// example multiple_choice options or follow-up text — render normally.
+  TutorContext _streamingContext() {
+    var firstSuppressed = false;
+    return TutorContext(
+      conductor: _conductor,
+      startNewCode: _startNewCode,
+      addTutorMessage: (message) {
+        if (!firstSuppressed) {
+          firstSuppressed = true;
+          return;
+        }
+        _addTutorMessage(message);
+      },
+      addSystemMessage: _addSystemMessage,
+      setExerciseType: (type) => _currentExerciseType = type,
+      setFollowUp: _setFollowUp,
+      requestExercise: requestExercise,
+      maybeRetry: _maybeRetryStream,
+    );
+  }
+
+  TutorContext _nonStreamingContext() {
+    return TutorContext(
+      conductor: _conductor,
+      startNewCode: _startNewCode,
+      addTutorMessage: _addTutorMessage,
+      addSystemMessage: _addSystemMessage,
+      setExerciseType: (type) => _currentExerciseType = type,
+      setFollowUp: _setFollowUp,
+      requestExercise: requestExercise,
+      maybeRetry: _maybeRetry,
+    );
+  }
+
+  Future<void> _processNonStreamingResult(ConnectorResult result) async {
     switch (result) {
       case ConnectorOk(:final output):
         await _handleResponse(output);
@@ -210,7 +317,16 @@ class TutorService {
     _retriesLeft--;
     final result = await _resendLastRequest();
     if (result == null) return;
-    await _processResult(result);
+    await _processNonStreamingResult(result);
+  }
+
+  Future<void> _maybeRetryStream() async {
+    if (_retriesLeft <= 0) return;
+    _retriesLeft--;
+    if (state.value != TutorState.working) {
+      state.value = TutorState.working;
+    }
+    await _runStream(() => _connector.resendRequestStream());
   }
 
   Future<void> handleStudentMessage(String message) async {
@@ -249,6 +365,14 @@ class TutorService {
     DataService.chat.addSystemMessage(
       "Je volgende oefening wordt voorbereid...",
     );
+
+    // Often invoked from a feedback handler dispatched inside the outer
+    // queryTutor's try block, so state is still `working` here. Release it
+    // so the chained queryTutor below doesn't short-circuit on its idle guard.
+    if (state.value == TutorState.working) {
+      state.value = TutorState.idle;
+    }
+
     await queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2);
   }
 
@@ -266,11 +390,11 @@ class TutorService {
 
   // ---- Private helpers ------------------------------------------------------
 
-  Future<void> _handleResponse(dynamic response) async {
-    final parsed = AIResponseParser.parse(response);
+  Future<void> _handleResponse(String output) async {
+    final parsed = AIResponseParser.parse(output);
     _connector.addResponse(parsed);
 
-    final dispatched = await dispatchResponse(parsed, _ctx);
+    final dispatched = await dispatchResponse(parsed, _nonStreamingContext());
     if (!dispatched) {
       _addTutorMessage('Onbekend antwoord ontvangen.');
       await _maybeRetry();

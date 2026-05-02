@@ -29,6 +29,14 @@ import 'package:mocktail/mocktail.dart';
 import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
+/// Strip the constant envelope-contract prefix that every system prompt now
+/// starts with. Tests focus on the teacher-edited part of the rendering, not
+/// the hard-coded transport contract.
+String _withoutEnvelope(String full) {
+  if (!full.startsWith(envelopeContract)) return full;
+  return full.substring(envelopeContract.length + 1); // +1 for the trailing \n
+}
+
 void main() {
   late MockGoalsService goals;
   late MockInstructionsService instructions;
@@ -37,6 +45,8 @@ void main() {
   late ValueNotifier<Goal?> selectedChild;
   late ValueNotifier<Goal?> preferredRoot;
   late ValueNotifier<Goal?> preferredChild;
+  late ValueNotifier<List<Goal>> cachedRoots;
+  late ValueNotifier<List<Instruction>> cachedAll;
 
   Goal makeGoal(
     String id, {
@@ -61,11 +71,15 @@ void main() {
     selectedChild = ValueNotifier<Goal?>(null);
     preferredRoot = ValueNotifier<Goal?>(null);
     preferredChild = ValueNotifier<Goal?>(null);
+    cachedRoots = ValueNotifier<List<Goal>>(const []);
+    cachedAll = ValueNotifier<List<Instruction>>(const []);
 
     when(() => goals.selectedRootGoal).thenReturn(selectedRoot);
     when(() => goals.selectedChildGoal).thenReturn(selectedChild);
     when(() => goals.preferredRootGoal).thenReturn(preferredRoot);
     when(() => goals.preferredChildGoal).thenReturn(preferredChild);
+    when(() => goals.cachedRoots).thenReturn(cachedRoots);
+    when(() => instructions.cachedAll).thenReturn(cachedAll);
 
     when(() => goals.getRootGoalsOnce()).thenAnswer((_) async => <Goal>[]);
     when(() => instructions.getAll())
@@ -81,6 +95,8 @@ void main() {
     selectedChild.dispose();
     preferredRoot.dispose();
     preferredChild.dispose();
+    cachedRoots.dispose();
+    cachedAll.dispose();
   });
 
   group('generateInstructions — guard clauses', () {
@@ -101,9 +117,30 @@ void main() {
     });
   });
 
-  group('generateInstructions — section selection & ordering', () {
-    test('per-type sections come first, alwaysInclude appended last',
+  group('generateInstructions — envelope contract', () {
+    test('every non-empty rendering starts with the envelope contract',
         () async {
+      selectedRoot.value = makeGoal('root');
+      selectedChild.value = makeGoal('child');
+
+      when(() => instructions.getAll()).thenAnswer(
+        (_) async => [
+          Instruction(
+            id: 'alwaysInclude',
+            sections: {'a': 'X'},
+          ),
+        ],
+      );
+
+      final out = await InstructionGenerator()
+          .generateInstructions(ChatRequestType.socraticQuestion);
+      expect(out, startsWith(envelopeContract));
+    });
+  });
+
+  group('generateInstructions — section selection & ordering', () {
+    test('alwaysInclude renders before per-type sections (cache-friendly '
+        'ordering)', () async {
       selectedRoot.value = makeGoal('root');
       selectedChild.value = makeGoal('child');
 
@@ -127,10 +164,10 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
+      final body = _withoutEnvelope(out);
 
-      // Per-type sections render first (in map iteration order), then
-      // alwaysInclude. The unrelated id contributes nothing.
-      expect(out, 'TYPE-INTRO\nTYPE-BODY\nALWAYS-RULES\n');
+      // alwaysInclude first, then per-type sections in map iteration order.
+      expect(body, 'ALWAYS-RULES\nTYPE-INTRO\nTYPE-BODY\n');
       expect(out, isNot(contains('IGNORED')));
     });
 
@@ -150,10 +187,11 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.requestHint);
-      expect(out, 'ALWAYS\n');
+      expect(_withoutEnvelope(out), 'ALWAYS\n');
     });
 
-    test('no matching id at all → empty string', () async {
+    test('no matching id at all → only the envelope contract is emitted',
+        () async {
       selectedRoot.value = makeGoal('root');
       selectedChild.value = makeGoal('child');
 
@@ -165,7 +203,7 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
-      expect(out, '');
+      expect(_withoutEnvelope(out), '');
     });
   });
 
@@ -195,7 +233,10 @@ void main() {
           .generateInstructions(ChatRequestType.socraticQuestion);
       // No mastered concepts because the only root goal IS the target —
       // the loop short-circuits before adding anything.
-      expect(out, 'goal=Lussen sub=For-loop sug=s1\ns2 known=\n');
+      expect(
+        _withoutEnvelope(out),
+        'goal=Lussen sub=For-loop sug=s1\ns2 known=\n',
+      );
     });
 
     test('case-insensitive and tolerant of whitespace inside braces',
@@ -217,7 +258,7 @@ void main() {
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
       expect(
-        out,
+        _withoutEnvelope(out),
         'GOAL-TITLE / GOAL-TITLE / GOAL-TITLE / GOAL-TITLE / SUB-TITLE\n',
       );
     });
@@ -240,7 +281,7 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
-      expect(out, 'goal=PREF-ROOT sub=PREF-CHILD\n');
+      expect(_withoutEnvelope(out), 'goal=PREF-ROOT sub=PREF-CHILD\n');
     });
   });
 
@@ -282,7 +323,7 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
-      expect(out, '<variables\ntypes>\n');
+      expect(_withoutEnvelope(out), '<variables\ntypes>\n');
       expect(out, isNot(contains('loops')));
       expect(out, isNot(contains('classes')));
     });
@@ -313,7 +354,7 @@ void main() {
 
       final out = await InstructionGenerator()
           .generateInstructions(ChatRequestType.socraticQuestion);
-      expect(out, '<c-a>\n');
+      expect(_withoutEnvelope(out), '<c-a>\n');
     });
   });
 }

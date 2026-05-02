@@ -1,13 +1,35 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:flutter/foundation.dart';
 
 import 'instruction.dart';
 
 class InstructionsService {
+  InstructionsService() {
+    _subscription = watchAll().listen((list) {
+      cachedAll.value = List.unmodifiable(list);
+    });
+  }
+
   static const String _pk = CosmosPartitions.instruction;
 
   CosmosContainer get _container => CosmosPaths.instructions();
+
+  /// Latest instruction docs from the polling watcher. Empty list until the
+  /// first fetch completes. Hot callers (the AI request loop) should read
+  /// this synchronously instead of awaiting [getAll] every turn.
+  final ValueNotifier<List<Instruction>> cachedAll =
+      ValueNotifier<List<Instruction>>(const []);
+
+  StreamSubscription<List<Instruction>>? _subscription;
+
+  void dispose() {
+    _subscription?.cancel();
+    cachedAll.dispose();
+  }
 
   /// Stream all instruction docs (poll-based, see TODO.md).
   Stream<List<Instruction>> watchAll() {
