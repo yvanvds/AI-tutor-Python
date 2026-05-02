@@ -64,7 +64,7 @@ class OpenaiConnector {
   /// Edit in source while tuning; promote to GlobalConfig once the right
   /// value is known.
   // ignore: unnecessary_nullable_for_final_variable_declarations
-  static const String? reasoningEffort = 'minimal';
+  static const String? reasoningEffort = 'low';
 
   /// Hard cap on each history scope. Keeps memory bounded and trims input
   /// tokens for long-lived sessions.

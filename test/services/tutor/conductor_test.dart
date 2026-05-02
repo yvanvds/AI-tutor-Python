@@ -1,11 +1,13 @@
-// Reference test for the Conductor — the brain that picks question types,
-// computes progress deltas, adapts difficulty, and advances goals. The
-// Conductor reads/writes through `DataService` (a `get_it` locator), so the
-// test pattern is: register service mocks under the *interface* type, plumb
-// real `ValueNotifier`s through stubbed getters so `notifier.value = x`
-// writes work as in production, then exercise the public API and verify the
-// observable side effects (`progress.upsert`, `chat.addSystemMessage`,
-// `splash.showGoalReached`, `sound.*`).
+// Tests for the mastery-streak Conductor. A subgoal is mastered when the
+// student answers correctly `_streakNeeded` times in a row across at least
+// `_distinctTypesNeeded` different question types. Mastery triggers a
+// fast-forward diagnostic on the next subgoal.
+//
+// The Conductor talks to the rest of the app through `DataService` (a
+// `get_it` locator), so each test registers service mocks under the
+// interface type, plumbs real `ValueNotifier`s through stubbed getters, and
+// verifies observable side effects (`progress.upsert`,
+// `chat.addSystemMessage`, `splash.showGoalReached`, `sound.*`).
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
@@ -93,71 +95,386 @@ void main() {
     currentProgress.dispose();
   });
 
-  group('updateProgress — delta computation', () {
-    test('correct on default (no question type set, easy, 0 hints) bumps by '
-        'baseDelta(0.14) × typeMult(1.0) × diffMult(0.8) = 0.112', () async {
+  /// Drives the Conductor through guiding so practice can begin. The
+  /// guiding phase completes once the running confidence sum reaches 0.8.
+  Future<void> completeGuiding(Conductor c) async {
+    c.getNextQuestion(); // sets _currentQuestionType to guidingQuestion
+    await c.guidingIsComplete(0.8);
+  }
+
+  /// Records a correct answer for [type] on [c]. Caller is responsible for
+  /// having selected a child goal first.
+  Future<void> answerCorrect(Conductor c, ChatRequestType type) async {
+    // Force the question-type record by advancing through getNextQuestion
+    // until we hit [type]. A simpler approach: poke the field via a
+    // round-trip — but the Conductor doesn't expose it, so we drive
+    // updateProgress while pretending the just-issued question was [type].
+    // The Conductor's updateProgress reads `_currentQuestionType` set by
+    // getNextQuestion; we reach the desired type by calling getNextQuestion
+    // until it returns it.
+    var safety = 20;
+    while (safety-- > 0) {
+      final (got, _) = c.getNextQuestion();
+      if (got == type) break;
+    }
+    await c.updateProgress(AnswerQuality.correct);
+  }
+
+  group('getNextQuestion', () {
+    test('no selected or preferred child → noResult', () {
+      final (type, _) = Conductor().getNextQuestion();
+      expect(type, ChatRequestType.noResult);
+    });
+
+    test('fresh subgoal (no persisted progress) → guidingQuestion', () async {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
       final c = Conductor();
+      final (type, difficulty) = c.getNextQuestion();
+      expect(type, ChatRequestType.guidingQuestion);
+      expect(difficulty, QuestionDifficulty.easy);
+    });
+
+    test('after guiding completes, picks from practice types and avoids '
+        'back-to-back repeats', () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      const practice = {
+        ChatRequestType.mcQuestion,
+        ChatRequestType.explainCodeQuestion,
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.socraticQuestion,
+        ChatRequestType.writeCodeQuestion,
+      };
+
+      final first = c.getNextQuestion().$1;
+      expect(practice, contains(first));
+      // Run a few more picks; none should ever repeat the immediately
+      // previous type.
+      var prev = first;
+      for (var i = 0; i < 10; i++) {
+        final next = c.getNextQuestion().$1;
+        expect(practice, contains(next));
+        expect(next, isNot(prev));
+        prev = next;
+      }
+    });
+  });
+
+  group('guidingIsComplete', () {
+    test('accumulates confidence; returning true once the running sum '
+        'reaches 0.8 plays the chime and persists the post-guiding marker',
+        () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      expect(await c.guidingIsComplete(0.5), isFalse);
+      expect(await c.guidingIsComplete(0.4), isTrue);
+
+      verify(() => sound.guidingComplete()).called(1);
+      // Last upsert reflects the post-guiding marker (display = 0.05).
+      final upserts = verify(() => progress.upsert(captureAny<Progress>()))
+          .captured
+          .cast<Progress>();
+      expect(upserts.last.goalID, 'child-1');
+      expect(upserts.last.progress, closeTo(0.05, 1e-9));
+      expect(currentProgress.value, closeTo(0.05, 1e-9));
+    });
+  });
+
+  group('updateProgress — streak progression', () {
+    test('a single correct answer after guiding bumps display to 1/3 and '
+        'persists it', () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+      // Clear earlier captures.
+      clearInteractions(progress);
+      when(() => progress.upsert(any<Progress>())).thenAnswer((_) async {});
+
+      c.getNextQuestion(); // sets _currentQuestionType to a practice type
       await c.updateProgress(AnswerQuality.correct);
 
-      // Only the child upserts — no root upsert because selectedRootGoal is
-      // null (parent recompute is gated on that).
       final captured = verify(() => progress.upsert(captureAny<Progress>()))
           .captured
           .cast<Progress>();
-      expect(captured, hasLength(1));
       expect(captured.single.goalID, 'child-1');
-      expect(captured.single.progress, closeTo(0.112, 1e-9));
-      expect(currentProgress.value, closeTo(0.112, 1e-9));
-      verify(() => sound.correctAnswer()).called(1);
+      expect(captured.single.progress, closeTo(1.0 / 3.0, 1e-9));
+      expect(currentProgress.value, closeTo(1.0 / 3.0, 1e-9));
     });
 
-    test('wrong delta clamps at 0.0 instead of going negative', () async {
+    test('wrong answer resets the streak (display drops back to the '
+        'guiding-done marker)', () async {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      await Conductor().updateProgress(AnswerQuality.wrong);
+      final c = Conductor();
+      await completeGuiding(c);
 
-      final p = verify(() => progress.upsert(captureAny<Progress>()))
-          .captured
-          .single as Progress;
-      expect(p.progress, 0.0);
-      verifyNever(() => sound.correctAnswer());
-    });
+      c.getNextQuestion();
+      await c.updateProgress(AnswerQuality.correct); // 1/3
+      clearInteractions(progress);
+      when(() => progress.upsert(any<Progress>())).thenAnswer((_) async {});
 
-    test('hints dampen a positive delta but cannot flip its sign', () async {
-      selectedChild.value = makeGoal('child-1');
-      currentProgress.value = 0.0;
-
-      final c = Conductor()
-        ..hintProvided()
-        ..hintProvided();
-      await c.updateProgress(AnswerQuality.correct);
-
-      // 0.14 × 1.0 × 0.8 = 0.112 ; hintPenalty = 0.02 × 2 = 0.04 → 0.072
-      final p = verify(() => progress.upsert(captureAny<Progress>()))
-          .captured
-          .single as Progress;
-      expect(p.progress, closeTo(0.072, 1e-9));
-    });
-
-    test('hint counter resets after each updateProgress call', () async {
-      selectedChild.value = makeGoal('child-1');
-      currentProgress.value = 0.0;
-
-      final c = Conductor()
-        ..hintProvided()
-        ..hintProvided();
-      await c.updateProgress(AnswerQuality.correct); // 0.072 (with penalty)
-      await c.updateProgress(AnswerQuality.correct); // 0.112 (no penalty)
+      c.getNextQuestion();
+      await c.updateProgress(AnswerQuality.wrong);
 
       final captured = verify(() => progress.upsert(captureAny<Progress>()))
           .captured
           .cast<Progress>();
-      expect(captured[0].progress, closeTo(0.072, 1e-9));
-      expect(captured[1].progress, closeTo(0.072 + 0.112, 1e-9));
+      expect(captured.single.progress, closeTo(0.05, 1e-9));
+    });
+
+    test('partial answer holds ground (no streak change, no upsert change)',
+        () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      c.getNextQuestion();
+      await c.updateProgress(AnswerQuality.correct); // 1/3
+      clearInteractions(progress);
+      when(() => progress.upsert(any<Progress>())).thenAnswer((_) async {});
+
+      c.getNextQuestion();
+      await c.updateProgress(AnswerQuality.partial);
+
+      final captured = verify(() => progress.upsert(captureAny<Progress>()))
+          .captured
+          .cast<Progress>();
+      // Still 1/3 — partial neither advances nor resets.
+      expect(captured.single.progress, closeTo(1.0 / 3.0, 1e-9));
+    });
+  });
+
+  group('updateProgress — mastery', () {
+    test('3 correct answers across 2 distinct question types triggers '
+        'mastery: persists 1.0, fires goal-reached, and clears selection '
+        'when no further subgoal is found', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1', title: 'Variabelen');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      // Drive question types so the streak hits 2 distinct types.
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      // The 3rd correct can be on any type; reuse mc to confirm types-set
+      // (already 2 distinct) is sufficient.
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+
+      verify(
+        () => splash.showGoalReached(
+          goalTitle: 'Variabelen',
+          description: any<String>(named: 'description'),
+        ),
+      ).called(1);
+      verify(() => sound.playGoalReached()).called(1);
+
+      // 1.0 was persisted for the child.
+      final upserts = verify(() => progress.upsert(captureAny<Progress>()))
+          .captured
+          .cast<Progress>();
+      expect(
+        upserts.any((p) => p.goalID == 'child-1' && p.progress == 1.0),
+        isTrue,
+      );
+
+      // No further subgoal → selection cleared and notifier reset.
+      expect(selectedChild.value, isNull);
+      expect(selectedRoot.value, isNull);
+      expect(currentProgress.value, 0.0);
+    });
+
+    test('3 corrects on a SINGLE type does not yet master (distinct-types '
+        'requirement not met)', () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      // Force the same question type three times.
+      for (var i = 0; i < 3; i++) {
+        await answerCorrect(c, ChatRequestType.mcQuestion);
+      }
+
+      verifyNever(
+        () => splash.showGoalReached(
+          goalTitle: any<String>(named: 'goalTitle'),
+          description: any<String>(named: 'description'),
+        ),
+      );
+    });
+
+    test('once the streak reaches threshold without distinct-types, '
+        'updateProgress denies the follow-up so the caller fetches a new '
+        'exercise of a different type', () async {
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      Future<bool> correctOn(ChatRequestType type) async {
+        var safety = 20;
+        while (safety-- > 0) {
+          final (got, _) = c.getNextQuestion();
+          if (got == type) break;
+        }
+        return c.updateProgress(AnswerQuality.correct);
+      }
+
+      // Streak 1 and 2 on a single type may still allow follow-ups.
+      await correctOn(ChatRequestType.mcQuestion);
+      await correctOn(ChatRequestType.mcQuestion);
+      // Streak 3 on a single type: mastery can't fire yet, so the follow-up
+      // must be denied to force a new question type.
+      final allowedAtThree = await correctOn(ChatRequestType.mcQuestion);
+      expect(allowedAtThree, isFalse);
+    });
+  });
+
+  group('updateProgress — fast-forward diagnostic', () {
+    test('after mastery, getNextQuestion returns a writeCodeQuestion at '
+        'medium for the new subgoal (the diagnostic)', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      // After child-1 is mastered, advance to child-2 under the same root.
+      when(() => goals.getRootGoalsOnce())
+          .thenAnswer((_) async => [makeGoal('root-1')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [makeGoal('child-1'), makeGoal('child-2')],
+      );
+      when(() => progress.getAll()).thenAnswer(
+        (_) async => [
+          // child-1 is mastered (1.0); child-2 is fresh (0.0).
+          Progress(goalID: 'child-1', progress: 1.0),
+        ],
+      );
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+
+      // After advancement, child-2 is the new active subgoal; the next
+      // question must be a diagnostic.
+      expect(selectedChild.value?.id, 'child-2');
+
+      final (type, difficulty) = c.getNextQuestion();
+      expect(type, ChatRequestType.writeCodeQuestion);
+      expect(difficulty, QuestionDifficulty.medium);
+    });
+
+    test('correct diagnostic answer fast-forwards: marks the new subgoal '
+        'mastered too and fires goal-reached again', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      // Three child goals — the diagnostic on child-2 should fast-forward
+      // to child-3.
+      when(() => goals.getRootGoalsOnce())
+          .thenAnswer((_) async => [makeGoal('root-1')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [
+          makeGoal('child-1'),
+          makeGoal('child-2'),
+          makeGoal('child-3'),
+        ],
+      );
+      // Track which children are mastered as the test progresses.
+      final mastered = <String>{};
+      when(() => progress.getAll()).thenAnswer(
+        (_) async => mastered
+            .map((id) => Progress(goalID: id, progress: 1.0))
+            .toList(),
+      );
+      when(() => progress.upsert(any<Progress>())).thenAnswer((inv) async {
+        final p = inv.positionalArguments.first as Progress;
+        if (p.progress >= 1.0) mastered.add(p.goalID);
+      });
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      // Master child-1.
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      expect(selectedChild.value?.id, 'child-2');
+
+      // Diagnostic question on child-2.
+      final (diag, _) = c.getNextQuestion();
+      expect(diag, ChatRequestType.writeCodeQuestion);
+
+      // Student aces it → child-2 is mastered without practice; advances
+      // to child-3.
+      await c.updateProgress(AnswerQuality.correct);
+
+      expect(mastered, containsAll(['child-1', 'child-2']));
+      expect(selectedChild.value?.id, 'child-3');
+
+      // Two goal-reached events: one for child-1, one for child-2.
+      verify(
+        () => splash.showGoalReached(
+          goalTitle: any<String>(named: 'goalTitle'),
+          description: any<String>(named: 'description'),
+        ),
+      ).called(2);
+    });
+
+    test('wrong diagnostic answer cancels the fast-forward and falls back '
+        'to guiding on the new subgoal', () async {
+      selectedRoot.value = makeGoal('root-1');
+      selectedChild.value = makeGoal('child-1');
+      currentProgress.value = 0.0;
+
+      when(() => goals.getRootGoalsOnce())
+          .thenAnswer((_) async => [makeGoal('root-1')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [makeGoal('child-1'), makeGoal('child-2')],
+      );
+      when(() => progress.getAll()).thenAnswer(
+        (_) async => [Progress(goalID: 'child-1', progress: 1.0)],
+      );
+
+      final c = Conductor();
+      await completeGuiding(c);
+
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      await answerCorrect(c, ChatRequestType.explainCodeQuestion);
+      await answerCorrect(c, ChatRequestType.mcQuestion);
+      expect(selectedChild.value?.id, 'child-2');
+
+      // Diagnostic.
+      final (diag, _) = c.getNextQuestion();
+      expect(diag, ChatRequestType.writeCodeQuestion);
+
+      // Student gets it wrong — fall back to normal guiding flow.
+      await c.updateProgress(AnswerQuality.wrong);
+
+      // Next question on child-2 is a guidingQuestion, not another
+      // diagnostic.
+      final (next, _) = c.getNextQuestion();
+      expect(next, ChatRequestType.guidingQuestion);
     });
   });
 
@@ -168,11 +485,13 @@ void main() {
       currentProgress.value = 0.0;
 
       final c = Conductor();
+      await completeGuiding(c);
+
       for (var i = 0; i < 4; i++) {
+        c.getNextQuestion();
         await c.updateProgress(AnswerQuality.correct);
       }
 
-      // Exactly one "easy → medium" message after the 4th correct.
       verify(
         () => chat.addSystemMessage(
           any<String>(
@@ -188,99 +507,71 @@ void main() {
     });
   });
 
-  group('updateProgress — parent recompute', () {
-    test('upserts child first, then root with average of children\' '
-        'pre-update progress (representative of read-back-from-Cosmos)',
-        () async {
+  group('parent recompute', () {
+    test('a single-child correct upserts both child progress and the root '
+        'average', () async {
       selectedRoot.value = makeGoal('root-1');
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      when(() => goals.getChildrenOnce('root-1'))
-          .thenAnswer((_) async => [makeGoal('child-1'), makeGoal('child-2')]);
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [makeGoal('child-1'), makeGoal('child-2')],
+      );
       when(() => progress.getByGoalId('child-1')).thenAnswer(
-        (_) async => Progress(goalID: 'child-1', progress: 0.4),
+        (_) async => Progress(goalID: 'child-1', progress: 1.0 / 3.0),
       );
       when(() => progress.getByGoalId('child-2')).thenAnswer(
         (_) async => Progress(goalID: 'child-2', progress: 0.0),
       );
 
-      // partial: 0.07 × 1.0 × 0.8 = 0.056
-      await Conductor().updateProgress(AnswerQuality.partial);
+      final c = Conductor();
+      await completeGuiding(c);
+      clearInteractions(progress);
+      when(() => progress.upsert(any<Progress>())).thenAnswer((_) async {});
+      when(() => goals.getChildrenOnce('root-1')).thenAnswer(
+        (_) async => [makeGoal('child-1'), makeGoal('child-2')],
+      );
+      when(() => progress.getByGoalId('child-1')).thenAnswer(
+        (_) async => Progress(goalID: 'child-1', progress: 1.0 / 3.0),
+      );
+      when(() => progress.getByGoalId('child-2')).thenAnswer(
+        (_) async => Progress(goalID: 'child-2', progress: 0.0),
+      );
+
+      c.getNextQuestion();
+      await c.updateProgress(AnswerQuality.correct);
 
       final captured = verify(() => progress.upsert(captureAny<Progress>()))
           .captured
           .cast<Progress>();
-      expect(captured, hasLength(2));
+      // First write: child-1 at 1/3. Second: root average from re-read
+      // values (1/3 and 0) = 1/6.
       expect(captured[0].goalID, 'child-1');
-      expect(captured[0].progress, closeTo(0.056, 1e-9));
+      expect(captured[0].progress, closeTo(1.0 / 3.0, 1e-9));
       expect(captured[1].goalID, 'root-1');
-      // root avg = (child-1.read=0.4 + child-2.read=0.0) / 2 = 0.2
-      expect(captured[1].progress, closeTo(0.2, 1e-9));
+      expect(captured[1].progress, closeTo(1.0 / 6.0, 1e-9));
     });
   });
 
-  group('updateProgress — goal completion', () {
-    test('crossing 1.0 fires splash + goal-reached sound and clears '
-        'selected goals (when the next-target search finds nothing)',
-        () async {
-      selectedRoot.value = makeGoal('root-1');
-      selectedChild.value = makeGoal('child-1', title: 'Lussen');
-      currentProgress.value = 0.95; // any positive delta crosses 1.0
-
-      final followUp =
-          await Conductor().updateProgress(AnswerQuality.correct);
-
-      verify(
-        () => splash.showGoalReached(
-          goalTitle: 'Lussen',
-          description: any<String>(named: 'description'),
-        ),
-      ).called(1);
-      verify(() => sound.playGoalReached()).called(1);
-
-      // Crossing the 1.0 milestone makes followUp deterministically false:
-      // _rollFollowUpAllowance(false) returns false on both random branches.
-      expect(followUp, isFalse);
-
-      // _setTargetGoal cleared the selection and reset the progress notifier.
-      expect(selectedChild.value, isNull);
-      expect(selectedRoot.value, isNull);
-      expect(currentProgress.value, 0.0);
-    });
-  });
-
-  group('getNextQuestion', () {
-    test('progress < 0.2 → guidingQuestion', () {
+  group('setTarget — resume from persisted progress', () {
+    test('persisted 0.66 recovers `_correctStreak = 2` and skips guiding so '
+        'the next question comes from the practice pool', () async {
       selectedChild.value = makeGoal('child-1');
-      currentProgress.value = 0.1;
-
-      final (type, difficulty) = Conductor().getNextQuestion();
-
-      expect(type, ChatRequestType.guidingQuestion);
-      expect(difficulty, QuestionDifficulty.easy);
-    });
-
-    test('no selected or preferred child → noResult', () {
-      final (type, _) = Conductor().getNextQuestion();
-      expect(type, ChatRequestType.noResult);
-    });
-  });
-
-  group('guidingIsComplete', () {
-    test('accumulates understanding, displays understanding/5 mid-flow, '
-        'jumps to 0.2 and plays the chime when the running sum reaches 0.8',
-        () async {
-      selectedChild.value = makeGoal('child-1');
-      currentProgress.value = 0.0;
+      currentProgress.value = 0.66;
+      when(() => progress.getByGoalId('child-1')).thenAnswer(
+        (_) async => Progress(goalID: 'child-1', progress: 0.66),
+      );
+      // setTarget calls _setTargetGoal only if no preferredChildGoal *and*
+      // it would clear selectedChild — give it a no-result root list so it
+      // leaves the test's selection alone via the preferred path.
+      preferredChild.value = makeGoal('child-1');
+      preferredRoot.value = makeGoal('root-1');
 
       final c = Conductor();
-      expect(await c.guidingIsComplete(0.5), isFalse);
-      expect(currentProgress.value, closeTo(0.5 / 5, 1e-9));
+      await c.setTarget();
 
-      expect(await c.guidingIsComplete(0.4), isTrue);
-      expect(currentProgress.value, closeTo(0.2, 1e-9));
-      verify(() => sound.guidingComplete()).called(1);
+      final (type, _) = c.getNextQuestion();
+      expect(type, isNot(ChatRequestType.guidingQuestion));
     });
   });
 }

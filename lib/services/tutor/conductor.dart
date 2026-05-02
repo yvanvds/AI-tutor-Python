@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
@@ -5,33 +7,68 @@ import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:collection/collection.dart';
-import 'dart:math';
 
 class Conductor {
   Conductor();
 
-  static const double _followUpDenialChance = 0.35;
+  // Mastery thresholds for the current subgoal.
+  static const int _streakNeeded = 3;
+  static const int _distinctTypesNeeded = 2;
+
+  // Persisted floor that marks "guiding done, no practice yet" so a resumed
+  // session can detect prior progress and skip guiding.
+  static const double _guidingDoneMarker = 0.05;
+
+  static const List<ChatRequestType> _practiceTypes = [
+    ChatRequestType.mcQuestion,
+    ChatRequestType.explainCodeQuestion,
+    ChatRequestType.completeCodeQuestion,
+    ChatRequestType.socraticQuestion,
+    ChatRequestType.writeCodeQuestion,
+  ];
 
   final _rand = Random();
 
-  double _currentProgress = 0.0;
-  double _guidingUnderstanding = 0.0; // used to move on from guiding questions
+  // Per-subgoal state — reset whenever the active subgoal changes.
+  bool _guidingDone = false;
+  double _guidingConfidence = 0.0;
+  int _correctStreak = 0;
+  final Set<ChatRequestType> _typesInStreak = {};
 
+  // Cross-subgoal state — survives advancement.
   QuestionDifficulty _difficulty = QuestionDifficulty.easy;
   int _hintsUsed = 0;
   final List<AnswerQuality> _answerHistory = [];
-
   ChatRequestType? _currentQuestionType;
+
+  // Set after mastering subgoal X to issue one diagnostic on subgoal Y. If
+  // the student nails it, Y is also marked mastered (fast-forward).
+  bool _diagnosingNext = false;
+
+  // ---- Lifecycle ----------------------------------------------------------
 
   Future<void> setTarget() async {
     if (DataService.goals.preferredChildGoal.value == null) {
-      // 1. Set target goal
       await _setTargetGoal();
     }
-
-    // 2. Get the current progress
-    _currentProgress = await _getCurrentProgress();
+    final persisted = await _getCurrentProgress();
+    _resetSubgoalState(persistedProgress: persisted);
   }
+
+  /// Resets per-subgoal state. Recovers `_guidingDone` and `_correctStreak`
+  /// from [persistedProgress] so a resumed session doesn't visually rewind.
+  void _resetSubgoalState({double persistedProgress = 0.0}) {
+    _guidingDone = persistedProgress > 0.0;
+    _guidingConfidence = 0.0;
+    _correctStreak = (persistedProgress * _streakNeeded)
+        .round()
+        .clamp(0, _streakNeeded - 1);
+    _typesInStreak.clear();
+    _currentQuestionType = null;
+    _diagnosingNext = false;
+  }
+
+  // ---- Question selection -------------------------------------------------
 
   (ChatRequestType, QuestionDifficulty) getNextQuestion() {
     if (DataService.goals.selectedChildGoal.value == null &&
@@ -39,174 +76,167 @@ class Conductor {
       return (ChatRequestType.noResult, _difficulty);
     }
 
-    // Step 1: choose candidate pool based on progress band
-    final List<ChatRequestType> candidates;
-    _currentProgress = DataService.progress.currentProgress.value;
-
-    if (_currentProgress < 0.2) {
-      candidates = const [ChatRequestType.guidingQuestion];
-    } else if (_currentProgress < 0.4) {
-      candidates = const [
-        ChatRequestType.mcQuestion,
-        ChatRequestType.explainCodeQuestion,
-      ];
-    } else if (_currentProgress < 0.7) {
-      candidates = const [
-        ChatRequestType.completeCodeQuestion,
-        ChatRequestType.socraticQuestion,
-      ];
-    } else {
-      candidates = const [
-        ChatRequestType.writeCodeQuestion,
-        ChatRequestType.socraticQuestion,
-      ];
+    if (_diagnosingNext) {
+      _currentQuestionType = ChatRequestType.writeCodeQuestion;
+      return (_currentQuestionType!, QuestionDifficulty.medium);
     }
 
-    // Step 2: filter out the current type (avoid back-to-back repeats)
-    final filtered = candidates
-        .where((type) => type != _currentQuestionType)
+    if (!_guidingDone) {
+      _currentQuestionType = ChatRequestType.guidingQuestion;
+      return (_currentQuestionType!, QuestionDifficulty.easy);
+    }
+
+    final filtered = _practiceTypes
+        .where((t) => t != _currentQuestionType)
         .toList(growable: false);
-
-    // Step 3: pick random from remaining (fallback to full set if needed)
-    ChatRequestType pick;
-    if (filtered.isNotEmpty) {
-      pick = filtered[_rand.nextInt(filtered.length)];
-    } else {
-      pick = candidates[_rand.nextInt(candidates.length)];
-    }
-
+    final pool = filtered.isEmpty ? _practiceTypes : filtered;
+    final pick = pool[_rand.nextInt(pool.length)];
     _currentQuestionType = pick;
     return (pick, _difficulty);
   }
 
-  double getGuidingUnderstanding() {
-    return _guidingUnderstanding;
-  }
+  // ---- Guiding phase ------------------------------------------------------
+
+  double getGuidingUnderstanding() => _guidingConfidence;
 
   Future<bool> guidingIsComplete(double understanding) async {
-    _currentProgress = DataService.progress.currentProgress.value;
-    _guidingUnderstanding += understanding;
+    _guidingConfidence = (_guidingConfidence + understanding).clamp(0.0, 1.0);
 
-    // updating progress here is just to give the student
-    // an indication that something progresses
-    // We divide the max value (1) by 5 so we can never get above 0.2 at this point
-    final previousProgress = _currentProgress;
-
-    if (_guidingUnderstanding >= 0.8) {
-      _currentProgress = 0.2;
-    } else {
-      _currentProgress = (_guidingUnderstanding / 5);
-    }
-
-    DataService.chat.addSystemMessage(
-      'Vooruitgang: ${(previousProgress * 100).toStringAsFixed(1)}% -> ${(_currentProgress * 100).toStringAsFixed(1)}%',
-    );
-
-    await _updateProgress(_currentProgress);
-
-    if (_guidingUnderstanding >= 0.8) {
-      _guidingUnderstanding = 0.0;
+    if (_guidingConfidence >= 0.8) {
+      _guidingDone = true;
+      _guidingConfidence = 0.0;
       DataService.sound.guidingComplete();
+      await _persistDisplayProgress();
       return true;
     }
+    await _persistDisplayProgress();
     return false;
   }
 
+  // ---- Practice answer ----------------------------------------------------
+
+  /// Records [quality] and returns whether a follow-up message should be
+  /// shown (instead of immediately advancing to a new exercise).
   Future<bool> updateProgress(AnswerQuality quality) async {
     if (quality == AnswerQuality.correct) {
       DataService.sound.correctAnswer();
     }
 
-    final double start = DataService.progress.currentProgress.value;
-    final double delta = _computeDelta(quality);
-    final double next = (start + delta).clamp(0.0, 1.0);
-    bool followUpAllowed = !_crossesMilestone(start, next);
+    if (_diagnosingNext) {
+      return _handleDiagnosticAnswer(quality);
+    }
 
-    DataService.chat.addSystemMessage(
-      'Vooruitgang: ${(start * 100).toStringAsFixed(1)}% -> ${(next * 100).toStringAsFixed(1)}%',
-    );
-    _currentProgress = next;
+    final from = _displayProgress();
+    _adaptStreak(quality);
     _adaptDifficulty(quality);
     _hintsUsed = 0;
-    await _updateProgress(next);
+    final to = _displayProgress();
 
-    if (next >= 1.0) await _handleGoalCompletion();
-    return _rollFollowUpAllowance(followUpAllowed);
-  }
+    DataService.chat.addSystemMessage(
+      'Vooruitgang: ${(from * 100).toStringAsFixed(0)}% -> ${(to * 100).toStringAsFixed(0)}%',
+    );
 
-  /// Returns the signed progress delta for [quality], scaled by question
-  /// type, declared difficulty, and a hint-usage penalty.
-  double _computeDelta(AnswerQuality quality) {
-    final double baseDelta = switch (quality) {
-      AnswerQuality.wrong => -0.05,
-      AnswerQuality.partial => 0.07,
-      AnswerQuality.correct => 0.14,
-    };
-
-    // order from small to large: mc < explain < complete < (socratic|write)
-    final double typeMult = switch (_currentQuestionType) {
-      ChatRequestType.mcQuestion => 0.7,
-      ChatRequestType.explainCodeQuestion => 0.9,
-      ChatRequestType.completeCodeQuestion => 1.2,
-      ChatRequestType.socraticQuestion ||
-      ChatRequestType.writeCodeQuestion => 1.4,
-      _ => 1.0, // non-exercise interactions: neutral weight
-    };
-
-    final double diffMult = switch (_difficulty) {
-      QuestionDifficulty.easy => 0.8,
-      QuestionDifficulty.medium => 1.0,
-      QuestionDifficulty.hard => 1.5,
-    };
-
-    final double hintPenalty = 0.02 * _hintsUsed;
-
-    double delta = baseDelta * typeMult * diffMult;
-    if (delta > 0) {
-      // don't punish a correct/partial into negative solely by hints
-      delta = (delta - hintPenalty).clamp(0.0, double.infinity);
-    } else {
-      // wrong answers can be made slightly worse by heavy hint usage, bounded
-      delta = delta - (hintPenalty * 0.5);
+    if (_isMastered()) {
+      await _markMasteredAndAdvance();
+      return false;
     }
-    return delta;
+
+    await _persistDisplayProgress();
+    return _allowFollowUp(quality);
   }
 
-  /// True when [from] -> [to] newly crosses any of the {0.3, 0.7, 1.0} thresholds.
-  bool _crossesMilestone(double from, double to) {
-    const milestones = [0.3, 0.7, 1.0];
-    return milestones.any((m) => from < m && to >= m);
+  Future<bool> _handleDiagnosticAnswer(AnswerQuality quality) async {
+    _diagnosingNext = false;
+    _hintsUsed = 0;
+
+    if (quality == AnswerQuality.correct) {
+      DataService.chat.addSystemMessage(
+        'Diagnostisch antwoord goed — dit subdoel wordt overgeslagen.',
+      );
+      await _markMasteredAndAdvance();
+    } else {
+      DataService.chat.addSystemMessage(
+        'We pakken dit subdoel rustig op.',
+      );
+    }
+    return false;
   }
 
-  /// Records [quality] in the recent-answer window and applies up/down
-  /// difficulty rules, emitting a system message when difficulty changes.
+  bool _isMastered() =>
+      _correctStreak >= _streakNeeded &&
+      _typesInStreak.length >= _distinctTypesNeeded;
+
+  Future<void> _markMasteredAndAdvance() async {
+    final goal = _activeChildGoal;
+    if (goal != null) {
+      await DataService.progress.upsert(
+        Progress(goalID: goal.id, progress: 1.0),
+      );
+      DataService.progress.currentProgress.value = 1.0;
+      await _recomputeRoot();
+    }
+    await _handleGoalCompletion();
+    if (_activeChildGoal != null) {
+      _diagnosingNext = true;
+    }
+  }
+
+  void _adaptStreak(AnswerQuality quality) {
+    switch (quality) {
+      case AnswerQuality.correct:
+        _correctStreak += 1;
+        if (_currentQuestionType != null) {
+          _typesInStreak.add(_currentQuestionType!);
+        }
+      case AnswerQuality.partial:
+        // Partial answers neither advance nor reset.
+        break;
+      case AnswerQuality.wrong:
+        _correctStreak = 0;
+        _typesInStreak.clear();
+    }
+  }
+
+  double _displayProgress() {
+    if (!_guidingDone) return 0.0;
+    if (_correctStreak == 0) return _guidingDoneMarker;
+    return _correctStreak / _streakNeeded;
+  }
+
+  bool _allowFollowUp(AnswerQuality quality) {
+    if (quality == AnswerQuality.wrong) return false;
+    // Streak is at the mastery threshold but `_isMastered()` didn't fire,
+    // so the distinct-types requirement isn't met yet. Deny the follow-up
+    // so the caller picks a fresh exercise — `getNextQuestion()` excludes
+    // the current type, which is exactly what's needed to grow the set.
+    if (_correctStreak >= _streakNeeded) return false;
+    return true;
+  }
+
+  // ---- Difficulty adaptation ---------------------------------------------
+
   void _adaptDifficulty(AnswerQuality quality) {
     final previousDifficulty = _difficulty;
     _answerHistory.add(quality);
     const int window = 5;
     if (_answerHistory.length > 10) {
-      _answerHistory.removeAt(0); // keep recent 10
+      _answerHistory.removeAt(0);
     }
     final recent = _answerHistory.length <= window
         ? List<AnswerQuality>.from(_answerHistory)
         : _answerHistory.sublist(_answerHistory.length - window);
 
-    final int correctCount = recent
-        .where((q) => q == AnswerQuality.correct)
-        .length;
-    final int wrongCount = recent.where((q) => q == AnswerQuality.wrong).length;
-    final int partialCount = recent
-        .where((q) => q == AnswerQuality.partial)
-        .length;
+    final correctCount =
+        recent.where((q) => q == AnswerQuality.correct).length;
+    final wrongCount = recent.where((q) => q == AnswerQuality.wrong).length;
+    final partialCount =
+        recent.where((q) => q == AnswerQuality.partial).length;
 
-    // Up-difficulty: doing very well recently (≥4/5 correct) without spamming hints
     if (correctCount >= 4 &&
         _difficulty != QuestionDifficulty.hard &&
         _hintsUsed <= 1) {
       _difficulty = QuestionDifficulty.values[_difficulty.index + 1];
     }
-
-    // Down-difficulty: struggling (≥3 wrong) or (≥4 not-correct) recently
     if ((wrongCount >= 3 || (wrongCount + partialCount) >= 4) &&
         _difficulty != QuestionDifficulty.easy) {
       _difficulty = QuestionDifficulty.values[_difficulty.index - 1];
@@ -218,12 +248,14 @@ class Conductor {
     }
   }
 
-  /// Plays the goal-completion feedback, clears any preferred goal, picks the
-  /// next target goal, and resets [_currentProgress] to that goal's progress.
+  void hintProvided() {
+    _hintsUsed += 1;
+  }
+
+  // ---- Goal advancement ---------------------------------------------------
+
   Future<void> _handleGoalCompletion() async {
-    final goal =
-        DataService.goals.preferredChildGoal.value ??
-        DataService.goals.selectedChildGoal.value;
+    final goal = _activeChildGoal;
 
     DataService.splash.showGoalReached(
       goalTitle: goal?.title ?? 'Onbekend doel',
@@ -236,32 +268,16 @@ class Conductor {
       DataService.goals.preferredRootGoal.value = null;
     }
     await _setTargetGoal();
-
-    if (DataService.goals.selectedChildGoal.value != null) {
-      _currentProgress = await _getCurrentProgress();
-    }
+    final persisted = await _getCurrentProgress();
+    _resetSubgoalState(persistedProgress: persisted);
   }
 
-  /// Probabilistically denies an otherwise-allowed follow-up to keep variety.
-  bool _rollFollowUpAllowance(bool currentlyAllowed) {
-    if (_rand.nextDouble() < _followUpDenialChance) return false;
-    return currentlyAllowed;
-  }
-
-  void hintProvided() {
-    _hintsUsed += 1;
-  }
-
-  /// Computes and selects the next target goal/subgoal.
-  /// Returns true if a selection was made, false otherwise.
   Future<bool> _setTargetGoal() async {
-    // Clear previous selection
     DataService.goals.selectedRootGoal.value = null;
     DataService.goals.selectedChildGoal.value = null;
 
-    // Take stable snapshots
-    final roots = await DataService.goals.getRootGoalsOnce(); // List<Goal>
-    final progressList = await DataService.progress.getAll(); // List<Progress>
+    final roots = await DataService.goals.getRootGoalsOnce();
+    final progressList = await DataService.progress.getAll();
 
     double progressFor(Goal g) {
       final p = progressList.firstWhereOrNull((x) => x.goalID == g.id);
@@ -270,13 +286,9 @@ class Conductor {
 
     for (final root in roots) {
       if (progressFor(root) < 1.0) {
-        // Load children for this root on demand (family provider)
         final subgoals = await DataService.goals.getChildrenOnce(root.id);
-
-        // Pick first incomplete subgoal (if any)
-        final targetChild = subgoals.firstWhereOrNull(
-          (g) => progressFor(g) < 1.0,
-        );
+        final targetChild =
+            subgoals.firstWhereOrNull((g) => progressFor(g) < 1.0);
 
         if (targetChild != null) {
           DataService.goals.selectedRootGoal.value = root;
@@ -287,63 +299,50 @@ class Conductor {
           );
           return true;
         }
-        // else: all children complete -> try next root
       }
     }
     DataService.progress.currentProgress.value = 0.0;
     return false;
   }
 
-  // --- helpers / progress ---
+  // ---- Persistence helpers ------------------------------------------------
+
+  Goal? get _activeChildGoal =>
+      DataService.goals.preferredChildGoal.value ??
+      DataService.goals.selectedChildGoal.value;
 
   Future<double> _getCurrentProgress() async {
-    final currentChildGoal =
-        DataService.goals.preferredChildGoal.value ??
-        DataService.goals.selectedChildGoal.value;
-    if (currentChildGoal == null) return 0.0;
-    final progress = await DataService.progress.getByGoalId(
-      currentChildGoal.id,
-    );
-    return progress?.progress ?? 0.0;
+    final goal = _activeChildGoal;
+    if (goal == null) return 0.0;
+    final p = await DataService.progress.getByGoalId(goal.id);
+    return p?.progress ?? 0.0;
   }
 
-  Future<void> _updateProgress(double newProgress) async {
-    if (DataService.goals.selectedChildGoal.value == null &&
-        DataService.goals.preferredChildGoal.value == null) {
-      return;
-    }
-
-    // 1) Upsert child
-    final currentChildGoal =
-        DataService.goals.preferredChildGoal.value ??
-        DataService.goals.selectedChildGoal.value;
+  Future<void> _persistDisplayProgress() async {
+    final goal = _activeChildGoal;
+    if (goal == null) return;
+    final pct = _displayProgress();
     await DataService.progress.upsert(
-      Progress(goalID: currentChildGoal!.id, progress: newProgress),
+      Progress(goalID: goal.id, progress: pct),
     );
-    DataService.progress.currentProgress.value = newProgress;
+    DataService.progress.currentProgress.value = pct;
+    await _recomputeRoot();
+  }
 
+  Future<void> _recomputeRoot() async {
     if (DataService.goals.selectedRootGoal.value == null) return;
-
-    final currentRootGoal =
-        DataService.goals.preferredRootGoal.value ??
+    final root = DataService.goals.preferredRootGoal.value ??
         DataService.goals.selectedRootGoal.value;
-
-    // 2) Read child goals under the current root (provider names are examples)
-    final children = await DataService.goals.getChildrenOnce(
-      currentRootGoal!.id,
-    );
-
-    // 3) Sum each child’s progress (missing -> 0.0)
+    if (root == null) return;
+    final children = await DataService.goals.getChildrenOnce(root.id);
+    if (children.isEmpty) return;
     double sum = 0.0;
     for (final g in children) {
       final p = await DataService.progress.getByGoalId(g.id);
       sum += (p?.progress ?? 0.0);
     }
-    final rootAvg = sum / children.length;
-
-    // 4) Upsert root
     await DataService.progress.upsert(
-      Progress(goalID: currentRootGoal.id, progress: rootAvg),
+      Progress(goalID: root.id, progress: sum / children.length),
     );
   }
 }

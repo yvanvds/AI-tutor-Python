@@ -18,7 +18,11 @@
       "Bash(findstr /R \"dart_openai\")",
       "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\git\" -Directory -ErrorAction SilentlyContinue | Select-Object Name)",
       "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\git\", \"$env:APPDATA\\\\Pub\\\\Cache\\\\git\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\git\", \"$env:USERPROFILE\\\\AppData\\\\Roaming\\\\Pub\\\\Cache\\\\git\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Get-ChildItem $p -Directory | ForEach-Object { \"$\\($p\\)\\\\$\\($_.Name\\)\" } } else { \"missing: $p\" } })",
-      "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:APPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\"\\); foreach \\($p in $paths\\) { Write-Output \"==> $p\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Directory | Select-Object Name } })"
+      "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:APPDATA\\\\Pub\\\\Cache\\\\hosted\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\"\\); foreach \\($p in $paths\\) { Write-Output \"==> $p\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Directory | Select-Object Name } })",
+      "PowerShell(flutter analyze lib/services/tutor/conductor.dart test/services/tutor/conductor_test.dart 2>&1)",
+      "PowerShell(flutter test test/services/tutor/conductor_test.dart 2>&1)",
+      "PowerShell(flutter analyze 2>&1)",
+      "PowerShell(flutter test 2>&1)"
     ]
   }
 }

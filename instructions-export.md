@@ -34,7 +34,7 @@ Base exercise on suggested difficulty.
 Follow teaching tips.
 Generate examples that promote understanding, not memorization.
 Exercises may not require knowledge outside scope of goal, or mastered knowledge.
-The user already made some progress towards this subgoal.
+Calibrate the size of the gap to fill in to the requested difficulty: easy = a single token; medium = a short expression; hard = a short block.
 
 ## 02 Current Goal
 
@@ -145,7 +145,7 @@ Base exercise on suggested difficulty.
 Follow teaching tips.
 Generate examples that promote understanding, not memorization.
 Exercises may not require knowledge outside scope of goal, or mastered knowledge.
-The student only just started working towards this subgoal.
+Calibrate the snippet's complexity to the requested difficulty.
 
 ## 02 Current Goal
 
@@ -373,7 +373,7 @@ Base exercise on suggested difficulty.
 Follow teaching tips.
 Generate examples that promote understanding, not memorization.
 Exercises may not require knowledge outside scope of goal, or mastered knowledge.
-The student only just started working towards this subgoal.
+Calibrate the trickiness of the distractors to the requested difficulty.
 
 ## 02 Current Goal
 
@@ -539,7 +539,7 @@ Base question on suggested difficulty.
 Follow teaching tips.
 Generate a question that promotes understanding, not memorization.
 Questions may not require knowledge outside scope of goal, or mastered knowledge.
-The student is starting to get familiar with this subgoal.
+Calibrate how abstract or open-ended the question is to the requested difficulty.
 
 ## 02 Current Goal
 
@@ -752,7 +752,8 @@ Base exercise on suggested difficulty.
 Follow teaching tips.
 This question type must ask the student to write code, without providing any.
 Exercises may not require knowledge outside scope of goal, or mastered knowledge.
-The user has almost mastered this subgoal.
+Calibrate the scope (number of lines, branches, nesting) to the requested difficulty.
+The student may be either practicing or being checked for prior knowledge — the prompt should be a fair, representative exercise for the subgoal either way; do not assume mastery.
 
 ## 02 Current Goal
 
