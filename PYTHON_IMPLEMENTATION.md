@@ -25,7 +25,7 @@ One long-lived `python.exe` per app session, launched on first need and reused f
 
 Every frame carries a run `id` (UUID v4 minted in Dart per `PyRunner.run` call). v1 host serves one run at a time and rejects an `exec` while another is active *unless* the active run's `id` matches a pending cancel — see §2.3. The protocol is multi-run-shaped from day one so adding a second concurrent run later is a host-internal change.
 
-The host runs with `-X utf8 -u`, `PYTHONIOENCODING=utf-8`, and `PYTHONUNBUFFERED=1`. The Dart side decodes stdin/stdout as UTF-8. (Critical for Dutch students typing `ë`, `é`.)
+The host runs with `-s -X utf8 -u`, `PYTHONIOENCODING=utf-8`, `PYTHONUNBUFFERED=1`, and `PYTHONNOUSERSITE=1`. The Dart side decodes stdin/stdout as UTF-8. (Critical for Dutch students typing `ë`, `é`.) The `-s` + `PYTHONNOUSERSITE=1` pair keeps the bundle hermetic against any user-site `%APPDATA%\Roaming\Python\Python<XY>\site-packages` from a co-installed system Python — see §6 risks.
 
 ### 2.2 Wire protocol — v1 frames
 
@@ -192,10 +192,6 @@ numpy      = "2.3.*"
 pandas     = "2.3.*"
 matplotlib = "3.10.*"
 requests   = "2.32.*"
-# scikit-learn is in the current py_engine_desktop install list. Verify
-# cp314 wheel availability before adding it; otherwise leave it out of v1
-# and document for students that scikit-learn is unavailable until the
-# bundle moves to a Python that has wheels for it.
 ```
 
 ### Where the host script lives at runtime
@@ -331,8 +327,9 @@ Each step is independently testable and reviewable. Steps 1–9 land the existin
 - `PyRunner.run(code, {Duration? timeout})` — defaults to `null` (no timeout). Caller may pass one.
 - `host.py`: on timeout, `PyThreadState_SetAsyncExc(TimeoutError)` in the worker; if not honoured within 2 s, host emits `done(status:cancelled, reason:"timeout-hard")` and exits. `PyRunner` respawns transparently on next run.
 - Replace v1's "kill self" cancel fallback with the same hard-kill path.
+- Move the worker into a per-run subprocess so the OS — not Python — owns termination. This dissolves the v1 limitation called out in [`host.py`](packages/py_runner/python/host.py)'s `_handle_cancel` docstring (a worker stuck in a GIL-holding C call like `math.factorial(5_000_000)` defeats both `PyThreadState_SetAsyncExc` and the watchdog thread, since neither can acquire the GIL). Once the subprocess swap lands, delete that limitation paragraph from `_handle_cancel` — it stops being true.
 
-**Definition of done.** Manual: `while True: pass` with a 5 s timeout produces a `cancelled` done within ~5 s. `import time; time.sleep(60)` with a 2 s timeout cancels promptly. The dashboard does not enable timeouts in the UI yet — this step exposes the capability for future use.
+**Definition of done.** Manual: `while True: pass` with a 5 s timeout produces a `cancelled` done within ~5 s. `import time; time.sleep(60)` with a 2 s timeout cancels promptly. **Also:** `import math; math.factorial(5_000_000)` followed by Stop cancels within the 250 ms watchdog window (the test that fails on v1; passing it is the proof that the subprocess swap actually solved the GIL-bound-C-call class). The dashboard does not enable timeouts in the UI yet — this step exposes the capability for future use.
 
 ## 6. Risks & open questions
 
@@ -347,6 +344,7 @@ Each step is independently testable and reviewable. Steps 1–9 land the existin
 - **Multi-run interleaving.** v1 host serves one run at a time, but the protocol's `id` field forces the Dart pump to route by `id` from day one. A bug where run B's output leaks into run A's `RunHandle` would only surface in step 10+; cover it with a unit test on the pump.
 - **Path with spaces.** `{app}` typically lives under `C:\Program Files\Python Teacher\`. `host_locator.dart` must pass argv as a list, never as a joined command string. Worth a unit test with a fixture path containing a space.
 - **First-import latency.** numpy/pandas/matplotlib import is slow (~1–3 s combined) on first run after install. Mitigation: precompile to `.pyc` in step 1, and consider an "import warmup" at app startup that imports the heavy modules in the host before the student hits Run. *Defer the warmup — measure first.*
+- **User-site leakage on dev / student machines.** If a student or developer has a co-installed system Python of the same major.minor (e.g. their own 3.14 install with `pip install --user requests`), the bundled `python.exe` picks up `%APPDATA%\Roaming\Python\Python314\site-packages` by default. Caught during step 1 DoD verification: the first `pip install` into the bundle silently *skipped* `requests`, `pillow`, `urllib3`, `certifi`, `tzdata`, `packaging` because pip considered them already satisfied from user-site, leaving the bundle non-self-contained. Build-time fix: `PYTHONNOUSERSITE=1` plus `python -s -m pip install …` (already in [build_bundle.ps1](tooling/python/build_bundle.ps1)). **Runtime fix required in step 2:** `host.py` must be spawned with `PYTHONNOUSERSITE=1` in its env *and* `python.exe` invoked with `-s` (in addition to the planned `-X utf8 -u`); otherwise `import requests` in student code on a dev/student machine could resolve to the user's globally-installed copy with a different version than the bundle's. *Threat mitigated: phantom imports / version skew between dev and prod. Action: add `-s` and `PYTHONNOUSERSITE=1` to the host spawn in step 2.*
 
 ### Open questions
 

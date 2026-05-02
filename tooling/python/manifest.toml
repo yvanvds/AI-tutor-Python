@@ -1,0 +1,22 @@
+# Single source of truth for the bundled Python interpreter and the
+# packages pre-installed into it. Read by tooling/python/build_bundle.ps1
+# and (later) by the installer-build wrapper.
+#
+# To bump Python or a package: edit this file, re-run build_bundle.ps1,
+# ship a new installer. There is no second list to keep in sync.
+
+[python]
+# python-build-standalone release. Resolved 2026-05-02 from
+# https://github.com/astral-sh/python-build-standalone/releases/tag/20260414
+version     = "3.14.4"
+release_tag = "20260414"
+asset       = "cpython-3.14.4+20260414-x86_64-pc-windows-msvc-install_only.tar.gz"
+sha256      = "9647bb46d3c236e34c1c11bbb7113444d9711811f0d11c39956168807a955b1a"
+
+[packages]
+# Pinned to a minor series. Pre-installed at build time;
+# never pip-installed at runtime.
+numpy      = "2.3.*"
+pandas     = "2.3.*"
+matplotlib = "3.10.*"
+requests   = "2.32.*"

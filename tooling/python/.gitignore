@@ -1,0 +1,3 @@
+# Local download cache for python-build-standalone tarballs.
+# Content-addressed by sha256 in manifest.toml, so safe to wipe.
+.cache/
