@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__sonarqube__get_file_coverage_details"
+    ]
+  }
+}

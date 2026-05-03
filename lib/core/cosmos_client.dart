@@ -1,7 +1,7 @@
 // Thin REST wrapper around Azure Cosmos DB for NoSQL.
 //
 // We talk to the Cosmos REST API directly via package:http rather than pulling
-// in a third-party SDK (resolved open question 4 in TODO.md). All operations
+// in a third-party SDK. All operations
 // in this app fit a small surface area — read / query / upsert / delete plus
 // transactional batch — so a hand-rolled client is the safest long-term bet.
 //
@@ -170,9 +170,7 @@ class CosmosClient {
       final request = http.Request(verb, url)..headers.addAll(headers);
       if (encodedBody != null) request.bodyBytes = encodedBody;
 
-      final streamed = await _http
-          .send(request)
-          .timeout(_requestTimeout);
+      final streamed = await _http.send(request).timeout(_requestTimeout);
       final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode == 429 && attempt < _maxThrottleRetries) {
@@ -224,8 +222,7 @@ class CosmosContainer {
     );
     if (response.statusCode == 404) return null;
     _ensureOk(response);
-    return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
   /// Runs a SQL query. Pass `crossPartition: true` to fan out across all
@@ -292,8 +289,7 @@ class CosmosContainer {
       body: doc,
     );
     _ensureOk(response);
-    return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
   /// Creates or replaces a doc. The doc must contain its `id` field.
@@ -313,8 +309,7 @@ class CosmosContainer {
       body: doc,
     );
     _ensureOk(response);
-    return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
   /// Replaces an existing doc. Fails with 404 if the id is missing.
@@ -332,8 +327,7 @@ class CosmosContainer {
       body: doc,
     );
     _ensureOk(response);
-    return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
   /// Deletes a doc. 404 is treated as success (idempotent).

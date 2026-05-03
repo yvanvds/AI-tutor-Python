@@ -31,11 +31,9 @@ class InstructionsService {
     cachedAll.dispose();
   }
 
-  /// Stream all instruction docs (poll-based, see TODO.md).
+  /// Stream all instruction docs
   Stream<List<Instruction>> watchAll() {
-    return safeCosmosStream(
-      pollingStream(() => safeCosmos(_fetchAll)),
-    );
+    return safeCosmosStream(pollingStream(() => safeCosmos(_fetchAll)));
   }
 
   /// One-shot fetch of all docs.
@@ -49,8 +47,7 @@ class InstructionsService {
   }
 
   /// One-shot fetch a single doc (null if not found).
-  Future<Instruction?> getById(String id) =>
-      safeCosmos(() => _fetchById(id));
+  Future<Instruction?> getById(String id) => safeCosmos(() => _fetchById(id));
 
   /// Upsert: create or update the doc. Cosmos upsert replaces the whole
   /// doc — there is no merge semantics here, but the model's `toMap`
@@ -62,9 +59,7 @@ class InstructionsService {
   }
 
   Future<void> delete(String id) async {
-    await safeCosmos(
-      () => _container.delete(id, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.delete(id, partitionKey: _pk));
   }
 
   Future<List<Instruction>> _fetchAll() async {
