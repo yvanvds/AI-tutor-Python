@@ -23,6 +23,7 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
@@ -118,6 +119,7 @@ void main() {
     registerFallbackValue(AnswerQuality.wrong);
     registerFallbackValue(PreviousInputs.includeSession);
     registerFallbackValue(ChatRequestType.noResult);
+    registerFallbackValue(const GoalSelectionState());
   });
 
   late ProviderContainer pc;

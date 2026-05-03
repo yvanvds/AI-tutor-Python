@@ -1,6 +1,6 @@
 <!-- META
-last_updated_commit: a026da3c60bbe3cc060b4cc5ecc8fb278651850f
-last_updated_at: 2026-05-02
+last_updated_commit: f71bc857a4bdd4cc1a7a06577dae83d808d72520
+last_updated_at: 2026-05-03
 -->
 
 # PROJECT_OVERVIEW
@@ -17,7 +17,7 @@ last_updated_at: 2026-05-02
 ### Key packages (from [pubspec.yaml](pubspec.yaml))
 
 **State / DI**
-- `get_it` — service locator; all singletons registered in [services/data_service.dart](lib/services/data_service.dart).
+- `flutter_riverpod` — DI and reactivity; services are declared as `Provider` / `NotifierProvider` singletons and consumed via `ref.watch` / `ref.read` in `ConsumerWidget` / `ConsumerState`. Replaced the old `get_it` + `DataService` static-getter pattern.
 - `provider` — used only inside `flutter_chat_ui`'s custom-composer contract (`ComposerHeightNotifier`); not project-wide.
 
 **Backend**
@@ -48,7 +48,7 @@ last_updated_at: 2026-05-02
 
 ### Python execution approach
 
-Embedded Python via `py_engine_desktop` (a Flutter desktop plugin). On first mount of [features/dashboard/output.dart](lib/features/dashboard/output.dart) the engine is initialised and `numpy`, `pandas`, `requests`, `matplotlib`, `scikit-learn` are pip-installed unconditionally. Run-code writes the editor buffer to `<tempDir>/student_script.py` and starts a `PythonScript`, streaming `stdout`/`stderr` lines into the output panel. There is no sandboxing — student code runs in-process with full filesystem/network access.
+Python runs via `py_runner`, a local Flutter package at [packages/py_runner/](packages/py_runner/). `PyRunner` (configured with `InstallerPyHostLocator`) manages a long-lived Python host subprocess (`host.py`). [features/dashboard/output.dart](lib/features/dashboard/output.dart) calls `_output.run(code)` on `OutputService`, which starts the host if needed, submits the code string, and streams `stdout`/`stderr` lines into the output panel via `ValueNotifier<List<OutputLine>>`. Interactive `input()` calls are surfaced as `InputRequest` objects on `pendingInputRequest` and rendered as an inline text field in the output panel. There is no sandboxing — student code runs in a child process with full filesystem/network access.
 
 ### AI provider
 
@@ -63,7 +63,6 @@ The model is required to wrap every reply in a `<TEXT>...</TEXT><META>{...}</MET
 ```
 lib/
 ├── main.dart                    # App entry, silent token refresh, auth + key gate
-├── boot_gate.dart               # Shift-on-startup → safe-mode reset dialog
 ├── home_shell.dart              # NavigationRail shell, sign-out, update check
 ├── crash_recovery_screen.dart   # Shown on FlutterError or Cosmos auth failure
 ├── theme.dart                   # Material 3 light/dark color schemes
@@ -82,15 +81,16 @@ lib/
 │   ├── update_info.dart         # In-app installer-update helpers
 │   └── debounce.dart            # Generic debounce util
 │
-├── services/                    # All registered as get_it lazy singletons
-│   ├── data_service.dart        # The locator + typed getters
+├── services/                    # All declared as Riverpod providers
 │   ├── auth/auth_service.dart   # Entra OAuth (PKCE + loopback) + token cache
 │   ├── account/                 # Account model + AccountService (Cosmos)
 │   ├── chat/chat_service.dart   # Wraps flutter_chat InMemoryChatController
 │   ├── code/code_service.dart   # Wraps flutter_code_editor CodeController
 │   ├── config/                  # GlobalConfigService, AzureConfig (envied),
 │   │                            #   LocalApiKeyStorage
+│   ├── debug/debug_session_recorder.dart  # Circular buffer (200 turns) of TurnRecord events for live debug export
 │   ├── goal/                    # Goal model, GoalsService, SubtreeBackup
+│   │   ├── goal_selection_notifier.dart # GoalSelectionState + GoalSelectionNotifier (NotifierProvider replacing 6 ValueNotifiers)
 │   ├── instructions/            # Instruction (sections map) + InstructionsService
 │   ├── output/                  # OutputService + OutputController (binds widget)
 │   ├── progress/                # Progress model + ProgressService + helpers
@@ -100,7 +100,7 @@ lib/
 │   │   ├── progress_sample.dart         # One row of `progress_history` (time series)
 │   │   ├── concept_attribution.dart     # AI-emitted suspected-concept tag w/ at + quality
 │   │   └── teacher_signals.dart         # Pure helpers: StudentStatus, isStruggling, rankConceptAttributions
-│   ├── role/role_service.dart   # Mirrors AuthService.currentUser.isTeacher
+│   │                            # (RoleService removed; teacher flag read directly from authServiceProvider)
 │   ├── sound/sound_service.dart # Plays goal_reached/note/question/chime mp3s
 │   ├── splash/splash_service.dart # Goal-reached overlay state
 │   ├── status_report/           # StatusReport model + ReportService
@@ -131,12 +131,15 @@ lib/
 │   │   ├── dashboard.dart              # MultiSplitView layout
 │   │   ├── editor.dart                 # CodeField bound to CodeService.controller
 │   │   ├── controllers.dart            # Run/Stop/Hint/Submit/Request-exercise toolbar
-│   │   ├── output.dart                 # py_engine_desktop runner + log view
+│   │   ├── output.dart                 # py_runner-backed runner + log view + interactive input
+│   │   ├── debug_dialog.dart           # Teacher-only dialog to inspect/export DebugSessionRecorder buffer
 │   │   └── editor_controller.dart      # Entirely commented-out, dead file
 │   ├── chat/
 │   │   ├── chat_widget.dart            # flutter_chat_ui Chat host, swaps composer by TutorState
 │   │   ├── composer_continue_widget.dart  # "Continue" button when tutor has follow-up
-│   │   └── composer_wait_widget.dart       # Spinner composer while tutor is "working"
+│   │   ├── composer_wait_widget.dart       # Spinner composer while tutor is "working"
+│   │   ├── composer_mcq_wait_widget.dart   # Disabled MCQ composer while waiting for response
+│   │   └── mcq_options_widget.dart         # Clickable MCQ option buttons (replaces free-text for multiple-choice questions)
 │   ├── goals/                          # Teacher: goal-tree CRUD + reparent + DnD
 │   │   ├── goals_page.dart             # Three-pane: roots / children / editor
 │   │   ├── root_pane.dart, root_row.dart, child_pane.dart, child_row.dart
@@ -158,11 +161,11 @@ lib/
 │           └── progress_history_charts.dart  # Per-root-goal `fl_chart` line charts (30-day window)
 │
 └── widgets/                            # Reusable building blocks
-    ├── multi_value_listenable_builder.dart  # Combine N ValueListenables in one builder
     ├── goal_crumb_in_app_bar.dart           # Title-bar crumb for current goal/subgoal
     ├── goal_splash_overlay.dart             # Full-screen splash on goal completion
     ├── add_input.dart, chips_editor.dart, inline_title.dart
 
+packages/py_runner/                    # Local Flutter package — PyRunner, InstallerPyHostLocator, RunHandle, InputRequest
 test/                                  # mocktail-based unit tests (conductor, tutor_service, progress, accounts, etc.)
 public/version.json                    # Update manifest hosted at ai-tutor-python.web.app
 firebase.json                          # Firebase Hosting config (no Firestore/Auth)
@@ -253,7 +256,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 
 - Editor: [features/dashboard/editor.dart](lib/features/dashboard/editor.dart) renders `CodeField` bound to the singleton `CodeService.controller` ([services/code/code_service.dart](lib/services/code/code_service.dart)). `CodeService.setText(...)` is how the tutor pushes new starter code.
 - Toolbar (Run/Stop/Hint/Submit/Request-exercise): [features/dashboard/controllers.dart](lib/features/dashboard/controllers.dart).
-- Runner: [features/dashboard/output.dart](lib/features/dashboard/output.dart) — initialises `py_engine_desktop`, pip-installs a fixed set of packages on first mount, writes code to `student_script.py`, and tails `stdout`/`stderr`. The runner registers `_runCode`/`_forceStop` callbacks on `OutputService.controller.bind(...)` so other widgets call `DataService.output.run(code)` without knowing about the widget tree.
+- Runner: [features/dashboard/output.dart](lib/features/dashboard/output.dart) — reads `outputServiceProvider` via Riverpod `ref`. `OutputService.run(code)` starts the `PyRunner` host if not yet running, submits code, and streams lines into `lines` (`ValueNotifier<List<OutputLine>>`). Interactive `input()` prompts arrive as `InputRequest` on `pendingInputRequest` and are rendered as a live text-field row; the student's answer is forwarded back via `OutputService.submitInput(value)`. Other widgets that need to trigger a run call `ref.read(outputServiceProvider).run(code)` directly.
 
 ### AI chat panel
 
@@ -272,30 +275,28 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 - AI-instruction authoring: [features/instructions/instructions_editor_page.dart](lib/features/instructions/instructions_editor_page.dart) — left pane lists `instructions/{docId}` documents, middle pane lists named sections, right pane is a markdown `CodeField` editor. Save persists the whole `sections` map back to Cosmos. The page also supports importing/exporting Markdown via `file_picker`.
 - Account admin: [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable` with a status dot per student (active / idle / struggling, computed by [teacher_signals.dart](lib/services/progress/teacher_signals.dart)), search, toggle `mayUseGlobalKey`, delete account profile (does NOT delete the Entra user — that's a tenant-admin operation). Tapping a row opens [features/account/detail/student_detail_drawer.dart](lib/features/account/detail/student_detail_drawer.dart), an end-drawer that streams the student's progress docs, the read-only goal/progress list, the per-subgoal AI status reports, and 30 days of progress-history line charts (one chart per root goal via `fl_chart`, with the root's average overlaid on the children).
 
-### Crash recovery & safe mode
+### Crash recovery
 
-- [boot_gate.dart](lib/boot_gate.dart) — holding Shift at startup opens a Safe Mode dialog whose "Reset & Exit" button calls `resetAuthAndCacheAndExit()` ([core/cosmos_safety.dart](lib/core/cosmos_safety.dart)) to sign out (clearing the token bundle in `shared_preferences`) and `exit(0)`.
-- [crash_recovery_screen.dart](lib/crash_recovery_screen.dart) — pushed onto the navigator by `safeCosmos` on Cosmos 401/403, and by `FlutterError.onError` for unhandled errors. Single button calls `resetAuthAndCacheAndExit()`.
+- [crash_recovery_screen.dart](lib/crash_recovery_screen.dart) — pushed onto the navigator by `safeCosmos` on Cosmos 401/403, and by `FlutterError.onError` for unhandled errors. Single button calls `resetAuthAndCacheAndExit()` ([core/cosmos_safety.dart](lib/core/cosmos_safety.dart)).
+
+The Shift-on-startup safe-mode boot gate (`boot_gate.dart`) has been removed.
 
 ## 6. State management & data flow
 
 ### Pattern
 
-`get_it` for DI; `ValueNotifier` + `ValueListenableBuilder` for reactivity. A custom [widgets/multi_value_listenable_builder.dart](lib/widgets/multi_value_listenable_builder.dart) combines several notifiers in a single builder. There is no Riverpod, Bloc, or `provider` outside the `flutter_chat_ui` composer contract.
+`flutter_riverpod` for both DI and reactivity. Services are declared as `Provider<T>` (immutable) or `NotifierProvider<N, S>` (mutable) at the file level and consumed via `ref.watch(...)` / `ref.read(...)` in `ConsumerWidget` / `ConsumerState` subclasses. The old `get_it` / `DataService` static-getter pattern and the `MultiValueListenableBuilder` widget have been removed.
 
-All services are registered as lazy singletons in [services/data_service.dart](lib/services/data_service.dart) and accessed through static getters on `DataService` (e.g. `DataService.tutor`, `DataService.goals`, `DataService.auth`).
+`ValueNotifier` + `ValueListenableBuilder` is still used for leaf state *inside* services where Riverpod granularity would be overkill (e.g. `OutputService.lines`, `OutputService.isRunning`, `OutputService.pendingInputRequest`).
 
-Notable `ValueNotifier`s:
-- `AuthService.currentUser` (`AccountIdentity?` — Entra claims after silent refresh / interactive sign-in / sign-out)
-- `AccountService.currentAccount` (the Cosmos account doc, polled)
-- `RoleService.isTeacher` (mirrored from `AuthService`)
-- `GlobalConfigService.config` + `LocalApiKeyStorage.isKeyPresent`
-- `GoalsService.{selected,preferred}{Root,Child}Goal` and `editorSelectedRootGoal` / `editorSelectedGoal` — six notifiers tracking the active goal in different contexts
-- `GoalsService.cachedRoots` and `InstructionsService.cachedAll` — last polling-watcher snapshot for hot, latency-sensitive callers (the AI-request loop) so they don't await a Cosmos round-trip every turn
-- `ProgressService.currentProgress` (the active subgoal)
-- `TutorService.state` (`idle | working | hasFollowUp`)
-- `ChatService.streamState` (`StreamState` for the in-flight `TextStreamMessage`)
-- `SplashService.state` (goal-reached overlay payload)
+Notable Riverpod providers:
+- `authServiceProvider` — `NotifierProvider<AuthService, AccountIdentity?>` (Entra identity after silent refresh / sign-in / sign-out)
+- `accountServiceProvider` — `NotifierProvider` for the Cosmos account doc (polled)
+- `localApiKeyStorageProvider` — `NotifierProvider<LocalApiKeyStorage, bool>` (`isKeyPresent`)
+- `goalSelectionProvider` — `NotifierProvider<GoalSelectionNotifier, GoalSelectionState>` — single immutable state object replacing six old `ValueNotifier`s on `GoalsService` (selected/preferred root+child goals, editor selection, `cachedRoots`)
+- `globalConfigServiceProvider`, `instructionsServiceProvider` — config + instructions, with an `InstructionsService.cachedAll` snapshot for hot path (avoids Cosmos round-trip per AI turn)
+- `progressServiceProvider`, `tutorServiceProvider`, `chatServiceProvider`, `splashServiceProvider`, `outputServiceProvider`
+- Leaf `ValueNotifier`s still used inside `OutputService` (`lines`, `isRunning`, `pendingInputRequest`) and `ChatService.streamState` for in-flight stream rendering
 
 ### Cosmos REST + polling
 
@@ -306,15 +307,14 @@ Cosmos has a change feed but consuming it from a desktop client is awkward, so r
 ### Boot flow
 
 1. `WidgetsFlutterBinding.ensureInitialized()` and `FlutterError.onError` wired to the recovery screen.
-2. `DataService.init()` registers every lazy singleton.
-3. `AuthService.tryAcquireTokenSilent()` runs *before* `runApp`, so the first frame already knows whether a returning user has a valid refresh token.
-4. `GoalsApp` builds a `MultiValueListenableBuilder` over `auth.currentUser`, `account.currentAccount`, and `localStorage.isKeyPresent`.
-   - `currentUser == null` → `SignInPage`.
+2. A `ProviderContainer` is created manually; `authServiceProvider.notifier.tryAcquireTokenSilent()` is awaited *before* `runApp` so the first frame already knows the auth state. The container is handed to `UncontrolledProviderScope`.
+3. `GoalsApp` (`ConsumerWidget`) watches `authServiceProvider`, `accountServiceProvider`, and `localApiKeyStorageProvider`:
+   - `identity == null` → `SignInPage`.
    - account doc still loading on first sign-in → spinner.
    - `!mayUseGlobalKey && !hasLocalKey` → `LocalKeyGateScreen`.
    - else → `HomeShell`.
-5. `HomeShell.initState` schedules `checkForUpdate()` once after the first frame.
-6. `AccountService` listens to `auth.currentUser`. On a new identity it calls `_ensureProfile` (fire-and-forget create), subscribes to `watchAccount(uid)`, and on the first non-null emission calls `TutorService.initializeSession(force: true)` once per uid (deduped via `_lastInitedUid`).
+4. `HomeShell.initState` schedules `checkForUpdate()` once after the first frame.
+5. `AccountService` listens to the auth identity via its provider. On a new identity it calls `_ensureProfile` (fire-and-forget create), subscribes to `watchAccount(uid)`, and on the first non-null emission calls `TutorService.initializeSession(force: true)` once per uid (deduped via `_lastInitedUid`).
 
 ### Student progress: UI → Cosmos
 
@@ -350,10 +350,8 @@ See [TODO.md](TODO.md) for the current planning doc. The previous `docs/` folder
 - **`config/global` ApiKey field unused.** `GlobalConfig.apiKey` is parsed but never read by `OpenaiConnector` either. Only `GlobalConfig.model` is consumed.
 - **Tokens stored unencrypted.** The Entra token bundle lives in `shared_preferences` (per the school's "I don't care if students tamper" stance, see [auth_service.dart#L18-L21](lib/services/auth/auth_service.dart#L18-L21)). Students with shell access can read another student's refresh token from `%APPDATA%\com.example\ai_tutor_python\shared_preferences.json`.
 - **Dead file.** [features/dashboard/editor_controller.dart](lib/features/dashboard/editor_controller.dart) is entirely commented out.
-- **Dead branch in `crash_recovery_screen.dart`.** [crash_recovery_screen.dart#L38-L47](lib/crash_recovery_screen.dart#L38-L47) has both `await resetAuthAndCacheAndExit(); exit(0);` and a commented-out fallback. The `exit(0)` is unreachable because the helper already exits.
-- **`pip install` runs every time the Output widget is mounted.** [output.dart#L59-L70](lib/features/dashboard/output.dart#L59-L70) unconditionally pip-installs `numpy`, `pandas`, `requests`, `matplotlib`, `scikit-learn`. Likely a no-op after the first run, but adds startup latency.
-- **No sandboxing of student code.** The script runs in-process via `py_engine_desktop` with full host access.
-- **`AccountService.dispose()` is never called.** Service is a `lazySingleton`; its auth subscription lives for the app's lifetime, which is fine but the `dispose()` is dead.
+- **Dead branch in `crash_recovery_screen.dart`.** The file has both `await resetAuthAndCacheAndExit(); exit(0);` and a commented-out fallback. The `exit(0)` is unreachable because the helper already exits.
+- **No sandboxing of student code.** The script runs in a child process via `py_runner` with full filesystem/network access.
 - **`dart_openai` is pinned to a personal fork** (`https://github.com/yvanvds/openai.git`) — any upstream changes need to be merged manually.
 - **Windows-only.** `py_engine_desktop` is desktop-only and the launcher is Windows-flavoured (`.exe` installer, `%LOCALAPPDATA%` reset path). No iOS/Android/macOS/Linux/Web.
 - **All UI text is Dutch and hard-coded** throughout services and widgets; no i18n layer.
