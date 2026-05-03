@@ -1,15 +1,16 @@
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class McqOptionsWidget extends StatelessWidget {
+class McqOptionsWidget extends ConsumerWidget {
   const McqOptionsWidget({super.key, required this.message});
 
   final CustomMessage message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final metadata = message.metadata ?? const {};
     final options = (metadata['options'] as List?)?.cast<String>() ?? const [];
     final selected = metadata['selected'] as String?;
@@ -25,7 +26,7 @@ class McqOptionsWidget extends StatelessWidget {
               label: option,
               isSelected: option == selected,
               isDisabled: answered,
-              onTap: () => _onTap(option),
+              onTap: () => _onTap(ref, option),
             ),
             const SizedBox(height: 8),
           ],
@@ -34,11 +35,12 @@ class McqOptionsWidget extends StatelessWidget {
     );
   }
 
-  void _onTap(String picked) {
-    if (DataService.tutor.state.value != TutorState.idle) return;
-    DataService.chat.markMcqAnswered(message, picked);
-    DataService.chat.addMessage(picked);
-    DataService.tutor.handleStudentMessage(picked);
+  void _onTap(WidgetRef ref, String picked) {
+    if (ref.read(tutorServiceProvider) != TutorState.idle) return;
+    final chat = ref.read(chatServiceProvider);
+    chat.markMcqAnswered(message, picked);
+    chat.addMessage(picked);
+    ref.read(tutorServiceProvider.notifier).handleStudentMessage(picked);
   }
 }
 
@@ -58,9 +60,9 @@ class _OptionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      fontSize: 18,
-    );
+    final textStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontSize: 18);
 
     if (isSelected) {
       return FilledButton(

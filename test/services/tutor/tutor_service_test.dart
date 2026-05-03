@@ -2,7 +2,7 @@
 // OpenAI connector (streaming for student-facing turns, one-shot for
 // `status`), routes the parsed response to a handler, and keeps a `state`
 // notifier in sync. We mock the connector and conductor at the constructor
-// boundary and the chat/code/sound/report services at the locator.
+// boundary and the chat/code/sound/report services via provider overrides.
 //
 // State checks "during sendRequest" use a Completer to pause inside the
 // request and observe the working state, then complete it and continue.
@@ -17,21 +17,25 @@ import 'dart:convert';
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/config/global_config.dart';
+import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/instructions/instruction.dart';
+import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart' hide Answer;
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 class _FakeChatResponse extends Fake implements ChatResponse {}
@@ -42,6 +46,26 @@ class _EmptyError implements ChatResponse {
   String get type => 'error';
   @override
   Map<String, dynamic> toJson() => const {'type': 'error', 'message': ''};
+}
+
+/// Stub AuthService that always returns null (no signed-in user).
+class _ControlledAuth extends AuthService {
+  @override
+  AccountIdentity? build() => null;
+}
+
+/// Stub InstructionsService that returns an empty list.
+class _StubInstructionsService extends InstructionsService {
+  @override
+  List<Instruction> build() => [];
+  @override
+  Future<List<Instruction>> getAll() async => [];
+}
+
+/// Stub GlobalConfigService that returns null.
+class _NullGlobalConfig extends GlobalConfigService {
+  @override
+  GlobalConfig? build() => null;
 }
 
 /// Build an envelope-formatted assistant string from a typed-response body.
@@ -96,6 +120,8 @@ void main() {
     registerFallbackValue(ChatRequestType.noResult);
   });
 
+  late ProviderContainer pc;
+
   setUp(() {
     connector = MockOpenaiConnector();
     conductor = MockConductor();
@@ -105,13 +131,14 @@ void main() {
     sound = MockSoundService();
     report = MockReportService();
     goals = MockGoalsService();
-    when(() => goals.selectedRootGoal).thenReturn(ValueNotifier(null));
-    when(() => goals.selectedChildGoal).thenReturn(ValueNotifier(null));
-    when(() => goals.preferredRootGoal).thenReturn(ValueNotifier(null));
-    when(() => goals.preferredChildGoal).thenReturn(ValueNotifier(null));
 
-    when(() => instrGen.generateInstructions(any<ChatRequestType>()))
-        .thenAnswer((_) async => '');
+    when(() => instrGen.generateInstructions(
+          any<ChatRequestType>(),
+          goalSelection: any(named: 'goalSelection'),
+          cachedInstructions: any(named: 'cachedInstructions'),
+          fetchInstructions: any(named: 'fetchInstructions'),
+          fetchRootGoals: any(named: 'fetchRootGoals'),
+        )).thenAnswer((_) async => '');
     when(() => connector.addResponse(any<ChatResponse>())).thenReturn(null);
 
     // Default stub: empty stream → ErrorResponse → ErrorResponseHandler →
@@ -162,23 +189,29 @@ void main() {
     when(() => report.updateForCurrentChildGoal(any<String>()))
         .thenAnswer((_) async {});
 
-    registerMock<ChatService>(chat);
-    registerMock<CodeService>(code);
-    registerMock<SoundService>(sound);
-    registerMock<ReportService>(report);
-    registerMock<GoalsService>(goals);
-    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
+    pc = ProviderContainer(overrides: [
+      tutorServiceProvider.overrideWith(() => TutorService(
+            connectorOverride: connector,
+            conductorOverride: conductor,
+            instructionGeneratorOverride: instrGen,
+          )),
+      chatServiceProvider.overrideWithValue(chat),
+      codeServiceProvider.overrideWithValue(code),
+      soundServiceProvider.overrideWithValue(sound),
+      reportServiceProvider.overrideWithValue(report),
+      debugServiceProvider.overrideWithValue(DebugSessionRecorder()),
+      authServiceProvider.overrideWith(_ControlledAuth.new),
+      instructionsServiceProvider.overrideWith(_StubInstructionsService.new),
+      globalConfigServiceProvider.overrideWith(_NullGlobalConfig.new),
+      goalsServiceProvider.overrideWith((ref) => goals),
+    ]);
   });
 
-  tearDown(() async {
-    await resetLocator();
+  tearDown(() {
+    pc.dispose();
   });
 
-  TutorService build() => TutorService(
-        connector: connector,
-        conductor: conductor,
-        instructionGenerator: instrGen,
-      );
+  TutorService build() => pc.read(tutorServiceProvider.notifier);
 
   group('queryTutor — state transitions', () {
     test(
@@ -194,19 +227,19 @@ void main() {
         ).thenAnswer((_) => controller.stream);
 
         final tutor = build();
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
 
         // Fire-and-forget — we want to inspect state mid-flight.
         final pending =
             tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
         await Future<void>.delayed(Duration.zero);
-        expect(tutor.state.value, TutorState.working);
+        expect(pc.read(tutorServiceProvider), TutorState.working);
 
         // Complete with an empty/error stream → ErrorResponse → no follow-up.
         controller.add(const StreamCompleted(_EmptyError()));
         await controller.close();
         await pending;
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -225,7 +258,7 @@ void main() {
       // ignore: unawaited_futures
       tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
       await Future<void>.delayed(Duration.zero);
-      expect(tutor.state.value, TutorState.working);
+      expect(pc.read(tutorServiceProvider), TutorState.working);
 
       // A second call must short-circuit (no new stream invocation).
       await tutor.queryTutor(
@@ -267,7 +300,7 @@ void main() {
         final tutor = build();
         await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
 
-        expect(tutor.state.value, TutorState.hasFollowUp);
+        expect(pc.read(tutorServiceProvider), TutorState.hasFollowUp);
       },
     );
   });
@@ -285,7 +318,7 @@ void main() {
             inputs: any<PreviousInputs>(named: 'inputs'),
           ),
         );
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -301,7 +334,7 @@ void main() {
             inputs: any<PreviousInputs>(named: 'inputs'),
           ),
         );
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -315,7 +348,7 @@ void main() {
           inputs: any<PreviousInputs>(named: 'inputs'),
         ),
       );
-      expect(tutor.state.value, TutorState.idle);
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
     });
   });
 
@@ -627,7 +660,7 @@ void main() {
         expect(reqs, hasLength(2));
         expect(reqs[0]['request_type'], 'mcq_answer');
         expect(reqs[1]['request_type'], 'multiple_choice');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
         verify(
           () => chat.addSystemMessage(
             any<String>(
@@ -670,7 +703,7 @@ void main() {
         expect(reqs, hasLength(2));
         expect(reqs[0]['request_type'], 'submit_code');
         expect(reqs[1]['request_type'], 'write_code');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -706,7 +739,7 @@ void main() {
         final reqs = capturedRequests();
         expect(reqs, hasLength(2));
         expect(reqs[1]['request_type'], 'write_code');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -741,7 +774,7 @@ void main() {
         expect(reqs, hasLength(2));
         expect(reqs[0]['request_type'], 'explain_answer');
         expect(reqs[1]['request_type'], 'multiple_choice');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -776,7 +809,7 @@ void main() {
         expect(reqs, hasLength(2));
         expect(reqs[0]['request_type'], 'socratic_feedback');
         expect(reqs[1]['request_type'], 'multiple_choice');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
 
@@ -812,7 +845,7 @@ void main() {
         final reqs = capturedRequests();
         expect(reqs, hasLength(2));
         expect(reqs[1]['request_type'], 'multiple_choice');
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
       },
     );
   });
@@ -841,13 +874,13 @@ void main() {
 
         final tutor = build();
         await tutor.queryTutor(type: ChatRequestType.submitCode, code: 'x');
-        expect(tutor.state.value, TutorState.hasFollowUp);
+        expect(pc.read(tutorServiceProvider), TutorState.hasFollowUp);
 
         clearInteractions(chat);
         clearInteractions(code);
 
         tutor.moveToFollowUp();
-        expect(tutor.state.value, TutorState.idle);
+        expect(pc.read(tutorServiceProvider), TutorState.idle);
         verify(() => chat.addTutorMessage('next q')).called(1);
         verify(() => code.setText('print(1)')).called(1);
 
@@ -862,7 +895,7 @@ void main() {
     test('with no buffered follow-up, just returns state to idle', () {
       final tutor = build();
       tutor.moveToFollowUp();
-      expect(tutor.state.value, TutorState.idle);
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
     });
   });
 

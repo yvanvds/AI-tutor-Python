@@ -14,10 +14,6 @@
 // asks us to.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
-import 'package:ai_tutor_python/services/chat/chat_service.dart';
-import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
-import 'package:ai_tutor_python/services/sound/sound_service.dart';
-import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
@@ -38,7 +34,6 @@ import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart' hide Answer;
 
-import '../../../helpers/locator.dart';
 import '../../../helpers/mocks.dart';
 
 class _UnknownResponse implements ChatResponse {
@@ -89,11 +84,6 @@ void main() {
     when(() => report.updateForCurrentChildGoal(any<String>()))
         .thenAnswer((_) async {});
 
-    registerMock<SoundService>(sound);
-    registerMock<ReportService>(report);
-    registerMock<ChatService>(chat);
-    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
-
     ctx = TutorContext(
       conductor: conductor,
       startNewCode: rec.startedCode.add,
@@ -108,11 +98,12 @@ void main() {
       maybeRetry: () async {
         rec.maybeRetryCalls++;
       },
+      playQuestion: () => sound.askQuestion(),
+      addMcqOptions: chat.addMcqOptions,
+      updateReportForGoal: (_, _) async {},
+      updateReportForCurrentGoal: report.updateForCurrentChildGoal,
+      recordParsedResponse: (_) {},
     );
-  });
-
-  tearDown(() async {
-    await resetLocator();
   });
 
   group('dispatchResponse routes every subtype', () {

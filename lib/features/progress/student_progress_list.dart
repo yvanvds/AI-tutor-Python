@@ -1,23 +1,19 @@
 import 'package:ai_tutor_python/features/progress/goal_tile.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Displays all goals & subgoals for a student.
-///
-/// - Roots: parentId == null
-/// - Subgoals: indented below their parent
-/// - Each row: title, description, LinearProgressIndicator
-/// - Subgoals only: "Work on this" button (callback provided by parent)
 ///
 /// When [uid] is null the list is for the signed-in student and the action
 /// buttons on subgoals are wired to the conductor. When [uid] is provided
 /// the list is for *that* student (teacher-side detail drawer): the same
 /// per-uid `Progress` is read but every action is suppressed and the
-/// per-subgoal teacher annotations (recent-answers strip, persisted
-/// difficulty label) are revealed.
-class StudentProgressList extends StatelessWidget {
+/// per-subgoal teacher annotations are revealed.
+class StudentProgressList extends ConsumerWidget {
   const StudentProgressList({super.key, this.uid});
 
   final String? uid;
@@ -25,9 +21,12 @@ class StudentProgressList extends StatelessWidget {
   bool get _readOnly => uid != null;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final goalsService = ref.read(goalsServiceProvider);
+    final progressService = ref.read(progressServiceProvider);
+
     return StreamBuilder<List<Goal>>(
-      stream: DataService.goals.streamAllGoals(),
+      stream: goalsService.streamAllGoals(),
       builder: (context, goalsSnap) {
         if (goalsSnap.hasError) {
           return const Center(child: Text('Kon de doelen niet laden.'));
@@ -43,21 +42,17 @@ class StudentProgressList extends StatelessWidget {
           );
         }
 
+        final progressStream = uid == null
+            ? progressService.watchAll()
+            : progressService.watchProgressForUser(uid!);
+
         return StreamBuilder<List<Progress>>(
-          stream: _progressStream(),
+          stream: progressStream,
           builder: (context, progressSnap) =>
               _buildProgressList(goals, progressSnap.data ?? const []),
         );
       },
     );
-  }
-
-  Stream<List<Progress>> _progressStream() {
-    final pinned = uid;
-    if (pinned == null) {
-      return DataService.progress.watchAll();
-    }
-    return DataService.progress.watchProgressForUser(pinned);
   }
 
   Widget _buildProgressList(List<Goal> goals, List<Progress> progressList) {
@@ -79,13 +74,7 @@ class StudentProgressList extends StatelessWidget {
     final tiles = <Widget>[];
     for (final root in roots) {
       tiles.addAll(
-        _buildGoalTiles(
-          root,
-          null,
-          childrenByParent,
-          progressById,
-          depth: 0,
-        ),
+        _buildGoalTiles(root, null, childrenByParent, progressById, depth: 0),
       );
     }
 

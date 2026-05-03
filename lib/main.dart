@@ -1,11 +1,11 @@
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/create_text_theme.dart';
-import 'package:ai_tutor_python/services/account/account.dart';
+import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
-import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
+import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/sign_in_page.dart';
 import 'home_shell.dart';
 import 'theme.dart';
@@ -24,63 +24,50 @@ Future<void> main() async {
     );
   };
 
-  DataService.init();
+  // Use an explicit container so we can call tryAcquireTokenSilent before
+  // the first frame, then hand it off to UncontrolledProviderScope.
+  final container = ProviderContainer();
+  await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
 
-  // Try to restore the previous Entra session before the first frame so a
-  // returning user lands on HomeShell instead of flashing SignInPage.
-  await DataService.auth.tryAcquireTokenSilent();
-
-  runApp(const GoalsApp());
+  runApp(UncontrolledProviderScope(container: container, child: const GoalsApp()));
 }
 
-class GoalsApp extends StatelessWidget {
+class GoalsApp extends ConsumerWidget {
   const GoalsApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final brightness = View.of(context).platformDispatcher.platformBrightness;
     final textTheme = createTextTheme(context, "Exo 2", "Exo 2");
     final theme = MaterialTheme(textTheme);
 
-    return MultiValueListenableBuilder(
-      listenables: [
-        DataService.auth.currentUser,
-        DataService.account.currentAccount,
-        DataService.globalConfig.localStorage.isKeyPresent,
-      ],
-      builder: (context, values) {
-        return MaterialApp(
-          navigatorKey: appNavigatorKey,
-          title: 'Python Course',
-          theme: brightness == Brightness.light
-              ? theme.light()
-              : theme.dark(),
-          home: Builder(
-            builder: (context) {
-              final identity = values[0] as AccountIdentity?;
-              if (identity == null) return const SignInPage();
+    final identity = ref.watch(authServiceProvider);
+    final currentAccount = ref.watch(accountServiceProvider);
+    final hasLocalKey = ref.watch(localApiKeyStorageProvider);
 
-              // Account doc still loading (poll interval can be a few
-              // seconds on first sign-in) — show a spinner.
-              if (values[1] == null || values[2] == null) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
+    return MaterialApp(
+      navigatorKey: appNavigatorKey,
+      title: 'Python Course',
+      theme: brightness == Brightness.light ? theme.light() : theme.dark(),
+      home: Builder(
+        builder: (context) {
+          if (identity == null) return const SignInPage();
 
-              final hasGlobalPermission =
-                  (values[1] as Account).mayUseGlobalKey;
-              final hasLocalKey = values[2] as bool;
+          // Account doc still loading on first sign-in — show a spinner.
+          if (currentAccount == null) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
 
-              if (!hasGlobalPermission && !hasLocalKey) {
-                return const LocalKeyGateScreen();
-              }
+          final hasGlobalPermission = currentAccount.mayUseGlobalKey;
+          if (!hasGlobalPermission && !hasLocalKey) {
+            return const LocalKeyGateScreen();
+          }
 
-              return const HomeShell();
-            },
-          ),
-        );
-      },
+          return const HomeShell();
+        },
+      ),
     );
   }
 }

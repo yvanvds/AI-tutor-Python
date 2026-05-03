@@ -1,25 +1,24 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class GoalTile extends StatelessWidget {
+class GoalTile extends ConsumerWidget {
   final Goal goal;
   final Goal? rootGoal;
   final double progress;
   final int depth;
   final bool isSubgoal;
 
-  /// When true, the tile renders as a teacher peek: action buttons are
-  /// hidden and the per-subgoal teacher annotations (recent-answers strip,
-  /// persisted difficulty) are revealed when [progressDoc] is available.
+  /// When true, action buttons are hidden and teacher annotations are revealed.
   final bool readOnly;
 
-  /// Full progress doc for this goal. Optional — only the read-only/teacher
-  /// path needs the extra fields off it. The student-facing call sites can
-  /// keep passing nothing.
+  /// Full progress doc for this goal — only needed on the teacher path.
   final Progress? progressDoc;
 
   const GoalTile({
@@ -34,7 +33,7 @@ class GoalTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final indent = depth * 16.0;
     final theme = Theme.of(context);
 
@@ -48,7 +47,6 @@ class GoalTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title + optional button
               Row(
                 children: [
                   Expanded(
@@ -58,11 +56,12 @@ class GoalTile extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: () async {
                         final newProgress = (progress + 0.1).clamp(0.0, 1.0);
-                        await DataService.progress.upsert(
+                        await ref.read(progressServiceProvider).upsert(
                           Progress(goalID: goal.id, progress: newProgress),
                         );
-                        DataService.progress.currentProgress.value =
-                            newProgress;
+                        ref
+                            .read(progressServiceProvider)
+                            .setCurrentProgress(newProgress);
                       },
                       icon: const Icon(Icons.fast_forward),
                       label: const Text('Ga sneller'),
@@ -70,19 +69,26 @@ class GoalTile extends StatelessWidget {
                   if (!readOnly && isSubgoal)
                     ElevatedButton.icon(
                       onPressed: () async {
-                        DataService.goals.preferredChildGoal.value = goal;
-                        DataService.goals.preferredRootGoal.value = rootGoal;
+                        final sel = ref.read(goalSelectionProvider.notifier);
+                        sel.setPreferredChild(goal);
+                        sel.setPreferredRoot(rootGoal);
 
                         if (progress >= 1.0) {
-                          await DataService.progress.upsert(
+                          await ref.read(progressServiceProvider).upsert(
                             Progress(goalID: goal.id, progress: 0.5),
                           );
-                          DataService.progress.currentProgress.value = 0.5;
+                          ref
+                              .read(progressServiceProvider)
+                              .setCurrentProgress(0.5);
                         } else {
-                          DataService.progress.currentProgress.value = progress;
+                          ref
+                              .read(progressServiceProvider)
+                              .setCurrentProgress(progress);
                         }
 
-                        DataService.tutor.initializeSession(force: true);
+                        ref
+                            .read(tutorServiceProvider.notifier)
+                            .initializeSession(force: true);
                       },
                       label: const Text('Werk hieraan'),
                       icon: const Icon(Icons.play_arrow),
@@ -94,7 +100,6 @@ class GoalTile extends StatelessWidget {
                 ],
               ),
 
-              // Description
               if (goal.description != null &&
                   goal.description!.trim().isNotEmpty)
                 Padding(
@@ -105,7 +110,6 @@ class GoalTile extends StatelessWidget {
                   ),
                 ),
 
-              // Progress bar + %
               Row(
                 children: [
                   Expanded(
@@ -131,9 +135,6 @@ class GoalTile extends StatelessWidget {
   }
 }
 
-/// Compact strip rendered under the progress bar in the teacher detail
-/// drawer. Shows the persisted difficulty label and up to 5 colour-coded
-/// dots from `recentAnswers` (oldest left).
 class _TeacherSubgoalAnnotations extends StatelessWidget {
   const _TeacherSubgoalAnnotations({required this.progress});
 
@@ -208,10 +209,7 @@ class _AnswerDot extends StatelessWidget {
       child: Container(
         width: 10,
         height: 10,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

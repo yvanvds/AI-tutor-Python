@@ -1,25 +1,27 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:py_runner/py_runner.dart';
 
-class Output extends StatefulWidget {
+class Output extends ConsumerStatefulWidget {
   const Output({super.key});
 
   @override
-  State<Output> createState() => _OutputState();
+  ConsumerState<Output> createState() => _OutputState();
 }
 
-class _OutputState extends State<Output> {
+class _OutputState extends ConsumerState<Output> {
   final _scrollCtrl = ScrollController();
   final _inputCtrl = TextEditingController();
   final _inputFocus = FocusNode();
+  late final OutputService _output;
 
   @override
   void initState() {
     super.initState();
-    DataService.output.lines.addListener(_onLinesChanged);
-    DataService.output.pendingInputRequest.addListener(_onInputRequestChanged);
+    _output = ref.read(outputServiceProvider);
+    _output.lines.addListener(_onLinesChanged);
+    _output.pendingInputRequest.addListener(_onInputRequestChanged);
   }
 
   void _onLinesChanged() {
@@ -31,7 +33,7 @@ class _OutputState extends State<Output> {
   }
 
   void _onInputRequestChanged() {
-    if (DataService.output.pendingInputRequest.value != null) {
+    if (_output.pendingInputRequest.value != null) {
       _inputCtrl.clear();
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _inputFocus.requestFocus(),
@@ -40,14 +42,14 @@ class _OutputState extends State<Output> {
   }
 
   void _submitInput() {
-    DataService.output.submitInput(_inputCtrl.text);
+    _output.submitInput(_inputCtrl.text);
     _inputCtrl.clear();
   }
 
   @override
   void dispose() {
-    DataService.output.lines.removeListener(_onLinesChanged);
-    DataService.output.pendingInputRequest.removeListener(_onInputRequestChanged);
+    _output.lines.removeListener(_onLinesChanged);
+    _output.pendingInputRequest.removeListener(_onInputRequestChanged);
     _scrollCtrl.dispose();
     _inputCtrl.dispose();
     _inputFocus.dispose();
@@ -56,6 +58,8 @@ class _OutputState extends State<Output> {
 
   @override
   Widget build(BuildContext context) {
+    final output = _output;
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -66,7 +70,7 @@ class _OutputState extends State<Output> {
       child: Column(
         children: [
           ValueListenableBuilder<bool>(
-            valueListenable: DataService.output.isRunning,
+            valueListenable: output.isRunning,
             builder: (context, running, _) => Row(
               children: [
                 Text(
@@ -86,7 +90,7 @@ class _OutputState extends State<Output> {
           const SizedBox(height: 8),
           Expanded(
             child: ValueListenableBuilder<List<OutputLine>>(
-              valueListenable: DataService.output.lines,
+              valueListenable: output.lines,
               builder: (context, lines, _) => Scrollbar(
                 controller: _scrollCtrl,
                 child: ListView.builder(
@@ -113,7 +117,7 @@ class _OutputState extends State<Output> {
             ),
           ),
           ValueListenableBuilder<InputRequest?>(
-            valueListenable: DataService.output.pendingInputRequest,
+            valueListenable: output.pendingInputRequest,
             builder: (context, req, _) {
               if (req == null) return const SizedBox.shrink();
               return _buildInputRow(context, req);

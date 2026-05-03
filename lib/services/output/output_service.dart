@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ai_tutor_python/services/output/output_controller.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:py_runner/py_runner.dart';
 
 class OutputLine {
@@ -89,3 +90,13 @@ class OutputService {
     lines.value = [...lines.value, OutputLine(trimmed, isError: isError)];
   }
 }
+
+final outputServiceProvider = Provider<OutputService>((ref) {
+  final service = OutputService(
+    pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
+  );
+  ref.onDispose(() async {
+    await service.stop();
+  });
+  return service;
+});

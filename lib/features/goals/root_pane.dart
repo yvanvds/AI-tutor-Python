@@ -1,34 +1,35 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/widgets/add_input.dart';
 import 'package:flutter/material.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'root_row.dart';
 
-class RootPane extends StatelessWidget {
-  const RootPane({
-    super.key,
-    required this.rootsAsync,
-  });
+class RootPane extends ConsumerWidget {
+  const RootPane({super.key, required this.rootsAsync});
 
   final Stream<List<Goal>> rootsAsync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedRoot = ref.watch(goalSelectionProvider).editorSelectedRoot;
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: AddInput(
             hint: 'Add root goal… (Enter)',
-            onSubmit: (t) => DataService.goals.createRoot(t),
+            onSubmit: (t) => ref.read(goalsServiceProvider).createRoot(t),
           ),
         ),
-
         Expanded(
           child: StreamBuilder<List<Goal>>(
             stream: rootsAsync,
-            builder: _buildRootsList,
+            builder: (context, snapshot) =>
+                _buildRootsList(context, snapshot, selectedRoot, ref),
           ),
         ),
       ],
@@ -38,6 +39,8 @@ class RootPane extends StatelessWidget {
   Widget _buildRootsList(
     BuildContext context,
     AsyncSnapshot<List<Goal>> snapshot,
+    Goal? selectedRoot,
+    WidgetRef ref,
   ) {
     if (snapshot.connectionState == ConnectionState.waiting) {
       return const Center(child: CircularProgressIndicator());
@@ -50,11 +53,14 @@ class RootPane extends StatelessWidget {
     }
 
     final roots = snapshot.data!;
-    if (DataService.goals.editorSelectedRootGoal.value == null &&
-        roots.isNotEmpty) {
+    if (selectedRoot == null && roots.isNotEmpty) {
       Future.microtask(() {
-        DataService.goals.editorSelectedRootGoal.value = roots.first;
-        DataService.goals.editorSelectedGoal.value = roots.first;
+        ref.read(goalSelectionProvider.notifier).setEditorSelectedRoot(
+          roots.first,
+        );
+        ref.read(goalSelectionProvider.notifier).setEditorSelectedGoal(
+          roots.first,
+        );
       });
     }
     if (roots.isEmpty) {
@@ -64,18 +70,15 @@ class RootPane extends StatelessWidget {
     return ReorderableListView.builder(
       buildDefaultDragHandles: false,
       onReorder: (oldIndex, newIndex) =>
-          _onReorder(context, roots, oldIndex, newIndex),
+          _onReorder(context, roots, oldIndex, newIndex, ref),
       itemCount: roots.length,
       itemBuilder: (_, i) {
         final g = roots[i];
-        return ValueListenableBuilder<Goal?>(
+        return RootRow(
           key: ValueKey(g.id),
-          valueListenable: DataService.goals.editorSelectedRootGoal,
-          builder: (_, sel, _) => RootRow(
-            goal: g,
-            selected: g.id == sel?.id,
-            index: i,
-          ),
+          goal: g,
+          selected: g.id == selectedRoot?.id,
+          index: i,
         );
       },
     );
@@ -86,6 +89,7 @@ class RootPane extends StatelessWidget {
     List<Goal> roots,
     int oldIndex,
     int newIndex,
+    WidgetRef ref,
   ) async {
     final before = [...roots];
     final list = [...roots];
@@ -93,18 +97,14 @@ class RootPane extends StatelessWidget {
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
     final messenger = ScaffoldMessenger.of(context);
-    await DataService.goals.applyOrder(
-      null,
-      list.map((g) => g.id).toList(),
-    );
+    final svc = ref.read(goalsServiceProvider);
+    await svc.applyOrder(null, list.map((g) => g.id).toList());
 
     showUndoSnackBar(
       messenger,
       message: 'Reordered "${item.title}".',
-      onUndo: () async => await DataService.goals.applyOrder(
-        null,
-        before.map((g) => g.id).toList(),
-      ),
+      onUndo: () async =>
+          svc.applyOrder(null, before.map((g) => g.id).toList()),
     );
   }
 }

@@ -1,19 +1,29 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ParentField extends StatelessWidget {
+class ParentField extends ConsumerStatefulWidget {
   const ParentField({super.key, required this.goal});
   final Goal goal;
 
   @override
-  Widget build(BuildContext context) {
-    // Only roots in the parent dropdown
-    final rootsAsync = DataService.goals.streamRoots!;
+  ConsumerState<ParentField> createState() => _ParentFieldState();
+}
 
-    Widget result;
-    result = StreamBuilder<List<Goal>>(
-      stream: rootsAsync,
+class _ParentFieldState extends ConsumerState<ParentField> {
+  late final Stream<List<Goal>> _rootsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _rootsStream = ref.read(goalsServiceProvider).streamRoots!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Goal>>(
+      stream: _rootsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
@@ -31,15 +41,19 @@ class ParentField extends StatelessWidget {
             child: Text('(no parent)'),
           ),
           ...roots.map(
-            (g) => DropdownMenuItem<String?>(value: g.id, child: Text(g.title)),
+            (g) =>
+                DropdownMenuItem<String?>(value: g.id, child: Text(g.title)),
           ),
         ];
         return DropdownButtonFormField<String?>(
-          initialValue: goal.parentId, // may be null
+          initialValue: widget.goal.parentId,
           items: items,
           onChanged: (newParent) async {
-            if (newParent == goal.parentId) return;
-            await DataService.goals.reparent(goal.id, newParent);
+            if (newParent == widget.goal.parentId) return;
+            await ref.read(goalsServiceProvider).reparent(
+              widget.goal.id,
+              newParent,
+            );
           },
           decoration: const InputDecoration(
             labelText: 'Parent',
@@ -48,7 +62,5 @@ class ParentField extends StatelessWidget {
         );
       },
     );
-
-    return result;
   }
 }

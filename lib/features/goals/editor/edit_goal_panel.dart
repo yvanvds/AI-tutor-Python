@@ -1,26 +1,24 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'goal_form.dart';
 
-class EditGoalPanel extends StatelessWidget {
+class EditGoalPanel extends ConsumerWidget {
   const EditGoalPanel({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<Goal?>(
-      valueListenable: DataService.goals.editorSelectedGoal,
-      builder: (context, editing, _) => _buildPanel(context, editing?.id),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final editing = ref.watch(goalSelectionProvider).editorSelectedGoal;
+    return _buildPanel(context, editing?.id, ref);
   }
 
-  Widget _buildPanel(BuildContext context, String? editingId) {
-    Stream<Goal?>? goalAsync;
-    if (editingId != null) {
-      goalAsync = DataService.goals.streamGoal(editingId);
-    }
-
+  Widget _buildPanel(BuildContext context, String? editingId, WidgetRef ref) {
     final isOpen = editingId != null;
+    final goalAsync = editingId != null
+        ? ref.read(goalsServiceProvider).streamGoal(editingId)
+        : null;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -43,12 +41,13 @@ class EditGoalPanel extends StatelessWidget {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('Error loading documents: ${snapshot.error}'),
+                      child: Text(
+                        'Error loading documents: ${snapshot.error}',
+                      ),
                     ),
                   );
                 }
                 final goal = snapshot.data;
-
                 if (goal == null) {
                   return const Center(child: Text('No goal selected.'));
                 }

@@ -1,35 +1,46 @@
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/account/account.dart';
+import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progress/teacher_signals.dart';
 import 'package:flutter/material.dart';
-import '../../services/account/account.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AccountsPage extends StatefulWidget {
+class AccountsPage extends ConsumerStatefulWidget {
   const AccountsPage({super.key});
 
   @override
-  State<AccountsPage> createState() => _AccountsPageState();
+  ConsumerState<AccountsPage> createState() => _AccountsPageState();
 }
 
-class _AccountsPageState extends State<AccountsPage> {
+class _AccountsPageState extends ConsumerState<AccountsPage> {
   final TextEditingController _searchCtrl = TextEditingController();
 
-  final ScrollController _hCtrl = ScrollController(); // horizontal
-  final ScrollController _vCtrl = ScrollController(); // vertical
+  final ScrollController _hCtrl = ScrollController();
+  final ScrollController _vCtrl = ScrollController();
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   int _rowsPerPage = 25;
   int _pageIndex = 0;
 
-  /// Drives the `endDrawer`'s contents. We keep the endDrawer always present
-  /// in the tree (an empty placeholder when no row is selected) so that
-  /// `openEndDrawer()` works on the first row tap — Scaffold ignores the
-  /// call when its `endDrawer` arg is null at build time.
-  final ValueNotifier<Account?> _drawerAccount =
-      ValueNotifier<Account?>(null);
+  final ValueNotifier<Account?> _drawerAccount = ValueNotifier<Account?>(null);
+
+  late final Stream<List<Account>> _accountsStream;
+  late final Stream<Map<String, List<Progress>>> _progressStream;
+  late final Stream<List<Goal>> _goalsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _accountsStream =
+        ref.read(accountServiceProvider.notifier).streamAllAccounts();
+    _progressStream = ref.read(progressServiceProvider).watchAllProgress();
+    _goalsStream = ref.read(goalsServiceProvider).streamAllGoals();
+  }
 
   @override
   void dispose() {
@@ -69,13 +80,13 @@ class _AccountsPageState extends State<AccountsPage> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: StreamBuilder<List<Account>>(
-          stream: DataService.account.streamAllAccounts(),
+          stream: _accountsStream,
           builder: (context, accountsSnap) {
             return StreamBuilder<Map<String, List<Progress>>>(
-              stream: DataService.progress.watchAllProgress(),
+              stream: _progressStream,
               builder: (context, progressSnap) {
                 return StreamBuilder<List<Goal>>(
-                  stream: DataService.goals.streamAllGoals(),
+                  stream: _goalsStream,
                   builder: (context, goalsSnap) {
                     return _buildContent(
                       accountsSnap: accountsSnap,
@@ -191,10 +202,7 @@ class _AccountsPageState extends State<AccountsPage> {
           },
           items: const [10, 25, 50, 100]
               .map(
-                (v) => DropdownMenuItem(
-                  value: v,
-                  child: Text('$v / page'),
-                ),
+                (v) => DropdownMenuItem(value: v, child: Text('$v / page')),
               )
               .toList(),
         ),
@@ -241,14 +249,16 @@ class _AccountsPageState extends State<AccountsPage> {
                   DataColumn(label: Text('Actions')),
                 ],
                 rows: pageItems
-                    .map((a) => _buildAccountRow(
-                          a,
-                          progress: progressByUid[a.uid] ?? const [],
-                          rootIds: rootIds,
-                          rootById: rootById,
-                          goalById: goalById,
-                          parentByChild: parentByChild,
-                        ))
+                    .map(
+                      (a) => _buildAccountRow(
+                        a,
+                        progress: progressByUid[a.uid] ?? const [],
+                        rootIds: rootIds,
+                        rootById: rootById,
+                        goalById: goalById,
+                        parentByChild: parentByChild,
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -266,7 +276,7 @@ class _AccountsPageState extends State<AccountsPage> {
     required Map<String, Goal> goalById,
     required Map<String, String?> parentByChild,
   }) {
-    final lastActive = _resolveLastActive(a);
+    final lastActive = a.updatedAt ?? a.createdAt;
     final lastActiveStr = lastActive == null ? '—' : _formatTs(lastActive);
 
     final activeRootTitle = _activeRootTitle(
@@ -297,7 +307,8 @@ class _AccountsPageState extends State<AccountsPage> {
         DataCell(
           Switch(
             value: a.mayUseGlobalKey,
-            onChanged: (v) => DataService.account
+            onChanged: (v) => ref
+                .read(accountServiceProvider.notifier)
                 .setMayUseGlobalKey(uid: a.uid, value: v),
           ),
         ),
@@ -322,9 +333,9 @@ class _AccountsPageState extends State<AccountsPage> {
     required Map<String, Goal> goalById,
     required Map<String, String?> parentByChild,
   }) {
-    final ref = mostRecentlyActive(progress);
-    if (ref == null) return null;
-    final goal = goalById[ref.goalID];
+    final activeRef = mostRecentlyActive(progress);
+    if (activeRef == null) return null;
+    final goal = goalById[activeRef.goalID];
     if (goal == null) return null;
     if (goal.parentId == null) return goal.title;
     final parentId = parentByChild[goal.id];
@@ -332,8 +343,6 @@ class _AccountsPageState extends State<AccountsPage> {
     return goalById[parentId]?.title ?? goal.title;
   }
 
-  /// Average of root progress, where each root's progress is the average of
-  /// its non-optional children. Empty input → 0.0.
   double _overallRootProgress({
     required List<Progress> progress,
     required Set<String> rootIds,
@@ -345,7 +354,6 @@ class _AccountsPageState extends State<AccountsPage> {
     for (final p in progress) {
       final goal = goalById[p.goalID];
       if (goal == null) continue;
-      // Skip root progress docs (we recompute roots from children).
       if (goal.parentId == null) continue;
       if (goal.optional) continue;
       final parentId = goal.parentId!;
@@ -371,9 +379,8 @@ class _AccountsPageState extends State<AccountsPage> {
           children: [
             IconButton(
               tooltip: 'First page',
-              onPressed: _pageIndex > 0
-                  ? () => setState(() => _pageIndex = 0)
-                  : null,
+              onPressed:
+                  _pageIndex > 0 ? () => setState(() => _pageIndex = 0) : null,
               icon: const Icon(Icons.first_page),
             ),
             IconButton(
@@ -404,15 +411,8 @@ class _AccountsPageState extends State<AccountsPage> {
     );
   }
 
-  DateTime? _resolveLastActive(Account a) {
-    // If you later add `lastLoginAt` to the Account map, prefer it here.
-    // For now, fall back to updatedAt or createdAt.
-    return a.updatedAt ?? a.createdAt;
-  }
-
   String _formatTs(DateTime ts) {
     final dt = ts.toLocal();
-    // Simple readable format without extra deps:
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');
     final d = dt.day.toString().padLeft(2, '0');
@@ -449,7 +449,9 @@ class _AccountsPageState extends State<AccountsPage> {
     if (ok != true) return;
 
     try {
-      await DataService.account.deleteAccountDoc(a.uid);
+      await ref
+          .read(accountServiceProvider.notifier)
+          .deleteAccountDoc(a.uid);
       messenger.showSnackBar(
         SnackBar(content: Text('Deleted account: ${a.email}')),
       );

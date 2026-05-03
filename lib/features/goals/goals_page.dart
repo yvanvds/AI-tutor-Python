@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -12,26 +13,31 @@ import 'child_pane.dart';
 import 'editor/edit_goal_panel.dart';
 import 'root_pane.dart';
 
-class GoalsPage extends StatefulWidget {
+class GoalsPage extends ConsumerStatefulWidget {
   const GoalsPage({super.key});
 
   @override
-  State<GoalsPage> createState() => _GoalsPageState();
+  ConsumerState<GoalsPage> createState() => _GoalsPageState();
 }
 
-class _GoalsPageState extends State<GoalsPage> {
+class _GoalsPageState extends ConsumerState<GoalsPage> {
   bool _busy = false;
+  late final Stream<List<Goal>> _rootsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _rootsStream = ref.read(goalsServiceProvider).streamRoots!;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final rootsAsync = DataService.goals.streamRoots!;
-
     return Column(
       children: [
         Expanded(
           child: Row(
             children: [
-              Expanded(child: RootPane(rootsAsync: rootsAsync)),
+              Expanded(child: RootPane(rootsAsync: _rootsStream)),
               const VerticalDivider(width: 1),
               const Expanded(child: ChildPane()),
               const VerticalDivider(width: 1),
@@ -73,7 +79,7 @@ class _GoalsPageState extends State<GoalsPage> {
   Future<void> _exportGoals() async {
     setState(() => _busy = true);
     try {
-      final goals = await DataService.goals.getAllGoalsOnce();
+      final goals = await ref.read(goalsServiceProvider).getAllGoalsOnce();
       if (goals.isEmpty) {
         if (mounted) _showSnack('No goals to export');
         return;
@@ -137,10 +143,11 @@ class _GoalsPageState extends State<GoalsPage> {
   }
 
   Future<int> _deleteAllGoals() async {
-    final all = await DataService.goals.getAllGoalsOnce();
-    final roots = await DataService.goals.getRootGoalsOnce();
+    final svc = ref.read(goalsServiceProvider);
+    final all = await svc.getAllGoalsOnce();
+    final roots = await svc.getRootGoalsOnce();
     for (final root in roots) {
-      await DataService.goals.deleteSubtree(root.id);
+      await svc.deleteSubtree(root.id);
     }
     return all.length;
   }
@@ -201,8 +208,9 @@ class _GoalsPageState extends State<GoalsPage> {
     List<Map<String, dynamic>> nodes, {
     required String? parentId,
   }) async {
+    final svc = ref.read(goalsServiceProvider);
     for (final node in nodes) {
-      final newId = await DataService.goals.createGoalWithFields(
+      final newId = await svc.createGoalWithFields(
         title: (node['title'] as String?) ?? '',
         description: node['description'] as String?,
         parentId: parentId,
@@ -222,8 +230,9 @@ class _GoalsPageState extends State<GoalsPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -266,9 +275,7 @@ int _countNodes(List<Map<String, dynamic>> nodes) {
 }
 
 List<String> _stringList(dynamic v) {
-  if (v is List) {
-    return v.map((e) => e?.toString() ?? '').toList();
-  }
+  if (v is List) return v.map((e) => e?.toString() ?? '').toList();
   return const [];
 }
 

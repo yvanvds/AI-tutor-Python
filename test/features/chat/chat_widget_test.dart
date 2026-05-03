@@ -4,17 +4,16 @@
 // button). A frozen "Continue" button is one of the easiest regressions to
 // ship and the hardest to notice in dev, so we lock the wiring here.
 //
-// Setup: register a `MockTutorService` at the locator that exposes a real
-// `ValueNotifier<TutorState>` (so the widget's `ValueListenableBuilder`
-// rebuilds on `state.value = ...`), and a real `ChatService` (we only need
-// its `controller` and don't assert on chat behaviour). `initializeSession`
-// runs in a `Future.microtask` after mount, so we stub it to a no-op.
+// Setup: `_FakeTutorService` subclasses `TutorService` so its state can be
+// driven via `fakeTutor.set(...)` after mount. `chatServiceProvider` is
+// overridden with a real `ChatService` (we only need its `controller`).
+// `ProviderScope` wraps the widget under test.
 //
 // We seed the chat with one message in `setUp` so the underlying
 // `ChatAnimatedList` doesn't mount its `EmptyChatList` (which schedules a
 // `Future.delayed` Timer that survives widget disposal and trips the
 // flutter_test "pending Timer" invariant). Each test ends with
-// `_unmount(tester)` so the widget tree disposes (cancelling animation
+// `unmount(tester)` so the widget tree disposes (cancelling animation
 // tickers and timers) before the test framework's invariant checks run.
 
 import 'package:ai_tutor_python/features/chat/chat_widget.dart';
@@ -24,65 +23,56 @@ import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
-import '../../helpers/mocks.dart';
+class _FakeTutorService extends TutorService {
+  int initializeSessionCalls = 0;
+
+  @override
+  TutorState build() => TutorState.idle;
+
+  void set(TutorState s) => state = s;
+
+  @override
+  Future<void> initializeSession({bool force = false}) async {
+    initializeSessionCalls++;
+  }
+}
 
 void main() {
-  late MockTutorService tutor;
+  late _FakeTutorService fakeTutor;
   late ChatService chat;
-  late ValueNotifier<TutorState> stateNotifier;
 
   setUp(() {
-    tutor = MockTutorService();
+    fakeTutor = _FakeTutorService();
     chat = ChatService();
-    stateNotifier = ValueNotifier<TutorState>(TutorState.idle);
-
     // Seed one message so EmptyChatList isn't mounted (its 50ms
     // Future.delayed Timer survives widget disposal otherwise).
     chat.addTutorMessage('hi');
-
-    when(() => tutor.state).thenReturn(stateNotifier);
-    when(() => tutor.initializeSession(force: any<bool>(named: 'force')))
-        .thenAnswer((_) async {});
-
-    registerMock<TutorService>(tutor);
-    registerMock<ChatService>(chat);
   });
 
-  tearDown(() async {
-    stateNotifier.dispose();
+  tearDown(() {
     chat.dispose();
-    await resetLocator();
   });
 
-  Future<void> pumpChatWidget(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ChatWidget(),
-        ),
-      ),
-    );
-    // Two frames: first mounts Chat, second lets the composer builder
-    // produce its widget. Avoid pumpAndSettle — the wait composer uses
-    // `LoadingAnimationWidget` which animates forever.
-    await tester.pump();
-  }
+  Widget buildApp() => ProviderScope(
+    overrides: [
+      tutorServiceProvider.overrideWith(() => fakeTutor),
+      chatServiceProvider.overrideWithValue(chat),
+    ],
+    child: const MaterialApp(
+      home: Scaffold(body: ChatWidget()),
+    ),
+  );
 
-  // Replace the widget tree with an empty container so all State.dispose
-  // hooks fire (cancelling animation tickers from LoadingAnimationWidget
-  // and any pending timers in ChatAnimatedList) before the test framework
-  // checks the pending-Timer invariant.
   Future<void> unmount(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
   }
 
   testWidgets('idle state renders the default Composer', (tester) async {
-    stateNotifier.value = TutorState.idle;
-    await pumpChatWidget(tester);
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
 
     expect(find.byType(Composer), findsOneWidget);
     expect(find.byType(ComposerWaitWidget), findsNothing);
@@ -92,8 +82,9 @@ void main() {
   });
 
   testWidgets('working state renders the ComposerWaitWidget', (tester) async {
-    stateNotifier.value = TutorState.working;
-    await pumpChatWidget(tester);
+    await tester.pumpWidget(buildApp());
+    fakeTutor.set(TutorState.working);
+    await tester.pump();
 
     expect(find.byType(ComposerWaitWidget), findsOneWidget);
     expect(find.byType(Composer), findsNothing);
@@ -104,8 +95,9 @@ void main() {
 
   testWidgets('hasFollowUp state renders the ComposerContinueWidget',
       (tester) async {
-    stateNotifier.value = TutorState.hasFollowUp;
-    await pumpChatWidget(tester);
+    await tester.pumpWidget(buildApp());
+    fakeTutor.set(TutorState.hasFollowUp);
+    await tester.pump();
 
     expect(find.byType(ComposerContinueWidget), findsOneWidget);
     expect(find.byType(Composer), findsNothing);
@@ -116,20 +108,21 @@ void main() {
 
   testWidgets('swaps composer when state transitions idle → working → '
       'hasFollowUp → idle', (tester) async {
-    await pumpChatWidget(tester);
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
     expect(find.byType(Composer), findsOneWidget);
 
-    stateNotifier.value = TutorState.working;
+    fakeTutor.set(TutorState.working);
     await tester.pump();
     expect(find.byType(ComposerWaitWidget), findsOneWidget);
     expect(find.byType(Composer), findsNothing);
 
-    stateNotifier.value = TutorState.hasFollowUp;
+    fakeTutor.set(TutorState.hasFollowUp);
     await tester.pump();
     expect(find.byType(ComposerContinueWidget), findsOneWidget);
     expect(find.byType(ComposerWaitWidget), findsNothing);
 
-    stateNotifier.value = TutorState.idle;
+    fakeTutor.set(TutorState.idle);
     await tester.pump();
     expect(find.byType(Composer), findsOneWidget);
     expect(find.byType(ComposerContinueWidget), findsNothing);
@@ -138,9 +131,9 @@ void main() {
   });
 
   testWidgets('initializeSession is invoked once after mount', (tester) async {
-    await pumpChatWidget(tester);
-    // The microtask scheduled in initState fires on the first pump.
-    verify(() => tutor.initializeSession()).called(1);
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
+    expect(fakeTutor.initializeSessionCalls, 1);
 
     await unmount(tester);
   });

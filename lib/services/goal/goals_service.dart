@@ -5,24 +5,11 @@ import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 class GoalsService {
-  GoalsService({CosmosContainer? container}) : _containerOverride = container {
-    // In production (no container override) prime an in-memory cache of root
-    // goals from the polling watcher so the AI request hot-path can read it
-    // synchronously. Tests inject a container override and don't want a
-    // subscription kicking off rogue queries during setup.
-    if (container == null) {
-      final s = streamRoots;
-      if (s != null) {
-        _rootsSubscription = s.listen((list) {
-          cachedRoots.value = List.unmodifiable(list);
-        });
-      }
-    }
-  }
+  GoalsService({CosmosContainer? container}) : _containerOverride = container;
 
   static const String _pk = CosmosPartitions.goal;
   static const Uuid _uuid = Uuid();
@@ -31,34 +18,6 @@ class GoalsService {
 
   CosmosContainer get _container =>
       _containerOverride ?? CosmosPaths.goals();
-
-  final ValueNotifier<Goal?> selectedRootGoal = ValueNotifier(null);
-  final ValueNotifier<Goal?> selectedChildGoal = ValueNotifier(null);
-
-  final ValueNotifier<Goal?> editorSelectedRootGoal = ValueNotifier(null);
-  final ValueNotifier<Goal?> editorSelectedGoal = ValueNotifier(null);
-
-  final ValueNotifier<Goal?> preferredRootGoal = ValueNotifier(null);
-  final ValueNotifier<Goal?> preferredChildGoal = ValueNotifier(null);
-
-  /// Latest list of root goals from the polling watcher. Empty until first
-  /// fetch. Hot callers (the AI request loop) should prefer this over the
-  /// async [getRootGoalsOnce].
-  final ValueNotifier<List<Goal>> cachedRoots =
-      ValueNotifier<List<Goal>>(const []);
-
-  StreamSubscription<List<Goal>>? _rootsSubscription;
-
-  void dispose() {
-    _rootsSubscription?.cancel();
-    cachedRoots.dispose();
-    selectedRootGoal.dispose();
-    selectedChildGoal.dispose();
-    editorSelectedRootGoal.dispose();
-    editorSelectedGoal.dispose();
-    preferredRootGoal.dispose();
-    preferredChildGoal.dispose();
-  }
 
   // --- STREAMS -------------------------------------------------------------
 
@@ -88,7 +47,6 @@ class GoalsService {
 
   // --- ONE-SHOTS -----------------------------------------------------------
 
-  /// Read children once (used to compute target list on drop).
   Future<List<Goal>> getChildrenOnce(String? parentId) =>
       safeCosmos(() => _fetchChildrenOrRoots(parentId));
 
@@ -98,18 +56,17 @@ class GoalsService {
 
   /// Validation set for AI-emitted concept attributions: union of
   /// `knownConcepts` from [targetRootGoal] and every earlier root goal
-  /// (those with a strictly smaller `order`). Wider than the
-  /// `{known concepts}` text the instruction generator substitutes into
-  /// prompts, since the AI may sometimes tag a concept the student is
-  /// currently working on rather than a strictly mastered one — we accept
-  /// either, then filter out the rest as drift.
-  Future<List<String>> getKnownConceptsInScope(Goal targetRootGoal) async {
-    final cached = cachedRoots.value;
-    final roots = cached.isNotEmpty ? cached : await getRootGoalsOnce();
+  /// (those with a strictly smaller `order`). Pass [cachedRoots] (from
+  /// GoalSelectionState) to avoid a Cosmos round-trip on every AI request.
+  Future<List<String>> getKnownConceptsInScope(
+    Goal targetRootGoal, {
+    List<Goal>? cachedRoots,
+  }) async {
+    final roots = (cachedRoots != null && cachedRoots.isNotEmpty)
+        ? cachedRoots
+        : await getRootGoalsOnce();
     final out = <String>{};
     for (final root in roots) {
-      // Roots are ordered by `order`; bound the scan so we don't pick up
-      // future roots if [targetRootGoal] isn't in the cache.
       if (root.order > targetRootGoal.order) break;
       out.addAll(root.knownConcepts);
       if (root.id == targetRootGoal.id) break;
@@ -117,7 +74,6 @@ class GoalsService {
     return out.toList();
   }
 
-  /// Fetch every goal once. Used for export.
   Future<List<Goal>> getAllGoalsOnce() => safeCosmos(_fetchAll);
 
   // --- CREATE --------------------------------------------------------------
@@ -143,8 +99,6 @@ class GoalsService {
     );
   }
 
-  /// Create a goal with all fields populated. Returns the new Cosmos id.
-  /// Used for import where we want to preserve every field except the id.
   Future<String> createGoalWithFields({
     required String title,
     String? description,
@@ -190,15 +144,11 @@ class GoalsService {
   Future<void> updateKnownConcepts(String id, List<String> knownConcepts) =>
       _patch(id, {'knownConcepts': knownConcepts});
 
-  /// Change the parent of a goal. Place at end of new parent's list.
   Future<void> reparent(String id, String? newParentId) async {
     final next = await _nextOrder(parentId: newParentId);
     await _patch(id, {'parentId': newParentId, 'order': next});
   }
 
-  /// Atomically rewrite order/parentId on a contiguous list. All ops share
-  /// the same logical partition (`/type = "goal"`), so a Cosmos transactional
-  /// batch covers them in one call.
   Future<void> applyOrder(String? parentId, List<String> orderedIds) async {
     if (orderedIds.isEmpty) return;
     final ops = <BatchOperation>[];
@@ -216,6 +166,60 @@ class GoalsService {
     await safeCosmos(
       () => _container.executeBatch(ops, partitionKey: _pk),
     );
+  }
+
+  // --- SUBTREE BACKUP/RESTORE ----------------------------------------------
+
+  Future<SubtreeBackup> backupSubtree(String rootId) async {
+    final nodes = await _collectSubtree(rootId);
+    final out = <(String, Map<String, dynamic>)>[];
+    for (final g in nodes) {
+      out.add((
+        g.id,
+        {
+          'title': g.title,
+          'description': g.description,
+          'parentId': g.parentId,
+          'order': g.order,
+          'optional': g.optional,
+          'suggestions': g.suggestions,
+        },
+      ));
+    }
+    return SubtreeBackup(out);
+  }
+
+  Future<void> deleteSubtree(String rootId) async {
+    final nodes = await _collectSubtree(rootId);
+    if (nodes.isEmpty) return;
+    final ops = nodes
+        .map((g) => BatchOperation.delete(g.id))
+        .toList(growable: false);
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
+  }
+
+  Future<void> restoreSubtree(SubtreeBackup backup) async {
+    if (backup.nodes.isEmpty) return;
+    final ops = <BatchOperation>[];
+    for (final (id, data) in backup.nodes) {
+      ops.add(
+        BatchOperation.upsert({
+          'id': id,
+          'type': _pk,
+          ...data,
+        }),
+      );
+    }
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
+  }
+
+  Future<int> countDescendants(String rootId) async {
+    final subtree = await _collectSubtree(rootId);
+    return (subtree.length - 1).clamp(0, 1 << 31);
   }
 
   // --- HELPERS -------------------------------------------------------------
@@ -246,9 +250,7 @@ class GoalsService {
     );
     if (doc == null) return;
     doc.addAll(changes);
-    await safeCosmos(
-      () => _container.replace(id, doc, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.replace(id, doc, partitionKey: _pk));
   }
 
   Future<List<Goal>> _fetchRoots() async {
@@ -295,7 +297,6 @@ class GoalsService {
     return Goal.fromCosmos(doc);
   }
 
-  /// Build a Cosmos doc map for a goal. Includes the partition-key field.
   Map<String, Object?> _docMap(Goal goal) => {
     'id': goal.id,
     'type': _pk,
@@ -308,7 +309,6 @@ class GoalsService {
     'knownConcepts': goal.knownConcepts,
   };
 
-  /// Load *all* goals once (≤100 so it's fine) and build a map by id.
   Future<Map<String, Goal>> _getAllGoalsMap() async {
     final all = await _fetchAll();
     return {for (final g in all) g.id: g};
@@ -329,60 +329,8 @@ class GoalsService {
     }
     return out;
   }
-
-  /// Backup the subtree as raw maps so we can restore 1:1 (same ids).
-  Future<SubtreeBackup> backupSubtree(String rootId) async {
-    final nodes = await _collectSubtree(rootId);
-    final out = <(String, Map<String, dynamic>)>[];
-    for (final g in nodes) {
-      out.add((
-        g.id,
-        {
-          'title': g.title,
-          'description': g.description,
-          'parentId': g.parentId,
-          'order': g.order,
-          'optional': g.optional,
-          'suggestions': g.suggestions,
-        },
-      ));
-    }
-    return SubtreeBackup(out);
-  }
-
-  /// Delete every node in the subtree.
-  Future<void> deleteSubtree(String rootId) async {
-    final nodes = await _collectSubtree(rootId);
-    if (nodes.isEmpty) return;
-    final ops = nodes
-        .map((g) => BatchOperation.delete(g.id))
-        .toList(growable: false);
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
-  }
-
-  /// Restore a previously backed-up subtree (same ids).
-  Future<void> restoreSubtree(SubtreeBackup backup) async {
-    if (backup.nodes.isEmpty) return;
-    final ops = <BatchOperation>[];
-    for (final (id, data) in backup.nodes) {
-      ops.add(
-        BatchOperation.upsert({
-          'id': id,
-          'type': _pk,
-          ...data,
-        }),
-      );
-    }
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
-  }
-
-  /// Convenience: count descendants (excludes the root).
-  Future<int> countDescendants(String rootId) async {
-    final subtree = await _collectSubtree(rootId);
-    return (subtree.length - 1).clamp(0, 1 << 31);
-  }
 }
+
+final goalsServiceProvider = Provider<GoalsService>(
+  (_) => GoalsService(),
+);

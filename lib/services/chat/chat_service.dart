@@ -1,22 +1,19 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 
 class ChatService {
+  ChatService({
+    void Function(StreamState)? onStreamStateChanged,
+    void Function(bool)? onMcqPendingChanged,
+  })  : _onStreamStateChanged = onStreamStateChanged,
+        _onMcqPendingChanged = onMcqPendingChanged;
+
   final ChatController controller = InMemoryChatController();
+  final void Function(StreamState)? _onStreamStateChanged;
+  final void Function(bool)? _onMcqPendingChanged;
+
   int _id = 0;
-
-  /// Active stream state for the in-flight tutor message. Read by the
-  /// chat widget's [TextStreamMessage] builder. Only one tutor stream is
-  /// ever active at a time (the tutor service serialises requests).
-  final ValueNotifier<StreamState> streamState =
-      ValueNotifier<StreamState>(const StreamStateLoading());
-
-  /// True while a multiple-choice options block is awaiting a tap. The chat
-  /// widget swaps to a wait composer in this state so students must click an
-  /// option rather than typing.
-  final ValueNotifier<bool> mcqPending = ValueNotifier<bool>(false);
-
   TextStreamMessage? _activeStream;
 
   void addMessage(String text) {
@@ -40,9 +37,7 @@ class ChatService {
     );
   }
 
-  /// Insert a clickable multiple-choice options block. The chat widget renders
-  /// it as a row of buttons; tapping one routes through the same path as
-  /// keyboard input.
+  /// Insert a clickable multiple-choice options block.
   void addMcqOptions(List<String> options) {
     _id++;
     controller.insertMessage(
@@ -57,12 +52,11 @@ class ChatService {
         },
       ),
     );
-    mcqPending.value = true;
+    _onMcqPendingChanged?.call(true);
   }
 
   /// Mark an mcq-options message as answered so its buttons rebuild as
-  /// disabled with the picked one highlighted. Persisted on the controller
-  /// so it survives scroll-induced rebuilds.
+  /// disabled with the picked one highlighted.
   void markMcqAnswered(CustomMessage message, String picked) {
     controller.updateMessage(
       message,
@@ -70,38 +64,33 @@ class ChatService {
         metadata: {...?message.metadata, 'selected': picked},
       ),
     );
-    mcqPending.value = false;
+    _onMcqPendingChanged?.call(false);
   }
 
-  /// Start a streaming tutor message. Inserts a [TextStreamMessage] in the
-  /// loading state. Subsequent text deltas are passed via [updateStream];
-  /// finalize with [completeStream] (which swaps the placeholder for a
-  /// regular [TextMessage]) or [failStream].
+  /// Start a streaming tutor message. Finalize with [completeStream] or [failStream].
   void startStream() {
     _id++;
-    final streamId = 's${_id.toString()}';
     final message = TextStreamMessage(
       id: _id.toString(),
       authorId: 'Teacher',
-      streamId: streamId,
+      streamId: 's${_id.toString()}',
       createdAt: DateTime.now(),
     );
     _activeStream = message;
-    streamState.value = const StreamStateLoading();
+    _onStreamStateChanged?.call(const StreamStateLoading());
     controller.insertMessage(message);
   }
 
   void updateStream(String accumulatedText) {
     if (_activeStream == null) return;
-    streamState.value = StreamStateStreaming(accumulatedText);
+    _onStreamStateChanged?.call(StreamStateStreaming(accumulatedText));
   }
 
   /// Replace the active streaming placeholder with a finalised text message.
-  /// If the stream produced no visible text, the placeholder is removed.
   void completeStream(String finalText) {
     final placeholder = _activeStream;
     _activeStream = null;
-    streamState.value = const StreamStateLoading();
+    _onStreamStateChanged?.call(const StreamStateLoading());
     if (placeholder == null) return;
     if (finalText.trim().isEmpty) {
       controller.removeMessage(placeholder);
@@ -118,13 +107,11 @@ class ChatService {
     );
   }
 
-  /// Tear down the active stream after a transport error. The partial text
-  /// (if any) is dropped — callers typically follow up with
-  /// [addSystemMessage] to surface the failure.
+  /// Tear down the active stream after a transport error.
   void failStream() {
     final placeholder = _activeStream;
     _activeStream = null;
-    streamState.value = const StreamStateLoading();
+    _onStreamStateChanged?.call(const StreamStateLoading());
     if (placeholder != null) {
       controller.removeMessage(placeholder);
     }
@@ -133,14 +120,27 @@ class ChatService {
   void clear() {
     _id = 0;
     _activeStream = null;
-    streamState.value = const StreamStateLoading();
-    mcqPending.value = false;
+    _onStreamStateChanged?.call(const StreamStateLoading());
+    _onMcqPendingChanged?.call(false);
     controller.setMessages([]);
   }
 
-  void dispose() {
-    streamState.dispose();
-    mcqPending.dispose();
-    controller.dispose();
-  }
+  void dispose() => controller.dispose();
 }
+
+final streamStateProvider = StateProvider<StreamState>(
+  (_) => const StreamStateLoading(),
+);
+
+final mcqPendingProvider = StateProvider<bool>((_) => false);
+
+final chatServiceProvider = Provider<ChatService>((ref) {
+  final cs = ChatService(
+    onStreamStateChanged: (s) =>
+        ref.read(streamStateProvider.notifier).state = s,
+    onMcqPendingChanged: (v) =>
+        ref.read(mcqPendingProvider.notifier).state = v,
+  );
+  ref.onDispose(cs.dispose);
+  return cs;
+});

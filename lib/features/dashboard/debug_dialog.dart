@@ -1,16 +1,18 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class DebugDialog extends StatefulWidget {
+class DebugDialog extends ConsumerStatefulWidget {
   const DebugDialog({super.key});
 
   @override
-  State<DebugDialog> createState() => _DebugDialogState();
+  ConsumerState<DebugDialog> createState() => _DebugDialogState();
 }
 
-class _DebugDialogState extends State<DebugDialog> {
+class _DebugDialogState extends ConsumerState<DebugDialog> {
   QuestionDifficulty _difficulty = QuestionDifficulty.easy;
   bool _busy = false;
 
@@ -49,7 +51,7 @@ class _DebugDialogState extends State<DebugDialog> {
 
     setState(() => _busy = true);
     try {
-      await DataService.progress.deleteAllForCurrentUser();
+      await ref.read(progressServiceProvider).deleteAllForCurrentUser();
       messenger.showSnackBar(
         const SnackBar(content: Text('Progress wiped.')),
       );
@@ -65,7 +67,7 @@ class _DebugDialogState extends State<DebugDialog> {
   Future<void> _triggerQuestion(ChatRequestType type) async {
     Navigator.of(context).pop();
     final needsDifficulty = type != ChatRequestType.guidingQuestion;
-    await DataService.tutor.queryTutor(
+    await ref.read(tutorServiceProvider.notifier).queryTutor(
       type: type,
       difficulty: needsDifficulty ? _difficulty : null,
     );

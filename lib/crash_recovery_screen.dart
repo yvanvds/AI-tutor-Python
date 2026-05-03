@@ -1,15 +1,17 @@
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CrashRecoveryScreen extends StatelessWidget {
+class CrashRecoveryScreen extends ConsumerWidget {
   const CrashRecoveryScreen({super.key, this.message});
 
   final String? message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -35,7 +37,9 @@ class CrashRecoveryScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () async {
-                    await resetAuthAndCacheAndExit();
+                    await resetAuthAndCacheAndExit(
+                      () => ref.read(authServiceProvider.notifier).signOut(),
+                    );
                     exit(0);
 
                     // if (context.mounted) {

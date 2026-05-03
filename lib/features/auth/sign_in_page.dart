@@ -1,18 +1,15 @@
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Single "Sign in with school account" button. The Entra app registration
-/// owns identity now, so the old register/email/password flow is gone —
-/// new users are provisioned automatically the first time they sign in (see
-/// AccountService._ensureProfile).
-class SignInPage extends StatefulWidget {
+class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({super.key});
 
   @override
-  State<SignInPage> createState() => _SignInPageState();
+  ConsumerState<SignInPage> createState() => _SignInPageState();
 }
 
-class _SignInPageState extends State<SignInPage> {
+class _SignInPageState extends ConsumerState<SignInPage> {
   bool _busy = false;
   String? _error;
 
@@ -22,7 +19,7 @@ class _SignInPageState extends State<SignInPage> {
       _error = null;
     });
     try {
-      await DataService.auth.signIn();
+      await ref.read(authServiceProvider.notifier).signIn();
     } catch (e) {
       if (mounted) {
         setState(() => _error = 'Sign in failed: $e');

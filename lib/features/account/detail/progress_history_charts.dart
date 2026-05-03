@@ -1,16 +1,14 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress_sample.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const Duration _kHistoryWindow = Duration(days: 30);
 
-/// Renders one `LineChart` per root goal that has any history in the last
-/// 30 days. Each child subgoal is a thin coloured line; the root average
-/// (recomputed client-side from child samples at each x point) is overlaid
-/// as a thicker grey line.
-class ProgressHistoryCharts extends StatelessWidget {
+/// Renders one `LineChart` per root goal that has any history in the last 30 days.
+class ProgressHistoryCharts extends ConsumerWidget {
   const ProgressHistoryCharts({
     super.key,
     required this.uid,
@@ -21,10 +19,10 @@ class ProgressHistoryCharts extends StatelessWidget {
   final List<Goal> goals;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return StreamBuilder<List<ProgressSample>>(
-      stream: DataService.progress.watchHistoryForUser(
+      stream: ref.read(progressServiceProvider).watchHistoryForUser(
         uid,
         since: DateTime.now().toUtc().subtract(_kHistoryWindow),
       ),
@@ -61,8 +59,10 @@ class ProgressHistoryCharts extends StatelessWidget {
 
         final roots2 = roots.where((root) {
           final children = childrenByParent[root.id] ?? const <Goal>[];
-          return children.any((c) =>
-              (samplesByGoal[c.id] ?? const <ProgressSample>[]).isNotEmpty);
+          return children.any(
+            (c) =>
+                (samplesByGoal[c.id] ?? const <ProgressSample>[]).isNotEmpty,
+          );
         }).toList();
 
         if (roots2.isEmpty) {
@@ -143,10 +143,7 @@ class _RootGoalChart extends StatelessWidget {
             children: [
               Text(root.title, style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
-              Text(
-                'Nog geen geschiedenis',
-                style: theme.textTheme.bodySmall,
-              ),
+              Text('Nog geen geschiedenis', style: theme.textTheme.bodySmall),
             ],
           ),
         ),
@@ -298,12 +295,9 @@ class _RootGoalChart extends StatelessWidget {
     for (final x in sortedXs) {
       for (var i = 0; i < series.length; i++) {
         for (final spot in series[i].spots) {
-          if (spot.x == x) {
-            lastByChild[i] = spot.y;
-          }
+          if (spot.x == x) lastByChild[i] = spot.y;
         }
       }
-      // Only emit a root point once we've seen a sample for *every* child.
       if (lastByChild.length < series.length) continue;
       double total = 0;
       for (final v in lastByChild.values) {

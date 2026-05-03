@@ -1,51 +1,33 @@
-import 'dart:async';
-
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
-import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'global_config.dart';
 
-class GlobalConfigService {
-  GlobalConfigService() {
-    _subscription = watchConfig().listen((cfg) {
-      config.value = cfg;
-    });
-  }
-
-  final LocalApiKeyStorage localStorage = LocalApiKeyStorage();
-
+class GlobalConfigService extends Notifier<GlobalConfig?> {
   static const String _pk = CosmosPartitions.config;
   static const String _docId = CosmosDocId.globalConfig;
 
   CosmosContainer get _container => CosmosPaths.config();
 
-  /// Exposed latest config (null until first load or if doc missing).
-  final ValueNotifier<GlobalConfig?> config = ValueNotifier<GlobalConfig?>(
-    null,
-  );
+  @override
+  GlobalConfig? build() {
+    final sub = watchConfig().listen((cfg) => state = cfg);
+    ref.onDispose(sub.cancel);
+    return null;
+  }
 
-  late final StreamSubscription<GlobalConfig?> _subscription;
+  /// Synchronous fast-path for hot callers (e.g. the AI request loop).
+  GlobalConfig? get cachedConfig => state;
 
   Future<GlobalConfig?> getConfig() => safeCosmos(_fetchOnce);
-
-  /// Latest config from the polling watcher, or null if not yet fetched.
-  /// Synchronous fast-path for hot callers (e.g. the AI request loop) that
-  /// must not block on a Cosmos round-trip every call.
-  GlobalConfig? get cachedConfig => config.value;
 
   Stream<GlobalConfig?> watchConfig() {
     return safeCosmosStream(
       pollingStream(() => safeCosmos(_fetchOnce)),
     );
-  }
-
-  void dispose() {
-    _subscription.cancel();
-    config.dispose();
   }
 
   Future<GlobalConfig?> _fetchOnce() async {
@@ -54,3 +36,8 @@ class GlobalConfigService {
     return GlobalConfig.fromMap(doc);
   }
 }
+
+final globalConfigServiceProvider =
+    NotifierProvider<GlobalConfigService, GlobalConfig?>(
+  GlobalConfigService.new,
+);

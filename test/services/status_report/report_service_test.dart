@@ -10,12 +10,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 void main() {
   late MockCosmosContainer container;
-  late MockAuthService auth;
   late ValueNotifier<AccountIdentity?> currentUser;
 
   setUpAll(() {
@@ -24,18 +22,17 @@ void main() {
 
   setUp(() {
     container = MockCosmosContainer();
-    auth = MockAuthService();
     currentUser = ValueNotifier<AccountIdentity?>(null);
-    when(() => auth.currentUser).thenReturn(currentUser);
-    registerMock<AuthService>(auth);
   });
 
-  tearDown(() async {
-    await resetLocator();
+  tearDown(() {
     currentUser.dispose();
   });
 
-  ReportService build() => ReportService(container: container);
+  ReportService build() => ReportService(
+        container: container,
+        getUid: () => currentUser.value?.oid,
+      );
 
   test('getStatusReportsForUser scopes to the supplied uid as both partition '
       'key and parameter', () async {

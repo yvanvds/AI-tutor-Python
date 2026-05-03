@@ -4,52 +4,46 @@ import 'dart:io';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/widgets/goal_crumb_in_app_bar.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
-import 'package:ai_tutor_python/widgets/multi_value_listenable_builder.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'version.dart';
 import 'features/dashboard/dashboard.dart';
 import 'features/dashboard/debug_dialog.dart';
 
-class HomeShell extends StatefulWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> {
   int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // Uncomment the following line to enable update checking on startup
     WidgetsBinding.instance.addPostFrameCallback((_) => checkForUpdate());
   }
 
   @override
   Widget build(BuildContext context) {
+    final isTeacher = ref.watch(isTeacherProvider);
+    final currentAccount = ref.watch(accountServiceProvider);
+
     return Stack(
       children: [
-        MultiValueListenableBuilder(
-          listenables: [
-            DataService.role.isTeacher,
-            DataService.account.currentAccount,
-          ],
-          builder: (context, values) {
-            final isTeacher = values[0] as bool;
-            final currentAccount = values[1] as Account?;
-            return _buildShell(isTeacher, currentAccount);
-          },
-        ),
+        _buildShell(isTeacher, currentAccount),
         const GoalSplashOverlay(),
       ],
     );
@@ -90,12 +84,11 @@ class _HomeShellState extends State<HomeShell> {
           ),
           IconButton(
             tooltip: 'Sign out',
-            onPressed: () => DataService.auth.signOut(),
+            onPressed: () => ref.read(authServiceProvider.notifier).signOut(),
             icon: const Icon(Icons.logout),
           ),
         ],
       ),
-
       body: Row(
         children: [
           NavigationRail(
@@ -180,7 +173,7 @@ class _HomeShellState extends State<HomeShell> {
     try {
       final json = const JsonEncoder.withIndent(
         '  ',
-      ).convert(DataService.debug.exportJson());
+      ).convert(ref.read(debugServiceProvider).exportJson());
       final stamp = DateTime.now()
           .toIso8601String()
           .replaceAll(':', '-')
@@ -210,11 +203,10 @@ class _HomeShellState extends State<HomeShell> {
     if (info == null) return;
 
     if (isNewer(info.version, kAppVersion)) {
-      // Show dialog before proceeding
       if (!mounted) return;
       await showDialog(
         context: context,
-        barrierDismissible: false, // user cannot tap outside to close
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('Update available'),
           content: Text(
@@ -230,7 +222,6 @@ class _HomeShellState extends State<HomeShell> {
         ),
       );
 
-      // Continue with update after pressing OK
       final file = await downloadToTemp(info.url);
       if (file == null) return;
 

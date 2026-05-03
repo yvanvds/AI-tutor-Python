@@ -1,10 +1,7 @@
 // 1B.1 — Tests `InstructionGenerator.generateInstructions`. The generator
-// pulls goal/instruction state through `DataService.goals` /
-// `DataService.instructions` (i.e. the `get_it` locator), so the test
-// pattern is: register `MockGoalsService` / `MockInstructionsService` under
-// the *interface* type, plumb real `ValueNotifier`s through stubbed getters
-// for the four selection notifiers, then drive `generateInstructions` with
-// fixture `Instruction` lists and verify the rendered string.
+// now takes all its dependencies as named parameters instead of reading from
+// a locator. We pass a GoalSelectionState built from ValueNotifiers plus
+// direct callbacks to the mocked services.
 //
 // What's verified per TESTING_PLAN.md:
 // - `_replaceTags` substitutes `{goal}`, `{subgoal}`, `{suggestions}`,
@@ -18,15 +15,13 @@
 
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
-import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
-import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 /// Strip the constant envelope-contract prefix that every system prompt now
@@ -45,8 +40,6 @@ void main() {
   late ValueNotifier<Goal?> selectedChild;
   late ValueNotifier<Goal?> preferredRoot;
   late ValueNotifier<Goal?> preferredChild;
-  late ValueNotifier<List<Goal>> cachedRoots;
-  late ValueNotifier<List<Instruction>> cachedAll;
 
   Goal makeGoal(
     String id, {
@@ -71,47 +64,47 @@ void main() {
     selectedChild = ValueNotifier<Goal?>(null);
     preferredRoot = ValueNotifier<Goal?>(null);
     preferredChild = ValueNotifier<Goal?>(null);
-    cachedRoots = ValueNotifier<List<Goal>>(const []);
-    cachedAll = ValueNotifier<List<Instruction>>(const []);
-
-    when(() => goals.selectedRootGoal).thenReturn(selectedRoot);
-    when(() => goals.selectedChildGoal).thenReturn(selectedChild);
-    when(() => goals.preferredRootGoal).thenReturn(preferredRoot);
-    when(() => goals.preferredChildGoal).thenReturn(preferredChild);
-    when(() => goals.cachedRoots).thenReturn(cachedRoots);
-    when(() => instructions.cachedAll).thenReturn(cachedAll);
 
     when(() => goals.getRootGoalsOnce()).thenAnswer((_) async => <Goal>[]);
     when(() => instructions.getAll())
         .thenAnswer((_) async => <Instruction>[]);
-
-    registerMock<GoalsService>(goals);
-    registerMock<InstructionsService>(instructions);
   });
 
-  tearDown(() async {
-    await resetLocator();
+  tearDown(() {
     selectedRoot.dispose();
     selectedChild.dispose();
     preferredRoot.dispose();
     preferredChild.dispose();
-    cachedRoots.dispose();
-    cachedAll.dispose();
   });
+
+  /// Helper that builds a GoalSelectionState from the current ValueNotifier
+  /// values and delegates to InstructionGenerator.
+  Future<String> gen(ChatRequestType type) =>
+      InstructionGenerator().generateInstructions(
+        type,
+        goalSelection: GoalSelectionState(
+          selectedRoot: selectedRoot.value,
+          selectedChild: selectedChild.value,
+          preferredRoot: preferredRoot.value,
+          preferredChild: preferredChild.value,
+          cachedRoots: const [],
+        ),
+        cachedInstructions: const [],
+        fetchInstructions: instructions.getAll,
+        fetchRootGoals: goals.getRootGoalsOnce,
+      );
 
   group('generateInstructions — guard clauses', () {
     test('no selected root goal → empty string', () async {
       selectedChild.value = makeGoal('child');
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(out, '');
       verifyNever(() => instructions.getAll());
     });
 
     test('no selected child goal → empty string', () async {
       selectedRoot.value = makeGoal('root');
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(out, '');
       verifyNever(() => instructions.getAll());
     });
@@ -132,8 +125,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(out, startsWith(envelopeContract));
     });
   });
@@ -162,8 +154,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       final body = _withoutEnvelope(out);
 
       // alwaysInclude first, then per-type sections in map iteration order.
@@ -185,8 +176,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.requestHint);
+      final out = await gen(ChatRequestType.requestHint);
       expect(_withoutEnvelope(out), 'ALWAYS\n');
     });
 
@@ -201,8 +191,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(_withoutEnvelope(out), '');
     });
   });
@@ -229,8 +218,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       // No mastered concepts because the only root goal IS the target —
       // the loop short-circuits before adding anything.
       expect(
@@ -255,8 +243,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(
         _withoutEnvelope(out),
         'GOAL-TITLE / GOAL-TITLE / GOAL-TITLE / GOAL-TITLE / SUB-TITLE\n',
@@ -279,8 +266,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(_withoutEnvelope(out), 'goal=PREF-ROOT sub=PREF-CHILD\n');
     });
   });
@@ -321,8 +307,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(_withoutEnvelope(out), '<variables\ntypes>\n');
       expect(out, isNot(contains('loops')));
       expect(out, isNot(contains('classes')));
@@ -352,8 +337,7 @@ void main() {
         ],
       );
 
-      final out = await InstructionGenerator()
-          .generateInstructions(ChatRequestType.socraticQuestion);
+      final out = await gen(ChatRequestType.socraticQuestion);
       expect(_withoutEnvelope(out), '<c-a>\n');
     });
   });

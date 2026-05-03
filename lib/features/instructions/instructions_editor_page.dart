@@ -1,8 +1,8 @@
 // lib/features/instructions/instructions_editor_page.dart
 import 'dart:io';
 
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
+import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/features/instructions/doc_header.dart';
 import 'package:ai_tutor_python/features/instructions/doc_list.dart';
 import 'package:ai_tutor_python/features/instructions/editor_pane.dart';
@@ -11,23 +11,27 @@ import 'package:ai_tutor_python/features/instructions/sections_list.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:highlight/languages/markdown.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-class InstructionsEditorPage extends StatefulWidget {
+class InstructionsEditorPage extends ConsumerStatefulWidget {
   const InstructionsEditorPage({super.key});
 
   @override
-  State<InstructionsEditorPage> createState() => _InstructionsEditorPageState();
+  ConsumerState<InstructionsEditorPage> createState() =>
+      _InstructionsEditorPageState();
 }
 
-class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
+class _InstructionsEditorPageState
+    extends ConsumerState<InstructionsEditorPage> {
   String? _selectedDocId;
-  Instruction? _original; // last fetched/saved version
+  Instruction? _original;
   Map<String, String> _workingSections = {};
   String? _selectedSectionKey;
 
+  late final Stream<List<Instruction>> _docsStream;
   late CodeController _codeCtrl;
 
   bool get _hasDocSelected => _selectedDocId != null;
@@ -38,9 +42,13 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     return !_mapEquals(_original!.sections, _workingSections);
   }
 
+  InstructionsService get _svc =>
+      ref.read(instructionsServiceProvider.notifier);
+
   @override
   void initState() {
     super.initState();
+    _docsStream = ref.read(instructionsServiceProvider.notifier).watchAll();
     _codeCtrl = CodeController(text: '', language: markdown);
     _codeCtrl.addListener(_onEditorChanged);
   }
@@ -56,7 +64,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     if (!_hasSectionSelected) return;
     final key = _selectedSectionKey!;
     final newText = _codeCtrl.text;
-    // Avoid churning the map if nothing changed
     if (_workingSections[key] != newText) {
       setState(() {
         _workingSections = Map<String, String>.from(_workingSections)
@@ -70,7 +77,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       _selectedDocId = doc?.id;
       _original = doc;
       _workingSections = Map<String, String>.from(doc?.sections ?? {});
-      // Keep selected section if still present; else pick first or clear
       if (_selectedSectionKey == null ||
           !_workingSections.containsKey(_selectedSectionKey)) {
         _selectedSectionKey = _workingSections.isEmpty
@@ -111,11 +117,11 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
     final confirm = await _confirm(
       context,
-      'Delete “${_selectedDocId!}”?',
+      'Delete "$_selectedDocId"?',
       'This will permanently delete the document.',
     );
     if (confirm != true) return;
-    await DataService.instructions.delete(_selectedDocId!);
+    await _svc.delete(_selectedDocId!);
 
     setState(() {
       _selectedDocId = null;
@@ -132,7 +138,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
   Future<void> _saveDocument() async {
     if (!_hasDocSelected) return;
     final toSave = Instruction(id: _selectedDocId!, sections: _workingSections);
-    await DataService.instructions.upsert(toSave);
+    await _svc.upsert(toSave);
 
     setState(() {
       _original = toSave;
@@ -155,7 +161,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
     if (_workingSections.containsKey(k)) {
       if (!mounted) return;
-      _showSnackBar(context, 'Section “$k” already exists');
+      _showSnackBar(context, 'Section "$k" already exists');
       return;
     }
 
@@ -171,7 +177,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     final k = _selectedSectionKey!;
     final confirm = await _confirm(
       context,
-      'Delete “$k”?',
+      'Delete "$k"?',
       'This removes the section from the document.',
     );
     if (confirm != true) return;
@@ -181,7 +187,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       newMap.remove(k);
       _workingSections = newMap;
 
-      // Select another section if any
       _selectedSectionKey = _workingSections.isEmpty
           ? null
           : _workingSections.keys.first;
@@ -191,9 +196,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final Stream<List<Instruction>> docsAsync = DataService.instructions
-        .watchAll();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Instructions Editor'),
@@ -229,11 +231,10 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       ),
       body: Row(
         children: [
-          // Left: documents list
           SizedBox(
             width: 280,
             child: StreamBuilder<List<Instruction>>(
-              stream: docsAsync,
+              stream: _docsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -258,7 +259,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
           const VerticalDivider(width: 1),
 
-          // Middle: sections list + controls
           SizedBox(
             width: 280,
             child: Column(
@@ -307,7 +307,6 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
           const VerticalDivider(width: 1),
 
-          // Right: editor
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -329,7 +328,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
 
   Future<void> _exportAllToMarkdown() async {
     try {
-      final docs = await DataService.instructions.getAll();
+      final docs = await _svc.getAll();
       if (docs.isEmpty) {
         if (mounted) _showSnackBar(context, 'No documents to export');
         return;
@@ -340,7 +339,8 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       final markdown = _buildMarkdownExport(sortedDocs);
 
       final dir =
-          await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+          await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
       final stamp = DateTime.now().toIso8601String().split('T').first;
       final file = File(p.join(dir.path, 'instructions-export-$stamp.md'));
       await file.writeAsString(markdown);
@@ -384,8 +384,8 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
         title: const Text('Import instructions'),
         content: Text(
           'The file contains $docCount document(s).\n\n'
-          '• Add: only insert sections that don’t already exist; keep current values.\n'
-          '• Replace: overwrite each imported document’s sections with the file’s contents. Documents not in the file are left alone.',
+          "• Add: only insert sections that don't already exist; keep current values.\n"
+          "• Replace: overwrite each imported document's sections with the file's contents. Documents not in the file are left alone.",
         ),
         actions: [
           TextButton(
@@ -426,7 +426,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     Map<String, Map<String, String>> parsed,
     _InstructionsImportMode mode,
   ) async {
-    final existing = await DataService.instructions.getAll();
+    final existing = await _svc.getAll();
     final byId = {for (final d in existing) d.id: d};
 
     final stats = _ImportStats();
@@ -448,20 +448,15 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     final current = byId[id];
     if (current == null) {
       if (importedSections.isEmpty) return false;
-      await DataService.instructions.upsert(
-        Instruction(id: id, sections: importedSections),
-      );
+      await _svc.upsert(Instruction(id: id, sections: importedSections));
       stats.newDocs++;
       stats.addedSections += importedSections.length;
       return true;
     }
 
     if (mode == _InstructionsImportMode.replace) {
-      // Wholesale overwrite: imported sections become the document's sections.
       if (_mapEquals(current.sections, importedSections)) return false;
-      await DataService.instructions.upsert(
-        Instruction(id: id, sections: importedSections),
-      );
+      await _svc.upsert(Instruction(id: id, sections: importedSections));
       stats.updatedDocs++;
       stats.replacedSections += importedSections.length;
       return true;
@@ -476,9 +471,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       }
     }
     if (changed == 0) return false;
-    await DataService.instructions.upsert(
-      Instruction(id: id, sections: merged),
-    );
+    await _svc.upsert(Instruction(id: id, sections: merged));
     stats.updatedDocs++;
     stats.addedSections += changed;
     return true;
@@ -487,7 +480,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
   Future<void> _reloadSelectedDocument() async {
     final id = _selectedDocId;
     if (id == null) return;
-    final refreshed = await DataService.instructions.getAll();
+    final refreshed = await _svc.getAll();
     for (final d in refreshed) {
       if (d.id == id) {
         _selectDocument(d);
@@ -506,9 +499,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
       }
       final parts = <String>[];
       if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
-      if (stats.updatedDocs > 0) {
-        parts.add('${stats.updatedDocs} replaced');
-      }
+      if (stats.updatedDocs > 0) parts.add('${stats.updatedDocs} replaced');
       if (stats.addedSections > 0) {
         parts.add('${stats.addedSections} added section(s)');
       }
@@ -520,7 +511,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     if (stats.addedSections == 0) {
       return 'Nothing imported (all sections already exist)';
     }
-    final parts = <String>['Imported ${stats.addedSections} section(s)'];
+    final parts = ['Imported ${stats.addedSections} section(s)'];
     if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
     if (stats.updatedDocs > 0) parts.add('${stats.updatedDocs} updated');
     return parts.join(', ');
@@ -538,17 +529,16 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     final target = newId.trim();
     if (target.isEmpty || target == _selectedDocId) return;
 
-    // Implement "rename" by copy + delete for simplicity.
     final data = Instruction(id: target, sections: _workingSections);
-    await DataService.instructions.upsert(data);
-    await DataService.instructions.delete(_selectedDocId!);
+    await _svc.upsert(data);
+    await _svc.delete(_selectedDocId!);
 
     setState(() {
       _selectedDocId = target;
       _original = data;
     });
     if (mounted) {
-      _showSnackBar(context, 'Renamed to “$target”');
+      _showSnackBar(context, 'Renamed to "$target"');
     }
   }
 
@@ -567,7 +557,7 @@ class _InstructionsEditorPageState extends State<InstructionsEditorPage> {
     if (_workingSections.containsKey(nk)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('A section named “$nk” already exists')),
+        SnackBar(content: Text('A section named "$nk" already exists')),
       );
       return;
     }
@@ -645,16 +635,12 @@ void _showSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
-/// Parses the inverse of [_buildMarkdownExport]: top-level `# id` blocks
-/// containing `## section` blocks. Section bodies are preserved verbatim
-/// (no header un-bumping) so the parser also works on hand-written files.
 Map<String, Map<String, String>> _parseMarkdownImport(String md) {
   return _MarkdownImportParser().parse(md);
 }
 
 class _MarkdownImportParser {
   static final _fenceRe = RegExp(r'^\s*(```|~~~)');
-  // `^# ` matches level-1 only (level-2 has `#` where `\s` is required).
   static final _h1Re = RegExp(r'^#\s+(.+?)\s*$');
   static final _h2Re = RegExp(r'^##\s+(.+?)\s*$');
   static final _leadingNewlinesRe = RegExp(r'^\n+');
@@ -715,7 +701,8 @@ class _MarkdownImportParser {
     final doc = currentDoc;
     final section = currentSection;
     if (doc != null && section != null) {
-      final text = body.toString().replaceFirst(_leadingNewlinesRe, '').trimRight();
+      final text =
+          body.toString().replaceFirst(_leadingNewlinesRe, '').trimRight();
       result.putIfAbsent(doc, () => <String, String>{})[section] = text;
     }
     body.clear();
@@ -759,15 +746,11 @@ int? _leadingNumber(String key) {
 final _headerRe = RegExp(r'^(#{1,6})(\s|$)');
 final _fenceRe = RegExp(r'^\s*(```|~~~)');
 
-/// Shifts all ATX headings in [text] so the smallest level becomes at least 3,
-/// preserving the relative hierarchy. Lines inside fenced code blocks are
-/// left untouched.
 String _bumpHeadersToMin3(String text) {
   final lines = text.split('\n');
   final minLevel = _minHeaderLevel(lines);
   if (minLevel == null || minLevel >= 3) return text;
   final shift = 3 - minLevel;
-
   return _rewriteHeaders(lines, shift).join('\n');
 }
 

@@ -1,19 +1,17 @@
-// 2.4 — Tests `AccountService`. Container is injected; auth and tutor are
-// registered as locator mocks. The constructor immediately attaches a
-// listener to AuthService.currentUser and (re)subscribes a polling stream
-// when the user becomes non-null. To keep these tests pure-Dart and fast we
-// keep the user null in setUp; tests that exercise the listener flip it
-// explicitly and await the microtask queue so `_ensureProfile` has a chance
-// to run.
+// 2.4 — Tests `AccountService`. Container is injected; auth is wired via
+// a controlled AuthService subclass registered in a ProviderContainer.
+// The Notifier immediately attaches a listener to authServiceProvider and
+// (re)subscribes a polling stream when the user becomes non-null. To keep
+// these tests pure-Dart and fast we keep the user null in setUp; tests that
+// exercise the listener flip it explicitly and await the microtask queue so
+// `_ensureProfile` has a chance to run.
 
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
-import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 const _uid = 'oid-abc';
@@ -28,11 +26,16 @@ AccountIdentity _identity({String oid = _uid, String firstName = 'Test'}) =>
       isTeacher: false,
     );
 
+/// Controlled AuthService that allows tests to set the auth state directly.
+class _ControlledAuth extends AuthService {
+  @override
+  AccountIdentity? build() => null;
+  void set(AccountIdentity? v) => state = v;
+}
+
 void main() {
   late MockCosmosContainer container;
-  late MockAuthService auth;
-  late MockTutorService tutor;
-  late ValueNotifier<AccountIdentity?> currentUser;
+  late ProviderContainer pc;
 
   setUpAll(() {
     registerFallbackValue(<String, Object?>{});
@@ -40,24 +43,17 @@ void main() {
 
   setUp(() {
     container = MockCosmosContainer();
-    auth = MockAuthService();
-    tutor = MockTutorService();
-    currentUser = ValueNotifier<AccountIdentity?>(null);
-
-    when(() => auth.currentUser).thenReturn(currentUser);
-    when(() => tutor.initializeSession(force: any<bool>(named: 'force')))
-        .thenAnswer((_) async {});
-
-    registerMock<AuthService>(auth);
-    registerMock<TutorService>(tutor);
+    pc = ProviderContainer(overrides: [
+      authServiceProvider.overrideWith(_ControlledAuth.new),
+      accountServiceProvider.overrideWith(() => AccountService(container: container)),
+    ]);
   });
 
-  tearDown(() async {
-    await resetLocator();
-    currentUser.dispose();
+  tearDown(() {
+    pc.dispose();
   });
 
-  AccountService build() => AccountService(container: container);
+  AccountService build() => pc.read(accountServiceProvider.notifier);
 
   group('getAccount', () {
     test('returns null when the doc is missing', () async {
@@ -174,7 +170,7 @@ void main() {
 
   group('setTargetGoal', () {
     test('throws StateError when no user is signed in', () {
-      currentUser.value = null;
+      // No auth set → currentUid is null → throws StateError.
       expect(
         () => build().setTargetGoal(targetGoal: 'g'),
         throwsA(isA<StateError>()),
@@ -182,7 +178,8 @@ void main() {
     });
 
     test('reads, patches targetGoal, refreshes updatedAt, replaces', () async {
-      currentUser.value = _identity();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity());
       when(
         () => container.read(any<String>(),
             partitionKey: any<Object>(named: 'partitionKey')),
@@ -206,7 +203,7 @@ void main() {
       ).thenAnswer((_) async => <String, dynamic>{});
 
       final svc = build();
-      // Drain any microtasks the constructor's listener spawned (it queued
+      // Drain any microtasks the Notifier's listener spawned (it queued
       // _ensureProfile but we don't care about that here).
       await Future<void>.delayed(Duration.zero);
       // Reset interaction counters so we measure only setTargetGoal's effects.
@@ -300,7 +297,8 @@ void main() {
       ).thenAnswer((_) async => {'id': _uid, 'uid': _uid});
 
       build();
-      currentUser.value = _identity();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity());
       // Let the unawaited(_ensureProfile(...)) run.
       await Future<void>.delayed(Duration.zero);
 
@@ -326,7 +324,8 @@ void main() {
       ).thenAnswer((_) async => <String, dynamic>{});
 
       build();
-      currentUser.value = _identity(firstName: 'Yvan');
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity(firstName: 'Yvan'));
       await Future<void>.delayed(Duration.zero);
       // _ensureProfile → getAccount (read) → upsertAccount (read again, then upsert).
       // We only care that ONE upsert with the right firstName landed.
@@ -348,11 +347,14 @@ void main() {
       ).thenAnswer((_) async => {'id': _uid, 'uid': _uid});
 
       final svc = build();
-      currentUser.value = _identity();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity());
       await Future<void>.delayed(Duration.zero);
 
-      currentUser.value = null;
-      expect(svc.currentAccount.value, isNull);
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth).set(null);
+      expect(pc.read(accountServiceProvider), isNull);
+      // Also verify via the notifier's state alias for clarity.
+      expect(svc.state, isNull);
     });
   });
 }

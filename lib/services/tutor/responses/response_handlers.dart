@@ -1,4 +1,3 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -27,6 +26,11 @@ class TutorContext {
     required this.setFollowUp,
     required this.requestExercise,
     required this.maybeRetry,
+    required this.playQuestion,
+    required this.addMcqOptions,
+    required this.updateReportForGoal,
+    required this.updateReportForCurrentGoal,
+    required this.recordParsedResponse,
     this.statusReportGoalIdOverride,
   });
 
@@ -38,11 +42,15 @@ class TutorContext {
   final void Function({String? message, String? code}) setFollowUp;
   final Future<void> Function() requestExercise;
   final Future<void> Function() maybeRetry;
+  final void Function() playQuestion;
+  final void Function(List<String> options) addMcqOptions;
+  final Future<void> Function(String goalId, String report) updateReportForGoal;
+  final Future<void> Function(String report) updateReportForCurrentGoal;
+  final void Function(ChatResponse response) recordParsedResponse;
 
   /// Goal id the StatusSummaryHandler should write against. Set by
   /// TutorService when firing a post-mastery status query so the report
   /// lands on the just-mastered subgoal rather than the now-current one.
-  /// Null for the legacy path (writes against the selected child goal).
   final String? statusReportGoalIdOverride;
 }
 
@@ -58,7 +66,7 @@ class CompleteCodeHandler extends ResponseHandler<CompleteCode> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode(r.code);
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
   }
 }
 
@@ -69,7 +77,7 @@ class ExplainCodeHandler extends ResponseHandler<ExplainCode> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode(r.code);
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
   }
 }
 
@@ -80,7 +88,7 @@ class WriteCodeHandler extends ResponseHandler<WriteCode> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode('# Schrijf hier je code\n');
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
   }
 }
 
@@ -91,7 +99,7 @@ class SocraticQuestionHandler extends ResponseHandler<SocraticQuestion> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode('');
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
   }
 }
 
@@ -102,8 +110,8 @@ class MultipleChoiceHandler extends ResponseHandler<MultipleChoice> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode(r.code);
     ctx.addTutorMessage(r.prompt);
-    DataService.chat.addMcqOptions(r.options);
-    DataService.sound.askQuestion();
+    ctx.addMcqOptions(r.options);
+    ctx.playQuestion();
   }
 }
 
@@ -114,7 +122,7 @@ class GuidingExerciseHandler extends ResponseHandler<GuidingExercise> {
     ctx.setExerciseType(r.type);
     ctx.startNewCode(r.code);
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
   }
 }
 
@@ -124,7 +132,7 @@ class GuidingFeedbackHandler extends ResponseHandler<GuidingFeedback> {
   Future<void> handle(GuidingFeedback r, TutorContext ctx) async {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
-      DataService.sound.askQuestion();
+      ctx.playQuestion();
     }
 
     final guidingComplete = await ctx.conductor.guidingIsComplete(
@@ -148,7 +156,7 @@ class AnswerHandler extends ResponseHandler<Answer> {
   Future<void> handle(Answer r, TutorContext ctx) async {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
-      DataService.sound.askQuestion();
+      ctx.playQuestion();
     }
   }
 }
@@ -158,7 +166,7 @@ class HintHandler extends ResponseHandler<Hint> {
   @override
   Future<void> handle(Hint r, TutorContext ctx) async {
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
     ctx.conductor.hintProvided();
   }
 }
@@ -169,7 +177,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
   Future<void> handle(CodeFeedback r, TutorContext ctx) async {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
-      DataService.sound.askQuestion();
+      ctx.playQuestion();
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
@@ -187,7 +195,7 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
   @override
   Future<void> handle(McqFeedback r, TutorContext ctx) async {
     ctx.addTutorMessage(r.prompt);
-    DataService.sound.askQuestion();
+    ctx.playQuestion();
     await ctx.conductor.updateProgress(r.quality);
     await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
     await ctx.requestExercise();
@@ -200,7 +208,7 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
   Future<void> handle(ExplainFeedback r, TutorContext ctx) async {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
-      DataService.sound.askQuestion();
+      ctx.playQuestion();
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
@@ -219,7 +227,7 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
   Future<void> handle(SocraticFeedback r, TutorContext ctx) async {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
-      DataService.sound.askQuestion();
+      ctx.playQuestion();
     }
 
     final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
@@ -238,10 +246,10 @@ class StatusSummaryHandler extends ResponseHandler<StatusSummary> {
   Future<void> handle(StatusSummary r, TutorContext ctx) async {
     final override = ctx.statusReportGoalIdOverride;
     if (override != null) {
-      await DataService.report.updateForGoal(override, r.prompt);
+      await ctx.updateReportForGoal(override, r.prompt);
       return;
     }
-    await DataService.report.updateForCurrentChildGoal(r.prompt);
+    await ctx.updateReportForCurrentGoal(r.prompt);
   }
 }
 
@@ -286,16 +294,14 @@ final List<_DispatchEntry> _dispatchTable = [
 ];
 
 /// Dispatches a parsed [ChatResponse] to the matching handler.
-/// Returns false when the response type has no handler — caller decides
-/// what fallback (e.g. retry) to apply.
+/// Returns false when the response type has no handler.
 Future<bool> dispatchResponse(ChatResponse parsed, TutorContext ctx) async {
-  DataService.debug.recordParsedResponse(parsed);
+  ctx.recordParsedResponse(parsed);
   for (final entry in _dispatchTable) {
     if (entry.matches(parsed)) {
       await entry.handle(parsed, ctx);
       return true;
     }
   }
-  DataService.debug.recordEvent('dispatch.unhandled', {'type': parsed.type});
   return false;
 }

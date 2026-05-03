@@ -3,30 +3,21 @@
 // `_distinctTypesNeeded` different question types. Mastery triggers a
 // fast-forward diagnostic on the next subgoal.
 //
-// The Conductor talks to the rest of the app through `DataService` (a
-// `get_it` locator), so each test registers service mocks under the
-// interface type, plumbs real `ValueNotifier`s through stubbed getters, and
-// verifies observable side effects (`progress.upsert`,
-// `chat.addSystemMessage`, `splash.showGoalReached`, `sound.*`).
+// The Conductor now takes a `ConductorDeps` struct. Each test wires the deps
+// from plain ValueNotifiers and mocks via `makeDeps()`.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/services/chat/chat_service.dart';
-import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
-import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/progress/concept_attribution.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
-import 'package:ai_tutor_python/services/progress/progress_service.dart';
-import 'package:ai_tutor_python/services/sound/sound_service.dart';
-import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 class _FakeProgress extends Fake implements Progress {}
@@ -67,12 +58,6 @@ void main() {
     preferredChild = ValueNotifier<Goal?>(null);
     currentProgress = ValueNotifier<double>(0.0);
 
-    when(() => goals.selectedRootGoal).thenReturn(selectedRoot);
-    when(() => goals.selectedChildGoal).thenReturn(selectedChild);
-    when(() => goals.preferredRootGoal).thenReturn(preferredRoot);
-    when(() => goals.preferredChildGoal).thenReturn(preferredChild);
-    when(() => progress.currentProgress).thenReturn(currentProgress);
-
     when(() => progress.upsert(any<Progress>(), quality: any(named: 'quality'), isWarmUp: any(named: 'isWarmUp'), recordHistory: any(named: 'recordHistory'))).thenAnswer((_) async {});
     when(() => progress.getAll()).thenAnswer((_) async => <Progress>[]);
     when(() => progress.getByGoalId(any<String>()))
@@ -85,23 +70,46 @@ void main() {
     when(() => sound.correctAnswer()).thenAnswer((_) async {});
     when(() => sound.playGoalReached()).thenAnswer((_) async {});
     when(() => sound.guidingComplete()).thenAnswer((_) async {});
-
-    registerMock<GoalsService>(goals);
-    registerMock<ProgressService>(progress);
-    registerMock<ChatService>(chat);
-    registerMock<SoundService>(sound);
-    registerMock<SplashService>(splash);
-    registerMock<DebugSessionRecorder>(DebugSessionRecorder());
   });
 
-  tearDown(() async {
-    await resetLocator();
+  tearDown(() {
     selectedRoot.dispose();
     selectedChild.dispose();
     preferredRoot.dispose();
     preferredChild.dispose();
     currentProgress.dispose();
   });
+
+  ConductorDeps makeDeps() => ConductorDeps(
+    getGoalSelection: () => GoalSelectionState(
+      selectedRoot: selectedRoot.value,
+      selectedChild: selectedChild.value,
+      preferredRoot: preferredRoot.value,
+      preferredChild: preferredChild.value,
+    ),
+    setSelectedRoot: (g) => selectedRoot.value = g,
+    setSelectedChild: (g) => selectedChild.value = g,
+    clearPreferred: () {
+      preferredRoot.value = null;
+      preferredChild.value = null;
+    },
+    getRootGoals: () => goals.getRootGoalsOnce(),
+    getChildren: (id) => goals.getChildrenOnce(id),
+    getKnownConceptsInScope: (root, {cachedRoots}) =>
+        goals.getKnownConceptsInScope(root),
+    upsertProgress: (p, {quality, isWarmUp = false, recordHistory = true}) =>
+        progress.upsert(p, quality: quality, isWarmUp: isWarmUp, recordHistory: recordHistory),
+    getProgressAll: () => progress.getAll(),
+    getProgressByGoalId: (id) => progress.getByGoalId(id),
+    setCurrentProgress: (v) => currentProgress.value = v,
+    addSystemMessage: (msg) => chat.addSystemMessage(msg),
+    recordDebugEvent: (name, [data]) {},
+    playCorrectAnswer: () => sound.correctAnswer(),
+    playGuidingComplete: () => sound.guidingComplete(),
+    playGoalReached: () => sound.playGoalReached(),
+    showGoalReached: ({required goalTitle, required description}) =>
+        splash.showGoalReached(goalTitle: goalTitle, description: description),
+  );
 
   /// Drives the Conductor through guiding so practice can begin. The
   /// guiding phase completes once the running confidence sum reaches 0.8.
@@ -130,7 +138,7 @@ void main() {
 
   group('getNextQuestion', () {
     test('no selected or preferred child → noResult', () {
-      final (type, _) = Conductor().getNextQuestion();
+      final (type, _) = Conductor(deps: makeDeps()).getNextQuestion();
       expect(type, ChatRequestType.noResult);
     });
 
@@ -138,7 +146,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       final (type, difficulty) = c.getNextQuestion();
       expect(type, ChatRequestType.guidingQuestion);
       expect(difficulty, QuestionDifficulty.easy);
@@ -149,7 +157,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       const practice = {
@@ -181,7 +189,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       expect(await c.guidingIsComplete(0.5), isFalse);
       expect(await c.guidingIsComplete(0.4), isTrue);
 
@@ -202,7 +210,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
       // Clear earlier captures.
       clearInteractions(progress);
@@ -224,7 +232,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       c.getNextQuestion();
@@ -246,7 +254,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       c.getNextQuestion();
@@ -273,7 +281,7 @@ void main() {
       selectedChild.value = makeGoal('child-1', title: 'Variabelen');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       // Drive question types so the streak hits 2 distinct types.
@@ -311,7 +319,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       // Force the same question type three times.
@@ -333,7 +341,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       Future<bool> correctOn(ChatRequestType type) async {
@@ -375,7 +383,7 @@ void main() {
         ],
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       await answerCorrect(c, ChatRequestType.mcQuestion);
@@ -414,7 +422,7 @@ void main() {
         ),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
       await answerCorrect(c, ChatRequestType.mcQuestion);
       await answerCorrect(c, ChatRequestType.explainCodeQuestion);
@@ -467,7 +475,7 @@ void main() {
         ),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       // Practice-master child-1 → arms a diagnostic on child-2.
@@ -527,7 +535,7 @@ void main() {
         if (p.progress >= 1.0) mastered.add(p.goalID);
       });
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       // Master child-1.
@@ -571,7 +579,7 @@ void main() {
         (_) async => [Progress(goalID: 'child-1', progress: 1.0)],
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       await answerCorrect(c, ChatRequestType.mcQuestion);
@@ -603,7 +611,7 @@ void main() {
       selectedChild.value = makeGoal('child-1');
       currentProgress.value = 0.0;
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
 
       for (var i = 0; i < 4; i++) {
@@ -642,7 +650,7 @@ void main() {
         (_) async => Progress(goalID: 'child-2', progress: 0.0),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
       clearInteractions(progress);
       when(() => progress.upsert(any<Progress>(), quality: any(named: 'quality'), isWarmUp: any(named: 'isWarmUp'), recordHistory: any(named: 'recordHistory'))).thenAnswer((_) async {});
@@ -708,7 +716,7 @@ void main() {
         sessionAge: const Duration(days: 30),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
 
       expect(c.isInWarmup, isFalse);
@@ -725,7 +733,7 @@ void main() {
         sessionAge: const Duration(hours: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
 
       expect(c.isInWarmup, isFalse);
@@ -748,7 +756,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -791,7 +799,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -817,7 +825,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -836,7 +844,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -859,7 +867,7 @@ void main() {
         sessionAge: const Duration(days: 30),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -886,7 +894,7 @@ void main() {
         sessionAge: const Duration(days: 30),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -912,7 +920,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -952,7 +960,7 @@ void main() {
         sessionAge: const Duration(days: 1),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       expect(c.isInWarmup, isTrue);
 
@@ -986,7 +994,7 @@ void main() {
       );
       // child-2 has no persisted doc — getByGoalId default returns null.
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await completeGuiding(c);
       await answerCorrect(c, ChatRequestType.mcQuestion);
       await answerCorrect(c, ChatRequestType.explainCodeQuestion);
@@ -1011,7 +1019,7 @@ void main() {
       preferredChild.value = makeGoal('child-1');
       preferredRoot.value = makeGoal('root-1');
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
 
       final (type, _) = c.getNextQuestion();
@@ -1043,7 +1051,7 @@ void main() {
         ),
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
 
       // Difficulty is recovered, so the next practice question is medium.
@@ -1107,7 +1115,7 @@ void main() {
         (_) async => ['variables', 'loops', 'conditionals'],
       );
 
-      final c = Conductor();
+      final c = Conductor(deps: makeDeps());
       await c.setTarget();
       // Seed `_lastQuality` so attributions inherit a real value.
       c.getNextQuestion();

@@ -5,12 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('SplashService', () {
     late SplashService service;
+    late GoalSplashState? tracked;
 
-    setUp(() => service = SplashService());
-    tearDown(() => service.dispose());
+    setUp(() {
+      tracked = null;
+      service = SplashService(onStateChanged: (s) => tracked = s);
+    });
 
     test('state is null initially', () {
-      expect(service.state.value, isNull);
+      expect(tracked, isNull);
     });
 
     test('showGoalReached sets correct state fields', () {
@@ -18,19 +21,18 @@ void main() {
         goalTitle: 'Loops',
         description: 'You understand for loops!',
       );
-      final state = service.state.value;
-      expect(state, isNotNull);
-      expect(state!.title, 'Goal reached!');
-      expect(state.goalTitle, 'Loops');
-      expect(state.description, 'You understand for loops!');
-      expect(state.message, isA<String>());
-      expect(state.message, isNotEmpty);
+      expect(tracked, isNotNull);
+      expect(tracked!.title, 'Goal reached!');
+      expect(tracked!.goalTitle, 'Loops');
+      expect(tracked!.description, 'You understand for loops!');
+      expect(tracked!.message, isA<String>());
+      expect(tracked!.message, isNotEmpty);
     });
 
     test('hide clears state', () {
       service.showGoalReached(goalTitle: 'X', description: 'Y');
       service.hide();
-      expect(service.state.value, isNull);
+      expect(tracked, isNull);
     });
 
     test('randomPhrase returns a non-empty string', () {
@@ -44,9 +46,9 @@ void main() {
           description: 'Variables!',
           duration: const Duration(seconds: 5),
         );
-        expect(service.state.value, isNotNull);
+        expect(tracked, isNotNull);
         async.elapse(const Duration(seconds: 6));
-        expect(service.state.value, isNull);
+        expect(tracked, isNull);
       });
     });
 
@@ -65,7 +67,7 @@ void main() {
         );
         async.elapse(const Duration(seconds: 6));
         // First timer should not clear goal B
-        expect(service.state.value?.goalTitle, 'B');
+        expect(tracked?.goalTitle, 'B');
       });
     });
   });

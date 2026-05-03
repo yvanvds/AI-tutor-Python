@@ -1,9 +1,10 @@
 import 'dart:ui';
 
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' hide Consumer;
 
 /// The message composer widget positioned at the bottom of the chat screen.
 ///
@@ -91,12 +92,14 @@ class _ComposerContinueWidgetState extends State<ComposerContinueWidget> {
                       ) ??
                       EdgeInsets.only(bottom: bottomSafeArea))
                 : (widget.padding ?? EdgeInsets.zero),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                DataService.tutor.moveToFollowUp();
-              },
-              icon: const Icon(Icons.next_plan),
-              label: const Text('Continue'),
+            child: Consumer(
+              builder: (context, ref, _) => ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(tutorServiceProvider.notifier).moveToFollowUp();
+                },
+                icon: const Icon(Icons.next_plan),
+                label: const Text('Continue'),
+              ),
             ),
           ),
         ],
@@ -128,7 +131,6 @@ class _ComposerContinueWidgetState extends State<ComposerContinueWidget> {
       final bottomSafeArea = MediaQuery.of(context).padding.bottom;
 
       context.read<ComposerHeightNotifier>().setHeight(
-        // only set real height of the composer, ignoring safe area
         widget.handleSafeArea == true ? height - bottomSafeArea : height,
       );
     }

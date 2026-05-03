@@ -17,7 +17,6 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:flutter/material.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -116,12 +115,13 @@ Stream<T> pollingStream<T>(
 }
 
 /// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`.
-Future<void> resetAuthAndCacheAndExit() async {
-  try {
-    await DataService.auth.signOut();
-  } catch (e) {
-    // Best-effort — going nuclear regardless.
-    debugPrint('resetAuthAndCacheAndExit: signOut threw: $e');
+Future<void> resetAuthAndCacheAndExit([Future<void> Function()? signOut]) async {
+  if (signOut != null) {
+    try {
+      await signOut();
+    } catch (e) {
+      debugPrint('resetAuthAndCacheAndExit: signOut threw: $e');
+    }
   }
 
   // No local Cosmos response cache today. If/when we add one, wipe it here.

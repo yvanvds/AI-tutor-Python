@@ -1,19 +1,21 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
 import 'package:ai_tutor_python/widgets/chips_editor.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class GoalForm extends StatefulWidget {
+class GoalForm extends ConsumerStatefulWidget {
   const GoalForm({super.key, required this.goal});
   final Goal goal;
 
   @override
-  State<GoalForm> createState() => GoalFormState();
+  ConsumerState<GoalForm> createState() => GoalFormState();
 }
 
-class GoalFormState extends State<GoalForm> {
+class GoalFormState extends ConsumerState<GoalForm> {
   late final TextEditingController _title;
   late final TextEditingController _desc;
   bool _optional = false;
@@ -45,6 +47,7 @@ class GoalFormState extends State<GoalForm> {
 
   @override
   Widget build(BuildContext context) {
+    final svc = ref.read(goalsServiceProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit goal'),
@@ -57,7 +60,9 @@ class GoalFormState extends State<GoalForm> {
           ),
           IconButton(
             tooltip: 'Close',
-            onPressed: () => DataService.goals.editorSelectedGoal.value = null,
+            onPressed: () => ref
+                .read(goalSelectionProvider.notifier)
+                .setEditorSelectedGoal(null),
             icon: const Icon(Icons.close),
           ),
         ],
@@ -71,21 +76,17 @@ class GoalFormState extends State<GoalForm> {
               labelText: 'Title',
               border: OutlineInputBorder(),
             ),
-            onSubmitted: (t) => DataService.goals.updateTitle(
+            onSubmitted: (t) => svc.updateTitle(
               widget.goal.id,
               t.trim().isEmpty ? 'Untitled' : t.trim(),
             ),
-            onChanged:
-                (
-                  t,
-                ) {}, // explicit save on submit; we already have inline title elsewhere
+            onChanged: (t) {},
           ),
           const SizedBox(height: 12),
           widget.goal.parentId != null
               ? ParentField(goal: widget.goal)
               : const SizedBox.shrink(),
           const SizedBox(height: 12),
-
           TextField(
             controller: _desc,
             maxLines: 3,
@@ -93,24 +94,22 @@ class GoalFormState extends State<GoalForm> {
               labelText: 'Describe this goal for students.',
               border: OutlineInputBorder(),
             ),
-            onChanged: (t) => DataService.goals.updateDescription(
+            onChanged: (t) => svc.updateDescription(
               widget.goal.id,
               t.isEmpty ? null : t,
             ),
           ),
           const SizedBox(height: 12),
-
           SwitchListTile(
             value: _optional,
             onChanged: (v) {
               setState(() => _optional = v);
-              DataService.goals.updateOptional(widget.goal.id, v);
+              svc.updateOptional(widget.goal.id, v);
             },
             title: const Text('Optional'),
             contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: 12),
-
           const SizedBox(height: 12),
           widget.goal.parentId != null
               ? ChipsEditor(
@@ -118,16 +117,14 @@ class GoalFormState extends State<GoalForm> {
                   values: widget.goal.suggestions,
                   hintText: 'Type a suggestion and hit Enter',
                   onChanged: (vals) =>
-                      DataService.goals.updateSuggestions(widget.goal.id, vals),
+                      svc.updateSuggestions(widget.goal.id, vals),
                 )
               : ChipsEditor(
                   label: 'Known Concepts After Completion',
                   values: widget.goal.knownConcepts,
                   hintText: 'Type a concept and hit Enter',
-                  onChanged: (vals) => DataService.goals.updateKnownConcepts(
-                    widget.goal.id,
-                    vals,
-                  ),
+                  onChanged: (vals) =>
+                      svc.updateKnownConcepts(widget.goal.id, vals),
                 ),
           const SizedBox(height: 12),
         ],
@@ -138,18 +135,21 @@ class GoalFormState extends State<GoalForm> {
   Future<void> _handleDelete(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final id = widget.goal.id;
+    final svc = ref.read(goalsServiceProvider);
 
-    final count = await DataService.goals.countDescendants(id);
+    final count = await svc.countDescendants(id);
     if (!context.mounted) return;
 
     final confirmed = await _confirmDelete(context, count);
     if (!confirmed) return;
 
-    final backup = await DataService.goals.backupSubtree(id);
-    await DataService.goals.deleteSubtree(id);
+    final backup = await svc.backupSubtree(id);
+    await svc.deleteSubtree(id);
 
     if (mounted) {
-      DataService.goals.editorSelectedGoal.value = null;
+      ref
+          .read(goalSelectionProvider.notifier)
+          .setEditorSelectedGoal(null);
     }
 
     showUndoSnackBar(
@@ -157,9 +157,7 @@ class GoalFormState extends State<GoalForm> {
       message: count == 0
           ? 'Deleted "${widget.goal.title}".'
           : 'Deleted "${widget.goal.title}" (+$count).',
-      onUndo: () async {
-        await DataService.goals.restoreSubtree(backup);
-      },
+      onUndo: () async => svc.restoreSubtree(backup),
     );
   }
 
@@ -171,8 +169,8 @@ class GoalFormState extends State<GoalForm> {
           title: const Text('Delete goal'),
           content: Text(
             count == 0
-                ? 'Delete “${widget.goal.title}”?'
-                : 'Delete “${widget.goal.title}” and its $count descendant(s)?',
+                ? 'Delete "${widget.goal.title}"?'
+                : 'Delete "${widget.goal.title}" and its $count descendant(s)?',
           ),
           actions: [
             TextButton(

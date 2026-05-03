@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class GoalSplashState {
   final String title;
@@ -17,10 +18,13 @@ class GoalSplashState {
 }
 
 class SplashService {
-  final ValueNotifier<GoalSplashState?> _state =
-      ValueNotifier<GoalSplashState?>(null);
+  SplashService({void Function(GoalSplashState?)? onStateChanged})
+      : _onStateChanged = onStateChanged;
 
-  ValueListenable<GoalSplashState?> get state => _state;
+  final void Function(GoalSplashState?)? _onStateChanged;
+  GoalSplashState? _current;
+
+  final _random = Random();
 
   /// Call this from TutorService when a goal is reached.
   void showGoalReached({
@@ -28,23 +32,27 @@ class SplashService {
     required String description,
     Duration duration = const Duration(seconds: 10),
   }) {
-    _state.value = GoalSplashState(
+    final splash = GoalSplashState(
       title: 'Goal reached!',
       goalTitle: goalTitle,
       description: description,
       message: randomPhrase(),
     );
+    _current = splash;
+    _onStateChanged?.call(splash);
 
-    // Auto-hide after [duration].
     Future.delayed(duration, () {
-      // Only clear if still showing the same splash (avoid race conditions)
-      if (_state.value?.goalTitle == goalTitle) {
-        _state.value = null;
+      if (_current?.goalTitle == goalTitle) {
+        _current = null;
+        _onStateChanged?.call(null);
       }
     });
   }
 
-  final _random = Random();
+  void hide() {
+    _current = null;
+    _onStateChanged?.call(null);
+  }
 
   /// 25 hilariously over-the-top Dutch encouragements
   static const List<String> _phrases = [
@@ -70,19 +78,18 @@ class SplashService {
     "Wiskundigen huilen van ontroering.",
     "Python zelf fluistert: 'thank you, master'.",
     "Dit is geen succes meer. Dit is folklore.",
-    "NASA belt: ‘kun je bij ons komen debuggen?’",
+    "NASA belt: 'kun je bij ons komen debuggen?'",
     "De AI-tutor heeft besloten jou voortaan te tutoren.",
     "Stop! Je bent te goed. Geef de rest een kans.",
   ];
 
-  /// Pick a random encouragement phrase
-  String randomPhrase() {
-    return _phrases[_random.nextInt(_phrases.length)];
-  }
-
-  void hide() => _state.value = null;
-
-  void dispose() {
-    _state.dispose();
-  }
+  String randomPhrase() => _phrases[_random.nextInt(_phrases.length)];
 }
+
+final splashStateProvider = StateProvider<GoalSplashState?>((_) => null);
+
+final splashServiceProvider = Provider<SplashService>((ref) {
+  return SplashService(
+    onStateChanged: (s) => ref.read(splashStateProvider.notifier).state = s,
+  );
+});

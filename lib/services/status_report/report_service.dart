@@ -5,23 +5,31 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'status_report.dart';
 
 class ReportService {
-  ReportService({CosmosContainer? container}) : _containerOverride = container;
+  ReportService({
+    CosmosContainer? container,
+    required String? Function() getUid,
+    String? Function()? getCurrentChildGoalId,
+  })  : _containerOverride = container,
+        _getUid = getUid,
+        _getCurrentChildGoalId = getCurrentChildGoalId;
 
   final CosmosContainer? _containerOverride;
+  final String? Function() _getUid;
+  final String? Function()? _getCurrentChildGoalId;
 
   CosmosContainer get _container =>
       _containerOverride ?? CosmosPaths.statusReports();
 
   String get _uid {
-    final uid = DataService.auth.currentUser.value?.oid;
-    if (uid == null) {
-      throw StateError('No authenticated user.');
-    }
+    final uid = _getUid();
+    if (uid == null) throw StateError('No authenticated user.');
     return uid;
   }
 
@@ -76,9 +84,9 @@ class ReportService {
   /// Upsert a status report for the currently selected child goal.
   /// No-op if no child goal is selected.
   Future<void> updateForCurrentChildGoal(String newReport) async {
-    final goal = DataService.goals.selectedChildGoal.value;
-    if (goal == null) return;
-    await upsert(StatusReport(goalID: goal.id, statusReport: newReport));
+    final goalId = _getCurrentChildGoalId?.call();
+    if (goalId == null) return;
+    await upsert(StatusReport(goalID: goalId, statusReport: newReport));
   }
 
   /// Upsert a status report against an explicit subgoal id. Used by the
@@ -106,3 +114,11 @@ class ReportService {
     return StatusReport.fromCosmos(doc);
   }
 }
+
+final reportServiceProvider = Provider<ReportService>((ref) {
+  return ReportService(
+    getUid: () => ref.read(authServiceProvider)?.oid,
+    getCurrentChildGoalId: () =>
+        ref.read(goalSelectionProvider).activeChildGoal?.id,
+  );
+});

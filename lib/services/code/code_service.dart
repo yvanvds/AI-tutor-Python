@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:highlight/languages/python.dart';
 
 class CodeService {
@@ -22,3 +23,9 @@ class CodeService {
     controller.dispose();
   }
 }
+
+final codeServiceProvider = Provider<CodeService>((ref) {
+  final s = CodeService();
+  ref.onDispose(s.dispose);
+  return s;
+});

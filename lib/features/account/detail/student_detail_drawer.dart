@@ -3,27 +3,21 @@ import 'package:ai_tutor_python/features/account/detail/status_reports_section.d
 import 'package:ai_tutor_python/features/account/detail/student_status_summary.dart';
 import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Right-hand peek panel for one student. Shown via the accounts page on
-/// row tap. Loads:
-///
-/// - The student's progress docs (per-subgoal table + status summary).
-/// - The student's status reports (collapsible per-subgoal section).
-/// - The student's progress history (per-root-goal line chart).
-///
-/// Each section streams independently so the drawer can progressively
-/// reveal content rather than block on the slowest read.
-class StudentDetailDrawer extends StatelessWidget {
+/// Right-hand peek panel for one student.
+class StudentDetailDrawer extends ConsumerWidget {
   const StudentDetailDrawer({super.key, required this.account});
 
   final Account account;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final mediaWidth = MediaQuery.of(context).size.width;
     final width = (mediaWidth * 0.45).clamp(380.0, 720.0);
@@ -38,11 +32,12 @@ class StudentDetailDrawer extends StatelessWidget {
             const Divider(height: 1),
             Expanded(
               child: StreamBuilder<List<Goal>>(
-                stream: DataService.goals.streamAllGoals(),
+                stream: ref.read(goalsServiceProvider).streamAllGoals(),
                 builder: (context, goalsSnap) {
                   final goals = goalsSnap.data ?? const <Goal>[];
                   return StreamBuilder<List<Progress>>(
-                    stream: DataService.progress
+                    stream: ref
+                        .read(progressServiceProvider)
                         .watchProgressForUser(account.uid),
                     builder: (context, progSnap) {
                       final progress = progSnap.data ?? const <Progress>[];
@@ -113,10 +108,7 @@ class _Header extends StatelessWidget {
                   style: theme.textTheme.titleMedium,
                 ),
                 if (account.fullName.trim().isNotEmpty)
-                  Text(
-                    account.email,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(account.email, style: theme.textTheme.bodySmall),
               ],
             ),
           ),

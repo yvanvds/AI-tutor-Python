@@ -18,14 +18,26 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/status_report/status_report.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
+/// Minimal AccountService subclass that returns a fixed accounts stream
+/// without touching auth or Cosmos.
+class _FakeAccountService extends AccountService {
+  _FakeAccountService(this._accounts);
+  final List<Account> _accounts;
+
+  @override
+  Account? build() => null;
+
+  @override
+  Stream<List<Account>> streamAllAccounts() => Stream.value(_accounts);
+}
+
 void main() {
-  late MockAccountService accountSvc;
   late MockProgressService progressSvc;
   late MockGoalsService goalsSvc;
   late MockReportService reportSvc;
@@ -85,13 +97,10 @@ void main() {
   };
 
   setUp(() {
-    accountSvc = MockAccountService();
     progressSvc = MockProgressService();
     goalsSvc = MockGoalsService();
     reportSvc = MockReportService();
 
-    when(() => accountSvc.streamAllAccounts())
-        .thenAnswer((_) => Stream<List<Account>>.value(accounts));
     when(() => progressSvc.watchAllProgress()).thenAnswer(
       (_) => Stream<Map<String, List<Progress>>>.value(progressByUid),
     );
@@ -112,20 +121,21 @@ void main() {
         .thenAnswer((_) => Stream<List<Goal>>.value(goals));
     when(() => reportSvc.watchStatusReportsForUser(any<String>()))
         .thenAnswer((_) => Stream<List<StatusReport>>.value(const []));
-
-    registerMock<AccountService>(accountSvc);
-    registerMock<ProgressService>(progressSvc);
-    registerMock<GoalsService>(goalsSvc);
-    registerMock<ReportService>(reportSvc);
-  });
-
-  tearDown(() async {
-    await resetLocator();
   });
 
   Future<void> pump(WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: AccountsPage()),
+      ProviderScope(
+        overrides: [
+          accountServiceProvider.overrideWith(
+            () => _FakeAccountService(accounts),
+          ),
+          progressServiceProvider.overrideWithValue(progressSvc),
+          goalsServiceProvider.overrideWithValue(goalsSvc),
+          reportServiceProvider.overrideWithValue(reportSvc),
+        ],
+        child: const MaterialApp(home: AccountsPage()),
+      ),
     );
     await tester.pump();
   }

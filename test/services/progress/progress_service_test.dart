@@ -1,8 +1,7 @@
 // 2.2 — Tests `ProgressService`. The service is a thin wrapper over a
 // Cosmos container with composite doc-id `${uid}_${goalId}` and partition
-// key = uid. We inject a `MockCosmosContainer` via the constructor and a
-// `MockAuthService` via the locator (the service reads `currentUser.value
-// .oid` to compute uid).
+// key = uid. We inject a `MockCosmosContainer` via the constructor and
+// a `getUid` closure that reads from a local ValueNotifier.
 //
 // Step 4 added a `progress_history` time-series container whose writes
 // happen inside `upsert` whenever the persisted progress value actually
@@ -19,7 +18,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../helpers/locator.dart';
 import '../../helpers/mocks.dart';
 
 const _uid = 'oid-123';
@@ -27,7 +25,6 @@ const _uid = 'oid-123';
 void main() {
   late MockCosmosContainer container;
   late MockCosmosContainer history;
-  late MockAuthService auth;
   late ValueNotifier<AccountIdentity?> currentUser;
 
   setUpAll(() {
@@ -37,7 +34,6 @@ void main() {
   setUp(() {
     container = MockCosmosContainer();
     history = MockCosmosContainer();
-    auth = MockAuthService();
     currentUser = ValueNotifier<AccountIdentity?>(
       const AccountIdentity(
         oid: _uid,
@@ -48,8 +44,6 @@ void main() {
         isTeacher: false,
       ),
     );
-    when(() => auth.currentUser).thenReturn(currentUser);
-    registerMock<AuthService>(auth);
 
     // Default stubs that most tests share. Individual groups override as
     // needed.
@@ -73,14 +67,14 @@ void main() {
     ).thenAnswer((_) async => <String, dynamic>{});
   });
 
-  tearDown(() async {
-    await resetLocator();
+  tearDown(() {
     currentUser.dispose();
   });
 
   ProgressService build() => ProgressService(
         container: container,
         historyContainer: history,
+        getUid: () => currentUser.value?.oid,
       );
 
   group('uid resolution', () {

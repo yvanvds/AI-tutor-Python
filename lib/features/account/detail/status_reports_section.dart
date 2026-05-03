@@ -1,12 +1,11 @@
-import 'package:ai_tutor_python/services/data_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/status_report/status_report.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Collapsible per-subgoal AI status reports for one student. Section header
-/// is always visible; each subgoal that has a report renders as an
-/// `ExpansionTile`. Most-recently-updated reports come first.
-class StatusReportsSection extends StatelessWidget {
+/// Collapsible per-subgoal AI status reports for one student.
+class StatusReportsSection extends ConsumerWidget {
   const StatusReportsSection({
     super.key,
     required this.uid,
@@ -17,10 +16,10 @@ class StatusReportsSection extends StatelessWidget {
   final List<Goal> goals;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return StreamBuilder<List<StatusReport>>(
-      stream: DataService.report.watchStatusReportsForUser(uid),
+      stream: ref.read(reportServiceProvider).watchStatusReportsForUser(uid),
       builder: (context, snap) {
         if (snap.hasError) {
           return _section(
@@ -64,10 +63,7 @@ class StatusReportsSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final r in reports)
-                _ReportTile(
-                  report: r,
-                  goal: goalById[r.goalID],
-                ),
+                _ReportTile(report: r, goal: goalById[r.goalID]),
             ],
           ),
         );

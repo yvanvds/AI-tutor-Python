@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 const int kBufferCapacity = 200;
@@ -258,3 +259,7 @@ class DebugSessionRecorder {
     }
   }
 }
+
+final debugServiceProvider = Provider<DebugSessionRecorder>(
+  (_) => DebugSessionRecorder(),
+);

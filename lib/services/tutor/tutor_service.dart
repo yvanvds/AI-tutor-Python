@@ -1,6 +1,19 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/sound/sound_service.dart';
+import 'package:ai_tutor_python/services/splash/splash_service.dart';
+import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -9,7 +22,7 @@ import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum TutorState { idle, working, hasFollowUp }
 
@@ -21,84 +34,136 @@ class _RequestInput {
   ]);
   final String input;
   final PreviousInputs history;
-
-  /// Some request types (e.g. status_summary) don't produce a student-
-  /// facing message, so streaming them just adds visual noise. Those use
-  /// the non-streaming path.
   final bool streamable;
 }
 
-class TutorService {
-  final ValueNotifier<TutorState> state = ValueNotifier<TutorState>(
-    TutorState.idle,
-  );
-
+class TutorService extends Notifier<TutorState> {
   TutorService({
-    OpenaiConnector? connector,
-    Conductor? conductor,
-    InstructionGenerator? instructionGenerator,
-  }) {
-    _connector = connector ?? OpenaiConnector();
-    _conductor = conductor ?? Conductor();
-    _instructionGeneratorOverride = instructionGenerator;
-    var lastState = state.value;
-    state.addListener(() {
-      final next = state.value;
-      DataService.debug.recordEvent('tutor.state_change', {
-        'from': lastState.name,
-        'to': next.name,
-      });
-      lastState = next;
-    });
-  }
-  bool _initialized = false;
+    OpenaiConnector? connectorOverride,
+    Conductor? conductorOverride,
+    InstructionGenerator? instructionGeneratorOverride,
+  })  : _connectorOverride = connectorOverride,
+        _conductorOverride = conductorOverride,
+        _instructionGeneratorOverride = instructionGeneratorOverride;
 
-  InstructionGenerator? _instructionGeneratorOverride;
-
-  InstructionGenerator get _instructionGenerator =>
-      _instructionGeneratorOverride ?? InstructionGenerator();
+  final OpenaiConnector? _connectorOverride;
+  final Conductor? _conductorOverride;
+  final InstructionGenerator? _instructionGeneratorOverride;
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
+  late final ChatService _chat;
+  late final DebugSessionRecorder _debug;
 
+  bool _initialized = false;
   String _currentExerciseType = '';
-
   String? _nextMessage;
   String? _nextCode;
-
-  // Set by [_runStatusReportFor] for the duration of a single status
-  // request so [StatusSummaryHandler] can write the report against the
-  // just-mastered subgoal instead of the (already advanced) current one.
   String? _statusReportGoalIdOverride;
 
   static const int _maxRetriesPerRequest = 1;
   int _retriesLeft = 0;
+
+  InstructionGenerator get _instructionGenerator =>
+      _instructionGeneratorOverride ?? InstructionGenerator();
+
+  @override
+  TutorState build() {
+    _chat = ref.read(chatServiceProvider);
+    _debug = ref.read(debugServiceProvider);
+    _connector = _connectorOverride ?? OpenaiConnector(
+      onRecordRawOutput: _debug.recordRawOutput,
+      onRecordStreamFailure: _debug.recordStreamFailure,
+      getConfig: () => ref.read(globalConfigServiceProvider),
+    );
+    _conductor = _conductorOverride ??
+        Conductor(deps: _buildConductorDeps());
+
+    ref.listen<AccountIdentity?>(
+      authServiceProvider,
+      (prev, next) {
+        if (next == null) {
+          _initialized = false;
+          return;
+        }
+        if (!_initialized) unawaited(Future.microtask(initializeSession));
+      },
+      fireImmediately: true,
+    );
+
+    return TutorState.idle;
+  }
+
+  ConductorDeps _buildConductorDeps() {
+    return ConductorDeps(
+      getGoalSelection: () => ref.read(goalSelectionProvider),
+      setSelectedRoot: (g) =>
+          ref.read(goalSelectionProvider.notifier).setSelectedRoot(g),
+      setSelectedChild: (g) =>
+          ref.read(goalSelectionProvider.notifier).setSelectedChild(g),
+      clearPreferred: () {
+        ref.read(goalSelectionProvider.notifier).setPreferredRoot(null);
+        ref.read(goalSelectionProvider.notifier).setPreferredChild(null);
+      },
+      getRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
+      getChildren: (id) =>
+          ref.read(goalsServiceProvider).getChildrenOnce(id),
+      getKnownConceptsInScope: (root, {cachedRoots}) =>
+          ref.read(goalsServiceProvider).getKnownConceptsInScope(
+            root,
+            cachedRoots: cachedRoots,
+          ),
+      upsertProgress: (p, {quality, isWarmUp = false, recordHistory = true}) =>
+          ref.read(progressServiceProvider).upsert(
+            p,
+            quality: quality,
+            isWarmUp: isWarmUp,
+            recordHistory: recordHistory,
+          ),
+      getProgressAll: () => ref.read(progressServiceProvider).getAll(),
+      getProgressByGoalId: (id) =>
+          ref.read(progressServiceProvider).getByGoalId(id),
+      setCurrentProgress: (v) =>
+          ref.read(progressServiceProvider).setCurrentProgress(v),
+      addSystemMessage: _chat.addSystemMessage,
+      recordDebugEvent: _debug.recordEvent,
+      playCorrectAnswer: () =>
+          unawaited(ref.read(soundServiceProvider).correctAnswer()),
+      playGuidingComplete: () =>
+          unawaited(ref.read(soundServiceProvider).guidingComplete()),
+      playGoalReached: () =>
+          unawaited(ref.read(soundServiceProvider).playGoalReached()),
+      showGoalReached: ({required goalTitle, required description}) =>
+          ref.read(splashServiceProvider).showGoalReached(
+            goalTitle: goalTitle,
+            description: description,
+          ),
+    );
+  }
 
   // ---- Public API -----------------------------------------------------------
 
   Future<void> initializeSession({bool force = false}) async {
     if (_initialized && !force) return;
     _initialized = true;
-    DataService.chat.clear();
+    _chat.clear();
 
     if (force) {
-      final user = DataService.auth.currentUser.value;
-      DataService.debug.resetSession(
+      final user = ref.read(authServiceProvider);
+      _debug.resetSession(
         uid: user?.oid,
         email: user?.email,
-        modelName: DataService.globalConfig.cachedConfig?.model,
+        modelName: ref.read(globalConfigServiceProvider)?.model,
       );
     }
 
     await _conductor.setTarget();
 
     final newQuestion = _conductor.getNextQuestion();
-
     if (newQuestion.$1 == ChatRequestType.noResult) {
-      DataService.chat.addSystemMessage(
-        "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
+      _chat.addSystemMessage(
+        'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!',
       );
-      return;
     }
   }
 
@@ -108,14 +173,20 @@ class TutorService {
     String? code,
     String? prompt,
   }) async {
-    if (state.value != TutorState.idle) return;
-    state.value = TutorState.working;
+    if (state != TutorState.idle) return;
+    state = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
 
     var turnOpened = false;
     try {
+      final selection = ref.read(goalSelectionProvider);
       final instructions = await _instructionGenerator.generateInstructions(
         type,
+        goalSelection: selection,
+        cachedInstructions: ref.read(instructionsServiceProvider),
+        fetchInstructions: () =>
+            ref.read(instructionsServiceProvider.notifier).getAll(),
+        fetchRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
       );
 
       final request = _buildRequestInput(
@@ -125,23 +196,23 @@ class TutorService {
         prompt: prompt,
       );
       if (request == null) {
-        state.value = TutorState.idle;
+        state = TutorState.idle;
         return;
       }
 
-      DataService.debug.beginTurn(
+      _debug.beginTurn(
         requestType: type.name,
         currentExerciseTypeAtStart: _currentExerciseType,
-        tutorStateAtStart: state.value.name,
-        selectedRootGoalId: DataService.goals.selectedRootGoal.value?.id,
-        selectedChildGoalId: DataService.goals.selectedChildGoal.value?.id,
-        preferredRootGoalId: DataService.goals.preferredRootGoal.value?.id,
-        preferredChildGoalId: DataService.goals.preferredChildGoal.value?.id,
+        tutorStateAtStart: state.name,
+        selectedRootGoalId: selection.selectedRoot?.id,
+        selectedChildGoalId: selection.selectedChild?.id,
+        preferredRootGoalId: selection.preferredRoot?.id,
+        preferredChildGoalId: selection.preferredChild?.id,
         streamable: request.streamable,
         previousInputsMode: request.history.name,
       );
       turnOpened = true;
-      DataService.debug.recordRequestPayload(
+      _debug.recordRequestPayload(
         userInput: request.input,
         instructions: instructions,
         instructionsDocId: type.name,
@@ -164,15 +235,11 @@ class TutorService {
         await _processNonStreamingResult(result);
       }
     } catch (e) {
-      DataService.chat.failStream();
-      _addSystemMessage('Er ging iets mis bij de tutor: $e');
+      _chat.failStream();
+      _chat.addSystemMessage('Er ging iets mis bij de tutor: $e');
     } finally {
-      if (turnOpened) {
-        DataService.debug.endTurn();
-      }
-      if (state.value == TutorState.working) {
-        state.value = TutorState.idle;
-      }
+      if (turnOpened) _debug.endTurn();
+      if (state == TutorState.working) state = TutorState.idle;
     }
   }
 
@@ -233,7 +300,7 @@ class TutorService {
         return _RequestInput(
           QuestionFormatter.status(),
           PreviousInputs.includeAll,
-          false, // not streamable: result is stored, not shown
+          false,
         );
 
       case ChatRequestType.noResult:
@@ -255,13 +322,13 @@ class TutorService {
         QuestionFormatter.completeCodeQuestion(difficulty!),
       ChatRequestType.writeCodeQuestion =>
         QuestionFormatter.writeCodeQuestion(difficulty!),
-      _ => "",
+      _ => '',
     };
     return _RequestInput(input, PreviousInputs.newSession);
   }
 
   Future<void> _runStream(Stream<StreamChunk> Function() open) async {
-    DataService.chat.startStream();
+    _chat.startStream();
     final accumulated = StringBuffer();
     ChatResponse? completed;
     StreamFailed? failed;
@@ -270,7 +337,7 @@ class TutorService {
       switch (chunk) {
         case StreamTextDelta(:final text):
           accumulated.write(text);
-          DataService.chat.updateStream(accumulated.toString());
+          _chat.updateStream(accumulated.toString());
         case StreamCompleted(:final response):
           completed = response;
         case StreamFailed():
@@ -279,87 +346,86 @@ class TutorService {
     }
 
     if (failed != null) {
-      DataService.chat.failStream();
-      _addSystemMessage('Er ging iets mis bij de tutor: ${failed.message}');
+      _chat.failStream();
+      _chat.addSystemMessage('Er ging iets mis bij de tutor: ${failed.message}');
       await _maybeRetryStream();
       return;
     }
 
-    final response = completed ??
-        AIResponseParser.parse(accumulated.toString());
+    final response = completed ?? AIResponseParser.parse(accumulated.toString());
     _connector.addResponse(response);
+    _chat.completeStream(_finalTextFor(response, accumulated));
 
-    DataService.chat.completeStream(_finalTextFor(response, accumulated));
-
-    final dispatched = await dispatchResponse(
-      response,
-      _streamingContext(),
-    );
+    final dispatched = await dispatchResponse(response, _streamingContext());
     if (!dispatched) {
-      _addTutorMessage('Onbekend antwoord ontvangen.');
+      _chat.addTutorMessage('Onbekend antwoord ontvangen.');
       await _maybeRetryStream();
     }
   }
 
-  /// What we actually want to leave on screen after the stream finalises.
-  /// For most types the streamed text already matches the model's `prompt`
-  /// field. For [ErrorResponse] the model wrote the error in TEXT, but we
-  /// don't want it lingering as a tutor message — clear it; the dispatcher
-  /// will add a system message.
   String _finalTextFor(ChatResponse response, StringBuffer accumulated) {
     if (response is ErrorResponse) return '';
     return accumulated.toString();
   }
 
-  /// Build a TutorContext whose first `addTutorMessage` is a no-op (the
-  /// prompt was already shown via the stream). Subsequent calls — for
-  /// example multiple_choice options or follow-up text — render normally.
   TutorContext _streamingContext() {
     var firstSuppressed = false;
-    return TutorContext(
-      conductor: _conductor,
-      startNewCode: _startNewCode,
-      addTutorMessage: (message) {
+    return _buildTutorContext(
+      addTutorMessageOverride: (message) {
         if (!firstSuppressed) {
           firstSuppressed = true;
           return;
         }
-        _addTutorMessage(message);
+        _chat.addTutorMessage(message);
       },
-      addSystemMessage: _addSystemMessage,
-      setExerciseType: _trackedSetExerciseType,
-      setFollowUp: _trackedSetFollowUp,
-      requestExercise: requestExercise,
-      maybeRetry: _maybeRetryStream,
+      maybeRetryOverride: _maybeRetryStream,
+      statusGoalIdOverride: null,
     );
   }
 
   TutorContext _nonStreamingContext() {
+    return _buildTutorContext(
+      addTutorMessageOverride: null,
+      maybeRetryOverride: _maybeRetry,
+      statusGoalIdOverride: _statusReportGoalIdOverride,
+    );
+  }
+
+  TutorContext _buildTutorContext({
+    required void Function(String)? addTutorMessageOverride,
+    required Future<void> Function() maybeRetryOverride,
+    required String? statusGoalIdOverride,
+  }) {
+    final report = ref.read(reportServiceProvider);
     return TutorContext(
       conductor: _conductor,
-      startNewCode: _startNewCode,
-      addTutorMessage: _addTutorMessage,
-      addSystemMessage: _addSystemMessage,
+      startNewCode: (code) => ref.read(codeServiceProvider).setText(code),
+      addTutorMessage:
+          addTutorMessageOverride ?? _chat.addTutorMessage,
+      addSystemMessage: _chat.addSystemMessage,
       setExerciseType: _trackedSetExerciseType,
       setFollowUp: _trackedSetFollowUp,
       requestExercise: requestExercise,
-      maybeRetry: _maybeRetry,
-      statusReportGoalIdOverride: _statusReportGoalIdOverride,
+      maybeRetry: maybeRetryOverride,
+      playQuestion: () =>
+          unawaited(ref.read(soundServiceProvider).askQuestion()),
+      addMcqOptions: _chat.addMcqOptions,
+      updateReportForGoal: report.updateForGoal,
+      updateReportForCurrentGoal: report.updateForCurrentChildGoal,
+      recordParsedResponse: _debug.recordParsedResponse,
+      statusReportGoalIdOverride: statusGoalIdOverride,
     );
   }
 
   void _trackedSetExerciseType(String type) {
     final from = _currentExerciseType;
     _currentExerciseType = type;
-    DataService.debug.recordEvent('tutor.exercise_type_set', {
-      'from': from,
-      'to': type,
-    });
+    _debug.recordEvent('tutor.exercise_type_set', {'from': from, 'to': type});
   }
 
   void _trackedSetFollowUp({String? message, String? code}) {
     _setFollowUp(message: message, code: code);
-    DataService.debug.recordEvent('tutor.follow_up_set', {
+    _debug.recordEvent('tutor.follow_up_set', {
       'hasMessage': message != null,
       'hasCode': code != null,
     });
@@ -370,15 +436,13 @@ class TutorService {
       case ConnectorOk(:final output):
         await _handleResponse(output);
       case ConnectorFailure(:final message):
-        _addSystemMessage('Er ging iets mis bij de tutor: $message');
+        _chat.addSystemMessage('Er ging iets mis bij de tutor: $message');
         await _maybeRetry();
     }
   }
 
   Future<void> _maybeRetry() async {
-    DataService.debug.recordEvent('tutor.maybe_retry', {
-      'retriesLeft': _retriesLeft,
-    });
+    _debug.recordEvent('tutor.maybe_retry', {'retriesLeft': _retriesLeft});
     if (_retriesLeft <= 0) return;
     _retriesLeft--;
     final result = await _resendLastRequest();
@@ -387,14 +451,10 @@ class TutorService {
   }
 
   Future<void> _maybeRetryStream() async {
-    DataService.debug.recordEvent('tutor.maybe_retry', {
-      'retriesLeft': _retriesLeft,
-    });
+    _debug.recordEvent('tutor.maybe_retry', {'retriesLeft': _retriesLeft});
     if (_retriesLeft <= 0) return;
     _retriesLeft--;
-    if (state.value != TutorState.working) {
-      state.value = TutorState.working;
-    }
+    if (state != TutorState.working) state = TutorState.working;
     await _runStream(() => _connector.resendRequestStream());
   }
 
@@ -422,7 +482,7 @@ class TutorService {
   }
 
   Future<void> requestExercise() async {
-    DataService.debug.recordEvent('tutor.request_exercise.entered');
+    _debug.recordEvent('tutor.request_exercise.entered');
 
     final pendingStatusGoalId = _conductor.takePendingStatusReportGoalId();
     if (pendingStatusGoalId != null) {
@@ -430,41 +490,26 @@ class TutorService {
     }
 
     final newQuestion = _conductor.getNextQuestion();
-    DataService.debug.recordEvent('tutor.request_exercise.next', {
+    _debug.recordEvent('tutor.request_exercise.next', {
       'type': newQuestion.$1.name,
       'difficulty': newQuestion.$2.name,
     });
 
     if (newQuestion.$1 == ChatRequestType.noResult) {
-      DataService.chat.addSystemMessage(
-        "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
+      _chat.addSystemMessage(
+        'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!',
       );
       return;
     }
 
-    DataService.chat.addSystemMessage(
-      "Je volgende oefening wordt voorbereid...",
-    );
+    _chat.addSystemMessage('Je volgende oefening wordt voorbereid...');
 
-    // Often invoked from a feedback handler dispatched inside the outer
-    // queryTutor's try block, so state is still `working` here. Release it
-    // so the chained queryTutor below doesn't short-circuit on its idle guard.
-    if (state.value == TutorState.working) {
-      state.value = TutorState.idle;
-    }
-
+    if (state == TutorState.working) state = TutorState.idle;
     await queryTutor(type: newQuestion.$1, difficulty: newQuestion.$2);
   }
 
-  /// Fires a one-off non-streaming `status` query whose AI response will
-  /// be written to Cosmos against [goalID] (the just-mastered subgoal).
-  /// Releases the working state first so the inner [queryTutor] call
-  /// doesn't short-circuit on its idle guard — same dance as the chained
-  /// queries in `requestExercise`.
   Future<void> _runStatusReportFor(String goalID) async {
-    if (state.value == TutorState.working) {
-      state.value = TutorState.idle;
-    }
+    if (state == TutorState.working) state = TutorState.idle;
     _statusReportGoalIdOverride = goalID;
     try {
       await queryTutor(type: ChatRequestType.status);
@@ -475,14 +520,14 @@ class TutorService {
 
   void moveToFollowUp() {
     if (_nextMessage != null) {
-      _addTutorMessage(_nextMessage!);
+      _chat.addTutorMessage(_nextMessage!);
       _nextMessage = null;
     }
     if (_nextCode != null) {
-      _startNewCode(_nextCode!);
+      ref.read(codeServiceProvider).setText(_nextCode!);
       _nextCode = null;
     }
-    state.value = TutorState.idle;
+    state = TutorState.idle;
   }
 
   // ---- Private helpers ------------------------------------------------------
@@ -490,39 +535,30 @@ class TutorService {
   Future<void> _handleResponse(String output) async {
     final parsed = AIResponseParser.parse(output);
     _connector.addResponse(parsed);
-
     final dispatched = await dispatchResponse(parsed, _nonStreamingContext());
     if (!dispatched) {
-      _addTutorMessage('Onbekend antwoord ontvangen.');
+      _chat.addTutorMessage('Onbekend antwoord ontvangen.');
       await _maybeRetry();
     }
   }
 
   Future<ConnectorResult?> _resendLastRequest() async {
-    if (state.value != TutorState.idle) return null;
-    state.value = TutorState.working;
+    if (state != TutorState.idle) return null;
+    state = TutorState.working;
     try {
       return await _connector.resendRequest();
     } finally {
-      state.value = TutorState.idle;
+      state = TutorState.idle;
     }
   }
 
   void _setFollowUp({String? message, String? code}) {
     _nextMessage = message;
     _nextCode = code;
-    state.value = TutorState.hasFollowUp;
-  }
-
-  void _startNewCode(String code) {
-    DataService.code.setText(code);
-  }
-
-  void _addTutorMessage(String message) {
-    DataService.chat.addTutorMessage(message);
-  }
-
-  void _addSystemMessage(String message) {
-    DataService.chat.addSystemMessage(message);
+    state = TutorState.hasFollowUp;
   }
 }
+
+final tutorServiceProvider = NotifierProvider<TutorService, TutorState>(
+  TutorService.new,
+);

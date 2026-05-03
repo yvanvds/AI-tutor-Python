@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:ai_tutor_python/services/data_service.dart';
+import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -56,6 +56,18 @@ class StreamFailed extends StreamChunk {
 }
 
 class OpenaiConnector {
+  OpenaiConnector({
+    void Function(String)? onRecordRawOutput,
+    void Function(String)? onRecordStreamFailure,
+    GlobalConfig? Function()? getConfig,
+  })  : _onRecordRawOutput = onRecordRawOutput,
+        _onRecordStreamFailure = onRecordStreamFailure,
+        _getConfig = getConfig;
+
+  final void Function(String)? _onRecordRawOutput;
+  final void Function(String)? _onRecordStreamFailure;
+  final GlobalConfig? Function()? _getConfig;
+
   final String _apiKey = Env.apiKey;
 
   /// Reasoning effort for gpt-5 / o-series models.
@@ -97,14 +109,15 @@ class OpenaiConnector {
     final messages = _buildMessages(instructions, _historyFor(inputs), input);
 
     try {
+      final model = _resolveModel();
       final response = await OpenAI.instance.chat.create(
-        model: _resolveModel(),
+        model: model,
         messages: messages,
-        extraParams: _extraParams(),
+        extraParams: _extraParams(model),
       );
       _recordUserTurn(input, inputs);
       final text = _extractText(response);
-      DataService.debug.recordRawOutput(text);
+      _onRecordRawOutput?.call(text);
       return ConnectorOk(text);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequest failed: $e');
@@ -134,10 +147,11 @@ class OpenaiConnector {
     final raw = StringBuffer();
 
     try {
+      final model = _resolveModel();
       final stream = OpenAI.instance.chat.createStream(
-        model: _resolveModel(),
+        model: model,
         messages: messages,
-        extraParams: _extraParams(),
+        extraParams: _extraParams(model),
       );
 
       await for (final event in stream) {
@@ -157,7 +171,7 @@ class OpenaiConnector {
       final tail = assembler.close();
       if (tail.isNotEmpty) yield StreamTextDelta(tail);
 
-      DataService.debug.recordRawOutput(raw.toString());
+      _onRecordRawOutput?.call(raw.toString());
 
       final ChatResponse parsed = assembler.sawOpenTag
           ? AIResponseParser.fromEnvelopePieces(
@@ -172,7 +186,7 @@ class OpenaiConnector {
       yield StreamCompleted(parsed);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequestStream failed: $e');
-      DataService.debug.recordStreamFailure(e.toString());
+      _onRecordStreamFailure?.call(e.toString());
       yield StreamFailed(e, stack, e.toString());
     }
   }
@@ -242,16 +256,18 @@ class OpenaiConnector {
   /// Extra body params merged into chat.completions calls. Currently only
   /// carries `reasoning_effort` for gpt-5 / o-series models. Returns null
   /// when there's nothing to add so the field is omitted entirely.
-  Map<String, dynamic>? _extraParams() {
+  Map<String, dynamic>? _extraParams(String model) {
     final params = <String, dynamic>{};
-    if (reasoningEffort != null) {
+    final supportsReasoning =
+        RegExp(r'^o\d|^gpt-5').hasMatch(model);
+    if (reasoningEffort != null && supportsReasoning) {
       params['reasoning_effort'] = reasoningEffort;
     }
     return params.isEmpty ? null : params;
   }
 
   String _resolveModel() {
-    final cfg = DataService.globalConfig.cachedConfig;
+    final cfg = _getConfig?.call();
     final m = cfg?.model;
     final result = (m != null && m.isNotEmpty) ? m : 'gpt-4o';
     debugPrint('Resolved model: $result');
