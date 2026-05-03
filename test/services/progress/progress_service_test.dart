@@ -426,6 +426,103 @@ void main() {
     });
   });
 
+  group('setCurrentProgress', () {
+    test('invokes the updateCurrentProgress callback with the supplied value',
+        () async {
+      double? received;
+      final svc = ProgressService(
+        container: container,
+        historyContainer: history,
+        getUid: () => currentUser.value?.oid,
+        updateCurrentProgress: (v) => received = v,
+      );
+      svc.setCurrentProgress(0.75);
+      expect(received, 0.75);
+    });
+  });
+
+  group('deleteAllForCurrentUser', () {
+    test('deletes every progress doc and every history doc, then resets '
+        'current progress to 0', () async {
+      when(
+        () => container.query(
+          any<String>(),
+          parameters: any<Map<String, Object?>>(named: 'parameters'),
+          partitionKey: any<Object?>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <Map<String, dynamic>>[
+            {'id': '${_uid}_g1'},
+            {'id': '${_uid}_g2'},
+          ]);
+      when(
+        () => history.query(
+          any<String>(),
+          parameters: any<Map<String, Object?>>(named: 'parameters'),
+          partitionKey: any<Object?>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <Map<String, dynamic>>[
+            {'id': 'hist-1'},
+          ]);
+      when(
+        () => container.delete(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async {});
+      when(
+        () => history.delete(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async {});
+
+      double? resetValue;
+      final svc = ProgressService(
+        container: container,
+        historyContainer: history,
+        getUid: () => currentUser.value?.oid,
+        updateCurrentProgress: (v) => resetValue = v,
+      );
+
+      await svc.deleteAllForCurrentUser();
+
+      verify(() => container.delete('${_uid}_g1', partitionKey: _uid))
+          .called(1);
+      verify(() => container.delete('${_uid}_g2', partitionKey: _uid))
+          .called(1);
+      verify(() => history.delete('hist-1', partitionKey: _uid)).called(1);
+      expect(resetValue, 0.0);
+    });
+
+    test('skips docs whose id field is null', () async {
+      when(
+        () => container.query(
+          any<String>(),
+          parameters: any<Map<String, Object?>>(named: 'parameters'),
+          partitionKey: any<Object?>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <Map<String, dynamic>>[
+            {'id': null},
+          ]);
+      when(
+        () => history.query(
+          any<String>(),
+          parameters: any<Map<String, Object?>>(named: 'parameters'),
+          partitionKey: any<Object?>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => const <Map<String, dynamic>>[]);
+
+      await build().deleteAllForCurrentUser();
+
+      verifyNever(
+        () => container.delete(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      );
+    });
+  });
+
   group('teacher-scoped reads', () {
     test('getAllProgress fans out cross-partition and groups by uid',
         () async {

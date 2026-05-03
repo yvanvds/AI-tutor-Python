@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -277,7 +278,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     required Map<String, String?> parentByChild,
   }) {
     final lastActive = a.updatedAt ?? a.createdAt;
-    final lastActiveStr = lastActive == null ? '—' : _formatTs(lastActive);
+    final lastActiveStr = lastActive == null ? '—' : formatTs(lastActive);
 
     final activeRootTitle = _activeRootTitle(
       progress: progress,
@@ -409,16 +410,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
       ],
     );
-  }
-
-  String _formatTs(DateTime ts) {
-    final dt = ts.toLocal();
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
-    return '$y-$m-$d $hh:$mm';
   }
 
   Future<void> _confirmDelete(BuildContext context, Account a) async {

@@ -289,6 +289,128 @@ void main() {
     });
   });
 
+  group('getMyAccount', () {
+    test('returns null immediately when no user is signed in', () async {
+      expect(await build().getMyAccount(), isNull);
+    });
+
+    test('delegates to getAccount using the current uid', () async {
+      when(
+        () => container.read(any<String>(),
+            partitionKey: any<Object>(named: 'partitionKey')),
+      ).thenAnswer((_) async => {
+            'id': _uid,
+            'uid': _uid,
+            'firstName': 'Yvan',
+            'lastName': 'V',
+            'email': 'y@example.com',
+            'targetGoal': '',
+            'mayUseGlobalKey': false,
+          });
+
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity());
+      final acc = await build().getMyAccount();
+      expect(acc, isNotNull);
+      expect(acc!.uid, _uid);
+    });
+  });
+
+  group('watchMyAccount', () {
+    test('returns a single-null stream when no user is signed in', () async {
+      final first = await build().watchMyAccount().first;
+      expect(first, isNull);
+    });
+  });
+
+  group('watchMyMayUseGlobalKey', () {
+    test('returns a false stream when no user is signed in', () async {
+      final first = await build().watchMyMayUseGlobalKey().first;
+      expect(first, isFalse);
+    });
+  });
+
+  group('watchMayUseGlobalKey', () {
+    test('emits false when doc is missing', () async {
+      when(
+        () => container.read(any<String>(),
+            partitionKey: any<Object>(named: 'partitionKey')),
+      ).thenAnswer((_) async => null);
+
+      final first = await build().watchMayUseGlobalKey(_uid).first;
+      expect(first, isFalse);
+    });
+
+    test('emits the stored boolean value', () async {
+      when(
+        () => container.read(any<String>(),
+            partitionKey: any<Object>(named: 'partitionKey')),
+      ).thenAnswer((_) async => {'id': _uid, 'mayUseGlobalKey': true});
+
+      final first = await build().watchMayUseGlobalKey(_uid).first;
+      expect(first, isTrue);
+    });
+  });
+
+  group('getAllAccounts', () {
+    test('queries cross-partition, sorts by createdAt descending', () async {
+      when(
+        () => container.query(
+          any<String>(),
+          crossPartition: any<bool>(named: 'crossPartition'),
+        ),
+      ).thenAnswer((_) async => <Map<String, dynamic>>[
+            {
+              'id': 'u1',
+              'uid': 'u1',
+              'firstName': 'A',
+              'lastName': 'A',
+              'email': 'a@example.com',
+              'targetGoal': '',
+              'mayUseGlobalKey': false,
+              'createdAt': '2024-01-01T00:00:00.000Z',
+            },
+            {
+              'id': 'u2',
+              'uid': 'u2',
+              'firstName': 'B',
+              'lastName': 'B',
+              'email': 'b@example.com',
+              'targetGoal': '',
+              'mayUseGlobalKey': false,
+              'createdAt': '2025-01-01T00:00:00.000Z',
+            },
+          ]);
+
+      final accounts = await build().getAllAccounts();
+      // Sorted newest-first: u2 before u1.
+      expect(accounts, hasLength(2));
+      expect(accounts.first.uid, 'u2');
+      expect(accounts.last.uid, 'u1');
+
+      final captured = verify(
+        () => container.query(
+          captureAny<String>(),
+          crossPartition: captureAny<bool>(named: 'crossPartition'),
+        ),
+      ).captured;
+      expect(captured[0], contains('SELECT * FROM c'));
+      expect(captured[1], isTrue);
+    });
+  });
+
+  group('deleteAccountDoc', () {
+    test('deletes by uid with uid as partition key', () async {
+      when(
+        () => container.delete(any<String>(),
+            partitionKey: any<Object>(named: 'partitionKey')),
+      ).thenAnswer((_) async {});
+
+      await build().deleteAccountDoc(_uid);
+      verify(() => container.delete(_uid, partitionKey: _uid)).called(1);
+    });
+  });
+
   group('auth listener — _ensureProfile', () {
     test('does not call upsert when an account doc already exists', () async {
       when(

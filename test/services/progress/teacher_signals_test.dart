@@ -168,6 +168,44 @@ void main() {
     });
   });
 
+  group('mostRecentlyActive — no-timestamp fallback', () {
+    test('returns the first doc when none have any timestamp', () {
+      final first = Progress(goalID: 'g1', progress: 0.3);
+      final second = Progress(goalID: 'g2', progress: 0.6);
+      expect(mostRecentlyActive([first, second]), same(first));
+    });
+  });
+
+  group('averageProgress', () {
+    test('returns 0.0 for empty input', () {
+      expect(averageProgress(const []), 0.0);
+    });
+
+    test('averages progress values across all docs', () {
+      final docs = [
+        Progress(goalID: 'g1', progress: 0.4),
+        Progress(goalID: 'g2', progress: 0.6),
+        Progress(goalID: 'g3', progress: 0.8),
+      ];
+      expect(averageProgress(docs), closeTo(0.6, 0.001));
+    });
+
+    test('skips docs whose goalID is in excludeIds', () {
+      final docs = [
+        Progress(goalID: 'g1', progress: 0.0),
+        Progress(goalID: 'g2', progress: 1.0),
+        Progress(goalID: 'root', progress: 0.5),
+      ];
+      final avg = averageProgress(docs, excludeIds: {'root'});
+      expect(avg, closeTo(0.5, 0.001));
+    });
+
+    test('returns 0.0 when all docs are excluded', () {
+      final docs = [Progress(goalID: 'g1', progress: 0.5)];
+      expect(averageProgress(docs, excludeIds: {'g1'}), 0.0);
+    });
+  });
+
   group('rankConceptAttributions', () {
     test('returns an empty list for empty input', () {
       expect(rankConceptAttributions(const []), isEmpty);

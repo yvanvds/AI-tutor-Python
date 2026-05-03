@@ -918,4 +918,156 @@ void main() {
       expect(json['code'], 'x = 1');
     });
   });
+
+  group('queryTutor — additional required-arg short-circuits', () {
+    test('requestHint without code: no request, state restored to idle',
+        () async {
+      final tutor = build();
+      await tutor.queryTutor(type: ChatRequestType.requestHint);
+      verifyNever(
+        () => connector.sendRequestStream(
+          input: any<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      );
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
+    });
+
+    test('socraticFeedback without prompt: no request, state restored to idle',
+        () async {
+      final tutor = build();
+      await tutor.queryTutor(type: ChatRequestType.socraticFeedback);
+      verifyNever(
+        () => connector.sendRequestStream(
+          input: any<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      );
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
+    });
+
+    test('studentQuestion without prompt: no request, state restored to idle',
+        () async {
+      final tutor = build();
+      await tutor.queryTutor(type: ChatRequestType.studentQuestion);
+      verifyNever(
+        () => connector.sendRequestStream(
+          input: any<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      );
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
+    });
+
+    test('explainAnswer without prompt: no request, state restored to idle',
+        () async {
+      final tutor = build();
+      await tutor.queryTutor(type: ChatRequestType.explainAnswer);
+      verifyNever(
+        () => connector.sendRequestStream(
+          input: any<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      );
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
+    });
+
+    test('guidingAnswer without prompt: no request, state restored to idle',
+        () async {
+      final tutor = build();
+      await tutor.queryTutor(type: ChatRequestType.guidingAnswer);
+      verifyNever(
+        () => connector.sendRequestStream(
+          input: any<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: any<PreviousInputs>(named: 'inputs'),
+        ),
+      );
+      expect(pc.read(tutorServiceProvider), TutorState.idle);
+    });
+  });
+
+  group('queryTutor — guidingQuestion type', () {
+    test('guidingQuestion uses newSession scope and no prompt required',
+        () async {
+      await build().queryTutor(type: ChatRequestType.guidingQuestion);
+      final captured = verify(
+        () => connector.sendRequestStream(
+          input: captureAny<String>(named: 'input'),
+          instructions: any<String>(named: 'instructions'),
+          inputs: captureAny<PreviousInputs>(named: 'inputs'),
+        ),
+      ).captured;
+      final json = jsonDecode(captured[0] as String) as Map<String, dynamic>;
+      expect(json['request_type'], 'guiding_question');
+      expect(captured[1] as PreviousInputs, PreviousInputs.newSession);
+    });
+  });
+
+  group('requestExercise — pending status report', () {
+    test(
+      'runs a status query for the pending goal before the next exercise',
+      () async {
+        // First call: status (non-streaming). Second call: the exercise.
+        var callCount = 0;
+        when(
+          () => connector.sendRequest(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        ).thenAnswer((_) async => const ConnectorOk(''));
+        when(
+          () => connector.sendRequestStream(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: any<PreviousInputs>(named: 'inputs'),
+          ),
+        ).thenAnswer((_) {
+          callCount++;
+          return _emptyStream();
+        });
+
+        when(() => conductor.takePendingStatusReportGoalId())
+            .thenReturn('pending-goal-id');
+        when(() => conductor.getNextQuestion())
+            .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
+
+        await build().requestExercise();
+
+        // Status uses sendRequest; exercise uses sendRequestStream.
+        verify(
+          () => connector.sendRequest(
+            input: any<String>(named: 'input'),
+            instructions: any<String>(named: 'instructions'),
+            inputs: captureAny<PreviousInputs>(named: 'inputs'),
+          ),
+        ).called(1);
+        expect(callCount, greaterThanOrEqualTo(1));
+      },
+    );
+  });
+
+  group('initializeSession', () {
+    test('force: true clears chat and re-runs setTarget even if already '
+        'initialized', () async {
+      final tutor = build();
+      // Prime initialization.
+      await tutor.initializeSession();
+      clearInteractions(chat);
+      clearInteractions(conductor);
+      when(() => conductor.setTarget()).thenAnswer((_) async {});
+      when(() => conductor.getNextQuestion())
+          .thenReturn((ChatRequestType.noResult, QuestionDifficulty.easy));
+
+      await tutor.initializeSession(force: true);
+
+      verify(() => chat.clear()).called(1);
+      verify(() => conductor.setTarget()).called(1);
+    });
+  });
 }

@@ -47,11 +47,14 @@
       "Bash(./build/python_bundle/python/python.exe -s -X utf8 -u ./packages/py_runner/python/host.py)",
       "Bash(./build/python_bundle/python/python.exe -m py_compile ./packages/py_runner/python/host.py)",
       "Bash(./build/python_bundle/python/python.exe -s -X utf8 -u \"C:/Users/yvan/AppData/Local/Temp/drive_cancel.py\" \"./build/python_bundle/python/python.exe\" \"./packages/py_runner/python/host.py\")",
-      "Bash(./build/python_bundle/python/python.exe -s -X utf8 -u \"C:/Users/yvan/AppData/Local/Temp/drive_hardkill.py\" \"./build/python_bundle/python/python.exe\" \"./packages/py_runner/python/host.py\")"
+      "Bash(./build/python_bundle/python/python.exe -s -X utf8 -u \"C:/Users/yvan/AppData/Local/Temp/drive_hardkill.py\" \"./build/python_bundle/python/python.exe\" \"./packages/py_runner/python/host.py\")",
+      "mcp__sonarqube__search_my_sonarqube_projects",
+      "mcp__sonarqube__search_duplicated_files",
+      "mcp__sonarqube__get_duplications"
     ],
+    "defaultMode": "bypassPermissions",
     "additionalDirectories": [
       "C:\\Users\\yvan\\AppData\\Local\\Temp"
-    ],
-    "defaultMode": "bypassPermissions"
+    ]
   }
 }

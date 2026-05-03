@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/status_report/status_report.dart';
@@ -97,7 +98,7 @@ class _ReportTile extends StatelessWidget {
     final theme = Theme.of(context);
     final title = goal?.title ?? report.goalID;
     final updated = report.updatedAt;
-    final subtitle = updated == null ? null : _formatTs(updated);
+    final subtitle = updated == null ? null : formatTs(updated);
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
       title: Text(title, style: theme.textTheme.bodyMedium),
@@ -115,13 +116,4 @@ class _ReportTile extends StatelessWidget {
     );
   }
 
-  String _formatTs(DateTime ts) {
-    final dt = ts.toLocal();
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
-    return '$y-$m-$d $hh:$mm';
-  }
 }
