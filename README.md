@@ -1,5 +1,7 @@
 # AI-tutor-Python
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=yvanvds_AI-tutor-Python&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=yvanvds_AI-tutor-Python) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=yvanvds_AI-tutor-Python&metric=coverage)](https://sonarcloud.io/summary/new_code?id=yvanvds_AI-tutor-Python) [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=yvanvds_AI-tutor-Python&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=yvanvds_AI-tutor-Python) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=yvanvds_AI-tutor-Python&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=yvanvds_AI-tutor-Python)
+
 A Windows desktop application that acts as a personal AI tutor for Python students. A single window combines:
 
 - an embedded Python editor with a **Run** button (no separate Python install needed — the runtime is bundled),
