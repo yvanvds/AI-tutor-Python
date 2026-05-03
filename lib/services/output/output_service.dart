@@ -33,7 +33,7 @@ class OutputService {
     }
     _runSubs.clear();
 
-    lines.value = [const OutputLine('▶ Running…', isMeta: true)];
+    lines.value = [];
     isRunning.value = true;
 
     try {
@@ -84,7 +84,8 @@ class OutputService {
   }
 
   void _addLine(String text, {bool isError = false}) {
-    if (text.isEmpty) return;
-    lines.value = [...lines.value, OutputLine(text, isError: isError)];
+    final trimmed = text.trimRight();
+    if (trimmed.isEmpty) return;
+    lines.value = [...lines.value, OutputLine(trimmed, isError: isError)];
   }
 }

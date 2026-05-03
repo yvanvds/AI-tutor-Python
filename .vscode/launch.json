@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AI Tutor (dev)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "env": {
+        "PY_RUNNER_PYTHON": "${workspaceFolder}\\build\\python_bundle\\python\\python.exe",
+        "PY_RUNNER_HOST_SCRIPT": "${workspaceFolder}\\packages\\py_runner\\python\\host.py"
+      }
+    }
+  ]
+}
