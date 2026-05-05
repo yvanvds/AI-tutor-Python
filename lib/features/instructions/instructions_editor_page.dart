@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/features/instructions/editor_pane.dart';
 import 'package:ai_tutor_python/features/instructions/section_header.dart';
 import 'package:ai_tutor_python/features/instructions/sections_list.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -196,40 +197,28 @@ class _InstructionsEditorPageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Instructions Editor'),
-        actions: [
-          IconButton(
-            tooltip: 'New document',
-            icon: const Icon(Icons.add),
-            onPressed: _newDocument,
+    return Container(
+      color: AppColors.ink0,
+      child: Column(
+        children: [
+          _Toolbar(
+            isDirty: _isDirty,
+            hasDocSelected: _hasDocSelected,
+            onNew: _newDocument,
+            onDelete: _hasDocSelected ? _deleteDocument : null,
+            onExport: _exportAllToMarkdown,
+            onImport: _importFromMarkdown,
+            onSave: _hasDocSelected ? _saveDocument : null,
           ),
-          IconButton(
-            tooltip: 'Delete document',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _hasDocSelected ? _deleteDocument : null,
-          ),
-          IconButton(
-            tooltip: 'Export all to Markdown',
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: _exportAllToMarkdown,
-          ),
-          IconButton(
-            tooltip: 'Import from Markdown',
-            icon: const Icon(Icons.file_upload_outlined),
-            onPressed: _importFromMarkdown,
-          ),
-          const SizedBox(width: 12),
-          FilledButton.icon(
-            icon: const Icon(Icons.save),
-            onPressed: _hasDocSelected ? _saveDocument : null,
-            label: Text(_isDirty ? 'Save *' : 'Save'),
-          ),
-          const SizedBox(width: 12),
+          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Expanded(child: _buildBody()),
         ],
       ),
-      body: Row(
+    );
+  }
+
+  Widget _buildBody() {
+    return Row(
         children: [
           SizedBox(
             width: 280,
@@ -322,7 +311,6 @@ class _InstructionsEditorPageState
             ),
           ),
         ],
-      ),
     );
   }
 
@@ -809,4 +797,72 @@ bool _mapEquals(Map<String, String> a, Map<String, String> b) {
     if (b[e.key] != e.value) return false;
   }
   return true;
+}
+
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({
+    required this.isDirty,
+    required this.hasDocSelected,
+    required this.onNew,
+    required this.onDelete,
+    required this.onExport,
+    required this.onImport,
+    required this.onSave,
+  });
+
+  final bool isDirty;
+  final bool hasDocSelected;
+  final VoidCallback onNew;
+  final VoidCallback? onDelete;
+  final VoidCallback onExport;
+  final VoidCallback onImport;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      color: AppColors.ink1,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Row(
+        children: [
+          const Text(
+            'Instructies',
+            style: TextStyle(
+              color: AppColors.fg,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'New document',
+            icon: const Icon(Icons.add, size: 18),
+            onPressed: onNew,
+          ),
+          IconButton(
+            tooltip: 'Delete document',
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: onDelete,
+          ),
+          IconButton(
+            tooltip: 'Export all to Markdown',
+            icon: const Icon(Icons.file_download_outlined, size: 18),
+            onPressed: onExport,
+          ),
+          IconButton(
+            tooltip: 'Import from Markdown',
+            icon: const Icon(Icons.file_upload_outlined, size: 18),
+            onPressed: onImport,
+          ),
+          const SizedBox(width: AppSpacing.s),
+          FilledButton.icon(
+            icon: const Icon(Icons.save, size: 16),
+            onPressed: onSave,
+            label: Text(isDirty ? 'Save *' : 'Save'),
+          ),
+        ],
+      ),
+    );
+  }
 }

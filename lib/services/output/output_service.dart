@@ -84,6 +84,12 @@ class OutputService {
     _currentHandle?.respondToInput(req.requestId, value);
   }
 
+  /// Clear collected output without affecting an in-flight run. Used by the
+  /// "Reset" button in the redesigned RunControls.
+  void clear() {
+    lines.value = [];
+  }
+
   void _addLine(String text, {bool isError = false}) {
     final trimmed = text.trimRight();
     if (trimmed.isEmpty) return;

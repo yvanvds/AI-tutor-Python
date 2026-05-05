@@ -1,0 +1,329 @@
+import 'package:ai_tutor_python/services/output/output_service.dart';
+import 'package:ai_tutor_python/theme/app_theme.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:py_runner/py_runner.dart';
+
+enum _OutputUiState { idle, running, ok, error }
+
+class OutputPanel extends ConsumerStatefulWidget {
+  const OutputPanel({super.key});
+
+  @override
+  ConsumerState<OutputPanel> createState() => _OutputPanelState();
+}
+
+class _OutputPanelState extends ConsumerState<OutputPanel>
+    with SingleTickerProviderStateMixin {
+  final _scrollCtrl = ScrollController();
+  final _inputCtrl = TextEditingController();
+  final _inputFocus = FocusNode();
+  late final OutputService _output;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _output = ref.read(outputServiceProvider);
+    _output.lines.addListener(_onLinesChanged);
+    _output.pendingInputRequest.addListener(_onInputRequestChanged);
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  void _onLinesChanged() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      }
+    });
+  }
+
+  void _onInputRequestChanged() {
+    if (_output.pendingInputRequest.value != null) {
+      _inputCtrl.clear();
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _inputFocus.requestFocus(),
+      );
+    }
+  }
+
+  void _submitInput() {
+    _output.submitInput(_inputCtrl.text);
+    _inputCtrl.clear();
+  }
+
+  @override
+  void dispose() {
+    _output.lines.removeListener(_onLinesChanged);
+    _output.pendingInputRequest.removeListener(_onInputRequestChanged);
+    _scrollCtrl.dispose();
+    _inputCtrl.dispose();
+    _inputFocus.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  _OutputUiState _resolveState(bool running, List<OutputLine> lines) {
+    if (running) return _OutputUiState.running;
+    if (lines.isEmpty) return _OutputUiState.idle;
+    final hasError = lines.any((l) => l.isError);
+    return hasError ? _OutputUiState.error : _OutputUiState.ok;
+  }
+
+  String _stateLabel(_OutputUiState s, List<OutputLine> lines) {
+    switch (s) {
+      case _OutputUiState.idle:
+        return 'Geen output';
+      case _OutputUiState.running:
+        return 'Aan het uitvoeren…';
+      case _OutputUiState.ok:
+        return 'Klaar';
+      case _OutputUiState.error:
+        final errors = lines.where((l) => l.isError).length;
+        return errors == 1 ? '1 fout' : '$errors fouten';
+    }
+  }
+
+  Color _dotColor(_OutputUiState s) {
+    switch (s) {
+      case _OutputUiState.idle:
+        return AppColors.fgFaint;
+      case _OutputUiState.running:
+        return AppColors.accent;
+      case _OutputUiState.ok:
+        return AppColors.accent2;
+      case _OutputUiState.error:
+        return AppColors.danger;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.ink1,
+        border: Border(top: BorderSide(color: AppColors.ink2, width: 1)),
+      ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _output.isRunning,
+        builder: (context, running, _) {
+          return ValueListenableBuilder<List<OutputLine>>(
+            valueListenable: _output.lines,
+            builder: (context, lines, _) {
+              final state = _resolveState(running, lines);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Header(
+                    state: state,
+                    dotColor: _dotColor(state),
+                    label: _stateLabel(state, lines),
+                    pulse: _pulse,
+                  ),
+                  Expanded(child: _Body(state: state, lines: lines, scroll: _scrollCtrl)),
+                  ValueListenableBuilder<InputRequest?>(
+                    valueListenable: _output.pendingInputRequest,
+                    builder: (context, req, _) {
+                      if (req == null) return const SizedBox.shrink();
+                      return _InputRow(
+                        request: req,
+                        controller: _inputCtrl,
+                        focusNode: _inputFocus,
+                        onSubmit: _submitInput,
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.state,
+    required this.dotColor,
+    required this.label,
+    required this.pulse,
+  });
+
+  final _OutputUiState state;
+  final Color dotColor;
+  final String label;
+  final AnimationController pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.ink2)),
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: pulse,
+            builder: (context, _) {
+              final opacity = state == _OutputUiState.running
+                  ? 0.5 + 0.5 * pulse.value
+                  : 1.0;
+              return Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: dotColor.withValues(alpha: opacity),
+                  shape: BoxShape.circle,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: AppSpacing.s),
+          const Text(
+            'Output',
+            style: TextStyle(
+              color: AppColors.fg,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            '· $label',
+            style: const TextStyle(
+              color: AppColors.fgMute,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Body extends StatelessWidget {
+  const _Body({required this.state, required this.lines, required this.scroll});
+
+  final _OutputUiState state;
+  final List<OutputLine> lines;
+  final ScrollController scroll;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == _OutputUiState.idle) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: Text(
+            'Druk op Run om je code uit te voeren.',
+            style: TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.m,
+        AppSpacing.s,
+        AppSpacing.m,
+        AppSpacing.s,
+      ),
+      child: Scrollbar(
+        controller: scroll,
+        child: ListView.builder(
+          controller: scroll,
+          itemCount: lines.length,
+          itemBuilder: (context, i) {
+            final line = lines[i];
+            final color = line.isError
+                ? AppColors.danger
+                : (line.isMeta ? AppColors.fgFaint : AppColors.fg);
+            return SelectableText(
+              line.text,
+              style: AppMono.output(color: color),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _InputRow extends StatelessWidget {
+  const _InputRow({
+    required this.request,
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmit,
+  });
+
+  final InputRequest request;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.m,
+        AppSpacing.s,
+        AppSpacing.m,
+        AppSpacing.s,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.ink2)),
+      ),
+      child: Row(
+        children: [
+          if (request.prompt.isNotEmpty) ...[
+            Text(
+              request.prompt,
+              style: AppMono.output(color: AppColors.fgMute),
+            ),
+            const SizedBox(width: AppSpacing.s),
+          ],
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              style: AppMono.output(),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s,
+                  vertical: AppSpacing.xs,
+                ),
+                filled: true,
+                fillColor: AppColors.ink2,
+                border: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.all(Radius.circular(AppRadius.inputSmall)),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) => onSubmit(),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s),
+          IconButton(
+            icon: const Icon(Icons.send_rounded, size: 18),
+            color: AppColors.accent,
+            onPressed: onSubmit,
+          ),
+        ],
+      ),
+    );
+  }
+}

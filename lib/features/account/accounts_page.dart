@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progress/teacher_signals.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -67,7 +68,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(title: const Text('Accounts')),
+      backgroundColor: AppColors.ink0,
       endDrawer: ValueListenableBuilder<Account?>(
         valueListenable: _drawerAccount,
         builder: (context, account, _) {
@@ -79,26 +80,40 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         if (!open) _drawerAccount.value = null;
       },
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: StreamBuilder<List<Account>>(
-          stream: _accountsStream,
-          builder: (context, accountsSnap) {
-            return StreamBuilder<Map<String, List<Progress>>>(
-              stream: _progressStream,
-              builder: (context, progressSnap) {
-                return StreamBuilder<List<Goal>>(
-                  stream: _goalsStream,
-                  builder: (context, goalsSnap) {
-                    return _buildContent(
-                      accountsSnap: accountsSnap,
-                      progressByUid: progressSnap.data ?? const {},
-                      goals: goalsSnap.data ?? const [],
-                    );
-                  },
-                );
-              },
-            );
-          },
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxxl,
+          AppSpacing.xxl,
+          AppSpacing.xxxl,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _PageHeader(),
+            const SizedBox(height: AppSpacing.lg),
+            Expanded(
+              child: StreamBuilder<List<Account>>(
+                stream: _accountsStream,
+                builder: (context, accountsSnap) {
+                  return StreamBuilder<Map<String, List<Progress>>>(
+                    stream: _progressStream,
+                    builder: (context, progressSnap) {
+                      return StreamBuilder<List<Goal>>(
+                        stream: _goalsStream,
+                        builder: (context, goalsSnap) {
+                          return _buildContent(
+                            accountsSnap: accountsSnap,
+                            progressByUid: progressSnap.data ?? const {},
+                            goals: goalsSnap.data ?? const [],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -236,31 +251,53 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             child: SingleChildScrollView(
               controller: _vCtrl,
               primary: false,
-              child: DataTable(
-                showCheckboxColumn: false,
-                columns: const [
-                  DataColumn(label: Text('Email')),
-                  DataColumn(label: Text('First name')),
-                  DataColumn(label: Text('Last name')),
-                  DataColumn(label: Text('Last active')),
-                  DataColumn(label: Text('Huidig doel')),
-                  DataColumn(label: Text('Voortgang')),
-                  DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Global key')),
-                  DataColumn(label: Text('Actions')),
-                ],
-                rows: pageItems
-                    .map(
-                      (a) => _buildAccountRow(
-                        a,
-                        progress: progressByUid[a.uid] ?? const [],
-                        rootIds: rootIds,
-                        rootById: rootById,
-                        goalById: goalById,
-                        parentByChild: parentByChild,
-                      ),
-                    )
-                    .toList(),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: AppColors.ink2,
+                  dataTableTheme: const DataTableThemeData(
+                    dividerThickness: 1,
+                    headingRowHeight: 40,
+                    dataRowMinHeight: 48,
+                    dataRowMaxHeight: 56,
+                    headingRowColor: WidgetStatePropertyAll(Colors.transparent),
+                    dataRowColor: WidgetStatePropertyAll(Colors.transparent),
+                    headingTextStyle: TextStyle(
+                      color: AppColors.fgFaint,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                    ),
+                    dataTextStyle: TextStyle(
+                      color: AppColors.fg,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                child: DataTable(
+                  showCheckboxColumn: false,
+                  columns: const [
+                    DataColumn(label: Text('EMAIL')),
+                    DataColumn(label: Text('NAAM')),
+                    DataColumn(label: Text('STREAK')),
+                    DataColumn(label: Text('HUIDIG DOEL')),
+                    DataColumn(label: Text('VOORTGANG')),
+                    DataColumn(label: Text('STATUS')),
+                    DataColumn(label: Text('SLEUTEL')),
+                    DataColumn(label: Text('ACTIES')),
+                  ],
+                  rows: pageItems
+                      .map(
+                        (a) => _buildAccountRow(
+                          a,
+                          progress: progressByUid[a.uid] ?? const [],
+                          rootIds: rootIds,
+                          rootById: rootById,
+                          goalById: goalById,
+                          parentByChild: parentByChild,
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
             ),
           ),
@@ -295,13 +332,21 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
     final status = computeStudentStatus(progress: progress);
 
+    final fullName = [a.firstName, a.lastName]
+        .where((s) => s.trim().isNotEmpty)
+        .join(' ');
+
     return DataRow(
       onSelectChanged: (_) => _openDrawerFor(a),
       cells: [
-        DataCell(SelectableText(a.email)),
-        DataCell(Text(a.firstName)),
-        DataCell(Text(a.lastName)),
-        DataCell(Text(lastActiveStr)),
+        DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
+        DataCell(Text(fullName.isEmpty ? '—' : fullName)),
+        DataCell(
+          Text(
+            '—',
+            style: const TextStyle(color: AppColors.fgFaint),
+          ),
+        ),
         DataCell(Text(activeRootTitle ?? '—')),
         DataCell(_OverallProgressBar(value: overall)),
         DataCell(_StatusDot(status: status)),
@@ -467,6 +512,71 @@ class _PageView {
   });
 }
 
+class _PageHeader extends StatelessWidget {
+  const _PageHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        Text(
+          'Studenten',
+          style: TextStyle(
+            color: AppColors.fg,
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            height: 1.15,
+            letterSpacing: -0.4,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'Beheer accounts en volg de voortgang van je studenten.',
+          style: TextStyle(
+            color: AppColors.fgFaint,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmailCell extends StatelessWidget {
+  const _EmailCell({required this.email, required this.lastActive});
+  final String email;
+  final String lastActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          email,
+          style: const TextStyle(
+            color: AppColors.fg,
+            fontSize: 13,
+            height: 1.3,
+          ),
+        ),
+        if (lastActive != '—')
+          Text(
+            'laatst actief: $lastActive',
+            style: const TextStyle(
+              color: AppColors.fgFaint,
+              fontSize: 10.5,
+              height: 1.4,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _OverallProgressBar extends StatelessWidget {
   const _OverallProgressBar({required this.value});
 
@@ -479,10 +589,31 @@ class _OverallProgressBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: LinearProgressIndicator(value: value.clamp(0.0, 1.0)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: SizedBox(
+                height: 6,
+                child: Stack(
+                  children: [
+                    Container(color: AppColors.ink2),
+                    FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: value.clamp(0.0, 1.0),
+                      child: Container(color: AppColors.accent),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          Text('${(value * 100).round()}%'),
+          const SizedBox(width: AppSpacing.s),
+          Text(
+            '${(value * 100).round()}%',
+            style: const TextStyle(
+              color: AppColors.fgMute,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -497,9 +628,9 @@ class _StatusDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      StudentStatus.struggling => Colors.red.shade400,
-      StudentStatus.active => Colors.green.shade400,
-      StudentStatus.idle => Colors.grey.shade400,
+      StudentStatus.struggling => AppColors.danger,
+      StudentStatus.active => AppColors.accent2,
+      StudentStatus.idle => AppColors.fgFaint,
     };
     final tip = switch (status) {
       StudentStatus.struggling =>
@@ -510,8 +641,8 @@ class _StatusDot extends StatelessWidget {
     return Tooltip(
       message: tip,
       child: Container(
-        width: 12,
-        height: 12,
+        width: 10,
+        height: 10,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );

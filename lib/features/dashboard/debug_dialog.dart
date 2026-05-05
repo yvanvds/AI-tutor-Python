@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,6 +74,17 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
     );
   }
 
+  void _triggerLevelUp() {
+    Navigator.of(context).pop();
+    ref.read(levelUpControllerProvider.notifier).push(
+      const LevelUpEvent(
+        newLevel: 5,
+        xpAwarded: 20,
+        conceptName: 'elif-ladder',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -87,6 +99,12 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
               onPressed: _busy ? null : _wipeProgress,
               icon: const Icon(Icons.delete_forever),
               label: const Text('Wipe all progress (Azure)'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : _triggerLevelUp,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Show level-up overlay'),
             ),
             const SizedBox(height: 24),
             const Divider(),

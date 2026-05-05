@@ -1,5 +1,7 @@
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:ai_tutor_python/theme/app_theme.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,8 @@ class McqOptionsWidget extends ConsumerWidget {
 
   final CustomMessage message;
 
+  static const _badges = ['A', 'B', 'C', 'D', 'E', 'F'];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final metadata = message.metadata ?? const {};
@@ -17,18 +21,22 @@ class McqOptionsWidget extends ConsumerWidget {
     final answered = selected != null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s,
+        vertical: AppSpacing.xs,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final option in options) ...[
+          for (var i = 0; i < options.length; i++) ...[
             _OptionButton(
-              label: option,
-              isSelected: option == selected,
+              badge: i < _badges.length ? _badges[i] : '${i + 1}',
+              label: options[i],
+              isSelected: options[i] == selected,
               isDisabled: answered,
-              onTap: () => _onTap(ref, option),
+              onTap: () => _onTap(ref, options[i]),
             ),
-            const SizedBox(height: 8),
+            if (i < options.length - 1) const SizedBox(height: AppSpacing.xs),
           ],
         ],
       ),
@@ -44,44 +52,107 @@ class McqOptionsWidget extends ConsumerWidget {
   }
 }
 
-class _OptionButton extends StatelessWidget {
+class _OptionButton extends StatefulWidget {
   const _OptionButton({
+    required this.badge,
     required this.label,
     required this.isSelected,
     required this.isDisabled,
     required this.onTap,
   });
 
+  final String badge;
   final String label;
   final bool isSelected;
   final bool isDisabled;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final textStyle = Theme.of(
-      context,
-    ).textTheme.bodyMedium?.copyWith(fontSize: 18);
+  State<_OptionButton> createState() => _OptionButtonState();
+}
 
-    if (isSelected) {
-      return FilledButton(
-        onPressed: null,
-        style: FilledButton.styleFrom(
-          backgroundColor: colors.primary,
-          disabledBackgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          disabledForegroundColor: colors.onPrimary,
-          textStyle: textStyle,
-        ),
-        child: Text(label),
-      );
+class _OptionButtonState extends State<_OptionButton> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.isSelected;
+    final dimmed = widget.isDisabled && !selected;
+
+    final Color bg;
+    final Color border;
+    final Color textColor;
+    final Color badgeBg;
+    final Color badgeFg;
+
+    if (selected) {
+      bg = AppColors.accent.withValues(alpha: 0.18);
+      border = AppColors.accent.withValues(alpha: 0.6);
+      textColor = AppColors.accent;
+      badgeBg = AppColors.accent;
+      badgeFg = AppColors.ink0;
+    } else if (dimmed) {
+      bg = AppColors.ink1;
+      border = AppColors.ink2;
+      textColor = AppColors.fgFaint;
+      badgeBg = AppColors.ink2;
+      badgeFg = AppColors.fgFaint;
+    } else {
+      bg = _hovering ? AppColors.ink2 : AppColors.ink1;
+      border = AppColors.ink2;
+      textColor = AppColors.fg;
+      badgeBg = AppColors.ink2;
+      badgeFg = AppColors.fgMute;
     }
 
-    return OutlinedButton(
-      onPressed: isDisabled ? null : onTap,
-      style: OutlinedButton.styleFrom(textStyle: textStyle),
-      child: Text(label),
+    return MouseRegion(
+      cursor: widget.isDisabled
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onTap: widget.isDisabled ? null : widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: AppDurations.hover,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border.all(color: border),
+            borderRadius: BorderRadius.circular(AppRadius.cardLarge),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(AppRadius.inputSmall),
+                ),
+                child: Text(
+                  widget.badge,
+                  style: AppMono.code(color: badgeFg, size: 12)
+                      .copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: AppMono.code(color: textColor, size: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

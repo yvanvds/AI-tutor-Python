@@ -1,25 +1,30 @@
-import 'package:ai_tutor_python/features/chat/composer_continue_widget.dart';
-import 'package:ai_tutor_python/features/chat/composer_mcq_wait_widget.dart';
-import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
 import 'package:ai_tutor_python/features/chat/mcq_options_widget.dart';
+import 'package:ai_tutor_python/features/chat/widgets/chat_header.dart';
+import 'package:ai_tutor_python/features/chat/widgets/chat_system_pill.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_continue.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_mcq_disabled.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
+import 'package:ai_tutor_python/features/chat/widgets/role_chip.dart';
+import 'package:ai_tutor_python/features/chat/widgets/student_bubble.dart';
+import 'package:ai_tutor_python/features/chat/widgets/tutor_bubble.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flyer_chat_system_message/flyer_chat_system_message.dart';
-import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 
 class ChatWidget extends ConsumerStatefulWidget {
   const ChatWidget({super.key});
 
   @override
-  ConsumerState<ChatWidget> createState() => _TutorState();
+  ConsumerState<ChatWidget> createState() => _ChatWidgetState();
 }
 
-class _TutorState extends ConsumerState<ChatWidget> {
+class _ChatWidgetState extends ConsumerState<ChatWidget> {
   bool _didInit = false;
 
   @override
@@ -34,115 +39,141 @@ class _TutorState extends ConsumerState<ChatWidget> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const ChatHeader(),
+        Expanded(child: _ChatBody()),
+      ],
+    );
+  }
+}
+
+class _ChatBody extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final tutorState = ref.watch(tutorServiceProvider);
     final mcqPending = ref.watch(mcqPendingProvider);
     final streamState = ref.watch(streamStateProvider);
     final chat = ref.read(chatServiceProvider);
 
-    return Column(
-      children: [
-        Expanded(
-          child: Chat(
-            theme: ChatTheme.fromThemeData(Theme.of(context)),
-            chatController: chat.controller,
-            currentUserId: 'You',
-            onMessageSend: (text) async {
-              chat.addMessage(text);
-              await ref
-                  .read(tutorServiceProvider.notifier)
-                  .handleStudentMessage(text);
-            },
-            builders: Builders(
-              composerBuilder: (context) {
-                if (tutorState == TutorState.working) {
-                  return const ComposerWaitWidget();
-                } else if (tutorState == TutorState.hasFollowUp) {
-                  return const ComposerContinueWidget();
-                } else if (mcqPending) {
-                  return const ComposerMcqWaitWidget();
-                } else {
-                  return const Composer();
-                }
-              },
-              chatAnimatedListBuilder: (context, itemBuilder) {
-                return ChatAnimatedListReversed(itemBuilder: itemBuilder);
-              },
-              textMessageBuilder: (
-                context,
-                message,
-                index, {
-                required bool isSentByMe,
-                MessageGroupStatus? groupStatus,
-              }) => FlyerChatTextMessage(
-                index: index,
-                message: message,
-                sentTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  fontSize: 20,
-                  color: Theme.of(context).colorScheme.onPrimary,
+    return Chat(
+      theme: ChatTheme.fromThemeData(Theme.of(context)).copyWith(
+        colors: ChatColors.fromThemeData(Theme.of(context)).copyWith(
+          surface: AppColors.ink1,
+        ),
+      ),
+      chatController: chat.controller,
+      currentUserId: 'You',
+      onMessageSend: (text) async {
+        chat.addMessage(text);
+        await ref
+            .read(tutorServiceProvider.notifier)
+            .handleStudentMessage(text);
+      },
+      builders: Builders(
+        composerBuilder: (context) {
+          if (tutorState == TutorState.working) {
+            return const ComposerThinking();
+          } else if (tutorState == TutorState.hasFollowUp) {
+            return const ComposerContinue();
+          } else if (mcqPending) {
+            return const ComposerMcqDisabled();
+          } else {
+            return const ComposerIdle();
+          }
+        },
+        chatAnimatedListBuilder: (context, itemBuilder) {
+          return ChatAnimatedListReversed(itemBuilder: itemBuilder);
+        },
+        textMessageBuilder: (
+          context,
+          message,
+          index, {
+          required bool isSentByMe,
+          MessageGroupStatus? groupStatus,
+        }) => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.xs,
+          ),
+          child: isSentByMe
+              ? StudentBubble(
+                  text: message.text,
+                  createdAt: message.createdAt,
+                )
+              : TutorBubble(
+                  text: message.text,
+                  role: tutorRoleFromMetadata(message.metadata),
+                  createdAt: message.createdAt,
                 ),
-                receivedTextStyle: Theme.of(
-                  context,
-                ).textTheme.bodyMedium!.copyWith(
-                  fontSize: 20,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+        ),
+        textStreamMessageBuilder: (
+          context,
+          message,
+          index, {
+          required bool isSentByMe,
+          MessageGroupStatus? groupStatus,
+        }) => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.xs,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.82,
               ),
-
-              textStreamMessageBuilder: (
-                context,
-                message,
-                index, {
-                required bool isSentByMe,
-                MessageGroupStatus? groupStatus,
-              }) => FlyerChatTextStreamMessage(
+              child: FlyerChatTextStreamMessage(
                 index: index,
                 message: message,
                 streamState: streamState,
                 mode: TextStreamMessageMode.instantMarkdown,
-                receivedTextStyle: Theme.of(
-                  context,
-                ).textTheme.bodyMedium!.copyWith(
-                  fontSize: 20,
-                  color: Theme.of(context).colorScheme.onSurface,
+                receivedBackgroundColor: AppColors.ink1,
+                borderRadius: BorderRadius.circular(AppRadius.bubble),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
                 ),
-                loadingText: 'Aan het denken...',
-              ),
-
-              systemMessageBuilder: (
-                context,
-                message,
-                index, {
-                required bool isSentByMe,
-                MessageGroupStatus? groupStatus,
-              }) => FlyerChatSystemMessage(
-                message: message,
-                index: index,
-                backgroundColor: Theme.of(context).canvasColor,
-                textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: Theme.of(context).colorScheme.error,
+                receivedTextStyle: const TextStyle(
+                  color: AppColors.fg,
+                  fontSize: 14,
+                  height: 1.55,
                 ),
+                loadingText: 'Tutor denkt na…',
               ),
-
-              customMessageBuilder: (
-                context,
-                message,
-                index, {
-                required bool isSentByMe,
-                MessageGroupStatus? groupStatus,
-              }) {
-                if (message.metadata?['kind'] == 'mcq_options') {
-                  return McqOptionsWidget(message: message);
-                }
-                return const SizedBox.shrink();
-              },
             ),
-            resolveUser: (UserID id) async {
-              return User(id: id, name: id == 'user1' ? 'You' : 'Tutor');
-            },
           ),
         ),
-      ],
+        systemMessageBuilder: (
+          context,
+          message,
+          index, {
+          required bool isSentByMe,
+          MessageGroupStatus? groupStatus,
+        }) => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.xs,
+          ),
+          child: ChatSystemPill(text: message.text),
+        ),
+        customMessageBuilder: (
+          context,
+          message,
+          index, {
+          required bool isSentByMe,
+          MessageGroupStatus? groupStatus,
+        }) {
+          if (message.metadata?['kind'] == 'mcq_options') {
+            return McqOptionsWidget(message: message);
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+      resolveUser: (UserID id) async {
+        return User(id: id, name: id == 'You' ? 'You' : 'Tutor');
+      },
     );
   }
 }

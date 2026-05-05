@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,47 +33,55 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(child: RootPane(rootsAsync: _rootsStream)),
-              const VerticalDivider(width: 1),
-              const Expanded(child: ChildPane()),
-              const VerticalDivider(width: 1),
-              const SizedBox(width: 720, child: EditGoalPanel()),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                icon: const Icon(Icons.file_download_outlined),
-                label: const Text('Export goals'),
-                onPressed: _busy ? null : _exportGoals,
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.file_upload_outlined),
-                label: const Text('Import goals'),
-                onPressed: _busy ? null : _importGoals,
-              ),
-              if (_busy) ...const [
-                SizedBox(width: 12),
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+    return Container(
+      color: AppColors.ink0,
+      child: Column(
+        children: [
+          _GoalsHeader(),
+          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: RootPane(rootsAsync: _rootsStream)),
+                const VerticalDivider(width: 1, color: AppColors.ink2),
+                const Expanded(child: ChildPane()),
+                const VerticalDivider(width: 1, color: AppColors.ink2),
+                const SizedBox(width: 720, child: EditGoalPanel()),
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.m,
+              vertical: AppSpacing.s,
+            ),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.file_download_outlined, size: 16),
+                  label: const Text('Export goals'),
+                  onPressed: _busy ? null : _exportGoals,
+                ),
+                const SizedBox(width: AppSpacing.s),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.file_upload_outlined, size: 16),
+                  label: const Text('Import goals'),
+                  onPressed: _busy ? null : _importGoals,
+                ),
+                if (_busy) ...const [
+                  SizedBox(width: AppSpacing.m),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -280,3 +289,23 @@ List<String> _stringList(dynamic v) {
 }
 
 enum _ImportMode { add, replace }
+
+class _GoalsHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      color: AppColors.ink1,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      alignment: Alignment.centerLeft,
+      child: const Text(
+        'Doelen',
+        style: TextStyle(
+          color: AppColors.fg,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
