@@ -1,12 +1,14 @@
 // 3.1 — `ChatWidget` swaps the chat composer based on `TutorService.state`:
-// `idle` → default `Composer`; `working` → `ComposerWaitWidget` (typing
-// indicator); `hasFollowUp` → `ComposerContinueWidget` (the "Continue"
-// button). A frozen "Continue" button is one of the easiest regressions to
-// ship and the hardest to notice in dev, so we lock the wiring here.
+// `idle` → `ComposerIdle`; `working` → `ComposerThinking` (typing indicator);
+// `hasFollowUp` → `ComposerContinue` (the "Continue" button). A frozen
+// "Continue" button is one of the easiest regressions to ship and the hardest
+// to notice in dev, so we lock the wiring here.
 //
 // Setup: `_FakeTutorService` subclasses `TutorService` so its state can be
 // driven via `fakeTutor.set(...)` after mount. `chatServiceProvider` is
 // overridden with a real `ChatService` (we only need its `controller`).
+// `profileProvider` is overridden with a fixed `Profile` so the new
+// `ChatHeader` builds without pulling account/auth services.
 // `ProviderScope` wraps the widget under test.
 //
 // We seed the chat with one message in `setUp` so the underlying
@@ -17,12 +19,13 @@
 // tickers and timers) before the test framework's invariant checks run.
 
 import 'package:ai_tutor_python/features/chat/chat_widget.dart';
-import 'package:ai_tutor_python/features/chat/composer_continue_widget.dart';
-import 'package:ai_tutor_python/features/chat/composer_wait_widget.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_continue.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,6 +42,16 @@ class _FakeTutorService extends TutorService {
     initializeSessionCalls++;
   }
 }
+
+const _testProfile = Profile(
+  name: 'Test',
+  topic: '',
+  level: 1,
+  xp: 0,
+  xpNext: 1500,
+  streak: 0,
+  role: Role.student,
+);
 
 void main() {
   late _FakeTutorService fakeTutor;
@@ -60,6 +73,7 @@ void main() {
     overrides: [
       tutorServiceProvider.overrideWith(() => fakeTutor),
       chatServiceProvider.overrideWithValue(chat),
+      profileProvider.overrideWithValue(_testProfile),
     ],
     child: const MaterialApp(
       home: Scaffold(body: ChatWidget()),
@@ -70,38 +84,38 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   }
 
-  testWidgets('idle state renders the default Composer', (tester) async {
+  testWidgets('idle state renders the ComposerIdle', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pump();
 
-    expect(find.byType(Composer), findsOneWidget);
-    expect(find.byType(ComposerWaitWidget), findsNothing);
-    expect(find.byType(ComposerContinueWidget), findsNothing);
+    expect(find.byType(ComposerIdle), findsOneWidget);
+    expect(find.byType(ComposerThinking), findsNothing);
+    expect(find.byType(ComposerContinue), findsNothing);
 
     await unmount(tester);
   });
 
-  testWidgets('working state renders the ComposerWaitWidget', (tester) async {
+  testWidgets('working state renders the ComposerThinking', (tester) async {
     await tester.pumpWidget(buildApp());
     fakeTutor.set(TutorState.working);
     await tester.pump();
 
-    expect(find.byType(ComposerWaitWidget), findsOneWidget);
-    expect(find.byType(Composer), findsNothing);
-    expect(find.byType(ComposerContinueWidget), findsNothing);
+    expect(find.byType(ComposerThinking), findsOneWidget);
+    expect(find.byType(ComposerIdle), findsNothing);
+    expect(find.byType(ComposerContinue), findsNothing);
 
     await unmount(tester);
   });
 
-  testWidgets('hasFollowUp state renders the ComposerContinueWidget',
+  testWidgets('hasFollowUp state renders the ComposerContinue',
       (tester) async {
     await tester.pumpWidget(buildApp());
     fakeTutor.set(TutorState.hasFollowUp);
     await tester.pump();
 
-    expect(find.byType(ComposerContinueWidget), findsOneWidget);
-    expect(find.byType(Composer), findsNothing);
-    expect(find.byType(ComposerWaitWidget), findsNothing);
+    expect(find.byType(ComposerContinue), findsOneWidget);
+    expect(find.byType(ComposerIdle), findsNothing);
+    expect(find.byType(ComposerThinking), findsNothing);
 
     await unmount(tester);
   });
@@ -110,22 +124,22 @@ void main() {
       'hasFollowUp → idle', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pump();
-    expect(find.byType(Composer), findsOneWidget);
+    expect(find.byType(ComposerIdle), findsOneWidget);
 
     fakeTutor.set(TutorState.working);
     await tester.pump();
-    expect(find.byType(ComposerWaitWidget), findsOneWidget);
-    expect(find.byType(Composer), findsNothing);
+    expect(find.byType(ComposerThinking), findsOneWidget);
+    expect(find.byType(ComposerIdle), findsNothing);
 
     fakeTutor.set(TutorState.hasFollowUp);
     await tester.pump();
-    expect(find.byType(ComposerContinueWidget), findsOneWidget);
-    expect(find.byType(ComposerWaitWidget), findsNothing);
+    expect(find.byType(ComposerContinue), findsOneWidget);
+    expect(find.byType(ComposerThinking), findsNothing);
 
     fakeTutor.set(TutorState.idle);
     await tester.pump();
-    expect(find.byType(Composer), findsOneWidget);
-    expect(find.byType(ComposerContinueWidget), findsNothing);
+    expect(find.byType(ComposerIdle), findsOneWidget);
+    expect(find.byType(ComposerContinue), findsNothing);
 
     await unmount(tester);
   });
