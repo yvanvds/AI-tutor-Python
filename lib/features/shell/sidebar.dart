@@ -18,6 +18,7 @@ class Sidebar extends ConsumerWidget {
 
   static const _teacherSections = [
     Section.goals,
+    Section.lessonContent,
     Section.instructions,
     Section.students,
   ];
@@ -84,6 +85,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.insights_outlined;
       case Section.goals:
         return Icons.flag_outlined;
+      case Section.lessonContent:
+        return Icons.menu_book_outlined;
       case Section.instructions:
         return Icons.integration_instructions_outlined;
       case Section.students:

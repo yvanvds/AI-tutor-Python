@@ -155,13 +155,23 @@ class _LeerpadBody extends ConsumerWidget {
     return roots.isEmpty ? null : roots.first.id;
   }
 
-  void _continueRoot(WidgetRef ref, Goal root) {
+  Future<void> _continueRoot(WidgetRef ref, Goal root) async {
     final sel = ref.read(goalSelectionProvider.notifier);
     sel.setPreferredRoot(root);
     sel.setPreferredChild(null);
-    ref.read(tutorServiceProvider.notifier).initializeSession(force: true);
     ref.read(sectionProvider.notifier).state = Section.session;
-    ref.read(modeProvider.notifier).state = SessionMode.explain;
+    await ref.read(tutorServiceProvider.notifier).initializeSession(force: true);
+
+    final child = ref.read(goalSelectionProvider).activeChildGoal;
+    final hasContent =
+        child != null && (child.contentId?.isNotEmpty ?? false);
+    final persisted = child == null
+        ? null
+        : await ref.read(progressServiceProvider).getByGoalId(child.id);
+    final hasProgress = (persisted?.progress ?? 0) > 0;
+
+    ref.read(modeProvider.notifier).state =
+        (!hasContent || hasProgress) ? SessionMode.practice : SessionMode.explain;
   }
 }
 

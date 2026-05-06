@@ -9,6 +9,15 @@ class Goal {
   final List<String> suggestions;
   final List<String> knownConcepts;
 
+  /// Reference to a `content` doc holding the authored explanation block for
+  /// this subgoal. Null when no block has been authored yet (transient
+  /// during authoring; target state is non-null for every leaf subgoal).
+  final String? contentId;
+
+  /// Parent module id. Empty string means "not yet backfilled" — the
+  /// Lesinhoud view treats those goals as belonging to the default module.
+  final String moduleId;
+
   Goal({
     required this.id,
     required this.title,
@@ -18,6 +27,8 @@ class Goal {
     this.optional = false,
     this.suggestions = const [],
     this.knownConcepts = const [],
+    this.contentId,
+    this.moduleId = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -28,6 +39,8 @@ class Goal {
     'optional': optional,
     'suggestions': suggestions,
     'knownConcepts': knownConcepts,
+    'contentId': contentId,
+    'moduleId': moduleId,
   };
 
   factory Goal.fromMap({
@@ -43,6 +56,8 @@ class Goal {
       optional: map['optional'] ?? false,
       suggestions: List<String>.from(map['suggestions'] ?? []),
       knownConcepts: List<String>.from(map['knownConcepts'] ?? []),
+      contentId: map['contentId'] as String?,
+      moduleId: (map['moduleId'] as String?) ?? '',
     );
   }
 

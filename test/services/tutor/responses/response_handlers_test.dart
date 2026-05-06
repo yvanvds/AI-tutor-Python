@@ -49,6 +49,9 @@ class _Recorder {
   final List<String> systemMessages = [];
   final List<String> exerciseTypes = [];
   final List<({String? message, String? code})> followUps = [];
+  final List<({String prompt, String code, List<String> options})> activeMcqs =
+      [];
+  final List<({String prompt, AnswerQuality quality})> mcqFeedbacks = [];
   int requestExerciseCalls = 0;
   int maybeRetryCalls = 0;
 }
@@ -57,7 +60,6 @@ void main() {
   late MockConductor conductor;
   late MockSoundService sound;
   late MockReportService report;
-  late MockChatService chat;
   late _Recorder rec;
   late TutorContext ctx;
 
@@ -69,11 +71,9 @@ void main() {
     conductor = MockConductor();
     sound = MockSoundService();
     report = MockReportService();
-    chat = MockChatService();
     rec = _Recorder();
 
     when(() => sound.askQuestion()).thenAnswer((_) async {});
-    when(() => chat.addMcqOptions(any())).thenReturn(null);
     when(() => conductor.hintProvided()).thenReturn(null);
     when(() => conductor.updateProgress(any<AnswerQuality>()))
         .thenAnswer((_) async => true);
@@ -99,7 +99,17 @@ void main() {
         rec.maybeRetryCalls++;
       },
       playQuestion: () => sound.askQuestion(),
-      addMcqOptions: chat.addMcqOptions,
+      setActiveMcq: ({
+        required String prompt,
+        required String code,
+        required List<String> options,
+      }) =>
+          rec.activeMcqs.add((prompt: prompt, code: code, options: options)),
+      applyMcqFeedback: ({
+        required String prompt,
+        required AnswerQuality quality,
+      }) =>
+          rec.mcqFeedbacks.add((prompt: prompt, quality: quality)),
       updateReportForGoal: (_, _) async {},
       updateReportForCurrentGoal: report.updateForCurrentChildGoal,
       recordParsedResponse: (_) {},
@@ -154,7 +164,8 @@ void main() {
       expect(rec.tutorMessages, ['why?']);
     });
 
-    test('MultipleChoice posts prompt + clickable options block', () async {
+    test('MultipleChoice routes prompt+code+options into activeMcq state',
+        () async {
       final ok = await dispatchResponse(
         MultipleChoice(
           type: 'multiple_choice',
@@ -165,9 +176,15 @@ void main() {
         ctx,
       );
       expect(ok, isTrue);
-      expect(rec.startedCode, ['print(1)']);
-      expect(rec.tutorMessages, ['pick']);
-      verify(() => chat.addMcqOptions(['A', 'B', 'C'])).called(1);
+      expect(rec.exerciseTypes, ['multiple_choice']);
+      // The MCQ render owns the code + prompt — no chat tutor message and
+      // no editor seed.
+      expect(rec.startedCode, isEmpty);
+      expect(rec.tutorMessages, isEmpty);
+      expect(rec.activeMcqs, hasLength(1));
+      expect(rec.activeMcqs.single.prompt, 'pick');
+      expect(rec.activeMcqs.single.code, 'print(1)');
+      expect(rec.activeMcqs.single.options, ['A', 'B', 'C']);
       verify(() => sound.askQuestion()).called(1);
     });
 
@@ -321,7 +338,7 @@ void main() {
   });
 
   group('McqFeedbackHandler', () {
-    test('always posts prompt, updates progress, then requestExercise',
+    test('lands feedback on activeMcq, updates progress, defers advance',
         () async {
       await dispatchResponse(
         McqFeedback(
@@ -332,10 +349,15 @@ void main() {
         ctx,
       );
 
-      expect(rec.tutorMessages, ['try again']);
+      // Feedback lives in activeMcq, not the chat history.
+      expect(rec.tutorMessages, isEmpty);
+      expect(rec.mcqFeedbacks,
+          [(prompt: 'try again', quality: AnswerQuality.wrong)]);
       verify(() => conductor.updateProgress(AnswerQuality.wrong)).called(1);
       verify(() => sound.askQuestion()).called(1);
-      expect(rec.requestExerciseCalls, 1);
+      // The student clicks "Volgende" to advance — the handler no longer
+      // auto-requests the next exercise.
+      expect(rec.requestExerciseCalls, 0);
       expect(rec.followUps, isEmpty);
     });
   });

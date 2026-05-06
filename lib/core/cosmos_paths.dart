@@ -9,14 +9,18 @@ const String _statusReportsContainer = 'status_reports';
 const String _goalsContainer = 'goals';
 const String _instructionsContainer = 'instructions';
 const String _configContainer = 'config';
+const String _contentContainer = 'content';
+const String _modulesContainer = 'modules';
 
 /// Constant partition-key values for the single-partition containers
-/// (`goals`, `instructions`, `config`). Each doc in those containers carries
-/// a `type` field with this exact value.
+/// (`goals`, `instructions`, `config`, `content`, `modules`). Each doc in
+/// those containers carries a `type` field with this exact value.
 class CosmosPartitions {
   static const String goal = 'goal';
   static const String instruction = 'instruction';
   static const String config = 'config';
+  static const String content = 'content';
+  static const String module = 'module';
 }
 
 class CosmosPaths {
@@ -49,4 +53,12 @@ class CosmosPaths {
 
   /// `/type` partition (always `"config"`). Single doc with id `global`.
   static CosmosContainer config() => _client.container(_configContainer);
+
+  /// `/type` partition (always `"content"`). One doc per authored
+  /// explanation block; referenced from `Goal.contentId`.
+  static CosmosContainer content() => _client.container(_contentContainer);
+
+  /// `/type` partition (always `"module"`). Top-level grouping for goals;
+  /// v1 has a single bootstrapped doc.
+  static CosmosContainer modules() => _client.container(_modulesContainer);
 }

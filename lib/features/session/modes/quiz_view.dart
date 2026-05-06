@@ -1,52 +1,27 @@
+import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Quiz mode — full-bleed multiple-choice presentation.
-///
-/// Phase 3 ships with hard-coded sample content so the layout, progress
-/// segments, and answer feedback (correct → accent-2, wrong → danger) can be
-/// validated. Wiring to the live MCQ flow (the `mcq_options` custom message
-/// in `chat_service`) is a follow-up: read the active MCQ message's
-/// `metadata['options']` here and reuse the chat path's
-/// `markMcqAnswered` + `addMessage` + `tutorService.handleStudentMessage`.
-class QuizView extends StatefulWidget {
+/// MCQ render — full-bleed multiple-choice presentation, lifted from the
+/// old top-level Quiz mode. `PracticeView` mounts this whenever
+/// `activeMcqProvider` is non-null. The layout (header pill, code card,
+/// option grid, feedback area) is preserved from the original sketch; the
+/// data is now live from the tutor flow.
+class QuizView extends ConsumerWidget {
   const QuizView({super.key});
 
   @override
-  State<QuizView> createState() => _QuizViewState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mcq = ref.watch(activeMcqProvider);
+    if (mcq == null) return const SizedBox.shrink();
+    final tutorState = ref.watch(tutorServiceProvider);
 
-class _QuizViewState extends State<QuizView> {
-  static const _total = 5;
-  static const _current = 3;
-
-  static const _correct = [true, true, false]; // questions 1..3 - 3 in flight
-
-  static const _question = 'Wat zal Python printen?';
-  static const _code = '''score = 78
-if score >= 90:
-    print("A")
-elif score >= 75:
-    print("B")
-elif score >= 60:
-    print("C")
-else:
-    print("D")''';
-  static const _options = ['"A"', '"B"', '"C"', '"D"'];
-  static const _correctAnswer = '"B"';
-
-  String? _selected;
-
-  void _pick(String option) {
-    if (_selected != null) return;
-    setState(() => _selected = option);
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       color: AppColors.ink0,
       child: SingleChildScrollView(
@@ -60,15 +35,11 @@ else:
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _QuizHeader(
-                  current: _current,
-                  total: _total,
-                  history: _correct,
-                ),
+                const _QuizHeader(),
                 const SizedBox(height: AppSpacing.xl),
-                const Text(
-                  _question,
-                  style: TextStyle(
+                Text(
+                  mcq.prompt,
+                  style: const TextStyle(
                     color: AppColors.fg,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -76,15 +47,33 @@ else:
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                const _CodeCard(code: _code),
+                if (mcq.code.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _CodeCard(code: mcq.code),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 _OptionGrid(
-                  options: _options,
-                  selected: _selected,
-                  correct: _correctAnswer,
-                  onPick: _pick,
+                  options: mcq.options,
+                  selected: mcq.selected,
+                  feedbackQuality: mcq.feedbackQuality,
+                  onPick: (option) => ref
+                      .read(tutorServiceProvider.notifier)
+                      .submitMcqAnswer(option),
                 ),
+                if (mcq.hasFeedback) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _FeedbackPanel(
+                    text: mcq.feedback!,
+                    quality: mcq.feedbackQuality,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _AdvanceButton(
+                    enabled: tutorState == TutorState.idle,
+                    onTap: () => ref
+                        .read(tutorServiceProvider.notifier)
+                        .advanceFromMcq(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -95,15 +84,7 @@ else:
 }
 
 class _QuizHeader extends StatelessWidget {
-  const _QuizHeader({
-    required this.current,
-    required this.total,
-    required this.history,
-  });
-
-  final int current;
-  final int total;
-  final List<bool> history;
+  const _QuizHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -118,9 +99,9 @@ class _QuizHeader extends StatelessWidget {
             color: AppColors.accent.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
-          child: Text(
-            'QUIZ VRAAG $current / $total',
-            style: const TextStyle(
+          child: const Text(
+            'QUIZVRAAG',
+            style: TextStyle(
               color: AppColors.accent,
               fontSize: 10,
               fontWeight: FontWeight.w600,
@@ -128,55 +109,7 @@ class _QuizHeader extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
-        _ProgressSegments(
-          current: current,
-          total: total,
-          history: history,
-        ),
       ],
-    );
-  }
-}
-
-class _ProgressSegments extends StatelessWidget {
-  const _ProgressSegments({
-    required this.current,
-    required this.total,
-    required this.history,
-  });
-
-  final int current;
-  final int total;
-  final List<bool> history;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(total, (i) {
-        final n = i + 1;
-        final Color color;
-        if (n < current) {
-          final ok = i < history.length ? history[i] : true;
-          color = ok ? AppColors.accent2 : AppColors.danger;
-        } else if (n == current) {
-          color = AppColors.accent;
-        } else {
-          color = AppColors.ink2;
-        }
-        return Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Container(
-            width: 22,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-          ),
-        );
-      }),
     );
   }
 }
@@ -208,13 +141,13 @@ class _OptionGrid extends StatelessWidget {
   const _OptionGrid({
     required this.options,
     required this.selected,
-    required this.correct,
+    required this.feedbackQuality,
     required this.onPick,
   });
 
   final List<String> options;
   final String? selected;
-  final String correct;
+  final AnswerQuality? feedbackQuality;
   final void Function(String) onPick;
 
   static const _badges = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -242,16 +175,22 @@ class _OptionGrid extends StatelessWidget {
 
   _OptionState _stateFor(String option) {
     if (selected == null) return _OptionState.idle;
-    final isThisCorrect = option == correct;
     final isThisSelected = option == selected;
-    if (isThisSelected && isThisCorrect) return _OptionState.correctChosen;
-    if (isThisSelected && !isThisCorrect) return _OptionState.wrongChosen;
-    if (!isThisSelected && isThisCorrect) return _OptionState.correctReveal;
-    return _OptionState.dismissed;
+    if (!isThisSelected) return _OptionState.dismissed;
+    // Selected. Visual depends on feedback (if any yet).
+    switch (feedbackQuality) {
+      case null:
+        return _OptionState.selectedPending;
+      case AnswerQuality.correct:
+      case AnswerQuality.partial:
+        return _OptionState.correctChosen;
+      case AnswerQuality.wrong:
+        return _OptionState.wrongChosen;
+    }
   }
 }
 
-enum _OptionState { idle, correctChosen, wrongChosen, correctReveal, dismissed }
+enum _OptionState { idle, selectedPending, correctChosen, wrongChosen, dismissed }
 
 class _Option extends StatefulWidget {
   const _Option({
@@ -339,8 +278,15 @@ class _OptionRowState extends State<_Option> {
           badgeBg: AppColors.ink2,
           badgeFg: AppColors.fgMute,
         );
+      case _OptionState.selectedPending:
+        return _OptionVisuals(
+          bg: AppColors.accent.withValues(alpha: 0.18),
+          border: AppColors.accent.withValues(alpha: 0.6),
+          fg: AppColors.accent,
+          badgeBg: AppColors.accent,
+          badgeFg: AppColors.ink0,
+        );
       case _OptionState.correctChosen:
-      case _OptionState.correctReveal:
         return _OptionVisuals(
           bg: AppColors.accent2.withValues(alpha: 0.18),
           border: AppColors.accent2.withValues(alpha: 0.6),
@@ -382,4 +328,91 @@ class _OptionVisuals {
   final Color fg;
   final Color badgeBg;
   final Color badgeFg;
+}
+
+class _FeedbackPanel extends StatelessWidget {
+  const _FeedbackPanel({required this.text, required this.quality});
+
+  final String text;
+  final AnswerQuality? quality;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = switch (quality) {
+      AnswerQuality.correct || AnswerQuality.partial => AppColors.accent2,
+      AnswerQuality.wrong => AppColors.danger,
+      null => AppColors.accent,
+    };
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.10),
+        border: Border.all(color: accent.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(AppRadius.cardLarge),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.fg,
+          fontSize: 14,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _AdvanceButton extends StatefulWidget {
+  const _AdvanceButton({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  State<_AdvanceButton> createState() => _AdvanceButtonState();
+}
+
+class _AdvanceButtonState extends State<_AdvanceButton> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.enabled;
+    final bg = enabled
+        ? (_hovering ? AppColors.accent2 : AppColors.accent)
+        : AppColors.ink2;
+    final fg = enabled ? AppColors.ink0 : AppColors.fgMute;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) => setState(() => _hovering = true),
+        onExit: (_) => setState(() => _hovering = false),
+        child: GestureDetector(
+          onTap: enabled ? widget.onTap : null,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: AppDurations.hover,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.s,
+            ),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              'Volgende →',
+              style: TextStyle(
+                color: fg,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

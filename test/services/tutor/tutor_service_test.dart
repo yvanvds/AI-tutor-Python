@@ -636,18 +636,14 @@ void main() {
     }
 
     test(
-      'mcq_feedback chains a fresh exercise (regression: "voorbereid..." stall)',
+      'mcq_feedback no longer auto-chains; advance is deferred to the student',
       () async {
-        // First sendRequestStream is the mcqAnswer turn → mcq_feedback.
-        // Second is the next-exercise turn requested by the handler.
+        // Phase B change: McqFeedbackHandler no longer calls requestExercise.
+        // The MCQ render in PracticeView shows the feedback and surfaces a
+        // "Volgende" button — the student drives the next request via
+        // tutorService.advanceFromMcq.
         stubSendStreamSequence([
           {'type': 'mcq_feedback', 'prompt': 'Goed!', 'quality': 'correct'},
-          {
-            'type': 'multiple_choice',
-            'prompt': 'wat print dit?',
-            'code': 'print(1)',
-            'options': const <Map>[],
-          },
         ]);
         when(() => conductor.getNextQuestion())
             .thenReturn((ChatRequestType.mcQuestion, QuestionDifficulty.easy));
@@ -659,17 +655,18 @@ void main() {
         );
 
         final reqs = capturedRequests();
-        expect(reqs, hasLength(2));
+        expect(reqs, hasLength(1));
         expect(reqs[0]['request_type'], 'mcq_answer');
-        expect(reqs[1]['request_type'], 'multiple_choice');
         expect(pc.read(tutorServiceProvider), TutorState.idle);
-        verify(
+        // No "voorbereid..." preparation message since no follow-up
+        // exercise is queued.
+        verifyNever(
           () => chat.addSystemMessage(
             any<String>(
               that: predicate<String>((s) => s.contains('voorbereid')),
             ),
           ),
-        ).called(1);
+        );
       },
     );
 

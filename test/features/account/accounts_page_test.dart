@@ -142,9 +142,9 @@ void main() {
 
   testWidgets('renders the new inline columns', (tester) async {
     await pump(tester);
-    expect(find.text('Huidig doel'), findsOneWidget);
-    expect(find.text('Voortgang'), findsOneWidget);
-    expect(find.text('Status'), findsOneWidget);
+    expect(find.text('HUIDIG DOEL'), findsOneWidget);
+    expect(find.text('VOORTGANG'), findsOneWidget);
+    expect(find.text('STATUS'), findsOneWidget);
   });
 
   testWidgets('shows the most-recently-active root goal title in '
@@ -161,7 +161,7 @@ void main() {
 
     // Tap a plain Text cell — SelectableText would swallow the tap before
     // DataRow.onSelectChanged sees it.
-    await tester.tap(find.text('Alice'));
+    await tester.tap(find.text('Alice A'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

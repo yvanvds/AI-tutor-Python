@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -27,7 +28,8 @@ class TutorContext {
     required this.requestExercise,
     required this.maybeRetry,
     required this.playQuestion,
-    required this.addMcqOptions,
+    required this.setActiveMcq,
+    required this.applyMcqFeedback,
     required this.updateReportForGoal,
     required this.updateReportForCurrentGoal,
     required this.recordParsedResponse,
@@ -43,7 +45,22 @@ class TutorContext {
   final Future<void> Function() requestExercise;
   final Future<void> Function() maybeRetry;
   final void Function() playQuestion;
-  final void Function(List<String> options) addMcqOptions;
+
+  /// Open a fresh MCQ in the practice view. Replaces the chat-based
+  /// `addMcqOptions` flow.
+  final void Function({
+    required String prompt,
+    required String code,
+    required List<String> options,
+  }) setActiveMcq;
+
+  /// Land tutor feedback onto the in-flight MCQ so the practice view can
+  /// reveal correct/wrong styling and the "Volgende" button.
+  final void Function({
+    required String prompt,
+    required AnswerQuality quality,
+  }) applyMcqFeedback;
+
   final Future<void> Function(String goalId, String report) updateReportForGoal;
   final Future<void> Function(String report) updateReportForCurrentGoal;
   final void Function(ChatResponse response) recordParsedResponse;
@@ -108,9 +125,7 @@ class MultipleChoiceHandler extends ResponseHandler<MultipleChoice> {
   @override
   Future<void> handle(MultipleChoice r, TutorContext ctx) async {
     ctx.setExerciseType(r.type);
-    ctx.startNewCode(r.code);
-    ctx.addTutorMessage(r.prompt);
-    ctx.addMcqOptions(r.options);
+    ctx.setActiveMcq(prompt: r.prompt, code: r.code, options: r.options);
     ctx.playQuestion();
   }
 }
@@ -194,11 +209,12 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
   const McqFeedbackHandler();
   @override
   Future<void> handle(McqFeedback r, TutorContext ctx) async {
-    ctx.addTutorMessage(r.prompt);
+    ctx.applyMcqFeedback(prompt: r.prompt, quality: r.quality);
     ctx.playQuestion();
     await ctx.conductor.updateProgress(r.quality);
     await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
-    await ctx.requestExercise();
+    // Advance is deferred until the student clicks "Volgende" inside the
+    // MCQ render — see TutorService.advanceFromMcq.
   }
 }
 

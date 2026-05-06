@@ -40,13 +40,15 @@ class ConductorDeps {
   final Future<List<String>> Function(
     Goal targetRoot, {
     List<Goal>? cachedRoots,
-  }) getKnownConceptsInScope;
+  })
+  getKnownConceptsInScope;
   final Future<void> Function(
     Progress p, {
     AnswerQuality? quality,
     bool isWarmUp,
     bool recordHistory,
-  }) upsertProgress;
+  })
+  upsertProgress;
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
   final void Function(double) setCurrentProgress;
@@ -55,10 +57,8 @@ class ConductorDeps {
   final void Function() playCorrectAnswer;
   final void Function() playGuidingComplete;
   final void Function() playGoalReached;
-  final void Function({
-    required String goalTitle,
-    required String description,
-  }) showGoalReached;
+  final void Function({required String goalTitle, required String description})
+  showGoalReached;
 }
 
 class Conductor {

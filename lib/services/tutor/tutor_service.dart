@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -14,6 +15,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -57,6 +59,7 @@ class TutorService extends Notifier<TutorState> {
 
   bool _initialized = false;
   String _currentExerciseType = '';
+  String? _currentExerciseGoalId;
   String? _nextMessage;
   String? _nextCode;
   String? _statusReportGoalIdOverride;
@@ -146,6 +149,8 @@ class TutorService extends Notifier<TutorState> {
   Future<void> initializeSession({bool force = false}) async {
     if (_initialized && !force) return;
     _initialized = true;
+    _currentExerciseType = '';
+    _currentExerciseGoalId = null;
     _chat.clear();
 
     if (force) {
@@ -409,7 +414,8 @@ class TutorService extends Notifier<TutorState> {
       maybeRetry: maybeRetryOverride,
       playQuestion: () =>
           unawaited(ref.read(soundServiceProvider).askQuestion()),
-      addMcqOptions: _chat.addMcqOptions,
+      setActiveMcq: _setActiveMcq,
+      applyMcqFeedback: _applyMcqFeedback,
       updateReportForGoal: report.updateForGoal,
       updateReportForCurrentGoal: report.updateForCurrentChildGoal,
       recordParsedResponse: _debug.recordParsedResponse,
@@ -420,7 +426,66 @@ class TutorService extends Notifier<TutorState> {
   void _trackedSetExerciseType(String type) {
     final from = _currentExerciseType;
     _currentExerciseType = type;
-    _debug.recordEvent('tutor.exercise_type_set', {'from': from, 'to': type});
+    _currentExerciseGoalId =
+        ref.read(goalSelectionProvider).activeChildGoal?.id;
+    _debug.recordEvent('tutor.exercise_type_set', {
+      'from': from,
+      'to': type,
+      'goalId': _currentExerciseGoalId,
+    });
+  }
+
+  void _setActiveMcq({
+    required String prompt,
+    required String code,
+    required List<String> options,
+  }) {
+    ref.read(activeMcqProvider.notifier).state = ActiveMcq(
+      prompt: prompt,
+      code: code,
+      options: options,
+    );
+  }
+
+  void _applyMcqFeedback({
+    required String prompt,
+    required AnswerQuality quality,
+  }) {
+    final current = ref.read(activeMcqProvider);
+    if (current == null) return;
+    ref.read(activeMcqProvider.notifier).state = current.copyWith(
+      feedback: prompt,
+      feedbackQuality: quality,
+    );
+  }
+
+  /// Records the student's MCQ pick and asks the tutor to grade it.
+  /// Called from the MCQ render in `PracticeView`.
+  Future<void> submitMcqAnswer(String picked) async {
+    final current = ref.read(activeMcqProvider);
+    if (current == null || current.selected != null) return;
+    ref.read(activeMcqProvider.notifier).state =
+        current.copyWith(selected: picked);
+    await queryTutor(type: ChatRequestType.mcqAnswer, prompt: picked);
+  }
+
+  /// Dismisses the current MCQ render and asks the conductor for the next
+  /// exercise. Called when the student clicks "Volgende" after seeing
+  /// feedback.
+  Future<void> advanceFromMcq() async {
+    ref.read(activeMcqProvider.notifier).state = null;
+    await requestExercise();
+  }
+
+  /// Whether there's an exercise rendered (or being prepared) for the
+  /// current active subgoal. `PracticeView` uses this to decide whether to
+  /// auto-request a new exercise on entry.
+  bool hasInFlightExercise() {
+    final activeId = ref.read(goalSelectionProvider).activeChildGoal?.id;
+    if (activeId == null) return false;
+    if (state != TutorState.idle) return true;
+    if (_currentExerciseType.isEmpty) return false;
+    return _currentExerciseGoalId == activeId;
   }
 
   void _trackedSetFollowUp({String? message, String? code}) {

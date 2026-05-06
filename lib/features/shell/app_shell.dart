@@ -3,6 +3,7 @@ import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/dashboard/debug_dialog.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
+import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -78,6 +79,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const LeerpadPage();
       case Section.goals:
         return const GoalsPage();
+      case Section.lessonContent:
+        return const LessonContentPage();
       case Section.instructions:
         return const InstructionsEditorPage();
       case Section.students:

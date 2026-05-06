@@ -144,6 +144,34 @@ class GoalsService {
   Future<void> updateKnownConcepts(String id, List<String> knownConcepts) =>
       _patch(id, {'knownConcepts': knownConcepts});
 
+  Future<void> setContentId(String id, String? contentId) =>
+      _patch(id, {'contentId': contentId});
+
+  Future<void> setModuleId(String id, String moduleId) =>
+      _patch(id, {'moduleId': moduleId});
+
+  /// Idempotent backfill: any goal whose `moduleId` is empty/missing gets
+  /// [defaultModuleId]. All goals share the `/type = "goal"` partition, so
+  /// the writes go through a single transactional batch.
+  Future<int> backfillModuleIds(String defaultModuleId) async {
+    final all = await safeCosmos(_fetchAll);
+    final ops = <BatchOperation>[];
+    for (final g in all) {
+      if (g.moduleId.isNotEmpty) continue;
+      final doc = await safeCosmos(
+        () => _container.read(g.id, partitionKey: _pk),
+      );
+      if (doc == null) continue;
+      doc['moduleId'] = defaultModuleId;
+      ops.add(BatchOperation.upsert(doc));
+    }
+    if (ops.isEmpty) return 0;
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
+    return ops.length;
+  }
+
   Future<void> reparent(String id, String? newParentId) async {
     final next = await _nextOrder(parentId: newParentId);
     await _patch(id, {'parentId': newParentId, 'order': next});
@@ -307,6 +335,8 @@ class GoalsService {
     'optional': goal.optional,
     'suggestions': goal.suggestions,
     'knownConcepts': goal.knownConcepts,
+    'contentId': goal.contentId,
+    'moduleId': goal.moduleId,
   };
 
   Future<Map<String, Goal>> _getAllGoalsMap() async {

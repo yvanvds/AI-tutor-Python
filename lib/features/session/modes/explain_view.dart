@@ -1,16 +1,18 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/content/content.dart';
+import 'package:ai_tutor_python/services/content/content_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Uitleg — read-and-understand layout. Renders a single explanatory concept
-/// as a scrollable canvas with a header, a "Hoe Python eraan denkt" card, an
-/// info callout, and a footer.
-///
-/// Phase 3 ships with a hard-coded elif-ladder example matching the prototype.
-/// Future work: lift the content to a data source (e.g. `instructions_service`)
-/// and walk the curriculum tree.
+/// Uitleg — read-and-understand layout. Reads the active subgoal from
+/// `goalSelectionProvider`, loads the linked `content` doc, and renders its
+/// markdown body using the same visual language as the prototype: header
+/// pill, title, code card, info callout, and footer.
 class ExplainView extends ConsumerWidget {
   const ExplainView({super.key});
 
@@ -18,6 +20,21 @@ class ExplainView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selection = ref.watch(goalSelectionProvider);
+    final child = selection.activeChildGoal;
+    final root = selection.activeRootGoal;
+
+    Widget body;
+    if (child == null) {
+      body = const _Placeholder(
+        message: 'Kies een subdoel in Leerpad om de uitleg te bekijken.',
+      );
+    } else if (child.contentId == null || child.contentId!.isEmpty) {
+      body = _MissingContent(child: child, root: root);
+    } else {
+      body = _ContentView(child: child, root: root, contentId: child.contentId!);
+    }
+
     return Container(
       color: AppColors.ink0,
       child: SingleChildScrollView(
@@ -28,20 +45,7 @@ class ExplainView extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: _maxWidth),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Header(pill: 'Concept', current: 2, total: 4),
-                SizedBox(height: AppSpacing.lg),
-                _Title(),
-                SizedBox(height: AppSpacing.xl),
-                _ElifLadderCard(),
-                SizedBox(height: AppSpacing.lg),
-                _ImportantCallout(),
-                SizedBox(height: AppSpacing.xxl),
-                _Footer(),
-              ],
-            ),
+            child: body,
           ),
         ),
       ),
@@ -49,259 +53,196 @@ class ExplainView extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.pill, required this.current, required this.total});
-  final String pill;
-  final int current;
-  final int total;
+class _ContentView extends ConsumerWidget {
+  const _ContentView({
+    required this.child,
+    required this.root,
+    required this.contentId,
+  });
+
+  final Goal child;
+  final Goal? root;
+  final String contentId;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cached = ref.watch(contentServiceProvider);
+    final content = cached
+        .where((c) => c.id == contentId)
+        .cast<Content?>()
+        .firstWhere((_) => true, orElse: () => null);
+
+    if (content == null) {
+      // Cache hasn't filled yet — fall back to a one-shot stream.
+      return StreamBuilder<Content?>(
+        stream: ref
+            .read(contentServiceProvider.notifier)
+            .watchById(contentId),
+        builder: (context, snap) {
+          final c = snap.data;
+          if (c == null) {
+            return const _Placeholder(message: 'Lesinhoud laden…');
+          }
+          return _ContentBody(child: child, root: root, content: c);
+        },
+      );
+    }
+    return _ContentBody(child: child, root: root, content: content);
+  }
+}
+
+class _ContentBody extends ConsumerWidget {
+  const _ContentBody({
+    required this.child,
+    required this.root,
+    required this.content,
+  });
+
+  final Goal child;
+  final Goal? root;
+  final Content content;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s,
-            vertical: 3,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Text(
-            pill.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.accent,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ),
-        const Spacer(),
-        Text(
-          '$current / $total',
-          style: AppMono.tnum(
-            size: 12,
-            weight: FontWeight.w500,
-            color: AppColors.fgFaint,
-          ),
-        ),
+        _SubgoalHeader(child: child, root: root),
+        const SizedBox(height: AppSpacing.lg),
+        _Title(text: content.title),
+        const SizedBox(height: AppSpacing.xl),
+        ...renderMarkdownBlocks(content.body),
+        const SizedBox(height: AppSpacing.xxl),
+        const _Footer(),
       ],
     );
   }
 }
 
-class _Title extends StatelessWidget {
-  const _Title();
+class _MissingContent extends StatelessWidget {
+  const _MissingContent({required this.child, required this.root});
+  final Goal child;
+  final Goal? root;
 
   @override
   Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(
-          color: AppColors.fg,
-          fontSize: 30,
-          fontWeight: FontWeight.w700,
-          height: 1.15,
-          letterSpacing: -0.4,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SubgoalHeader(child: child, root: root),
+        const SizedBox(height: AppSpacing.lg),
+        _Title(text: child.title),
+        const SizedBox(height: AppSpacing.xl),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.ink1,
+            border: Border.all(color: AppColors.ink2),
+            borderRadius: BorderRadius.circular(AppRadius.cardLarge),
+          ),
+          child: const Text(
+            'Nog geen lesinhoud beschikbaar voor dit subdoel.',
+            style: TextStyle(
+              color: AppColors.fgMute,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
         ),
-        children: [
-          const TextSpan(text: 'De '),
-          TextSpan(
-            text: 'elif',
-            style: AppMono.code(color: AppColors.accent, size: 26)
-                .copyWith(fontWeight: FontWeight.w600),
-          ),
-          const TextSpan(text: '-ladder: één keuze tegelijk'),
-        ],
-      ),
+        const SizedBox(height: AppSpacing.xxl),
+        const _Footer(),
+      ],
     );
   }
 }
 
-class _ElifLadderCard extends StatelessWidget {
-  const _ElifLadderCard();
-
-  static const _steps = [
-    _LadderStep(1, 'als score >= 90', '"A"'),
-    _LadderStep(2, 'als score >= 75', '"B"'),
-    _LadderStep(3, 'als score >= 60', '"C"'),
-    _LadderStep(4, 'anders', '"D"'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.ink1,
-        border: Border.all(color: AppColors.ink2),
-        borderRadius: BorderRadius.circular(AppRadius.cardLarge),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lgPlus,
-              AppSpacing.md,
-              AppSpacing.lgPlus,
-              AppSpacing.s,
-            ),
-            child: const Text(
-              'Hoe Python eraan denkt',
-              style: TextStyle(
-                color: AppColors.fg,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          for (var i = 0; i < _steps.length; i++) ...[
-            if (i > 0) const _DashedDivider(),
-            _LadderRow(step: _steps[i]),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _LadderStep {
-  const _LadderStep(this.index, this.condition, this.output);
-  final int index;
-  final String condition;
-  final String output;
-}
-
-class _LadderRow extends StatelessWidget {
-  const _LadderRow({required this.step});
-  final _LadderStep step;
+class _Placeholder extends StatelessWidget {
+  const _Placeholder({required this.message});
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lgPlus,
-        vertical: AppSpacing.m,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+      child: Center(
+        child: Text(
+          message,
+          style: const TextStyle(color: AppColors.fgMute, fontSize: 13),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.ink2,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '${step.index}',
-              style: AppMono.tnum(
-                size: 11,
-                weight: FontWeight.w600,
-                color: AppColors.fgMute,
+    );
+  }
+}
+
+class _SubgoalHeader extends ConsumerWidget {
+  const _SubgoalHeader({required this.child, required this.root});
+  final Goal child;
+  final Goal? root;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pill = (root?.title ?? 'Concept').toUpperCase();
+    return StreamBuilder<List<Goal>>(
+      stream: root == null
+          ? const Stream.empty()
+          : ref.read(goalsServiceProvider).streamChildren(root!.id),
+      builder: (context, snap) {
+        final siblings = snap.data ?? const <Goal>[];
+        final idx = siblings.indexWhere((g) => g.id == child.id);
+        final total = siblings.length;
+        final showCounter = idx >= 0 && total > 0;
+        return Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s,
+                vertical: 3,
               ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.m),
-          Expanded(
-            child: Text(
-              step.condition,
-              style: AppMono.code(color: AppColors.fg, size: 13),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s),
-          const Icon(Icons.arrow_forward, size: 14, color: AppColors.fgFaint),
-          const SizedBox(width: AppSpacing.s),
-          Text(
-            step.output,
-            style: AppMono.code(color: AppColors.syntaxStr, size: 13),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashedDivider extends StatelessWidget {
-  const _DashedDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lgPlus),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const dashWidth = 4.0;
-          const dashSpace = 4.0;
-          final count =
-              (constraints.maxWidth / (dashWidth + dashSpace)).floor();
-          return ClipRect(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(count, (_) {
-                return const SizedBox(
-                  width: dashWidth + dashSpace,
-                  height: 1,
-                  child: Padding(
-                    padding: EdgeInsets.only(right: dashSpace),
-                    child: ColoredBox(color: AppColors.ink2),
-                  ),
-                );
-              }),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ImportantCallout extends StatelessWidget {
-  const _ImportantCallout();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.accent3.withValues(alpha: 0.1),
-        border: Border.all(color: AppColors.accent3.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.info_outline,
-            size: 16,
-            color: AppColors.accent3,
-          ),
-          const SizedBox(width: AppSpacing.s),
-          Expanded(
-            child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 13,
-                  height: 1.5,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Text(
+                pill,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.6,
                 ),
-                children: [
-                  TextSpan(
-                    text: 'Belangrijk. ',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  TextSpan(
-                    text:
-                        'Python checkt de regels van boven naar beneden en stopt zodra er één klopt. '
-                        'Zet daarom de strengste voorwaarde bovenaan.',
-                  ),
-                ],
               ),
             ),
-          ),
-        ],
+            const Spacer(),
+            if (showCounter)
+              Text(
+                '${idx + 1} / $total',
+                style: AppMono.tnum(
+                  size: 12,
+                  weight: FontWeight.w500,
+                  color: AppColors.fgFaint,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _Title extends StatelessWidget {
+  const _Title({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppColors.fg,
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+        height: 1.15,
+        letterSpacing: -0.4,
       ),
     );
   }
@@ -338,6 +279,281 @@ class _Footer extends ConsumerWidget {
     );
   }
 }
+
+// --- Markdown rendering --------------------------------------------------
+
+/// Renders a small, opinionated markdown subset matching the conventions
+/// teachers author against:
+/// * Fenced ` ```python ` blocks → "Hoe Python eraan denkt" code card.
+/// * Lines starting with `> [!info]` → info callout pill.
+/// * `# / ## / ###` headings → progressively smaller titles.
+/// * Everything else → paragraph text (with `**bold**` and ` `code` `
+///   inline runs).
+List<Widget> renderMarkdownBlocks(String body) {
+  final blocks = _parseBlocks(body);
+  final out = <Widget>[];
+  for (var i = 0; i < blocks.length; i++) {
+    if (i > 0) out.add(const SizedBox(height: AppSpacing.lg));
+    out.add(_renderBlock(blocks[i]));
+  }
+  return out;
+}
+
+abstract class _Block {}
+
+class _CodeBlock extends _Block {
+  _CodeBlock(this.language, this.lines);
+  final String language;
+  final List<String> lines;
+}
+
+class _CalloutBlock extends _Block {
+  _CalloutBlock(this.kind, this.text);
+  final String kind; // info | warn | …
+  final String text;
+}
+
+class _HeadingBlock extends _Block {
+  _HeadingBlock(this.level, this.text);
+  final int level;
+  final String text;
+}
+
+class _ParagraphBlock extends _Block {
+  _ParagraphBlock(this.text);
+  final String text;
+}
+
+List<_Block> _parseBlocks(String body) {
+  final lines = body.split('\n');
+  final blocks = <_Block>[];
+  final paragraph = StringBuffer();
+
+  void flushParagraph() {
+    final t = paragraph.toString().trim();
+    if (t.isNotEmpty) blocks.add(_ParagraphBlock(t));
+    paragraph.clear();
+  }
+
+  var i = 0;
+  while (i < lines.length) {
+    final line = lines[i];
+    final trimmed = line.trimLeft();
+
+    // Fenced code block. Accepts `​```python`, `​```{python}` (Quarto style),
+    // and bare `​```` openers.
+    final fenceMatch = RegExp(r'^```\s*(.*?)\s*$').firstMatch(trimmed);
+    if (fenceMatch != null) {
+      flushParagraph();
+      var lang = fenceMatch.group(1) ?? '';
+      if (lang.startsWith('{') && lang.endsWith('}')) {
+        lang = lang.substring(1, lang.length - 1);
+      }
+      final codeLines = <String>[];
+      i++;
+      while (i < lines.length && !RegExp(r'^\s*```\s*$').hasMatch(lines[i])) {
+        codeLines.add(lines[i]);
+        i++;
+      }
+      blocks.add(_CodeBlock(lang, codeLines));
+      if (i < lines.length) i++; // consume closing fence
+      continue;
+    }
+
+    // Callout: `> [!info] body...` (continuation lines also starting with `>`)
+    final calloutMatch =
+        RegExp(r'^>\s*\[!(\w+)\]\s*(.*)$').firstMatch(trimmed);
+    if (calloutMatch != null) {
+      flushParagraph();
+      final kind = calloutMatch.group(1)!.toLowerCase();
+      final buf = StringBuffer(calloutMatch.group(2) ?? '');
+      i++;
+      while (i < lines.length) {
+        final cont = RegExp(r'^>\s?(.*)$').firstMatch(lines[i].trimLeft());
+        if (cont == null) break;
+        buf.write('\n${cont.group(1) ?? ''}');
+        i++;
+      }
+      blocks.add(_CalloutBlock(kind, buf.toString().trim()));
+      continue;
+    }
+
+    // Heading
+    final headingMatch = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(trimmed);
+    if (headingMatch != null) {
+      flushParagraph();
+      final level = headingMatch.group(1)!.length;
+      final text = headingMatch.group(2)!.trim();
+      blocks.add(_HeadingBlock(level, text));
+      i++;
+      continue;
+    }
+
+    // Blank line ends a paragraph.
+    if (trimmed.isEmpty) {
+      flushParagraph();
+      i++;
+      continue;
+    }
+
+    if (paragraph.isNotEmpty) paragraph.write('\n');
+    paragraph.write(line);
+    i++;
+  }
+  flushParagraph();
+  return blocks;
+}
+
+Widget _renderBlock(_Block block) {
+  if (block is _CodeBlock) return _CodeCard(block: block);
+  if (block is _CalloutBlock) return _Callout(block: block);
+  if (block is _HeadingBlock) return _Heading(block: block);
+  if (block is _ParagraphBlock) return _Paragraph(text: block.text);
+  return const SizedBox.shrink();
+}
+
+class _CodeCard extends StatelessWidget {
+  const _CodeCard({required this.block});
+  final _CodeBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ink1,
+        border: Border.all(color: AppColors.ink2),
+        borderRadius: BorderRadius.circular(AppRadius.cardLarge),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lgPlus,
+        vertical: AppSpacing.md,
+      ),
+      child: SelectableText(
+        block.lines.join('\n'),
+        style: AppMono.code(color: AppColors.fg, size: 13),
+      ),
+    );
+  }
+}
+
+class _Callout extends StatelessWidget {
+  const _Callout({required this.block});
+  final _CalloutBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (block.kind) {
+      'warn' || 'warning' => AppColors.danger,
+      _ => AppColors.accent3,
+    };
+    final icon = switch (block.kind) {
+      'warn' || 'warning' => Icons.warning_amber_outlined,
+      _ => Icons.info_outline,
+    };
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: AppSpacing.s),
+          Expanded(
+            child: Text(
+              block.text,
+              style: const TextStyle(
+                color: AppColors.fg,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading({required this.block});
+  final _HeadingBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = switch (block.level) {
+      1 => 22.0,
+      2 => 18.0,
+      _ => 15.0,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: AppColors.fg,
+            fontSize: size,
+            fontWeight: FontWeight.w600,
+            height: 1.25,
+          ),
+          children: _inlineSpans(block.text, codeSize: size - 2),
+        ),
+      ),
+    );
+  }
+}
+
+class _Paragraph extends StatelessWidget {
+  const _Paragraph({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(
+          color: AppColors.fg,
+          fontSize: 14,
+          height: 1.55,
+        ),
+        children: _inlineSpans(text),
+      ),
+    );
+  }
+}
+
+List<InlineSpan> _inlineSpans(String text, {double codeSize = 13}) {
+  // Tokenises `**bold**` and `` `code` `` runs; everything else is plain.
+  final out = <InlineSpan>[];
+  final pattern = RegExp(r'\*\*(.+?)\*\*|`([^`]+)`');
+  var cursor = 0;
+  for (final m in pattern.allMatches(text)) {
+    if (m.start > cursor) {
+      out.add(TextSpan(text: text.substring(cursor, m.start)));
+    }
+    if (m.group(1) != null) {
+      out.add(TextSpan(
+        text: m.group(1),
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ));
+    } else if (m.group(2) != null) {
+      out.add(TextSpan(
+        text: m.group(2),
+        style: AppMono.code(color: AppColors.accent, size: codeSize),
+      ));
+    }
+    cursor = m.end;
+  }
+  if (cursor < text.length) {
+    out.add(TextSpan(text: text.substring(cursor)));
+  }
+  return out;
+}
+
+// --- Buttons (unchanged from prototype) ----------------------------------
 
 class _GhostButton extends StatefulWidget {
   const _GhostButton({

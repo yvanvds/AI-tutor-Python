@@ -3,11 +3,11 @@ import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which session mode the workspace is rendering.
-enum SessionMode { explain, practice, quiz, free }
+enum SessionMode { explain, practice, free }
 
 /// Top-level sidebar destinations. Student sees the first two; teacher
-/// additionally sees the last three.
-enum Section { session, map, goals, instructions, students }
+/// additionally sees the last four.
+enum Section { session, map, goals, lessonContent, instructions, students }
 
 enum Role { student, teacher }
 
@@ -69,8 +69,6 @@ extension SessionModeLabel on SessionMode {
         return 'Uitleg';
       case SessionMode.practice:
         return 'Oefenen';
-      case SessionMode.quiz:
-        return 'Quiz';
       case SessionMode.free:
         return 'Vrij coderen';
     }
@@ -82,7 +80,6 @@ extension SessionModeLabel on SessionMode {
       case SessionMode.practice:
       case SessionMode.explain:
         return true;
-      case SessionMode.quiz:
       case SessionMode.free:
         return false;
     }
@@ -98,6 +95,8 @@ extension SectionLabel on Section {
         return 'Leerpad';
       case Section.goals:
         return 'Doelen';
+      case Section.lessonContent:
+        return 'Lesinhoud';
       case Section.instructions:
         return 'Instructies';
       case Section.students:
@@ -108,6 +107,7 @@ extension SectionLabel on Section {
   bool get isTeacherOnly {
     switch (this) {
       case Section.goals:
+      case Section.lessonContent:
       case Section.instructions:
       case Section.students:
         return true;

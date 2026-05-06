@@ -1,7 +1,10 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/chips_editor.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
 import 'package:flutter/material.dart';
@@ -127,6 +130,8 @@ class GoalFormState extends ConsumerState<GoalForm> {
                       svc.updateKnownConcepts(widget.goal.id, vals),
                 ),
           const SizedBox(height: 12),
+          if (widget.goal.parentId != null) _LesinhoudRow(goal: widget.goal),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -189,5 +194,79 @@ class GoalFormState extends ConsumerState<GoalForm> {
       },
     );
     return result ?? false;
+  }
+}
+
+/// Inline status row in the subgoal editor: shows whether the subgoal has
+/// authored content, with a one-click handoff to the Lesinhoud view.
+class _LesinhoudRow extends ConsumerWidget {
+  const _LesinhoudRow({required this.goal});
+  final Goal goal;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cid = goal.contentId;
+    final hasContent = cid != null && cid.isNotEmpty;
+    final cached = ref.watch(contentServiceProvider);
+    final title = hasContent
+        ? cached
+            .where((c) => c.id == cid)
+            .map((c) => c.title)
+            .cast<String?>()
+            .firstWhere((_) => true, orElse: () => null)
+        : null;
+
+    void openInLesinhoud() {
+      ref.read(sectionProvider.notifier).state = Section.lessonContent;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasContent ? Icons.article_outlined : Icons.article_outlined,
+            size: 16,
+            color: hasContent
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).disabledColor,
+          ),
+          const SizedBox(width: AppSpacing.s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Lesinhoud',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  hasContent
+                      ? (title ?? 'Lesinhoud gekoppeld')
+                      : '(geen lesinhoud)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasContent ? null : Theme.of(context).disabledColor,
+                    fontStyle:
+                        hasContent ? FontStyle.normal : FontStyle.italic,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: openInLesinhoud,
+            child: Text(hasContent ? 'Bewerk' : 'Maak'),
+          ),
+        ],
+      ),
+    );
   }
 }

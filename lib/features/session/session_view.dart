@@ -2,25 +2,28 @@ import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/free_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
-import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const double chatPanelWidth = 460;
 
-/// Workspace shown when [Section.session] is active. Houses the four mode
+/// Workspace shown when [Section.session] is active. Houses the three mode
 /// views in the left panel and the chat panel on the right; the chat panel
 /// width animates between 0 and [chatPanelWidth] depending on the active
-/// mode (Quiz and Free hide the chat).
+/// mode (Free hides the chat) and additionally collapses while an MCQ is
+/// being rendered inside `PracticeView`, so the student can focus on the
+/// question.
 class SessionView extends ConsumerWidget {
   const SessionView({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(modeProvider);
-    final showChat = mode.showsChatPanel;
+    final mcqActive = ref.watch(activeMcqProvider) != null;
+    final showChat = mode.showsChatPanel && !mcqActive;
 
     return Row(
       children: [
@@ -65,8 +68,6 @@ class SessionView extends ConsumerWidget {
         return const ExplainView();
       case SessionMode.practice:
         return const PracticeView();
-      case SessionMode.quiz:
-        return const QuizView();
       case SessionMode.free:
         return const FreeView();
     }
