@@ -439,15 +439,15 @@ Do NOT include the exercise code here. The TEXT must contain only the question (
   "type": "multiple_choice",
   "code": "print('Python')",
   "options": [
-    {"option": "A: Python"},
-    {"option": "B: 'Python'"},
-    {"option": "C: print('Python')"},
-    {"option": "D: Error"}
+    {"option": "Python"},
+    {"option": "'Python'"},
+    {"option": "print('Python')"},
+    {"option": "Error"}
   ],
   "correct": "A"
 }
 
-Provide 3 to 5 options.
+Provide 3 to 5 options. The `correct` field uses the positional letter (A = first option, B = second, …). Do NOT put letter prefixes inside the option text — the UI renders the letter badge separately, so any prefix appears twice.
 
 ## 04 Rules
 
@@ -461,6 +461,7 @@ Only include one exercise per response.
 - The exercise code goes ONLY in the META `code` field. It is rendered as a syntax-highlighted block underneath the question. Never repeat it inside the TEXT section.
 - never include line numbers before lines of code
 - Option labels may span multiple lines — use `\n` inside the option string to separate lines (e.g. multi-line `print` output). Keep each option visually compact; prefer ≤ 4 lines per option.
+- Never prefix option text with `A:`, `B:`, `1.`, etc. The letter badge is rendered by the UI from position; a prefix duplicates it.
 
 # requestHint
 

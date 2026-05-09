@@ -206,11 +206,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
       followUp: r.followUp,
     );
     if (outcome == IntegrateOutcome.followUpPresented) return;
-    if (outcome == IntegrateOutcome.continuing && r.suggestion.isNotEmpty) {
-      ctx.setFollowUp(message: r.suggestion);
-    } else {
-      await ctx.requestExercise();
-    }
+    await ctx.requestExercise();
   }
 }
 

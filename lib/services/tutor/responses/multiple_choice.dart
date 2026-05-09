@@ -4,10 +4,10 @@
   "prompt": "What will this code output?\n\nprint('Python')",
   "code": "print('Python')",
   "options": [
-    {"option": "A: Python"},
-    {"option": "B: 'Python'"},
-    {"option": "C: print('Python')"},
-    {"option": "D: Error"}
+    {"option": "Python"},
+    {"option": "'Python'"},
+    {"option": "print('Python')"},
+    {"option": "Error"}
   ]
 }
 */
