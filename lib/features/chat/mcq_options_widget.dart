@@ -126,6 +126,7 @@ class _OptionButtonState extends State<_OptionButton> {
             borderRadius: BorderRadius.circular(AppRadius.cardLarge),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 24,
@@ -146,7 +147,6 @@ class _OptionButtonState extends State<_OptionButton> {
                 child: Text(
                   widget.label,
                   style: AppMono.code(color: textColor, size: 13),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

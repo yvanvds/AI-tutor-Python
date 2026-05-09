@@ -89,6 +89,8 @@ class GoalsService {
     List<String> teachingTips = const [],
     bool allowChains = false,
     List<Map<String, dynamic>> objectives = const [],
+    String? contentId,
+    String moduleId = '',
   }) async {
     final goal = Goal(
       id: _uuid.v4(),
@@ -102,6 +104,8 @@ class GoalsService {
       objectives: objectives
           .map(LearningObjective.fromMap)
           .toList(growable: false),
+      contentId: contentId,
+      moduleId: moduleId,
     );
     await safeCosmos(
       () => _container.create(_docMap(goal), partitionKey: _pk),

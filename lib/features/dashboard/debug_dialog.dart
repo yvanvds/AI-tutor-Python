@@ -2,9 +2,13 @@ import 'dart:convert';
 
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
+import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
+import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
+import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
@@ -37,8 +41,9 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
       builder: (ctx) => AlertDialog(
         title: const Text('Wipe progress?'),
         content: const Text(
-          'This deletes every progress and progress_history doc for the '
-          'signed-in user from Cosmos. Cannot be undone.',
+          'This deletes progress, progress_history, lo_beliefs and '
+          'turn_history docs for the signed-in user, and resets the '
+          'account calibration to medium. Cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -57,6 +62,11 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
     setState(() => _busy = true);
     try {
       await ref.read(progressServiceProvider).deleteAllForCurrentUser();
+      await ref.read(loBeliefsServiceProvider).deleteAllForCurrentUser();
+      await ref.read(turnHistoryServiceProvider).deleteAllForCurrentUser();
+      await ref
+          .read(accountServiceProvider.notifier)
+          .setCalibration(StudentCalibration.fresh());
       messenger.showSnackBar(
         const SnackBar(content: Text('Progress wiped.')),
       );
@@ -107,10 +117,11 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
       title: const Text('Debug'),
       content: SizedBox(
         width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             FilledButton.tonalIcon(
               onPressed: _busy ? null : _wipeProgress,
               icon: const Icon(Icons.delete_forever),
@@ -174,7 +185,8 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
               height: 200,
               child: _RecentTurnsList(turns: recorder.buffer),
             ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

@@ -154,22 +154,36 @@ class _OptionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AppSpacing.m,
-      crossAxisSpacing: AppSpacing.m,
-      childAspectRatio: 4.4,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < options.length; i++)
-          _Option(
-            badge: i < _badges.length ? _badges[i] : '${i + 1}',
-            label: options[i],
-            state: _stateFor(options[i]),
-            onTap: () => onPick(options[i]),
+        for (var i = 0; i < options.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.m),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildOption(i)),
+                const SizedBox(width: AppSpacing.m),
+                Expanded(
+                  child: i + 1 < options.length
+                      ? _buildOption(i + 1)
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildOption(int i) {
+    return _Option(
+      badge: i < _badges.length ? _badges[i] : '${i + 1}',
+      label: options[i],
+      state: _stateFor(options[i]),
+      onTap: () => onPick(options[i]),
     );
   }
 
@@ -236,6 +250,7 @@ class _OptionRowState extends State<_Option> {
             borderRadius: BorderRadius.circular(AppRadius.cardLarge),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 28,
@@ -256,8 +271,6 @@ class _OptionRowState extends State<_Option> {
                 child: Text(
                   widget.label,
                   style: AppMono.code(color: visuals.fg, size: 13.5),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

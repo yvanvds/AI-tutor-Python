@@ -1,0 +1,276 @@
+{
+  "goal": {
+    "id": "eenvoudige-python-scripts",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Eenvoudige Python-scripts schrijven en begrijpen",
+    "description": "De student kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken.",
+    "order": 1000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "uitvoer-print",
+      "type": "goal",
+      "parentId": "eenvoudige-python-scripts",
+      "title": "Uitvoer met print",
+      "description": "De student kan met print() strings en getallen op het scherm tonen en herkent het verschil tussen wat in de broncode staat en wat als uitvoer verschijnt.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe whether the student treats unquoted text as a name vs. a string literal — if they write `print(hello)`, ask what `hello` refers to before correcting.",
+        "When testing multi-argument print, contrast it directly with the `+` form on the same content; the comma-inserts-space behavior is the deliverable.",
+        "Lean on the `'score: ' + 5` TypeError as a probe for whether the student conflates string concatenation with addition.",
+        "Stay within bare `print` calls in this subgoal — escape sequences, `end=`, `sep=`, and Python 2 `print` syntax belong later."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "predict_print_output",
+          "statement": "Je kan voorspellen wat een print()-aanroep op het scherm toont.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_print_value",
+          "statement": "Je kan een print()-aanroep schrijven die een gegeven waarde toont.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_print_multi",
+          "statement": "Je kan een print()-aanroep schrijven die meerdere waarden tegelijk toont, gescheiden door komma's.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_comma_vs_plus",
+          "statement": "Je kan het verschil in uitvoer voorspellen tussen print met komma's en print met plustekens.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_quotes_for_strings",
+          "statement": "Je kan aangeven wanneer aanhalingstekens nodig zijn rond een waarde.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "variabelen",
+      "type": "goal",
+      "parentId": "eenvoudige-python-scripts",
+      "title": "Variabelen",
+      "description": "De student kan een waarde toekennen aan een variabele met =, een geldige naam kiezen, de variabele gebruiken in expressies en print, en haar waarde herwijzen.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Treat `=` as 'put the right side into the name on the left' — if the student reads it as math-equals, surface directionality directly; they'll trip on `x = x + 1` otherwise.",
+        "Belgian students write decimals with a comma; `pi = 3,14` silently becomes the tuple `(3, 14)`. Probe with a comma-form value at first exposure and explain the tuple outcome, not just 'wrong'.",
+        "Probe right-to-left reading on self-reference like `x = x + 1` — a working mental model of assignment shows up here, not on bare first-time assignment.",
+        "When testing naming rules, mix valid and invalid candidates (`2name`, `for`, `my-var`, `Name`); case sensitivity is a separate failure mode from rule violations and warrants its own probe."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_assignment",
+          "statement": "Je kan een waarde toekennen aan een variabele met =.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_variable_value",
+          "statement": "Je kan voorspellen welke waarde een variabele heeft na een reeks toekenningen, inclusief herwijzen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_use_variable",
+          "statement": "Je kan een variabele gebruiken in een print-aanroep of in een expressie.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_naming_rules",
+          "statement": "Je kan geldige variabelenamen herkennen volgens de regels van Python.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_string_vs_number",
+          "statement": "Je kan herkennen of een waarde tekst (string) of een getal is op basis van de aanhalingstekens.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "rekenen-getallen",
+      "type": "goal",
+      "parentId": "eenvoudige-python-scripts",
+      "title": "Rekenen met getallen",
+      "description": "De student kan rekenkundige expressies schrijven en evalueren met de standaardoperatoren (+, -, *, /, //, %, **), de volgorde van bewerkingen toepassen, en het verschil herkennen tussen int en float.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Belgian students write decimals with a comma; `3,14 * 2` parses as `(3, 14) * 2` and yields a tuple, not multiplication. Surface this directly the first time float arithmetic is probed.",
+        "Probe whether the student expects `8 / 2` to be `int` — Python 3's `/` always returns `float`, and this surprises novices who haven't been told.",
+        "When testing precedence, prefer expressions where left-to-right and correct-precedence give different results (`2 + 3 * 4`); equal-result expressions don't probe the misconception.",
+        "If the student writes `2^3` for 'two to the third', correct to `**` and note that `^` is bitwise XOR in Python — leave XOR for later."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_arithmetic_expression",
+          "statement": "Je kan een rekenkundige expressie schrijven met +, -, *, /, //, %, en **.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_expression_value",
+          "statement": "Je kan voorspellen wat een rekenkundige expressie oplevert, inclusief de volgorde van bewerkingen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_int_vs_float_result",
+          "statement": "Je kan voorspellen of het resultaat van een expressie een int of een float is.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_div_vs_floordiv",
+          "statement": "Je kan voorspellen wat het verschil is tussen / en // voor twee gegeven getallen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_python_operators",
+          "statement": "Je kan de Python-operatoren voor de standaardbewerkingen benoemen, inclusief ** voor machtsverheffing.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "invoer-input",
+      "type": "goal",
+      "parentId": "eenvoudige-python-scripts",
+      "title": "Invoer met input",
+      "description": "De student kan met input() een waarde van de gebruiker opvragen met een duidelijke prompt, het resultaat opslaan in een variabele, en de invoer omzetten naar int of float wanneer rekenwerk nodig is.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "When probing the return type of `input()`, set up the question so the student commits to a prediction before seeing the runtime answer — the 'input always returns a string' shock is the load-bearing insight here.",
+        "Belgian students will type `3,14` at a `float()` prompt and hit `ValueError`; expose this case explicitly when calibration warrants and tie it to the same comma-vs-dot rule from the variables and arithmetic subgoals.",
+        "Probe the missing-conversion bug with two-input addition (`a = input(); b = input(); print(a + b)`); the visible string concatenation ('53' for inputs 5 and 3) is more diagnostic than a hard `TypeError` because the student has to explain why it's not 8.",
+        "Stay within bare `input` + `int`/`float` conversion in this subgoal — `try`/`except`, validation loops, and `split()` belong later."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_input_call",
+          "statement": "Je kan een input()-aanroep schrijven met een duidelijke prompt en het resultaat opslaan in een variabele.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_input_returns_string",
+          "statement": "Je kan benoemen dat input() altijd een string teruggeeft, ook als de gebruiker een getal typt.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_input_with_conversion",
+          "statement": "Je kan invoer omzetten naar een int of float wanneer er met de waarde gerekend moet worden.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_unconverted_input_bug",
+          "statement": "Je kan voorspellen wat er gebeurt als rauwe input zonder conversie in een rekenkundige expressie wordt gebruikt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_conversion_error",
+          "statement": "Je kan voorspellen wanneer int() of float() een ValueError geeft op gebruikersinvoer.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "klein-script",
+      "type": "goal",
+      "parentId": "eenvoudige-python-scripts",
+      "title": "Een klein script samenstellen",
+      "description": "De student kan de eerder behandelde bouwstenen — input, variabelen, rekenen, print — combineren tot een klein, werkend Python-script dat een probleem in natuurlijke taal oplost, en kan zo'n script lezen, traceren en debuggen.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the silent-wrong-output bug in script context: a script where `print(a + b)` on raw input yields string concatenation rather than a sum is the canonical diagnostic — harder to spot than the same bug in isolation.",
+        "When the script-writing prompt is in natural Dutch ('het gemiddelde van twee getallen'), expect translation errors at the operator level — `a + b / 2` instead of `(a + b) / 2`. Probe the parentheses issue separately when the student gets the structure right but the precedence wrong.",
+        "Don't introduce any new mechanics in this subgoal — no `if`, loops, functions, or `try`/`except`. The integrative skill is composing print, variables, arithmetic, and input cleanly."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_simple_script",
+          "statement": "Je kan een klein script schrijven dat één of meerdere invoeren ophaalt, een berekening uitvoert, en het resultaat toont.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_script_output",
+          "statement": "Je kan voorspellen wat een gegeven klein script als uitvoer geeft voor een specifieke gebruikersinvoer.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_script_runtime_error",
+          "statement": "Je kan voorspellen wanneer een klein script tijdens uitvoering een fout zal geven.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_simple_script_bug",
+          "statement": "Je kan een veelvoorkomende fout in een klein script herkennen en oplossen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}

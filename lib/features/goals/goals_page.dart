@@ -94,11 +94,11 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         return;
       }
 
-      final tree = _buildTree(goals);
+      final entries = _buildExportEntries(goals);
       final payload = {
-        'version': 1,
+        'version': 2,
         'exportedAt': DateTime.now().toIso8601String(),
-        'goals': tree,
+        'goals': entries,
       };
       final json = const JsonEncoder.withIndent('  ').convert(payload);
 
@@ -119,16 +119,16 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   Future<void> _importGoals() async {
     setState(() => _busy = true);
     try {
-      final tree = await _pickAndParseGoalsFile();
-      if (tree == null) return;
+      final entries = await _pickAndParseGoalsFile();
+      if (entries == null) return;
 
-      final totalCount = _countNodes(tree);
+      final totalCount = _countNodes(entries);
       if (totalCount == 0) {
         if (mounted) _showSnack('File contained no goals');
         return;
       }
 
-      final mode = await _askImportMode(totalCount, tree.length);
+      final mode = await _askImportMode(totalCount, entries.length);
       if (mode == null) return;
 
       var deletedCount = 0;
@@ -136,7 +136,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         deletedCount = await _deleteAllGoals();
       }
 
-      await _insertTree(tree, parentId: null);
+      await _insertEntries(entries);
 
       if (mounted) {
         final suffix = mode == _ImportMode.replace
@@ -205,35 +205,76 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
 
     final raw = await File(path).readAsString();
     final decoded = jsonDecode(raw);
-    if (decoded is! Map<String, dynamic> || decoded['goals'] is! List) {
+    if (decoded is! Map<String, dynamic>) {
       if (mounted) _showSnack('Invalid goals file');
       return null;
     }
 
-    return (decoded['goals'] as List).cast<Map<String, dynamic>>();
+    // Two accepted envelopes:
+    //   single-goal authoring  → { goal: {...}, subgoals: [...] }
+    //   multi-goal collection  → { goals: [ { goal, subgoals }, ... ] }
+    final List<Map<String, dynamic>> entries;
+    if (decoded['goal'] is Map && decoded['subgoals'] is List) {
+      entries = [
+        {
+          'goal': Map<String, dynamic>.from(decoded['goal'] as Map),
+          'subgoals': (decoded['subgoals'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList(),
+        },
+      ];
+    } else if (decoded['goals'] is List) {
+      entries = (decoded['goals'] as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) => e['goal'] is Map && e['subgoals'] is List)
+          .map((e) => {
+                'goal': Map<String, dynamic>.from(e['goal'] as Map),
+                'subgoals': (e['subgoals'] as List)
+                    .whereType<Map>()
+                    .map((s) => Map<String, dynamic>.from(s))
+                    .toList(),
+              })
+          .toList();
+      if (entries.isEmpty) {
+        if (mounted) _showSnack('Invalid goals file');
+        return null;
+      }
+    } else {
+      if (mounted) _showSnack('Invalid goals file');
+      return null;
+    }
+
+    return entries;
   }
 
-  Future<void> _insertTree(
-    List<Map<String, dynamic>> nodes, {
-    required String? parentId,
-  }) async {
+  Future<void> _insertEntries(List<Map<String, dynamic>> entries) async {
     final svc = ref.read(goalsServiceProvider);
-    for (final node in nodes) {
-      final newId = await svc.createGoalWithFields(
-        title: (node['title'] as String?) ?? '',
-        description: node['description'] as String?,
-        parentId: parentId,
-        order: (node['order'] as num?)?.toInt() ?? 0,
-        optional: node['optional'] as bool? ?? false,
-        teachingTips: _stringList(node['teachingTips']),
-        allowChains: node['allowChains'] as bool? ?? false,
-        objectives: _objectiveList(node['objectives']),
+    for (final entry in entries) {
+      final goal = entry['goal'] as Map<String, dynamic>;
+      final goalId = await svc.createGoalWithFields(
+        title: (goal['title'] as String?) ?? '',
+        description: goal['description'] as String?,
+        parentId: null,
+        order: (goal['order'] as num?)?.toInt() ?? 0,
+        optional: goal['optional'] as bool? ?? false,
+        moduleId: (goal['moduleId'] as String?) ?? '',
       );
-      final children = node['children'];
-      if (children is List && children.isNotEmpty) {
-        await _insertTree(
-          children.cast<Map<String, dynamic>>(),
-          parentId: newId,
+
+      final subgoals = (entry['subgoals'] as List)
+          .cast<Map<String, dynamic>>();
+      for (final sg in subgoals) {
+        await svc.createGoalWithFields(
+          title: (sg['title'] as String?) ?? '',
+          description: sg['description'] as String?,
+          parentId: goalId,
+          order: (sg['order'] as num?)?.toInt() ?? 0,
+          optional: sg['optional'] as bool? ?? false,
+          teachingTips: _stringList(sg['teachingTips']),
+          allowChains: sg['allowChains'] as bool? ?? false,
+          objectives: _objectiveList(sg['objectives']),
+          contentId: sg['contentId'] as String?,
         );
       }
     }
@@ -246,7 +287,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   }
 }
 
-List<Map<String, dynamic>> _buildTree(List<Goal> goals) {
+List<Map<String, dynamic>> _buildExportEntries(List<Goal> goals) {
   final byParent = <String?, List<Goal>>{};
   for (final g in goals) {
     byParent.putIfAbsent(g.parentId, () => []).add(g);
@@ -255,33 +296,41 @@ List<Map<String, dynamic>> _buildTree(List<Goal> goals) {
     list.sort((a, b) => a.order.compareTo(b.order));
   }
 
-  Map<String, dynamic> nodeFor(Goal g) {
-    final children = byParent[g.id] ?? const <Goal>[];
-    final isSubgoal = g.parentId != null;
-    return {
-      'title': g.title,
-      'description': g.description,
-      'order': g.order,
-      'optional': g.optional,
-      if (isSubgoal) 'teachingTips': g.teachingTips,
-      if (isSubgoal) 'allowChains': g.allowChains,
-      if (isSubgoal) 'objectives': g.objectives.map((o) => o.toMap()).toList(),
-      'children': children.map(nodeFor).toList(),
-    };
-  }
+  Map<String, dynamic> goalMap(Goal g) => {
+        'title': g.title,
+        'description': g.description,
+        'moduleId': g.moduleId,
+        'order': g.order,
+        'optional': g.optional,
+      };
+
+  Map<String, dynamic> subgoalMap(Goal g) => {
+        'title': g.title,
+        'description': g.description,
+        'order': g.order,
+        'optional': g.optional,
+        'contentId': g.contentId,
+        'teachingTips': g.teachingTips,
+        'allowChains': g.allowChains,
+        'objectives': g.objectives.map((o) => o.toMap()).toList(),
+      };
 
   final roots = byParent[null] ?? const <Goal>[];
-  return roots.map(nodeFor).toList();
+  return roots.map((root) {
+    final subgoals = byParent[root.id] ?? const <Goal>[];
+    return {
+      'goal': goalMap(root),
+      'subgoals': subgoals.map(subgoalMap).toList(),
+    };
+  }).toList();
 }
 
-int _countNodes(List<Map<String, dynamic>> nodes) {
+int _countNodes(List<Map<String, dynamic>> entries) {
   var n = 0;
-  for (final node in nodes) {
-    n += 1;
-    final children = node['children'];
-    if (children is List && children.isNotEmpty) {
-      n += _countNodes(children.cast<Map<String, dynamic>>());
-    }
+  for (final entry in entries) {
+    n += 1; // the root goal
+    final subgoals = entry['subgoals'];
+    if (subgoals is List) n += subgoals.length;
   }
   return n;
 }

@@ -15,12 +15,17 @@ Future<void> main() async {
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.dumpErrorToConsole(details);
-    appNavigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) =>
-            CrashRecoveryScreen(message: details.exceptionAsString()),
-      ),
-    );
+    // Defer the push: errors fired during a Navigator transition / build
+    // phase leave the Navigator `_debugLocked`, and pushing inside that
+    // window throws an assertion that masks the original error.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      appNavigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) =>
+              CrashRecoveryScreen(message: details.exceptionAsString()),
+        ),
+      );
+    });
   };
 
   // Use an explicit container so we can call tryAcquireTokenSilent before

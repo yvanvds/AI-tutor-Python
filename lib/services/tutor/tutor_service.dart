@@ -726,6 +726,7 @@ class TutorService extends Notifier<TutorState> {
       updateReportForCurrentGoal: report.updateForCurrentChildGoal,
       recordParsedResponse: _debug.recordParsedResponse,
       integrateGradedAnswer: _integrateGradedAnswer,
+      getCurrentExerciseType: () => _currentExerciseType,
       statusReportGoalIdOverride: statusGoalIdOverride,
     );
   }

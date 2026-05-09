@@ -2,10 +2,8 @@
 
 ## 00 restrictions
 
-The 'input()' method is not supported in the code environment.
 Be creative when generating exercises. Avoid cliche contents.
 Actual text(prompt, feedback, followUp, suggestion) and code should be in dutch.
-Do not use unicode characters in code. It's ok in text.
 
 ## 01 Errors
 
@@ -59,6 +57,7 @@ Calibrate the size of the gap to fill in to the requested difficulty: easy = a s
 ### TEXT section
 
 A short, motivating prompt in Dutch — e.g. "Vul het ontbrekende stuk in zodat de code 'Hallo, wereld!' afdrukt."
+Do NOT include the exercise code in TEXT — not as a code fence, not inline. The code is rendered on the left from META.code.
 
 ### META section (JSON)
 
@@ -78,6 +77,8 @@ Only include one exercise per response.
 
 - If you refer to code, it is displayed on the left
 - never include line numbers before lines of code
+- TEXT must not contain a code block or inline snippet of the exercise — the code lives only in META.code
+- META.code MUST contain at least one `___` placeholder marking the gap the student fills in. NEVER write the solution into META.code; the placeholder is the deliverable to the student
 
 # explainAnswer
 
@@ -254,7 +255,7 @@ A short, encouraging message about the answer. No new question here.
 
 ### RULES
 
-* `"understanding"` must be between 0 and 1.  
+* `"understanding"` your estimate (0–1) of how clearly this single answer demonstrates the concept. The system tracks progress over time; do not try to remember prior turns. 
 * Keep TEXT warm, motivating, and specific.  
 * Avoid repeating the same phrasing or examples.  
 * Keep total output under ~400 tokens.
@@ -429,7 +430,8 @@ Calibrate the trickiness of the distractors to the requested difficulty.
 
 ### TEXT section
 
-The question itself, e.g. "Wat zal deze code afdrukken?\n\nprint('Python')"
+The question itself, e.g. "Wat zal deze code afdrukken?"
+Do NOT include the exercise code here. The TEXT must contain only the question (and any short framing prose). No fenced code blocks, no inline code listings — the code is rendered separately from the META `code` field.
 
 ### META section (JSON)
 
@@ -441,7 +443,8 @@ The question itself, e.g. "Wat zal deze code afdrukken?\n\nprint('Python')"
     {"option": "B: 'Python'"},
     {"option": "C: print('Python')"},
     {"option": "D: Error"}
-  ]
+  ],
+  "correct": "A"
 }
 
 Provide 3 to 5 options.
@@ -455,8 +458,9 @@ Prompt should be clear, short, motivating.
 Output must be under ~600 tokens.
 Only include one exercise per response.
 
-- If you refer to code, it is displayed on the left
+- The exercise code goes ONLY in the META `code` field. It is rendered as a syntax-highlighted block underneath the question. Never repeat it inside the TEXT section.
 - never include line numbers before lines of code
+- Option labels may span multiple lines — use `\n` inside the option string to separate lines (e.g. multi-line `print` output). Keep each option visually compact; prefer ≤ 4 lines per option.
 
 # requestHint
 

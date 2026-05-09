@@ -52,6 +52,7 @@ class TutorContext {
     required this.updateReportForCurrentGoal,
     required this.recordParsedResponse,
     required this.integrateGradedAnswer,
+    required this.getCurrentExerciseType,
     this.statusReportGoalIdOverride,
   });
 
@@ -97,6 +98,12 @@ class TutorContext {
   /// TutorService when firing a post-mastery status query so the report
   /// lands on the just-mastered subgoal rather than the now-current one.
   final String? statusReportGoalIdOverride;
+
+  /// Current exercise type as tracked by TutorService (e.g. `complete_code`,
+  /// `write_code`, `multiple_choice`). Used by AnswerHandler to detect when a
+  /// chat reply lands while a code-editor exercise is still open, so the
+  /// student can be reminded to submit through the editor.
+  final String Function() getCurrentExerciseType;
 }
 
 abstract class ResponseHandler<R extends ChatResponse> {
@@ -165,6 +172,12 @@ class AnswerHandler extends ResponseHandler<Answer> {
     if (r.prompt.isNotEmpty) {
       ctx.addTutorMessage(r.prompt);
       ctx.playQuestion();
+    }
+    final type = ctx.getCurrentExerciseType();
+    if (type == 'complete_code' || type == 'write_code') {
+      ctx.addSystemMessage(
+        'Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.',
+      );
     }
   }
 }

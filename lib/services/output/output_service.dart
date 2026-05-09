@@ -28,6 +28,12 @@ class OutputService {
   RunHandle? _currentHandle;
   final List<StreamSubscription<dynamic>> _runSubs = [];
 
+  // Python's `print` calls write() once per argument, once per separator,
+  // and once for the trailing newline — so a single `print("a", "b")`
+  // arrives here as four chunks. Buffer per stream and split on '\n'.
+  final StringBuffer _stdoutBuf = StringBuffer();
+  final StringBuffer _stderrBuf = StringBuffer();
+
   Future<void> run(String code) async {
     for (final sub in _runSubs) {
       await sub.cancel();
@@ -35,12 +41,14 @@ class OutputService {
     _runSubs.clear();
 
     lines.value = [];
+    _stdoutBuf.clear();
+    _stderrBuf.clear();
     isRunning.value = true;
 
     try {
       await _pyRunner.start();
     } catch (e) {
-      _addLine('[Python host error] $e', isError: true);
+      _pushLine('[Python host error] $e', isError: true);
       isRunning.value = false;
       return;
     }
@@ -48,8 +56,8 @@ class OutputService {
     final handle = _pyRunner.run(code);
     _currentHandle = handle;
 
-    _runSubs.add(handle.stdout.listen(_addLine));
-    _runSubs.add(handle.stderr.listen((t) => _addLine(t, isError: true)));
+    _runSubs.add(handle.stdout.listen((t) => _appendChunk(t, isError: false)));
+    _runSubs.add(handle.stderr.listen((t) => _appendChunk(t, isError: true)));
     _runSubs.add(handle.inputRequests.listen((req) {
       pendingInputRequest.value = req;
     }));
@@ -59,13 +67,16 @@ class OutputService {
       try {
         final result = await handle.done;
         if (!identical(_currentHandle, capturedHandle)) return;
+        _flushBuffers();
         if (result.exception != null) {
-          _addLine(result.exception!.traceback, isError: true);
+          _appendChunk(result.exception!.traceback, isError: true);
+          _flushBuffers();
         }
         pendingInputRequest.value = null;
         isRunning.value = false;
       } catch (_) {
         if (!identical(_currentHandle, capturedHandle)) return;
+        _flushBuffers();
         pendingInputRequest.value = null;
         isRunning.value = false;
       }
@@ -88,9 +99,47 @@ class OutputService {
   /// "Reset" button in the redesigned RunControls.
   void clear() {
     lines.value = [];
+    _stdoutBuf.clear();
+    _stderrBuf.clear();
   }
 
-  void _addLine(String text, {bool isError = false}) {
+  void _appendChunk(String text, {required bool isError}) {
+    if (text.isEmpty) return;
+    final buf = isError ? _stderrBuf : _stdoutBuf;
+    buf.write(text);
+    final combined = buf.toString();
+    final lastNl = combined.lastIndexOf('\n');
+    if (lastNl < 0) return;
+    final complete = combined.substring(0, lastNl);
+    buf
+      ..clear()
+      ..write(combined.substring(lastNl + 1));
+    final added = <OutputLine>[
+      for (final line in complete.split('\n'))
+        OutputLine(line, isError: isError),
+    ];
+    lines.value = [...lines.value, ...added];
+  }
+
+  void _flushBuffers() {
+    final stdoutRemaining = _stdoutBuf.toString();
+    final stderrRemaining = _stderrBuf.toString();
+    _stdoutBuf.clear();
+    _stderrBuf.clear();
+    final added = <OutputLine>[];
+    if (stdoutRemaining.isNotEmpty) {
+      added.add(OutputLine(stdoutRemaining));
+    }
+    if (stderrRemaining.isNotEmpty) {
+      added.add(OutputLine(stderrRemaining, isError: true));
+    }
+    if (added.isNotEmpty) {
+      lines.value = [...lines.value, ...added];
+    }
+  }
+
+  void _pushLine(String text, {bool isError = false}) {
+    _flushBuffers();
     final trimmed = text.trimRight();
     if (trimmed.isEmpty) return;
     lines.value = [...lines.value, OutputLine(trimmed, isError: isError)];
