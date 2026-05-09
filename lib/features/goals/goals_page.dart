@@ -131,17 +131,38 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       final mode = await _askImportMode(totalCount, entries.length);
       if (mode == null) return;
 
-      var deletedCount = 0;
-      if (mode == _ImportMode.replace) {
-        deletedCount = await _deleteAllGoals();
+      final svc = ref.read(goalsServiceProvider);
+      final existing = await svc.getAllGoalsOnce();
+      final existingIds = {for (final g in existing) g.id};
+      final importedIds = _collectIds(entries);
+
+      if (mode == _ImportMode.add) {
+        final collisions = importedIds.intersection(existingIds);
+        if (collisions.isNotEmpty) {
+          if (mounted) {
+            _showSnack(
+              'Add aborted: ${collisions.length} id(s) already exist '
+              '(e.g. ${collisions.take(3).join(", ")}). '
+              'Use Replace, or remove the duplicates first.',
+            );
+          }
+          return;
+        }
+        await _insertEntriesAdd(entries);
+        if (mounted) _showSnack('Imported $totalCount goal(s)');
+        return;
       }
 
-      await _insertEntries(entries);
-
+      // Replace: upsert by id (preserves contentId), then delete leftovers.
+      await _insertEntriesReplace(entries);
+      final leftovers = existingIds.difference(importedIds).toList();
+      if (leftovers.isNotEmpty) {
+        await svc.deleteGoalsByIds(leftovers);
+      }
       if (mounted) {
-        final suffix = mode == _ImportMode.replace
-            ? ' (replaced $deletedCount existing)'
-            : '';
+        final suffix = leftovers.isEmpty
+            ? ''
+            : ' (removed ${leftovers.length} not in file)';
         _showSnack('Imported $totalCount goal(s)$suffix');
       }
     } catch (e) {
@@ -151,16 +172,6 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
     }
   }
 
-  Future<int> _deleteAllGoals() async {
-    final svc = ref.read(goalsServiceProvider);
-    final all = await svc.getAllGoalsOnce();
-    final roots = await svc.getRootGoalsOnce();
-    for (final root in roots) {
-      await svc.deleteSubtree(root.id);
-    }
-    return all.length;
-  }
-
   Future<_ImportMode?> _askImportMode(int total, int rootCount) async {
     return showDialog<_ImportMode>(
       context: context,
@@ -168,8 +179,8 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         title: const Text('Import goals'),
         content: Text(
           'The file contains $rootCount root goal(s) and $total total node(s).\n\n'
-          '• Add: append to your existing goals (new ids assigned).\n'
-          '• Replace: delete all current goals first, then import.',
+          '• Add: append using the ids from the file. Aborts if any id already exists.\n'
+          '• Replace: upsert by id (keeps existing lesinhoud links) and remove any goals not in the file.',
         ),
         actions: [
           TextButton(
@@ -249,11 +260,14 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
     return entries;
   }
 
-  Future<void> _insertEntries(List<Map<String, dynamic>> entries) async {
+  Future<void> _insertEntriesAdd(List<Map<String, dynamic>> entries) async {
     final svc = ref.read(goalsServiceProvider);
     for (final entry in entries) {
       final goal = entry['goal'] as Map<String, dynamic>;
       final goalId = await svc.createGoalWithFields(
+        id: (goal['id'] as String?)?.trim().isEmpty == false
+            ? goal['id'] as String
+            : null,
         title: (goal['title'] as String?) ?? '',
         description: goal['description'] as String?,
         parentId: null,
@@ -262,10 +276,13 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         moduleId: (goal['moduleId'] as String?) ?? '',
       );
 
-      final subgoals = (entry['subgoals'] as List)
-          .cast<Map<String, dynamic>>();
+      final subgoals =
+          (entry['subgoals'] as List).cast<Map<String, dynamic>>();
       for (final sg in subgoals) {
         await svc.createGoalWithFields(
+          id: (sg['id'] as String?)?.trim().isEmpty == false
+              ? sg['id'] as String
+              : null,
           title: (sg['title'] as String?) ?? '',
           description: sg['description'] as String?,
           parentId: goalId,
@@ -278,6 +295,77 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         );
       }
     }
+  }
+
+  Future<void> _insertEntriesReplace(
+      List<Map<String, dynamic>> entries) async {
+    final svc = ref.read(goalsServiceProvider);
+    for (final entry in entries) {
+      final goal = entry['goal'] as Map<String, dynamic>;
+      final rawGoalId = goal['id'] as String?;
+      // Replace mode requires a stable id per doc to preserve content links.
+      // Fall back to a hash-stable id derived from title only as a last resort
+      // — but the goal-generator JSON always provides one.
+      if (rawGoalId == null || rawGoalId.trim().isEmpty) {
+        throw StateError(
+          'Goal "${goal['title']}" has no id; Replace mode requires an id '
+          'on every imported goal/subgoal. Use Add instead.',
+        );
+      }
+      final goalId = rawGoalId;
+      await svc.upsertGoalWithFields(
+        id: goalId,
+        title: (goal['title'] as String?) ?? '',
+        description: goal['description'] as String?,
+        parentId: null,
+        order: (goal['order'] as num?)?.toInt() ?? 0,
+        optional: goal['optional'] as bool? ?? false,
+        moduleId: (goal['moduleId'] as String?) ?? '',
+      );
+
+      final subgoals =
+          (entry['subgoals'] as List).cast<Map<String, dynamic>>();
+      for (final sg in subgoals) {
+        final rawSgId = sg['id'] as String?;
+        if (rawSgId == null || rawSgId.trim().isEmpty) {
+          throw StateError(
+            'Subgoal "${sg['title']}" has no id; Replace mode requires an id '
+            'on every imported goal/subgoal. Use Add instead.',
+          );
+        }
+        await svc.upsertGoalWithFields(
+          id: rawSgId,
+          title: (sg['title'] as String?) ?? '',
+          description: sg['description'] as String?,
+          parentId: goalId,
+          order: (sg['order'] as num?)?.toInt() ?? 0,
+          optional: sg['optional'] as bool? ?? false,
+          teachingTips: _stringList(sg['teachingTips']),
+          allowChains: sg['allowChains'] as bool? ?? false,
+          objectives: _objectiveList(sg['objectives']),
+          contentId: sg['contentId'] as String?,
+        );
+      }
+    }
+  }
+
+  /// Collects every `id` referenced in the import payload (root goals and
+  /// their subgoals), skipping entries that don't carry one.
+  Set<String> _collectIds(List<Map<String, dynamic>> entries) {
+    final ids = <String>{};
+    for (final entry in entries) {
+      final goal = entry['goal'] as Map<String, dynamic>;
+      final gid = goal['id'];
+      if (gid is String && gid.trim().isNotEmpty) ids.add(gid);
+
+      final subgoals = (entry['subgoals'] as List?)?.cast<Map<String, dynamic>>()
+          ?? const <Map<String, dynamic>>[];
+      for (final sg in subgoals) {
+        final sid = sg['id'];
+        if (sid is String && sid.trim().isNotEmpty) ids.add(sid);
+      }
+    }
+    return ids;
   }
 
   void _showSnack(String message) {

@@ -81,6 +81,7 @@ class GoalsService {
   }
 
   Future<String> createGoalWithFields({
+    String? id,
     required String title,
     String? description,
     String? parentId,
@@ -93,7 +94,7 @@ class GoalsService {
     String moduleId = '',
   }) async {
     final goal = Goal(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(),
       title: title,
       description: description,
       parentId: parentId,
@@ -111,6 +112,67 @@ class GoalsService {
       () => _container.create(_docMap(goal), partitionKey: _pk),
     );
     return goal.id;
+  }
+
+  /// Upserts a goal/subgoal at the given [id]. If a doc with that id already
+  /// exists, its `contentId` (the link to the authored Lesinhoud) is carried
+  /// over unless the caller passes a non-null [contentId] explicitly. Used by
+  /// the "Replace" import path so authored lesson content survives a re-import
+  /// of the goal tree.
+  Future<void> upsertGoalWithFields({
+    required String id,
+    required String title,
+    String? description,
+    String? parentId,
+    required int order,
+    bool optional = false,
+    List<String> teachingTips = const [],
+    bool allowChains = false,
+    List<Map<String, dynamic>> objectives = const [],
+    String? contentId,
+    String moduleId = '',
+  }) async {
+    String? finalContentId = contentId;
+    if (finalContentId == null) {
+      final existing = await safeCosmos(
+        () => _container.read(id, partitionKey: _pk),
+      );
+      final existingCid = existing?['contentId'];
+      if (existingCid is String && existingCid.isNotEmpty) {
+        finalContentId = existingCid;
+      }
+    }
+
+    final goal = Goal(
+      id: id,
+      title: title,
+      description: description,
+      parentId: parentId,
+      order: order,
+      optional: optional,
+      teachingTips: teachingTips,
+      allowChains: allowChains,
+      objectives: objectives
+          .map(LearningObjective.fromMap)
+          .toList(growable: false),
+      contentId: finalContentId,
+      moduleId: moduleId,
+    );
+    await safeCosmos(
+      () => _container.upsert(_docMap(goal), partitionKey: _pk),
+    );
+  }
+
+  /// Deletes the listed goal docs in a single transactional batch. All goal
+  /// docs share the `/type = "goal"` partition, so this is safe.
+  Future<void> deleteGoalsByIds(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final ops = ids
+        .map((id) => BatchOperation.delete(id))
+        .toList(growable: false);
+    await safeCosmos(
+      () => _container.executeBatch(ops, partitionKey: _pk),
+    );
   }
 
   // --- UPDATE --------------------------------------------------------------

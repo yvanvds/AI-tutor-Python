@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:highlight/languages/markdown.dart';
-import 'package:uuid/uuid.dart';
 
 /// Teacher-only "Lesinhoud" view: a tree of module → root goals → subgoals
 /// rendered from the goal tree, paired with a markdown editor for the
@@ -23,8 +22,6 @@ class LessonContentPage extends ConsumerStatefulWidget {
 }
 
 class _LessonContentPageState extends ConsumerState<LessonContentPage> {
-  static const Uuid _uuid = Uuid();
-
   String? _selectedGoalId;
   Content? _original;
   String _workingTitle = '';
@@ -122,7 +119,10 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     final goal = await goalsSvc.getGoalOnce(goalId);
     if (goal == null) return;
 
-    final id = goal.contentId ?? _uuid.v4();
+    // Content id mirrors the subgoal id so the link is structural — no
+    // separate UUID to drift, and re-imports of the goal tree can't orphan
+    // the lesinhoud.
+    final id = goalId;
     final content = Content(
       id: id,
       title: _workingTitle.trim().isEmpty ? goal.title : _workingTitle.trim(),
