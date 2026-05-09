@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +38,7 @@ class QuizView extends ConsumerWidget {
               children: [
                 const _QuizHeader(),
                 const SizedBox(height: AppSpacing.xl),
-                Text(
+                TutorMarkdown(
                   mcq.prompt,
                   style: const TextStyle(
                     color: AppColors.fg,
@@ -363,7 +364,7 @@ class _FeedbackPanel extends StatelessWidget {
         border: Border.all(color: accent.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(AppRadius.cardLarge),
       ),
-      child: Text(
+      child: TutorMarkdown(
         text,
         style: const TextStyle(
           color: AppColors.fg,

@@ -530,7 +530,7 @@ packages:
     source: hosted
     version: "6.3.2"
   gpt_markdown:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: gpt_markdown
       sha256: "8174983f2ed7d8576d25810913e3afe3f8ffdaa3172c0c823b7cfc289b67f380"

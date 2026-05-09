@@ -23,6 +23,7 @@ dependencies:
   flyer_chat_text_message: ^2.5.1
   flyer_chat_system_message: ^2.1.13
   flyer_chat_text_stream_message: ^2.2.6
+  gpt_markdown: ^1.1.4
   collection: ^1.19.1
   dart_openai:
     git:

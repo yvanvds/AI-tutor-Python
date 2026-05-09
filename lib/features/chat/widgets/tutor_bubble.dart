@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/features/chat/widgets/_chat_time.dart';
 import 'package:ai_tutor_python/features/chat/widgets/role_chip.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:flutter/material.dart';
 
 /// Receiver bubble for tutor messages. Renders an optional [RoleChip]
@@ -51,14 +52,7 @@ class TutorBubble extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(AppRadius.bubble),
               ),
-              child: SelectableText(
-                text,
-                style: const TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 14,
-                  height: 1.55,
-                ),
-              ),
+              child: TutorMarkdown(text),
             ),
             if (createdAt != null) ...[
               const SizedBox(height: 4),
