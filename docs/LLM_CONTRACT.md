@@ -91,7 +91,6 @@ by per-question signals. Keeps prompt token cost bounded.
 {
   "overallQuality": "wrong" | "partial" | "correct",
   "feedbackText": "Dutch student-facing message",
-  "followUpHint": "optional follow-up the policy may use, or null",
   "loSignals": [
     {
       "subgoalId": "use_if_else",
@@ -99,9 +98,19 @@ by per-question signals. Keeps prompt token cost bounded.
       "signal": "positive" | "negative" | "neutral",
       "strength": "strong" | "moderate" | "weak"
     }
-  ]
+  ],
+  "followUp": {
+    "question": "Wat als de afgeleide nul wordt?",
+    "rationale": "test understanding of edge case"
+  }
 }
 ```
+
+`followUp` is optional / nullable. The grader emits it when it
+judges the previous answer would benefit from a deepening or
+edge-case probe — typically because the answer was correct but
+shallow, or wrong in an instructive way that dialogue would
+clarify. Most graded turns omit it.
 
 ### Field semantics
 
@@ -115,9 +124,14 @@ downstream decision, not part of the contract.
 the existing `prompt`/`feedback` text. Granular per-LO feedback is for
 the conductor's eyes only; the student gets one readable message.
 
-**`followUpHint`** — optional. Whether the policy chains a follow-up
-question off this is a part-4 decision; the contract just allows the
-LLM to suggest one.
+**`followUp`** — optional. When present, contains a `question` (the
+text the conductor will show the student verbatim, in Dutch) and a
+`rationale` (for debugging and teacher visibility, not shown to the
+student). The grader emits this when continuing the dialogue would
+deepen understanding more than a fresh probe would. Whether the
+conductor actually presents it depends on conductor-side conditions
+(see conductor policy section 6.3): default depth limit is 1, raised
+to 2 when the subgoal's `allowChains` flag is `true`.
 
 **`loSignals`** — the array that updates belief. Always present,
 possibly empty.
@@ -142,6 +156,32 @@ in real grading.
 
 The LLM may emit at most one signal per `(subgoalId, loId)` pair per
 question.
+
+## Grading follow-up answers
+
+When the student answers a follow-up (a question the conductor
+presented because the previous grader response had a `followUp`
+field, per conductor policy section 6), the LLM is invoked again
+with the follow-up question and the student's answer. The grading
+contract is the same shape as for primary probes — same
+`overallQuality`, `feedbackText`, `loSignals`, and an optional
+nested `followUp` if chains are allowed.
+
+Two semantic differences from primary probe grading:
+
+- **No calibrated difficulty.** Follow-up questions don't carry a
+  `difficulty` field; they're dialogue, not calibrated probes. The
+  conductor treats follow-up signals as `medium` for the
+  difficulty-multiplier step in belief updates.
+- **Conductor caps strength at `weak`** for any `loSignals` emitted
+  on a follow-up answer. The LLM may emit `strong` or `moderate`,
+  but the conductor downgrades to `weak` before applying. This
+  reflects that follow-up answers, while real evidence, weren't
+  designed as calibrated probes of a specific LO at a specific
+  difficulty.
+
+Other than these two, follow-up answer grading uses the same
+schema, scope, and validation rules as primary grading.
 
 ## Validation on the conductor side
 
@@ -199,6 +239,14 @@ answer was just graded.
   decision.
 - **Cross-student isolation is absolute.** The LLM never sees data
   about students other than the one being graded.
+- **`followUp` is a question text**, not a hint. When present, the
+  conductor shows it to the student verbatim. Whether to present it
+  is a conductor-side decision (policy section 6.3); the contract
+  just provides the question.
+- **Follow-up answer grading reuses the primary grading shape**
+  with two semantic differences: signals are treated as
+  `medium`-difficulty for weight calculation, and the conductor
+  caps emitted strength at `weak`.
 
 ## What this contract deliberately does not do
 
@@ -213,9 +261,13 @@ answer was just graded.
 - **Does not promise per-aspect feedback to the student.**
   `feedbackText` is one Dutch message; signal granularity is for the
   conductor.
-- **Does not handle multi-turn grading.** Each call is one
-  question/one answer. Follow-up exchanges produce their own grading
-  events with their own `loSignals`.
+- **Does not handle multi-turn grading as a single call.** Each call
+  is one question / one answer. Follow-up exchanges produce their own
+  grading events with their own `loSignals`.
 - **Does not carry `suspectedConcepts`.** The LO model replaces it: a
   shaky concept surfaces as a signal on the LO that owns it. No
   parallel free-text taxonomy.
+- **Does not let the LLM control whether a follow-up is presented.**
+  The grader emits a `followUp` if it judges one warranted; the
+  conductor decides whether to actually present it (chunk 6.3
+  conditions).

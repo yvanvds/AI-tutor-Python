@@ -75,7 +75,7 @@ void main() {
       expect(t.endedAt, isNotNull);
     });
 
-    test('exportJson exposes schema=1 plus the documented top-level keys', () {
+    test('exportJson exposes the current schema version plus the documented top-level keys', () {
       final r = DebugSessionRecorder();
       r.resetSession(uid: 'u-123', email: 'student@x.test', modelName: 'gpt-test');
       _begin(r);
@@ -83,7 +83,6 @@ void main() {
 
       final out = r.exportJson();
       expect(out['schema'], kSchemaVersion);
-      expect(out['schema'], 1);
       expect(out['sessionId'], isA<String>());
       expect(out['sessionStartedAt'], isA<String>());
       expect(out['exportedAt'], isA<String>());

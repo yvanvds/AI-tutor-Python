@@ -1,4 +1,12 @@
 // Model class representing a Goal.
+//
+// `Goal` is a unified type for both root goals and subgoals; `parentId == null`
+// distinguishes a root from a subgoal. Subgoal-only fields (`teachingTips`,
+// `allowChains`, `objectives`, `contentId`) are present on the type for
+// every doc but only meaningful on subgoals.
+
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+
 class Goal {
   final String id;
   final String title;
@@ -6,12 +14,20 @@ class Goal {
   final String? parentId;
   final int order;
   final bool optional;
-  final List<String> suggestions;
-  final List<String> knownConcepts;
+
+  /// Subgoal-only: free-form prose hints to the LLM about how to approach this
+  /// subgoal. Surfaced in instruction prompts as `{teachingTips}`.
+  final List<String> teachingTips;
+
+  /// Subgoal-only: enables follow-up chains up to depth 2 within this subgoal.
+  /// Default `false` — enabled per-subgoal for conceptually rich content.
+  final bool allowChains;
+
+  /// Subgoal-only: ordered list of Learning Objectives.
+  final List<LearningObjective> objectives;
 
   /// Reference to a `content` doc holding the authored explanation block for
-  /// this subgoal. Null when no block has been authored yet (transient
-  /// during authoring; target state is non-null for every leaf subgoal).
+  /// this subgoal. Null when no block has been authored yet.
   final String? contentId;
 
   /// Parent module id. Empty string means "not yet backfilled" — the
@@ -25,23 +41,25 @@ class Goal {
     this.parentId,
     required this.order,
     this.optional = false,
-    this.suggestions = const [],
-    this.knownConcepts = const [],
+    this.teachingTips = const [],
+    this.allowChains = false,
+    this.objectives = const [],
     this.contentId,
     this.moduleId = '',
   });
 
   Map<String, dynamic> toMap() => {
-    'title': title,
-    'description': description,
-    'parentId': parentId,
-    'order': order,
-    'optional': optional,
-    'suggestions': suggestions,
-    'knownConcepts': knownConcepts,
-    'contentId': contentId,
-    'moduleId': moduleId,
-  };
+        'title': title,
+        'description': description,
+        'parentId': parentId,
+        'order': order,
+        'optional': optional,
+        'teachingTips': teachingTips,
+        'allowChains': allowChains,
+        'objectives': objectives.map((o) => o.toMap()).toList(),
+        'contentId': contentId,
+        'moduleId': moduleId,
+      };
 
   factory Goal.fromMap({
     required String id,
@@ -54,8 +72,14 @@ class Goal {
       parentId: map['parentId'],
       order: map['order'] ?? 0,
       optional: map['optional'] ?? false,
-      suggestions: List<String>.from(map['suggestions'] ?? []),
-      knownConcepts: List<String>.from(map['knownConcepts'] ?? []),
+      teachingTips: List<String>.from(map['teachingTips'] ?? const []),
+      allowChains: map['allowChains'] ?? false,
+      objectives: (map['objectives'] as List?)
+              ?.map((e) => LearningObjective.fromMap(
+                    Map<String, dynamic>.from(e as Map),
+                  ))
+              .toList() ??
+          const [],
       contentId: map['contentId'] as String?,
       moduleId: (map['moduleId'] as String?) ?? '',
     );

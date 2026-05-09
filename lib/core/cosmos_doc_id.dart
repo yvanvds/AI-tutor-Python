@@ -22,6 +22,17 @@ class CosmosDocId {
     return '${at.toUtc().toIso8601String()}_$suffix';
   }
 
+  /// Doc id for the `turn_history` container. Same shape as
+  /// `progressHistory` — sortable timestamp prefix + random suffix.
+  static String turnHistory(DateTime at, {Random? random}) {
+    final r = random ?? _random;
+    final suffix = r
+        .nextInt(1 << 32)
+        .toRadixString(36)
+        .padLeft(7, '0');
+    return '${at.toUtc().toIso8601String()}_$suffix';
+  }
+
   /// Single global config doc.
   static const String globalConfig = 'global';
 

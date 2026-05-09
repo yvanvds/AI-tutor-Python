@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progress/teacher_signals.dart';
+import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -349,7 +350,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
         DataCell(Text(activeRootTitle ?? '—')),
         DataCell(_OverallProgressBar(value: overall)),
-        DataCell(_StatusDot(status: status)),
+        DataCell(_StatusCell(status: status, uid: a.uid)),
         DataCell(
           Switch(
             value: a.mayUseGlobalKey,
@@ -620,31 +621,68 @@ class _OverallProgressBar extends StatelessWidget {
   }
 }
 
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.status});
+/// Status dot + "needs attention" badge per CONDUCTOR_POLICY §8.2. Badge
+/// shows the count of unacknowledged strong-signal events for the student;
+/// hidden when zero.
+class _StatusCell extends ConsumerWidget {
+  const _StatusCell({required this.status, required this.uid});
 
   final StudentStatus status;
+  final String uid;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final color = switch (status) {
-      StudentStatus.struggling => AppColors.danger,
       StudentStatus.active => AppColors.accent2,
       StudentStatus.idle => AppColors.fgFaint,
     };
     final tip = switch (status) {
-      StudentStatus.struggling =>
-        'Recente antwoorden tonen veel fouten op dit subdoel.',
       StudentStatus.active => 'Recent vooruitgang geboekt.',
       StudentStatus.idle => 'Geen vooruitgang in de laatste 7 dagen.',
     };
-    return Tooltip(
-      message: tip,
-      child: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: tip,
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+        ),
+        const SizedBox(width: 8),
+        StreamBuilder<int>(
+          stream: ref
+              .read(turnHistoryServiceProvider)
+              .watchStrongUnacknowledgedFor(uid),
+          builder: (context, snap) {
+            final n = snap.data ?? 0;
+            if (n <= 0) return const SizedBox.shrink();
+            return Tooltip(
+              message: 'Onbevestigde signaaleventjes',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade400,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  '$n',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

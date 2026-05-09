@@ -1,40 +1,45 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
-import 'package:ai_tutor_python/services/tutor/responses/suspected_concepts.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 
 class McqFeedback implements ChatResponse {
   @override
   final String type;
   final AnswerQuality quality;
   final String prompt;
-  final List<String>? suspectedConcepts;
+  final List<LoSignal> loSignals;
+  final FollowUp? followUp;
 
   McqFeedback({
     required this.type,
     required this.quality,
     required this.prompt,
-    this.suspectedConcepts,
+    this.loSignals = const [],
+    this.followUp,
   });
 
   factory McqFeedback.fromMap(Map<String, dynamic> map) {
     return McqFeedback(
       type: map['type'] ?? 'mcq_feedback',
-      quality: _stringToQuality(map['quality']),
+      quality: _stringToQuality(map['overallQuality'] ?? map['quality']),
       prompt: map['prompt'] ?? '',
-      suspectedConcepts: parseSuspectedConcepts(map['suspected_concepts']),
+      loSignals: parseLoSignals(map['loSignals']),
+      followUp: FollowUp.tryParse(map['followUp']),
     );
   }
 
   @override
   Map<String, dynamic> toJson() => {
     'type': type,
-    'quality': quality.name,
+    'overallQuality': quality.name,
     'prompt': prompt,
-    if (suspectedConcepts != null) 'suspected_concepts': suspectedConcepts,
+    'loSignals': loSignals.map((s) => s.toJson()).toList(),
+    if (followUp != null) 'followUp': followUp!.toJson(),
   };
 
-  static AnswerQuality _stringToQuality(String? value) {
-    switch (value?.toLowerCase()) {
+  static AnswerQuality _stringToQuality(Object? value) {
+    if (value is! String) return AnswerQuality.wrong;
+    switch (value.toLowerCase()) {
       case 'wrong':
         return AnswerQuality.wrong;
       case 'partial':

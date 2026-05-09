@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -54,26 +55,6 @@ class GoalsService {
 
   Future<List<Goal>> getRootGoalsOnce() => safeCosmos(_fetchRoots);
 
-  /// Validation set for AI-emitted concept attributions: union of
-  /// `knownConcepts` from [targetRootGoal] and every earlier root goal
-  /// (those with a strictly smaller `order`). Pass [cachedRoots] (from
-  /// GoalSelectionState) to avoid a Cosmos round-trip on every AI request.
-  Future<List<String>> getKnownConceptsInScope(
-    Goal targetRootGoal, {
-    List<Goal>? cachedRoots,
-  }) async {
-    final roots = (cachedRoots != null && cachedRoots.isNotEmpty)
-        ? cachedRoots
-        : await getRootGoalsOnce();
-    final out = <String>{};
-    for (final root in roots) {
-      if (root.order > targetRootGoal.order) break;
-      out.addAll(root.knownConcepts);
-      if (root.id == targetRootGoal.id) break;
-    }
-    return out.toList();
-  }
-
   Future<List<Goal>> getAllGoalsOnce() => safeCosmos(_fetchAll);
 
   // --- CREATE --------------------------------------------------------------
@@ -105,8 +86,9 @@ class GoalsService {
     String? parentId,
     required int order,
     bool optional = false,
-    List<String> suggestions = const [],
-    List<String> knownConcepts = const [],
+    List<String> teachingTips = const [],
+    bool allowChains = false,
+    List<Map<String, dynamic>> objectives = const [],
   }) async {
     final goal = Goal(
       id: _uuid.v4(),
@@ -115,8 +97,11 @@ class GoalsService {
       parentId: parentId,
       order: order,
       optional: optional,
-      suggestions: suggestions,
-      knownConcepts: knownConcepts,
+      teachingTips: teachingTips,
+      allowChains: allowChains,
+      objectives: objectives
+          .map(LearningObjective.fromMap)
+          .toList(growable: false),
     );
     await safeCosmos(
       () => _container.create(_docMap(goal), partitionKey: _pk),
@@ -138,11 +123,11 @@ class GoalsService {
   Future<void> updateTags(String id, List<String> tags) =>
       _patch(id, {'tags': tags});
 
-  Future<void> updateSuggestions(String id, List<String> suggestions) =>
-      _patch(id, {'suggestions': suggestions});
+  Future<void> updateTeachingTips(String id, List<String> teachingTips) =>
+      _patch(id, {'teachingTips': teachingTips});
 
-  Future<void> updateKnownConcepts(String id, List<String> knownConcepts) =>
-      _patch(id, {'knownConcepts': knownConcepts});
+  Future<void> updateAllowChains(String id, bool allowChains) =>
+      _patch(id, {'allowChains': allowChains});
 
   Future<void> setContentId(String id, String? contentId) =>
       _patch(id, {'contentId': contentId});
@@ -210,7 +195,11 @@ class GoalsService {
           'parentId': g.parentId,
           'order': g.order,
           'optional': g.optional,
-          'suggestions': g.suggestions,
+          'teachingTips': g.teachingTips,
+          'allowChains': g.allowChains,
+          'objectives': g.objectives.map((o) => o.toMap()).toList(),
+          'contentId': g.contentId,
+          'moduleId': g.moduleId,
         },
       ));
     }
@@ -333,8 +322,9 @@ class GoalsService {
     'parentId': goal.parentId,
     'order': goal.order,
     'optional': goal.optional,
-    'suggestions': goal.suggestions,
-    'knownConcepts': goal.knownConcepts,
+    'teachingTips': goal.teachingTips,
+    'allowChains': goal.allowChains,
+    'objectives': goal.objectives.map((o) => o.toMap()).toList(),
     'contentId': goal.contentId,
     'moduleId': goal.moduleId,
   };

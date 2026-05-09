@@ -113,25 +113,18 @@ class GoalFormState extends ConsumerState<GoalForm> {
             contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: 12),
-          const SizedBox(height: 12),
-          widget.goal.parentId != null
-              ? ChipsEditor(
-                  label: 'Suggestions',
-                  values: widget.goal.suggestions,
-                  hintText: 'Type a suggestion and hit Enter',
-                  onChanged: (vals) =>
-                      svc.updateSuggestions(widget.goal.id, vals),
-                )
-              : ChipsEditor(
-                  label: 'Known Concepts After Completion',
-                  values: widget.goal.knownConcepts,
-                  hintText: 'Type a concept and hit Enter',
-                  onChanged: (vals) =>
-                      svc.updateKnownConcepts(widget.goal.id, vals),
-                ),
-          const SizedBox(height: 12),
-          if (widget.goal.parentId != null) _LesinhoudRow(goal: widget.goal),
-          const SizedBox(height: 12),
+          if (widget.goal.parentId != null) ...[
+            ChipsEditor(
+              label: 'Teaching tips',
+              values: widget.goal.teachingTips,
+              hintText: 'Type a teaching tip and hit Enter',
+              onChanged: (vals) =>
+                  svc.updateTeachingTips(widget.goal.id, vals),
+            ),
+            const SizedBox(height: 12),
+            _LesinhoudRow(goal: widget.goal),
+            const SizedBox(height: 12),
+          ],
         ],
       ),
     );

@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'account.dart';
@@ -145,6 +146,14 @@ class AccountService extends Notifier<Account?> {
     required bool value,
   }) async {
     await _patch(uid, {'mayUseGlobalKey': value});
+  }
+
+  /// Persists the calibration substructure on the current user's account
+  /// doc. Called by the conductor after every belief update.
+  Future<void> setCalibration(StudentCalibration calibration) async {
+    final uid = currentUid;
+    if (uid == null) return;
+    await _patch(uid, {'calibration': calibration.toJson()});
   }
 
   Future<void> deleteAccountDoc(String uid) async {

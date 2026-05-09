@@ -1,25 +1,19 @@
 {
   "version": 1,
-  "exportedAt": "2026-05-01T17:22:39.290442",
+  "exportedAt": "2026-05-09T00:00:00.000000",
   "goals": [
     {
       "title": "Be able to write and understand very basic Python scripts",
       "description": "You can write and understand short Python scripts that use `print()`, variables, and basic mathematical operators. You understand how these building blocks interact to produce simple outputs.",
       "order": 1000,
       "optional": false,
-      "suggestions": [],
-      "knownConcepts": [
-        "print()",
-        "variables",
-        "mathematical operators"
-      ],
       "children": [
         {
           "title": "Use print() correctly",
           "description": "You can display text or numbers on screen with the print() function and understand when to use quotes around text versus numbers.",
           "order": 1000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Begin with examples and let students predict what each line will print.",
             "Ask them to explain why certain lines cause errors (e.g. missing quotes).",
             "Follow up with short tasks where they must write the `print()` statements themselves.",
@@ -27,7 +21,30 @@
             "Do not use sep or len",
             "Be creative in the worlds you print. Don't use typical phrasing like 'Hello World'"
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_print_syntax",
+              "statement": "You know that `print()` displays its argument(s) on the screen and that text arguments must be enclosed in quotes.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_print_call",
+              "statement": "You can write a `print()` statement that displays a given message or value.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_print_output",
+              "statement": "You can predict what a given `print()` call will output, and recognise which lines fail because of missing or mismatched quotes.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -35,12 +52,42 @@
           "description": "You can create and use variables to store values, and you understand the difference between text (`str`), integers (`int`), and real numbers (`float`).",
           "order": 2000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Use simple examples to show how variable values can change during execution.",
             "Contrast code that uses `\"5\"` (a string) and `5` (a number) and discuss what happens.",
             "Provide small exercises where students must fix or complete snippets with incorrect variable usage."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_variable_types",
+              "statement": "You know that Python distinguishes between text (`str`), integers (`int`), and floating-point numbers (`float`).",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_assign_variable",
+              "statement": "You can declare a variable, assign a value to it, and use it later in the same program.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_variable_value",
+              "statement": "You can predict the final value of a variable after a short sequence of assignments.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_string_vs_number",
+              "statement": "You can explain why `\"5\"` and `5` behave differently and identify operations that fail when their types are mixed.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -48,12 +95,35 @@
           "description": "You can use Python’s basic mathematical operators (`+`, `-`, `*`, `/`, `**`, `//`, `%`) and understand how they behave with different types of numbers.",
           "order": 3000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Start with `+`, `-`, `*`, and `/`, then introduce `**`, `//`, and `%` once the basics are secure.",
             "Let students predict the result before running each expression.",
             "Include examples that mix integers and floats, and demonstrate what happens when math operators are used with strings."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_operator_meanings",
+              "statement": "You know what each of `+`, `-`, `*`, `/`, `**`, `//`, and `%` computes.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_compute_expression",
+              "statement": "You can write a Python expression that computes a given numeric result using these operators.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_expression_value",
+              "statement": "You can predict the value of an expression that combines several arithmetic operators, including the difference between `/` and `//`.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         }
       ]
@@ -63,24 +133,41 @@
       "description": "You can write and understand Python programs that make decisions using `if`, `elif`, and `else` statements. You know how comparison and logical operators control program flow.",
       "order": 2000,
       "optional": false,
-      "suggestions": [],
-      "knownConcepts": [
-        "if, else, elif",
-        "comparison operators, and, or, not",
-        "True, False"
-      ],
       "children": [
         {
           "title": "Understand comparison operators",
           "description": "You can compare values using operators such as `==`, `!=`, `<`, `>`, `<=`, and `>=`, and predict whether an expression is `True` or `False`.",
           "order": 1000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Present short examples and have students state which lines evaluate to `True`.",
             "Use real-life contexts (“Is temperature > 30?”) to make the logic meaningful.",
             "Follow up with small prediction tasks before moving to coding exercises."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_comparison_set",
+              "statement": "You know the comparison operators `==`, `!=`, `<`, `>`, `<=`, `>=` and what each one tests.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_comparison_result",
+              "statement": "You can predict whether a given comparison expression evaluates to `True` or `False`.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_write_comparison",
+              "statement": "You can write a comparison expression that captures a condition stated in natural language.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -88,14 +175,37 @@
           "description": "You can write simple conditional statements that execute different code depending on whether a condition is true or false.",
           "order": 2000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Let students convert such sentences into code step by step.",
             "Gradually increase complexity by nesting.",
             "Start from natural-language examples.",
             "do not require the use of elif yet.",
             "Do not require the use of combined conditions."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_if_else_syntax",
+              "statement": "You know how to write a Python `if` / `else` block, including the colon and the indented body.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_simple_branch",
+              "statement": "You can write an `if` / `else` statement that runs different code depending on a single condition.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_branch_taken",
+              "statement": "You can predict which branch of an `if` / `else` runs given the truth value of the condition.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -103,12 +213,42 @@
           "description": "You can chain multiple conditions with `elif` and use logical operators (`and`, `or`, `not`) to combine them.",
           "order": 3000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Show how `elif` avoids redundant `if` statements.",
             "Practice truth tables for `and` / `or` / `not` to clarify outcomes.",
             "Design mini-projects like a grade classifier (“If score >= 90: … elif score >= 80: … else: …”)."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_logical_operators",
+              "statement": "You know how the operators `and`, `or`, and `not` combine boolean values.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_chain_elif",
+              "statement": "You can write a multi-way decision using `if` / `elif` / `else` for a problem with more than two cases.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_combined_condition",
+              "statement": "You can predict the outcome of a combined condition that uses `and`, `or`, or `not`.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_choose_elif_vs_if",
+              "statement": "You can explain why `elif` is preferable to a chain of separate `if` statements when only one branch should run.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         }
       ]
@@ -118,22 +258,40 @@
       "description": "You can write and understand Python programs that use for loops to repeat actions. You know how iteration works over sequences such as lists, strings, and ranges.",
       "order": 3000,
       "optional": false,
-      "suggestions": [],
-      "knownConcepts": [
-        "for, in, range(), len()",
-        "iteration, sequence, repetition"
-      ],
       "children": [
         {
           "title": "Understand the structure of a for-loop",
           "description": "You can recognize and explain the syntax of a for loop and describe how it repeats actions for each item in a sequence.",
           "order": 1000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Start from natural-language examples.",
             "Show loop headers and bodies separately to clarify indentation."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_for_syntax",
+              "statement": "You know the syntactic parts of a `for` loop: the loop variable, the iterable, the colon, and the indented body.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_iteration_count",
+              "statement": "You can predict how many times the body of a given `for` loop runs.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_loop_body_role",
+              "statement": "You can explain which lines belong to the loop body and how indentation determines that.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -141,13 +299,36 @@
           "description": "You can use range() to create sequences of numbers and control how many times a loop runs.",
           "order": 2000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Practice small examples like for i in range(5):.",
             "Discuss start, stop, and step values.",
             "Have students predict the output before running the code.",
             "Use visual number lines to represent iteration."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_range_args",
+              "statement": "You know that `range()` accepts up to three arguments — start, stop, and step — and that the stop value is exclusive.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_loop_with_range",
+              "statement": "You can write a `for` loop using `range()` that runs a given number of times or over a given numeric sequence.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_range_output",
+              "statement": "You can predict the sequence of values produced by a given `range(...)` call.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -155,12 +336,35 @@
           "description": "You can loop through characters in a string, and access each element during the loop.",
           "order": 3000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Use concrete examples such as looping over a small sentence.",
             "Show the difference between for x in string and for i in range(len(string)).",
             "Play with vowels and consonants."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "apply_iterate_string",
+              "statement": "You can write a `for` loop that visits every character of a given string.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_string_loop_output",
+              "statement": "You can predict what a `for` loop over a string prints or accumulates.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_index_vs_element",
+              "statement": "You can explain the difference between iterating directly over a string and iterating with `range(len(...))`.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -168,12 +372,35 @@
           "description": "You can use if statements inside for loops to make decisions during iteration.",
           "order": 4000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Show filtering tasks (“print only even numbers”).",
             "Let students write small data-processing scripts that mix repetition and selection.",
             "Encourage reasoning about loop flow: when does the condition trigger?"
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "apply_filter_in_loop",
+              "statement": "You can write a `for` loop that uses an `if` statement to act only on items that match a condition.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_filter_output",
+              "statement": "You can predict which items a loop with an internal condition will process or print.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_loop_condition_flow",
+              "statement": "You can explain when a condition inside a loop body fires versus when it is skipped.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         }
       ]
@@ -183,25 +410,42 @@
       "description": "You can write and understand Python programs that use while loops to repeat actions until a condition is no longer true. You can decide when to use a while loop instead of a for loop.",
       "order": 4000,
       "optional": false,
-      "suggestions": [],
-      "knownConcepts": [
-        "while, break, continue",
-        "loop condition, infinite loop",
-        "difference between for and while"
-      ],
       "children": [
         {
           "title": "Understand the structure of a while-loop",
           "description": "You can explain how a while loop checks a condition before each repetition, and how it stops when the condition becomes false.",
           "order": 1000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Compare the while loop to natural language",
             "Let students predict how many times a simple while loop runs.",
             "Show the importance of changing a variable inside the loop to avoid infinite repetition.",
             "Use examples like counting up or down with a variable."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_while_syntax",
+              "statement": "You know that a `while` loop checks its condition before each iteration and stops once the condition becomes false.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_while_iterations",
+              "statement": "You can predict how many times a simple `while` loop runs given its condition and the updates inside it.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_infinite_loop_cause",
+              "statement": "You can explain why a `while` loop becomes infinite when nothing in the body eventually makes the condition false.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -209,13 +453,36 @@
           "description": "You can control a while loop using numeric counters and conditions.",
           "order": 2000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Ask students to describe in words what each part of the loop does.",
             "Use interactive predictions (“what happens if we forget to update i?”).",
             "Practice both increasing and decreasing counters.",
             "Don't lead students in to executing infinite loops!"
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "apply_counter_loop",
+              "statement": "You can write a `while` loop driven by a numeric counter that counts up or down to a target value.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_counter_endstate",
+              "statement": "You can predict the final value of a counter after a given `while` loop finishes.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_update_position",
+              "statement": "You can explain why the counter update has to be inside the loop body and why its position matters.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -223,12 +490,35 @@
           "description": "You can decide which type of loop fits a problem: use for when the number of repetitions is known, and while when it depends on a condition.",
           "order": 3000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Compare both loop types for similar tasks (“count from 1 to 5” vs. “keep counting until reached 5”).",
             "Discuss readability and clarity as criteria for choosing.",
             "Provide short mixed exercises where students must decide which loop is better suited."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_for_vs_while",
+              "statement": "You know that `for` fits a known number of repetitions while `while` fits repetition controlled by a condition.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_pick_loop_type",
+              "statement": "You can choose the appropriate loop type for a given problem and write the corresponding loop.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_loop_choice_tradeoff",
+              "statement": "You can explain why one loop type produces clearer code than the other for a specific problem.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -236,13 +526,36 @@
           "description": "You can interrupt or skip parts of a loop using break and continue",
           "order": 4000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Show examples where break stops the loop early (e.g. stop at a certain number).",
             "Show how continue skips the rest of one iteration but keeps looping.",
             "Discuss typical mistakes like unreachable code after break.",
             "Use simple counting examples to illustrate both commands clearly."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_break_continue_meaning",
+              "statement": "You know that `break` exits the loop immediately while `continue` skips to the next iteration.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_use_break_continue",
+              "statement": "You can write a loop that uses `break` to stop early or `continue` to skip specific iterations.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_break_continue_output",
+              "statement": "You can predict the output of a loop that uses `break` and/or `continue` at specific iterations.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         }
       ]
@@ -252,24 +565,41 @@
       "description": "You can create, access, and modify lists in Python. You understand that a list is an ordered collection of items that can be changed and iterated over.",
       "order": 5000,
       "optional": false,
-      "suggestions": [],
-      "knownConcepts": [
-        "list, index, element",
-        "len(), append()",
-        "for loops with lists"
-      ],
       "children": [
         {
           "title": "Understand what a list is",
           "description": "You can explain what a list represents and recognize the syntax for creating one using square brackets.",
           "order": 1000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Show lists with different types of values (numbers, text, or mixed).",
             "Compare a single variable with a list containing several values.",
             "Let students predict what happens when printing a list or its type."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_list_syntax",
+              "statement": "You know that a list is created with square brackets and can hold multiple values, possibly of different types.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_list_print",
+              "statement": "You can predict what `print(my_list)` and `type(my_list)` show for a given list literal.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_list_vs_variable",
+              "statement": "You can explain how a list differs from a single variable holding one value.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -277,13 +607,36 @@
           "description": "You can retrieve and change elements in a list using their index.",
           "order": 2000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Highlight that the first element has index 0.",
             "Demonstrate reading and updating items step by step.",
             "Have students write short snippets that change one or more items and observe the result.",
             "Encourage reasoning about what happens when indices go out of range."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_indexing_starts_at_zero",
+              "statement": "You know that the first element of a list has index 0 and that valid indices range up to `len(list) - 1`.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_read_and_update",
+              "statement": "You can write code that reads an element of a list and assigns a new value to it by index.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_index_error",
+              "statement": "You can predict whether a given indexing expression succeeds or raises an `IndexError`.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -291,12 +644,35 @@
           "description": "You can measure the length of a list and add new elements to it dynamically.",
           "order": 3000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Show how the length changes after appending.",
             "Combine both functions in short, progressive examples.",
             "Encourage exploration of order: newly added items appear at the end."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "recall_len_append_meaning",
+              "statement": "You know that `len(list)` returns the current length and that `list.append(x)` adds `x` to the end.",
+              "kind": "recall",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "apply_grow_list",
+              "statement": "You can write code that builds a list incrementally with `append()` and reports its length with `len()`.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_list_after_appends",
+              "statement": "You can predict the contents and length of a list after a sequence of `append()` calls.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -304,13 +680,36 @@
           "description": "You can use a for loop to process each element in a list.",
           "order": 4000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Demonstrate both looping directly over elements and looping by index.",
             "Encourage predicting outputs before execution.",
             "Let students modify the loop body to perform small transformations or print patterns.",
             "Alternate between lists of numbers and lists of short words to maintain variety."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "apply_loop_over_list",
+              "statement": "You can write a `for` loop that processes each element of a list, either directly or by index.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_loop_output",
+              "statement": "You can predict what a `for` loop prints or accumulates when iterating over a given list.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_direct_vs_index_iteration",
+              "statement": "You can explain when iterating by element is cleaner than iterating by index, and when the opposite is true.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         },
         {
@@ -318,13 +717,36 @@
           "description": "You can use if statements inside loops to check or select certain elements.",
           "order": 5000,
           "optional": false,
-          "suggestions": [
+          "teachingTips": [
             "Ask conceptual questions about which items meet a condition.",
             "Have students print, count, or collect items that fit a rule.",
             "Emphasize how conditions work the same way inside a loop as outside it.",
             "Encourage creative variations instead of repeating one fixed example type."
           ],
-          "knownConcepts": [],
+          "allowChains": false,
+          "objectives": [
+            {
+              "id": "apply_filter_list",
+              "statement": "You can write a loop that selects, counts, or prints only the list elements that satisfy a given condition.",
+              "kind": "apply",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "predict_filtered_result",
+              "statement": "You can predict which elements of a given list a loop with an internal `if` will process.",
+              "kind": "predict",
+              "weight": 1.0,
+              "optional": false
+            },
+            {
+              "id": "reason_condition_in_loop_body",
+              "statement": "You can explain how the same condition behaves inside a loop body versus on its own.",
+              "kind": "reason",
+              "weight": 1.0,
+              "optional": false
+            }
+          ],
           "children": []
         }
       ]

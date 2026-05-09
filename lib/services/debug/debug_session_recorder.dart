@@ -1,11 +1,23 @@
+// In-memory mirror of the persisted `turn_history` container, viewable in
+// `kDebugMode` via `DebugDialog`. Same schema as the persisted records
+// (CONDUCTOR_POLICY 8.1) plus per-turn request/response payloads useful for
+// debugging.
+//
+// The recorder keeps the existing circular-buffer / 200-entry shape; what
+// changed is the canonical fields surfaced — `chosenReason`, `notchDropFired`,
+// candidate LOs, `hadFallback`, decay-effective values, and any follow-up
+// the grader emitted (recorded but not acted on in this step).
+
+import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 const int kBufferCapacity = 200;
-const int kSchemaVersion = 1;
+const int kSchemaVersion = 2;
 
 class TurnEvent {
   final int atMs;
@@ -48,6 +60,14 @@ class TurnRecord {
   final List<TurnEvent> events = [];
   String? error;
 
+  /// Mirror of the persisted `turn_history` doc once `_integrateGradedAnswer`
+  /// runs. `null` for non-graded turns (questions, hints, status).
+  PersistedTurnRecord? persisted;
+
+  /// Optional follow-up the grader emitted (CONDUCTOR_POLICY §6 / §6.6).
+  /// Captured for debug visibility; not acted on in the current step.
+  FollowUp? followUp;
+
   TurnRecord({
     required this.turnId,
     required this.sessionId,
@@ -88,6 +108,8 @@ class TurnRecord {
       'parsedResponse': parsedResponse,
       'events': events.map((e) => e.toJson()).toList(),
       'error': error,
+      if (persisted != null) 'persisted': persisted!.toMap(uid: ''),
+      if (followUp != null) 'followUp': followUp!.toJson(),
     };
   }
 }
@@ -110,6 +132,9 @@ class DebugSessionRecorder {
 
   @visibleForTesting
   TurnRecord? get currentForTest => _current;
+
+  /// Read-only view of the buffer for the debug dialog.
+  List<TurnRecord> get buffer => List.unmodifiable(_buffer);
 
   void resetSession({String? uid, String? email, String? modelName}) {
     try {
@@ -209,6 +234,21 @@ class DebugSessionRecorder {
       }
     } catch (e) {
       debugPrint('DebugRecorder.recordParsedResponse: $e');
+    }
+  }
+
+  /// Mirror the just-built persisted `turn_history` doc on the active turn.
+  /// Captures everything CONDUCTOR_POLICY 8.3 calls out — `chosenReason`,
+  /// `notchDropFired`, candidate LOs and stats, `hadFallback`, decay-effective
+  /// values are part of `loStatusAfter`.
+  void recordPersistedTurn(PersistedTurnRecord record, {FollowUp? followUp}) {
+    try {
+      final t = _current;
+      if (t == null) return;
+      t.persisted = record;
+      t.followUp = followUp;
+    } catch (e) {
+      debugPrint('DebugRecorder.recordPersistedTurn: $e');
     }
   }
 

@@ -7,8 +7,7 @@ import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_exercise.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_feedback.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
@@ -16,6 +15,25 @@ import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart'
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
 import 'package:ai_tutor_python/services/tutor/responses/status_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
+
+/// Outcome of integrating a graded answer into the conductor (CONDUCTOR_POLICY
+/// §6.5 post-answer flow). Distinct from the `bool` of "did the subgoal
+/// advance" because there's now a third path — the conductor presented a
+/// chained follow-up and is waiting on the next student answer.
+enum IntegrateOutcome {
+  /// The subgoal mastered and we advanced to the next one. The handler
+  /// should not also call `requestExercise`.
+  advanced,
+
+  /// A follow-up question was presented in chat. The handler should NOT
+  /// call `requestExercise`; the next student message will route to a
+  /// follow-up grading call.
+  followUpPresented,
+
+  /// Belief / calibration updated; nothing presented. The handler should
+  /// continue to `requestExercise` as usual.
+  continuing,
+}
 
 class TutorContext {
   TutorContext({
@@ -33,6 +51,7 @@ class TutorContext {
     required this.updateReportForGoal,
     required this.updateReportForCurrentGoal,
     required this.recordParsedResponse,
+    required this.integrateGradedAnswer,
     this.statusReportGoalIdOverride,
   });
 
@@ -46,8 +65,7 @@ class TutorContext {
   final Future<void> Function() maybeRetry;
   final void Function() playQuestion;
 
-  /// Open a fresh MCQ in the practice view. Replaces the chat-based
-  /// `addMcqOptions` flow.
+  /// Open a fresh MCQ in the practice view.
   final void Function({
     required String prompt,
     required String code,
@@ -64,6 +82,16 @@ class TutorContext {
   final Future<void> Function(String goalId, String report) updateReportForGoal;
   final Future<void> Function(String report) updateReportForCurrentGoal;
   final void Function(ChatResponse response) recordParsedResponse;
+
+  /// Builds the `GradedAnswer`, runs validation/fallback, calls the
+  /// conductor's `integrateAnswer`, optionally presents a follow-up, and
+  /// returns the outcome. TutorService owns the implementation since it has
+  /// access to the in-flight `QuestionPlan` and current goal scope.
+  final Future<IntegrateOutcome> Function({
+    required AnswerQuality overallQuality,
+    required List<LoSignal> loSignals,
+    required FollowUp? followUp,
+  }) integrateGradedAnswer;
 
   /// Goal id the StatusSummaryHandler should write against. Set by
   /// TutorService when firing a post-mastery status query so the report
@@ -130,41 +158,6 @@ class MultipleChoiceHandler extends ResponseHandler<MultipleChoice> {
   }
 }
 
-class GuidingExerciseHandler extends ResponseHandler<GuidingExercise> {
-  const GuidingExerciseHandler();
-  @override
-  Future<void> handle(GuidingExercise r, TutorContext ctx) async {
-    ctx.setExerciseType(r.type);
-    ctx.startNewCode(r.code);
-    ctx.addTutorMessage(r.prompt);
-    ctx.playQuestion();
-  }
-}
-
-class GuidingFeedbackHandler extends ResponseHandler<GuidingFeedback> {
-  const GuidingFeedbackHandler();
-  @override
-  Future<void> handle(GuidingFeedback r, TutorContext ctx) async {
-    if (r.prompt.isNotEmpty) {
-      ctx.addTutorMessage(r.prompt);
-      ctx.playQuestion();
-    }
-
-    final guidingComplete = await ctx.conductor.guidingIsComplete(
-      r.understanding,
-    );
-    if (guidingComplete) {
-      await ctx.requestExercise();
-      return;
-    }
-
-    ctx.setFollowUp(
-      message: r.followUp.isNotEmpty ? r.followUp : null,
-      code: r.code.isNotEmpty ? r.code : null,
-    );
-  }
-}
-
 class AnswerHandler extends ResponseHandler<Answer> {
   const AnswerHandler();
   @override
@@ -194,10 +187,13 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
       ctx.addTutorMessage(r.prompt);
       ctx.playQuestion();
     }
-
-    final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
-    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
-    if (r.suggestion.isNotEmpty && suggestionAllowed) {
+    final outcome = await ctx.integrateGradedAnswer(
+      overallQuality: r.quality,
+      loSignals: r.loSignals,
+      followUp: r.followUp,
+    );
+    if (outcome == IntegrateOutcome.followUpPresented) return;
+    if (outcome == IntegrateOutcome.continuing && r.suggestion.isNotEmpty) {
       ctx.setFollowUp(message: r.suggestion);
     } else {
       await ctx.requestExercise();
@@ -211,10 +207,14 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
   Future<void> handle(McqFeedback r, TutorContext ctx) async {
     ctx.applyMcqFeedback(prompt: r.prompt, quality: r.quality);
     ctx.playQuestion();
-    await ctx.conductor.updateProgress(r.quality);
-    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
+    await ctx.integrateGradedAnswer(
+      overallQuality: r.quality,
+      loSignals: r.loSignals,
+      followUp: r.followUp,
+    );
     // Advance is deferred until the student clicks "Volgende" inside the
-    // MCQ render — see TutorService.advanceFromMcq.
+    // MCQ render — see TutorService.advanceFromMcq. A follow-up presented
+    // here will simply replace that flow on the next student turn.
   }
 }
 
@@ -226,14 +226,13 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
       ctx.addTutorMessage(r.prompt);
       ctx.playQuestion();
     }
-
-    final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
-    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
-    if (r.followUp != null && suggestionAllowed) {
-      ctx.setFollowUp(message: r.followUp);
-    } else {
-      await ctx.requestExercise();
-    }
+    final outcome = await ctx.integrateGradedAnswer(
+      overallQuality: r.quality,
+      loSignals: r.loSignals,
+      followUp: r.followUp,
+    );
+    if (outcome == IntegrateOutcome.followUpPresented) return;
+    await ctx.requestExercise();
   }
 }
 
@@ -245,14 +244,13 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
       ctx.addTutorMessage(r.prompt);
       ctx.playQuestion();
     }
-
-    final suggestionAllowed = await ctx.conductor.updateProgress(r.quality);
-    await ctx.conductor.recordConceptAttributions(r.suspectedConcepts);
-    if (r.followUp != null && suggestionAllowed) {
-      ctx.setFollowUp(message: r.followUp);
-    } else {
-      await ctx.requestExercise();
-    }
+    final outcome = await ctx.integrateGradedAnswer(
+      overallQuality: r.quality,
+      loSignals: r.loSignals,
+      followUp: r.followUp,
+    );
+    if (outcome == IntegrateOutcome.followUpPresented) return;
+    await ctx.requestExercise();
   }
 }
 
@@ -297,8 +295,6 @@ final List<_DispatchEntry> _dispatchTable = [
   _entry(const WriteCodeHandler()),
   _entry(const SocraticQuestionHandler()),
   _entry(const MultipleChoiceHandler()),
-  _entry(const GuidingExerciseHandler()),
-  _entry(const GuidingFeedbackHandler()),
   _entry(const AnswerHandler()),
   _entry(const HintHandler()),
   _entry(const CodeFeedbackHandler()),

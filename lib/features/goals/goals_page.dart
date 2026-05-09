@@ -225,8 +225,9 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         parentId: parentId,
         order: (node['order'] as num?)?.toInt() ?? 0,
         optional: node['optional'] as bool? ?? false,
-        suggestions: _stringList(node['suggestions']),
-        knownConcepts: _stringList(node['knownConcepts']),
+        teachingTips: _stringList(node['teachingTips']),
+        allowChains: node['allowChains'] as bool? ?? false,
+        objectives: _objectiveList(node['objectives']),
       );
       final children = node['children'];
       if (children is List && children.isNotEmpty) {
@@ -256,13 +257,15 @@ List<Map<String, dynamic>> _buildTree(List<Goal> goals) {
 
   Map<String, dynamic> nodeFor(Goal g) {
     final children = byParent[g.id] ?? const <Goal>[];
+    final isSubgoal = g.parentId != null;
     return {
       'title': g.title,
       'description': g.description,
       'order': g.order,
       'optional': g.optional,
-      'suggestions': g.suggestions,
-      'knownConcepts': g.knownConcepts,
+      if (isSubgoal) 'teachingTips': g.teachingTips,
+      if (isSubgoal) 'allowChains': g.allowChains,
+      if (isSubgoal) 'objectives': g.objectives.map((o) => o.toMap()).toList(),
       'children': children.map(nodeFor).toList(),
     };
   }
@@ -285,6 +288,16 @@ int _countNodes(List<Map<String, dynamic>> nodes) {
 
 List<String> _stringList(dynamic v) {
   if (v is List) return v.map((e) => e?.toString() ?? '').toList();
+  return const [];
+}
+
+List<Map<String, dynamic>> _objectiveList(dynamic v) {
+  if (v is List) {
+    return v
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
   return const [];
 }
 

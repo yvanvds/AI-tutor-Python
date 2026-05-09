@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/account/detail/progress_history_charts.dart';
+import 'package:ai_tutor_python/features/account/detail/signal_events_section.dart';
 import 'package:ai_tutor_python/features/account/detail/status_reports_section.dart';
 import 'package:ai_tutor_python/features/account/detail/student_status_summary.dart';
 import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
@@ -54,6 +55,8 @@ class StudentDetailDrawer extends ConsumerWidget {
                               progress: progress,
                               goals: goals,
                             ),
+                          const Divider(height: 1),
+                          SignalEventsSection(uid: account.uid),
                           const Divider(height: 1),
                           _SectionTitle(theme: theme, label: 'Doelen'),
                           SizedBox(

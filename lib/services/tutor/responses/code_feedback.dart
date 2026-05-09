@@ -1,14 +1,15 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
-import 'package:ai_tutor_python/services/tutor/responses/suspected_concepts.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 
 /*
 {
   "type": "code_feedback",
   "summary": "brief explanation of correctness or errors",
   "suggestion": "concise next step for improvement",
-  "quality": "wrong | partial | correct",
-  "suspected_concepts": ["optional", "tags"]
+  "overallQuality": "wrong | partial | correct",
+  "loSignals": [...],
+  "followUp": { "question": "...", "rationale": "..." }   // optional
 }
 */
 
@@ -18,14 +19,16 @@ class CodeFeedback implements ChatResponse {
   final String prompt;
   final String suggestion;
   final AnswerQuality quality;
-  final List<String>? suspectedConcepts;
+  final List<LoSignal> loSignals;
+  final FollowUp? followUp;
 
   CodeFeedback({
     required this.type,
     required this.prompt,
     required this.suggestion,
     required this.quality,
-    this.suspectedConcepts,
+    this.loSignals = const [],
+    this.followUp,
   });
 
   factory CodeFeedback.fromMap(Map<String, dynamic> map) {
@@ -33,8 +36,9 @@ class CodeFeedback implements ChatResponse {
       type: map['type'] ?? 'code_feedback',
       prompt: map['prompt'] ?? '',
       suggestion: map['suggestion'] ?? '',
-      quality: _stringToQuality(map['quality']),
-      suspectedConcepts: parseSuspectedConcepts(map['suspected_concepts']),
+      quality: _stringToQuality(map['overallQuality'] ?? map['quality']),
+      loSignals: parseLoSignals(map['loSignals']),
+      followUp: FollowUp.tryParse(map['followUp']),
     );
   }
 
@@ -44,13 +48,15 @@ class CodeFeedback implements ChatResponse {
       'type': type,
       'prompt': prompt,
       'suggestion': suggestion,
-      'quality': quality.name,
-      if (suspectedConcepts != null) 'suspected_concepts': suspectedConcepts,
+      'overallQuality': quality.name,
+      'loSignals': loSignals.map((s) => s.toJson()).toList(),
+      if (followUp != null) 'followUp': followUp!.toJson(),
     };
   }
 
-  static AnswerQuality _stringToQuality(String? value) {
-    switch (value?.toLowerCase()) {
+  static AnswerQuality _stringToQuality(Object? value) {
+    if (value is! String) return AnswerQuality.wrong;
+    switch (value.toLowerCase()) {
       case 'wrong':
         return AnswerQuality.wrong;
       case 'partial':

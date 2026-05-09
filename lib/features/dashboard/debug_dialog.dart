@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
+import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +19,7 @@ class DebugDialog extends ConsumerStatefulWidget {
 }
 
 class _DebugDialogState extends ConsumerState<DebugDialog> {
-  QuestionDifficulty _difficulty = QuestionDifficulty.easy;
+  QuestionDifficulty _difficulty = QuestionDifficulty.medium;
   bool _busy = false;
 
   static const List<(ChatRequestType, String)> _questionTypes = [
@@ -23,7 +28,6 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
     (ChatRequestType.explainCodeQuestion, 'Explain code'),
     (ChatRequestType.completeCodeQuestion, 'Complete code'),
     (ChatRequestType.writeCodeQuestion, 'Write code'),
-    (ChatRequestType.guidingQuestion, 'Guiding'),
   ];
 
   Future<void> _wipeProgress() async {
@@ -67,10 +71,21 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
 
   Future<void> _triggerQuestion(ChatRequestType type) async {
     Navigator.of(context).pop();
-    final needsDifficulty = type != ChatRequestType.guidingQuestion;
+    // Ad-hoc plan for debug-fired questions: no LO targeting, just the
+    // chosen difficulty.
+    final plan = QuestionPlan(
+      type: type,
+      difficulty: _difficulty,
+      targetLOs: const [],
+      reason: const TurnSelectionReason(
+        candidateLOs: [],
+        chosenReason: 'debug dialog',
+        notchDropFired: false,
+      ),
+    );
     await ref.read(tutorServiceProvider.notifier).queryTutor(
       type: type,
-      difficulty: needsDifficulty ? _difficulty : null,
+      plan: plan,
     );
   }
 
@@ -87,10 +102,11 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final recorder = ref.read(debugServiceProvider);
     return AlertDialog(
       title: const Text('Debug'),
       content: SizedBox(
-        width: 400,
+        width: 560,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -146,6 +162,18 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
                   ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Text(
+              'Recent turns',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 200,
+              child: _RecentTurnsList(turns: recorder.buffer),
+            ),
           ],
         ),
       ),
@@ -155,6 +183,112 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+}
+
+class _RecentTurnsList extends StatelessWidget {
+  const _RecentTurnsList({required this.turns});
+
+  final List<TurnRecord> turns;
+
+  @override
+  Widget build(BuildContext context) {
+    if (turns.isEmpty) {
+      return const Center(child: Text('No turns recorded yet.'));
+    }
+    final reversed = turns.reversed.toList(growable: false);
+    return ListView.separated(
+      itemCount: reversed.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (ctx, i) {
+        final t = reversed[i];
+        final p = t.persisted;
+        final fallback = p?.hadFallback == true;
+        final reason = p?.selectionReason;
+        final isFu = p?.isFollowUp == true;
+        final hasFu = t.followUp != null;
+        final events = p?.signalEvents ?? const <TurnSignalEvent>[];
+        final eventsLabel = events
+            .map((e) =>
+                '${e.kind.name}/${e.severity.name}')
+            .join(', ');
+        return ListTile(
+          dense: true,
+          tileColor: fallback
+              ? Theme.of(ctx).colorScheme.errorContainer.withValues(alpha: 0.4)
+              : null,
+          title: Row(
+            children: [
+              if (isFu)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'FU d=${p?.chainDepth ?? 0}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  '#${t.turnId}  ${t.requestType}'
+                  '${p == null ? '' : '  → ${p.overallQuality.name}'}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            [
+              if (reason != null) reason.chosenReason,
+              if (reason?.notchDropFired == true) 'notch-dropped',
+              if (p != null) 'targets: ${p.targetLOIds.join(", ")}',
+              if (p != null)
+                'cal: ${p.calibrationBefore.name}→${p.calibrationAfter.name}',
+              if (fallback) 'FALLBACK',
+              if (hasFu) 'followUp: "${t.followUp!.question}"',
+              if (events.isNotEmpty) 'events: $eventsLabel',
+            ].whereType<String>().join(' · '),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onTap: () => _showTurnDetail(ctx, t),
+        );
+      },
+    );
+  }
+
+  void _showTurnDetail(BuildContext ctx, TurnRecord t) {
+    showDialog<void>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: Text('Turn #${t.turnId}'),
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              const JsonEncoder.withIndent('  ').convert(t.toJson()),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 }

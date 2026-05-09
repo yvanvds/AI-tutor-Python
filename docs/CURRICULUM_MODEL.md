@@ -71,6 +71,7 @@ all its LOs crosses a threshold.
 - `optional` — bool
 - `contentId` — string?, references `content/{id}` (from Phase A — the authored Uitleg)
 - `teachingTips` — `string[]`. Free-form prose hints to the LLM about how to approach this subgoal. (Renamed from current `suggestions` for clarity. Stays unstructured deliberately.)
+- `allowChains` — bool, default `false`. Enables follow-up chains up to depth 2 within this subgoal. Off by default — appropriate for procedural/foundational subgoals where chained dialogue is mostly noise. Set to `true` for conceptually rich subgoals (math, physics, edge-case reasoning) where deeper dialogue is pedagogically valuable. The flag *enables* chains; it doesn't force them. See conductor policy section 6.
 - `objectives` — ordered list of LOs (see below)
 
 ### Deliberately not on a Subgoal
@@ -90,6 +91,7 @@ The conductor maintains a posterior belief per LO (defined in part 2).
 - `statement` — string, one sentence in second person describing what the student would have to demonstrate. ("You can predict which branch runs given the condition's truth value.")
 - `kind` — enum, one of: `recall`, `apply`, `predict`, `reason` (see below).
 - `weight` — number, default `1.0`. Lets the teacher mark high-stakes LOs.
+- `optional` — bool, default `false`. Optional LOs are still probed for variety and coverage but don't gate subgoal advancement (see conductor policy section 4). Use case: "nice to have" LOs included for completeness without making them blockers — e.g. historical context for a numerical method when the implementation skill is what really matters.
 
 ### `kind` enum
 
@@ -146,12 +148,14 @@ Subgoal {
   optional: bool
   contentId: string?
   teachingTips: string[]
+  allowChains: bool   // default false
   objectives: [
     {
       id: string         // unique within the subgoal
       statement: string
       kind: "recall" | "apply" | "predict" | "reason"
       weight: number     // default 1.0
+      optional: bool     // default false
     }
   ]
 }
@@ -167,6 +171,8 @@ no benefit.
 - **`kind` enum has four values:** `recall | apply | predict | reason`. Considered collapsing `recall` into `predict` and rejected — they probe different things and the policy may want to treat them differently.
 - **`weight` exists at v1.** Default 1.0. Field present in schema, hidden in the UI for v1, exposed later if needed.
 - **LO `id` is unique within the subgoal**, not globally. Belief state is naturally keyed on (student, subgoal, lo); globally-unique ids would just mean longer strings.
+- **`optional: bool` on LO** (default `false`). From conductor policy section 4.2. Optional LOs are probed but don't gate advancement.
+- **`allowChains: bool` on Subgoal** (default `false`). From conductor policy section 6.4. Subgoal-level rather than LO-level because depth-worthiness is a content-area property; granular per-LO would invite inconsistency within a subgoal.
 
 ## Non-goals of this model
 
@@ -180,8 +186,9 @@ no benefit.
 The current `goals` container holds Goal docs and Subgoal docs (both `type = "goal"`, distinguished by `parentId`). To get to this model:
 
 - Goals: drop `knownConcepts` and `suggestions` (suggestions on a root goal is unused today). Add `moduleId` (Phase A also adds this).
-- Subgoals: rename `suggestions` → `teachingTips`. Drop `knownConcepts` (currently always empty on subgoals). Add `contentId` (Phase A). Add `objectives` (this doc).
-- Existing subgoals come in with `objectives: []`. Authoring LOs is the follow-up exercise; until then, the conductor needs a sensible fallback for a subgoal with no LOs (deferred to part 4 / the policy design).
+- Subgoals: rename `suggestions` → `teachingTips`. Drop `knownConcepts` (currently always empty on subgoals). Add `contentId` (Phase A). Add `allowChains` (default `false`). Add `objectives` (this doc).
+- Existing subgoals come in with `objectives: []`. Authoring LOs is the follow-up exercise. The conductor blocks empty-`objectives` subgoals (see conductor policy section 7.1) — students see a "not ready" message and can pick another subgoal.
+- LOs carry `optional: bool` (default `false`) from the start.
 
 Authoring LOs for a given subgoal — the heuristics, the granularity rule
 ("split when the LOs would naturally be probed by different questions,

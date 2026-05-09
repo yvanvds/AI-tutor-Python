@@ -7,7 +7,6 @@
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
-import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/goal/subtree_backup.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -271,8 +270,9 @@ void main() {
             'parentId': null,
             'order': 1000,
             'optional': false,
-            'suggestions': const ['s'],
-            'knownConcepts': const [],
+            'teachingTips': const <String>[],
+            'allowChains': false,
+            'objectives': const <Map<String, dynamic>>[],
           },
           'child-a': {
             'id': 'child-a',
@@ -282,8 +282,9 @@ void main() {
             'parentId': 'root',
             'order': 1000,
             'optional': false,
-            'suggestions': const [],
-            'knownConcepts': const [],
+            'teachingTips': const <String>[],
+            'allowChains': false,
+            'objectives': const <Map<String, dynamic>>[],
           },
           'child-b': {
             'id': 'child-b',
@@ -293,8 +294,9 @@ void main() {
             'parentId': 'root',
             'order': 2000,
             'optional': true,
-            'suggestions': const ['x', 'y'],
-            'knownConcepts': const [],
+            'teachingTips': const ['x', 'y'],
+            'allowChains': true,
+            'objectives': const <Map<String, dynamic>>[],
           },
         };
 
@@ -499,71 +501,6 @@ void main() {
     });
   });
 
-  group('getKnownConceptsInScope', () {
-    Goal makeRoot(String id, int order, List<String> concepts) => Goal(
-          id: id,
-          title: 'Root $id',
-          order: order,
-          knownConcepts: concepts,
-        );
-
-    test('uses cachedRoots when provided and skips Cosmos round-trip',
-        () async {
-      final roots = [
-        makeRoot('r1', 1000, ['variables', 'loops']),
-        makeRoot('r2', 2000, ['functions']),
-        makeRoot('r3', 3000, ['classes']),
-      ];
-      final target = roots[1]; // r2, order 2000
-
-      final concepts =
-          await build().getKnownConceptsInScope(target, cachedRoots: roots);
-
-      // r1 (order <= 2000) + r2 (target itself) included; r3 excluded.
-      expect(concepts, containsAll(['variables', 'loops', 'functions']));
-      expect(concepts, isNot(contains('classes')));
-
-      // No Cosmos query fired.
-      verifyNever(
-        () => container.query(
-          any<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      );
-    });
-
-    test('falls back to Cosmos query when cachedRoots is null', () async {
-      when(
-        () => container.query(
-          any<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {
-              'id': 'r1',
-              'title': 'R1',
-              'order': 1000,
-              'knownConcepts': ['for', 'while'],
-            },
-            {
-              'id': 'r2',
-              'title': 'R2',
-              'order': 2000,
-              'knownConcepts': ['def'],
-            },
-          ]);
-
-      final target = Goal(id: 'r1', title: 'R1', order: 1000);
-      final concepts = await build().getKnownConceptsInScope(target);
-
-      // Only r1 (the target); r2 has higher order.
-      expect(concepts, containsAll(['for', 'while']));
-      expect(concepts, isNot(contains('def')));
-    });
-  });
-
   group('createGoalWithFields', () {
     test('stores all provided fields and returns a non-empty id', () async {
       when(
@@ -586,8 +523,8 @@ void main() {
         parentId: 'parent-1',
         order: 3000,
         optional: true,
-        suggestions: ['try a list comp'],
-        knownConcepts: ['lists'],
+        teachingTips: ['try a list comp'],
+        allowChains: true,
       );
 
       expect(id, isNotEmpty);
@@ -603,8 +540,9 @@ void main() {
       expect(captured['parentId'], 'parent-1');
       expect(captured['order'], 3000);
       expect(captured['optional'], true);
-      expect(captured['suggestions'], ['try a list comp']);
-      expect(captured['knownConcepts'], ['lists']);
+      expect(captured['teachingTips'], ['try a list comp']);
+      expect(captured['allowChains'], true);
+      expect(captured['objectives'], isEmpty);
       expect(captured['type'], _pk);
     });
   });
@@ -622,7 +560,9 @@ void main() {
             'title': 'Old title',
             'parentId': null,
             'order': 1000,
-            'knownConcepts': const <String>[],
+            'teachingTips': const <String>[],
+            'allowChains': false,
+            'objectives': const <Map<String, dynamic>>[],
           });
       when(
         () => container.replace(
@@ -648,9 +588,9 @@ void main() {
       expect((captured[1] as Map)['title'], 'New title');
     });
 
-    test('updateKnownConcepts patches the knownConcepts field', () async {
+    test('updateTeachingTips patches the teachingTips field', () async {
       stubReadAndReplace('g1');
-      await build().updateKnownConcepts('g1', ['loops', 'functions']);
+      await build().updateTeachingTips('g1', ['hint a', 'hint b']);
 
       final captured = verify(
         () => container.replace(
@@ -659,7 +599,21 @@ void main() {
           partitionKey: any<Object>(named: 'partitionKey'),
         ),
       ).captured;
-      expect((captured[1] as Map)['knownConcepts'], ['loops', 'functions']);
+      expect((captured[1] as Map)['teachingTips'], ['hint a', 'hint b']);
+    });
+
+    test('updateAllowChains patches the allowChains field', () async {
+      stubReadAndReplace('g1');
+      await build().updateAllowChains('g1', true);
+
+      final captured = verify(
+        () => container.replace(
+          captureAny<String>(),
+          captureAny<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).captured;
+      expect((captured[1] as Map)['allowChains'], true);
     });
 
     test('patch is a no-op when the doc is missing', () async {

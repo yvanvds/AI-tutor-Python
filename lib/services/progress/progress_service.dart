@@ -1,6 +1,11 @@
 // Reads/writes the `progress` Cosmos container. Composite doc id
 // `${uid}_${goalId}` with partition key = uid.
 //
+// Under the LO-belief redesign, the `progress` doc is a derived cache: its
+// `progress: 0.0..1.0` value is recomputed from per-LO beliefs whenever any
+// constituent belief changes. Source of truth for student state lives in
+// `lo_beliefs` and `accounts/{uid}.calibration`.
+//
 // Also owns the `progress_history` time-series writes: every successful
 // `upsert` that actually changes the persisted `progress` value emits one
 // sample doc to `progress_history`. History writes are best-effort — a
@@ -75,13 +80,12 @@ class ProgressService {
 
   /// Upserts the `progress` doc. When [recordHistory] is true (the default)
   /// and the persisted `progress` value actually changed, also writes a
-  /// `progress_history` sample tagged with [quality] and [isWarmUp]. Pass
+  /// `progress_history` sample tagged with [quality]. Pass
   /// `recordHistory: false` for derived writes such as the root-goal
   /// recompute, where sampling would just duplicate the child trajectories.
   Future<void> upsert(
     Progress p, {
     AnswerQuality? quality,
-    bool isWarmUp = false,
     bool recordHistory = true,
   }) async {
     final uid = _uid;
@@ -102,12 +106,7 @@ class ProgressService {
     if (!recordHistory) return;
     if (previous != null && previous.progress == p.progress) return;
 
-    await _writeHistorySample(
-      uid: uid,
-      progress: p,
-      quality: quality,
-      isWarmUp: isWarmUp,
-    );
+    await _writeHistorySample(uid: uid, progress: p, quality: quality);
   }
 
   Future<void> delete(String goalID) async {
@@ -302,14 +301,11 @@ class ProgressService {
     required String uid,
     required Progress progress,
     required AnswerQuality? quality,
-    required bool isWarmUp,
   }) async {
     final sample = ProgressSample(
       goalID: progress.goalID,
       progress: progress.progress,
-      difficulty: progress.difficulty,
       quality: quality,
-      isWarmUp: isWarmUp,
       at: DateTime.now().toUtc(),
     );
     try {

@@ -186,6 +186,15 @@ StudentLOBelief {
   beta: number            // pseudo-count of "doesn't have it"
   lastUpdatedAt: string   // ISO 8601, used for decay and recency
   lastQuestionType: string?  // last ChatRequestType that probed this LO
+  lastPositiveAtCalibratedAt: string?  // ISO 8601, set when a positive
+                                        // signal arrives at the student's
+                                        // calibration-or-higher at the time
+                                        // of the answer. Required for
+                                        // mastery (see conductor policy 4.3).
+                                        // Survives calibration changes —
+                                        // a one-way ratchet for the
+                                        // "ever demonstrated at non-easy"
+                                        // signal.
 }
 ```
 
@@ -234,14 +243,27 @@ get dropped.
 The `progress_history` container stays as-is. It's the time series for
 teacher charts and is independent of the model redesign.
 
+### `turn_history` container (new)
+
+A separate, observability-focused container holds one append-only doc
+per graded turn. Partition `/uid` (consistent with `lo_beliefs`).
+Schema and rationale live in conductor policy section 8.1; the data
+is part of the student's runtime record but is consumed by debug and
+teacher-dashboard surfaces, not by the conductor's decision logic.
+Belief and calibration are the source of truth for decisions;
+`turn_history` is the audit trail.
+
 ## Settled decisions
 
 - **Belief is Beta-distributed**, parameterized by `(α, β)`. Both the
   mean and the total evidence are first-class.
 - **Mastery requires both** mean above threshold and minimum evidence.
-- **Evidence cap exists.** Exact value lives in part 4.
+  A third condition — at least one positive signal at calibrated
+  difficulty (tracked by `lastPositiveAtCalibratedAt`) — is added
+  by conductor policy section 4.3 to fix the easy-grinding problem.
+- **Evidence cap exists.** Exact value: 20 (conductor policy 3.4).
 - **Decay applies from v1**, lazily on read, gentle (months not weeks),
-  preserving the prior.
+  preserving the prior. Half-life: 60 days (conductor policy 3.3).
 - **Difficulty is per-student, one value**, sticks across subgoals.
 - **New students start at medium**, not easy.
 - **LO ids are immutable.** Teachers can add and delete LOs. Deleted
@@ -250,6 +272,11 @@ teacher charts and is independent of the model redesign.
   cleaned up later.
 - **Subgoal `progress` is cached**, recomputed from LO beliefs on every
   belief update.
+- **`lastPositiveAtCalibratedAt` is a one-way ratchet.** Calibration
+  changes do not retroactively invalidate old timestamps — once
+  set, the field reflects "the student demonstrated this LO at
+  the calibration in force at that time," which remains a valid
+  signal regardless of subsequent calibration shifts.
 
 ## What this model deliberately does not do
 
@@ -279,6 +306,8 @@ plus implicit fields on the account doc. To get to this model:
 - New `lo_beliefs` container, partition `/uid`. Empty for existing
   students at first; populated as students answer questions under the
   new conductor.
+- New `turn_history` container, partition `/uid`. Empty at first;
+  populated per graded turn. Schema in conductor policy 8.1.
 - Extend `accounts/{uid}` with `calibration` substructure. Default for
   existing students: `difficulty = "medium"`, empty histories.
 - `progress.{progress}` field is repurposed as a derived cache. Drop

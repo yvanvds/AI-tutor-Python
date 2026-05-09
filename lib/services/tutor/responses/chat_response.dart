@@ -5,8 +5,6 @@ import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/explain_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_feedback.dart';
-import 'package:ai_tutor_python/services/tutor/responses/guiding_exercise.dart';
 import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
@@ -39,8 +37,6 @@ class ChatResponseFactory {
         return CompleteCode.fromMap(map);
       case 'write_code':
         return WriteCode.fromMap(map);
-      case 'guiding_exercise':
-        return GuidingExercise.fromMap(map);
 
       // Feedback / system types
       case 'answer':
@@ -55,8 +51,6 @@ class ChatResponseFactory {
         return ExplainFeedback.fromMap(map);
       case 'socratic_feedback':
         return SocraticFeedback.fromMap(map);
-      case 'guiding_feedback':
-        return GuidingFeedback.fromMap(map);
       case 'status_summary':
         return StatusSummary.fromMap(map);
       case 'error':

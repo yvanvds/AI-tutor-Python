@@ -11,6 +11,8 @@ const String _instructionsContainer = 'instructions';
 const String _configContainer = 'config';
 const String _contentContainer = 'content';
 const String _modulesContainer = 'modules';
+const String _loBeliefsContainer = 'lo_beliefs';
+const String _turnHistoryContainer = 'turn_history';
 
 /// Constant partition-key values for the single-partition containers
 /// (`goals`, `instructions`, `config`, `content`, `modules`). Each doc in
@@ -29,8 +31,8 @@ class CosmosPaths {
   /// `/uid` partition. One doc per user.
   static CosmosContainer accounts() => _client.container(_accountsContainer);
 
-  /// `/uid` partition. Doc id `${uid}_${goalId}`. Flattened from the old
-  /// `accounts/{uid}/progress/{goalId}` subcollection.
+  /// `/uid` partition. Doc id `${uid}_${goalId}`. Now a derived cache of
+  /// `progress: 0.0..1.0` aggregated from per-LO beliefs (see STUDENT_MODEL).
   static CosmosContainer progress() => _client.container(_progressContainer);
 
   /// `/uid` partition. One doc per progress sample, time-ordered. Time
@@ -61,4 +63,14 @@ class CosmosPaths {
   /// `/type` partition (always `"module"`). Top-level grouping for goals;
   /// v1 has a single bootstrapped doc.
   static CosmosContainer modules() => _client.container(_modulesContainer);
+
+  /// `/uid` partition. One doc per `(uid, subgoalId, loId)` Beta belief.
+  /// Source of truth for student mastery state per STUDENT_MODEL.
+  static CosmosContainer loBeliefs() =>
+      _client.container(_loBeliefsContainer);
+
+  /// `/uid` partition. Append-only audit trail; one doc per graded turn
+  /// per CONDUCTOR_POLICY 8.1. Consumed by debug surfaces only.
+  static CosmosContainer turnHistory() =>
+      _client.container(_turnHistoryContainer);
 }

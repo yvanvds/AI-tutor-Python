@@ -1,5 +1,3 @@
-import 'package:ai_tutor_python/core/answer_quality.dart';
-import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
@@ -15,10 +13,12 @@ class GoalTile extends ConsumerWidget {
   final int depth;
   final bool isSubgoal;
 
-  /// When true, action buttons are hidden and teacher annotations are revealed.
+  /// When true, action buttons are hidden.
   final bool readOnly;
 
-  /// Full progress doc for this goal — only needed on the teacher path.
+  /// Full progress doc for this goal — kept on the API so the read-only
+  /// teacher path can still pass it through, even though no per-doc detail
+  /// is rendered under the LO-belief redesign.
   final Progress? progressDoc;
 
   const GoalTile({
@@ -121,95 +121,9 @@ class GoalTile extends ConsumerWidget {
                   Text('${(progress * 100).round()}%'),
                 ],
               ),
-
-              if (readOnly && isSubgoal && progressDoc != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: _TeacherSubgoalAnnotations(progress: progressDoc!),
-                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TeacherSubgoalAnnotations extends StatelessWidget {
-  const _TeacherSubgoalAnnotations({required this.progress});
-
-  final Progress progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dots = progress.recentAnswers;
-
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            _difficultyLabel(progress.difficulty),
-            style: theme.textTheme.bodySmall,
-          ),
-        ),
-        const SizedBox(width: 12),
-        if (dots.isEmpty)
-          Text(
-            'Nog geen antwoorden',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          )
-        else
-          Row(
-            children: [
-              for (final q in dots)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: _AnswerDot(quality: q),
-                ),
-            ],
-          ),
-      ],
-    );
-  }
-
-  String _difficultyLabel(QuestionDifficulty d) {
-    switch (d) {
-      case QuestionDifficulty.easy:
-        return 'gemakkelijk';
-      case QuestionDifficulty.medium:
-        return 'gemiddeld';
-      case QuestionDifficulty.hard:
-        return 'moeilijk';
-    }
-  }
-}
-
-class _AnswerDot extends StatelessWidget {
-  const _AnswerDot({required this.quality});
-
-  final AnswerQuality quality;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (quality) {
-      AnswerQuality.wrong => Colors.red.shade400,
-      AnswerQuality.partial => Colors.amber.shade400,
-      AnswerQuality.correct => Colors.green.shade400,
-    };
-    return Tooltip(
-      message: quality.name,
-      child: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

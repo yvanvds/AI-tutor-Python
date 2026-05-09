@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 
 /// Hard-coded envelope contract appended to every system prompt. Tells the
@@ -34,6 +35,8 @@ class InstructionGenerator {
     required List<Instruction> cachedInstructions,
     required Future<List<Instruction>> Function() fetchInstructions,
     required Future<List<Goal>> Function() fetchRootGoals,
+    List<LearningObjective> targetLOs = const [],
+    List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) async {
     final selectedRoot = goalSelection.selectedRoot;
     final selectedChild = goalSelection.selectedChild;
@@ -43,25 +46,21 @@ class InstructionGenerator {
         ? cachedInstructions
         : await fetchInstructions();
 
-    final targetGoal = goalSelection.preferredRoot ?? selectedRoot;
-    final knownConcepts = await _getMasteredConcepts(
-      targetGoal,
-      cachedRoots: goalSelection.cachedRoots,
-      fetchRootGoals: fetchRootGoals,
-    );
-
     final typeString = _chatRequestTypeToString(type);
 
     String alwaysInclude = '';
     String typeSpecific = '';
+    final root = goalSelection.preferredRoot ?? selectedRoot;
+    final subgoal = goalSelection.preferredChild ?? selectedChild;
     for (final instruction in instructions) {
       if (instruction.id == typeString) {
         for (final content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            goalSelection.preferredRoot ?? selectedRoot,
-            goalSelection.preferredChild ?? selectedChild,
-            knownConcepts,
+            root,
+            subgoal,
+            targetLOs: targetLOs,
+            goalScopeLOs: goalScopeLOs,
           );
           typeSpecific += '$processed\n';
         }
@@ -71,7 +70,8 @@ class InstructionGenerator {
             content.value,
             selectedRoot,
             selectedChild,
-            knownConcepts,
+            targetLOs: targetLOs,
+            goalScopeLOs: goalScopeLOs,
           );
           alwaysInclude += '$processed\n';
         }
@@ -87,15 +87,26 @@ class InstructionGenerator {
   String _replaceTags(
     String input,
     Goal goal,
-    Goal subGoal,
-    List<String> knownConcepts,
-  ) {
+    Goal subGoal, {
+    required List<LearningObjective> targetLOs,
+    required List<({String subgoalId, LearningObjective lo})> goalScopeLOs,
+  }) {
     String output = input;
+    final teachingTips = subGoal.teachingTips.join('\n');
     final replacements = {
       'goal': goal.title,
       'subgoal': subGoal.title,
-      'suggestions': subGoal.suggestions.join('\n'),
-      'known concepts': knownConcepts.join('\n'),
+      // `{teachingTips}` is the canonical name; `{suggestions}` is kept as
+      // an alias for any teacher-authored instruction docs that haven't been
+      // updated yet.
+      'teachingTips': teachingTips,
+      'suggestions': teachingTips,
+      'targetLOs': _renderTargetLOs(targetLOs),
+      'goalScopeLOs': _renderGoalScopeLOs(goalScopeLOs),
+      // `{known concepts}` no longer expands to a real list — the LO model
+      // replaces concept-scope fencing. Stale instruction docs that still
+      // reference it resolve to an empty string.
+      'known concepts': '',
     };
     for (final entry in replacements.entries) {
       final pattern = RegExp(
@@ -107,20 +118,20 @@ class InstructionGenerator {
     return output;
   }
 
-  Future<List<String>> _getMasteredConcepts(
-    Goal targetGoal, {
-    required List<Goal> cachedRoots,
-    required Future<List<Goal>> Function() fetchRootGoals,
-  }) async {
-    final rootGoals = cachedRoots.isNotEmpty
-        ? cachedRoots
-        : await fetchRootGoals();
+  String _renderTargetLOs(List<LearningObjective> los) {
+    if (los.isEmpty) return '';
+    return los
+        .map((lo) => '- (${lo.kind.name}) ${lo.id}: ${lo.statement}')
+        .join('\n');
+  }
 
-    final masteredConcepts = <String>{};
-    for (final goal in rootGoals) {
-      if (goal.order >= targetGoal.order || goal.id == targetGoal.id) break;
-      masteredConcepts.addAll(goal.knownConcepts);
-    }
-    return masteredConcepts.toList();
+  String _renderGoalScopeLOs(
+    List<({String subgoalId, LearningObjective lo})> entries,
+  ) {
+    if (entries.isEmpty) return '';
+    return entries
+        .map((e) =>
+            '- [${e.subgoalId}] (${e.lo.kind.name}) ${e.lo.id}: ${e.lo.statement}')
+        .join('\n');
   }
 }
