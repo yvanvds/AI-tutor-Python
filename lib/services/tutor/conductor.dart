@@ -36,6 +36,12 @@ class QuestionPlan {
   final bool blockedEmptyObjectives;
   final bool blockedSaturated;
 
+  /// Set when [Conductor] is in degraded mode (CONDUCTOR_POLICY §7.3) and
+  /// declines to plan anything. The conductor already surfaced its own
+  /// "feedback is broken" system message at the moment of degradation, so
+  /// callers should NOT also surface a "no more goals" celebration.
+  final bool blockedDegraded;
+
   const QuestionPlan({
     required this.type,
     required this.difficulty,
@@ -43,6 +49,7 @@ class QuestionPlan {
     required this.reason,
     this.blockedEmptyObjectives = false,
     this.blockedSaturated = false,
+    this.blockedDegraded = false,
   });
 
   static const QuestionPlan noResult = QuestionPlan(
@@ -54,6 +61,18 @@ class QuestionPlan {
       chosenReason: 'no result',
       notchDropFired: false,
     ),
+  );
+
+  static const QuestionPlan degraded = QuestionPlan(
+    type: ChatRequestType.noResult,
+    difficulty: QuestionDifficulty.medium,
+    targetLOs: [],
+    reason: TurnSelectionReason(
+      candidateLOs: [],
+      chosenReason: 'degraded mode',
+      notchDropFired: false,
+    ),
+    blockedDegraded: true,
   );
 
   factory QuestionPlan.emptyObjectives() {
@@ -304,7 +323,7 @@ class Conductor {
   /// The same algorithm covers both; the only difference is what's empty.
   Future<QuestionPlan> planNext() async {
     if (_degraded) {
-      return QuestionPlan.noResult;
+      return QuestionPlan.degraded;
     }
     final selection = _deps.getGoalSelection();
     final subgoal = selection.activeChildGoal;

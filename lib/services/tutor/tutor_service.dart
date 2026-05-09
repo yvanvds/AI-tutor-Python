@@ -35,6 +35,7 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.dart';
+import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -364,6 +365,11 @@ class TutorService extends Notifier<TutorState> {
       );
       return;
     }
+    if (plan.blockedDegraded) {
+      // The conductor already surfaced its own degraded-mode message at the
+      // moment of degradation. Stay quiet on follow-up planNext calls.
+      return;
+    }
     if (plan.type == ChatRequestType.noResult) {
       _chat.addSystemMessage(
         'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!',
@@ -676,6 +682,7 @@ class TutorService extends Notifier<TutorState> {
 
   String _finalTextFor(ChatResponse response, StringBuffer accumulated) {
     if (response is ErrorResponse) return '';
+    if (response is MultipleChoice) return '';
     return accumulated.toString();
   }
 
@@ -1023,6 +1030,11 @@ class TutorService extends Notifier<TutorState> {
       _chat.addSystemMessage(
         'Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?',
       );
+      return;
+    }
+    if (plan.blockedDegraded) {
+      // The conductor already surfaced its own degraded-mode message at the
+      // moment of degradation. Stay quiet on follow-up requestExercise calls.
       return;
     }
     if (plan.type == ChatRequestType.noResult) {
