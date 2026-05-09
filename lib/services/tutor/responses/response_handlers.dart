@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
@@ -160,7 +162,11 @@ class MultipleChoiceHandler extends ResponseHandler<MultipleChoice> {
   @override
   Future<void> handle(MultipleChoice r, TutorContext ctx) async {
     ctx.setExerciseType(r.type);
-    ctx.setActiveMcq(prompt: r.prompt, code: r.code, options: r.options);
+    // Shuffle to defeat the LLM's positional bias (it tends to put the
+    // correct answer in slot A). Grader sees the picked text, not the
+    // position, so the round-trip is unaffected.
+    final shuffled = [...r.options]..shuffle(Random());
+    ctx.setActiveMcq(prompt: r.prompt, code: r.code, options: shuffled);
     ctx.playQuestion();
   }
 }
