@@ -4,6 +4,7 @@
 // every currently-listed strong-event acknowledgment for this student.
 
 import 'package:ai_tutor_python/core/date_format.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
@@ -34,7 +36,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
             children: [
               Expanded(
                 child: Text(
-                  'Signaaleventjes',
+                  l.drawer_signals_title,
                   style: theme.textTheme.titleMedium,
                 ),
               ),
@@ -48,7 +50,9 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
                     onPressed: (n == 0 || _ackBusy)
                         ? null
                         : () => _acknowledge(context),
-                    child: Text(_ackBusy ? 'Bezig…' : 'Bevestigen ($n)'),
+                    child: Text(_ackBusy
+                        ? l.drawer_signals_button_busy
+                        : l.drawer_signals_button_acknowledge(n)),
                   );
                 },
               ),
@@ -67,7 +71,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
               }
               if (records.isEmpty) {
                 return Text(
-                  'Geen events',
+                  l.drawer_signals_empty,
                   style: theme.textTheme.bodySmall,
                 );
               }
@@ -87,10 +91,10 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final row in strong) _renderRow(theme, row),
+                  for (final row in strong) _renderRow(theme, l, row),
                   if (strong.isNotEmpty && audit.isNotEmpty)
                     const Divider(height: 12),
-                  for (final row in audit) _renderRow(theme, row),
+                  for (final row in audit) _renderRow(theme, l, row),
                 ],
               );
             },
@@ -100,7 +104,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
     );
   }
 
-  Widget _renderRow(ThemeData theme, _EventRow row) {
+  Widget _renderRow(ThemeData theme, AppLocalizations l, _EventRow row) {
     final isStrong = row.event.severity == TurnSignalEventSeverity.strong;
     final ack = row.record.acknowledgedAt != null;
     return Padding(
@@ -126,7 +130,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _kindLabel(row.event.kind),
+                  _kindLabel(l, row.event.kind),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     decoration: ack ? TextDecoration.lineThrough : null,
@@ -145,22 +149,22 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
     );
   }
 
-  String _kindLabel(TurnSignalEventKind kind) {
+  String _kindLabel(AppLocalizations l, TurnSignalEventKind kind) {
     switch (kind) {
       case TurnSignalEventKind.stuckLoAdvance:
-        return 'Vastgelopen LO bij overgang';
+        return l.drawer_signals_kind_stuckLoAdvance;
       case TurnSignalEventKind.singleLoDeadlock:
-        return 'Single-LO impasse';
+        return l.drawer_signals_kind_singleLoDeadlock;
       case TurnSignalEventKind.repeatedDemotions:
-        return 'Herhaalde demotion';
+        return l.drawer_signals_kind_repeatedDemotions;
       case TurnSignalEventKind.sustainedLlmFailure:
-        return 'Aanhoudende LLM-fout';
+        return l.drawer_signals_kind_sustainedLlmFailure;
       case TurnSignalEventKind.cascadeHalt:
-        return 'Cascade-halt (audit)';
+        return l.drawer_signals_kind_cascadeHalt;
       case TurnSignalEventKind.emptyObjectivesBlock:
-        return 'Subdoel zonder LO\'s (audit)';
+        return l.drawer_signals_kind_emptyObjectivesBlock;
       case TurnSignalEventKind.subgoalDeletedRedirect:
-        return 'Subdoel verwijderd (audit)';
+        return l.drawer_signals_kind_subgoalDeletedRedirect;
     }
   }
 
@@ -176,13 +180,16 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
 
   Future<void> _acknowledge(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
     setState(() => _ackBusy = true);
     try {
       await ref
           .read(turnHistoryServiceProvider)
           .acknowledgeAllFor(widget.uid);
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Bevestigen faalde: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.drawer_signals_ackFailed(e.toString()))),
+      );
     } finally {
       if (mounted) setState(() => _ackBusy = false);
     }

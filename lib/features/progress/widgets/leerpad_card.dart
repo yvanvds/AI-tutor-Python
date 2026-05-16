@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
@@ -196,7 +197,9 @@ class _ProgressRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = completed ? AppColors.accent2 : AppColors.accent;
-    final label = completed ? 'voltooid' : '${(value * 100).round()}%';
+    final label = completed
+        ? AppLocalizations.of(context).leerpad_card_completed
+        : '${(value * 100).round()}%';
 
     return Row(
       children: [
@@ -299,19 +302,19 @@ class _VerderButtonState extends State<_VerderButton> {
                 : AppColors.accent,
             borderRadius: BorderRadius.circular(AppRadius.inputLarge),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Verder',
-                style: TextStyle(
+                AppLocalizations.of(context).leerpad_card_button_continue,
+                style: const TextStyle(
                   color: AppColors.ink0,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              SizedBox(width: 6),
-              Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
+              const SizedBox(width: 6),
+              const Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
             ],
           ),
         ),

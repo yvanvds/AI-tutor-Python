@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -24,8 +25,9 @@ class ExplainView extends ConsumerWidget {
     final root = selection.activeRootGoal;
 
     if (child == null) {
-      return const _PlaceholderScreen(
-        message: 'Kies een subdoel in Leerpad om de uitleg te bekijken.',
+      return _PlaceholderScreen(
+        message:
+            AppLocalizations.of(context).session_explain_placeholder_noSubgoal,
       );
     }
 
@@ -72,7 +74,9 @@ class _ContentWebView extends ConsumerWidget {
       builder: (context, snap) {
         final c = snap.data;
         if (c == null) {
-          return const _Placeholder(message: 'Lesinhoud laden…');
+          return _Placeholder(
+            message: AppLocalizations.of(context).session_explain_loading,
+          );
         }
         return LessonHtmlView(fragment: c.body);
       },
@@ -97,9 +101,9 @@ class _MissingContent extends StatelessWidget {
               border: Border.all(color: AppColors.ink2),
               borderRadius: BorderRadius.circular(AppRadius.cardLarge),
             ),
-            child: const Text(
-              'Nog geen lesinhoud beschikbaar voor dit subdoel.',
-              style: TextStyle(
+            child: Text(
+              AppLocalizations.of(context).session_explain_missingContent,
+              style: const TextStyle(
                 color: AppColors.fgMute,
                 fontSize: 13,
                 height: 1.5,
@@ -150,7 +154,9 @@ class _ChromeHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pill = (root?.title ?? 'Concept').toUpperCase();
+    final pill = (root?.title ??
+            AppLocalizations.of(context).session_explain_defaultPillLabel)
+        .toUpperCase();
     return StreamBuilder<List<Goal>>(
       stream: root == null
           ? const Stream.empty()
@@ -211,6 +217,7 @@ class _ChromeFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xxxl,
@@ -221,14 +228,14 @@ class _ChromeFooter extends ConsumerWidget {
       child: Row(
         children: [
           _GhostButton(
-            label: 'Vorige',
+            label: l.session_explain_prev_button,
             icon: Icons.arrow_back,
             onTap: () {},
           ),
           const Spacer(),
-          const Text(
-            '+10 XP bij voltooien',
-            style: TextStyle(
+          Text(
+            l.session_explain_completeXp,
+            style: const TextStyle(
               color: AppColors.fgFaint,
               fontSize: 11,
               fontWeight: FontWeight.w500,
@@ -236,7 +243,7 @@ class _ChromeFooter extends ConsumerWidget {
           ),
           const SizedBox(width: AppSpacing.m),
           _AccentButton(
-            label: 'Probeer het zelf',
+            label: l.session_explain_tryItYourself,
             onTap: () =>
                 ref.read(modeProvider.notifier).state = SessionMode.practice,
           ),

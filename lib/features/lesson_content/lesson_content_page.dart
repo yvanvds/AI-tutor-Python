@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -153,11 +154,13 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     }
     if (!mounted) return;
     setState(() => _original = content);
-    _showSnack('Opgeslagen');
+    _showSnack(AppLocalizations.of(context).lesson_snack_saved);
   }
 
   Future<void> _uploadHtml() async {
     if (_selectedGoalId == null) return;
+    final couldNotReadMessage =
+        AppLocalizations.of(context).lesson_snack_couldNotRead;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['html', 'htm'],
@@ -173,7 +176,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     } else if (file.path != null) {
       text = await File(file.path!).readAsString();
     } else {
-      _showSnack('Kon bestand niet lezen.');
+      _showSnack(couldNotReadMessage);
       return;
     }
 
@@ -201,23 +204,23 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     if (goalId == null) return;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Lesinhoud loskoppelen?'),
-        content: const Text(
-          'Het content-document blijft bestaan, maar dit subdoel verwijst er '
-          'niet meer naar.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuleren'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Loskoppelen'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.lesson_unlink_dialog_title),
+          content: Text(l.lesson_unlink_dialog_message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.lesson_unlink_dialog_cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.lesson_unlink_dialog_confirm),
+            ),
+          ],
+        );
+      },
     );
     if (confirm != true) return;
 
@@ -276,7 +279,8 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Text(
-                                    'Fout bij laden: ${snap.error}',
+                                    AppLocalizations.of(context).lesson_loadError(
+                                        snap.error.toString()),
                                   ),
                                 ),
                               );
@@ -313,11 +317,12 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   }
 
   Widget _buildEditorPane() {
+    final l = AppLocalizations.of(context);
     if (_selectedGoalId == null) {
-      return const Center(
+      return Center(
         child: Text(
-          'Kies een subdoel om de lesinhoud te bewerken.',
-          style: TextStyle(color: AppColors.fgMute),
+          l.lesson_editor_empty_pickSubgoal,
+          style: const TextStyle(color: AppColors.fgMute),
         ),
       );
     }
@@ -336,9 +341,9 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
               Expanded(
                 child: TextField(
                   controller: _titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Titel',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.lesson_editor_field_title,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -348,7 +353,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                 TextButton.icon(
                   onPressed: _clearLink,
                   icon: const Icon(Icons.link_off, size: 16),
-                  label: const Text('Loskoppelen'),
+                  label: Text(l.lesson_editor_button_unlink),
                 ),
             ],
           ),
@@ -400,11 +405,11 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
       return Container(
         color: AppColors.ink0,
         alignment: Alignment.center,
-        child: const Padding(
-          padding: EdgeInsets.all(AppSpacing.lg),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Text(
-            'Voorbeeld verschijnt hier zodra je HTML toevoegt.',
-            style: TextStyle(color: AppColors.fgFaint, fontSize: 12),
+            AppLocalizations.of(context).lesson_preview_empty,
+            style: const TextStyle(color: AppColors.fgFaint, fontSize: 12),
           ),
         ),
       );
@@ -428,15 +433,16 @@ class _Toolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       height: 48,
       color: AppColors.ink1,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Row(
         children: [
-          const Text(
-            'Lesinhoud',
-            style: TextStyle(
+          Text(
+            l.lesson_toolbar_title,
+            style: const TextStyle(
               color: AppColors.fg,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -446,13 +452,14 @@ class _Toolbar extends StatelessWidget {
           OutlinedButton.icon(
             icon: const Icon(Icons.upload_file, size: 16),
             onPressed: onUpload,
-            label: const Text('Upload .html'),
+            label: Text(l.lesson_toolbar_upload),
           ),
           const SizedBox(width: AppSpacing.s),
           FilledButton.icon(
             icon: const Icon(Icons.save, size: 16),
             onPressed: hasSelection ? onSave : null,
-            label: Text(isDirty ? 'Opslaan *' : 'Opslaan'),
+            label: Text(
+                isDirty ? l.lesson_toolbar_save_dirty : l.lesson_toolbar_save),
           ),
         ],
       ),
@@ -496,7 +503,7 @@ class _GoalTree extends StatelessWidget {
     if (ordered.isEmpty || !ordered.any((m) => m.id == Module.defaultId)) {
       ordered.add(Module(
         id: Module.defaultId,
-        title: 'Python basics',
+        title: AppLocalizations.of(context).lesson_default_moduleTitle,
         order: 0,
       ));
     }
@@ -601,7 +608,7 @@ class _SubgoalRowState extends State<_SubgoalRow> {
     final hasContent = widget.goal.contentId != null;
     final label = hasContent
         ? (widget.content?.title ?? widget.goal.title)
-        : '(geen lesinhoud)';
+        : AppLocalizations.of(context).lesson_subgoal_noContent;
 
     final bg = widget.selected
         ? AppColors.ink2

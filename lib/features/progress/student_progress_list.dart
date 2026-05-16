@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/progress/goal_tile.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
@@ -28,8 +29,9 @@ class StudentProgressList extends ConsumerWidget {
     return StreamBuilder<List<Goal>>(
       stream: goalsService.streamAllGoals(),
       builder: (context, goalsSnap) {
+        final l = AppLocalizations.of(context);
         if (goalsSnap.hasError) {
-          return const Center(child: Text('Kon de doelen niet laden.'));
+          return Center(child: Text(l.progress_loadError));
         }
         if (!goalsSnap.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -37,9 +39,7 @@ class StudentProgressList extends ConsumerWidget {
 
         final goals = goalsSnap.data!;
         if (goals.isEmpty) {
-          return const Center(
-            child: Text('Er zijn nog geen doelen beschikbaar.'),
-          );
+          return Center(child: Text(l.progress_empty));
         }
 
         final progressStream = uid == null

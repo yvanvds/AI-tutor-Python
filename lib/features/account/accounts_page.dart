@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -130,7 +131,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     }
     if (accountsSnap.hasError) {
       return Center(
-        child: Text('Error loading accounts:\n${accountsSnap.error}'),
+        child: Text(
+          AppLocalizations.of(context)
+              .accounts_loadError(accountsSnap.error.toString()),
+        ),
       );
     }
     final filtered = _filterAccounts(accountsSnap.data ?? []);
@@ -193,15 +197,16 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   }
 
   Widget _buildSearchAndPageSizeRow() {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
           child: TextField(
             controller: _searchCtrl,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search by name or email…',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: l.accounts_search_hint,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
             onChanged: (_) => setState(_resetPaging),
@@ -219,7 +224,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           },
           items: const [10, 25, 50, 100]
               .map(
-                (v) => DropdownMenuItem(value: v, child: Text('$v / page')),
+                (v) => DropdownMenuItem(
+                  value: v,
+                  child: Text(l.accounts_pageSize_label(v)),
+                ),
               )
               .toList(),
         ),
@@ -274,17 +282,19 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                     ),
                   ),
                 ),
-                child: DataTable(
+                child: Builder(builder: (context) {
+                  final l = AppLocalizations.of(context);
+                  return DataTable(
                   showCheckboxColumn: false,
-                  columns: const [
-                    DataColumn(label: Text('EMAIL')),
-                    DataColumn(label: Text('NAAM')),
-                    DataColumn(label: Text('STREAK')),
-                    DataColumn(label: Text('HUIDIG DOEL')),
-                    DataColumn(label: Text('VOORTGANG')),
-                    DataColumn(label: Text('STATUS')),
-                    DataColumn(label: Text('SLEUTEL')),
-                    DataColumn(label: Text('ACTIES')),
+                  columns: [
+                    DataColumn(label: Text(l.accounts_column_email)),
+                    DataColumn(label: Text(l.accounts_column_name)),
+                    DataColumn(label: Text(l.accounts_column_streak)),
+                    DataColumn(label: Text(l.accounts_column_currentGoal)),
+                    DataColumn(label: Text(l.accounts_column_progress)),
+                    DataColumn(label: Text(l.accounts_column_status)),
+                    DataColumn(label: Text(l.accounts_column_key)),
+                    DataColumn(label: Text(l.accounts_column_actions)),
                   ],
                   rows: pageItems
                       .map(
@@ -298,7 +308,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                         ),
                       )
                       .toList(),
-                ),
+                );
+                }),
               ),
             ),
           ),
@@ -364,7 +375,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: 'Delete account',
+                tooltip:
+                    AppLocalizations.of(context).accounts_tooltip_deleteAccount,
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _confirmDelete(context, a),
               ),
@@ -416,37 +428,45 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   }
 
   Widget _buildPaginationBar(_PageView page) {
+    final l = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Showing ${page.total == 0 ? 0 : page.start + 1}–${page.end} of ${page.total}',
+          l.accounts_pagination_showing(
+            page.total == 0 ? 0 : page.start + 1,
+            page.end,
+            page.total,
+          ),
         ),
         Row(
           children: [
             IconButton(
-              tooltip: 'First page',
+              tooltip: l.accounts_tooltip_firstPage,
               onPressed:
                   _pageIndex > 0 ? () => setState(() => _pageIndex = 0) : null,
               icon: const Icon(Icons.first_page),
             ),
             IconButton(
-              tooltip: 'Previous page',
+              tooltip: l.accounts_tooltip_previousPage,
               onPressed: _pageIndex > 0
                   ? () => setState(() => _pageIndex -= 1)
                   : null,
               icon: const Icon(Icons.chevron_left),
             ),
-            Text('Page ${_pageIndex + 1} / ${page.maxPage + 1}'),
+            Text(l.accounts_pagination_pageOf(
+              _pageIndex + 1,
+              page.maxPage + 1,
+            )),
             IconButton(
-              tooltip: 'Next page',
+              tooltip: l.accounts_tooltip_nextPage,
               onPressed: _pageIndex < page.maxPage
                   ? () => setState(() => _pageIndex += 1)
                   : null,
               icon: const Icon(Icons.chevron_right),
             ),
             IconButton(
-              tooltip: 'Last page',
+              tooltip: l.accounts_tooltip_lastPage,
               onPressed: _pageIndex < page.maxPage
                   ? () => setState(() => _pageIndex = page.maxPage)
                   : null,
@@ -460,27 +480,27 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   Future<void> _confirmDelete(BuildContext context, Account a) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete account'),
-        content: Text(
-          'This will delete the account profile for:\n\n'
-          '${a.email}\n\n'
-          'This does NOT remove the user from the school account directory. Continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final ld = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(ld.accounts_delete_dialog_title),
+          content: Text(ld.accounts_delete_dialog_message(a.email)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ld.accounts_delete_dialog_cancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ld.accounts_delete_dialog_confirm),
+            ),
+          ],
+        );
+      },
     );
 
     if (ok != true) return;
@@ -490,10 +510,12 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           .read(accountServiceProvider.notifier)
           .deleteAccountDoc(a.uid);
       messenger.showSnackBar(
-        SnackBar(content: Text('Deleted account: ${a.email}')),
+        SnackBar(content: Text(l.accounts_delete_success(a.email))),
       );
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.accounts_delete_failed(e.toString()))),
+      );
     }
   }
 }
@@ -518,12 +540,13 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
-          'Studenten',
-          style: TextStyle(
+          l.accounts_page_title,
+          style: const TextStyle(
             color: AppColors.fg,
             fontSize: 30,
             fontWeight: FontWeight.w700,
@@ -531,10 +554,10 @@ class _PageHeader extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
-          'Beheer accounts en volg de voortgang van je studenten.',
-          style: TextStyle(
+          l.accounts_page_subtitle,
+          style: const TextStyle(
             color: AppColors.fgFaint,
             fontSize: 13,
             height: 1.4,
@@ -566,7 +589,7 @@ class _EmailCell extends StatelessWidget {
         ),
         if (lastActive != '—')
           Text(
-            'laatst actief: $lastActive',
+            AppLocalizations.of(context).accounts_email_lastActive(lastActive),
             style: const TextStyle(
               color: AppColors.fgFaint,
               fontSize: 10.5,
@@ -632,13 +655,14 @@ class _StatusCell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final color = switch (status) {
       StudentStatus.active => AppColors.accent2,
       StudentStatus.idle => AppColors.fgFaint,
     };
     final tip = switch (status) {
-      StudentStatus.active => 'Recent vooruitgang geboekt.',
-      StudentStatus.idle => 'Geen vooruitgang in de laatste 7 dagen.',
+      StudentStatus.active => l.accounts_status_tooltip_active,
+      StudentStatus.idle => l.accounts_status_tooltip_idle,
     };
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -660,7 +684,7 @@ class _StatusCell extends ConsumerWidget {
             final n = snap.data ?? 0;
             if (n <= 0) return const SizedBox.shrink();
             return Tooltip(
-              message: 'Onbevestigde signaaleventjes',
+              message: l.accounts_badge_unackTooltip,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 6,

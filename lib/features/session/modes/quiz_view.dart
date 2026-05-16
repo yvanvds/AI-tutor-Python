@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
@@ -100,9 +101,9 @@ class _QuizHeader extends StatelessWidget {
             color: AppColors.accent.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
-          child: const Text(
-            'QUIZVRAAG',
-            style: TextStyle(
+          child: Text(
+            AppLocalizations.of(context).session_quiz_pill.toUpperCase(),
+            style: const TextStyle(
               color: AppColors.accent,
               fontSize: 10,
               fontWeight: FontWeight.w600,
@@ -417,7 +418,7 @@ class _AdvanceButtonState extends State<_AdvanceButton> {
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Text(
-              'Volgende →',
+              AppLocalizations.of(context).session_quiz_next_button,
               style: TextStyle(
                 color: fg,
                 fontSize: 13.5,

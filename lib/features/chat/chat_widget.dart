@@ -8,6 +8,7 @@ import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
 import 'package:ai_tutor_python/features/chat/widgets/role_chip.dart';
 import 'package:ai_tutor_python/features/chat/widgets/student_bubble.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_bubble.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -140,7 +141,7 @@ class _ChatBody extends ConsumerWidget {
                   fontSize: 14,
                   height: 1.55,
                 ),
-                loadingText: 'Tutor denkt na…',
+                loadingText: AppLocalizations.of(context).chat_loading_thinking,
               ),
             ),
           ),
@@ -172,7 +173,11 @@ class _ChatBody extends ConsumerWidget {
         },
       ),
       resolveUser: (UserID id) async {
-        return User(id: id, name: id == 'You' ? 'You' : 'Tutor');
+        final l = AppLocalizations.of(context);
+        return User(
+          id: id,
+          name: id == 'You' ? l.chat_userName_you : l.chat_tutorName,
+        );
       },
     );
   }

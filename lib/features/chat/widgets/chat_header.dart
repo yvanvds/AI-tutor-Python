@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/chat/widgets/tutor_avatar.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -32,9 +33,9 @@ class ChatHeader extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Tutor',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).chat_tutorName,
+                  style: const TextStyle(
                     color: AppColors.fg,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -62,6 +63,7 @@ class _PresenceLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
         Container(
@@ -83,9 +85,9 @@ class _PresenceLine extends StatelessWidget {
                 height: 1.3,
               ),
               children: [
-                const TextSpan(text: 'online'),
+                TextSpan(text: l.chat_header_presence_online),
                 if (topic.isNotEmpty) ...[
-                  const TextSpan(text: ' · helpt je met '),
+                  TextSpan(text: l.chat_header_presence_helpsWith),
                   TextSpan(
                     text: topic,
                     style: AppMono.code(color: AppColors.fgMute, size: 11.5),
@@ -121,7 +123,7 @@ class _RestartButtonState extends State<_RestartButton> {
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Tooltip(
-          message: 'Sessie herstarten',
+          message: AppLocalizations.of(context).chat_header_restart_tooltip,
           waitDuration: const Duration(milliseconds: 400),
           child: AnimatedContainer(
             duration: AppDurations.hover,

@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress_sample.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
@@ -21,6 +22,7 @@ class ProgressHistoryCharts extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return StreamBuilder<List<ProgressSample>>(
       stream: ref.read(progressServiceProvider).watchHistoryForUser(
         uid,
@@ -30,8 +32,9 @@ class ProgressHistoryCharts extends ConsumerWidget {
         if (snap.hasError) {
           return _frame(
             theme,
+            l,
             child: Text(
-              'Kon de geschiedenis niet laden.',
+              l.drawer_history_loadError,
               style: theme.textTheme.bodySmall,
             ),
           );
@@ -39,6 +42,7 @@ class ProgressHistoryCharts extends ConsumerWidget {
         if (!snap.hasData) {
           return _frame(
             theme,
+            l,
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: LinearProgressIndicator(minHeight: 2),
@@ -68,8 +72,9 @@ class ProgressHistoryCharts extends ConsumerWidget {
         if (roots2.isEmpty) {
           return _frame(
             theme,
+            l,
             child: Text(
-              'Nog geen geschiedenis.',
+              l.drawer_history_empty,
               style: theme.textTheme.bodySmall,
             ),
           );
@@ -77,6 +82,7 @@ class ProgressHistoryCharts extends ConsumerWidget {
 
         return _frame(
           theme,
+          l,
           child: ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -97,13 +103,13 @@ class ProgressHistoryCharts extends ConsumerWidget {
     );
   }
 
-  Widget _frame(ThemeData theme, {required Widget child}) {
+  Widget _frame(ThemeData theme, AppLocalizations l, {required Widget child}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Voortgang in de tijd', style: theme.textTheme.titleMedium),
+          Text(l.drawer_history_title, style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
           child,
         ],
@@ -126,6 +132,7 @@ class _RootGoalChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final activeChildren = children
         .where(
           (c) => (samplesByGoal[c.id] ?? const <ProgressSample>[]).isNotEmpty,
@@ -143,7 +150,8 @@ class _RootGoalChart extends StatelessWidget {
             children: [
               Text(root.title, style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
-              Text('Nog geen geschiedenis', style: theme.textTheme.bodySmall),
+              Text(l.drawer_history_card_empty,
+                  style: theme.textTheme.bodySmall),
             ],
           ),
         ),
@@ -258,7 +266,7 @@ class _RootGoalChart extends StatelessWidget {
                   _LegendDot(color: s.color, label: s.child.title),
                 _LegendDot(
                   color: theme.colorScheme.onSurfaceVariant,
-                  label: 'gemiddelde',
+                  label: l.drawer_history_legend_average,
                   thick: true,
                 ),
               ],

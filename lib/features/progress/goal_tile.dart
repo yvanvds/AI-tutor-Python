@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
@@ -64,7 +65,8 @@ class GoalTile extends ConsumerWidget {
                             .setCurrentProgress(newProgress);
                       },
                       icon: const Icon(Icons.fast_forward),
-                      label: const Text('Ga sneller'),
+                      label:
+                          Text(AppLocalizations.of(context).goalTile_button_faster),
                     ),
                   if (!readOnly && isSubgoal)
                     ElevatedButton.icon(
@@ -90,7 +92,8 @@ class GoalTile extends ConsumerWidget {
                             .read(tutorServiceProvider.notifier)
                             .initializeSession(force: true);
                       },
-                      label: const Text('Werk hieraan'),
+                      label:
+                          Text(AppLocalizations.of(context).goalTile_button_workOn),
                       icon: const Icon(Icons.play_arrow),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,

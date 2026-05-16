@@ -3,6 +3,7 @@ import 'package:ai_tutor_python/features/account/detail/signal_events_section.da
 import 'package:ai_tutor_python/features/account/detail/status_reports_section.dart';
 import 'package:ai_tutor_python/features/account/detail/student_status_summary.dart';
 import 'package:ai_tutor_python/features/progress/student_progress_list.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -58,7 +59,11 @@ class StudentDetailDrawer extends ConsumerWidget {
                           const Divider(height: 1),
                           SignalEventsSection(uid: account.uid),
                           const Divider(height: 1),
-                          _SectionTitle(theme: theme, label: 'Doelen'),
+                          _SectionTitle(
+                            theme: theme,
+                            label: AppLocalizations.of(context)
+                                .drawer_section_goals,
+                          ),
                           SizedBox(
                             height: 320,
                             child: StudentProgressList(uid: account.uid),
@@ -116,7 +121,7 @@ class _Header extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Sluiten',
+            tooltip: AppLocalizations.of(context).drawer_close_tooltip,
             icon: const Icon(Icons.close),
             onPressed: onClose,
           ),

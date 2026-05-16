@@ -379,6 +379,1389 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OK'**
   String get update_dialog_ok;
+
+  /// No description provided for @session_explain_placeholder_noSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a subgoal in the learning path to see the explanation.'**
+  String get session_explain_placeholder_noSubgoal;
+
+  /// No description provided for @session_explain_loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading lesson…'**
+  String get session_explain_loading;
+
+  /// No description provided for @session_explain_missingContent.
+  ///
+  /// In en, this message translates to:
+  /// **'No lesson content available for this subgoal yet.'**
+  String get session_explain_missingContent;
+
+  /// Fallback label for the explain-view root pill when no root goal is set; displayed uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Concept'**
+  String get session_explain_defaultPillLabel;
+
+  /// No description provided for @session_explain_prev_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get session_explain_prev_button;
+
+  /// No description provided for @session_explain_completeXp.
+  ///
+  /// In en, this message translates to:
+  /// **'+10 XP on completion'**
+  String get session_explain_completeXp;
+
+  /// No description provided for @session_explain_tryItYourself.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it yourself'**
+  String get session_explain_tryItYourself;
+
+  /// No description provided for @session_playground_pill.
+  ///
+  /// In en, this message translates to:
+  /// **'playground'**
+  String get session_playground_pill;
+
+  /// No description provided for @session_playground_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No goal — just you and Python.'**
+  String get session_playground_subtitle;
+
+  /// Quiz header pill — displayed uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz question'**
+  String get session_quiz_pill;
+
+  /// No description provided for @session_quiz_next_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Next →'**
+  String get session_quiz_next_button;
+
+  /// No description provided for @session_output_state_idle.
+  ///
+  /// In en, this message translates to:
+  /// **'No output'**
+  String get session_output_state_idle;
+
+  /// No description provided for @session_output_state_running.
+  ///
+  /// In en, this message translates to:
+  /// **'Running…'**
+  String get session_output_state_running;
+
+  /// No description provided for @session_output_state_ok.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get session_output_state_ok;
+
+  /// No description provided for @session_output_state_error_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 error} other{{count} errors}}'**
+  String session_output_state_error_count(int count);
+
+  /// No description provided for @session_output_header_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get session_output_header_label;
+
+  /// No description provided for @session_output_emptyState_runHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Run to execute your code.'**
+  String get session_output_emptyState_runHint;
+
+  /// No description provided for @session_runControls_tooltip_resetOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset output'**
+  String get session_runControls_tooltip_resetOutput;
+
+  /// No description provided for @session_runControls_tooltip_askHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for a hint'**
+  String get session_runControls_tooltip_askHint;
+
+  /// No description provided for @session_runControls_tooltip_sendToTutor.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to tutor'**
+  String get session_runControls_tooltip_sendToTutor;
+
+  /// No description provided for @session_runControls_chatMessage_needHint.
+  ///
+  /// In en, this message translates to:
+  /// **'I need a hint.'**
+  String get session_runControls_chatMessage_needHint;
+
+  /// No description provided for @session_runControls_chatMessage_hereIsCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Here is my code.'**
+  String get session_runControls_chatMessage_hereIsCode;
+
+  /// No description provided for @session_runControls_button_run.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get session_runControls_button_run;
+
+  /// No description provided for @session_runControls_button_stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get session_runControls_button_stop;
+
+  /// Banner header pill at the top of practice view — displayed uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Current goal'**
+  String get session_objectiveBanner_pill;
+
+  /// No description provided for @chat_tutorName.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutor'**
+  String get chat_tutorName;
+
+  /// No description provided for @chat_userName_you.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get chat_userName_you;
+
+  /// No description provided for @chat_loading_thinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutor is thinking…'**
+  String get chat_loading_thinking;
+
+  /// No description provided for @chat_header_presence_online.
+  ///
+  /// In en, this message translates to:
+  /// **'online'**
+  String get chat_header_presence_online;
+
+  /// Connective fragment between 'online' and the topic name; leading dot and bullet are part of the string
+  ///
+  /// In en, this message translates to:
+  /// **' · helping you with '**
+  String get chat_header_presence_helpsWith;
+
+  /// No description provided for @chat_header_restart_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart session'**
+  String get chat_header_restart_tooltip;
+
+  /// No description provided for @chat_composer_idle_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your question or answer…'**
+  String get chat_composer_idle_hint;
+
+  /// No description provided for @chat_composer_idle_kbd_send.
+  ///
+  /// In en, this message translates to:
+  /// **'send'**
+  String get chat_composer_idle_kbd_send;
+
+  /// No description provided for @chat_composer_idle_kbd_newline.
+  ///
+  /// In en, this message translates to:
+  /// **'new line'**
+  String get chat_composer_idle_kbd_newline;
+
+  /// No description provided for @chat_composer_idle_tip_prefix.
+  ///
+  /// In en, this message translates to:
+  /// **'tip: type '**
+  String get chat_composer_idle_tip_prefix;
+
+  /// Trailing fragment of the hint tip — leading space is part of the string
+  ///
+  /// In en, this message translates to:
+  /// **' for a hint'**
+  String get chat_composer_idle_tip_suffix;
+
+  /// No description provided for @chat_composer_idle_hintMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'I need a hint'**
+  String get chat_composer_idle_hintMessage;
+
+  /// No description provided for @chat_composer_thinking_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutor is thinking…'**
+  String get chat_composer_thinking_label;
+
+  /// No description provided for @chat_composer_continue_prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for the next part?'**
+  String get chat_composer_continue_prompt;
+
+  /// No description provided for @chat_composer_continue_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get chat_composer_continue_button;
+
+  /// No description provided for @chat_composer_mcqDisabled_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap an answer above'**
+  String get chat_composer_mcqDisabled_label;
+
+  /// No description provided for @goals_header_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals'**
+  String get goals_header_title;
+
+  /// No description provided for @goals_action_export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export goals'**
+  String get goals_action_export;
+
+  /// No description provided for @goals_action_import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import goals'**
+  String get goals_action_import;
+
+  /// No description provided for @goals_snack_noGoalsToExport.
+  ///
+  /// In en, this message translates to:
+  /// **'No goals to export'**
+  String get goals_snack_noGoalsToExport;
+
+  /// No description provided for @goals_snack_exportedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported to {path}'**
+  String goals_snack_exportedTo(String path);
+
+  /// No description provided for @goals_snack_exportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String goals_snack_exportFailed(String error);
+
+  /// No description provided for @goals_snack_fileEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'File contained no goals'**
+  String get goals_snack_fileEmpty;
+
+  /// No description provided for @goals_snack_addAborted.
+  ///
+  /// In en, this message translates to:
+  /// **'Add aborted: {count} id(s) already exist (e.g. {sample}). Use Replace, or remove the duplicates first.'**
+  String goals_snack_addAborted(int count, String sample);
+
+  /// No description provided for @goals_snack_imported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} goal(s)'**
+  String goals_snack_imported(int count);
+
+  /// No description provided for @goals_snack_importedWithRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} goal(s) (removed {removed} not in file)'**
+  String goals_snack_importedWithRemoved(int count, int removed);
+
+  /// No description provided for @goals_snack_importFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String goals_snack_importFailed(String error);
+
+  /// No description provided for @goals_snack_couldNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read selected file'**
+  String get goals_snack_couldNotRead;
+
+  /// No description provided for @goals_snack_invalidFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid goals file'**
+  String get goals_snack_invalidFile;
+
+  /// No description provided for @goals_import_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Import goals'**
+  String get goals_import_dialog_title;
+
+  /// No description provided for @goals_import_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: upsert by id (keeps existing lesson content links) and remove any goals not in the file.'**
+  String goals_import_dialog_message(int rootCount, int total);
+
+  /// No description provided for @goals_import_action_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get goals_import_action_cancel;
+
+  /// No description provided for @goals_import_action_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get goals_import_action_add;
+
+  /// No description provided for @goals_import_action_replace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get goals_import_action_replace;
+
+  /// No description provided for @goals_import_filePicker_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Select goals JSON to import'**
+  String get goals_import_filePicker_title;
+
+  /// No description provided for @goals_editor_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit goal'**
+  String get goals_editor_title;
+
+  /// No description provided for @goals_editor_tooltip_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get goals_editor_tooltip_delete;
+
+  /// No description provided for @goals_editor_tooltip_close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get goals_editor_tooltip_close;
+
+  /// No description provided for @goals_editor_field_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get goals_editor_field_title;
+
+  /// No description provided for @goals_editor_untitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get goals_editor_untitled;
+
+  /// No description provided for @goals_editor_field_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe this goal for students.'**
+  String get goals_editor_field_description;
+
+  /// No description provided for @goals_editor_switch_optional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get goals_editor_switch_optional;
+
+  /// No description provided for @goals_editor_switch_concept.
+  ///
+  /// In en, this message translates to:
+  /// **'Concept goal'**
+  String get goals_editor_switch_concept;
+
+  /// No description provided for @goals_editor_switch_concept_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastering this subgoal triggers the level-up overlay.'**
+  String get goals_editor_switch_concept_subtitle;
+
+  /// No description provided for @goals_editor_teachingTips_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Teaching tips'**
+  String get goals_editor_teachingTips_label;
+
+  /// No description provided for @goals_editor_teachingTips_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a teaching tip and hit Enter'**
+  String get goals_editor_teachingTips_hint;
+
+  /// No description provided for @goals_editor_lesinhoud_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson content'**
+  String get goals_editor_lesinhoud_label;
+
+  /// No description provided for @goals_editor_lesinhoud_linked.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson content linked'**
+  String get goals_editor_lesinhoud_linked;
+
+  /// No description provided for @goals_editor_lesinhoud_none.
+  ///
+  /// In en, this message translates to:
+  /// **'(no lesson content)'**
+  String get goals_editor_lesinhoud_none;
+
+  /// No description provided for @goals_editor_lesinhoud_edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get goals_editor_lesinhoud_edit;
+
+  /// No description provided for @goals_editor_lesinhoud_create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get goals_editor_lesinhoud_create;
+
+  /// No description provided for @goals_editor_delete_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete goal'**
+  String get goals_editor_delete_dialog_title;
+
+  /// No description provided for @goals_editor_delete_dialog_message_single.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\"?'**
+  String goals_editor_delete_dialog_message_single(String title);
+
+  /// No description provided for @goals_editor_delete_dialog_message_withDescendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\" and its {count} descendant(s)?'**
+  String goals_editor_delete_dialog_message_withDescendants(
+    String title,
+    int count,
+  );
+
+  /// No description provided for @goals_editor_delete_action_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get goals_editor_delete_action_cancel;
+
+  /// No description provided for @goals_editor_delete_action_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get goals_editor_delete_action_confirm;
+
+  /// No description provided for @goals_editor_deleted_single.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{title}\".'**
+  String goals_editor_deleted_single(String title);
+
+  /// No description provided for @goals_editor_deleted_withDescendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{title}\" (+{count}).'**
+  String goals_editor_deleted_withDescendants(String title, int count);
+
+  /// No description provided for @goals_pane_error.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String goals_pane_error(String error);
+
+  /// No description provided for @goals_pane_noData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data'**
+  String get goals_pane_noData;
+
+  /// No description provided for @goals_pane_reordered.
+  ///
+  /// In en, this message translates to:
+  /// **'Reordered \"{title}\".'**
+  String goals_pane_reordered(String title);
+
+  /// No description provided for @goals_childPane_empty_pickRoot.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a root goal to see its children.'**
+  String get goals_childPane_empty_pickRoot;
+
+  /// No description provided for @goals_childPane_addHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add child goal… (Enter)'**
+  String get goals_childPane_addHint;
+
+  /// No description provided for @goals_childPane_empty_addOne.
+  ///
+  /// In en, this message translates to:
+  /// **'No children yet. Add one above.'**
+  String get goals_childPane_empty_addOne;
+
+  /// No description provided for @goals_rootPane_addHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add root goal… (Enter)'**
+  String get goals_rootPane_addHint;
+
+  /// No description provided for @goals_rootPane_empty_addOne.
+  ///
+  /// In en, this message translates to:
+  /// **'No goals yet. Add one above.'**
+  String get goals_rootPane_empty_addOne;
+
+  /// No description provided for @goals_parentField_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent'**
+  String get goals_parentField_label;
+
+  /// No description provided for @goals_parentField_noParent.
+  ///
+  /// In en, this message translates to:
+  /// **'(no parent)'**
+  String get goals_parentField_noParent;
+
+  /// No description provided for @goals_parentField_loadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load parents: {error}'**
+  String goals_parentField_loadFailed(String error);
+
+  /// No description provided for @goals_editorPanel_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading documents: {error}'**
+  String goals_editorPanel_loadError(String error);
+
+  /// No description provided for @goals_editorPanel_noGoalSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No goal selected.'**
+  String get goals_editorPanel_noGoalSelected;
+
+  /// No description provided for @lesson_toolbar_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson content'**
+  String get lesson_toolbar_title;
+
+  /// No description provided for @lesson_toolbar_upload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload .html'**
+  String get lesson_toolbar_upload;
+
+  /// No description provided for @lesson_toolbar_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get lesson_toolbar_save;
+
+  /// No description provided for @lesson_toolbar_save_dirty.
+  ///
+  /// In en, this message translates to:
+  /// **'Save *'**
+  String get lesson_toolbar_save_dirty;
+
+  /// No description provided for @lesson_snack_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get lesson_snack_saved;
+
+  /// No description provided for @lesson_snack_couldNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read file.'**
+  String get lesson_snack_couldNotRead;
+
+  /// No description provided for @lesson_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Load failed: {error}'**
+  String lesson_loadError(String error);
+
+  /// No description provided for @lesson_unlink_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink lesson content?'**
+  String get lesson_unlink_dialog_title;
+
+  /// No description provided for @lesson_unlink_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The content document stays in place, but this subgoal will no longer point to it.'**
+  String get lesson_unlink_dialog_message;
+
+  /// No description provided for @lesson_unlink_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lesson_unlink_dialog_cancel;
+
+  /// No description provided for @lesson_unlink_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink'**
+  String get lesson_unlink_dialog_confirm;
+
+  /// No description provided for @lesson_editor_empty_pickSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a subgoal to edit its lesson content.'**
+  String get lesson_editor_empty_pickSubgoal;
+
+  /// No description provided for @lesson_editor_field_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get lesson_editor_field_title;
+
+  /// No description provided for @lesson_editor_button_unlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink'**
+  String get lesson_editor_button_unlink;
+
+  /// No description provided for @lesson_preview_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'The preview appears here as soon as you add HTML.'**
+  String get lesson_preview_empty;
+
+  /// No description provided for @lesson_subgoal_noContent.
+  ///
+  /// In en, this message translates to:
+  /// **'(no lesson content)'**
+  String get lesson_subgoal_noContent;
+
+  /// No description provided for @lesson_default_moduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Python basics'**
+  String get lesson_default_moduleTitle;
+
+  /// No description provided for @instructions_toolbar_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions'**
+  String get instructions_toolbar_title;
+
+  /// No description provided for @instructions_toolbar_tooltip_new.
+  ///
+  /// In en, this message translates to:
+  /// **'New document'**
+  String get instructions_toolbar_tooltip_new;
+
+  /// No description provided for @instructions_toolbar_tooltip_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete document'**
+  String get instructions_toolbar_tooltip_delete;
+
+  /// No description provided for @instructions_toolbar_tooltip_export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export all to Markdown'**
+  String get instructions_toolbar_tooltip_export;
+
+  /// No description provided for @instructions_toolbar_tooltip_import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Markdown'**
+  String get instructions_toolbar_tooltip_import;
+
+  /// No description provided for @instructions_toolbar_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get instructions_toolbar_save;
+
+  /// No description provided for @instructions_toolbar_save_dirty.
+  ///
+  /// In en, this message translates to:
+  /// **'Save *'**
+  String get instructions_toolbar_save_dirty;
+
+  /// No description provided for @instructions_dialog_common_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get instructions_dialog_common_cancel;
+
+  /// No description provided for @instructions_dialog_common_ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get instructions_dialog_common_ok;
+
+  /// No description provided for @instructions_dialog_common_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get instructions_dialog_common_delete;
+
+  /// No description provided for @instructions_dialog_common_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get instructions_dialog_common_add;
+
+  /// No description provided for @instructions_dialog_common_replace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get instructions_dialog_common_replace;
+
+  /// No description provided for @instructions_dialog_newDoc_title.
+  ///
+  /// In en, this message translates to:
+  /// **'New document'**
+  String get instructions_dialog_newDoc_title;
+
+  /// No description provided for @instructions_dialog_newDoc_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Document id (e.g. system_prompt)'**
+  String get instructions_dialog_newDoc_label;
+
+  /// No description provided for @instructions_dialog_renameDoc_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename document'**
+  String get instructions_dialog_renameDoc_title;
+
+  /// No description provided for @instructions_dialog_renameDoc_label.
+  ///
+  /// In en, this message translates to:
+  /// **'New document id'**
+  String get instructions_dialog_renameDoc_label;
+
+  /// No description provided for @instructions_dialog_renameSection_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename section'**
+  String get instructions_dialog_renameSection_title;
+
+  /// No description provided for @instructions_dialog_renameSection_label.
+  ///
+  /// In en, this message translates to:
+  /// **'New section key'**
+  String get instructions_dialog_renameSection_label;
+
+  /// No description provided for @instructions_dialog_addSection_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Add section'**
+  String get instructions_dialog_addSection_title;
+
+  /// No description provided for @instructions_dialog_addSection_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Section key (e.g. current_context)'**
+  String get instructions_dialog_addSection_label;
+
+  /// No description provided for @instructions_confirm_deleteDoc_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{id}\"?'**
+  String instructions_confirm_deleteDoc_title(String id);
+
+  /// No description provided for @instructions_confirm_deleteDoc_body.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently delete the document.'**
+  String get instructions_confirm_deleteDoc_body;
+
+  /// No description provided for @instructions_confirm_deleteSection_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{key}\"?'**
+  String instructions_confirm_deleteSection_title(String key);
+
+  /// No description provided for @instructions_confirm_deleteSection_body.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the section from the document.'**
+  String get instructions_confirm_deleteSection_body;
+
+  /// No description provided for @instructions_import_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Import instructions'**
+  String get instructions_import_dialog_title;
+
+  /// No description provided for @instructions_import_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The file contains {docCount} document(s).\n\n• Add: only insert sections that don\'t already exist; keep current values.\n• Replace: overwrite each imported document\'s sections with the file\'s contents. Documents not in the file are left alone.'**
+  String instructions_import_dialog_message(int docCount);
+
+  /// No description provided for @instructions_filePicker_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Markdown file to import'**
+  String get instructions_filePicker_title;
+
+  /// No description provided for @instructions_snack_documentDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Document deleted'**
+  String get instructions_snack_documentDeleted;
+
+  /// No description provided for @instructions_snack_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get instructions_snack_saved;
+
+  /// No description provided for @instructions_snack_sectionExists.
+  ///
+  /// In en, this message translates to:
+  /// **'Section \"{key}\" already exists'**
+  String instructions_snack_sectionExists(String key);
+
+  /// No description provided for @instructions_snack_sectionExistsRename.
+  ///
+  /// In en, this message translates to:
+  /// **'A section named \"{key}\" already exists'**
+  String instructions_snack_sectionExistsRename(String key);
+
+  /// No description provided for @instructions_snack_renamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Renamed to \"{target}\"'**
+  String instructions_snack_renamed(String target);
+
+  /// No description provided for @instructions_snack_noDocsToExport.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents to export'**
+  String get instructions_snack_noDocsToExport;
+
+  /// No description provided for @instructions_snack_exportedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported to {path}'**
+  String instructions_snack_exportedTo(String path);
+
+  /// No description provided for @instructions_snack_exportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String instructions_snack_exportFailed(String error);
+
+  /// No description provided for @instructions_snack_noDocsInFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents found in file'**
+  String get instructions_snack_noDocsInFile;
+
+  /// No description provided for @instructions_snack_importFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String instructions_snack_importFailed(String error);
+
+  /// No description provided for @instructions_snack_couldNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read selected file'**
+  String get instructions_snack_couldNotRead;
+
+  /// No description provided for @instructions_snack_replace_nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changed (file matched existing content)'**
+  String get instructions_snack_replace_nothing;
+
+  /// No description provided for @instructions_snack_add_nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing imported (all sections already exist)'**
+  String get instructions_snack_add_nothing;
+
+  /// No description provided for @instructions_snack_imported_prefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} section(s)'**
+  String instructions_snack_imported_prefix(int count);
+
+  /// No description provided for @instructions_snack_stats_newDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new doc(s)'**
+  String instructions_snack_stats_newDocs(int count);
+
+  /// No description provided for @instructions_snack_stats_updated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} updated'**
+  String instructions_snack_stats_updated(int count);
+
+  /// No description provided for @instructions_snack_stats_replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} replaced'**
+  String instructions_snack_stats_replaced(int count);
+
+  /// No description provided for @instructions_snack_stats_addedSections.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} added section(s)'**
+  String instructions_snack_stats_addedSections(int count);
+
+  /// No description provided for @instructions_snack_stats_replacedSections.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} replaced section(s)'**
+  String instructions_snack_stats_replacedSections(int count);
+
+  /// No description provided for @instructions_body_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading documents: {error}'**
+  String instructions_body_loadError(String error);
+
+  /// No description provided for @instructions_sectionsList_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add section'**
+  String get instructions_sectionsList_add;
+
+  /// No description provided for @instructions_sectionsList_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get instructions_sectionsList_delete;
+
+  /// No description provided for @instructions_docList_header.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get instructions_docList_header;
+
+  /// No description provided for @instructions_docHeader_noDoc.
+  ///
+  /// In en, this message translates to:
+  /// **'No document selected'**
+  String get instructions_docHeader_noDoc;
+
+  /// No description provided for @instructions_docHeader_renameTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename document'**
+  String get instructions_docHeader_renameTooltip;
+
+  /// No description provided for @instructions_sectionHeader_noSection.
+  ///
+  /// In en, this message translates to:
+  /// **'No section selected'**
+  String get instructions_sectionHeader_noSection;
+
+  /// No description provided for @instructions_sectionHeader_renameTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename section'**
+  String get instructions_sectionHeader_renameTooltip;
+
+  /// No description provided for @accounts_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Students'**
+  String get accounts_page_title;
+
+  /// No description provided for @accounts_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage accounts and follow your students\' progress.'**
+  String get accounts_page_subtitle;
+
+  /// No description provided for @accounts_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading accounts:\n{error}'**
+  String accounts_loadError(String error);
+
+  /// No description provided for @accounts_search_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or email…'**
+  String get accounts_search_hint;
+
+  /// No description provided for @accounts_pageSize_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} / page'**
+  String accounts_pageSize_label(int n);
+
+  /// No description provided for @accounts_column_email.
+  ///
+  /// In en, this message translates to:
+  /// **'EMAIL'**
+  String get accounts_column_email;
+
+  /// No description provided for @accounts_column_name.
+  ///
+  /// In en, this message translates to:
+  /// **'NAME'**
+  String get accounts_column_name;
+
+  /// No description provided for @accounts_column_streak.
+  ///
+  /// In en, this message translates to:
+  /// **'STREAK'**
+  String get accounts_column_streak;
+
+  /// No description provided for @accounts_column_currentGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'CURRENT GOAL'**
+  String get accounts_column_currentGoal;
+
+  /// No description provided for @accounts_column_progress.
+  ///
+  /// In en, this message translates to:
+  /// **'PROGRESS'**
+  String get accounts_column_progress;
+
+  /// No description provided for @accounts_column_status.
+  ///
+  /// In en, this message translates to:
+  /// **'STATUS'**
+  String get accounts_column_status;
+
+  /// No description provided for @accounts_column_key.
+  ///
+  /// In en, this message translates to:
+  /// **'KEY'**
+  String get accounts_column_key;
+
+  /// No description provided for @accounts_column_actions.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIONS'**
+  String get accounts_column_actions;
+
+  /// No description provided for @accounts_email_lastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'last active: {ts}'**
+  String accounts_email_lastActive(String ts);
+
+  /// No description provided for @accounts_tooltip_deleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get accounts_tooltip_deleteAccount;
+
+  /// No description provided for @accounts_tooltip_firstPage.
+  ///
+  /// In en, this message translates to:
+  /// **'First page'**
+  String get accounts_tooltip_firstPage;
+
+  /// No description provided for @accounts_tooltip_previousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get accounts_tooltip_previousPage;
+
+  /// No description provided for @accounts_tooltip_nextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get accounts_tooltip_nextPage;
+
+  /// No description provided for @accounts_tooltip_lastPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Last page'**
+  String get accounts_tooltip_lastPage;
+
+  /// No description provided for @accounts_pagination_showing.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {start}–{end} of {total}'**
+  String accounts_pagination_showing(int start, int end, int total);
+
+  /// No description provided for @accounts_pagination_pageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} / {total}'**
+  String accounts_pagination_pageOf(int page, int total);
+
+  /// No description provided for @accounts_delete_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get accounts_delete_dialog_title;
+
+  /// No description provided for @accounts_delete_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This will delete the account profile for:\n\n{email}\n\nThis does NOT remove the user from the school account directory. Continue?'**
+  String accounts_delete_dialog_message(String email);
+
+  /// No description provided for @accounts_delete_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get accounts_delete_dialog_cancel;
+
+  /// No description provided for @accounts_delete_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get accounts_delete_dialog_confirm;
+
+  /// No description provided for @accounts_delete_success.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted account: {email}'**
+  String accounts_delete_success(String email);
+
+  /// No description provided for @accounts_delete_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String accounts_delete_failed(String error);
+
+  /// No description provided for @accounts_status_tooltip_active.
+  ///
+  /// In en, this message translates to:
+  /// **'Made progress recently.'**
+  String get accounts_status_tooltip_active;
+
+  /// No description provided for @accounts_status_tooltip_idle.
+  ///
+  /// In en, this message translates to:
+  /// **'No progress in the last 7 days.'**
+  String get accounts_status_tooltip_idle;
+
+  /// No description provided for @accounts_badge_unackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Unacknowledged signal events'**
+  String get accounts_badge_unackTooltip;
+
+  /// No description provided for @drawer_close_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get drawer_close_tooltip;
+
+  /// No description provided for @drawer_section_goals.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals'**
+  String get drawer_section_goals;
+
+  /// No description provided for @drawer_statusSummary_active_with_goal.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently active on \"{title}\".'**
+  String drawer_statusSummary_active_with_goal(String title);
+
+  /// No description provided for @drawer_statusSummary_active_noGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently active.'**
+  String get drawer_statusSummary_active_noGoal;
+
+  /// No description provided for @drawer_statusSummary_idle.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent activity.'**
+  String get drawer_statusSummary_idle;
+
+  /// No description provided for @drawer_signals_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal events'**
+  String get drawer_signals_title;
+
+  /// No description provided for @drawer_signals_button_busy.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get drawer_signals_button_busy;
+
+  /// No description provided for @drawer_signals_button_acknowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge ({count})'**
+  String drawer_signals_button_acknowledge(int count);
+
+  /// No description provided for @drawer_signals_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No events'**
+  String get drawer_signals_empty;
+
+  /// No description provided for @drawer_signals_ackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge failed: {error}'**
+  String drawer_signals_ackFailed(String error);
+
+  /// No description provided for @drawer_signals_kind_stuckLoAdvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Stuck LO at transition'**
+  String get drawer_signals_kind_stuckLoAdvance;
+
+  /// No description provided for @drawer_signals_kind_singleLoDeadlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Single-LO impasse'**
+  String get drawer_signals_kind_singleLoDeadlock;
+
+  /// No description provided for @drawer_signals_kind_repeatedDemotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeated demotion'**
+  String get drawer_signals_kind_repeatedDemotions;
+
+  /// No description provided for @drawer_signals_kind_sustainedLlmFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Sustained LLM failure'**
+  String get drawer_signals_kind_sustainedLlmFailure;
+
+  /// No description provided for @drawer_signals_kind_cascadeHalt.
+  ///
+  /// In en, this message translates to:
+  /// **'Cascade halt (audit)'**
+  String get drawer_signals_kind_cascadeHalt;
+
+  /// No description provided for @drawer_signals_kind_emptyObjectivesBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Subgoal without LOs (audit)'**
+  String get drawer_signals_kind_emptyObjectivesBlock;
+
+  /// No description provided for @drawer_signals_kind_subgoalDeletedRedirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Subgoal deleted (audit)'**
+  String get drawer_signals_kind_subgoalDeletedRedirect;
+
+  /// No description provided for @drawer_statusReports_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Status reports'**
+  String get drawer_statusReports_title;
+
+  /// No description provided for @drawer_statusReports_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load status reports.'**
+  String get drawer_statusReports_loadError;
+
+  /// No description provided for @drawer_statusReports_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No status reports yet.'**
+  String get drawer_statusReports_empty;
+
+  /// No description provided for @drawer_history_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress over time'**
+  String get drawer_history_title;
+
+  /// No description provided for @drawer_history_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load history.'**
+  String get drawer_history_loadError;
+
+  /// No description provided for @drawer_history_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No history yet.'**
+  String get drawer_history_empty;
+
+  /// No description provided for @drawer_history_card_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No history yet'**
+  String get drawer_history_card_empty;
+
+  /// No description provided for @drawer_history_legend_average.
+  ///
+  /// In en, this message translates to:
+  /// **'average'**
+  String get drawer_history_legend_average;
+
+  /// No description provided for @progress_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load goals.'**
+  String get progress_loadError;
+
+  /// No description provided for @progress_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No goals available yet.'**
+  String get progress_empty;
+
+  /// No description provided for @leerpad_header_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning path'**
+  String get leerpad_header_title;
+
+  /// No description provided for @leerpad_header_subtitle_default.
+  ///
+  /// In en, this message translates to:
+  /// **'Python — beginner\'s journey'**
+  String get leerpad_header_subtitle_default;
+
+  /// No description provided for @leerpad_card_completed.
+  ///
+  /// In en, this message translates to:
+  /// **'completed'**
+  String get leerpad_card_completed;
+
+  /// No description provided for @leerpad_card_button_continue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get leerpad_card_button_continue;
+
+  /// No description provided for @goalTile_button_faster.
+  ///
+  /// In en, this message translates to:
+  /// **'Go faster'**
+  String get goalTile_button_faster;
+
+  /// No description provided for @goalTile_button_workOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Work on this'**
+  String get goalTile_button_workOn;
 }
 
 class _AppLocalizationsDelegate

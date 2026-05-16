@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -75,16 +76,17 @@ class _OutputPanelState extends ConsumerState<OutputPanel>
   }
 
   String _stateLabel(_OutputUiState s, List<OutputLine> lines) {
+    final l = AppLocalizations.of(context);
     switch (s) {
       case _OutputUiState.idle:
-        return 'Geen output';
+        return l.session_output_state_idle;
       case _OutputUiState.running:
-        return 'Aan het uitvoeren…';
+        return l.session_output_state_running;
       case _OutputUiState.ok:
-        return 'Klaar';
+        return l.session_output_state_ok;
       case _OutputUiState.error:
         final errors = lines.where((l) => l.isError).length;
-        return errors == 1 ? '1 fout' : '$errors fouten';
+        return l.session_output_state_error_count(errors);
     }
   }
 
@@ -189,9 +191,9 @@ class _Header extends StatelessWidget {
             },
           ),
           const SizedBox(width: AppSpacing.s),
-          const Text(
-            'Output',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context).session_output_header_label,
+            style: const TextStyle(
               color: AppColors.fg,
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
@@ -221,12 +223,12 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state == _OutputUiState.idle) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Text(
-            'Druk op Run om je code uit te voeren.',
-            style: TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
+            AppLocalizations.of(context).session_output_emptyState_runHint,
+            style: const TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
           ),
         ),
       );

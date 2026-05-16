@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -47,9 +48,11 @@ class ObjectiveBanner extends ConsumerWidget {
                   color: AppColors.accent.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
-                child: const Text(
-                  'HUIDIG DOEL',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context)
+                      .session_objectiveBanner_pill
+                      .toUpperCase(),
+                  style: const TextStyle(
                     color: AppColors.accent,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

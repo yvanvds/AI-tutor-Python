@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
@@ -17,6 +18,7 @@ class RunControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final output = ref.read(outputServiceProvider);
     final mode = ref.watch(modeProvider);
+    final l = AppLocalizations.of(context);
 
     return Container(
       color: AppColors.ink1,
@@ -33,26 +35,30 @@ class RunControls extends ConsumerWidget {
           ),
           const SizedBox(width: AppSpacing.s),
           _GhostIconButton(
-            tooltip: 'Reset output',
+            tooltip: l.session_runControls_tooltip_resetOutput,
             icon: Icons.refresh_rounded,
             onTap: output.clear,
           ),
           const Spacer(),
           _GhostIconButton(
-            tooltip: 'Vraag een hint',
+            tooltip: l.session_runControls_tooltip_askHint,
             icon: Icons.lightbulb_outline,
             onTap: () async {
-              ref.read(chatServiceProvider).addMessage('Ik heb een hint nodig.');
+              ref
+                  .read(chatServiceProvider)
+                  .addMessage(l.session_runControls_chatMessage_needHint);
               final code = ref.read(codeServiceProvider(mode)).getText();
               await ref.read(tutorServiceProvider.notifier).requestHint(code);
             },
           ),
           const SizedBox(width: AppSpacing.xxs),
           _GhostIconButton(
-            tooltip: 'Stuur naar tutor',
+            tooltip: l.session_runControls_tooltip_sendToTutor,
             icon: Icons.send_outlined,
             onTap: () async {
-              ref.read(chatServiceProvider).addMessage('Hier is mijn code.');
+              ref
+                  .read(chatServiceProvider)
+                  .addMessage(l.session_runControls_chatMessage_hereIsCode);
               final code = ref.read(codeServiceProvider(mode)).getText();
               await ref.read(tutorServiceProvider.notifier).submitCode(code);
             },
@@ -82,9 +88,9 @@ class _RunButton extends StatelessWidget {
         children: [
           const Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ink0),
           const SizedBox(width: 4),
-          const Text(
-            'Run',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context).session_runControls_button_run,
+            style: const TextStyle(
               color: AppColors.ink0,
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -112,14 +118,14 @@ class _StopButton extends StatelessWidget {
       fg: AppColors.danger,
       borderColor: AppColors.danger.withValues(alpha: 0.6),
       onTap: output.stop,
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.stop_rounded, size: 16, color: AppColors.danger),
-          SizedBox(width: 4),
+          const Icon(Icons.stop_rounded, size: 16, color: AppColors.danger),
+          const SizedBox(width: 4),
           Text(
-            'Stop',
-            style: TextStyle(
+            AppLocalizations.of(context).session_runControls_button_stop,
+            style: const TextStyle(
               color: AppColors.danger,
               fontSize: 13,
               fontWeight: FontWeight.w600,

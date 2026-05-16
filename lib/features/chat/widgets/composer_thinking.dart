@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_avatar.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -21,16 +22,16 @@ class ComposerThinking extends StatelessWidget {
             border: Border.all(color: AppColors.ink3),
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TutorAvatar(size: 20),
-              SizedBox(width: AppSpacing.s),
-              _BouncingDots(),
-              SizedBox(width: AppSpacing.s),
+              const TutorAvatar(size: 20),
+              const SizedBox(width: AppSpacing.s),
+              const _BouncingDots(),
+              const SizedBox(width: AppSpacing.s),
               Text(
-                'Tutor denkt na…',
-                style: TextStyle(
+                AppLocalizations.of(context).chat_composer_thinking_label,
+                style: const TextStyle(
                   color: AppColors.fgMute,
                   fontSize: 12,
                   fontStyle: FontStyle.italic,

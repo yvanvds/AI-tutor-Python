@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -55,18 +56,19 @@ class GoalFormState extends ConsumerState<GoalForm> {
   @override
   Widget build(BuildContext context) {
     final svc = ref.read(goalsServiceProvider);
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit goal'),
+        title: Text(l.goals_editor_title),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            tooltip: 'Delete',
+            tooltip: l.goals_editor_tooltip_delete,
             icon: const Icon(Icons.delete),
             onPressed: () => _handleDelete(context),
           ),
           IconButton(
-            tooltip: 'Close',
+            tooltip: l.goals_editor_tooltip_close,
             onPressed: () => ref
                 .read(goalSelectionProvider.notifier)
                 .setEditorSelectedGoal(null),
@@ -79,13 +81,13 @@ class GoalFormState extends ConsumerState<GoalForm> {
         children: [
           TextField(
             controller: _title,
-            decoration: const InputDecoration(
-              labelText: 'Title',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.goals_editor_field_title,
+              border: const OutlineInputBorder(),
             ),
             onSubmitted: (t) => svc.updateTitle(
               widget.goal.id,
-              t.trim().isEmpty ? 'Untitled' : t.trim(),
+              t.trim().isEmpty ? l.goals_editor_untitled : t.trim(),
             ),
             onChanged: (t) {},
           ),
@@ -97,9 +99,9 @@ class GoalFormState extends ConsumerState<GoalForm> {
           TextField(
             controller: _desc,
             maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Describe this goal for students.',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.goals_editor_field_description,
+              border: const OutlineInputBorder(),
             ),
             onChanged: (t) => svc.updateDescription(
               widget.goal.id,
@@ -113,7 +115,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
               setState(() => _optional = v);
               svc.updateOptional(widget.goal.id, v);
             },
-            title: const Text('Optional'),
+            title: Text(l.goals_editor_switch_optional),
             contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: 12),
@@ -124,17 +126,15 @@ class GoalFormState extends ConsumerState<GoalForm> {
                 setState(() => _isConcept = v);
                 svc.updateKind(widget.goal.id, v ? 'concept' : null);
               },
-              title: const Text('Concept goal'),
-              subtitle: const Text(
-                'Mastering this subgoal triggers the level-up overlay.',
-              ),
+              title: Text(l.goals_editor_switch_concept),
+              subtitle: Text(l.goals_editor_switch_concept_subtitle),
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 12),
             ChipsEditor(
-              label: 'Teaching tips',
+              label: l.goals_editor_teachingTips_label,
               values: widget.goal.teachingTips,
-              hintText: 'Type a teaching tip and hit Enter',
+              hintText: l.goals_editor_teachingTips_hint,
               onChanged: (vals) =>
                   svc.updateTeachingTips(widget.goal.id, vals),
             ),
@@ -149,6 +149,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
 
   Future<void> _handleDelete(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
     final id = widget.goal.id;
     final svc = ref.read(goalsServiceProvider);
 
@@ -170,8 +171,8 @@ class GoalFormState extends ConsumerState<GoalForm> {
     showUndoSnackBar(
       messenger,
       message: count == 0
-          ? 'Deleted "${widget.goal.title}".'
-          : 'Deleted "${widget.goal.title}" (+$count).',
+          ? l.goals_editor_deleted_single(widget.goal.title)
+          : l.goals_editor_deleted_withDescendants(widget.goal.title, count),
       onUndo: () async => svc.restoreSubtree(backup),
     );
   }
@@ -180,24 +181,26 @@ class GoalFormState extends ConsumerState<GoalForm> {
     final result = await showDialog<bool>(
       context: context,
       builder: (dCtx) {
+        final l = AppLocalizations.of(dCtx);
         return AlertDialog(
-          title: const Text('Delete goal'),
+          title: Text(l.goals_editor_delete_dialog_title),
           content: Text(
             count == 0
-                ? 'Delete "${widget.goal.title}"?'
-                : 'Delete "${widget.goal.title}" and its $count descendant(s)?',
+                ? l.goals_editor_delete_dialog_message_single(widget.goal.title)
+                : l.goals_editor_delete_dialog_message_withDescendants(
+                    widget.goal.title, count),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dCtx, false),
-              child: const Text('Cancel'),
+              child: Text(l.goals_editor_delete_action_cancel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error,
               ),
               onPressed: () => Navigator.pop(dCtx, true),
-              child: const Text('Delete'),
+              child: Text(l.goals_editor_delete_action_confirm),
             ),
           ],
         );
@@ -215,6 +218,7 @@ class _LesinhoudRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final cid = goal.contentId;
     final hasContent = cid != null && cid.isNotEmpty;
     final cached = ref.watch(contentServiceProvider);
@@ -252,14 +256,15 @@ class _LesinhoudRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Lesinhoud',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                Text(
+                  l.goals_editor_lesinhoud_label,
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   hasContent
-                      ? (title ?? 'Lesinhoud gekoppeld')
-                      : '(geen lesinhoud)',
+                      ? (title ?? l.goals_editor_lesinhoud_linked)
+                      : l.goals_editor_lesinhoud_none,
                   style: TextStyle(
                     fontSize: 12,
                     color: hasContent ? null : Theme.of(context).disabledColor,
@@ -274,7 +279,9 @@ class _LesinhoudRow extends ConsumerWidget {
           ),
           TextButton(
             onPressed: openInLesinhoud,
-            child: Text(hasContent ? 'Bewerk' : 'Maak'),
+            child: Text(hasContent
+                ? l.goals_editor_lesinhoud_edit
+                : l.goals_editor_lesinhoud_create),
           ),
         ],
       ),

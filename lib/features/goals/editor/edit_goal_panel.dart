@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -37,19 +38,23 @@ class EditGoalPanel extends ConsumerWidget {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                final l = AppLocalizations.of(context);
                 if (snapshot.hasError) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        'Error loading documents: ${snapshot.error}',
+                        l.goals_editorPanel_loadError(
+                            snapshot.error.toString()),
                       ),
                     ),
                   );
                 }
                 final goal = snapshot.data;
                 if (goal == null) {
-                  return const Center(child: Text('No goal selected.'));
+                  return Center(
+                    child: Text(l.goals_editorPanel_noGoalSelected),
+                  );
                 }
                 return GoalForm(goal: goal);
               },

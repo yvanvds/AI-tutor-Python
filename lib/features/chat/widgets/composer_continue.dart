@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -50,10 +51,10 @@ class _ComposerContinueState extends ConsumerState<ComposerContinue> {
           autofocus: true,
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Klaar voor het volgende stuk?',
-                  style: TextStyle(
+                  AppLocalizations.of(context).chat_composer_continue_prompt,
+                  style: const TextStyle(
                     color: AppColors.fg,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -107,9 +108,9 @@ class _GoButtonState extends State<_GoButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Ga verder',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).chat_composer_continue_button,
+                style: const TextStyle(
                   color: AppColors.ink0,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,

@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -29,7 +30,7 @@ class LeerpadPage extends ConsumerWidget {
         stream: goalsService.streamAllGoals(),
         builder: (context, goalsSnap) {
           if (goalsSnap.hasError) {
-            return const _Centered('Kon de doelen niet laden.');
+            return _Centered(AppLocalizations.of(context).progress_loadError);
           }
           if (!goalsSnap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -37,7 +38,7 @@ class LeerpadPage extends ConsumerWidget {
 
           final goals = goalsSnap.data!;
           if (goals.isEmpty) {
-            return const _Centered('Er zijn nog geen doelen beschikbaar.');
+            return _Centered(AppLocalizations.of(context).progress_empty);
           }
 
           return StreamBuilder<List<Progress>>(
@@ -202,12 +203,13 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Leerpad',
-          style: TextStyle(
+        Text(
+          l.leerpad_header_title,
+          style: const TextStyle(
             color: AppColors.fg,
             fontSize: 30,
             fontWeight: FontWeight.w700,
@@ -217,7 +219,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          topic.isEmpty ? 'Python — beginnersreis' : topic,
+          topic.isEmpty ? l.leerpad_header_subtitle_default : topic,
           style: const TextStyle(
             color: AppColors.fgFaint,
             fontSize: 13,

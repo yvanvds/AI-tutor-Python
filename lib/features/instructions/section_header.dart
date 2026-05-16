@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class SectionHeader extends StatelessWidget {
@@ -14,15 +15,16 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return ListTile(
       title: Text(
-        keyName ?? 'No section selected',
+        keyName ?? l.instructions_sectionHeader_noSection,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       trailing: IconButton(
-        tooltip: 'Rename section',
+        tooltip: l.instructions_sectionHeader_renameTooltip,
         onPressed: enabled ? onRename : null,
         icon: const Icon(Icons.drive_file_rename_outline),
       ),

@@ -23,6 +23,7 @@ import 'package:ai_tutor_python/features/chat/widgets/composer_continue.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
@@ -75,8 +76,10 @@ void main() {
       chatServiceProvider.overrideWithValue(chat),
       profileProvider.overrideWithValue(_testProfile),
     ],
-    child: const MaterialApp(
-      home: Scaffold(body: ChatWidget()),
+    child: MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: ChatWidget()),
     ),
   );
 

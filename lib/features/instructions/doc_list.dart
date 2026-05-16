@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:flutter/material.dart';
 
@@ -17,10 +18,10 @@ class DocsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const ListTile(
+        ListTile(
           title: Text(
-            'Documents',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            AppLocalizations.of(context).instructions_docList_header,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
         const Divider(height: 1),

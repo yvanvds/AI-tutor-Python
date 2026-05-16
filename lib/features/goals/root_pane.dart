@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -21,7 +22,7 @@ class RootPane extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: AddInput(
-            hint: 'Add root goal… (Enter)',
+            hint: AppLocalizations.of(context).goals_rootPane_addHint,
             onSubmit: (t) => ref.read(goalsServiceProvider).createRoot(t),
           ),
         ),
@@ -42,14 +43,15 @@ class RootPane extends ConsumerWidget {
     Goal? selectedRoot,
     WidgetRef ref,
   ) {
+    final l = AppLocalizations.of(context);
     if (snapshot.connectionState == ConnectionState.waiting) {
       return const Center(child: CircularProgressIndicator());
     }
     if (snapshot.hasError) {
-      return Center(child: Text('Error: ${snapshot.error}'));
+      return Center(child: Text(l.goals_pane_error(snapshot.error.toString())));
     }
     if (!snapshot.hasData) {
-      return const Center(child: Text('No data'));
+      return Center(child: Text(l.goals_pane_noData));
     }
 
     final roots = snapshot.data!;
@@ -64,7 +66,7 @@ class RootPane extends ConsumerWidget {
       });
     }
     if (roots.isEmpty) {
-      return const Center(child: Text('No goals yet. Add one above.'));
+      return Center(child: Text(l.goals_rootPane_empty_addOne));
     }
 
     return ReorderableListView.builder(
@@ -97,12 +99,13 @@ class RootPane extends ConsumerWidget {
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
     final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
     final svc = ref.read(goalsServiceProvider);
     await svc.applyOrder(null, list.map((g) => g.id).toList());
 
     showUndoSnackBar(
       messenger,
-      message: 'Reordered "${item.title}".',
+      message: l.goals_pane_reordered(item.title),
       onUndo: () async =>
           svc.applyOrder(null, before.map((g) => g.id).toList()),
     );

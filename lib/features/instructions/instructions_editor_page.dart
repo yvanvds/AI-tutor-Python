@@ -1,6 +1,7 @@
 // lib/features/instructions/instructions_editor_page.dart
 import 'dart:io';
 
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/features/instructions/doc_header.dart';
@@ -97,10 +98,11 @@ class _InstructionsEditorPageState
   }
 
   Future<void> _newDocument() async {
+    final l = AppLocalizations.of(context);
     final id = await _promptForText(
       context,
-      title: 'New document',
-      label: 'Document id (e.g. system_prompt)',
+      title: l.instructions_dialog_newDoc_title,
+      label: l.instructions_dialog_newDoc_label,
     );
     if (id == null || id.trim().isEmpty) return;
 
@@ -115,11 +117,12 @@ class _InstructionsEditorPageState
 
   Future<void> _deleteDocument() async {
     if (!_hasDocSelected) return;
+    final l = AppLocalizations.of(context);
 
     final confirm = await _confirm(
       context,
-      'Delete "$_selectedDocId"?',
-      'This will permanently delete the document.',
+      l.instructions_confirm_deleteDoc_title(_selectedDocId!),
+      l.instructions_confirm_deleteDoc_body,
     );
     if (confirm != true) return;
     await _svc.delete(_selectedDocId!);
@@ -132,12 +135,13 @@ class _InstructionsEditorPageState
       _refreshEditorFromSelection();
     });
     if (mounted) {
-      _showSnackBar(context, 'Document deleted');
+      _showSnackBar(context, l.instructions_snack_documentDeleted);
     }
   }
 
   Future<void> _saveDocument() async {
     if (!_hasDocSelected) return;
+    final savedMessage = AppLocalizations.of(context).instructions_snack_saved;
     final toSave = Instruction(id: _selectedDocId!, sections: _workingSections);
     await _svc.upsert(toSave);
 
@@ -145,16 +149,17 @@ class _InstructionsEditorPageState
       _original = toSave;
     });
     if (mounted) {
-      _showSnackBar(context, 'Saved');
+      _showSnackBar(context, savedMessage);
     }
   }
 
   Future<void> _addSection() async {
     if (!_hasDocSelected) return;
+    final l = AppLocalizations.of(context);
     final key = await _promptForText(
       context,
-      title: 'Add section',
-      label: 'Section key (e.g. current_context)',
+      title: l.instructions_dialog_addSection_title,
+      label: l.instructions_dialog_addSection_label,
     );
     if (key == null) return;
     final k = key.trim();
@@ -162,7 +167,7 @@ class _InstructionsEditorPageState
 
     if (_workingSections.containsKey(k)) {
       if (!mounted) return;
-      _showSnackBar(context, 'Section "$k" already exists');
+      _showSnackBar(context, l.instructions_snack_sectionExists(k));
       return;
     }
 
@@ -175,11 +180,12 @@ class _InstructionsEditorPageState
 
   Future<void> _deleteSection() async {
     if (!_hasDocSelected || !_hasSectionSelected) return;
+    final l = AppLocalizations.of(context);
     final k = _selectedSectionKey!;
     final confirm = await _confirm(
       context,
-      'Delete "$k"?',
-      'This removes the section from the document.',
+      l.instructions_confirm_deleteSection_title(k),
+      l.instructions_confirm_deleteSection_body,
     );
     if (confirm != true) return;
 
@@ -232,7 +238,10 @@ class _InstructionsEditorPageState
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('Error loading documents: ${snapshot.error}'),
+                      child: Text(
+                        AppLocalizations.of(context).instructions_body_loadError(
+                            snapshot.error.toString()),
+                      ),
                     ),
                   );
                 }
@@ -272,23 +281,26 @@ class _InstructionsEditorPageState
                 const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _hasDocSelected ? _addSection : null,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add section'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _hasDocSelected && _hasSectionSelected
-                            ? _deleteSection
-                            : null,
-                        icon: const Icon(Icons.remove),
-                        label: const Text('Delete'),
-                      ),
-                    ],
-                  ),
+                  child: Builder(builder: (context) {
+                    final l = AppLocalizations.of(context);
+                    return Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _hasDocSelected ? _addSection : null,
+                          icon: const Icon(Icons.add),
+                          label: Text(l.instructions_sectionsList_add),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _hasDocSelected && _hasSectionSelected
+                              ? _deleteSection
+                              : null,
+                          icon: const Icon(Icons.remove),
+                          label: Text(l.instructions_sectionsList_delete),
+                        ),
+                      ],
+                    );
+                  }),
                 ),
               ],
             ),
@@ -315,10 +327,13 @@ class _InstructionsEditorPageState
   }
 
   Future<void> _exportAllToMarkdown() async {
+    final l = AppLocalizations.of(context);
     try {
       final docs = await _svc.getAll();
       if (docs.isEmpty) {
-        if (mounted) _showSnackBar(context, 'No documents to export');
+        if (mounted) {
+          _showSnackBar(context, l.instructions_snack_noDocsToExport);
+        }
         return;
       }
 
@@ -333,20 +348,27 @@ class _InstructionsEditorPageState
       final file = File(p.join(dir.path, 'instructions-export-$stamp.md'));
       await file.writeAsString(markdown);
 
-      if (mounted) _showSnackBar(context, 'Exported to ${file.path}');
+      if (mounted) {
+        _showSnackBar(context, l.instructions_snack_exportedTo(file.path));
+      }
     } catch (e) {
-      if (mounted) _showSnackBar(context, 'Export failed: $e');
+      if (mounted) {
+        _showSnackBar(context, l.instructions_snack_exportFailed(e.toString()));
+      }
     }
   }
 
   Future<void> _importFromMarkdown() async {
+    final l = AppLocalizations.of(context);
     try {
       final path = await _pickMarkdownPath();
       if (path == null) return;
 
       final parsed = _parseMarkdownImport(await File(path).readAsString());
       if (parsed.isEmpty) {
-        if (mounted) _showSnackBar(context, 'No documents found in file');
+        if (mounted) {
+          _showSnackBar(context, l.instructions_snack_noDocsInFile);
+        }
         return;
       }
 
@@ -357,9 +379,11 @@ class _InstructionsEditorPageState
       if (stats.refreshSelected) await _reloadSelectedDocument();
 
       if (!mounted) return;
-      _showSnackBar(context, _formatImportSummary(stats, mode));
+      _showSnackBar(context, _formatImportSummary(stats, mode, l));
     } catch (e) {
-      if (mounted) _showSnackBar(context, 'Import failed: $e');
+      if (mounted) {
+        _showSnackBar(context, l.instructions_snack_importFailed(e.toString()));
+      }
     }
   }
 
@@ -368,43 +392,43 @@ class _InstructionsEditorPageState
   ) async {
     return showDialog<_InstructionsImportMode>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import instructions'),
-        content: Text(
-          'The file contains $docCount document(s).\n\n'
-          "• Add: only insert sections that don't already exist; keep current values.\n"
-          "• Replace: overwrite each imported document's sections with the file's contents. Documents not in the file are left alone.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(_InstructionsImportMode.add),
-            child: const Text('Add'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(_InstructionsImportMode.replace),
-            child: const Text('Replace'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.instructions_import_dialog_title),
+          content: Text(l.instructions_import_dialog_message(docCount)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(l.instructions_dialog_common_cancel),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(_InstructionsImportMode.add),
+              child: Text(l.instructions_dialog_common_add),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(_InstructionsImportMode.replace),
+              child: Text(l.instructions_dialog_common_replace),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Future<String?> _pickMarkdownPath() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Select Markdown file to import',
+      dialogTitle: l.instructions_filePicker_title,
       type: FileType.custom,
       allowedExtensions: ['md', 'markdown'],
     );
     if (result == null || result.files.isEmpty) return null;
     final path = result.files.single.path;
     if (path == null) {
-      if (mounted) _showSnackBar(context, 'Could not read selected file');
+      if (mounted) _showSnackBar(context, l.instructions_snack_couldNotRead);
       return null;
     }
     return path;
@@ -480,37 +504,49 @@ class _InstructionsEditorPageState
   String _formatImportSummary(
     _ImportStats stats,
     _InstructionsImportMode mode,
+    AppLocalizations l,
   ) {
     if (mode == _InstructionsImportMode.replace) {
       if (stats.replacedSections == 0 && stats.newDocs == 0) {
-        return 'Nothing changed (file matched existing content)';
+        return l.instructions_snack_replace_nothing;
       }
       final parts = <String>[];
-      if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
-      if (stats.updatedDocs > 0) parts.add('${stats.updatedDocs} replaced');
+      if (stats.newDocs > 0) {
+        parts.add(l.instructions_snack_stats_newDocs(stats.newDocs));
+      }
+      if (stats.updatedDocs > 0) {
+        parts.add(l.instructions_snack_stats_replaced(stats.updatedDocs));
+      }
       if (stats.addedSections > 0) {
-        parts.add('${stats.addedSections} added section(s)');
+        parts.add(
+            l.instructions_snack_stats_addedSections(stats.addedSections));
       }
       if (stats.replacedSections > 0) {
-        parts.add('${stats.replacedSections} replaced section(s)');
+        parts.add(l.instructions_snack_stats_replacedSections(
+            stats.replacedSections));
       }
       return parts.join(', ');
     }
     if (stats.addedSections == 0) {
-      return 'Nothing imported (all sections already exist)';
+      return l.instructions_snack_add_nothing;
     }
-    final parts = ['Imported ${stats.addedSections} section(s)'];
-    if (stats.newDocs > 0) parts.add('${stats.newDocs} new doc(s)');
-    if (stats.updatedDocs > 0) parts.add('${stats.updatedDocs} updated');
+    final parts = [l.instructions_snack_imported_prefix(stats.addedSections)];
+    if (stats.newDocs > 0) {
+      parts.add(l.instructions_snack_stats_newDocs(stats.newDocs));
+    }
+    if (stats.updatedDocs > 0) {
+      parts.add(l.instructions_snack_stats_updated(stats.updatedDocs));
+    }
     return parts.join(', ');
   }
 
   Future<void> _renameDocument() async {
     if (!_hasDocSelected) return;
+    final l = AppLocalizations.of(context);
     final newId = await _promptForText(
       context,
-      title: 'Rename document',
-      label: 'New document id',
+      title: l.instructions_dialog_renameDoc_title,
+      label: l.instructions_dialog_renameDoc_label,
       initial: _selectedDocId,
     );
     if (newId == null) return;
@@ -526,17 +562,18 @@ class _InstructionsEditorPageState
       _original = data;
     });
     if (mounted) {
-      _showSnackBar(context, 'Renamed to "$target"');
+      _showSnackBar(context, l.instructions_snack_renamed(target));
     }
   }
 
   Future<void> _renameSection() async {
     if (!_hasSectionSelected) return;
+    final l = AppLocalizations.of(context);
     final oldKey = _selectedSectionKey!;
     final newKey = await _promptForText(
       context,
-      title: 'Rename section',
-      label: 'New section key',
+      title: l.instructions_dialog_renameSection_title,
+      label: l.instructions_dialog_renameSection_label,
       initial: oldKey,
     );
     if (newKey == null) return;
@@ -545,7 +582,9 @@ class _InstructionsEditorPageState
     if (_workingSections.containsKey(nk)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('A section named "$nk" already exists')),
+        SnackBar(
+          content: Text(l.instructions_snack_sectionExistsRename(nk)),
+        ),
       );
       return;
     }
@@ -574,6 +613,7 @@ Future<String?> _promptForText(
   return showDialog<String>(
     context: context,
     builder: (context) {
+      final l = AppLocalizations.of(context);
       return AlertDialog(
         title: Text(title),
         content: TextField(
@@ -585,11 +625,11 @@ Future<String?> _promptForText(
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Cancel'),
+            child: Text(l.instructions_dialog_common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(ctrl.text),
-            child: const Text('OK'),
+            child: Text(l.instructions_dialog_common_ok),
           ),
         ],
       );
@@ -601,17 +641,18 @@ Future<bool?> _confirm(BuildContext context, String title, String body) async {
   return showDialog<bool>(
     context: context,
     builder: (context) {
+      final l = AppLocalizations.of(context);
       return AlertDialog(
         title: Text(title),
         content: Text(body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l.instructions_dialog_common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(l.instructions_dialog_common_delete),
           ),
         ],
       );
@@ -820,15 +861,16 @@ class _Toolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       height: 48,
       color: AppColors.ink1,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Row(
         children: [
-          const Text(
-            'Instructies',
-            style: TextStyle(
+          Text(
+            l.instructions_toolbar_title,
+            style: const TextStyle(
               color: AppColors.fg,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -836,22 +878,22 @@ class _Toolbar extends StatelessWidget {
           ),
           const Spacer(),
           IconButton(
-            tooltip: 'New document',
+            tooltip: l.instructions_toolbar_tooltip_new,
             icon: const Icon(Icons.add, size: 18),
             onPressed: onNew,
           ),
           IconButton(
-            tooltip: 'Delete document',
+            tooltip: l.instructions_toolbar_tooltip_delete,
             icon: const Icon(Icons.delete_outline, size: 18),
             onPressed: onDelete,
           ),
           IconButton(
-            tooltip: 'Export all to Markdown',
+            tooltip: l.instructions_toolbar_tooltip_export,
             icon: const Icon(Icons.file_download_outlined, size: 18),
             onPressed: onExport,
           ),
           IconButton(
-            tooltip: 'Import from Markdown',
+            tooltip: l.instructions_toolbar_tooltip_import,
             icon: const Icon(Icons.file_upload_outlined, size: 18),
             onPressed: onImport,
           ),
@@ -859,7 +901,9 @@ class _Toolbar extends StatelessWidget {
           FilledButton.icon(
             icon: const Icon(Icons.save, size: 16),
             onPressed: onSave,
-            label: Text(isDirty ? 'Save *' : 'Save'),
+            label: Text(isDirty
+                ? l.instructions_toolbar_save_dirty
+                : l.instructions_toolbar_save),
           ),
         ],
       ),

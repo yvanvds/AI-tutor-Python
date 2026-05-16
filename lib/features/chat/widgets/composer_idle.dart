@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
@@ -53,7 +54,9 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
 
     if (text == '?') {
       final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
-      chat.addMessage('Ik heb een hint nodig');
+      chat.addMessage(
+        AppLocalizations.of(context).chat_composer_idle_hintMessage,
+      );
       await tutor.requestHint(code);
       return;
     }
@@ -134,11 +137,12 @@ class _Field extends StatelessWidget {
                   fontSize: 14,
                   height: 1.5,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
-                  hintText: 'Typ je vraag of antwoord…',
-                  hintStyle: TextStyle(
+                  hintText:
+                      AppLocalizations.of(context).chat_composer_idle_hint,
+                  hintStyle: const TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 14,
                     height: 1.5,
@@ -208,6 +212,7 @@ class _HintFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -215,11 +220,11 @@ class _HintFooter extends StatelessWidget {
           children: [
             _Kbd(text: '⌘↵'),
             const SizedBox(width: 4),
-            const Text('verstuur', style: _captionStyle),
+            Text(l.chat_composer_idle_kbd_send, style: _captionStyle),
             const SizedBox(width: AppSpacing.s),
             _Kbd(text: '↵'),
             const SizedBox(width: 4),
-            const Text('nieuwe regel', style: _captionStyle),
+            Text(l.chat_composer_idle_kbd_newline, style: _captionStyle),
           ],
         ),
         const SizedBox(width: AppSpacing.s),
@@ -230,12 +235,12 @@ class _HintFooter extends StatelessWidget {
             text: TextSpan(
               style: _captionStyle,
               children: [
-                const TextSpan(text: 'tip: typ '),
+                TextSpan(text: l.chat_composer_idle_tip_prefix),
                 TextSpan(
                   text: '?',
                   style: AppMono.kbd(color: AppColors.fgMute),
                 ),
-                const TextSpan(text: ' om een hint te vragen'),
+                TextSpan(text: l.chat_composer_idle_tip_suffix),
               ],
             ),
           ),

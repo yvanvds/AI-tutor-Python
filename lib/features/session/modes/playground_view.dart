@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -36,9 +37,9 @@ class PlaygroundView extends StatelessWidget {
                     color: AppColors.ink2,
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
-                  child: const Text(
-                    'playground',
-                    style: TextStyle(
+                  child: Text(
+                    AppLocalizations.of(context).session_playground_pill,
+                    style: const TextStyle(
                       color: AppColors.fgMute,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -47,9 +48,9 @@ class PlaygroundView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.m),
-                const Text(
-                  'Geen doel — alleen jij en Python.',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).session_playground_subtitle,
+                  style: const TextStyle(
                     color: AppColors.fgMute,
                     fontSize: 12.5,
                   ),

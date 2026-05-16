@@ -92,5 +92,436 @@
       "version": { "type": "String" }
     }
   },
-  "update_dialog_ok": "OK"
+  "update_dialog_ok": "OK",
+
+  "session_explain_placeholder_noSubgoal": "Pick a subgoal in the learning path to see the explanation.",
+  "session_explain_loading": "Loading lesson…",
+  "session_explain_missingContent": "No lesson content available for this subgoal yet.",
+  "session_explain_defaultPillLabel": "Concept",
+  "@session_explain_defaultPillLabel": {
+    "description": "Fallback label for the explain-view root pill when no root goal is set; displayed uppercase"
+  },
+  "session_explain_prev_button": "Previous",
+  "session_explain_completeXp": "+10 XP on completion",
+  "session_explain_tryItYourself": "Try it yourself",
+
+  "session_playground_pill": "playground",
+  "session_playground_subtitle": "No goal — just you and Python.",
+
+  "session_quiz_pill": "Quiz question",
+  "@session_quiz_pill": {
+    "description": "Quiz header pill — displayed uppercase"
+  },
+  "session_quiz_next_button": "Next →",
+
+  "session_output_state_idle": "No output",
+  "session_output_state_running": "Running…",
+  "session_output_state_ok": "Done",
+  "session_output_state_error_count": "{count, plural, =1{1 error} other{{count} errors}}",
+  "@session_output_state_error_count": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "session_output_header_label": "Output",
+  "session_output_emptyState_runHint": "Press Run to execute your code.",
+
+  "session_runControls_tooltip_resetOutput": "Reset output",
+  "session_runControls_tooltip_askHint": "Ask for a hint",
+  "session_runControls_tooltip_sendToTutor": "Send to tutor",
+  "session_runControls_chatMessage_needHint": "I need a hint.",
+  "session_runControls_chatMessage_hereIsCode": "Here is my code.",
+  "session_runControls_button_run": "Run",
+  "session_runControls_button_stop": "Stop",
+
+  "session_objectiveBanner_pill": "Current goal",
+  "@session_objectiveBanner_pill": {
+    "description": "Banner header pill at the top of practice view — displayed uppercase"
+  },
+
+  "chat_tutorName": "Tutor",
+  "chat_userName_you": "You",
+  "chat_loading_thinking": "Tutor is thinking…",
+  "chat_header_presence_online": "online",
+  "chat_header_presence_helpsWith": " · helping you with ",
+  "@chat_header_presence_helpsWith": {
+    "description": "Connective fragment between 'online' and the topic name; leading dot and bullet are part of the string"
+  },
+  "chat_header_restart_tooltip": "Restart session",
+  "chat_composer_idle_hint": "Type your question or answer…",
+  "chat_composer_idle_kbd_send": "send",
+  "chat_composer_idle_kbd_newline": "new line",
+  "chat_composer_idle_tip_prefix": "tip: type ",
+  "chat_composer_idle_tip_suffix": " for a hint",
+  "@chat_composer_idle_tip_suffix": {
+    "description": "Trailing fragment of the hint tip — leading space is part of the string"
+  },
+  "chat_composer_idle_hintMessage": "I need a hint",
+  "chat_composer_thinking_label": "Tutor is thinking…",
+  "chat_composer_continue_prompt": "Ready for the next part?",
+  "chat_composer_continue_button": "Continue",
+  "chat_composer_mcqDisabled_label": "Tap an answer above",
+
+  "goals_header_title": "Goals",
+  "goals_action_export": "Export goals",
+  "goals_action_import": "Import goals",
+  "goals_snack_noGoalsToExport": "No goals to export",
+  "goals_snack_exportedTo": "Exported to {path}",
+  "@goals_snack_exportedTo": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "goals_snack_exportFailed": "Export failed: {error}",
+  "@goals_snack_exportFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "goals_snack_fileEmpty": "File contained no goals",
+  "goals_snack_addAborted": "Add aborted: {count} id(s) already exist (e.g. {sample}). Use Replace, or remove the duplicates first.",
+  "@goals_snack_addAborted": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "sample": { "type": "String" }
+    }
+  },
+  "goals_snack_imported": "Imported {count} goal(s)",
+  "@goals_snack_imported": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "goals_snack_importedWithRemoved": "Imported {count} goal(s) (removed {removed} not in file)",
+  "@goals_snack_importedWithRemoved": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "removed": { "type": "int" }
+    }
+  },
+  "goals_snack_importFailed": "Import failed: {error}",
+  "@goals_snack_importFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "goals_snack_couldNotRead": "Could not read selected file",
+  "goals_snack_invalidFile": "Invalid goals file",
+  "goals_import_dialog_title": "Import goals",
+  "goals_import_dialog_message": "The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: upsert by id (keeps existing lesson content links) and remove any goals not in the file.",
+  "@goals_import_dialog_message": {
+    "placeholders": {
+      "rootCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "goals_import_action_cancel": "Cancel",
+  "goals_import_action_add": "Add",
+  "goals_import_action_replace": "Replace",
+  "goals_import_filePicker_title": "Select goals JSON to import",
+
+  "goals_editor_title": "Edit goal",
+  "goals_editor_tooltip_delete": "Delete",
+  "goals_editor_tooltip_close": "Close",
+  "goals_editor_field_title": "Title",
+  "goals_editor_untitled": "Untitled",
+  "goals_editor_field_description": "Describe this goal for students.",
+  "goals_editor_switch_optional": "Optional",
+  "goals_editor_switch_concept": "Concept goal",
+  "goals_editor_switch_concept_subtitle": "Mastering this subgoal triggers the level-up overlay.",
+  "goals_editor_teachingTips_label": "Teaching tips",
+  "goals_editor_teachingTips_hint": "Type a teaching tip and hit Enter",
+  "goals_editor_lesinhoud_label": "Lesson content",
+  "goals_editor_lesinhoud_linked": "Lesson content linked",
+  "goals_editor_lesinhoud_none": "(no lesson content)",
+  "goals_editor_lesinhoud_edit": "Edit",
+  "goals_editor_lesinhoud_create": "Create",
+  "goals_editor_delete_dialog_title": "Delete goal",
+  "goals_editor_delete_dialog_message_single": "Delete \"{title}\"?",
+  "@goals_editor_delete_dialog_message_single": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "goals_editor_delete_dialog_message_withDescendants": "Delete \"{title}\" and its {count} descendant(s)?",
+  "@goals_editor_delete_dialog_message_withDescendants": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "goals_editor_delete_action_cancel": "Cancel",
+  "goals_editor_delete_action_confirm": "Delete",
+  "goals_editor_deleted_single": "Deleted \"{title}\".",
+  "@goals_editor_deleted_single": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "goals_editor_deleted_withDescendants": "Deleted \"{title}\" (+{count}).",
+  "@goals_editor_deleted_withDescendants": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+
+  "goals_pane_error": "Error: {error}",
+  "@goals_pane_error": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "goals_pane_noData": "No data",
+  "goals_pane_reordered": "Reordered \"{title}\".",
+  "@goals_pane_reordered": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "goals_childPane_empty_pickRoot": "Select a root goal to see its children.",
+  "goals_childPane_addHint": "Add child goal… (Enter)",
+  "goals_childPane_empty_addOne": "No children yet. Add one above.",
+  "goals_rootPane_addHint": "Add root goal… (Enter)",
+  "goals_rootPane_empty_addOne": "No goals yet. Add one above.",
+  "goals_parentField_label": "Parent",
+  "goals_parentField_noParent": "(no parent)",
+  "goals_parentField_loadFailed": "Failed to load parents: {error}",
+  "@goals_parentField_loadFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "goals_editorPanel_loadError": "Error loading documents: {error}",
+  "@goals_editorPanel_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "goals_editorPanel_noGoalSelected": "No goal selected.",
+
+  "lesson_toolbar_title": "Lesson content",
+  "lesson_toolbar_upload": "Upload .html",
+  "lesson_toolbar_save": "Save",
+  "lesson_toolbar_save_dirty": "Save *",
+  "lesson_snack_saved": "Saved",
+  "lesson_snack_couldNotRead": "Could not read file.",
+  "lesson_loadError": "Load failed: {error}",
+  "@lesson_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "lesson_unlink_dialog_title": "Unlink lesson content?",
+  "lesson_unlink_dialog_message": "The content document stays in place, but this subgoal will no longer point to it.",
+  "lesson_unlink_dialog_cancel": "Cancel",
+  "lesson_unlink_dialog_confirm": "Unlink",
+  "lesson_editor_empty_pickSubgoal": "Pick a subgoal to edit its lesson content.",
+  "lesson_editor_field_title": "Title",
+  "lesson_editor_button_unlink": "Unlink",
+  "lesson_preview_empty": "The preview appears here as soon as you add HTML.",
+  "lesson_subgoal_noContent": "(no lesson content)",
+  "lesson_default_moduleTitle": "Python basics",
+
+  "instructions_toolbar_title": "Instructions",
+  "instructions_toolbar_tooltip_new": "New document",
+  "instructions_toolbar_tooltip_delete": "Delete document",
+  "instructions_toolbar_tooltip_export": "Export all to Markdown",
+  "instructions_toolbar_tooltip_import": "Import from Markdown",
+  "instructions_toolbar_save": "Save",
+  "instructions_toolbar_save_dirty": "Save *",
+
+  "instructions_dialog_common_cancel": "Cancel",
+  "instructions_dialog_common_ok": "OK",
+  "instructions_dialog_common_delete": "Delete",
+  "instructions_dialog_common_add": "Add",
+  "instructions_dialog_common_replace": "Replace",
+
+  "instructions_dialog_newDoc_title": "New document",
+  "instructions_dialog_newDoc_label": "Document id (e.g. system_prompt)",
+  "instructions_dialog_renameDoc_title": "Rename document",
+  "instructions_dialog_renameDoc_label": "New document id",
+  "instructions_dialog_renameSection_title": "Rename section",
+  "instructions_dialog_renameSection_label": "New section key",
+  "instructions_dialog_addSection_title": "Add section",
+  "instructions_dialog_addSection_label": "Section key (e.g. current_context)",
+
+  "instructions_confirm_deleteDoc_title": "Delete \"{id}\"?",
+  "@instructions_confirm_deleteDoc_title": {
+    "placeholders": { "id": { "type": "String" } }
+  },
+  "instructions_confirm_deleteDoc_body": "This will permanently delete the document.",
+  "instructions_confirm_deleteSection_title": "Delete \"{key}\"?",
+  "@instructions_confirm_deleteSection_title": {
+    "placeholders": { "key": { "type": "String" } }
+  },
+  "instructions_confirm_deleteSection_body": "This removes the section from the document.",
+
+  "instructions_import_dialog_title": "Import instructions",
+  "instructions_import_dialog_message": "The file contains {docCount} document(s).\n\n• Add: only insert sections that don't already exist; keep current values.\n• Replace: overwrite each imported document's sections with the file's contents. Documents not in the file are left alone.",
+  "@instructions_import_dialog_message": {
+    "placeholders": { "docCount": { "type": "int" } }
+  },
+  "instructions_filePicker_title": "Select Markdown file to import",
+
+  "instructions_snack_documentDeleted": "Document deleted",
+  "instructions_snack_saved": "Saved",
+  "instructions_snack_sectionExists": "Section \"{key}\" already exists",
+  "@instructions_snack_sectionExists": {
+    "placeholders": { "key": { "type": "String" } }
+  },
+  "instructions_snack_sectionExistsRename": "A section named \"{key}\" already exists",
+  "@instructions_snack_sectionExistsRename": {
+    "placeholders": { "key": { "type": "String" } }
+  },
+  "instructions_snack_renamed": "Renamed to \"{target}\"",
+  "@instructions_snack_renamed": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "instructions_snack_noDocsToExport": "No documents to export",
+  "instructions_snack_exportedTo": "Exported to {path}",
+  "@instructions_snack_exportedTo": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "instructions_snack_exportFailed": "Export failed: {error}",
+  "@instructions_snack_exportFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "instructions_snack_noDocsInFile": "No documents found in file",
+  "instructions_snack_importFailed": "Import failed: {error}",
+  "@instructions_snack_importFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "instructions_snack_couldNotRead": "Could not read selected file",
+  "instructions_snack_replace_nothing": "Nothing changed (file matched existing content)",
+  "instructions_snack_add_nothing": "Nothing imported (all sections already exist)",
+  "instructions_snack_imported_prefix": "Imported {count} section(s)",
+  "@instructions_snack_imported_prefix": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "instructions_snack_stats_newDocs": "{count} new doc(s)",
+  "@instructions_snack_stats_newDocs": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "instructions_snack_stats_updated": "{count} updated",
+  "@instructions_snack_stats_updated": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "instructions_snack_stats_replaced": "{count} replaced",
+  "@instructions_snack_stats_replaced": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "instructions_snack_stats_addedSections": "{count} added section(s)",
+  "@instructions_snack_stats_addedSections": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "instructions_snack_stats_replacedSections": "{count} replaced section(s)",
+  "@instructions_snack_stats_replacedSections": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "instructions_body_loadError": "Error loading documents: {error}",
+  "@instructions_body_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "instructions_sectionsList_add": "Add section",
+  "instructions_sectionsList_delete": "Delete",
+
+  "instructions_docList_header": "Documents",
+  "instructions_docHeader_noDoc": "No document selected",
+  "instructions_docHeader_renameTooltip": "Rename document",
+  "instructions_sectionHeader_noSection": "No section selected",
+  "instructions_sectionHeader_renameTooltip": "Rename section",
+
+  "accounts_page_title": "Students",
+  "accounts_page_subtitle": "Manage accounts and follow your students' progress.",
+  "accounts_loadError": "Error loading accounts:\n{error}",
+  "@accounts_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "accounts_search_hint": "Search by name or email…",
+  "accounts_pageSize_label": "{n} / page",
+  "@accounts_pageSize_label": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+
+  "accounts_column_email": "EMAIL",
+  "accounts_column_name": "NAME",
+  "accounts_column_streak": "STREAK",
+  "accounts_column_currentGoal": "CURRENT GOAL",
+  "accounts_column_progress": "PROGRESS",
+  "accounts_column_status": "STATUS",
+  "accounts_column_key": "KEY",
+  "accounts_column_actions": "ACTIONS",
+
+  "accounts_email_lastActive": "last active: {ts}",
+  "@accounts_email_lastActive": {
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "accounts_tooltip_deleteAccount": "Delete account",
+  "accounts_tooltip_firstPage": "First page",
+  "accounts_tooltip_previousPage": "Previous page",
+  "accounts_tooltip_nextPage": "Next page",
+  "accounts_tooltip_lastPage": "Last page",
+  "accounts_pagination_showing": "Showing {start}–{end} of {total}",
+  "@accounts_pagination_showing": {
+    "placeholders": {
+      "start": { "type": "int" },
+      "end": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "accounts_pagination_pageOf": "Page {page} / {total}",
+  "@accounts_pagination_pageOf": {
+    "placeholders": {
+      "page": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "accounts_delete_dialog_title": "Delete account",
+  "accounts_delete_dialog_message": "This will delete the account profile for:\n\n{email}\n\nThis does NOT remove the user from the school account directory. Continue?",
+  "@accounts_delete_dialog_message": {
+    "placeholders": { "email": { "type": "String" } }
+  },
+  "accounts_delete_dialog_cancel": "Cancel",
+  "accounts_delete_dialog_confirm": "Delete",
+  "accounts_delete_success": "Deleted account: {email}",
+  "@accounts_delete_success": {
+    "placeholders": { "email": { "type": "String" } }
+  },
+  "accounts_delete_failed": "Delete failed: {error}",
+  "@accounts_delete_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "accounts_status_tooltip_active": "Made progress recently.",
+  "accounts_status_tooltip_idle": "No progress in the last 7 days.",
+  "accounts_badge_unackTooltip": "Unacknowledged signal events",
+
+  "drawer_close_tooltip": "Close",
+  "drawer_section_goals": "Goals",
+
+  "drawer_statusSummary_active_with_goal": "Recently active on \"{title}\".",
+  "@drawer_statusSummary_active_with_goal": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "drawer_statusSummary_active_noGoal": "Recently active.",
+  "drawer_statusSummary_idle": "No recent activity.",
+
+  "drawer_signals_title": "Signal events",
+  "drawer_signals_button_busy": "Working…",
+  "drawer_signals_button_acknowledge": "Acknowledge ({count})",
+  "@drawer_signals_button_acknowledge": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "drawer_signals_empty": "No events",
+  "drawer_signals_ackFailed": "Acknowledge failed: {error}",
+  "@drawer_signals_ackFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "drawer_signals_kind_stuckLoAdvance": "Stuck LO at transition",
+  "drawer_signals_kind_singleLoDeadlock": "Single-LO impasse",
+  "drawer_signals_kind_repeatedDemotions": "Repeated demotion",
+  "drawer_signals_kind_sustainedLlmFailure": "Sustained LLM failure",
+  "drawer_signals_kind_cascadeHalt": "Cascade halt (audit)",
+  "drawer_signals_kind_emptyObjectivesBlock": "Subgoal without LOs (audit)",
+  "drawer_signals_kind_subgoalDeletedRedirect": "Subgoal deleted (audit)",
+
+  "drawer_statusReports_title": "Status reports",
+  "drawer_statusReports_loadError": "Could not load status reports.",
+  "drawer_statusReports_empty": "No status reports yet.",
+
+  "drawer_history_title": "Progress over time",
+  "drawer_history_loadError": "Could not load history.",
+  "drawer_history_empty": "No history yet.",
+  "drawer_history_card_empty": "No history yet",
+  "drawer_history_legend_average": "average",
+
+  "progress_loadError": "Could not load goals.",
+  "progress_empty": "No goals available yet.",
+  "leerpad_header_title": "Learning path",
+  "leerpad_header_subtitle_default": "Python — beginner's journey",
+  "leerpad_card_completed": "completed",
+  "leerpad_card_button_continue": "Continue",
+  "goalTile_button_faster": "Go faster",
+  "goalTile_button_workOn": "Work on this"
 }

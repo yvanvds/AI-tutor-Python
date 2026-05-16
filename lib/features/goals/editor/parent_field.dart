@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ class _ParentFieldState extends ConsumerState<ParentField> {
     return StreamBuilder<List<Goal>>(
       stream: _rootsStream,
       builder: (context, snapshot) {
+        final l = AppLocalizations.of(context);
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 56,
@@ -32,13 +34,14 @@ class _ParentFieldState extends ConsumerState<ParentField> {
           );
         }
         if (snapshot.hasError) {
-          return Text('Failed to load parents: ${snapshot.error}');
+          return Text(
+              l.goals_parentField_loadFailed(snapshot.error.toString()));
         }
         final roots = snapshot.data ?? [];
         final items = <DropdownMenuItem<String?>>[
-          const DropdownMenuItem<String?>(
+          DropdownMenuItem<String?>(
             value: null,
-            child: Text('(no parent)'),
+            child: Text(l.goals_parentField_noParent),
           ),
           ...roots.map(
             (g) =>
@@ -55,9 +58,9 @@ class _ParentFieldState extends ConsumerState<ParentField> {
               newParent,
             );
           },
-          decoration: const InputDecoration(
-            labelText: 'Parent',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l.goals_parentField_label,
+            border: const OutlineInputBorder(),
           ),
         );
       },

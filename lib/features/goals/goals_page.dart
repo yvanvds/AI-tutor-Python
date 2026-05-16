@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -33,11 +34,12 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       color: AppColors.ink0,
       child: Column(
         children: [
-          _GoalsHeader(),
+          const _GoalsHeader(),
           const Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(
             child: Row(
@@ -60,13 +62,13 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
               children: [
                 OutlinedButton.icon(
                   icon: const Icon(Icons.file_download_outlined, size: 16),
-                  label: const Text('Export goals'),
+                  label: Text(l.goals_action_export),
                   onPressed: _busy ? null : _exportGoals,
                 ),
                 const SizedBox(width: AppSpacing.s),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.file_upload_outlined, size: 16),
-                  label: const Text('Import goals'),
+                  label: Text(l.goals_action_import),
                   onPressed: _busy ? null : _importGoals,
                 ),
                 if (_busy) ...const [
@@ -86,11 +88,12 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   }
 
   Future<void> _exportGoals() async {
+    final l = AppLocalizations.of(context);
     setState(() => _busy = true);
     try {
       final goals = await ref.read(goalsServiceProvider).getAllGoalsOnce();
       if (goals.isEmpty) {
-        if (mounted) _showSnack('No goals to export');
+        if (mounted) _showSnack(l.goals_snack_noGoalsToExport);
         return;
       }
 
@@ -108,15 +111,16 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       final file = File(p.join(dir.path, 'goals-export-$stamp.json'));
       await file.writeAsString(json);
 
-      if (mounted) _showSnack('Exported to ${file.path}');
+      if (mounted) _showSnack(l.goals_snack_exportedTo(file.path));
     } catch (e) {
-      if (mounted) _showSnack('Export failed: $e');
+      if (mounted) _showSnack(l.goals_snack_exportFailed(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _importGoals() async {
+    final l = AppLocalizations.of(context);
     setState(() => _busy = true);
     try {
       final entries = await _pickAndParseGoalsFile();
@@ -124,7 +128,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
 
       final totalCount = _countNodes(entries);
       if (totalCount == 0) {
-        if (mounted) _showSnack('File contained no goals');
+        if (mounted) _showSnack(l.goals_snack_fileEmpty);
         return;
       }
 
@@ -140,16 +144,15 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         final collisions = importedIds.intersection(existingIds);
         if (collisions.isNotEmpty) {
           if (mounted) {
-            _showSnack(
-              'Add aborted: ${collisions.length} id(s) already exist '
-              '(e.g. ${collisions.take(3).join(", ")}). '
-              'Use Replace, or remove the duplicates first.',
-            );
+            _showSnack(l.goals_snack_addAborted(
+              collisions.length,
+              collisions.take(3).join(', '),
+            ));
           }
           return;
         }
         await _insertEntriesAdd(entries);
-        if (mounted) _showSnack('Imported $totalCount goal(s)');
+        if (mounted) _showSnack(l.goals_snack_imported(totalCount));
         return;
       }
 
@@ -160,13 +163,12 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         await svc.deleteGoalsByIds(leftovers);
       }
       if (mounted) {
-        final suffix = leftovers.isEmpty
-            ? ''
-            : ' (removed ${leftovers.length} not in file)';
-        _showSnack('Imported $totalCount goal(s)$suffix');
+        _showSnack(leftovers.isEmpty
+            ? l.goals_snack_imported(totalCount)
+            : l.goals_snack_importedWithRemoved(totalCount, leftovers.length));
       }
     } catch (e) {
-      if (mounted) _showSnack('Import failed: $e');
+      if (mounted) _showSnack(l.goals_snack_importFailed(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -175,34 +177,34 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   Future<_ImportMode?> _askImportMode(int total, int rootCount) async {
     return showDialog<_ImportMode>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import goals'),
-        content: Text(
-          'The file contains $rootCount root goal(s) and $total total node(s).\n\n'
-          '• Add: append using the ids from the file. Aborts if any id already exists.\n'
-          '• Replace: upsert by id (keeps existing lesinhoud links) and remove any goals not in the file.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_ImportMode.add),
-            child: const Text('Add'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(_ImportMode.replace),
-            child: const Text('Replace'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.goals_import_dialog_title),
+          content: Text(l.goals_import_dialog_message(rootCount, total)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(l.goals_import_action_cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(_ImportMode.add),
+              child: Text(l.goals_import_action_add),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(_ImportMode.replace),
+              child: Text(l.goals_import_action_replace),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Future<List<Map<String, dynamic>>?> _pickAndParseGoalsFile() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Select goals JSON to import',
+      dialogTitle: l.goals_import_filePicker_title,
       type: FileType.custom,
       allowedExtensions: ['json'],
     );
@@ -210,14 +212,14 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
 
     final path = result.files.single.path;
     if (path == null) {
-      if (mounted) _showSnack('Could not read selected file');
+      if (mounted) _showSnack(l.goals_snack_couldNotRead);
       return null;
     }
 
     final raw = await File(path).readAsString();
     final decoded = jsonDecode(raw);
     if (decoded is! Map<String, dynamic>) {
-      if (mounted) _showSnack('Invalid goals file');
+      if (mounted) _showSnack(l.goals_snack_invalidFile);
       return null;
     }
 
@@ -249,11 +251,11 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
               })
           .toList();
       if (entries.isEmpty) {
-        if (mounted) _showSnack('Invalid goals file');
+        if (mounted) _showSnack(l.goals_snack_invalidFile);
         return null;
       }
     } else {
-      if (mounted) _showSnack('Invalid goals file');
+      if (mounted) _showSnack(l.goals_snack_invalidFile);
       return null;
     }
 
@@ -441,6 +443,8 @@ List<Map<String, dynamic>> _objectiveList(dynamic v) {
 enum _ImportMode { add, replace }
 
 class _GoalsHeader extends StatelessWidget {
+  const _GoalsHeader();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -448,9 +452,9 @@ class _GoalsHeader extends StatelessWidget {
       color: AppColors.ink1,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       alignment: Alignment.centerLeft,
-      child: const Text(
-        'Doelen',
-        style: TextStyle(
+      child: Text(
+        AppLocalizations.of(context).goals_header_title,
+        style: const TextStyle(
           color: AppColors.fg,
           fontSize: 14,
           fontWeight: FontWeight.w600,

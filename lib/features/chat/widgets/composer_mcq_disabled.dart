@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
@@ -20,7 +21,7 @@ class ComposerMcqDisabled extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.s),
           Text(
-            'Klik op een antwoord hierboven',
+            AppLocalizations.of(context).chat_composer_mcqDisabled_label,
             style: TextStyle(
               color: AppColors.fgMute,
               fontSize: 12.5,

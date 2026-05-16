@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/teacher_signals.dart';
@@ -18,6 +19,7 @@ class StudentStatusSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final status = computeStudentStatus(progress: progress);
     final reference = mostRecentlyActive(progress);
 
@@ -33,7 +35,7 @@ class StudentStatusSummary extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _summary(status, activeGoal),
+              _summary(l, status, activeGoal),
               style: theme.textTheme.bodyMedium,
             ),
           ),
@@ -42,13 +44,14 @@ class StudentStatusSummary extends StatelessWidget {
     );
   }
 
-  String _summary(StudentStatus status, Goal? activeGoal) {
-    final on = activeGoal == null ? '' : ' op "${activeGoal.title}"';
+  String _summary(AppLocalizations l, StudentStatus status, Goal? activeGoal) {
     switch (status) {
       case StudentStatus.active:
-        return 'Recent actief$on.';
+        return activeGoal == null
+            ? l.drawer_statusSummary_active_noGoal
+            : l.drawer_statusSummary_active_with_goal(activeGoal.title);
       case StudentStatus.idle:
-        return 'Geen recente activiteit.';
+        return l.drawer_statusSummary_idle;
     }
   }
 }
@@ -60,14 +63,15 @@ class _StatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final color = switch (status) {
       StudentStatus.active => Colors.green.shade400,
       StudentStatus.idle => Colors.grey.shade400,
     };
     return Tooltip(
       message: switch (status) {
-        StudentStatus.active => 'Recent vooruitgang geboekt.',
-        StudentStatus.idle => 'Geen vooruitgang in de laatste 7 dagen.',
+        StudentStatus.active => l.accounts_status_tooltip_active,
+        StudentStatus.idle => l.accounts_status_tooltip_idle,
       },
       child: Container(
         width: 12,

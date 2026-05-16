@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -17,8 +18,8 @@ class ChildPane extends ConsumerWidget {
     final selectedRootId = selectedRoot?.id;
 
     if (selectedRootId == null) {
-      return const Center(
-        child: Text('Select a root goal to see its children.'),
+      return Center(
+        child: Text(AppLocalizations.of(context).goals_childPane_empty_pickRoot),
       );
     }
 
@@ -36,12 +37,13 @@ class ChildPane extends ConsumerWidget {
     Stream<List<Goal>> childrenAsync,
     WidgetRef ref,
   ) {
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: AddInput(
-            hint: 'Add child goal… (Enter)',
+            hint: l.goals_childPane_addHint,
             onSubmit: (t) =>
                 ref.read(goalsServiceProvider).createChild(selectedRootId, t),
           ),
@@ -53,12 +55,14 @@ class ChildPane extends ConsumerWidget {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               } else if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return Center(
+                  child: Text(l.goals_pane_error(snapshot.error.toString())),
+                );
               } else if (snapshot.hasData) {
                 final children = snapshot.data!;
                 if (children.isEmpty) {
-                  return const Center(
-                    child: Text('No children yet. Add one above.'),
+                  return Center(
+                    child: Text(l.goals_childPane_empty_addOne),
                   );
                 }
                 return ReorderableListView.builder(
@@ -77,7 +81,7 @@ class ChildPane extends ConsumerWidget {
                     );
                     showUndoSnackBar(
                       messenger,
-                      message: 'Reordered "${item.title}".',
+                      message: l.goals_pane_reordered(item.title),
                       onUndo: () async => svc.applyOrder(
                         selectedRootId,
                         before.map((g) => g.id).toList(),
@@ -96,7 +100,7 @@ class ChildPane extends ConsumerWidget {
                   },
                 );
               } else {
-                return const Center(child: Text('No data'));
+                return Center(child: Text(l.goals_pane_noData));
               }
             },
           ),
