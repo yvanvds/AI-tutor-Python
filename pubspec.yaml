@@ -1,7 +1,7 @@
 ﻿name: ai_tutor_python
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.1+16
+version: 2.0.0+17
 
 environment:
   sdk: ^3.10.1
@@ -107,6 +107,11 @@ flutter:
 
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+
+
+
+
 
 
 
