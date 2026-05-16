@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
@@ -717,7 +718,7 @@ class TutorService extends Notifier<TutorState> {
     final report = ref.read(reportServiceProvider);
     return TutorContext(
       conductor: _conductor,
-      startNewCode: (code) => ref.read(codeServiceProvider).setText(code),
+      startNewCode: (code) => ref.read(codeServiceProvider(SessionMode.practice)).setText(code),
       addTutorMessage:
           addTutorMessageOverride ?? _chat.addTutorMessage,
       addSystemMessage: _chat.addSystemMessage,
@@ -1066,7 +1067,7 @@ class TutorService extends Notifier<TutorState> {
       _nextMessage = null;
     }
     if (_nextCode != null) {
-      ref.read(codeServiceProvider).setText(_nextCode!);
+      ref.read(codeServiceProvider(SessionMode.practice)).setText(_nextCode!);
       _nextCode = null;
     }
     state = TutorState.idle;

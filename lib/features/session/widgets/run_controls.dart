@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
@@ -8,13 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Strip above the editor: Run/Stop primary button, Reset (ghost), and on the
-/// right hint + send-to-tutor (both ghost). Used by Practice and Free modes.
+/// right hint + send-to-tutor (both ghost). Used by Practice and Playground modes.
 class RunControls extends ConsumerWidget {
   const RunControls({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final output = ref.read(outputServiceProvider);
+    final mode = ref.watch(modeProvider);
 
     return Container(
       color: AppColors.ink1,
@@ -27,7 +29,7 @@ class RunControls extends ConsumerWidget {
           ValueListenableBuilder<bool>(
             valueListenable: output.isRunning,
             builder: (context, running, _) =>
-                running ? _StopButton(output: output) : _RunButton(ref: ref),
+                running ? _StopButton(output: output) : _RunButton(ref: ref, mode: mode),
           ),
           const SizedBox(width: AppSpacing.s),
           _GhostIconButton(
@@ -41,7 +43,7 @@ class RunControls extends ConsumerWidget {
             icon: Icons.lightbulb_outline,
             onTap: () async {
               ref.read(chatServiceProvider).addMessage('Ik heb een hint nodig.');
-              final code = ref.read(codeServiceProvider).getText();
+              final code = ref.read(codeServiceProvider(mode)).getText();
               await ref.read(tutorServiceProvider.notifier).requestHint(code);
             },
           ),
@@ -51,7 +53,7 @@ class RunControls extends ConsumerWidget {
             icon: Icons.send_outlined,
             onTap: () async {
               ref.read(chatServiceProvider).addMessage('Hier is mijn code.');
-              final code = ref.read(codeServiceProvider).getText();
+              final code = ref.read(codeServiceProvider(mode)).getText();
               await ref.read(tutorServiceProvider.notifier).submitCode(code);
             },
           ),
@@ -62,8 +64,9 @@ class RunControls extends ConsumerWidget {
 }
 
 class _RunButton extends StatelessWidget {
-  const _RunButton({required this.ref});
+  const _RunButton({required this.ref, required this.mode});
   final WidgetRef ref;
+  final SessionMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +74,7 @@ class _RunButton extends StatelessWidget {
       bg: AppColors.accent,
       fg: AppColors.ink0,
       onTap: () async {
-        final code = ref.read(codeServiceProvider).getText();
+        final code = ref.read(codeServiceProvider(mode)).getText();
         await ref.read(outputServiceProvider).run(code);
       },
       child: Row(

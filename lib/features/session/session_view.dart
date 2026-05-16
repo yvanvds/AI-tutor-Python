@@ -1,6 +1,6 @@
 import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
-import 'package:ai_tutor_python/features/session/modes/free_view.dart';
+import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
@@ -68,8 +68,8 @@ class SessionView extends ConsumerWidget {
         return const ExplainView();
       case SessionMode.practice:
         return const PracticeView();
-      case SessionMode.free:
-        return const FreeView();
+      case SessionMode.playground:
+        return const PlaygroundView();
     }
   }
 }

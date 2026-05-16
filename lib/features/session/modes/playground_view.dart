@@ -2,11 +2,10 @@ import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
-/// Vrij coderen — playground. Phase 2 reuses [PracticeView] under a small
-/// header strip; Phase 3 will refine the strip ("speeltuin" pill + caption)
-/// and remove the share-with-tutor link from RunControls.
-class FreeView extends StatelessWidget {
-  const FreeView({super.key});
+/// Playground mode. Reuses [PracticeView] under a small header strip,
+/// without the share-with-tutor link from RunControls.
+class PlaygroundView extends StatelessWidget {
+  const PlaygroundView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +37,7 @@ class FreeView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                   child: const Text(
-                    'speeltuin',
+                    'playground',
                     style: TextStyle(
                       color: AppColors.fgMute,
                       fontSize: 11,

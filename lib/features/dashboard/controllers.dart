@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
@@ -18,7 +19,7 @@ class Controllers extends ConsumerWidget {
             icon: const Icon(Icons.play_arrow),
             tooltip: 'Run Code',
             onPressed: () async {
-              final code = ref.read(codeServiceProvider).getText();
+              final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
               await ref.read(outputServiceProvider).run(code);
             },
             color: Colors.green,
@@ -45,7 +46,7 @@ class Controllers extends ConsumerWidget {
             tooltip: 'Request Hint',
             onPressed: () async {
               ref.read(chatServiceProvider).addMessage("Ik heb een hint nodig.");
-              final code = ref.read(codeServiceProvider).getText();
+              final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
               await ref.read(tutorServiceProvider.notifier).requestHint(code);
             },
           ),
@@ -57,7 +58,7 @@ class Controllers extends ConsumerWidget {
             tooltip: 'Submit Code',
             onPressed: () async {
               ref.read(chatServiceProvider).addMessage("Hier is mijn code.");
-              final code = ref.read(codeServiceProvider).getText();
+              final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
               await ref.read(tutorServiceProvider.notifier).submitCode(code);
             },
             color: Colors.blue,

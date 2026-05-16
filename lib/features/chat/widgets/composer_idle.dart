@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
@@ -51,7 +52,7 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
     _controller.clear();
 
     if (text == '?') {
-      final code = ref.read(codeServiceProvider).getText();
+      final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
       chat.addMessage('Ik heb een hint nodig');
       await tutor.requestHint(code);
       return;

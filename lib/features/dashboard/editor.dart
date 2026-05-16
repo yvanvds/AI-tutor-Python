@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
@@ -11,10 +12,11 @@ class Editor extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(modeProvider);
     return CodeTheme(
       data: CodeThemeData(styles: tutorCodeTheme),
       child: CodeField(
-        controller: ref.read(codeServiceProvider).controller,
+        controller: ref.read(codeServiceProvider(mode)).controller,
         textStyle: AppMono.code(),
         background: AppColors.ink0,
         gutterStyle: GutterStyle(

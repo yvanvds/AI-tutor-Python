@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,7 +25,12 @@ class CodeService {
   }
 }
 
-final codeServiceProvider = Provider<CodeService>((ref) {
+/// Per-mode editor buffer. Practice and Playground keep independent
+/// `CodeController`s so switching mode preserves what the student was
+/// typing in each. Explain mode has no editor but is included so call
+/// sites can pass the current `modeProvider` value without special-casing.
+final codeServiceProvider =
+    Provider.family<CodeService, SessionMode>((ref, mode) {
   final s = CodeService();
   ref.onDispose(s.dispose);
   return s;

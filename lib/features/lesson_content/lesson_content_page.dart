@@ -13,6 +13,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// One-shot signal from other pages (e.g. the goals editor) to pre-select
+/// a specific subgoal on the next mount of `LessonContentPage`. The page
+/// consumes and clears the value on bootstrap so the selection only fires
+/// once per navigation event.
+final pendingLessonContentGoalIdProvider = StateProvider<String?>((_) => null);
+
 /// Teacher-only "Lesinhoud" view: a tree of module → root goals → subgoals
 /// rendered from the goal tree, paired with a raw-HTML editor + WebView
 /// preview for the selected subgoal's authored content. The tree is
@@ -64,6 +70,16 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     await goals.backfillModuleIds(defaultId);
     if (!mounted) return;
     setState(() => _bootstrapping = false);
+    await _consumePendingSelection();
+  }
+
+  Future<void> _consumePendingSelection() async {
+    final pendingId = ref.read(pendingLessonContentGoalIdProvider);
+    if (pendingId == null) return;
+    ref.read(pendingLessonContentGoalIdProvider.notifier).state = null;
+    final goal = await ref.read(goalsServiceProvider).getGoalOnce(pendingId);
+    if (!mounted || goal == null) return;
+    await _selectGoal(goal);
   }
 
   bool get _isDirty {

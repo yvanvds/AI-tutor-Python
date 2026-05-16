@@ -3,7 +3,7 @@ import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which session mode the workspace is rendering.
-enum SessionMode { explain, practice, free }
+enum SessionMode { explain, practice, playground }
 
 /// Top-level sidebar destinations. Student sees the first two; teacher
 /// additionally sees the last four.
@@ -69,8 +69,8 @@ extension SessionModeLabel on SessionMode {
         return 'Uitleg';
       case SessionMode.practice:
         return 'Oefenen';
-      case SessionMode.free:
-        return 'Vrij coderen';
+      case SessionMode.playground:
+        return 'Playground';
     }
   }
 
@@ -80,7 +80,7 @@ extension SessionModeLabel on SessionMode {
       case SessionMode.practice:
       case SessionMode.explain:
         return true;
-      case SessionMode.free:
+      case SessionMode.playground:
         return false;
     }
   }

@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -210,6 +211,7 @@ class _LesinhoudRow extends ConsumerWidget {
         : null;
 
     void openInLesinhoud() {
+      ref.read(pendingLessonContentGoalIdProvider.notifier).state = goal.id;
       ref.read(sectionProvider.notifier).state = Section.lessonContent;
     }
 

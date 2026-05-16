@@ -11,8 +11,9 @@ class GoalSplashOverlay extends ConsumerWidget {
     final splash = ref.watch(splashStateProvider);
     if (splash == null) return const SizedBox.shrink();
 
-    return IgnorePointer(
-      ignoring: true,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => ref.read(splashServiceProvider).hide(),
       child: AnimatedOpacity(
         opacity: 1,
         duration: const Duration(milliseconds: 250),
