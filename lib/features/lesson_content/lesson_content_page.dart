@@ -11,9 +11,7 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:highlight/languages/xml.dart';
 
 /// Teacher-only "Lesinhoud" view: a tree of module → root goals → subgoals
 /// rendered from the goal tree, paired with a raw-HTML editor + WebView
@@ -32,7 +30,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   String _workingTitle = '';
   String _workingBody = '';
 
-  late final CodeController _bodyCtrl;
+  late final TextEditingController _bodyCtrl;
   late final TextEditingController _titleCtrl;
   late final Stream<List<Goal>> _goalsStream;
   bool _bootstrapping = true;
@@ -40,7 +38,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   @override
   void initState() {
     super.initState();
-    _bodyCtrl = CodeController(text: '', language: xml);
+    _bodyCtrl = TextEditingController();
     _bodyCtrl.addListener(_onEditorChanged);
     _titleCtrl = TextEditingController();
     _titleCtrl.addListener(_onTitleChanged);
@@ -226,9 +224,9 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final modules = ref.watch(moduleServiceProvider);
-    final contentList = ref.watch(contentServiceProvider);
-
+    // Don't watch poll-driven providers at this level — they tick every 5s
+    // and would rebuild the preview WebView along with the tree. The tree
+    // watches them inside its own Consumer below.
     return Container(
       color: AppColors.ink0,
       child: Column(
@@ -267,14 +265,23 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                                 ),
                               );
                             }
-                            return _GoalTree(
-                              goals: snap.data ?? const [],
-                              modules: modules,
-                              contentById: {
-                                for (final c in contentList) c.id: c,
+                            final goals = snap.data ?? const <Goal>[];
+                            return Consumer(
+                              builder: (context, ref, _) {
+                                final modules =
+                                    ref.watch(moduleServiceProvider);
+                                final contentList =
+                                    ref.watch(contentServiceProvider);
+                                return _GoalTree(
+                                  goals: goals,
+                                  modules: modules,
+                                  contentById: {
+                                    for (final c in contentList) c.id: c,
+                                  },
+                                  selectedGoalId: _selectedGoalId,
+                                  onSelect: _selectGoal,
+                                );
                               },
-                              selectedGoalId: _selectedGoalId,
-                              onSelect: _selectGoal,
                             );
                           },
                         ),
@@ -348,22 +355,25 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   Widget _buildHtmlEditor() {
     return Container(
       color: AppColors.ink1,
-      child: CodeTheme(
-        data: CodeThemeData(styles: const {}),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.m,
-            vertical: AppSpacing.s,
-          ),
-          child: CodeField(
-            controller: _bodyCtrl,
-            textStyle: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 13,
-              height: 1.45,
-              color: AppColors.fg,
-            ),
-          ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
+      child: TextField(
+        controller: _bodyCtrl,
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        keyboardType: TextInputType.multiline,
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 13,
+          height: 1.45,
+          color: AppColors.fg,
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          isCollapsed: true,
         ),
       ),
     );

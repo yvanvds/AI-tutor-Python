@@ -52,14 +52,20 @@ class _ContentWebView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cached = ref.watch(contentServiceProvider);
-    final content = cached
-        .where((c) => c.id == contentId)
-        .cast<Content?>()
-        .firstWhere((_) => true, orElse: () => null);
+    // Scope the watch to this content's body so 5s polls that don't change
+    // the body don't rebuild the WebView host (which visibly flickers on
+    // Windows even when the fragment string is unchanged).
+    final body = ref.watch(
+      contentServiceProvider.select((list) {
+        for (final c in list) {
+          if (c.id == contentId) return c.body;
+        }
+        return null;
+      }),
+    );
 
-    if (content != null) {
-      return LessonHtmlView(fragment: content.body);
+    if (body != null) {
+      return LessonHtmlView(fragment: body);
     }
     return StreamBuilder<Content?>(
       stream: ref.read(contentServiceProvider.notifier).watchById(contentId),
