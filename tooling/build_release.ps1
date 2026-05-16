@@ -136,8 +136,19 @@ $iscc = Find-Iscc
 Write-Host "          ISCC: $iscc"
 
 New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
-& $iscc $IssScript
-if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed (exit $LASTEXITCODE)" }
+
+# ISCC resolves relative paths in the .iss file from the current working
+# directory, not from the .iss file's location (despite the comment in
+# installer.iss). Push to the .iss directory so OutputDir, SetupIconFile, and
+# SourceDir resolve as documented in the .iss file.
+$IssDir = Split-Path -Parent $IssScript
+Push-Location $IssDir
+try {
+    & $iscc (Split-Path -Leaf $IssScript)
+    if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed (exit $LASTEXITCODE)" }
+} finally {
+    Pop-Location
+}
 
 if (-not (Test-Path -LiteralPath $IsccOutput)) {
     throw "Expected $IsccOutput after ISCC build; check OutputBaseFilename in installer.iss."
