@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -5,15 +8,17 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/module/module.dart';
 import 'package:ai_tutor_python/services/module/module_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:highlight/languages/markdown.dart';
+import 'package:highlight/languages/xml.dart';
 
 /// Teacher-only "Lesinhoud" view: a tree of module → root goals → subgoals
-/// rendered from the goal tree, paired with a markdown editor for the
-/// selected subgoal's authored content. The tree is read-only ordering;
-/// reorder still happens in `GoalsPage`.
+/// rendered from the goal tree, paired with a raw-HTML editor + WebView
+/// preview for the selected subgoal's authored content. The tree is
+/// read-only ordering; reorder still happens in `GoalsPage`.
 class LessonContentPage extends ConsumerStatefulWidget {
   const LessonContentPage({super.key});
 
@@ -35,7 +40,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   @override
   void initState() {
     super.initState();
-    _bodyCtrl = CodeController(text: '', language: markdown);
+    _bodyCtrl = CodeController(text: '', language: xml);
     _bodyCtrl.addListener(_onEditorChanged);
     _titleCtrl = TextEditingController();
     _titleCtrl.addListener(_onTitleChanged);
@@ -137,6 +142,46 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     _showSnack('Opgeslagen');
   }
 
+  Future<void> _uploadHtml() async {
+    if (_selectedGoalId == null) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['html', 'htm'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    String text;
+    final bytes = file.bytes;
+    if (bytes != null) {
+      text = utf8.decode(bytes, allowMalformed: true);
+    } else if (file.path != null) {
+      text = await File(file.path!).readAsString();
+    } else {
+      _showSnack('Kon bestand niet lezen.');
+      return;
+    }
+
+    final fragment = _extractBodyFragment(text);
+    setState(() {
+      _workingBody = fragment;
+      _bodyCtrl.text = fragment;
+    });
+  }
+
+  /// If [source] looks like a full HTML document, returns the body's inner
+  /// HTML. Otherwise returns [source] unchanged. Match is case-insensitive
+  /// and dot-all so multi-line bodies work.
+  static String _extractBodyFragment(String source) {
+    final match = RegExp(
+      r'<body\b[^>]*>([\s\S]*?)</body\s*>',
+      caseSensitive: false,
+    ).firstMatch(source);
+    if (match == null) return source;
+    return match.group(1)!.trim();
+  }
+
   Future<void> _clearLink() async {
     final goalId = _selectedGoalId;
     if (goalId == null) return;
@@ -192,6 +237,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
             isDirty: _isDirty,
             hasSelection: _selectedGoalId != null,
             onSave: _isDirty ? _save : null,
+            onUpload: _selectedGoalId != null ? _uploadHtml : null,
           ),
           const Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(
@@ -286,30 +332,58 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
         ),
         const Divider(height: 1, color: AppColors.ink2),
         Expanded(
-          child: Container(
-            color: AppColors.ink1,
-            child: CodeTheme(
-              data: CodeThemeData(styles: const {}),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.m,
-                  vertical: AppSpacing.s,
-                ),
-                child: CodeField(
-                  controller: _bodyCtrl,
-                  textStyle: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    height: 1.45,
-                    color: AppColors.fg,
-                  ),
-                ),
-              ),
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _buildHtmlEditor()),
+              const VerticalDivider(width: 1, color: AppColors.ink2),
+              Expanded(child: _buildPreview()),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildHtmlEditor() {
+    return Container(
+      color: AppColors.ink1,
+      child: CodeTheme(
+        data: CodeThemeData(styles: const {}),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.m,
+            vertical: AppSpacing.s,
+          ),
+          child: CodeField(
+            controller: _bodyCtrl,
+            textStyle: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              height: 1.45,
+              color: AppColors.fg,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreview() {
+    if (_workingBody.isEmpty) {
+      return Container(
+        color: AppColors.ink0,
+        alignment: Alignment.center,
+        child: const Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: Text(
+            'Voorbeeld verschijnt hier zodra je HTML toevoegt.',
+            style: TextStyle(color: AppColors.fgFaint, fontSize: 12),
+          ),
+        ),
+      );
+    }
+    return LessonHtmlView(fragment: _workingBody);
   }
 }
 
@@ -318,11 +392,13 @@ class _Toolbar extends StatelessWidget {
     required this.isDirty,
     required this.hasSelection,
     required this.onSave,
+    required this.onUpload,
   });
 
   final bool isDirty;
   final bool hasSelection;
   final VoidCallback? onSave;
+  final VoidCallback? onUpload;
 
   @override
   Widget build(BuildContext context) {
@@ -341,6 +417,12 @@ class _Toolbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.upload_file, size: 16),
+            onPressed: onUpload,
+            label: const Text('Upload .html'),
+          ),
+          const SizedBox(width: AppSpacing.s),
           FilledButton.icon(
             icon: const Icon(Icons.save, size: 16),
             onPressed: hasSelection ? onSave : null,

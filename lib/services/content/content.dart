@@ -1,6 +1,12 @@
 /// Authored explanation block for a subgoal. Lives in the `content` Cosmos
 /// container (single-partition, `/type = "content"`). Rendered by
-/// `explain_view.dart` and edited in the teacher's "Lesinhoud" view.
+/// `explain_view.dart` (inside a WebView styled by `assets/lesson/lesson.css`)
+/// and edited in the teacher's "Lesinhoud" view.
+///
+/// `body` is an HTML body fragment — what goes inside `<body class="lesson">`,
+/// not a full document. The WebView host wraps it at render time. Lesson
+/// HTML must not contain navigation CTAs ("try it yourself" etc.); those are
+/// Flutter chrome around the canvas.
 class Content {
   Content({
     required this.id,
