@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rekenen met getallen</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+
+<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+
+<h2>De zeven operatoren</h2>
+
+<p>Python heeft zeven standaard rekenoperatoren:</p>
+
+<table>
+<thead>
+<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
+</thead>
+<tbody>
+<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
+<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
+<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
+<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
+<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
+<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
+<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
+</tbody>
+</table>
+
+<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+
+<pre><code>print(5 + 3)
+print(2 ** 10)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>8
+1024</code></pre>
+
+<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+
+<h2>Delen, gehele deling en rest</h2>
+
+<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+
+<pre><code>print(10 / 4)
+print(10 // 4)
+print(10 % 4)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>2.5
+2
+2</code></pre>
+
+<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+
+<h2>Volgorde van bewerkingen</h2>
+
+<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+
+<pre><code>print(2 + 3 * 4)
+print((2 + 3) * 4)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>14
+20</code></pre>
+
+<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+
+<h2>Hele getallen en kommagetallen</h2>
+
+<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
+
+<pre><code>print(3 + 4)
+print(3 + 4.0)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>7
+7.0</code></pre>
+
+<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als het netjes opgaat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
+
+<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
+
+</body>
+</html>

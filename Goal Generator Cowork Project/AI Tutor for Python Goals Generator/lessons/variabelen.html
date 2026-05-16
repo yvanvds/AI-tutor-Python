@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Variabelen</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+
+<p>Een <em>variabele</em> is een naam waaraan je een waarde koppelt, zodat je die waarde later kan terugroepen door simpelweg de naam te gebruiken. Zo hoef je niet elke keer dezelfde tekst of hetzelfde getal opnieuw te typen, en kan je waarden bewaren tijdens een script.</p>
+
+<h2>Toekennen met =</h2>
+
+<p>Je koppelt een waarde aan een naam met het is-gelijk-aan teken. Links staat de naam, rechts de waarde.</p>
+
+<pre><code>naam = "Mira"
+leeftijd = 16
+print(naam)
+print(leeftijd)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>Mira
+16</code></pre>
+
+<p>Lees <code>=</code> als "wordt gelijk aan". Het is dus geen wiskundige gelijkheid, maar een opdracht met een richting: van rechts naar links.</p>
+
+<h2>De variabele gebruiken</h2>
+
+<p>Eens een variabele bestaat, kan je haar overal gebruiken waar je anders de waarde zelf zou typen — in <code>print</code>, of samen met andere waarden.</p>
+
+<pre><code>naam = "Mira"
+print("Hallo", naam)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>Hallo Mira</code></pre>
+
+<p>Let op het verschil tussen <code>naam</code> en <code>"naam"</code>. Zonder aanhalingstekens verwijst <code>naam</code> naar de waarde die je hebt opgeslagen. Met aanhalingstekens is het gewoon de tekst <em>naam</em>.</p>
+
+<pre><code>naam = "Mira"
+print("naam")
+print(naam)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>naam
+Mira</code></pre>
+
+<h2>Een waarde overschrijven</h2>
+
+<p>Een variabele kan een nieuwe waarde krijgen door er opnieuw iets aan toe te kennen. De oude waarde is dan weg.</p>
+
+<pre><code>x = 10
+x = 20
+print(x)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>20</code></pre>
+
+<p>Het kan ook dat de nieuwe waarde afhankelijk is van de oude. Python kijkt dan eerst rechts wat er staat, en stopt het resultaat daarna pas in de naam links.</p>
+
+<pre><code>x = 10
+x = x + 1
+print(x)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>11</code></pre>
+
+<p>De regel <code>x = x + 1</code> betekent dus: neem de huidige waarde van <code>x</code> (10), tel er 1 bij op, en bewaar dat resultaat als de nieuwe <code>x</code>.</p>
+
+<h2>Regels voor namen</h2>
+
+<p>Niet elke tekst werkt als variabelenaam. Python heeft een paar regels:</p>
+
+<ul>
+<li>Een naam begint met een letter of een underscore, niet met een cijfer. <code>score</code> en <code>_score</code> mogen, <code>2score</code> niet.</li>
+<li>Een naam bevat alleen letters, cijfers en underscores. Geen koppelteken, geen spatie. <code>mijn_score</code> mag, <code>mijn-score</code> en <code>mijn score</code> niet.</li>
+<li>Een naam mag geen Python-sleutelwoord zijn, zoals <code>for</code> of <code>if</code>.</li>
+<li>Hoofdletters tellen mee: <code>naam</code> en <code>Naam</code> zijn twee verschillende variabelen.</li>
+</ul>
+
+<h2>Tekst of getal</h2>
+
+<p>De aanhalingstekens bepalen het type van de waarde. <code>"16"</code> is tekst die toevallig uit cijfers bestaat. <code>16</code> zonder aanhalingstekens is een getal waarmee je kan rekenen.</p>
+
+<pre><code>a = "16"
+b = 16</code></pre>
+
+<p>Ze zien er op het scherm hetzelfde uit als je ze print, maar Python behandelt ze anders.</p>
+
+<div class="callout warn"><p>In België schrijf je kommagetallen met een komma, maar Python verwacht een punt. <code>pi = 3,14</code> is geen kommagetal — Python leest het als twee aparte waarden achter elkaar en stopt die als een paar in <code>pi</code>. Wil je 3,14 als getal, schrijf dan <code>pi = 3.14</code>.</p></div>
+
+</body>
+</html>
