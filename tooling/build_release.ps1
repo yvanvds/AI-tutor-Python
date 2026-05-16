@@ -112,8 +112,11 @@ const String kAppVersion = '$fullVersion';
 
 Write-Step 'Step 3/9: Python bundle'
 $BundleScript = Join-Path $ScriptDir 'python\build_bundle.ps1'
-& pwsh -NonInteractive -File $BundleScript
-if ($LASTEXITCODE -ne 0) { throw "build_bundle.ps1 failed (exit $LASTEXITCODE)" }
+# Invoke in the current PowerShell session (works on both Windows PowerShell 5.1
+# and PowerShell 7). $ErrorActionPreference=Stop in the bundle script will
+# propagate failures via exception, so $LASTEXITCODE alone is not sufficient.
+& $BundleScript
+if ($LASTEXITCODE -gt 0) { throw "build_bundle.ps1 failed (exit $LASTEXITCODE)" }
 
 # --- 4. Flutter release build ------------------------------------------------
 
