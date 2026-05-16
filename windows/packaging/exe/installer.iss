@@ -22,10 +22,11 @@ AppUpdatesURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-; OutputDir is relative to the ISS file directory.
-OutputDir=..\..\..\public
+; OutputDir is relative to SourceDir (set below to the repo root) because
+; SourceDir overrides the default '.iss-file directory' base for OutputDir too.
+OutputDir=public
 OutputBaseFilename=PythonTeacherSetup
-; SetupIconFile is relative to SourceDir (set below to the repo root).
+; SetupIconFile is relative to SourceDir.
 SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma
 SolidCompression=yes
