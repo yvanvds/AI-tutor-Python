@@ -17,6 +17,16 @@ class Account {
   /// absent on disk.
   final StudentCalibration calibration;
 
+  /// Number of consecutive "active days" with a successful tutor turn.
+  /// Bumped by AccountService.registerSessionTurn with a 36-hour grace
+  /// window (issue #10, option c).
+  final int streakDays;
+
+  /// UTC timestamp of the most recent successful tutor turn, or null for
+  /// a fresh account. Used for the streak grace-window calculation and
+  /// for de-duplicating same-day increments.
+  final DateTime? streakLastAt;
+
   const Account({
     required this.uid,
     required this.email,
@@ -29,6 +39,8 @@ class Account {
     this.calibration = const StudentCalibration(
       difficulty: StudentCalibration.defaultDifficulty,
     ),
+    this.streakDays = 0,
+    this.streakLastAt,
   });
 
   String get displayFirstName => firstName;
@@ -51,6 +63,8 @@ class Account {
     if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toUtc().toIso8601String(),
     'calibration': calibration.toJson(),
+    'streakDays': streakDays,
+    if (streakLastAt != null) 'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
   };
 
   factory Account.fromMap(Map<String, dynamic> data) {
@@ -70,6 +84,10 @@ class Account {
       createdAt: created is String ? DateTime.tryParse(created) : null,
       updatedAt: updated is String ? DateTime.tryParse(updated) : null,
       calibration: cal,
+      streakDays: (data['streakDays'] as int?) ?? 0,
+      streakLastAt: data['streakLastAt'] is String
+          ? DateTime.tryParse(data['streakLastAt'] as String)
+          : null,
     );
   }
 }

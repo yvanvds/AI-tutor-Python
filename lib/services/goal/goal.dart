@@ -34,6 +34,11 @@ class Goal {
   /// Lesinhoud view treats those goals as belonging to the default module.
   final String moduleId;
 
+  /// Optional classifier on a subgoal. Currently the only recognized value
+  /// is `'concept'` — completing such a goal fires the level-up overlay
+  /// (issue #12). New values can be added freely (no enum migration).
+  final String? kind;
+
   Goal({
     required this.id,
     required this.title,
@@ -46,6 +51,7 @@ class Goal {
     this.objectives = const [],
     this.contentId,
     this.moduleId = '',
+    this.kind,
   });
 
   Map<String, dynamic> toMap() => {
@@ -59,6 +65,7 @@ class Goal {
         'objectives': objectives.map((o) => o.toMap()).toList(),
         'contentId': contentId,
         'moduleId': moduleId,
+        if (kind != null) 'kind': kind,
       };
 
   factory Goal.fromMap({
@@ -82,6 +89,7 @@ class Goal {
           const [],
       contentId: map['contentId'] as String?,
       moduleId: (map['moduleId'] as String?) ?? '',
+      kind: map['kind'] as String?,
     );
   }
 

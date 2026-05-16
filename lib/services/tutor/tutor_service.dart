@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -16,6 +18,7 @@ import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
@@ -284,6 +287,23 @@ class TutorService extends Notifier<TutorState> {
     ref.read(progressServiceProvider).setCurrentProgress(cached);
   }
 
+  /// Translates the conductor's "a concept goal just mastered" signal into
+  /// a throttled level-up overlay push. Reads the current derived XP/level
+  /// from [xpStateProvider]; throttle lives on [LevelUpController].
+  void _onConceptMastered(String conceptName) {
+    final xpState = ref.read(xpStateProvider).maybeWhen(
+          data: (s) => s,
+          orElse: () => null,
+        );
+    ref.read(levelUpControllerProvider.notifier).pushThrottled(
+          LevelUpEvent(
+            newLevel: xpState?.level ?? 1,
+            xpAwarded: 100,
+            conceptName: conceptName,
+          ),
+        );
+  }
+
   ConductorDeps _buildConductorDeps() {
     return ConductorDeps(
       getGoalSelection: () => ref.read(goalSelectionProvider),
@@ -320,6 +340,7 @@ class TutorService extends Notifier<TutorState> {
             goalTitle: goalTitle,
             description: description,
           ),
+      pushConceptMastered: _onConceptMastered,
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
           StudentCalibration.fresh(),
@@ -679,6 +700,17 @@ class TutorService extends Notifier<TutorState> {
     final response = completed ?? AIResponseParser.parse(accumulated.toString());
     _connector.addResponse(response);
     _chat.completeStream(_finalTextFor(response, accumulated));
+
+    // Streak counter (issue #10): a successful tutor turn marks the day as
+    // "active". Fire-and-forget so a streak write never blocks dispatch.
+    unawaited(
+      ref
+          .read(accountServiceProvider.notifier)
+          .registerSessionTurn()
+          .catchError((Object e, StackTrace _) {
+        debugPrint('TutorService: streak update failed: $e');
+      }),
+    );
 
     final dispatched = await dispatchResponse(response, _streamingContext());
     if (!dispatched) {

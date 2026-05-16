@@ -1,5 +1,9 @@
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which session mode the workspace is rendering.
@@ -40,24 +44,91 @@ final modeProvider = StateProvider<SessionMode>((_) => SessionMode.explain);
 
 final sectionProvider = StateProvider<Section>((_) => Section.session);
 
+/// Streams the persisted `Progress` doc for a single goal id, used by the
+/// ambient rim. autoDispose so a stream isn't held open after the active
+/// child goal changes.
+final _progressByGoalIdStreamProvider =
+    StreamProvider.autoDispose.family<Progress?, String>((ref, goalId) {
+  return ref.watch(progressServiceProvider).streamByGoalId(goalId);
+});
+
 /// Aggregated session-progress signal driving the 2px ambient progress line
-/// at the top of the workspace. Phase 6 wires this to real progression data;
-/// for now it returns 0 so the line is invisible until there's signal.
-final ambientProgressProvider = Provider<double>((_) => 0.0);
+/// at the top of the workspace. Tracks the active child goal's persisted
+/// progress (issue #11, option a) — same data the goal tile reads.
+final ambientProgressProvider = Provider<double>((ref) {
+  final goalId = ref.watch(goalSelectionProvider).activeChildGoal?.id;
+  if (goalId == null) return 0.0;
+  return ref.watch(_progressByGoalIdStreamProvider(goalId)).maybeWhen(
+        data: (p) => (p?.progress ?? 0.0).clamp(0.0, 1.0),
+        orElse: () => 0.0,
+      );
+});
+
+// XP & level derivation — issue #9, option (a).
+//
+// XP is derived from `Progress.progress` summed over every non-optional
+// subgoal × a flat constant. Level steps are a gentle linear ramp
+// (xpNext = 1500 * level). No new collection, no migration.
+
+const int _xpPerSubgoal = 100;
+int _xpNextFor(int level) => 1500 * level;
+
+typedef XpState = ({int xp, int level, int xpNext});
+
+const XpState _defaultXpState = (xp: 0, level: 1, xpNext: 1500);
+
+XpState _xpBreakdown(int totalXp) {
+  var level = 1;
+  var remaining = totalXp;
+  while (remaining >= _xpNextFor(level)) {
+    remaining -= _xpNextFor(level);
+    level += 1;
+  }
+  return (xp: remaining, level: level, xpNext: _xpNextFor(level));
+}
+
+final xpStateProvider = StreamProvider<XpState>((ref) async* {
+  final account = ref.watch(accountServiceProvider);
+  if (account == null) {
+    yield _defaultXpState;
+    return;
+  }
+  final subgoals = (await ref.watch(goalsServiceProvider).getAllGoalsOnce())
+      .where((g) => g.parentId != null && !g.optional)
+      .toList();
+  if (subgoals.isEmpty) {
+    yield _defaultXpState;
+    return;
+  }
+  final progressStream = ref.watch(progressServiceProvider).watchAll();
+  await for (final progress in progressStream) {
+    final byId = {for (final p in progress) p.goalID: p};
+    final total = subgoals
+        .fold<double>(
+          0.0,
+          (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * _xpPerSubgoal,
+        )
+        .round();
+    yield _xpBreakdown(total);
+  }
+});
 
 /// Derived view of the signed-in user for the new shell. Reads name + role
-/// from existing services and supplies placeholder gamification fields until
-/// `progression_service.dart` (Phase 6) wires them up for real.
+/// from existing services and composes XP/level from [xpStateProvider].
 final profileProvider = Provider<Profile>((ref) {
   final account = ref.watch(accountServiceProvider);
   final isTeacher = ref.watch(isTeacherProvider);
+  final xpState = ref.watch(xpStateProvider).maybeWhen(
+        data: (s) => s,
+        orElse: () => _defaultXpState,
+      );
   return Profile(
     name: account?.firstName ?? '',
     topic: account?.targetGoal ?? '',
-    level: 1,
-    xp: 0,
-    xpNext: 1500,
-    streak: 0,
+    level: xpState.level,
+    xp: xpState.xp,
+    xpNext: xpState.xpNext,
+    streak: account?.streakDays ?? 0,
     role: isTeacher ? Role.teacher : Role.student,
   );
 });

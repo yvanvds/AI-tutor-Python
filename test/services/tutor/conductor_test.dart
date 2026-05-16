@@ -68,6 +68,7 @@ ConductorDeps _buildDeps(_Fakes f) {
     playCorrectAnswer: () {},
     playGoalReached: () {},
     showGoalReached: ({required goalTitle, required description}) {},
+    pushConceptMastered: (_) {},
     getCalibration: () => f.calibration,
     setCalibration: (c) async => f.calibration = c,
     getLoBelief: ({required subgoalId, required loId}) async =>

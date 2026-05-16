@@ -205,6 +205,7 @@ class ConductorDeps {
     required this.playCorrectAnswer,
     required this.playGoalReached,
     required this.showGoalReached,
+    required this.pushConceptMastered,
     required this.getCalibration,
     required this.setCalibration,
     required this.getLoBelief,
@@ -233,6 +234,11 @@ class ConductorDeps {
   final void Function() playGoalReached;
   final void Function({required String goalTitle, required String description})
       showGoalReached;
+
+  /// Invoked when a subgoal with `kind == 'concept'` masters. The host
+  /// (tutor_service) decides whether to show the level-up overlay and what
+  /// numbers to put on it — the conductor only signals the event.
+  final void Function(String conceptName) pushConceptMastered;
 
   /// Calibration accessors. The current-account calibration substructure is
   /// embedded on `accounts/{uid}` (STUDENT_MODEL).
@@ -858,6 +864,9 @@ class Conductor {
         description: subgoal.description ?? '',
       );
       _deps.playGoalReached();
+      if (subgoal.kind == 'concept') {
+        _deps.pushConceptMastered(subgoal.title);
+      }
       _cascadeDepth = 0;
       await _advanceWithCascadeCap();
       advanced = true;

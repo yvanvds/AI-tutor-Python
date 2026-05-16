@@ -156,6 +156,40 @@ class AccountService extends Notifier<Account?> {
     await _patch(uid, {'calibration': calibration.toJson()});
   }
 
+  /// Records that the current user had a successful tutor turn "today".
+  /// Implements the streak counter from issue #10 (option c): one int +
+  /// one timestamp stored on the account doc, with a 36-hour grace window
+  /// so a single missed day doesn't reset the streak.
+  ///
+  /// - Same UTC day as `streakLastAt`: no-op.
+  /// - Within 36 h of `streakLastAt`: increment.
+  /// - Otherwise (or no prior): reset to 1.
+  Future<void> registerSessionTurn({DateTime? now}) async {
+    final uid = currentUid;
+    if (uid == null) return;
+    final acc = state;
+    if (acc == null) return;
+
+    final ts = (now ?? DateTime.now()).toUtc();
+    final last = acc.streakLastAt?.toUtc();
+
+    if (last != null &&
+        last.year == ts.year &&
+        last.month == ts.month &&
+        last.day == ts.day) {
+      return;
+    }
+
+    final next = (last != null && ts.difference(last).inHours <= 36)
+        ? acc.streakDays + 1
+        : 1;
+
+    await _patch(uid, {
+      'streakDays': next,
+      'streakLastAt': ts.toIso8601String(),
+    });
+  }
+
   Future<void> deleteAccountDoc(String uid) async {
     await safeCosmos(() => _container.delete(uid, partitionKey: uid));
   }
