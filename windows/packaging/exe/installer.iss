@@ -1,9 +1,9 @@
 ; windows/packaging/exe/installer.iss
 ; Custom Inno Setup script for Python Teacher.
-; SourceDir is set to the repo root so [Files] Source: paths are repo-relative.
-; OutputDir and SetupIconFile use paths relative to this ISS file.
-; Run via: tooling/build_release.ps1  (preferred)
-;          iscc.exe windows\packaging\exe\installer.iss  (direct)
+; SourceDir is set to the repo root, so [Files] Source: paths AND
+; SetupIconFile are repo-relative. OutputDir is relative to this ISS file's
+; directory (resolved before SourceDir is applied).
+; Run via: tooling/build_release.ps1  (which cd's to this directory first)
 
 #define AppName "Python Teacher"
 #define AppVersion "1.0.1"
@@ -22,10 +22,11 @@ AppUpdatesURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-; OutputDir and SetupIconFile are relative to the ISS file directory.
+; OutputDir is relative to the ISS file directory.
 OutputDir=..\..\..\public
 OutputBaseFilename=PythonTeacherSetup
-SetupIconFile=..\..\runner\resources\app_icon.ico
+; SetupIconFile is relative to SourceDir (set below to the repo root).
+SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
