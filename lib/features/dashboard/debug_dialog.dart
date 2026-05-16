@@ -13,6 +13,7 @@ import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class DebugDialog extends ConsumerStatefulWidget {
@@ -99,6 +100,18 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
     );
   }
 
+  Future<void> _copyAllTurns(List<TurnRecord> turns) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final encoded = const JsonEncoder.withIndent('  ').convert(
+      turns.map((t) => t.toJson()).toList(growable: false),
+    );
+    await Clipboard.setData(ClipboardData(text: encoded));
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(content: Text('Copied ${turns.length} turns to clipboard.')),
+    );
+  }
+
   void _triggerLevelUp() {
     Navigator.of(context).pop();
     ref.read(levelUpControllerProvider.notifier).push(
@@ -176,9 +189,22 @@ class _DebugDialogState extends ConsumerState<DebugDialog> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            Text(
-              'Recent turns',
-              style: Theme.of(context).textTheme.titleSmall,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Recent turns',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: recorder.buffer.isEmpty
+                      ? null
+                      : () => _copyAllTurns(recorder.buffer),
+                  icon: const Icon(Icons.copy_all, size: 18),
+                  label: const Text('Copy all'),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             SizedBox(
