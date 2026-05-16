@@ -20,7 +20,7 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe whether the student treats unquoted text as a name vs. a string literal — if they write `print(hello)`, ask what `hello` refers to before correcting.",
+        "Probe whether the student understands that quotes are what turn text into a string — without them, `print(hello)` makes Python look for something called `hello` and raise an error. Frame the contrast as 'met aanhalingstekens = tekst' vs. 'zonder aanhalingstekens = Python zoekt iets dat zo heet'. Do NOT use the word `variabele` or `variable name` — variables are not introduced until the next subgoal.",
         "When testing multi-argument print, contrast it directly with the `+` form on the same content; the comma-inserts-space behavior is the deliverable.",
         "Lean on the `'score: ' + 5` TypeError as a probe for whether the student conflates string concatenation with addition.",
         "Stay within bare `print` calls in this subgoal — escape sequences, `end=`, `sep=`, and Python 2 `print` syntax belong later."
