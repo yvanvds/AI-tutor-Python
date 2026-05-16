@@ -88,8 +88,13 @@ XpState _xpBreakdown(int totalXp) {
 }
 
 final xpStateProvider = StreamProvider<XpState>((ref) async* {
-  final account = ref.watch(accountServiceProvider);
-  if (account == null) {
+  // Only react to sign-in/sign-out, not to every poll-driven re-emission of
+  // the account doc — Account has no `==` override, so each 5 s
+  // accountServiceProvider tick is a "new" object and would otherwise
+  // tear this provider down and flash the XP pill back to 0.
+  final signedIn =
+      ref.watch(accountServiceProvider.select((a) => a != null));
+  if (!signedIn) {
     yield _defaultXpState;
     return;
   }
