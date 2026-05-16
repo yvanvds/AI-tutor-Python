@@ -71,6 +71,10 @@ class GoalSelectionNotifier extends Notifier<GoalSelectionState> {
   @override
   GoalSelectionState build() => const GoalSelectionState();
 
+  /// Public read-only view of the current state, for callers that hold the
+  /// notifier directly (e.g. after a WidgetRef has been disposed).
+  GoalSelectionState get current => state;
+
   void setSelectedRoot(Goal? goal) =>
       state = state.copyWith(
         selectedRoot: goal,

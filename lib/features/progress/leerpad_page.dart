@@ -156,21 +156,29 @@ class _LeerpadBody extends ConsumerWidget {
   }
 
   Future<void> _continueRoot(WidgetRef ref, Goal root) async {
+    // Capture handles before flipping section — sectionProvider switch disposes
+    // this widget, after which ref is unusable. Notifier/service instances live
+    // on the ProviderContainer and survive.
     final sel = ref.read(goalSelectionProvider.notifier);
+    final section = ref.read(sectionProvider.notifier);
+    final tutor = ref.read(tutorServiceProvider.notifier);
+    final progressService = ref.read(progressServiceProvider);
+    final mode = ref.read(modeProvider.notifier);
+
     sel.setPreferredRoot(root);
     sel.setPreferredChild(null);
-    ref.read(sectionProvider.notifier).state = Section.session;
-    await ref.read(tutorServiceProvider.notifier).initializeSession(force: true);
+    section.state = Section.session;
+    await tutor.initializeSession(force: true);
 
-    final child = ref.read(goalSelectionProvider).activeChildGoal;
+    final child = sel.current.activeChildGoal;
     final hasContent =
         child != null && (child.contentId?.isNotEmpty ?? false);
     final persisted = child == null
         ? null
-        : await ref.read(progressServiceProvider).getByGoalId(child.id);
+        : await progressService.getByGoalId(child.id);
     final hasProgress = (persisted?.progress ?? 0) > 0;
 
-    ref.read(modeProvider.notifier).state =
+    mode.state =
         (!hasContent || hasProgress) ? SessionMode.practice : SessionMode.explain;
   }
 }
