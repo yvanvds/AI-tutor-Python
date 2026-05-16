@@ -104,19 +104,19 @@ abstract class AppLocalizations {
   /// **'Python Course'**
   String get appTitle;
 
-  /// Header for the sidebar settings popup
+  /// No description provided for @settings_menuTitle.
   ///
   /// In en, this message translates to:
   /// **'Settings'**
   String get settings_menuTitle;
 
-  /// Label for the language selector inside settings
+  /// No description provided for @settings_language_label.
   ///
   /// In en, this message translates to:
   /// **'Language'**
   String get settings_language_label;
 
-  /// Language choice meaning 'follow the operating system locale'
+  /// No description provided for @settings_language_system.
   ///
   /// In en, this message translates to:
   /// **'System'**
@@ -128,7 +128,7 @@ abstract class AppLocalizations {
   /// **'English'**
   String get settings_language_english;
 
-  /// Dutch language name, written in Dutch
+  /// Dutch language name, kept in Dutch in both locales
   ///
   /// In en, this message translates to:
   /// **'Nederlands'**
@@ -151,6 +151,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Debug'**
   String get sidebar_debug_tooltip;
+
+  /// No description provided for @sidebar_teacherHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Teacher'**
+  String get sidebar_teacherHeader;
+
+  /// No description provided for @sidebar_section_session.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get sidebar_section_session;
+
+  /// No description provided for @sidebar_section_map.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning path'**
+  String get sidebar_section_map;
+
+  /// No description provided for @sidebar_section_goals.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals'**
+  String get sidebar_section_goals;
+
+  /// No description provided for @sidebar_section_lessonContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson content'**
+  String get sidebar_section_lessonContent;
+
+  /// No description provided for @sidebar_section_instructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions'**
+  String get sidebar_section_instructions;
+
+  /// No description provided for @sidebar_section_students.
+  ///
+  /// In en, this message translates to:
+  /// **'Students'**
+  String get sidebar_section_students;
+
+  /// No description provided for @session_mode_explain.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain'**
+  String get session_mode_explain;
+
+  /// No description provided for @session_mode_practice.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice'**
+  String get session_mode_practice;
+
+  /// No description provided for @session_mode_playground.
+  ///
+  /// In en, this message translates to:
+  /// **'Playground'**
+  String get session_mode_playground;
+
+  /// No description provided for @topBar_greeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi {name},'**
+  String topBar_greeting(String name);
+
+  /// No description provided for @topBar_subline_default.
+  ///
+  /// In en, this message translates to:
+  /// **'let\'s get started'**
+  String get topBar_subline_default;
+
+  /// No description provided for @topBar_subline_withTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'let\'s get started with {topic}'**
+  String topBar_subline_withTopic(String topic);
+
+  /// No description provided for @topBar_streak_days.
+  ///
+  /// In en, this message translates to:
+  /// **'days'**
+  String get topBar_streak_days;
+
+  /// No description provided for @topBar_xp_level.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {level}'**
+  String topBar_xp_level(int level);
+
+  /// No description provided for @auth_signIn_appBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get auth_signIn_appBarTitle;
+
+  /// No description provided for @auth_signIn_prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your school Microsoft account to continue.'**
+  String get auth_signIn_prompt;
+
+  /// No description provided for @auth_signIn_errorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in failed: {error}'**
+  String auth_signIn_errorPrefix(String error);
+
+  /// No description provided for @auth_signIn_button_idle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with school account'**
+  String get auth_signIn_button_idle;
+
+  /// No description provided for @auth_signIn_button_busy.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in…'**
+  String get auth_signIn_button_busy;
+
+  /// No description provided for @auth_localKey_appBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provide Your API Key'**
+  String get auth_localKey_appBarTitle;
+
+  /// No description provided for @auth_localKey_explainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is not yet approved to use the global key.\n\nYou can either wait until your account is approved, or provide your own OpenAI API key to continue immediately. Your key will be stored locally on this device and only used by this app.'**
+  String get auth_localKey_explainer;
+
+  /// No description provided for @auth_localKey_field_label.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get auth_localKey_field_label;
+
+  /// No description provided for @auth_localKey_field_helper.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll store this key locally for this user on this device.'**
+  String get auth_localKey_field_helper;
+
+  /// No description provided for @auth_localKey_tooltip_showKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Show key'**
+  String get auth_localKey_tooltip_showKey;
+
+  /// No description provided for @auth_localKey_tooltip_hideKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide key'**
+  String get auth_localKey_tooltip_hideKey;
+
+  /// No description provided for @auth_localKey_tooltip_paste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get auth_localKey_tooltip_paste;
+
+  /// No description provided for @auth_localKey_button_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save key'**
+  String get auth_localKey_button_save;
+
+  /// No description provided for @auth_localKey_validation_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter an API key.'**
+  String get auth_localKey_validation_empty;
+
+  /// No description provided for @auth_localKey_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'API key saved locally.'**
+  String get auth_localKey_saved;
+
+  /// No description provided for @auth_localKey_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save key: {error}'**
+  String auth_localKey_saveFailed(String error);
+
+  /// No description provided for @auth_localKey_footnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: You can change or remove this key later in Settings.'**
+  String get auth_localKey_footnote;
+
+  /// No description provided for @crash_title.
+  ///
+  /// In en, this message translates to:
+  /// **'We hit a problem'**
+  String get crash_title;
+
+  /// No description provided for @crash_defaultMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.'**
+  String get crash_defaultMessage;
+
+  /// No description provided for @crash_resetButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset app (fix permissions)'**
+  String get crash_resetButton;
+
+  /// No description provided for @update_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get update_dialog_title;
+
+  /// No description provided for @update_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'A newer version ({version}) of the application is available. The update will now be installed. You can open it again in a moment.'**
+  String update_dialog_message(String version);
+
+  /// No description provided for @update_dialog_ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get update_dialog_ok;
 }
 
 class _AppLocalizationsDelegate

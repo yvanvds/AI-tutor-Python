@@ -11,5 +11,50 @@
 
   "sidebar_settings_tooltip": "Instellingen",
   "sidebar_signOut_tooltip": "Afmelden",
-  "sidebar_debug_tooltip": "Debug"
+  "sidebar_debug_tooltip": "Debug",
+  "sidebar_teacherHeader": "Docent",
+
+  "sidebar_section_session": "Sessie",
+  "sidebar_section_map": "Leerpad",
+  "sidebar_section_goals": "Doelen",
+  "sidebar_section_lessonContent": "Lesinhoud",
+  "sidebar_section_instructions": "Instructies",
+  "sidebar_section_students": "Studenten",
+
+  "session_mode_explain": "Uitleg",
+  "session_mode_practice": "Oefenen",
+  "session_mode_playground": "Playground",
+
+  "topBar_greeting": "Hoi {name},",
+  "topBar_subline_default": "aan de slag",
+  "topBar_subline_withTopic": "aan de slag met {topic}",
+  "topBar_streak_days": "dagen",
+  "topBar_xp_level": "Level {level}",
+
+  "auth_signIn_appBarTitle": "Aanmelden",
+  "auth_signIn_prompt": "Meld je aan met je school-Microsoft-account om verder te gaan.",
+  "auth_signIn_errorPrefix": "Aanmelden mislukt: {error}",
+  "auth_signIn_button_idle": "Aanmelden met schoolaccount",
+  "auth_signIn_button_busy": "Bezig met aanmelden…",
+
+  "auth_localKey_appBarTitle": "Geef je API-sleutel op",
+  "auth_localKey_explainer": "Je account is nog niet goedgekeurd voor gebruik van de globale sleutel.\n\nJe kunt wachten tot je account is goedgekeurd, of je eigen OpenAI-API-sleutel opgeven om meteen verder te kunnen. Je sleutel wordt lokaal op dit toestel opgeslagen en alleen door deze app gebruikt.",
+  "auth_localKey_field_label": "API-sleutel",
+  "auth_localKey_field_helper": "We bewaren deze sleutel lokaal voor deze gebruiker op dit toestel.",
+  "auth_localKey_tooltip_showKey": "Sleutel tonen",
+  "auth_localKey_tooltip_hideKey": "Sleutel verbergen",
+  "auth_localKey_tooltip_paste": "Plakken",
+  "auth_localKey_button_save": "Sleutel opslaan",
+  "auth_localKey_validation_empty": "Geef een API-sleutel op.",
+  "auth_localKey_saved": "API-sleutel lokaal opgeslagen.",
+  "auth_localKey_saveFailed": "Opslaan mislukt: {error}",
+  "auth_localKey_footnote": "Opmerking: je kunt deze sleutel later wijzigen of verwijderen in Instellingen.",
+
+  "crash_title": "Er ging iets mis",
+  "crash_defaultMessage": "Dit kan gebeuren na wijzigingen aan rechten of regels.\nProbeer de app te resetten. Je wordt afgemeld en de caches worden gewist.",
+  "crash_resetButton": "App resetten (rechten herstellen)",
+
+  "update_dialog_title": "Update beschikbaar",
+  "update_dialog_message": "Er is een nieuwere versie ({version}) van de applicatie beschikbaar. De update wordt nu geïnstalleerd. Je kunt de app over enkele momenten opnieuw openen.",
+  "update_dialog_ok": "OK"
 }

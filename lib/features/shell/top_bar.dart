@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -71,12 +72,13 @@ class _Greeting extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
+    final l = AppLocalizations.of(context);
 
     final subline = section == Section.session
         ? (profile.topic.isEmpty
-            ? 'aan de slag'
-            : 'aan de slag met ${profile.topic}')
-        : section.label;
+            ? l.topBar_subline_default
+            : l.topBar_subline_withTopic(profile.topic))
+        : section.label(context);
 
     final name = profile.name.isEmpty ? '...' : profile.name;
 
@@ -85,7 +87,7 @@ class _Greeting extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Hoi $name,',
+          l.topBar_greeting(name),
           style: const TextStyle(
             color: AppColors.fg,
             fontSize: 16,
@@ -181,7 +183,7 @@ class _ModeButtonState extends State<_ModeButton> {
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Text(
-            widget.mode.label,
+            widget.mode.label(context),
             style: TextStyle(
               color: fg,
               fontSize: 12.5,
@@ -241,9 +243,9 @@ class _StreakChip extends StatelessWidget {
             style: AppMono.tnum(size: 12.5, color: AppColors.fg),
           ),
           const SizedBox(width: 4),
-          const Text(
-            'dagen',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context).topBar_streak_days,
+            style: const TextStyle(
               fontSize: 11,
               color: AppColors.fgMute,
               fontWeight: FontWeight.w500,
@@ -287,7 +289,7 @@ class _XpPill extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Level $level',
+                AppLocalizations.of(context).topBar_xp_level(level),
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

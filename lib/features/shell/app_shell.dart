@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
@@ -107,19 +108,19 @@ class _AppShellState extends ConsumerState<AppShell> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Update available'),
-        content: Text(
-          'A newer version (${info.version}) of the application is available. '
-          'The update will now be installed. You can open it again in a moment.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l.update_dialog_title),
+          content: Text(l.update_dialog_message(info.version)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l.update_dialog_ok),
+            ),
+          ],
+        );
+      },
     );
 
     final file = await downloadToTemp(info.url);

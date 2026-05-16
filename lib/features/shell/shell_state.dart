@@ -1,9 +1,11 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which session mode the workspace is rendering.
@@ -139,14 +141,15 @@ final profileProvider = Provider<Profile>((ref) {
 });
 
 extension SessionModeLabel on SessionMode {
-  String get label {
+  String label(BuildContext context) {
+    final l = AppLocalizations.of(context);
     switch (this) {
       case SessionMode.explain:
-        return 'Uitleg';
+        return l.session_mode_explain;
       case SessionMode.practice:
-        return 'Oefenen';
+        return l.session_mode_practice;
       case SessionMode.playground:
-        return 'Playground';
+        return l.session_mode_playground;
     }
   }
 
@@ -163,20 +166,21 @@ extension SessionModeLabel on SessionMode {
 }
 
 extension SectionLabel on Section {
-  String get label {
+  String label(BuildContext context) {
+    final l = AppLocalizations.of(context);
     switch (this) {
       case Section.session:
-        return 'Sessie';
+        return l.sidebar_section_session;
       case Section.map:
-        return 'Leerpad';
+        return l.sidebar_section_map;
       case Section.goals:
-        return 'Doelen';
+        return l.sidebar_section_goals;
       case Section.lessonContent:
-        return 'Lesinhoud';
+        return l.sidebar_section_lessonContent;
       case Section.instructions:
-        return 'Instructies';
+        return l.sidebar_section_instructions;
       case Section.students:
-        return 'Studenten';
+        return l.sidebar_section_students;
     }
   }
 

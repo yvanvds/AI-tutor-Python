@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,14 @@ class CrashRecoveryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The crash screen can mount from a global error handler before the
+    // localizations widget is in the tree. Fall back to English in that case.
+    final l = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final title = l?.crash_title ?? 'We hit a problem';
+    final defaultMessage = l?.crash_defaultMessage ??
+        'This can happen after permission or rules changes.\n'
+            'Try resetting the app. You’ll be signed out and caches will be cleared.';
+    final resetLabel = l?.crash_resetButton ?? 'Reset app (fix permissions)';
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -23,15 +32,16 @@ class CrashRecoveryScreen extends ConsumerWidget {
               children: [
                 const Icon(Icons.warning_rounded, size: 48),
                 const SizedBox(height: 16),
-                const Text(
-                  'We hit a problem',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  message ??
-                      'This can happen after permission or rules changes.\n'
-                          'Try resetting the app. You’ll be signed out and caches will be cleared.',
+                  message ?? defaultMessage,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -41,16 +51,8 @@ class CrashRecoveryScreen extends ConsumerWidget {
                       () => ref.read(authServiceProvider.notifier).signOut(),
                     );
                     exit(0);
-
-                    // if (context.mounted) {
-                    //   // After signOut, your auth StreamBuilder will land on SignInPage.
-                    //   appNavigatorKey.currentState?.pushAndRemoveUntil(
-                    //     MaterialPageRoute(builder: (_) => const SignInPage()),
-                    //     (r) => false,
-                    //   );
-                    // }
                   },
-                  child: const Text('Reset app (fix permissions)'),
+                  child: Text(resetLabel),
                 ),
               ],
             ),

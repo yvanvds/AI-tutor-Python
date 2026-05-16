@@ -7,24 +7,90 @@
   },
 
   "settings_menuTitle": "Settings",
-  "@settings_menuTitle": {
-    "description": "Header for the sidebar settings popup"
-  },
   "settings_language_label": "Language",
-  "@settings_language_label": {
-    "description": "Label for the language selector inside settings"
-  },
   "settings_language_system": "System",
-  "@settings_language_system": {
-    "description": "Language choice meaning 'follow the operating system locale'"
-  },
   "settings_language_english": "English",
   "settings_language_dutch": "Nederlands",
   "@settings_language_dutch": {
-    "description": "Dutch language name, written in Dutch"
+    "description": "Dutch language name, kept in Dutch in both locales"
   },
 
   "sidebar_settings_tooltip": "Settings",
   "sidebar_signOut_tooltip": "Sign out",
-  "sidebar_debug_tooltip": "Debug"
+  "sidebar_debug_tooltip": "Debug",
+  "sidebar_teacherHeader": "Teacher",
+
+  "sidebar_section_session": "Session",
+  "sidebar_section_map": "Learning path",
+  "sidebar_section_goals": "Goals",
+  "sidebar_section_lessonContent": "Lesson content",
+  "sidebar_section_instructions": "Instructions",
+  "sidebar_section_students": "Students",
+
+  "session_mode_explain": "Explain",
+  "session_mode_practice": "Practice",
+  "session_mode_playground": "Playground",
+
+  "topBar_greeting": "Hi {name},",
+  "@topBar_greeting": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "topBar_subline_default": "let's get started",
+  "topBar_subline_withTopic": "let's get started with {topic}",
+  "@topBar_subline_withTopic": {
+    "placeholders": {
+      "topic": { "type": "String" }
+    }
+  },
+  "topBar_streak_days": "days",
+  "topBar_xp_level": "Level {level}",
+  "@topBar_xp_level": {
+    "placeholders": {
+      "level": { "type": "int" }
+    }
+  },
+
+  "auth_signIn_appBarTitle": "Sign in",
+  "auth_signIn_prompt": "Sign in with your school Microsoft account to continue.",
+  "auth_signIn_errorPrefix": "Sign in failed: {error}",
+  "@auth_signIn_errorPrefix": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "auth_signIn_button_idle": "Sign in with school account",
+  "auth_signIn_button_busy": "Signing in…",
+
+  "auth_localKey_appBarTitle": "Provide Your API Key",
+  "auth_localKey_explainer": "Your account is not yet approved to use the global key.\n\nYou can either wait until your account is approved, or provide your own OpenAI API key to continue immediately. Your key will be stored locally on this device and only used by this app.",
+  "auth_localKey_field_label": "API Key",
+  "auth_localKey_field_helper": "We'll store this key locally for this user on this device.",
+  "auth_localKey_tooltip_showKey": "Show key",
+  "auth_localKey_tooltip_hideKey": "Hide key",
+  "auth_localKey_tooltip_paste": "Paste",
+  "auth_localKey_button_save": "Save key",
+  "auth_localKey_validation_empty": "Please enter an API key.",
+  "auth_localKey_saved": "API key saved locally.",
+  "auth_localKey_saveFailed": "Failed to save key: {error}",
+  "@auth_localKey_saveFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "auth_localKey_footnote": "Note: You can change or remove this key later in Settings.",
+
+  "crash_title": "We hit a problem",
+  "crash_defaultMessage": "This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.",
+  "crash_resetButton": "Reset app (fix permissions)",
+
+  "update_dialog_title": "Update available",
+  "update_dialog_message": "A newer version ({version}) of the application is available. The update will now be installed. You can open it again in a moment.",
+  "@update_dialog_message": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "update_dialog_ok": "OK"
 }

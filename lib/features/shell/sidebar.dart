@@ -49,7 +49,9 @@ class Sidebar extends ConsumerWidget {
           ),
           if (profile.isTeacher) ...[
             const SizedBox(height: AppSpacing.lg),
-            const _SidebarHeader(label: 'Docent'),
+            _SidebarHeader(
+              label: AppLocalizations.of(context).sidebar_teacherHeader,
+            ),
             const SizedBox(height: AppSpacing.s),
             ..._teacherSections.map(
               (s) => _SidebarItem(
@@ -187,7 +189,7 @@ class _SidebarItemState extends State<_SidebarItem> {
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Tooltip(
-          message: widget.section.label,
+          message: widget.section.label(context),
           waitDuration: const Duration(milliseconds: 400),
           child: Container(
             height: 48,

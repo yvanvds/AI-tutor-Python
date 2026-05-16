@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   String? _error;
 
   Future<void> _signIn() async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -22,7 +24,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref.read(authServiceProvider.notifier).signIn();
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Sign in failed: $e');
+        setState(() => _error = l.auth_signIn_errorPrefix(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -31,8 +33,9 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      appBar: AppBar(title: Text(l.auth_signIn_appBarTitle)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -42,10 +45,10 @@ class _SignInPageState extends ConsumerState<SignInPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Sign in with your school Microsoft account to continue.',
+                Text(
+                  l.auth_signIn_prompt,
                   textAlign: TextAlign.center,
-                  style: TextStyle(height: 1.4),
+                  style: const TextStyle(height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 if (_error != null)
@@ -69,7 +72,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   label: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      _busy ? 'Signing in…' : 'Sign in with school account',
+                      _busy ? l.auth_signIn_button_busy : l.auth_signIn_button_idle,
                     ),
                   ),
                 ),
