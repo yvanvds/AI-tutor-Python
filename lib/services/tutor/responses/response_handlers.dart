@@ -211,7 +211,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
       loSignals: r.loSignals,
       followUp: r.followUp,
     );
-    if (outcome == IntegrateOutcome.followUpPresented) return;
+    if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();
   }
 }
@@ -246,7 +246,7 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
       loSignals: r.loSignals,
       followUp: r.followUp,
     );
-    if (outcome == IntegrateOutcome.followUpPresented) return;
+    if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();
   }
 }
@@ -264,7 +264,7 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
       loSignals: r.loSignals,
       followUp: r.followUp,
     );
-    if (outcome == IntegrateOutcome.followUpPresented) return;
+    if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();
   }
 }

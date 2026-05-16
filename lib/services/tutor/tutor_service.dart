@@ -116,6 +116,12 @@ class TutorService extends Notifier<TutorState> {
   /// graded (or its conditions fail and we fall back to a regular probe).
   _FollowUpInFlight? _followUpInFlight;
 
+  /// Set when an MCQ-driven grading advanced the subgoal and the next one has
+  /// authored content. The mode flip to uitleg is deferred until the student
+  /// clicks "Volgende" so the MCQ feedback panel survives long enough to be
+  /// read. Consumed in [advanceFromMcq].
+  bool _pendingExplainAfterMcqAdvance = false;
+
   /// Mid-flight curriculum-watch state (CONDUCTOR_POLICY §7.4). Subscribes
   /// to the active root's children so a teacher edit during a session can
   /// be reacted to (deleted subgoal → redirect, added LO → cache flip-back).
@@ -801,7 +807,24 @@ class TutorService extends Notifier<TutorState> {
     _followUpInFlight = null;
 
     if (outcome.subgoalAdvanced) {
-      return IntegrateOutcome.advanced;
+      // Drop back to uitleg so the new subgoal's theory is presented first,
+      // before any practice question. Only when there's actually content to
+      // show — without it the explain view renders an empty placeholder, so
+      // fall through to the normal request-exercise path instead. For an
+      // MCQ-driven advance, defer the mode flip until the student clicks
+      // "Volgende" so the in-place MCQ feedback isn't unmounted before they
+      // see it.
+      final nextChild = ref.read(goalSelectionProvider).activeChildGoal;
+      final hasContent =
+          nextChild != null && (nextChild.contentId?.isNotEmpty ?? false);
+      if (hasContent) {
+        if (plan.type == ChatRequestType.mcQuestion) {
+          _pendingExplainAfterMcqAdvance = true;
+        } else {
+          ref.read(modeProvider.notifier).state = SessionMode.explain;
+        }
+        return IntegrateOutcome.advanced;
+      }
     }
 
     if (followUp != null &&
@@ -925,6 +948,11 @@ class TutorService extends Notifier<TutorState> {
   /// feedback.
   Future<void> advanceFromMcq() async {
     ref.read(activeMcqProvider.notifier).state = null;
+    if (_pendingExplainAfterMcqAdvance) {
+      _pendingExplainAfterMcqAdvance = false;
+      ref.read(modeProvider.notifier).state = SessionMode.explain;
+      return;
+    }
     await requestExercise();
   }
 
