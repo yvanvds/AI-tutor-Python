@@ -1,0 +1,30 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Python Course",
+  "@appTitle": {
+    "description": "Window title and application brand name"
+  },
+
+  "settings_menuTitle": "Settings",
+  "@settings_menuTitle": {
+    "description": "Header for the sidebar settings popup"
+  },
+  "settings_language_label": "Language",
+  "@settings_language_label": {
+    "description": "Label for the language selector inside settings"
+  },
+  "settings_language_system": "System",
+  "@settings_language_system": {
+    "description": "Language choice meaning 'follow the operating system locale'"
+  },
+  "settings_language_english": "English",
+  "settings_language_dutch": "Nederlands",
+  "@settings_language_dutch": {
+    "description": "Dutch language name, written in Dutch"
+  },
+
+  "sidebar_settings_tooltip": "Settings",
+  "sidebar_signOut_tooltip": "Sign out",
+  "sidebar_debug_tooltip": "Debug"
+}

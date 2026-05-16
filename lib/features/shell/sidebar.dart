@@ -1,4 +1,6 @@
+import 'package:ai_tutor_python/features/shell/settings_menu.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -61,12 +63,19 @@ class Sidebar extends ConsumerWidget {
           const Spacer(),
           if (onDebug != null)
             _SidebarIconButton(
-              tooltip: 'Debug',
+              tooltip: AppLocalizations.of(context).sidebar_debug_tooltip,
               icon: Icons.bug_report_outlined,
               onTap: onDebug!,
             ),
+          Builder(
+            builder: (settingsCtx) => _SidebarIconButton(
+              tooltip: AppLocalizations.of(context).sidebar_settings_tooltip,
+              icon: Icons.settings_outlined,
+              onTap: () => showSettingsMenu(settingsCtx, ref),
+            ),
+          ),
           _SidebarIconButton(
-            tooltip: 'Sign out',
+            tooltip: AppLocalizations.of(context).sidebar_signOut_tooltip,
             icon: Icons.logout,
             onTap: () =>
                 ref.read(authServiceProvider.notifier).signOut(),

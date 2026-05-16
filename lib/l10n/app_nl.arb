@@ -1,0 +1,15 @@
+{
+  "@@locale": "nl",
+
+  "appTitle": "Python Cursus",
+
+  "settings_menuTitle": "Instellingen",
+  "settings_language_label": "Taal",
+  "settings_language_system": "Systeem",
+  "settings_language_english": "English",
+  "settings_language_dutch": "Nederlands",
+
+  "sidebar_settings_tooltip": "Instellingen",
+  "sidebar_signOut_tooltip": "Afmelden",
+  "sidebar_debug_tooltip": "Debug"
+}
