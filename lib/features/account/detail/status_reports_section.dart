@@ -104,7 +104,7 @@ class _ReportTile extends StatelessWidget {
     final theme = Theme.of(context);
     final title = goal?.title ?? report.goalID;
     final updated = report.updatedAt;
-    final subtitle = updated == null ? null : formatTs(updated);
+    final subtitle = updated == null ? null : formatTs(updated, context);
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
       title: Text(title, style: theme.textTheme.bodyMedium),

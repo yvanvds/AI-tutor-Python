@@ -1,9 +1,15 @@
-String formatTs(DateTime ts) {
+import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
+
+/// Formats [ts] in the user's local timezone using a locale-aware short
+/// date + time pattern. The locale is resolved from [context] — i.e. whichever
+/// locale `MaterialApp` resolved through `localizationsDelegates`.
+///
+/// Examples (US local time, given the same instant):
+///   en  → `5/16/2026 14:30`
+///   nl  → `16-5-2026 14:30`
+String formatTs(DateTime ts, BuildContext context) {
+  final localeTag = Localizations.localeOf(context).toLanguageTag();
   final dt = ts.toLocal();
-  final y = dt.year.toString().padLeft(4, '0');
-  final m = dt.month.toString().padLeft(2, '0');
-  final d = dt.day.toString().padLeft(2, '0');
-  final hh = dt.hour.toString().padLeft(2, '0');
-  final mm = dt.minute.toString().padLeft(2, '0');
-  return '$y-$m-$d $hh:$mm';
+  return DateFormat.yMd(localeTag).add_Hm().format(dt);
 }

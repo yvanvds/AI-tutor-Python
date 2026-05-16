@@ -107,6 +107,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
   Widget _renderRow(ThemeData theme, AppLocalizations l, _EventRow row) {
     final isStrong = row.event.severity == TurnSignalEventSeverity.strong;
     final ack = row.record.acknowledgedAt != null;
+    final ts = formatTs(row.record.turnAt, context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -137,8 +138,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
                   ),
                 ),
                 Text(
-                  '${formatTs(row.record.turnAt)}'
-                  '${_detailSummary(row.event.details)}',
+                  '$ts${_detailSummary(row.event.details)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],

@@ -327,7 +327,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     required Map<String, String?> parentByChild,
   }) {
     final lastActive = a.updatedAt ?? a.createdAt;
-    final lastActiveStr = lastActive == null ? '—' : formatTs(lastActive);
+    final lastActiveStr =
+        lastActive == null ? '—' : formatTs(lastActive, context);
 
     final activeRootTitle = _activeRootTitle(
       progress: progress,
