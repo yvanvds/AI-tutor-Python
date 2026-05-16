@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -11,10 +12,14 @@ class ObjectiveBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selection = ref.watch(goalSelectionProvider);
-    final goal = selection.activeChildGoal ?? selection.activeRootGoal;
+    final activeChildGoal = selection.activeChildGoal;
+    final goal = activeChildGoal ?? selection.activeRootGoal;
     if (goal == null) return const SizedBox.shrink();
 
     final description = (goal.description ?? '').trim();
+    final progress =
+        activeChildGoal == null ? 0.0 : ref.watch(ambientProgressProvider).clamp(0.0, 1.0);
+    final completed = progress >= 0.999;
 
     return Container(
       width: double.infinity,
@@ -79,6 +84,29 @@ class ObjectiveBanner extends ConsumerWidget {
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (activeChildGoal != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: SizedBox(
+                height: 4,
+                child: Stack(
+                  children: [
+                    Container(color: AppColors.ink2),
+                    AnimatedFractionallySizedBox(
+                      duration: AppDurations.progressFill,
+                      curve: AppCurves.layout,
+                      widthFactor: progress,
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        color: completed ? AppColors.accent2 : AppColors.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ],
