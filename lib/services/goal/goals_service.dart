@@ -186,6 +186,9 @@ class GoalsService {
   Future<void> updateOptional(String id, bool optional) =>
       _patch(id, {'optional': optional});
 
+  Future<void> updateKind(String id, String? kind) =>
+      _patch(id, {'kind': kind});
+
   Future<void> updateTags(String id, List<String> tags) =>
       _patch(id, {'tags': tags});
 

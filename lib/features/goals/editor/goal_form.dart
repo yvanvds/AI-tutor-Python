@@ -23,6 +23,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
   late final TextEditingController _title;
   late final TextEditingController _desc;
   bool _optional = false;
+  bool _isConcept = false;
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
     _title = TextEditingController(text: widget.goal.title);
     _desc = TextEditingController(text: widget.goal.description ?? '');
     _optional = widget.goal.optional;
+    _isConcept = widget.goal.kind == 'concept';
   }
 
   @override
@@ -39,6 +41,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
       _title.text = widget.goal.title;
       _desc.text = widget.goal.description ?? '';
       _optional = widget.goal.optional;
+      _isConcept = widget.goal.kind == 'concept';
     }
   }
 
@@ -115,6 +118,19 @@ class GoalFormState extends ConsumerState<GoalForm> {
           ),
           const SizedBox(height: 12),
           if (widget.goal.parentId != null) ...[
+            SwitchListTile(
+              value: _isConcept,
+              onChanged: (v) {
+                setState(() => _isConcept = v);
+                svc.updateKind(widget.goal.id, v ? 'concept' : null);
+              },
+              title: const Text('Concept goal'),
+              subtitle: const Text(
+                'Mastering this subgoal triggers the level-up overlay.',
+              ),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 12),
             ChipsEditor(
               label: 'Teaching tips',
               values: widget.goal.teachingTips,
