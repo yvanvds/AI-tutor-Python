@@ -65,6 +65,15 @@ class PolicyConstants {
   /// Used for the saturation-detection branch on a fully-mastered subgoal.
   static const double saturationSlack = 2.0;
 
+  /// Saturated-stuck rule: a non-practiceable LO whose mean is below this
+  /// ceiling is also stuck. The cap-then-shrink update in
+  /// `belief_math.applyEvidence` slows mean movement to a crawl once the
+  /// LO is at the evidence cap, so re-probing rarely catches up; the
+  /// student is better served by advancing. Set just below
+  /// `masteryMeanThreshold` so LOs within one good probe of mastery are
+  /// not prematurely written off.
+  static const double stuckSaturatedMeanCeiling = 0.75;
+
   /// Cap on the cascade-skip when advancing through pre-mastered subgoals.
   /// At most this many subgoals can auto-skip in a row.
   static const int cascadeSkipCap = 1;

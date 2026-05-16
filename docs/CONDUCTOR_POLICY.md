@@ -256,6 +256,23 @@ case (section 1.3). No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
 handle"). Cross-session decay handles forgetting.
 
+**Saturated LOs are filtered out of the unmastered pool.** An LO at
+`α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
+the cap-then-shrink rule makes mean movement too slow for re-probing
+to flip mastery in any reasonable number of turns. The saturated-stuck
+rule (section 4.4) normally marks these LOs stuck so the subgoal can
+advance; the selection-side filter is the matching guarantee that
+during the same turn the conductor doesn't preferentially target a
+dead-zone LO over a practiceable one with similar mean.
+
+**Fallback: all unmastered LOs saturated.** Rare, but possible when
+every remaining LO sits in the purgatory zone (saturated, mean in
+`[stuckSaturatedMeanCeiling, masteryMeanThreshold)`). In that case
+the conductor picks the **highest** mean (closest to mastery) so the
+slow climb has the best chance of flipping one LO and unblocking the
+subgoal. `chosenReason` is logged as `all unmastered saturated:
+highest-mean fallback` for debug visibility.
+
 **Convergence with curriculum order.** Early in a subgoal, "first
 unmastered in order" (section 1) and "lowest mean unmastered" pick
 different LOs because beliefs are sparse. After a few turns, every LO
@@ -736,9 +753,9 @@ students who get genuinely stuck on specific things, damaging
 motivation and burning the calibration system. Pure "advance after
 N attempts" treats unmastered as mastered, which it isn't.
 
-**Compound rule:** an LO is *stuck* when `α + β ≥ 8` AND mean < 0.6.
-A subgoal advances when all non-optional LOs are either **mastered
-or stuck**.
+**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 8` AND
+mean < 0.6. A subgoal advances when all non-optional LOs are either
+**mastered or stuck**.
 
 Numbers:
 
@@ -746,6 +763,27 @@ Numbers:
   evidence minimum (4) — meaningful effort.
 - mean < 0.6 is "still not getting it." Above 0.6 is on the upswing —
   keep probing.
+
+**Second branch (saturated):** an LO is also stuck when
+`α + β ≥ cap − saturationSlack` AND mean < `stuckSaturatedMeanCeiling`
+(0.75). This handles the case where an early strong-negative pushed
+the LO's β up, evidence saturated at the cap before subsequent
+correct answers could pull mean back above the mastery threshold, and
+the cap-then-shrink rule in §3.4 now makes mean movement so slow that
+further probing wastes turns. Without this branch a non-practiceable
+LO with mean between the classic-stuck ceiling (0.6) and the
+saturated-stuck ceiling (0.75) sits in purgatory — not mastered, not
+stuck, blocks subgoal advance indefinitely.
+
+Numbers for the saturated branch:
+
+- `α + β ≥ cap − saturationSlack` = `α + β ≥ 18` with current
+  constants. Matches the `isPracticeable` boundary in §3.4 so the
+  selection-side filter (§2.1) and the stuck-side rule agree.
+- mean < 0.75 leaves a one-strong-positive buffer to mastery
+  (`masteryMeanThreshold` = 0.8). LOs within that buffer are not
+  written off as stuck, even though the selection filter still skips
+  them; the highest-mean fallback in §2.1 keeps probing them.
 
 **Stuck is computed live, not stored.** Every mastery check evaluates
 each LO as `mastered | stuck | neither`. No flag, no persistence.

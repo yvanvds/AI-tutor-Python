@@ -114,9 +114,21 @@ bool meetsMasteryMeanAndEvidence(BeliefSnapshot snap) {
 }
 
 /// Stuck rule (CONDUCTOR_POLICY 4.4). Computed live, never stored.
+///
+/// Two ways an LO can be stuck:
+/// 1. Classic: enough evidence to be confident the student is not learning
+///    (`α + β ≥ stuckEvidenceMin` AND `mean < stuckMeanCeiling`).
+/// 2. Saturated: at the evidence cap but still below mastery
+///    (`α + β ≥ cap - saturationSlack` AND `mean < stuckSaturatedMeanCeiling`).
+///    The cap-then-shrink rule in `applyEvidence` makes mean movement too
+///    slow to catch up once here, so further probes mostly spin in place.
 bool isStuck(BeliefSnapshot snap) {
-  return snap.evidence >= PolicyConstants.stuckEvidenceMin &&
+  final classic = snap.evidence >= PolicyConstants.stuckEvidenceMin &&
       snap.mean < PolicyConstants.stuckMeanCeiling;
+  final saturated = snap.evidence >=
+          PolicyConstants.evidenceCap - PolicyConstants.saturationSlack &&
+      snap.mean < PolicyConstants.stuckSaturatedMeanCeiling;
+  return classic || saturated;
 }
 
 /// Whether an LO can usefully be probed further given the cap.

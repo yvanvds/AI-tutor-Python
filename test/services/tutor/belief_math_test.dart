@@ -139,6 +139,17 @@ void main() {
       expect(isStuck(const BeliefSnapshot(2, 4)), isFalse);
     });
 
+    test('stuck (saturated): at evidence cap and mean < mastery', () {
+      // (12, 6): mean 0.667, evidence 18 = cap - slack → saturated-stuck.
+      expect(isStuck(const BeliefSnapshot(12, 6)), isTrue);
+      // (14, 4): mean 0.778, evidence 18 → saturated but above the
+      // saturated-stuck ceiling (0.75), so NOT stuck.
+      expect(isStuck(const BeliefSnapshot(14, 4)), isFalse);
+      // (10, 5): mean 0.667 but evidence 15 < cap - slack → practiceable,
+      // not saturated, not stuck.
+      expect(isStuck(const BeliefSnapshot(10, 5)), isFalse);
+    });
+
     test('practiceable: evidence < cap - slack', () {
       expect(isPracticeable(const BeliefSnapshot(10, 5)), isTrue);
       // Right at the threshold.

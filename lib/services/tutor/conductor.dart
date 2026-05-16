@@ -377,36 +377,56 @@ class Conductor {
     String chosenReason;
 
     if (unmastered.isNotEmpty) {
-      // Among unmastered: pick lowest mean, weight as tiebreaker. Recency
-      // guard skips the previously-probed LO if alternatives exist.
-      var pool = unmastered
-          .where((lo) => lo.id != _lastTargetLoId)
+      // Prefer practiceable LOs: saturated ones can't move mean fast enough
+      // for re-probing to help, and the saturated-stuck rule (CONDUCTOR_POLICY
+      // §4.4) will normally have marked them stuck so the subgoal advances.
+      // Falling back to the full unmastered pool only matters for the
+      // purgatory case where every unmastered LO is saturated but sits in
+      // [stuckSaturatedMeanCeiling, masteryMeanThreshold).
+      final practiceable = unmastered
+          .where((lo) => isPracticeable(snapshots[lo.id]!))
           .toList(growable: false);
-      if (pool.isEmpty) pool = unmastered;
-      pool = pool.toList()
-        ..sort((a, b) {
-          final ma = snapshots[a.id]!.mean;
-          final mb = snapshots[b.id]!.mean;
-          if (ma != mb) return ma.compareTo(mb);
-          // Higher weight wins on near-equal means.
-          return b.weight.compareTo(a.weight);
+      if (practiceable.isNotEmpty) {
+        // Among practiceable: pick lowest mean, weight as tiebreaker.
+        // Recency guard skips the previously-probed LO if alternatives exist.
+        var pool = practiceable
+            .where((lo) => lo.id != _lastTargetLoId)
+            .toList(growable: false);
+        if (pool.isEmpty) pool = practiceable;
+        pool = pool.toList()
+          ..sort((a, b) {
+            final ma = snapshots[a.id]!.mean;
+            final mb = snapshots[b.id]!.mean;
+            if (ma != mb) return ma.compareTo(mb);
+            // Higher weight wins on near-equal means.
+            return b.weight.compareTo(a.weight);
+          });
+        target = pool.first;
+        // Curriculum-order short-circuit during cold start: if every
+        // snapshot is the prior, "lowest mean" ties on every LO — pick the
+        // first in authoring order (CONDUCTOR_POLICY §1.1).
+        final allFresh = unmastered.every((lo) {
+          final snap = snapshots[lo.id]!;
+          return snap.alpha == PolicyConstants.prior &&
+              snap.beta == PolicyConstants.prior;
         });
-      target = pool.first;
-      // Curriculum-order short-circuit during cold start: if every snapshot
-      // is the prior, "lowest mean" ties on every LO — pick the first in
-      // authoring order (CONDUCTOR_POLICY §1.1).
-      final allFresh = unmastered.every((lo) {
-        final snap = snapshots[lo.id]!;
-        return snap.alpha == PolicyConstants.prior &&
-            snap.beta == PolicyConstants.prior;
-      });
-      if (allFresh) {
-        target = unmastered.first;
-        chosenReason = 'cold start: first LO in order';
-      } else if (pool.length < unmastered.length) {
-        chosenReason = 'lowest mean (recency relaxed)';
+        if (allFresh) {
+          target = unmastered.first;
+          chosenReason = 'cold start: first LO in order';
+        } else if (pool.length < practiceable.length) {
+          chosenReason = 'lowest mean (recency relaxed)';
+        } else {
+          chosenReason = 'lowest mean unmastered';
+        }
       } else {
-        chosenReason = 'lowest mean unmastered';
+        // Every unmastered LO is saturated but not stuck. Pick the one
+        // closest to mastery so the slow climb has the best chance to flip
+        // an LO and unblock subgoal advance.
+        final sorted = unmastered.toList()
+          ..sort((a, b) =>
+              snapshots[b.id]!.mean.compareTo(snapshots[a.id]!.mean));
+        target = sorted.first;
+        chosenReason = 'all unmastered saturated: highest-mean fallback';
       }
     } else {
       // All mastered: top-up branch. Pick the mastered LO with the lowest

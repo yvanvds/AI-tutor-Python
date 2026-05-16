@@ -256,6 +256,23 @@ case (section 1.3). No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
 handle"). Cross-session decay handles forgetting.
 
+**Saturated LOs are filtered out of the unmastered pool.** An LO at
+`α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
+the cap-then-shrink rule makes mean movement too slow for re-probing
+to flip mastery in any reasonable number of turns. The saturated-stuck
+rule (section 4.4) normally marks these LOs stuck so the subgoal can
+advance; the selection-side filter is the matching guarantee that
+during the same turn the conductor doesn't preferentially target a
+dead-zone LO over a practiceable one with similar mean.
+
+**Fallback: all unmastered LOs saturated.** Rare, but possible when
+every remaining LO sits in the purgatory zone (saturated, mean in
+`[stuckSaturatedMeanCeiling, masteryMeanThreshold)`). In that case
+the conductor picks the **highest** mean (closest to mastery) so the
+slow climb has the best chance of flipping one LO and unblocking the
+subgoal. `chosenReason` is logged as `all unmastered saturated:
+highest-mean fallback` for debug visibility.
+
 **Convergence with curriculum order.** Early in a subgoal, "first
 unmastered in order" (section 1) and "lowest mean unmastered" pick
 different LOs because beliefs are sparse. After a few turns, every LO
@@ -736,9 +753,9 @@ students who get genuinely stuck on specific things, damaging
 motivation and burning the calibration system. Pure "advance after
 N attempts" treats unmastered as mastered, which it isn't.
 
-**Compound rule:** an LO is *stuck* when `α + β ≥ 8` AND mean < 0.6.
-A subgoal advances when all non-optional LOs are either **mastered
-or stuck**.
+**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 8` AND
+mean < 0.6. A subgoal advances when all non-optional LOs are either
+**mastered or stuck**.
 
 Numbers:
 
@@ -746,6 +763,27 @@ Numbers:
   evidence minimum (4) — meaningful effort.
 - mean < 0.6 is "still not getting it." Above 0.6 is on the upswing —
   keep probing.
+
+**Second branch (saturated):** an LO is also stuck when
+`α + β ≥ cap − saturationSlack` AND mean < `stuckSaturatedMeanCeiling`
+(0.75). This handles the case where an early strong-negative pushed
+the LO's β up, evidence saturated at the cap before subsequent
+correct answers could pull mean back above the mastery threshold, and
+the cap-then-shrink rule in §3.4 now makes mean movement so slow that
+further probing wastes turns. Without this branch a non-practiceable
+LO with mean between the classic-stuck ceiling (0.6) and the
+saturated-stuck ceiling (0.75) sits in purgatory — not mastered, not
+stuck, blocks subgoal advance indefinitely.
+
+Numbers for the saturated branch:
+
+- `α + β ≥ cap − saturationSlack` = `α + β ≥ 18` with current
+  constants. Matches the `isPracticeable` boundary in §3.4 so the
+  selection-side filter (§2.1) and the stuck-side rule agree.
+- mean < 0.75 leaves a one-strong-positive buffer to mastery
+  (`masteryMeanThreshold` = 0.8). LOs within that buffer are not
+  written off as stuck, even though the selection filter still skips
+  them; the highest-mean fallback in §2.1 keeps probing them.
 
 **Stuck is computed live, not stored.** Every mastery check evaluates
 each LO as `mastered | stuck | neither`. No flag, no persistence.
@@ -1471,8 +1509,28 @@ TurnRecord {
 
   // Teacher acknowledgment (8.2)
   acknowledgedAt: string?          // null until teacher reviews
+
+  // Observability events fired during this turn (8.2). Empty for an
+  // ordinary graded turn; one or more entries when the conductor
+  // detected a strong-signal or audit-only condition.
+  signalEvents: [
+    {
+      kind: string,                  // see 8.2 enum
+      severity: "strong" | "audit",
+      details: object?               // optional, kind-specific payload
+    }
+  ]
 }
 ```
+
+**Audit-only events outside graded turns** (empty-objectives blocks,
+subgoal-deleted redirects) are written to the same `turn_history`
+container as a stub record: `targetLOIds: []`, `questionType: ''`,
+`overallQuality: "wrong"` (sentinel), `loSignals/appliedSignals/
+loStatusAfter: []`, `subgoalAdvanced: false`, with exactly one entry
+in `signalEvents`. This keeps the dashboard query path uniform — a
+single partition query against `turn_history` returns both graded
+turns and audit events.
 
 **Storage estimate.** ~500 bytes per turn × ~50 turns/student/week
 × ~30 students ≈ 750 KB/week. Negligible for Cosmos.
@@ -1488,33 +1546,54 @@ If a future debug need requires full text, it can be added later.
 
 ### 8.2 Teacher-facing surfaces
 
+#### Signal-event `kind` enum
+
+Each `signalEvents[*].kind` is one of:
+
+**Strong (badge-driving):**
+
+- `stuckLoAdvance` — subgoal advanced with one or more stuck LOs
+  (section 4.4). Real knowledge gaps the conductor passed despite low
+  belief. `details: {subgoalId, stuckLoIds: [...]}`.
+- `singleLoDeadlock` — single-LO subgoal stuck, conductor blocked
+  from advancing (section 7.7). `details: {subgoalId, loId}`. Fires
+  once per (session, subgoal) pair.
+- `repeatedDemotions` — `repeatedDemotionsThreshold` consecutive
+  demotions in this session with no intervening promotion. Threshold
+  lives in the constants module (default 3). `details: {count,
+  calibrationAfter}`. Fires once per session; promotion resets the
+  counter.
+- `sustainedLlmFailure` — `degradedThreshold` of the last
+  `degradedWindow` grading calls fell back; the conductor flips
+  into degraded mode (section 7.3). `details: {fallbackCount,
+  window}`. Fires once per session.
+
+**Audit-only (no badge, drawer-only):**
+
+- `cascadeHalt` — auto-skip cascade exceeded `cascadeSkipCap`
+  (section 4.5). Data-inconsistency signal. `details:
+  {haltedAtSubgoalId, depth}`.
+- `emptyObjectivesBlock` — student landed on a subgoal with
+  `objectives: []` (section 7.1). Authoring incomplete. `details:
+  {subgoalId}`. Fires once per (session, subgoal).
+- `subgoalDeletedRedirect` — teacher deleted the active subgoal
+  mid-session (section 7.4). `details: {subgoalId}`.
+
 #### Strong signals — needs attention
 
 The "needs attention" badge on the accounts page fires when a
-student has any of these in their unacknowledged history:
+student has any unacknowledged record whose `signalEvents` contains
+at least one entry with `severity: strong`. The count shown on the
+badge is the number of such records (one per turn, regardless of
+how many strong events that turn carried).
 
-- **Stuck LOs at advancement** (section 4.4). Real knowledge gaps
-  the conductor passed despite low belief.
-- **Single-LO deadlock** (section 7.7). Student blocked, can't
-  advance.
-- **Repeated calibration demotions** (section 5.2). Student dropped
-  to easy and stayed there for N or more subgoals (specific N
-  tunable; suggest 3).
-- **Sustained LLM contract failures in a session** (section 7.3).
-  System-issue indicator.
-
-The badge shows a count of unacknowledged strong-signal events.
 Drilling into the student opens the detail drawer where each event
-is listed and can be acknowledged.
+is listed (strong first, then audit) and can be acknowledged.
 
 #### Audit-trail signals — informational
 
-Visible in the detail drawer but no badge:
-
-- Cascade-halt events (section 4.5). Data inconsistency.
-- Empty-objectives blocks (section 7.1). Authoring not done.
-- Subgoal-deleted redirects (section 7.4). Confirms teacher's edits
-  took effect for active students.
+Audit-severity events are visible in the detail drawer but do not
+contribute to the badge count.
 
 #### Acknowledgment
 
