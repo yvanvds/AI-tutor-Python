@@ -18,6 +18,7 @@ import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
+import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
 
 void main() {
@@ -29,4 +30,5 @@ void main() {
   update_prompt.main();
   update_failure.main();
   update_dev_build.main();
+  update_manual_check.main();
 }

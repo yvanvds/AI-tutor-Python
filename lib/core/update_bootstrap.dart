@@ -70,9 +70,8 @@ final updateServicesProvider = Provider<UpdateServices>((ref) {
     feed: feedUrl == null
         ? () async => null
         : () => fetchLatestRelease(feedUrl),
-    // The progress callback is part of the seam but not yet fed: streaming
-    // progress out of `downloadToTemp` arrives with the progress UI in #48.
-    download: (release, onProgress) => downloadToTemp(release.url),
+    download: (release, onProgress) =>
+        downloadToTemp(release.url, onProgress: onProgress),
     verify: verifyAndCleanUp,
     run: (installer) =>
         runInstallerAndExit(installer, args: kSilentInstallArguments),

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/update_controller.dart';
-import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
@@ -12,10 +11,10 @@ import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
-import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
+import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,10 +26,6 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  /// Whether the offer dialog is on screen, so a rebuild that re-enters
-  /// [UpdatePhase.available] cannot stack a second one.
-  bool _offering = false;
-
   @override
   void initState() {
     super.initState();
@@ -44,11 +39,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    // The only place an update is offered. Everything else about the flow —
-    // deciding, downloading, hashing, launching — lives in the controller.
-    ref.listen(updateControllerProvider.select((s) => s.release), (_, release) {
-      if (release != null) _offerUpdate(release);
-    });
+    // The only place an update is offered — as a strip of chrome that waits,
+    // not a modal that announces (#48). Everything else about the flow —
+    // deciding, downloading, hashing, launching — lives in the controller,
+    // and `apply()` is reachable only from the bar's own button.
+    final offering = ref.watch(
+      updateControllerProvider.select((s) => s.isOffering),
+    );
 
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
@@ -67,23 +64,32 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       backgroundColor: AppColors.ink0,
-      body: Stack(
+      body: Column(
         children: [
-          Row(
-            children: [
-              const Sidebar(),
-              Expanded(
-                child: Column(
+          // Above the sidebar as well as the content: this is the app telling
+          // the student something, not one page's business.
+          if (offering) const UpdateOfferBar(),
+          Expanded(
+            child: Stack(
+              children: [
+                Row(
                   children: [
-                    const TopBar(),
-                    Expanded(child: _bodyFor(section)),
+                    const Sidebar(),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const TopBar(),
+                          Expanded(child: _bodyFor(section)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const GoalSplashOverlay(),
+                const LevelUpOverlay(),
+              ],
+            ),
           ),
-          const GoalSplashOverlay(),
-          const LevelUpOverlay(),
         ],
       ),
     );
@@ -105,42 +111,6 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const AccountsPage();
       case Section.options:
         return const OptionsPage();
-    }
-  }
-
-  /// Tells the student an update is waiting, and applies it once they close
-  /// the dialog.
-  ///
-  /// The shell's whole remaining part in the flow: no fetching, no version
-  /// comparison, no download, no `Process.start`. Failures below this point
-  /// are handled by the controller and left on `UpdateState.message` for the
-  /// About panel (#48), which is also where a real accept/decline choice and
-  /// a progress indicator land.
-  Future<void> _offerUpdate(UpdateInfo release) async {
-    if (_offering || !mounted) return;
-    _offering = true;
-    try {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          final l = AppLocalizations.of(context);
-          return AlertDialog(
-            title: Text(l.update_dialog_title),
-            content: Text(l.update_dialog_message(release.version)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(l.update_dialog_ok),
-              ),
-            ],
-          );
-        },
-      );
-      if (!mounted) return;
-      await ref.read(updateControllerProvider.notifier).apply();
-    } finally {
-      _offering = false;
     }
   }
 }

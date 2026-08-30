@@ -14,6 +14,9 @@
 // and it is the only kind that can prove this: the server is never asked. It
 // fails on the unpatched code, where the boot fetches.
 //
+// The gate is about the *automatic* check only. `update_manual_check.dart`
+// boots the same way and proves About's button still reaches the feed (#48).
+//
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
@@ -53,7 +56,7 @@ void main() {
       0,
       reason: 'a debug build reached out to the Releases API',
     );
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byKey(const ValueKey('update-offer')), findsNothing);
     expect(find.byType(AppShell), findsOneWidget);
 
     await harness.dispose(tester);

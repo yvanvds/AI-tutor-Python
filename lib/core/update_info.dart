@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -67,7 +68,16 @@ bool isNewer(String remote, String local) {
   return false;
 }
 
-/// Downloads the installer to a temp file.
+/// Downloads the installer to a temp file, reporting how far it has got.
+///
+/// [onProgress] is called with a 0..1 fraction after every chunk, but only
+/// when the server declared a `Content-Length`: without one there is no
+/// denominator, the caller is left on 0, and the UI renders that as an
+/// indeterminate bar rather than a bar frozen at 0% (#48).
+///
+/// The body is consumed with a listen loop rather than `pipe`/`addStream`,
+/// which hand the whole stream to the sink and offer no per-chunk hook —
+/// that is why there was no progress to report before (#48).
 ///
 /// Throws an [UpdateCheckException] on any failure — a non-200 status, a
 /// transport error, a request that never gets a response, or a stream that
@@ -75,6 +85,7 @@ bool isNewer(String remote, String local) {
 /// hang forever on a dead socket (#46). A partial file is removed.
 Future<File> downloadToTemp(
   Uri url, {
+  void Function(double fraction)? onProgress,
   http.Client? client,
   Duration responseTimeout = kUpdateRequestTimeout,
   Duration stallTimeout = kDownloadStallTimeout,
@@ -91,14 +102,23 @@ Future<File> downloadToTemp(
         'installer download from $url returned HTTP ${res.statusCode}',
       );
     }
+    final total = res.contentLength;
+    var received = 0;
     final sink = tmp.openWrite();
     try {
-      // `addStream` rather than `pipe`: `pipe` closes the sink itself when
-      // the stream errors, so the close below would then throw "File
-      // closed" and bury the timeout that actually went wrong.
-      await sink.addStream(res.stream.timeout(stallTimeout));
+      await for (final chunk in res.stream.timeout(stallTimeout)) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (onProgress != null && total != null && total > 0) {
+          onProgress(received / total);
+        }
+      }
+      await sink.flush();
       await sink.close();
     } catch (_) {
+      // Close by hand rather than letting the sink dangle: `pipe` used to do
+      // this and then made the close below throw "File closed", burying the
+      // timeout that actually went wrong.
       try {
         await sink.close();
       } catch (_) {
@@ -128,10 +148,29 @@ Future<void> _deleteQuietly(File file) async {
   }
 }
 
+/// Hashes [file] against [expectedHex] without ever holding it in memory.
+///
+/// Read back in chunks off `openRead()`: the installer is ~250 MB, and
+/// `readAsBytes` pulled all of it into RAM on a machine that has just
+/// finished writing the same bytes to disk (#48). The download itself was
+/// already streamed; the hashing was the one place that buffered.
 Future<bool> verifySha256(File file, String expectedHex) async {
-  final bytes = await file.readAsBytes();
-  final digest = sha256.convert(bytes).toString();
-  return digest.toLowerCase() == expectedHex.toLowerCase();
+  Digest? result;
+  final input = sha256.startChunkedConversion(
+    ChunkedConversionSink<Digest>.withCallback(
+      (digests) => result = digests.single,
+    ),
+  );
+  try {
+    await for (final chunk in file.openRead()) {
+      input.add(chunk);
+    }
+  } finally {
+    input.close();
+  }
+  final digest = result;
+  if (digest == null) return false;
+  return digest.toString().toLowerCase() == expectedHex.toLowerCase();
 }
 
 Future<void> runInstallerAndExit(

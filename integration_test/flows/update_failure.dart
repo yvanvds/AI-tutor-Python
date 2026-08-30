@@ -47,7 +47,11 @@ Future<void> _expectSurvivesCheck(
     await tester.pump(const Duration(milliseconds: 50));
   }
 
+  // Nothing pushed at the student, in either shape: the modal #48 removed or
+  // the offer bar that replaced it. A check that failed has no release to
+  // offer, so its reason waits in About instead (#48).
   expect(find.byType(AlertDialog), findsNothing);
+  expect(find.byKey(const ValueKey('update-offer')), findsNothing);
   expect(find.byType(AppShell), findsOneWidget);
 
   await harness.dispose(tester);

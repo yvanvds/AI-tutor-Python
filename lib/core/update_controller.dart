@@ -13,8 +13,9 @@
 ///   developer's own machine the moment the manifest went ahead. See
 ///   [UpdateServices.autoCheck].
 /// - **Invisible.** A failed check left nothing behind for the UI to show.
-///   [UpdateState.phase] and [UpdateState.message] now carry the reason; the
-///   About panel renders it in #48.
+///   [UpdateState.phase] and [UpdateState.message] now carry the reason, and
+///   the About panel renders it beside its **Check for updates** button
+///   (#48).
 ///
 /// The layering mirrors AccountManager's (`lib/src/update/`): this file holds
 /// decision logic and no IO, `update_bootstrap.dart` holds the IO and is the
@@ -28,9 +29,9 @@ import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Where the update check has got to. The shell offers the update on
-/// [available]; the About panel renders [failed] with [UpdateState.message]
-/// (#48).
+/// Where the update check has got to. The shell's offer bar shows from
+/// [available] onwards; the About panel renders [failed] with
+/// [UpdateState.message] (#48).
 enum UpdatePhase {
   /// Nothing has been asked yet.
   idle,
@@ -116,8 +117,8 @@ class UpdateServices {
   /// checkout is something being developed against, not an install to update,
   /// and leaving this on means every `flutter run` and every integration-test
   /// boot reaches out — and, worse, installs a release build over the
-  /// developer's machine. [check] still runs when asked, which is what the
-  /// manual check in #48 will call.
+  /// developer's machine. [check] still runs when asked, which is what
+  /// About's **Check for updates** button calls (#48).
   final bool autoCheck;
 
   /// Where failures are written. Defaults to [debugPrint].
@@ -132,6 +133,7 @@ class UpdateState {
     this.release,
     this.message = '',
     this.progress = 0,
+    this.dismissed = false,
   });
 
   final UpdatePhase phase;
@@ -144,11 +146,31 @@ class UpdateState {
   final String message;
 
   /// Download progress as a 0..1 fraction while [phase] is
-  /// [UpdatePhase.downloading]. Stays 0 until the downloader reports it (#48).
+  /// [UpdatePhase.downloading]. Stays 0 while the server declared no content
+  /// length, which the bar renders as indeterminate rather than as 0% (#48).
   final double progress;
 
-  /// Whether a newer release is on offer and nothing has been started yet.
-  bool get isOffering => release != null && phase == UpdatePhase.available;
+  /// Whether the student has put this session's offer away with **Later**.
+  ///
+  /// Deliberately not persisted: it silences the bar for as long as the app
+  /// is open, and the next launch asks again. "Skip this version" forever is
+  /// a setting nobody revisits, and an un-updated install is the failure it
+  /// produces.
+  final bool dismissed;
+
+  /// Whether the shell should be showing the offer bar.
+  ///
+  /// Covers the whole accepted run, not just the moment before it: the bar is
+  /// where the progress and the outcome are rendered, so it has to stay while
+  /// the installer comes down and after an apply that failed. A *check* that
+  /// failed clears [release] and so shows nothing — that news waits in About.
+  bool get isOffering =>
+      !dismissed &&
+      release != null &&
+      (phase == UpdatePhase.available ||
+          phase == UpdatePhase.downloading ||
+          phase == UpdatePhase.applying ||
+          phase == UpdatePhase.failed);
 
   /// Whether an operation is in flight, so a button can disable itself.
   bool get busy =>
@@ -162,11 +184,13 @@ class UpdateState {
     bool clearRelease = false,
     String? message,
     double? progress,
+    bool? dismissed,
   }) => UpdateState(
     phase: phase ?? this.phase,
     release: clearRelease ? null : (release ?? this.release),
     message: message ?? this.message,
     progress: progress ?? this.progress,
+    dismissed: dismissed ?? this.dismissed,
   );
 }
 
@@ -220,6 +244,9 @@ class UpdateController extends Notifier<UpdateState> {
         message: '',
         clearRelease: true,
         progress: 0,
+        // Asking again is asking to be told: a check the student started
+        // themselves must be allowed to put the bar back.
+        dismissed: false,
       ),
     );
     try {
@@ -364,6 +391,17 @@ class UpdateController extends Notifier<UpdateState> {
         ),
       );
     }
+  }
+
+  /// Puts the offer bar away for this session (#48).
+  ///
+  /// The release stays on the state, so About still shows it and can still
+  /// apply it: dismissing an offer is "not now", not "not this version". A
+  /// dismissal during a download would leave an install running with nothing
+  /// on screen, so it is refused while [UpdateState.busy].
+  void dismiss() {
+    if (state.busy) return;
+    _set(state.copyWith(dismissed: true));
   }
 }
 
