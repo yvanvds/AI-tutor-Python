@@ -14,6 +14,7 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
@@ -200,7 +201,7 @@ class ConductorDeps {
     required this.getProgressAll,
     required this.getProgressByGoalId,
     required this.setCurrentProgress,
-    required this.addSystemMessage,
+    required this.addSystemNotice,
     required this.recordDebugEvent,
     required this.playCorrectAnswer,
     required this.playGoalReached,
@@ -228,7 +229,10 @@ class ConductorDeps {
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
   final void Function(double) setCurrentProgress;
-  final void Function(String) addSystemMessage;
+
+  /// Post a system pill in chat. Takes a [ChatNotice], not text — the
+  /// conductor has no locale; the chat widget localizes (#23).
+  final void Function(ChatNotice) addSystemNotice;
   final void Function(String name, [Map<String, Object?>?]) recordDebugEvent;
   final void Function() playCorrectAnswer;
   final void Function() playGoalReached;
@@ -629,8 +633,8 @@ class Conductor {
       final wasDegraded = _degraded;
       _degraded = true;
       if (!wasDegraded) {
-        _deps.addSystemMessage(
-          'Er is iets mis met de feedback. Probeer het over een paar minuten opnieuw.',
+        _deps.addSystemNotice(
+          const ChatNotice(ChatNoticeKind.feedbackDegraded),
         );
         _deps.recordDebugEvent('conductor.degraded_mode', {
           'fallbackCount': fallbackCount,
@@ -923,8 +927,11 @@ class Conductor {
           );
     final calibrationAfter = updatedCal.difficulty;
     if (cal.difficulty != calibrationAfter) {
-      _deps.addSystemMessage(
-        'Moeilijkheid aangepast: ${cal.difficulty.name} -> ${calibrationAfter.name}',
+      _deps.addSystemNotice(
+        ChatNotice(
+          ChatNoticeKind.difficultyChanged,
+          args: [cal.difficulty.name, calibrationAfter.name],
+        ),
       );
     }
     await _deps.setCalibration(updatedCal);
@@ -1116,8 +1123,11 @@ class Conductor {
           _deps.setSelectedRoot(root);
           _deps.setSelectedChild(targetChild);
           _deps.setCurrentProgress(progressFor(targetChild));
-          _deps.addSystemMessage(
-            'Nieuw doel geselecteerd: ${targetChild.title}',
+          _deps.addSystemNotice(
+            ChatNotice(
+              ChatNoticeKind.newGoalSelected,
+              args: [targetChild.title],
+            ),
           );
           return true;
         }

@@ -8,8 +8,10 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -204,15 +206,19 @@ class TutorService extends Notifier<TutorState> {
 
   // ---- Error surfacing (#7) ------------------------------------------------
 
-  /// One student-facing line for an exception that escaped a tutor flow.
-  /// Cosmos transient failures already went through the client's retries
-  /// by the time they get here, so "try again" is honest advice.
-  static String describeFailure(Object e) {
+  /// One student-facing line for an exception that escaped a tutor flow,
+  /// as a [ChatNotice] the chat widget localizes (#23). Cosmos transient
+  /// failures already went through the client's retries by the time they
+  /// get here, so "try again" is honest advice.
+  static ChatNotice describeFailure(Object e) {
     if (e is CosmosException && e.isTransient) {
-      return 'De verbinding met de database is even weg. Probeer het zo opnieuw.';
+      return const ChatNotice(ChatNoticeKind.databaseUnavailable);
     }
     return OpenaiConnector.describeTransportError(e);
   }
+
+  static ChatNotice _tutorFailed(ChatNotice cause) =>
+      ChatNotice(ChatNoticeKind.tutorFailed, cause: cause);
 
   /// Runs [body]; on failure posts a system message and resets whatever
   /// in-flight turn state would otherwise leak into the next request.
@@ -226,7 +232,7 @@ class TutorService extends Notifier<TutorState> {
       debugPrint('TutorService: $what failed: $e\n$stack');
       _debug.recordEvent('tutor.error', {'where': what, 'error': '$e'});
       _chat.failStream();
-      _chat.addSystemMessage('Er ging iets mis bij de tutor: ${describeFailure(e)}');
+      _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
       _inFlightPlan = null;
       _followUpInFlight = null;
       if (state == TutorState.working) state = TutorState.idle;
@@ -281,8 +287,8 @@ class TutorService extends Notifier<TutorState> {
   }
 
   Future<void> _handleActiveSubgoalDeleted({required String deletedId}) async {
-    _chat.addSystemMessage(
-      'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.',
+    _chat.addSystemNotice(
+      const ChatNotice(ChatNoticeKind.subgoalDeletedRedirect),
     );
     await ref.read(turnHistoryServiceProvider).appendAudit(
           subgoalId: deletedId,
@@ -374,7 +380,7 @@ class TutorService extends Notifier<TutorState> {
           ref.read(progressServiceProvider).getByGoalId(id),
       setCurrentProgress: (v) =>
           ref.read(progressServiceProvider).setCurrentProgress(v),
-      addSystemMessage: _chat.addSystemMessage,
+      addSystemNotice: _chat.addSystemNotice,
       recordDebugEvent: _debug.recordEvent,
       playCorrectAnswer: () =>
           unawaited(ref.read(soundServiceProvider).correctAnswer()),
@@ -434,8 +440,11 @@ class TutorService extends Notifier<TutorState> {
       debugPrint('TutorService: initializeSession failed: $e\n$stack');
       _debug.recordEvent('tutor.error', {'where': 'initializeSession', 'error': '$e'});
       _initialized = false;
-      _chat.addSystemMessage(
-        'De sessie kon niet starten: ${describeFailure(e)}',
+      _chat.addSystemNotice(
+        ChatNotice(
+          ChatNoticeKind.sessionStartFailed,
+          cause: describeFailure(e),
+        ),
       );
     }
   }
@@ -450,9 +459,7 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
     if (plan.blockedSaturated) {
-      _chat.addSystemMessage(
-        'Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?',
-      );
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
       return;
     }
     if (plan.blockedDegraded) {
@@ -461,9 +468,7 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
     if (plan.type == ChatRequestType.noResult) {
-      _chat.addSystemMessage(
-        'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!',
-      );
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.noGoalsLeft));
     }
   }
 
@@ -471,10 +476,7 @@ class TutorService extends Notifier<TutorState> {
   /// occurrence in this session for the active subgoal, append a
   /// `emptyObjectivesBlock` audit record (CONDUCTOR_POLICY §7.1 / §8.2).
   Future<void> _surfaceEmptyObjectivesBlock() async {
-    _chat.addSystemMessage(
-      'Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om '
-      'het af te ronden, of kies een ander subdoel.',
-    );
+    _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.emptyObjectives));
     final subgoalId = ref.read(goalSelectionProvider).activeChildGoal?.id;
     if (subgoalId == null) return;
     if (_emptyObjectivesAuditFiredFor.add(subgoalId)) {
@@ -584,9 +586,7 @@ class TutorService extends Notifier<TutorState> {
       debugPrint('TutorService: queryTutor(${type.name}) failed: $e\n$stack');
       _debug.recordEvent('tutor.error', {'where': 'queryTutor', 'error': '$e'});
       _chat.failStream();
-      _chat.addSystemMessage(
-        'Er ging iets mis bij de tutor: ${describeFailure(e)}',
-      );
+      _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
       _inFlightPlan = null;
       _followUpInFlight = null;
     } finally {
@@ -764,7 +764,7 @@ class TutorService extends Notifier<TutorState> {
 
     if (failed != null) {
       _chat.failStream();
-      _chat.addSystemMessage('Er ging iets mis bij de tutor: ${failed.message}');
+      _chat.addSystemNotice(_tutorFailed(failed.notice));
       await _maybeRetryStream();
       return;
     }
@@ -786,7 +786,7 @@ class TutorService extends Notifier<TutorState> {
 
     final dispatched = await dispatchResponse(response, _streamingContext());
     if (!dispatched) {
-      _chat.addTutorMessage('Onbekend antwoord ontvangen.');
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
       await _maybeRetryStream();
     }
   }
@@ -831,7 +831,11 @@ class TutorService extends Notifier<TutorState> {
       startNewCode: (code) => ref.read(codeServiceProvider(SessionMode.practice)).setText(code),
       addTutorMessage:
           addTutorMessageOverride ?? _chat.addTutorMessage,
-      addSystemMessage: _chat.addSystemMessage,
+      addSystemNotice: _chat.addSystemNotice,
+      // The editor comment a write-code exercise starts with. Read lazily so
+      // it follows the language in effect when the exercise arrives.
+      writeCodeTemplate: () =>
+          ref.read(appLocalizationsProvider).session_writeCode_template,
       setExerciseType: _trackedSetExerciseType,
       setFollowUp: _trackedSetFollowUp,
       requestExercise: requestExercise,
@@ -1082,8 +1086,8 @@ class TutorService extends Notifier<TutorState> {
     switch (result) {
       case ConnectorOk(:final output):
         await _handleResponse(output);
-      case ConnectorFailure(:final message):
-        _chat.addSystemMessage('Er ging iets mis bij de tutor: $message');
+      case ConnectorFailure(:final notice):
+        _chat.addSystemNotice(_tutorFailed(notice));
         await _maybeRetry();
     }
   }
@@ -1166,9 +1170,7 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
     if (plan.blockedSaturated) {
-      _chat.addSystemMessage(
-        'Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?',
-      );
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
       return;
     }
     if (plan.blockedDegraded) {
@@ -1177,13 +1179,11 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
     if (plan.type == ChatRequestType.noResult) {
-      _chat.addSystemMessage(
-        'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!',
-      );
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.noGoalsLeft));
       return;
     }
 
-    _chat.addSystemMessage('Je volgende oefening wordt voorbereid...');
+    _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));
 
     if (state == TutorState.working) state = TutorState.idle;
     await queryTutor(type: plan.type, plan: plan);
@@ -1218,7 +1218,7 @@ class TutorService extends Notifier<TutorState> {
     _connector.addResponse(parsed);
     final dispatched = await dispatchResponse(parsed, _nonStreamingContext());
     if (!dispatched) {
-      _chat.addTutorMessage('Onbekend antwoord ontvangen.');
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
       await _maybeRetry();
     }
   }

@@ -1,9 +1,30 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
 /// Optional tag shown above a tutor bubble. Set on `TextMessage.metadata['role']`
-/// using the enum's `name` (e.g. `'uitleg'`).
-enum TutorRole { uitleg, voorbeeld, denkvraag, goed }
+/// using the enum's `name` (e.g. `'uitleg'`). The names are the wire format;
+/// the visible label is localized via [label].
+enum TutorRole {
+  uitleg,
+  voorbeeld,
+  denkvraag,
+  goed;
+
+  String label(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    switch (this) {
+      case TutorRole.uitleg:
+        return l.chat_role_explanation;
+      case TutorRole.voorbeeld:
+        return l.chat_role_example;
+      case TutorRole.denkvraag:
+        return l.chat_role_question;
+      case TutorRole.goed:
+        return l.chat_role_correct;
+    }
+  }
+}
 
 TutorRole? tutorRoleFromMetadata(Map<String, dynamic>? metadata) {
   final raw = metadata?['role'];
@@ -35,7 +56,7 @@ class RoleChip extends StatelessWidget {
           Icon(s.icon, size: 11, color: s.fg),
           const SizedBox(width: 4),
           Text(
-            role.name,
+            role.label(context),
             style: TextStyle(
               color: s.fg,
               fontSize: 10,

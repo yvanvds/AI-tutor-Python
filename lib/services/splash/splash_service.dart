@@ -3,28 +3,36 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// What the goal-reached overlay shows. Carries data only — the title and
+/// the encouragement phrase are localized by the overlay (#23), so this
+/// holds the phrase's index rather than its text.
 class GoalSplashState {
-  final String title;
   final String goalTitle;
   final String description;
-  final String message;
+
+  /// Index into the localized encouragement phrases,
+  /// `0 <= phraseIndex < SplashService.phraseCount`.
+  final int phraseIndex;
 
   const GoalSplashState({
-    required this.title,
     required this.goalTitle,
     required this.description,
-    required this.message,
+    required this.phraseIndex,
   });
 }
 
 class SplashService {
   SplashService({void Function(GoalSplashState?)? onStateChanged})
-      : _onStateChanged = onStateChanged;
+    : _onStateChanged = onStateChanged;
 
   final void Function(GoalSplashState?)? _onStateChanged;
   GoalSplashState? _current;
 
   final _random = Random();
+
+  /// Number of over-the-top encouragements in the ARB files
+  /// (`splash_phrase_01` … `splash_phrase_25`).
+  static const int phraseCount = 25;
 
   /// Call this from TutorService when a goal is reached.
   void showGoalReached({
@@ -33,10 +41,9 @@ class SplashService {
     Duration duration = const Duration(seconds: 10),
   }) {
     final splash = GoalSplashState(
-      title: 'Goal reached!',
       goalTitle: goalTitle,
       description: description,
-      message: randomPhrase(),
+      phraseIndex: randomPhraseIndex(),
     );
     _current = splash;
     _onStateChanged?.call(splash);
@@ -54,36 +61,7 @@ class SplashService {
     _onStateChanged?.call(null);
   }
 
-  /// 25 hilariously over-the-top Dutch encouragements
-  static const List<String> _phrases = [
-    "LEGENDARISCH! Je code zal eeuwenlang worden bezongen!",
-    "Wauw! Zelfs je toetsenbord klapt voor je!",
-    "Kijk uit, de AI wordt jaloers op je!",
-    "Je hebt zojuist de informaticagod ontroerd.",
-    "BAM! Nog één overwinning voor de Hall of Fame!",
-    "Je toetsen maken rook — zo snel programmeer jij!",
-    "Briljant! Zelfs Stack Overflow heeft geen woorden.",
-    "De bugpolitiek heeft vandaag verloren!",
-    "Wat een meesterwerk! Rembrandt, maar dan in Python.",
-    "Je hebt net het internet verbeterd. Graag gedaan!",
-    "Overheid belt: ze willen je algoritme aankopen.",
-    "Applaus! De bits en bytes staan recht voor je!",
-    "De compiler glimlacht. Dat gebeurt zelden.",
-    "Je code is zo zuiver dat je er door kan kijken.",
-    "De matrix heeft je opgemerkt… en knikt goedkeurend.",
-    "De muis fluistert: 'ik ben niet waardig'.",
-    "Zelfs je laptop wil nu een handtekening van je.",
-    "Een nieuw record! De pixels juichen!",
-    "Je hebt de grenzen van menselijk begrip overschreden.",
-    "Wiskundigen huilen van ontroering.",
-    "Python zelf fluistert: 'thank you, master'.",
-    "Dit is geen succes meer. Dit is folklore.",
-    "NASA belt: 'kun je bij ons komen debuggen?'",
-    "De AI-tutor heeft besloten jou voortaan te tutoren.",
-    "Stop! Je bent te goed. Geef de rest een kans.",
-  ];
-
-  String randomPhrase() => _phrases[_random.nextInt(_phrases.length)];
+  int randomPhraseIndex() => _random.nextInt(phraseCount);
 }
 
 final splashStateProvider = StateProvider<GoalSplashState?>((_) => null);

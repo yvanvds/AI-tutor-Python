@@ -63,7 +63,7 @@ ConductorDeps _buildDeps(_Fakes f) {
     getProgressAll: () async => f.progressById.values.toList(),
     getProgressByGoalId: (id) async => f.progressById[id],
     setCurrentProgress: (v) => f.currentProgress = v,
-    addSystemMessage: (_) {},
+    addSystemNotice: (_) {},
     recordDebugEvent: (name, [data]) {},
     playCorrectAnswer: () {},
     playGoalReached: () {},

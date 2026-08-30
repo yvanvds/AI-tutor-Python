@@ -14,9 +14,9 @@ class LevelUpEvent {
   final int newLevel;
   final int xpAwarded;
 
-  /// Short, lowercase Dutch concept name shown in the subtitle
-  /// ("Je hebt de {concept} onder de knie."). Examples: `elif-ladder`,
-  /// `for-lus`, `lijsten`.
+  /// Short, lowercase concept name (the subgoal title as authored by the
+  /// teacher) shown in the localized subtitle ("You've mastered {concept}.").
+  /// Examples: `elif-ladder`, `for-lus`, `lijsten`.
   final String conceptName;
 }
 

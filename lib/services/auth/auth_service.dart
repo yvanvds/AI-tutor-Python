@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/azure_config.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -58,8 +59,6 @@ class AccountIdentity {
 class AuthService extends Notifier<AccountIdentity?> {
   static const String _scope = 'openid profile email offline_access';
   static const String _prefsKey = 'azure_auth_tokens_v1';
-  static const String _signInFailedTitle = 'Sign-in failed';
-
   String get _authorizeUrl =>
       'https://login.microsoftonline.com/${AzureConfig.tenantId}/oauth2/v2.0/authorize';
   String get _tokenUrl =>
@@ -150,6 +149,9 @@ class AuthService extends Notifier<AccountIdentity?> {
     required String expectedState,
   }) async {
     final completer = Completer<String>();
+    // The page the browser lands on after Entra redirects back. There is no
+    // widget to localize it in, so it takes the app's resolved locale (#23).
+    final l = ref.read(appLocalizationsProvider);
     late StreamSubscription<HttpRequest> sub;
     sub = server.listen((HttpRequest request) async {
       final params = request.uri.queryParameters;
@@ -160,22 +162,25 @@ class AuthService extends Notifier<AccountIdentity?> {
       request.response.headers.contentType = ContentType.html;
       if (error != null) {
         request.response.write(
-          _browserBody(title: _signInFailedTitle, body: errorDesc ?? error),
+          _browserBody(
+            title: l.auth_browser_failed_title,
+            body: errorDesc ?? error,
+          ),
         );
       } else if (code == null) {
         request.response.write(_browserBody(
-          title: _signInFailedTitle,
-          body: 'No authorization code returned.',
+          title: l.auth_browser_failed_title,
+          body: l.auth_browser_failed_noCode,
         ));
       } else if (returnedState != expectedState) {
         request.response.write(_browserBody(
-          title: _signInFailedTitle,
-          body: 'State mismatch — possible CSRF, please try again.',
+          title: l.auth_browser_failed_title,
+          body: l.auth_browser_failed_stateMismatch,
         ));
       } else {
         request.response.write(_browserBody(
-          title: 'Signed in',
-          body: 'You can close this tab and return to the app.',
+          title: l.auth_browser_signedIn_title,
+          body: l.auth_browser_signedIn_body,
         ));
       }
       await request.response.close();

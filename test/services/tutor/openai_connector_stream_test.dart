@@ -4,12 +4,14 @@
 //   - a reply cut off before `</META>` is a `StreamFailed`, not a
 //     half-parsed `ErrorResponse` carrying the partial text as its message;
 //   - a stream that stalls between chunks hits the idle timeout;
-//   - transport exceptions get a student-facing one-liner;
+//   - transport exceptions get a student-facing one-liner — as a typed
+//     `ChatNotice` the chat widget localizes (#23), never as text;
 //   - history is only recorded for a completed reply.
 
 import 'dart:async';
 import 'dart:io';
 
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,7 +65,7 @@ void main() {
     expect(chunks.whereType<StreamTextDelta>(), isNotEmpty);
     expect(chunks.whereType<StreamCompleted>(), isEmpty);
     final failed = chunks.last as StreamFailed;
-    expect(failed.message, contains('afgebroken'));
+    expect(failed.notice.kind, ChatNoticeKind.replyTruncated);
     expect(c.sessionHistory, isEmpty, reason: 'no history for a lost turn');
   });
 
@@ -75,7 +77,10 @@ void main() {
     );
 
     expect(chunks.last, isA<StreamFailed>());
-    expect((chunks.last as StreamFailed).message, contains('afgebroken'));
+    expect(
+      (chunks.last as StreamFailed).notice.kind,
+      ChatNoticeKind.replyTruncated,
+    );
   });
 
   test('a stalled stream hits the idle timeout', () async {
@@ -96,7 +101,7 @@ void main() {
     expect(chunks.first, isA<StreamTextDelta>());
     final failed = chunks.last as StreamFailed;
     expect(failed.error, isA<TimeoutException>());
-    expect(failed.message, contains('niet op tijd'));
+    expect(failed.notice.kind, ChatNoticeKind.tutorTimeout);
   });
 
   test('a transport exception becomes a student-facing failure', () async {
@@ -108,7 +113,7 @@ void main() {
 
     final failed = chunks.single as StreamFailed;
     expect(failed.error, isA<SocketException>());
-    expect(failed.message, 'Geen verbinding met de tutor.');
+    expect(failed.notice, const ChatNotice(ChatNoticeKind.tutorUnreachable));
   });
 
   test('legacy JSON-only output still completes', () async {
@@ -123,13 +128,12 @@ void main() {
   });
 
   test('describeTransportError keeps unknown errors verbatim', () {
-    expect(
-      OpenaiConnector.describeTransportError(StateError('x')),
-      contains('x'),
-    );
+    final unknown = OpenaiConnector.describeTransportError(StateError('x'));
+    expect(unknown.kind, ChatNoticeKind.raw);
+    expect(unknown.args.single, contains('x'));
     expect(
       OpenaiConnector.describeTransportError(TimeoutException('t')),
-      'De tutor reageerde niet op tijd.',
+      const ChatNotice(ChatNoticeKind.tutorTimeout),
     );
   });
 }

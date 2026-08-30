@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
@@ -27,8 +28,10 @@ class ConnectorOk extends ConnectorResult {
 class ConnectorFailure extends ConnectorResult {
   final Object error;
   final StackTrace stack;
-  final String message;
-  const ConnectorFailure(this.error, this.stack, this.message);
+
+  /// Student-facing description, localized by the chat widget (#23).
+  final ChatNotice notice;
+  const ConnectorFailure(this.error, this.stack, this.notice);
 }
 
 /// Streaming events emitted by [OpenaiConnector.sendRequestStream].
@@ -52,8 +55,10 @@ class StreamCompleted extends StreamChunk {
 class StreamFailed extends StreamChunk {
   final Object error;
   final StackTrace stack;
-  final String message;
-  const StreamFailed(this.error, this.stack, this.message);
+
+  /// Student-facing description, localized by the chat widget (#23).
+  final ChatNotice notice;
+  const StreamFailed(this.error, this.stack, this.notice);
 }
 
 class OpenaiConnector {
@@ -207,13 +212,12 @@ class OpenaiConnector {
       // Treat it like a transport failure — the partial text is not a
       // usable answer and the caller's retry gets a fresh, complete one.
       if (assembler.sawOpenTag && !assembler.sawCloseMeta) {
-        const message = 'Het antwoord van de tutor werd afgebroken.';
         debugPrint('OpenaiConnector: stream truncated before </META>');
         _onRecordStreamFailure?.call('truncated: ${raw.length} chars');
         yield StreamFailed(
           StateError('stream ended before </META>'),
           StackTrace.current,
-          message,
+          const ChatNotice(ChatNoticeKind.replyTruncated),
         );
         return;
       }
@@ -237,15 +241,16 @@ class OpenaiConnector {
   }
 
   /// Student-facing one-liner for a transport failure. The raw exception
-  /// (`SocketException: Failed host lookup ...`) stays in the debug log.
-  static String describeTransportError(Object e) {
+  /// (`SocketException: Failed host lookup ...`) stays in the debug log;
+  /// unknown errors are passed through verbatim.
+  static ChatNotice describeTransportError(Object e) {
     if (e is TimeoutException) {
-      return 'De tutor reageerde niet op tijd.';
+      return const ChatNotice(ChatNoticeKind.tutorTimeout);
     }
     if (e is SocketException || e is HttpException) {
-      return 'Geen verbinding met de tutor.';
+      return const ChatNotice(ChatNoticeKind.tutorUnreachable);
     }
-    return e.toString();
+    return ChatNotice.raw(e.toString());
   }
 
   Future<ConnectorResult> resendRequest() async {
@@ -255,7 +260,7 @@ class OpenaiConnector {
       return ConnectorFailure(
         StateError('No previous request to resend'),
         StackTrace.current,
-        'Geen vorige aanvraag om opnieuw te proberen.',
+        const ChatNotice(ChatNoticeKind.noPreviousRequest),
       );
     }
     return sendRequest(
@@ -272,7 +277,7 @@ class OpenaiConnector {
       yield StreamFailed(
         StateError('No previous request to resend'),
         StackTrace.current,
-        'Geen vorige aanvraag om opnieuw te proberen.',
+        const ChatNotice(ChatNoticeKind.noPreviousRequest),
       );
       return;
     }

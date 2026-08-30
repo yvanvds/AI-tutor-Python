@@ -4,8 +4,8 @@ import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
-import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,23 +46,18 @@ class GoalsApp extends ConsumerWidget {
     final identity = ref.watch(authServiceProvider);
     final currentAccount = ref.watch(accountServiceProvider);
     final hasLocalKey = ref.watch(localApiKeyStorageProvider);
-    final selectedLocale = ref.watch(localeServiceProvider);
+    // User override, else the system locale when translated, else English
+    // (#23). Resolved once in `appLocaleProvider` so services that need a
+    // locale (see `appLocalizationsProvider`) agree with the widget tree.
+    final locale = ref.watch(appLocaleProvider);
 
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: buildAppTheme(),
-      locale: selectedLocale,
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      localeResolutionCallback: (deviceLocale, supported) {
-        if (deviceLocale != null) {
-          for (final s in supported) {
-            if (s.languageCode == deviceLocale.languageCode) return s;
-          }
-        }
-        return const Locale('en');
-      },
       home: Builder(
         builder: (context) {
           if (identity == null) return const SignInPage();

@@ -1378,4 +1378,245 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goalTile_button_workOn => 'Work on this';
+
+  @override
+  String get common_undo => 'Undo';
+
+  @override
+  String get crash_permissionDenied => 'Permission denied while reading data.';
+
+  @override
+  String get auth_browser_signedIn_title => 'Signed in';
+
+  @override
+  String get auth_browser_signedIn_body =>
+      'You can close this tab and return to the app.';
+
+  @override
+  String get auth_browser_failed_title => 'Sign-in failed';
+
+  @override
+  String get auth_browser_failed_noCode => 'No authorization code returned.';
+
+  @override
+  String get auth_browser_failed_stateMismatch =>
+      'State mismatch — possible CSRF, please try again.';
+
+  @override
+  String levelUp_caption(int xp) {
+    return '+$xp XP · CONCEPT UNLOCKED';
+  }
+
+  @override
+  String levelUp_level(int level) {
+    return 'Level $level';
+  }
+
+  @override
+  String get levelUp_subtitle_generic => 'You\'ve mastered the next concept.';
+
+  @override
+  String levelUp_subtitle_concept(String concept) {
+    return 'You\'ve mastered $concept.';
+  }
+
+  @override
+  String get levelUp_button_continue => 'Keep learning';
+
+  @override
+  String get splash_title => 'Goal reached!';
+
+  @override
+  String get splash_phrase_01 =>
+      'LEGENDARY! Your code will be sung about for centuries!';
+
+  @override
+  String get splash_phrase_02 => 'Wow! Even your keyboard is applauding you!';
+
+  @override
+  String get splash_phrase_03 => 'Watch out, the AI is getting jealous of you!';
+
+  @override
+  String get splash_phrase_04 =>
+      'You just moved the god of computer science to tears.';
+
+  @override
+  String get splash_phrase_05 => 'BAM! One more victory for the Hall of Fame!';
+
+  @override
+  String get splash_phrase_06 =>
+      'Your keys are smoking — that\'s how fast you program!';
+
+  @override
+  String get splash_phrase_07 =>
+      'Brilliant! Even Stack Overflow is speechless.';
+
+  @override
+  String get splash_phrase_08 => 'The bug police lost today!';
+
+  @override
+  String get splash_phrase_09 =>
+      'What a masterpiece! Rembrandt, but in Python.';
+
+  @override
+  String get splash_phrase_10 =>
+      'You just improved the internet. You\'re welcome!';
+
+  @override
+  String get splash_phrase_11 =>
+      'The government is calling: they want to buy your algorithm.';
+
+  @override
+  String get splash_phrase_12 =>
+      'Applause! The bits and bytes are giving you a standing ovation!';
+
+  @override
+  String get splash_phrase_13 =>
+      'The compiler is smiling. That rarely happens.';
+
+  @override
+  String get splash_phrase_14 =>
+      'Your code is so clean you can see right through it.';
+
+  @override
+  String get splash_phrase_15 =>
+      'The matrix has noticed you… and nods approvingly.';
+
+  @override
+  String get splash_phrase_16 => 'The mouse whispers: \'I am not worthy\'.';
+
+  @override
+  String get splash_phrase_17 => 'Even your laptop wants your autograph now.';
+
+  @override
+  String get splash_phrase_18 => 'A new record! The pixels are cheering!';
+
+  @override
+  String get splash_phrase_19 =>
+      'You have exceeded the limits of human understanding.';
+
+  @override
+  String get splash_phrase_20 => 'Mathematicians are weeping with emotion.';
+
+  @override
+  String get splash_phrase_21 =>
+      'Python itself whispers: \'thank you, master\'.';
+
+  @override
+  String get splash_phrase_22 => 'This is no longer success. This is folklore.';
+
+  @override
+  String get splash_phrase_23 =>
+      'NASA is calling: \'can you come debug for us?\'';
+
+  @override
+  String get splash_phrase_24 =>
+      'The AI tutor has decided that you will tutor it from now on.';
+
+  @override
+  String get splash_phrase_25 =>
+      'Stop! You\'re too good. Give the others a chance.';
+
+  @override
+  String get chat_role_explanation => 'explanation';
+
+  @override
+  String get chat_role_example => 'example';
+
+  @override
+  String get chat_role_question => 'think about it';
+
+  @override
+  String get chat_role_correct => 'correct';
+
+  @override
+  String get session_writeCode_template => '# Write your code here';
+
+  @override
+  String get difficulty_easy => 'easy';
+
+  @override
+  String get difficulty_medium => 'medium';
+
+  @override
+  String get difficulty_hard => 'hard';
+
+  @override
+  String chat_notice_tutorFailed(String detail) {
+    return 'Something went wrong with the tutor: $detail';
+  }
+
+  @override
+  String chat_notice_sessionStartFailed(String detail) {
+    return 'The session could not start: $detail';
+  }
+
+  @override
+  String get chat_notice_databaseUnavailable =>
+      'The connection to the database dropped for a moment. Try again shortly.';
+
+  @override
+  String get chat_notice_tutorTimeout => 'The tutor did not respond in time.';
+
+  @override
+  String get chat_notice_tutorUnreachable => 'No connection to the tutor.';
+
+  @override
+  String get chat_notice_replyTruncated => 'The tutor\'s reply was cut off.';
+
+  @override
+  String get chat_notice_noPreviousRequest => 'No previous request to retry.';
+
+  @override
+  String get chat_notice_emptyResponse => 'Empty response from the tutor.';
+
+  @override
+  String chat_notice_unparseableResponse(String raw) {
+    return 'Could not process the response: $raw';
+  }
+
+  @override
+  String chat_notice_unknownResponseType(String type) {
+    return 'Unknown response type: $type';
+  }
+
+  @override
+  String get chat_notice_unknownResponse => 'Received an unknown response.';
+
+  @override
+  String get chat_notice_subgoalDeletedRedirect =>
+      'Your previous topic was removed by your teacher. Continuing with the next one.';
+
+  @override
+  String get chat_notice_subgoalSaturated =>
+      'You already have a good grip on this subgoal. Ready to move on?';
+
+  @override
+  String get chat_notice_noGoalsLeft =>
+      'There are no goals left to work on. Congratulations!';
+
+  @override
+  String get chat_notice_emptyObjectives =>
+      'This subgoal isn\'t quite finished yet — ask your teacher to complete it, or pick another subgoal.';
+
+  @override
+  String get chat_notice_preparingExercise => 'Preparing your next exercise...';
+
+  @override
+  String get chat_notice_feedbackDegraded =>
+      'Something is wrong with the feedback. Try again in a few minutes.';
+
+  @override
+  String chat_notice_newGoalSelected(String title) {
+    return 'New goal selected: $title';
+  }
+
+  @override
+  String chat_notice_difficultyChanged(String from, String to) {
+    return 'Difficulty adjusted: $from -> $to';
+  }
+
+  @override
+  String get chat_notice_submitViaEditor =>
+      'Adjust your code in the editor on the left and press Run to submit your solution.';
 }

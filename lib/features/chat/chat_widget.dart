@@ -8,7 +8,9 @@ import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
 import 'package:ai_tutor_python/features/chat/widgets/role_chip.dart';
 import 'package:ai_tutor_python/features/chat/widgets/student_bubble.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_bubble.dart';
+import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -157,7 +159,7 @@ class _ChatBody extends ConsumerWidget {
             horizontal: AppSpacing.lg,
             vertical: AppSpacing.xs,
           ),
-          child: ChatSystemPill(text: message.text),
+          child: ChatSystemPill(text: _systemText(context, message)),
         ),
         customMessageBuilder: (
           context,
@@ -180,5 +182,15 @@ class _ChatBody extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// System pills carry a [ChatNotice] rather than text (issue #23); resolve
+  /// it against the current locale so a language switch re-renders them.
+  static String _systemText(BuildContext context, SystemMessage message) {
+    final notice = ChatNotice.fromJson(
+      message.metadata?[ChatNotice.metadataKey],
+    );
+    if (notice == null) return message.text;
+    return AppLocalizations.of(context).chatNotice(notice);
   }
 }

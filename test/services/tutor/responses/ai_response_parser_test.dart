@@ -3,6 +3,7 @@
 // envelope first, falls back to legacy JSON-only output for non-compliant
 // responses, and otherwise returns an [ErrorResponse].
 
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
@@ -32,12 +33,14 @@ void main() {
       expect(mc.code, 'print(1)');
     });
 
-    test('error type uses TEXT as the message field', () {
+    test('error type uses TEXT as the message field, shown verbatim', () {
       final r = AIResponseParser.parse(
         '<TEXT>kapot</TEXT><META>{"type":"error"}</META>',
       );
       expect(r, isA<ErrorResponse>());
       expect((r as ErrorResponse).message, 'kapot');
+      // Model-authored text has no localized form.
+      expect(r.chatNotice, ChatNotice.raw('kapot'));
     });
 
     test('strips ```json fences inside META', () {
@@ -72,31 +75,47 @@ void main() {
     });
   });
 
+  // Parser-generated errors carry a typed notice so the chat widget can
+  // localize them (#23); `message` is the log-facing text.
   group('parse — error fallbacks', () {
-    test('empty input → "Lege respons"', () {
+    test('empty input → emptyResponse notice', () {
       final r = AIResponseParser.parse('');
       expect(r, isA<ErrorResponse>());
-      expect((r as ErrorResponse).message, contains('Lege respons'));
+      expect((r as ErrorResponse).notice?.kind, ChatNoticeKind.emptyResponse);
     });
 
-    test('whitespace-only input → "Lege respons"', () {
+    test('whitespace-only input → emptyResponse notice', () {
       final r = AIResponseParser.parse('   \n\n  ');
       expect(r, isA<ErrorResponse>());
-      expect((r as ErrorResponse).message, contains('Lege respons'));
+      expect((r as ErrorResponse).notice?.kind, ChatNoticeKind.emptyResponse);
     });
 
-    test('plain prose → "Kon respons niet verwerken"', () {
+    test('plain prose → unparseableResponse notice carrying the raw text', () {
       final r = AIResponseParser.parse('just some prose');
       expect(r, isA<ErrorResponse>());
-      expect((r as ErrorResponse).message, contains('Kon respons niet'));
+      expect(
+        (r as ErrorResponse).notice,
+        const ChatNotice(
+          ChatNoticeKind.unparseableResponse,
+          args: ['just some prose'],
+        ),
+      );
     });
 
-    test('unknown type in envelope → ErrorResponse from factory', () {
+    test('unknown type in envelope → unknownResponseType notice from the '
+        'factory', () {
       final r = AIResponseParser.parse(
         '<TEXT>x</TEXT><META>{"type":"made_up_type"}</META>',
       );
       expect(r, isA<ErrorResponse>());
       expect((r as ErrorResponse).message, contains('Unknown type'));
+      expect(
+        r.notice,
+        const ChatNotice(
+          ChatNoticeKind.unknownResponseType,
+          args: ['made_up_type'],
+        ),
+      );
     });
   });
 }

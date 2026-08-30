@@ -179,6 +179,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
       message: count == 0
           ? l.goals_editor_deleted_single(widget.goal.title)
           : l.goals_editor_deleted_withDescendants(widget.goal.title, count),
+      undoLabel: l.common_undo,
       onUndo: () async => svc.restoreSubtree(backup),
     );
   }

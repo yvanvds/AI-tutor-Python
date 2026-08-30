@@ -1,4 +1,5 @@
 // 1) Common interface for every AI message/response payload
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
@@ -57,7 +58,11 @@ class ChatResponseFactory {
         return ErrorResponse.fromMap(map);
 
       default:
-        return ErrorResponse(type: "error", message: 'Unknown type: $t');
+        return ErrorResponse(
+          type: 'error',
+          message: 'Unknown type: $t',
+          notice: ChatNotice(ChatNoticeKind.unknownResponseType, args: [t]),
+        );
     }
   }
 }

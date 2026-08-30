@@ -82,6 +82,7 @@ class ChildPane extends ConsumerWidget {
                     showUndoSnackBar(
                       messenger,
                       message: l.goals_pane_reordered(item.title),
+                      undoLabel: l.common_undo,
                       onUndo: () async => svc.applyOrder(
                         selectedRootId,
                         before.map((g) => g.id).toList(),

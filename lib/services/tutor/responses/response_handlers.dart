@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -42,7 +43,8 @@ class TutorContext {
     required this.conductor,
     required this.startNewCode,
     required this.addTutorMessage,
-    required this.addSystemMessage,
+    required this.addSystemNotice,
+    required this.writeCodeTemplate,
     required this.setExerciseType,
     required this.setFollowUp,
     required this.requestExercise,
@@ -61,7 +63,13 @@ class TutorContext {
   final Conductor conductor;
   final void Function(String code) startNewCode;
   final void Function(String message) addTutorMessage;
-  final void Function(String message) addSystemMessage;
+
+  /// System pill, localized by the chat widget (#23).
+  final void Function(ChatNotice notice) addSystemNotice;
+
+  /// Editor contents a write-code exercise starts with (a comment in the
+  /// UI language).
+  final String Function() writeCodeTemplate;
   final void Function(String type) setExerciseType;
   final void Function({String? message, String? code}) setFollowUp;
   final Future<void> Function() requestExercise;
@@ -140,7 +148,7 @@ class WriteCodeHandler extends ResponseHandler<WriteCode> {
   @override
   Future<void> handle(WriteCode r, TutorContext ctx) async {
     ctx.setExerciseType(r.type);
-    ctx.startNewCode('# Schrijf hier je code\n');
+    ctx.startNewCode('${ctx.writeCodeTemplate()}\n');
     ctx.addTutorMessage(r.prompt);
     ctx.playQuestion();
   }
@@ -181,9 +189,7 @@ class AnswerHandler extends ResponseHandler<Answer> {
     }
     final type = ctx.getCurrentExerciseType();
     if (type == 'complete_code' || type == 'write_code') {
-      ctx.addSystemMessage(
-        'Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.',
-      );
+      ctx.addSystemNotice(const ChatNotice(ChatNoticeKind.submitViaEditor));
     }
   }
 }
@@ -286,7 +292,7 @@ class ErrorResponseHandler extends ResponseHandler<ErrorResponse> {
   const ErrorResponseHandler();
   @override
   Future<void> handle(ErrorResponse r, TutorContext ctx) async {
-    ctx.addSystemMessage(r.message);
+    ctx.addSystemNotice(r.chatNotice);
     await ctx.maybeRetry();
   }
 }

@@ -711,5 +711,109 @@
   "leerpad_card_completed": "completed",
   "leerpad_card_button_continue": "Continue",
   "goalTile_button_faster": "Go faster",
-  "goalTile_button_workOn": "Work on this"
+  "goalTile_button_workOn": "Work on this",
+
+  "common_undo": "Undo",
+  "crash_permissionDenied": "Permission denied while reading data.",
+
+  "auth_browser_signedIn_title": "Signed in",
+  "auth_browser_signedIn_body": "You can close this tab and return to the app.",
+  "auth_browser_failed_title": "Sign-in failed",
+  "auth_browser_failed_noCode": "No authorization code returned.",
+  "auth_browser_failed_stateMismatch": "State mismatch — possible CSRF, please try again.",
+
+  "levelUp_caption": "+{xp} XP · CONCEPT UNLOCKED",
+  "@levelUp_caption": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "levelUp_level": "Level {level}",
+  "@levelUp_level": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "levelUp_subtitle_generic": "You've mastered the next concept.",
+  "levelUp_subtitle_concept": "You've mastered {concept}.",
+  "@levelUp_subtitle_concept": {
+    "placeholders": { "concept": { "type": "String" } }
+  },
+  "levelUp_button_continue": "Keep learning",
+
+  "splash_title": "Goal reached!",
+  "splash_phrase_01": "LEGENDARY! Your code will be sung about for centuries!",
+  "splash_phrase_02": "Wow! Even your keyboard is applauding you!",
+  "splash_phrase_03": "Watch out, the AI is getting jealous of you!",
+  "splash_phrase_04": "You just moved the god of computer science to tears.",
+  "splash_phrase_05": "BAM! One more victory for the Hall of Fame!",
+  "splash_phrase_06": "Your keys are smoking — that's how fast you program!",
+  "splash_phrase_07": "Brilliant! Even Stack Overflow is speechless.",
+  "splash_phrase_08": "The bug police lost today!",
+  "splash_phrase_09": "What a masterpiece! Rembrandt, but in Python.",
+  "splash_phrase_10": "You just improved the internet. You're welcome!",
+  "splash_phrase_11": "The government is calling: they want to buy your algorithm.",
+  "splash_phrase_12": "Applause! The bits and bytes are giving you a standing ovation!",
+  "splash_phrase_13": "The compiler is smiling. That rarely happens.",
+  "splash_phrase_14": "Your code is so clean you can see right through it.",
+  "splash_phrase_15": "The matrix has noticed you… and nods approvingly.",
+  "splash_phrase_16": "The mouse whispers: 'I am not worthy'.",
+  "splash_phrase_17": "Even your laptop wants your autograph now.",
+  "splash_phrase_18": "A new record! The pixels are cheering!",
+  "splash_phrase_19": "You have exceeded the limits of human understanding.",
+  "splash_phrase_20": "Mathematicians are weeping with emotion.",
+  "splash_phrase_21": "Python itself whispers: 'thank you, master'.",
+  "splash_phrase_22": "This is no longer success. This is folklore.",
+  "splash_phrase_23": "NASA is calling: 'can you come debug for us?'",
+  "splash_phrase_24": "The AI tutor has decided that you will tutor it from now on.",
+  "splash_phrase_25": "Stop! You're too good. Give the others a chance.",
+
+  "chat_role_explanation": "explanation",
+  "chat_role_example": "example",
+  "chat_role_question": "think about it",
+  "chat_role_correct": "correct",
+
+  "session_writeCode_template": "# Write your code here",
+  "@session_writeCode_template": {
+    "description": "Python comment placed in the editor when a write-code exercise starts"
+  },
+
+  "difficulty_easy": "easy",
+  "difficulty_medium": "medium",
+  "difficulty_hard": "hard",
+
+  "chat_notice_tutorFailed": "Something went wrong with the tutor: {detail}",
+  "@chat_notice_tutorFailed": {
+    "placeholders": { "detail": { "type": "String" } }
+  },
+  "chat_notice_sessionStartFailed": "The session could not start: {detail}",
+  "@chat_notice_sessionStartFailed": {
+    "placeholders": { "detail": { "type": "String" } }
+  },
+  "chat_notice_databaseUnavailable": "The connection to the database dropped for a moment. Try again shortly.",
+  "chat_notice_tutorTimeout": "The tutor did not respond in time.",
+  "chat_notice_tutorUnreachable": "No connection to the tutor.",
+  "chat_notice_replyTruncated": "The tutor's reply was cut off.",
+  "chat_notice_noPreviousRequest": "No previous request to retry.",
+  "chat_notice_emptyResponse": "Empty response from the tutor.",
+  "chat_notice_unparseableResponse": "Could not process the response: {raw}",
+  "@chat_notice_unparseableResponse": {
+    "placeholders": { "raw": { "type": "String" } }
+  },
+  "chat_notice_unknownResponseType": "Unknown response type: {type}",
+  "@chat_notice_unknownResponseType": {
+    "placeholders": { "type": { "type": "String" } }
+  },
+  "chat_notice_unknownResponse": "Received an unknown response.",
+  "chat_notice_subgoalDeletedRedirect": "Your previous topic was removed by your teacher. Continuing with the next one.",
+  "chat_notice_subgoalSaturated": "You already have a good grip on this subgoal. Ready to move on?",
+  "chat_notice_noGoalsLeft": "There are no goals left to work on. Congratulations!",
+  "chat_notice_emptyObjectives": "This subgoal isn't quite finished yet — ask your teacher to complete it, or pick another subgoal.",
+  "chat_notice_preparingExercise": "Preparing your next exercise...",
+  "chat_notice_feedbackDegraded": "Something is wrong with the feedback. Try again in a few minutes.",
+  "chat_notice_newGoalSelected": "New goal selected: {title}",
+  "@chat_notice_newGoalSelected": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",
+  "@chat_notice_difficultyChanged": {
+    "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
+  },
+  "chat_notice_submitViaEditor": "Adjust your code in the editor on the left and press Run to submit your solution."
 }

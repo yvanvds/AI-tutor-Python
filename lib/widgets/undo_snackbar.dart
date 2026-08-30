@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 void showUndoSnackBar(
   ScaffoldMessengerState messenger, {
   required String message,
+  required String undoLabel,
   required VoidCallback onUndo,
 }) {
   messenger
@@ -10,7 +11,7 @@ void showUndoSnackBar(
     ..showSnackBar(
       SnackBar(
         content: Text(message),
-        action: SnackBarAction(label: 'Undo', onPressed: onUndo),
+        action: SnackBarAction(label: undoLabel, onPressed: onUndo),
         duration: const Duration(seconds: 5),
       ),
     );
