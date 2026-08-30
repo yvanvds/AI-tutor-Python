@@ -5,12 +5,26 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+
+# The Flutter SDK every job below installs, and the single place it is pinned
+# (#60). Keep it equal to the version development happens on: the format gate
+# (`dart format`, step "Check formatting") is implemented by the `dart_style`
+# bundled with the SDK, and different SDKs format some constructs differently —
+# each rewriting the other's output — so a mismatch makes the local gate fail to
+# predict this one, with no way to satisfy both.
+#
+# Flutter 3.47.1 bundles Dart 3.13.1. `pubspec.yaml`'s `environment: sdk:` is
+# deliberately *not* raised to match: the constraint sets the package's language
+# version, which changes what `dart format` emits (29 files) and which lints
+# fire, and that reformat is its own change — see #61.
+env:
+  FLUTTER_VERSION: 3.47.1
+
 jobs:
   sonarqube:
     name: SonarQube
     runs-on: windows-latest
     env:
-      FLUTTER_VERSION: 3.44.0
       # Secrets are not exposed to workflow runs triggered by a pull request
       # from a fork, so `secrets.SONAR_TOKEN` is empty there and the scan can
       # only fail with an auth error (#35). Resolve the availability once here
@@ -50,13 +64,20 @@ jobs:
           ENTRA_REDIRECT_URI=http://localhost
           "@ | Out-File -FilePath .env -Encoding utf8 -NoNewline
 
+      # `--delete-conflicting-outputs` was removed in build_runner 2.16 (which
+      # the SDK bump in #60 pulled in, for an `analyzer` new enough to parse
+      # Dart 3.13 sources) and is now only warned about.
       - name: Generate code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build
 
       # Format gate (#40). Runs after code generation on purpose: the envied
       # *.g.dart output and the gen-l10n output (lib/l10n/generated, rewritten
       # by `flutter pub get` because pubspec has `generate: true`) are both
       # dart-format clean, so the check covers the exact tree CI builds.
+      #
+      # If this step fails on a file your local `dart format` calls clean, your
+      # SDK is not the one pinned in `FLUTTER_VERSION` at the top of this file —
+      # check `flutter --version` before touching the code.
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test integration_test packages/py_runner
 
@@ -87,8 +108,8 @@ jobs:
   # lesson page. The setup steps mirror the SonarQube job exactly.
   #
   # The test command must stay `flutter test integration_test -d windows`
-  # without listing files: on Windows, Flutter 3.44 launches the app only for
-  # the first test file of an invocation, so every flow is registered in
+  # without listing files: on Windows, Flutter launches the app only for the
+  # first test file of an invocation, so every flow is registered in
   # integration_test/app_test.dart and runs in one app process.
   #
   # If WebView2 ever proves unusable on the runner: guard the harness with
@@ -101,8 +122,6 @@ jobs:
     name: Integration tests (Windows desktop)
     runs-on: windows-latest
     timeout-minutes: 30
-    env:
-      FLUTTER_VERSION: 3.44.0
     steps:
       - uses: actions/checkout@v4
 
@@ -133,8 +152,11 @@ jobs:
           ENTRA_REDIRECT_URI=http://localhost
           "@ | Out-File -FilePath .env -Encoding utf8 -NoNewline
 
+      # `--delete-conflicting-outputs` was removed in build_runner 2.16 (which
+      # the SDK bump in #60 pulled in, for an `analyzer` new enough to parse
+      # Dart 3.13 sources) and is now only warned about.
       - name: Generate code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build
 
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
