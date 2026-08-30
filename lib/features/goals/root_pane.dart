@@ -57,12 +57,12 @@ class RootPane extends ConsumerWidget {
     final roots = snapshot.data!;
     if (selectedRoot == null && roots.isNotEmpty) {
       Future.microtask(() {
-        ref.read(goalSelectionProvider.notifier).setEditorSelectedRoot(
-          roots.first,
-        );
-        ref.read(goalSelectionProvider.notifier).setEditorSelectedGoal(
-          roots.first,
-        );
+        ref
+            .read(goalSelectionProvider.notifier)
+            .setEditorSelectedRoot(roots.first);
+        ref
+            .read(goalSelectionProvider.notifier)
+            .setEditorSelectedGoal(roots.first);
       });
     }
     if (roots.isEmpty) {
@@ -71,7 +71,7 @@ class RootPane extends ConsumerWidget {
 
     return ReorderableListView.builder(
       buildDefaultDragHandles: false,
-      onReorder: (oldIndex, newIndex) =>
+      onReorderItem: (oldIndex, newIndex) =>
           _onReorder(context, roots, oldIndex, newIndex, ref),
       itemCount: roots.length,
       itemBuilder: (_, i) {
@@ -93,9 +93,10 @@ class RootPane extends ConsumerWidget {
     int newIndex,
     WidgetRef ref,
   ) async {
+    // onReorderItem already delivers newIndex adjusted for the removed item,
+    // so no manual index correction here.
     final before = [...roots];
     final list = [...roots];
-    if (newIndex > oldIndex) newIndex -= 1;
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
     final messenger = ScaffoldMessenger.of(context);
