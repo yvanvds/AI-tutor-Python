@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -8,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Full-screen "Level X" celebration. Listens to [levelUpControllerProvider];
 /// when non-null, fades in a blurred backdrop and pops a centred card.
-/// Tapping outside the card or the "Verder leren →" button dismisses.
+/// Tapping outside the card or the "Keep learning →" button dismisses.
 class LevelUpOverlay extends ConsumerWidget {
   const LevelUpOverlay({super.key});
 
@@ -148,7 +149,7 @@ class _Caption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      '+$xpAwarded XP · CONCEPT ONTGRENDELD',
+      AppLocalizations.of(context).levelUp_caption(xpAwarded),
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: AppColors.accent2,
@@ -167,7 +168,7 @@ class _LevelNumber extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Level $level',
+      AppLocalizations.of(context).levelUp_level(level),
       textAlign: TextAlign.center,
       style: AppMono.tnum(
         size: 64,
@@ -184,10 +185,11 @@ class _Subtitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final concept = conceptName.trim();
     final text = concept.isEmpty
-        ? 'Je hebt het volgende concept onder de knie.'
-        : 'Je hebt de $concept onder de knie.';
+        ? l.levelUp_subtitle_generic
+        : l.levelUp_subtitle_concept(concept);
     return Text(
       text,
       textAlign: TextAlign.center,
@@ -235,19 +237,19 @@ class _ContinueButtonState extends State<_ContinueButton> {
                 : AppColors.accent,
             borderRadius: BorderRadius.circular(AppRadius.inputLarge),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Verder leren',
-                style: TextStyle(
+                AppLocalizations.of(context).levelUp_button_continue,
+                style: const TextStyle(
                   color: AppColors.ink0,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              SizedBox(width: 6),
-              Icon(Icons.arrow_forward, size: 16, color: AppColors.ink0),
+              const SizedBox(width: 6),
+              const Icon(Icons.arrow_forward, size: 16, color: AppColors.ink0),
             ],
           ),
         ),

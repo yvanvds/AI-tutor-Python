@@ -1,7 +1,41 @@
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
+
+/// Localized encouragement for `GoalSplashState.phraseIndex`.
+String splashPhrase(AppLocalizations l, int index) {
+  final phrases = <String Function(AppLocalizations)>[
+    (l) => l.splash_phrase_01,
+    (l) => l.splash_phrase_02,
+    (l) => l.splash_phrase_03,
+    (l) => l.splash_phrase_04,
+    (l) => l.splash_phrase_05,
+    (l) => l.splash_phrase_06,
+    (l) => l.splash_phrase_07,
+    (l) => l.splash_phrase_08,
+    (l) => l.splash_phrase_09,
+    (l) => l.splash_phrase_10,
+    (l) => l.splash_phrase_11,
+    (l) => l.splash_phrase_12,
+    (l) => l.splash_phrase_13,
+    (l) => l.splash_phrase_14,
+    (l) => l.splash_phrase_15,
+    (l) => l.splash_phrase_16,
+    (l) => l.splash_phrase_17,
+    (l) => l.splash_phrase_18,
+    (l) => l.splash_phrase_19,
+    (l) => l.splash_phrase_20,
+    (l) => l.splash_phrase_21,
+    (l) => l.splash_phrase_22,
+    (l) => l.splash_phrase_23,
+    (l) => l.splash_phrase_24,
+    (l) => l.splash_phrase_25,
+  ];
+  assert(phrases.length == SplashService.phraseCount);
+  return phrases[index % phrases.length](l);
+}
 
 class GoalSplashOverlay extends ConsumerWidget {
   const GoalSplashOverlay({super.key});
@@ -10,6 +44,7 @@ class GoalSplashOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final splash = ref.watch(splashStateProvider);
     if (splash == null) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -51,7 +86,7 @@ class GoalSplashOverlay extends ConsumerWidget {
                         const Icon(Icons.emoji_events, size: 64),
                         const SizedBox(height: 16),
                         Text(
-                          splash.title,
+                          l.splash_title,
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
@@ -72,7 +107,7 @@ class GoalSplashOverlay extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          splash.message,
+                          splashPhrase(l, splash.phraseIndex),
                           style: Theme.of(context).textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),

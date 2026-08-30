@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/envelope_assembler.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
@@ -12,7 +13,11 @@ class AIResponseParser {
   /// older instructions or non-compliant responses.
   static ChatResponse parse(String raw) {
     if (raw.trim().isEmpty) {
-      return ErrorResponse(type: 'error', message: 'Lege respons van de tutor.');
+      return ErrorResponse(
+        type: 'error',
+        message: 'Empty response from the tutor.',
+        notice: const ChatNotice(ChatNoticeKind.emptyResponse),
+      );
     }
 
     final assembler = EnvelopeAssembler()
@@ -51,12 +56,10 @@ class AIResponseParser {
       // <TEXT> by a confused model). Otherwise surface the raw text.
       final fromText = _tryLegacyJson(text);
       if (fromText != null) return fromText;
-      return ErrorResponse(
-        type: 'error',
-        message: text.isNotEmpty
-            ? text
-            : 'Kon respons niet verwerken: $raw',
-      );
+      if (text.isNotEmpty) {
+        return ErrorResponse(type: 'error', message: text);
+      }
+      return _unparseable(raw);
     }
 
     final type = (metaMap['type'] as String?)?.toLowerCase() ?? '';
@@ -76,11 +79,14 @@ class AIResponseParser {
   static ChatResponse _fromLegacyJson(String raw) {
     final parsed = _tryLegacyJson(raw);
     if (parsed != null) return parsed;
-    return ErrorResponse(
-      type: 'error',
-      message: 'Kon respons niet verwerken: $raw',
-    );
+    return _unparseable(raw);
   }
+
+  static ErrorResponse _unparseable(String raw) => ErrorResponse(
+        type: 'error',
+        message: 'Could not process the response: $raw',
+        notice: ChatNotice(ChatNoticeKind.unparseableResponse, args: [raw]),
+      );
 
   static ChatResponse? _tryLegacyJson(String raw) {
     final cleaned = _stripCodeFences(raw).trim();

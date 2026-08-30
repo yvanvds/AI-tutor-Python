@@ -6,6 +6,10 @@
 // fail). Everything in between — request building, stream handling, retry,
 // response dispatch, in-flight plan bookkeeping — is the production code.
 //
+// Issue #23 — the service layer emits typed `ChatNotice`s and the chat
+// widget localizes them, so every scenario runs under both locales and one
+// scenario switches the locale while the pills are on screen.
+//
 // Not driven through the full app: boot requires an Entra sign-in and a live
 // Cosmos endpoint, and there is no integration_test harness in the repo (#28).
 
@@ -22,6 +26,7 @@ import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_bubble.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -55,7 +60,11 @@ class _ScriptedConnector extends OpenaiConnector {
   Stream<StreamChunk> _next() {
     if (scripts.isEmpty) {
       return Stream.value(
-        StreamFailed(StateError('script exhausted'), StackTrace.current, 'x'),
+        StreamFailed(
+          StateError('script exhausted'),
+          StackTrace.current,
+          ChatNotice.raw('script exhausted'),
+        ),
       );
     }
     return Stream.fromIterable(scripts.removeAt(0));
@@ -121,10 +130,14 @@ final _plan = QuestionPlan(
   ),
 );
 
+/// What the real connector yields for a socket reset: a typed notice, so
+/// the pill text below comes from the ARB files, not from this test.
 StreamFailed _cut() => StreamFailed(
   const SocketException('reset by peer'),
   StackTrace.current,
-  'Geen verbinding met de tutor.',
+  OpenaiConnector.describeTransportError(
+    const SocketException('reset by peer'),
+  ),
 );
 
 List<StreamChunk> _answer(String text) => [
@@ -147,6 +160,31 @@ List<StreamChunk> _feedback(String text) => [
     ),
   ),
 ];
+
+/// The strings each locale is expected to show, keyed by language code.
+class _Expected {
+  const _Expected({
+    required this.unreachable,
+    required this.databaseUnavailable,
+    required this.sessionStartFailed,
+  });
+  final String unreachable;
+  final String databaseUnavailable;
+  final String sessionStartFailed;
+}
+
+const _expected = {
+  'en': _Expected(
+    unreachable: 'No connection to the tutor',
+    databaseUnavailable: 'The connection to the database dropped',
+    sessionStartFailed: 'The session could not start',
+  ),
+  'nl': _Expected(
+    unreachable: 'Geen verbinding met de tutor',
+    databaseUnavailable: 'De verbinding met de database is even weg',
+    sessionStartFailed: 'De sessie kon niet starten',
+  ),
+};
 
 void main() {
   late _ScriptedConnector connector;
@@ -204,10 +242,10 @@ void main() {
     chat.dispose();
   });
 
-  Widget buildApp() => UncontrolledProviderScope(
+  Widget buildApp(Locale locale) => UncontrolledProviderScope(
     container: pc,
     child: MaterialApp(
-      locale: const Locale('nl'),
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: const Scaffold(body: ChatWidget()),
@@ -223,11 +261,11 @@ void main() {
     }
   }
 
-  Future<void> mount(WidgetTester tester) async {
+  Future<void> mount(WidgetTester tester, Locale locale) async {
     tester.view.physicalSize = const Size(1000, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(buildApp());
+    await tester.pumpWidget(buildApp(locale));
     await settle(tester);
   }
 
@@ -251,97 +289,155 @@ void main() {
       .widgetList<ChatSystemPill>(find.byType(ChatSystemPill))
       .map((p) => p.text);
 
-  testWidgets('a reply cut off mid-stream is withdrawn, explained, and '
-      'retried once', (tester) async {
-    connector.scripts.addAll([
-      [const StreamTextDelta('Een lus herhaalt '), _cut()],
-      _answer('Een lus herhaalt code.'),
-    ]);
-    await mount(tester);
+  for (final MapEntry(key: code, value: expected) in _expected.entries) {
+    final locale = Locale(code);
 
-    await send(tester, 'Wat is een lus?');
+    group('[$code]', () {
+      testWidgets('a reply cut off mid-stream is withdrawn, explained, and '
+          'retried once', (tester) async {
+        connector.scripts.addAll([
+          [const StreamTextDelta('Een lus herhaalt '), _cut()],
+          _answer('Een lus herhaalt code.'),
+        ]);
+        await mount(tester, locale);
 
-    // The half-streamed placeholder is gone; the retry's full answer is the
-    // only tutor bubble.
-    expect(find.byType(FlyerChatTextStreamMessage), findsNothing);
-    expect(find.byType(TutorBubble), findsOneWidget);
-    expect(
-      find.textContaining('Een lus herhaalt code.', findRichText: true),
-      findsOneWidget,
-    );
-    expect(pills(tester), contains(contains('Geen verbinding met de tutor')));
-    expect(connector.sends, 1);
-    expect(connector.resends, 1);
-    expect(find.byType(ComposerIdle), findsOneWidget);
-    expect(find.byType(ComposerThinking), findsNothing);
+        await send(tester, 'Wat is een lus?');
 
-    await unmount(tester);
-  });
+        // The half-streamed placeholder is gone; the retry's full answer is
+        // the only tutor bubble.
+        expect(find.byType(FlyerChatTextStreamMessage), findsNothing);
+        expect(find.byType(TutorBubble), findsOneWidget);
+        expect(
+          find.textContaining('Een lus herhaalt code.', findRichText: true),
+          findsOneWidget,
+        );
+        expect(pills(tester), contains(contains(expected.unreachable)));
+        // Never the other language, never an empty pill.
+        for (final other in _expected.values) {
+          if (other == expected) continue;
+          expect(pills(tester), isNot(contains(contains(other.unreachable))));
+        }
+        expect(pills(tester), isNot(contains('')));
+        expect(connector.sends, 1);
+        expect(connector.resends, 1);
+        expect(find.byType(ComposerIdle), findsOneWidget);
+        expect(find.byType(ComposerThinking), findsNothing);
 
-  testWidgets('a Cosmos failure while integrating a grade is reported as a '
-      'transient problem and the next answer starts clean', (tester) async {
-    when(
-      () => conductor.integrateAnswer(
-        plan: any(named: 'plan'),
-        answer: any(named: 'answer'),
-      ),
-    ).thenThrow(CosmosException(503, 'Service Unavailable'));
+        await unmount(tester);
+      });
 
-    connector.scripts.addAll([
-      _question('Wat doet een for-lus?'),
-      _feedback('Goed uitgelegd!'),
-      // Third turn: the stale plan must be gone, so this feedback must not
-      // reach the conductor and the flow continues into a fresh question.
-      _feedback('Ook goed.'),
-      _question('Wat doet een while-lus?'),
-    ]);
-    await mount(tester);
+      testWidgets('a Cosmos failure while integrating a grade is reported as '
+          'a transient problem and the next answer starts clean', (
+        tester,
+      ) async {
+        when(
+          () => conductor.integrateAnswer(
+            plan: any(named: 'plan'),
+            answer: any(named: 'answer'),
+          ),
+        ).thenThrow(CosmosException(503, 'Service Unavailable'));
 
-    // What PracticeView does on mount.
-    await pc.read(tutorServiceProvider.notifier).requestExercise();
-    await settle(tester);
-    expect(
-      find.textContaining('Wat doet een for-lus?', findRichText: true),
-      findsOneWidget,
-    );
+        connector.scripts.addAll([
+          _question('Wat doet een for-lus?'),
+          _feedback('Goed uitgelegd!'),
+          // Third turn: the stale plan must be gone, so this feedback must
+          // not reach the conductor and the flow continues into a fresh
+          // question.
+          _feedback('Ook goed.'),
+          _question('Wat doet een while-lus?'),
+        ]);
+        await mount(tester, locale);
 
-    await send(tester, 'Hij herhaalt iets een aantal keer.');
+        // What PracticeView does on mount.
+        await pc.read(tutorServiceProvider.notifier).requestExercise();
+        await settle(tester);
+        expect(
+          find.textContaining('Wat doet een for-lus?', findRichText: true),
+          findsOneWidget,
+        );
 
-    // The raw CosmosException never reaches the student.
-    expect(
-      pills(tester),
-      contains(contains('De verbinding met de database is even weg')),
-    );
-    expect(pills(tester), isNot(contains(contains('CosmosException'))));
-    expect(find.byType(ComposerIdle), findsOneWidget);
+        await send(tester, 'Hij herhaalt iets een aantal keer.');
 
-    await send(tester, 'Nog een antwoord.');
+        // The raw CosmosException never reaches the student.
+        expect(pills(tester), contains(contains(expected.databaseUnavailable)));
+        expect(pills(tester), isNot(contains(contains('CosmosException'))));
+        expect(find.byType(ComposerIdle), findsOneWidget);
 
-    verify(
-      () => conductor.integrateAnswer(
-        plan: any(named: 'plan'),
-        answer: any(named: 'answer'),
-      ),
-    ).called(1);
-    expect(
-      find.textContaining('Wat doet een while-lus?', findRichText: true),
-      findsOneWidget,
-    );
-    expect(find.byType(ComposerIdle), findsOneWidget);
+        await send(tester, 'Nog een antwoord.');
 
-    await unmount(tester);
-  });
+        verify(
+          () => conductor.integrateAnswer(
+            plan: any(named: 'plan'),
+            answer: any(named: 'answer'),
+          ),
+        ).called(1);
+        expect(
+          find.textContaining('Wat doet een while-lus?', findRichText: true),
+          findsOneWidget,
+        );
+        expect(find.byType(ComposerIdle), findsOneWidget);
 
-  testWidgets('a Cosmos failure during session start is reported instead of '
-      'leaving an empty chat', (tester) async {
+        await unmount(tester);
+      });
+
+      testWidgets('a Cosmos failure during session start is reported instead '
+          'of leaving an empty chat', (tester) async {
+        when(
+          () => conductor.setTarget(),
+        ).thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
+
+        await mount(tester, locale);
+
+        expect(pills(tester), contains(contains(expected.sessionStartFailed)));
+        expect(pills(tester), contains(contains(expected.databaseUnavailable)));
+        expect(find.byType(ComposerIdle), findsOneWidget);
+
+        await unmount(tester);
+      });
+    });
+  }
+
+  testWidgets('switching the language re-renders the pills already in the '
+      'chat', (tester) async {
     when(
       () => conductor.setTarget(),
     ).thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
 
-    await mount(tester);
+    await mount(tester, const Locale('en'));
+    expect(
+      pills(tester),
+      contains(contains(_expected['en']!.sessionStartFailed)),
+    );
 
-    expect(pills(tester), contains(contains('De sessie kon niet starten')));
-    expect(find.byType(ComposerIdle), findsOneWidget);
+    // Same container, same chat history — only the app locale changes, as
+    // it does when the user picks a language on the Options page.
+    await tester.pumpWidget(buildApp(const Locale('nl')));
+    await settle(tester);
+
+    expect(
+      pills(tester),
+      contains(contains(_expected['nl']!.sessionStartFailed)),
+    );
+    expect(
+      pills(tester),
+      isNot(contains(contains(_expected['en']!.sessionStartFailed))),
+    );
+
+    await unmount(tester);
+  });
+
+  testWidgets('an unknown exception is shown verbatim inside the localized '
+      'wrapper', (tester) async {
+    when(() => conductor.setTarget()).thenThrow(StateError('boom-42'));
+
+    await mount(tester, const Locale('en'));
+
+    expect(
+      pills(tester),
+      contains(
+        allOf(contains('The session could not start'), contains('boom-42')),
+      ),
+    );
 
     await unmount(tester);
   });

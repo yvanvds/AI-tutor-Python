@@ -2452,6 +2452,402 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Work on this'**
   String get goalTile_button_workOn;
+
+  /// No description provided for @common_undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get common_undo;
+
+  /// No description provided for @crash_permissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission denied while reading data.'**
+  String get crash_permissionDenied;
+
+  /// No description provided for @auth_browser_signedIn_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get auth_browser_signedIn_title;
+
+  /// No description provided for @auth_browser_signedIn_body.
+  ///
+  /// In en, this message translates to:
+  /// **'You can close this tab and return to the app.'**
+  String get auth_browser_signedIn_body;
+
+  /// No description provided for @auth_browser_failed_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed'**
+  String get auth_browser_failed_title;
+
+  /// No description provided for @auth_browser_failed_noCode.
+  ///
+  /// In en, this message translates to:
+  /// **'No authorization code returned.'**
+  String get auth_browser_failed_noCode;
+
+  /// No description provided for @auth_browser_failed_stateMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'State mismatch — possible CSRF, please try again.'**
+  String get auth_browser_failed_stateMismatch;
+
+  /// No description provided for @levelUp_caption.
+  ///
+  /// In en, this message translates to:
+  /// **'+{xp} XP · CONCEPT UNLOCKED'**
+  String levelUp_caption(int xp);
+
+  /// No description provided for @levelUp_level.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {level}'**
+  String levelUp_level(int level);
+
+  /// No description provided for @levelUp_subtitle_generic.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve mastered the next concept.'**
+  String get levelUp_subtitle_generic;
+
+  /// No description provided for @levelUp_subtitle_concept.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve mastered {concept}.'**
+  String levelUp_subtitle_concept(String concept);
+
+  /// No description provided for @levelUp_button_continue.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep learning'**
+  String get levelUp_button_continue;
+
+  /// No description provided for @splash_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal reached!'**
+  String get splash_title;
+
+  /// No description provided for @splash_phrase_01.
+  ///
+  /// In en, this message translates to:
+  /// **'LEGENDARY! Your code will be sung about for centuries!'**
+  String get splash_phrase_01;
+
+  /// No description provided for @splash_phrase_02.
+  ///
+  /// In en, this message translates to:
+  /// **'Wow! Even your keyboard is applauding you!'**
+  String get splash_phrase_02;
+
+  /// No description provided for @splash_phrase_03.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch out, the AI is getting jealous of you!'**
+  String get splash_phrase_03;
+
+  /// No description provided for @splash_phrase_04.
+  ///
+  /// In en, this message translates to:
+  /// **'You just moved the god of computer science to tears.'**
+  String get splash_phrase_04;
+
+  /// No description provided for @splash_phrase_05.
+  ///
+  /// In en, this message translates to:
+  /// **'BAM! One more victory for the Hall of Fame!'**
+  String get splash_phrase_05;
+
+  /// No description provided for @splash_phrase_06.
+  ///
+  /// In en, this message translates to:
+  /// **'Your keys are smoking — that\'s how fast you program!'**
+  String get splash_phrase_06;
+
+  /// No description provided for @splash_phrase_07.
+  ///
+  /// In en, this message translates to:
+  /// **'Brilliant! Even Stack Overflow is speechless.'**
+  String get splash_phrase_07;
+
+  /// No description provided for @splash_phrase_08.
+  ///
+  /// In en, this message translates to:
+  /// **'The bug police lost today!'**
+  String get splash_phrase_08;
+
+  /// No description provided for @splash_phrase_09.
+  ///
+  /// In en, this message translates to:
+  /// **'What a masterpiece! Rembrandt, but in Python.'**
+  String get splash_phrase_09;
+
+  /// No description provided for @splash_phrase_10.
+  ///
+  /// In en, this message translates to:
+  /// **'You just improved the internet. You\'re welcome!'**
+  String get splash_phrase_10;
+
+  /// No description provided for @splash_phrase_11.
+  ///
+  /// In en, this message translates to:
+  /// **'The government is calling: they want to buy your algorithm.'**
+  String get splash_phrase_11;
+
+  /// No description provided for @splash_phrase_12.
+  ///
+  /// In en, this message translates to:
+  /// **'Applause! The bits and bytes are giving you a standing ovation!'**
+  String get splash_phrase_12;
+
+  /// No description provided for @splash_phrase_13.
+  ///
+  /// In en, this message translates to:
+  /// **'The compiler is smiling. That rarely happens.'**
+  String get splash_phrase_13;
+
+  /// No description provided for @splash_phrase_14.
+  ///
+  /// In en, this message translates to:
+  /// **'Your code is so clean you can see right through it.'**
+  String get splash_phrase_14;
+
+  /// No description provided for @splash_phrase_15.
+  ///
+  /// In en, this message translates to:
+  /// **'The matrix has noticed you… and nods approvingly.'**
+  String get splash_phrase_15;
+
+  /// No description provided for @splash_phrase_16.
+  ///
+  /// In en, this message translates to:
+  /// **'The mouse whispers: \'I am not worthy\'.'**
+  String get splash_phrase_16;
+
+  /// No description provided for @splash_phrase_17.
+  ///
+  /// In en, this message translates to:
+  /// **'Even your laptop wants your autograph now.'**
+  String get splash_phrase_17;
+
+  /// No description provided for @splash_phrase_18.
+  ///
+  /// In en, this message translates to:
+  /// **'A new record! The pixels are cheering!'**
+  String get splash_phrase_18;
+
+  /// No description provided for @splash_phrase_19.
+  ///
+  /// In en, this message translates to:
+  /// **'You have exceeded the limits of human understanding.'**
+  String get splash_phrase_19;
+
+  /// No description provided for @splash_phrase_20.
+  ///
+  /// In en, this message translates to:
+  /// **'Mathematicians are weeping with emotion.'**
+  String get splash_phrase_20;
+
+  /// No description provided for @splash_phrase_21.
+  ///
+  /// In en, this message translates to:
+  /// **'Python itself whispers: \'thank you, master\'.'**
+  String get splash_phrase_21;
+
+  /// No description provided for @splash_phrase_22.
+  ///
+  /// In en, this message translates to:
+  /// **'This is no longer success. This is folklore.'**
+  String get splash_phrase_22;
+
+  /// No description provided for @splash_phrase_23.
+  ///
+  /// In en, this message translates to:
+  /// **'NASA is calling: \'can you come debug for us?\''**
+  String get splash_phrase_23;
+
+  /// No description provided for @splash_phrase_24.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI tutor has decided that you will tutor it from now on.'**
+  String get splash_phrase_24;
+
+  /// No description provided for @splash_phrase_25.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop! You\'re too good. Give the others a chance.'**
+  String get splash_phrase_25;
+
+  /// No description provided for @chat_role_explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'explanation'**
+  String get chat_role_explanation;
+
+  /// No description provided for @chat_role_example.
+  ///
+  /// In en, this message translates to:
+  /// **'example'**
+  String get chat_role_example;
+
+  /// No description provided for @chat_role_question.
+  ///
+  /// In en, this message translates to:
+  /// **'think about it'**
+  String get chat_role_question;
+
+  /// No description provided for @chat_role_correct.
+  ///
+  /// In en, this message translates to:
+  /// **'correct'**
+  String get chat_role_correct;
+
+  /// Python comment placed in the editor when a write-code exercise starts
+  ///
+  /// In en, this message translates to:
+  /// **'# Write your code here'**
+  String get session_writeCode_template;
+
+  /// No description provided for @difficulty_easy.
+  ///
+  /// In en, this message translates to:
+  /// **'easy'**
+  String get difficulty_easy;
+
+  /// No description provided for @difficulty_medium.
+  ///
+  /// In en, this message translates to:
+  /// **'medium'**
+  String get difficulty_medium;
+
+  /// No description provided for @difficulty_hard.
+  ///
+  /// In en, this message translates to:
+  /// **'hard'**
+  String get difficulty_hard;
+
+  /// No description provided for @chat_notice_tutorFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong with the tutor: {detail}'**
+  String chat_notice_tutorFailed(String detail);
+
+  /// No description provided for @chat_notice_sessionStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The session could not start: {detail}'**
+  String chat_notice_sessionStartFailed(String detail);
+
+  /// No description provided for @chat_notice_databaseUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to the database dropped for a moment. Try again shortly.'**
+  String get chat_notice_databaseUnavailable;
+
+  /// No description provided for @chat_notice_tutorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The tutor did not respond in time.'**
+  String get chat_notice_tutorTimeout;
+
+  /// No description provided for @chat_notice_tutorUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection to the tutor.'**
+  String get chat_notice_tutorUnreachable;
+
+  /// No description provided for @chat_notice_replyTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'The tutor\'s reply was cut off.'**
+  String get chat_notice_replyTruncated;
+
+  /// No description provided for @chat_notice_noPreviousRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'No previous request to retry.'**
+  String get chat_notice_noPreviousRequest;
+
+  /// No description provided for @chat_notice_emptyResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty response from the tutor.'**
+  String get chat_notice_emptyResponse;
+
+  /// No description provided for @chat_notice_unparseableResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not process the response: {raw}'**
+  String chat_notice_unparseableResponse(String raw);
+
+  /// No description provided for @chat_notice_unknownResponseType.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown response type: {type}'**
+  String chat_notice_unknownResponseType(String type);
+
+  /// No description provided for @chat_notice_unknownResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Received an unknown response.'**
+  String get chat_notice_unknownResponse;
+
+  /// No description provided for @chat_notice_subgoalDeletedRedirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Your previous topic was removed by your teacher. Continuing with the next one.'**
+  String get chat_notice_subgoalDeletedRedirect;
+
+  /// No description provided for @chat_notice_subgoalSaturated.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have a good grip on this subgoal. Ready to move on?'**
+  String get chat_notice_subgoalSaturated;
+
+  /// No description provided for @chat_notice_noGoalsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no goals left to work on. Congratulations!'**
+  String get chat_notice_noGoalsLeft;
+
+  /// No description provided for @chat_notice_emptyObjectives.
+  ///
+  /// In en, this message translates to:
+  /// **'This subgoal isn\'t quite finished yet — ask your teacher to complete it, or pick another subgoal.'**
+  String get chat_notice_emptyObjectives;
+
+  /// No description provided for @chat_notice_preparingExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your next exercise...'**
+  String get chat_notice_preparingExercise;
+
+  /// No description provided for @chat_notice_feedbackDegraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Something is wrong with the feedback. Try again in a few minutes.'**
+  String get chat_notice_feedbackDegraded;
+
+  /// No description provided for @chat_notice_newGoalSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'New goal selected: {title}'**
+  String chat_notice_newGoalSelected(String title);
+
+  /// No description provided for @chat_notice_difficultyChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Difficulty adjusted: {from} -> {to}'**
+  String chat_notice_difficultyChanged(String from, String to);
+
+  /// No description provided for @chat_notice_submitViaEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust your code in the editor on the left and press Run to submit your solution.'**
+  String get chat_notice_submitViaEditor;
 }
 
 class _AppLocalizationsDelegate

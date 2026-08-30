@@ -1400,4 +1400,250 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get goalTile_button_workOn => 'Werk hieraan';
+
+  @override
+  String get common_undo => 'Ongedaan maken';
+
+  @override
+  String get crash_permissionDenied =>
+      'Geen toegang bij het lezen van gegevens.';
+
+  @override
+  String get auth_browser_signedIn_title => 'Aangemeld';
+
+  @override
+  String get auth_browser_signedIn_body =>
+      'Je kunt dit tabblad sluiten en teruggaan naar de app.';
+
+  @override
+  String get auth_browser_failed_title => 'Aanmelden mislukt';
+
+  @override
+  String get auth_browser_failed_noCode => 'Geen autorisatiecode ontvangen.';
+
+  @override
+  String get auth_browser_failed_stateMismatch =>
+      'State komt niet overeen — mogelijk CSRF, probeer het opnieuw.';
+
+  @override
+  String levelUp_caption(int xp) {
+    return '+$xp XP · CONCEPT ONTGRENDELD';
+  }
+
+  @override
+  String levelUp_level(int level) {
+    return 'Level $level';
+  }
+
+  @override
+  String get levelUp_subtitle_generic =>
+      'Je hebt het volgende concept onder de knie.';
+
+  @override
+  String levelUp_subtitle_concept(String concept) {
+    return 'Je hebt $concept onder de knie.';
+  }
+
+  @override
+  String get levelUp_button_continue => 'Verder leren';
+
+  @override
+  String get splash_title => 'Doel bereikt!';
+
+  @override
+  String get splash_phrase_01 =>
+      'LEGENDARISCH! Je code zal eeuwenlang worden bezongen!';
+
+  @override
+  String get splash_phrase_02 => 'Wauw! Zelfs je toetsenbord klapt voor je!';
+
+  @override
+  String get splash_phrase_03 => 'Kijk uit, de AI wordt jaloers op je!';
+
+  @override
+  String get splash_phrase_04 => 'Je hebt zojuist de informaticagod ontroerd.';
+
+  @override
+  String get splash_phrase_05 =>
+      'BAM! Nog één overwinning voor de Hall of Fame!';
+
+  @override
+  String get splash_phrase_06 =>
+      'Je toetsen maken rook — zo snel programmeer jij!';
+
+  @override
+  String get splash_phrase_07 =>
+      'Briljant! Zelfs Stack Overflow heeft geen woorden.';
+
+  @override
+  String get splash_phrase_08 => 'De bugpolitie heeft vandaag verloren!';
+
+  @override
+  String get splash_phrase_09 =>
+      'Wat een meesterwerk! Rembrandt, maar dan in Python.';
+
+  @override
+  String get splash_phrase_10 =>
+      'Je hebt net het internet verbeterd. Graag gedaan!';
+
+  @override
+  String get splash_phrase_11 =>
+      'Overheid belt: ze willen je algoritme aankopen.';
+
+  @override
+  String get splash_phrase_12 =>
+      'Applaus! De bits en bytes staan recht voor je!';
+
+  @override
+  String get splash_phrase_13 => 'De compiler glimlacht. Dat gebeurt zelden.';
+
+  @override
+  String get splash_phrase_14 =>
+      'Je code is zo zuiver dat je er door kan kijken.';
+
+  @override
+  String get splash_phrase_15 =>
+      'De matrix heeft je opgemerkt… en knikt goedkeurend.';
+
+  @override
+  String get splash_phrase_16 => 'De muis fluistert: \'ik ben niet waardig\'.';
+
+  @override
+  String get splash_phrase_17 =>
+      'Zelfs je laptop wil nu een handtekening van je.';
+
+  @override
+  String get splash_phrase_18 => 'Een nieuw record! De pixels juichen!';
+
+  @override
+  String get splash_phrase_19 =>
+      'Je hebt de grenzen van menselijk begrip overschreden.';
+
+  @override
+  String get splash_phrase_20 => 'Wiskundigen huilen van ontroering.';
+
+  @override
+  String get splash_phrase_21 =>
+      'Python zelf fluistert: \'thank you, master\'.';
+
+  @override
+  String get splash_phrase_22 => 'Dit is geen succes meer. Dit is folklore.';
+
+  @override
+  String get splash_phrase_23 =>
+      'NASA belt: \'kun je bij ons komen debuggen?\'';
+
+  @override
+  String get splash_phrase_24 =>
+      'De AI-tutor heeft besloten jou voortaan te tutoren.';
+
+  @override
+  String get splash_phrase_25 =>
+      'Stop! Je bent te goed. Geef de rest een kans.';
+
+  @override
+  String get chat_role_explanation => 'uitleg';
+
+  @override
+  String get chat_role_example => 'voorbeeld';
+
+  @override
+  String get chat_role_question => 'denkvraag';
+
+  @override
+  String get chat_role_correct => 'goed';
+
+  @override
+  String get session_writeCode_template => '# Schrijf hier je code';
+
+  @override
+  String get difficulty_easy => 'makkelijk';
+
+  @override
+  String get difficulty_medium => 'gemiddeld';
+
+  @override
+  String get difficulty_hard => 'moeilijk';
+
+  @override
+  String chat_notice_tutorFailed(String detail) {
+    return 'Er ging iets mis bij de tutor: $detail';
+  }
+
+  @override
+  String chat_notice_sessionStartFailed(String detail) {
+    return 'De sessie kon niet starten: $detail';
+  }
+
+  @override
+  String get chat_notice_databaseUnavailable =>
+      'De verbinding met de database is even weg. Probeer het zo opnieuw.';
+
+  @override
+  String get chat_notice_tutorTimeout => 'De tutor reageerde niet op tijd.';
+
+  @override
+  String get chat_notice_tutorUnreachable => 'Geen verbinding met de tutor.';
+
+  @override
+  String get chat_notice_replyTruncated =>
+      'Het antwoord van de tutor werd afgebroken.';
+
+  @override
+  String get chat_notice_noPreviousRequest =>
+      'Geen vorige aanvraag om opnieuw te proberen.';
+
+  @override
+  String get chat_notice_emptyResponse => 'Lege respons van de tutor.';
+
+  @override
+  String chat_notice_unparseableResponse(String raw) {
+    return 'Kon respons niet verwerken: $raw';
+  }
+
+  @override
+  String chat_notice_unknownResponseType(String type) {
+    return 'Onbekend antwoordtype: $type';
+  }
+
+  @override
+  String get chat_notice_unknownResponse => 'Onbekend antwoord ontvangen.';
+
+  @override
+  String get chat_notice_subgoalDeletedRedirect =>
+      'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
+
+  @override
+  String get chat_notice_subgoalSaturated =>
+      'Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?';
+
+  @override
+  String get chat_notice_noGoalsLeft =>
+      'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!';
+
+  @override
+  String get chat_notice_emptyObjectives =>
+      'Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om het af te ronden, of kies een ander subdoel.';
+
+  @override
+  String get chat_notice_preparingExercise =>
+      'Je volgende oefening wordt voorbereid...';
+
+  @override
+  String get chat_notice_feedbackDegraded =>
+      'Er is iets mis met de feedback. Probeer het over een paar minuten opnieuw.';
+
+  @override
+  String chat_notice_newGoalSelected(String title) {
+    return 'Nieuw doel geselecteerd: $title';
+  }
+
+  @override
+  String chat_notice_difficultyChanged(String from, String to) {
+    return 'Moeilijkheid aangepast: $from -> $to';
+  }
+
+  @override
+  String get chat_notice_submitViaEditor =>
+      'Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.';
 }

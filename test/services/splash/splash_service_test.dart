@@ -22,11 +22,11 @@ void main() {
         description: 'You understand for loops!',
       );
       expect(tracked, isNotNull);
-      expect(tracked!.title, 'Goal reached!');
       expect(tracked!.goalTitle, 'Loops');
       expect(tracked!.description, 'You understand for loops!');
-      expect(tracked!.message, isA<String>());
-      expect(tracked!.message, isNotEmpty);
+      // The phrase itself is localized by the overlay (#23); the service
+      // only picks which one.
+      expect(tracked!.phraseIndex, inInclusiveRange(0, SplashService.phraseCount - 1));
     });
 
     test('hide clears state', () {
@@ -35,8 +35,13 @@ void main() {
       expect(tracked, isNull);
     });
 
-    test('randomPhrase returns a non-empty string', () {
-      expect(service.randomPhrase(), isNotEmpty);
+    test('randomPhraseIndex stays within the localized phrase table', () {
+      for (var i = 0; i < 200; i++) {
+        expect(
+          service.randomPhraseIndex(),
+          inInclusiveRange(0, SplashService.phraseCount - 1),
+        );
+      }
     });
 
     test('auto-hides after duration elapses', () {

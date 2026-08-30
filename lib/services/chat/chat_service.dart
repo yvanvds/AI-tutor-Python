@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
@@ -30,10 +31,18 @@ class ChatService {
     );
   }
 
-  void addSystemMessage(String text) {
+  /// Insert a system pill. The text is not chosen here: the notice travels
+  /// on the message metadata and `ChatWidget` localizes it when it renders
+  /// (issue #23).
+  void addSystemNotice(ChatNotice notice) {
     _id++;
     controller.insertMessage(
-      SystemMessage(id: _id.toString(), text: text, authorId: 'system'),
+      SystemMessage(
+        id: _id.toString(),
+        text: '',
+        authorId: 'system',
+        metadata: {ChatNotice.metadataKey: notice.toJson()},
+      ),
     );
   }
 

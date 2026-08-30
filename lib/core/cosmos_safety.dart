@@ -37,9 +37,7 @@ Future<T> safeCosmos<T>(Future<T> Function() op) async {
       debugPrint('safeCosmos: auth error from Cosmos: $e');
       appNavigatorKey.currentState?.push(
         MaterialPageRoute(
-          builder: (_) => const CrashRecoveryScreen(
-            message: 'Permission denied while reading data.',
-          ),
+          builder: (_) => const CrashRecoveryScreen.permissionDenied(),
         ),
       );
     }
