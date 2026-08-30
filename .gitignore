@@ -41,6 +41,7 @@ lib/services/config/azure_config.g.dart
 .pub-cache/
 .pub/
 /build/
+packages/*/build/
 /coverage/
 
 # Symbolication related
