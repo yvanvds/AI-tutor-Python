@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,8 +13,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 enum SessionMode { explain, practice, playground }
 
 /// Top-level sidebar destinations. Student sees the first two; teacher
-/// additionally sees the last four.
+/// additionally sees goals / lessonContent / students. `instructions` is a
+/// developer tool (tutor system-prompt editor) and is only reachable when
+/// [developerToolsProvider] is true (issue #26).
 enum Section { session, map, goals, lessonContent, instructions, students }
+
+/// Whether developer-only surfaces (the instructions editor, the debug
+/// dialog) are exposed in the shell. Defaults to [kDebugMode]; overridden in
+/// tests.
+final developerToolsProvider = Provider<bool>((_) => kDebugMode);
 
 enum Role { student, teacher }
 
@@ -196,4 +204,7 @@ extension SectionLabel on Section {
         return false;
     }
   }
+
+  /// Sections that are hidden unless [developerToolsProvider] is true.
+  bool get isDeveloperOnly => this == Section.instructions;
 }

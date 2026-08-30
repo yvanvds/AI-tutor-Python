@@ -14,7 +14,6 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,11 +35,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
+    final devTools = ref.watch(developerToolsProvider);
 
-    // If a teacher-only section is active but the user is not a teacher,
-    // bounce back to the default section. Schedule the state mutation for
-    // after this build to keep Riverpod happy.
-    if (section.isTeacherOnly && !profile.isTeacher) {
+    // If a teacher-only section is active but the user is not a teacher (or
+    // a developer-only section without developer tools), bounce back to the
+    // default section. Schedule the state mutation for after this build to
+    // keep Riverpod happy.
+    if ((section.isTeacherOnly && !profile.isTeacher) ||
+        (section.isDeveloperOnly && !devTools)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(sectionProvider.notifier).state = Section.session;
       });
@@ -53,7 +55,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           Row(
             children: [
               Sidebar(
-                onDebug: kDebugMode ? () => _openDebugDialog(context) : null,
+                onDebug: devTools ? () => _openDebugDialog(context) : null,
               ),
               Expanded(
                 child: Column(

@@ -29,6 +29,9 @@ class Sidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
     final selected = ref.watch(sectionProvider);
+    final devTools = ref.watch(developerToolsProvider);
+    final teacherSections =
+        _teacherSections.where((s) => devTools || !s.isDeveloperOnly);
 
     return Container(
       width: sidebarWidth,
@@ -53,7 +56,7 @@ class Sidebar extends ConsumerWidget {
               label: AppLocalizations.of(context).sidebar_teacherHeader,
             ),
             const SizedBox(height: AppSpacing.s),
-            ..._teacherSections.map(
+            ...teacherSections.map(
               (s) => _SidebarItem(
                 section: s,
                 icon: _iconFor(s),
