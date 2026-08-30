@@ -17,6 +17,7 @@
 // stays real — pressing Run on a machine without the bundle shows the
 // in-app host error, which is what a student would see.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
@@ -101,6 +102,17 @@ class AppHarness {
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
   final FakeLessonCodeRunner lessonRunner;
 
+  /// Every installer handover the app performed, as `(executable, arguments)`
+  /// (#49).
+  ///
+  /// The launcher is *always* replaced, in every flow: the production one
+  /// spawns a real setup binary on the machine running the suite and then
+  /// calls `exit(0)`, which would take the test runner with it. Everything
+  /// above it — the feed, the download, the checksum — stays the real wiring,
+  /// so a flow can assert on the switches the app passes the installer.
+  final List<({String executable, List<String> arguments})> installerLaunches =
+      <({String executable, List<String> arguments})>[];
+
   late final InMemoryCosmosClient cosmos;
   late final Directory playgroundDir;
   ProviderContainer? _container;
@@ -123,6 +135,13 @@ class AppHarness {
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
+        installerLauncherProvider.overrideWithValue((executable, arguments) {
+          installerLaunches.add((executable: executable, arguments: arguments));
+          // The real launcher never returns — it exits the process. Hanging
+          // here keeps the app in `applying`, which is the state a student
+          // actually sees for the moment before the window closes.
+          return Completer<void>().future;
+        }),
         if (forceUpdateCheck)
           updateAutoCheckProvider.overrideWithValue(updateFeedUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),

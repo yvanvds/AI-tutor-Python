@@ -10,10 +10,12 @@
 //     release asset really carries, optionally with the UTF-8 BOM that
 //     `build_release.ps1` has put in front of a generated file before (#45);
 //   - the installer itself with a 404 unless a flow opts in with
-//     [FakeReleaseServer.start]'s `installerBytes` — and even then the bytes
-//     are junk whose hash cannot match the published one, so the real
-//     verify-then-run wiring stops before anything is spawned. A test run
-//     must never start a setup binary on the machine it is running on.
+//     [FakeReleaseServer.start]'s `installerBytes` — junk bytes whose hash
+//     cannot match the published one unless the flow also publishes their
+//     real hash with `installerSha256`. Nothing here ever spawns a setup
+//     binary either way: the harness always replaces the installer launcher
+//     (#49), because a test run must never start a real setup on the machine
+//     it is running on.
 
 import 'dart:convert';
 import 'dart:io';
@@ -55,9 +57,11 @@ class FakeReleaseServer {
   /// release.
   /// [installerBytes] opts into actually serving the installer asset, in
   /// [installerChunks] pieces spaced [chunkDelay] apart and with a declared
-  /// `Content-Length`, so a flow can watch the progress bar fill. The bytes
-  /// are junk: their hash is not [kFakeInstallerSha256], so the app's own
-  /// verify step rejects them and never reaches `Process.start`. Left `null`
+  /// `Content-Length`, so a flow can watch the progress bar fill. By default
+  /// the published hash is [kFakeInstallerSha256], which nothing matches, so
+  /// the app's own verify step rejects the download. A flow that needs the
+  /// app to get past verification — the install handover (#49) — passes
+  /// [installerSha256] as the real hash of the bytes it serves. Left `null`
   /// the installer is a 404, as it was before (#50).
   static Future<FakeReleaseServer> start({
     int status = HttpStatus.ok,
@@ -67,6 +71,7 @@ class FakeReleaseServer {
     bool withChecksumAsset = true,
     bool checksumBom = false,
     Uint8List? installerBytes,
+    String installerSha256 = kFakeInstallerSha256,
     int installerChunks = 5,
     Duration chunkDelay = const Duration(milliseconds: 120),
   }) async {
@@ -117,7 +122,7 @@ class FakeReleaseServer {
         );
         if (checksumBom) request.response.add(const [0xEF, 0xBB, 0xBF]);
         request.response.add(
-          utf8.encode('$kFakeInstallerSha256  $_installerName\n'),
+          utf8.encode('$installerSha256  $_installerName\n'),
         );
       } else if (path.endsWith(_installerName) && installerBytes != null) {
         fake.installerRequests++;

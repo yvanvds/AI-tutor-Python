@@ -19,9 +19,33 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-DefaultDirName={autopf}\{#AppName}
+
+; --- per-user install (#49) --------------------------------------------------
+; The load-bearing decision, not a preference. A machine-wide install under
+; Program Files needs UAC elevation for every single update, so the silent
+; installer the updater launches raised a prompt a student without local admin
+; rights could not answer — and the app had already exited by then, which made
+; the failure invisible. Installing into the student's own %LOCALAPPDATA% lets
+; the running app replace its own files with no elevation at all, so /SILENT
+; really is silent. No Dart-side change can fix that; it has to be fixed here.
+;
+; Already-installed machines are not migrated: an existing machine-wide install
+; keeps its Program Files location and its UAC prompt until it is uninstalled
+; and reinstalled once. The AppId below must not change either way.
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+DefaultDirName={localappdata}\Programs\{#AppName}
+UsePreviousAppDir=yes
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
+
+; --- upgrade behaviour (#49) -------------------------------------------------
+; Let the restart manager close the running copy rather than failing on a
+; locked .exe. RestartApplications is off on purpose: the [Run] section below
+; brings the app back itself when the updater passes /RELAUNCH=1, and letting
+; the restart manager *also* do it is how a student ends up with two windows.
+CloseApplications=yes
+RestartApplications=no
 ; OutputDir is relative to SourceDir (set below to the repo root) because
 ; SourceDir overrides the default '.iss-file directory' base for OutputDir too.
 OutputDir=public
@@ -31,7 +55,6 @@ SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
 ; SourceDir is relative to the ISS file directory; sets base for [Files] Source: paths.
 SourceDir=..\..\..
 
@@ -60,9 +83,27 @@ Source: "packages\py_runner\python\host.py"; \
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+; {autodesktop}, not {commondesktop}: an unelevated install cannot write to the
+; all-users desktop, and this setup no longer elevates (#49).
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
+; Two mutually exclusive relaunches, kept exclusive by the Check guards (#49).
+;
+; The first is the ordinary "run it now?" checkbox of an interactive install.
+; `skipifsilent` means it never fires under /SILENT — which is exactly why the
+; second one has to exist: the updater runs this installer silently, so without
+; it the app updated and simply never came back.
 Filename: "{app}\{#AppExeName}"; \
     Description: "{cm:LaunchProgram,{#AppName}}"; \
-    Flags: nowait postinstall skipifsilent
+    Flags: nowait postinstall skipifsilent; \
+    Check: not WantsRelaunch
+Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: WantsRelaunch
+
+[Code]
+{ True when this installer was started by the app's own updater, which passes
+  /RELAUNCH=1 (see kSilentInstallArguments in lib/core/update_bootstrap.dart). }
+function WantsRelaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;

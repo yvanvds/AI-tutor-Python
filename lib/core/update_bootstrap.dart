@@ -37,12 +37,40 @@ final updateFeedUrlProvider = Provider<Uri?>((_) => kLatestReleaseEndpoint);
 /// runs when it is asked to, which is what the manual check in #48 calls.
 final updateAutoCheckProvider = Provider<bool>((_) => kReleaseMode);
 
-/// The switches the installer is handed: no wizard, and never reboot the
-/// machine out from under a student.
+/// The switches the installer is handed (#49).
+///
+/// - `/SILENT` rather than `/VERYSILENT`: the student sees a progress window,
+///   so the app vanishing for half a minute is visibly *something happening*
+///   rather than a crash.
+/// - `/NOCANCEL`: there is no safe point to abandon a half-replaced install.
+/// - `/NORESTART`: never reboot the machine out from under a student.
+/// - `/RELAUNCH=1`: the custom switch `installer.iss` reads in its
+///   `WantsRelaunch` check, which is what starts the app again afterwards. The
+///   installer's ordinary `[Run]` entry is flagged `skipifsilent` and so is
+///   skipped in exactly this case, which is why the app never used to come
+///   back from an update at all.
 const List<String> kSilentInstallArguments = <String>[
-  '/VERYSILENT',
+  '/SILENT',
+  '/NOCANCEL',
   '/NORESTART',
+  '/RELAUNCH=1',
 ];
+
+/// How a verified installer is actually handed to Windows: spawn it, then end
+/// this process.
+///
+/// A seam of its own because it is the one step that cannot run inside a test
+/// — `Process.start` would put a real setup binary on the machine running the
+/// suite and `exit(0)` would take the test runner with it. Overriding
+/// [installerLauncherProvider] lets an end-to-end run drive the real feed,
+/// download and checksum wiring and then assert on the handover itself.
+typedef InstallerLauncher =
+    Future<void> Function(String executable, List<String> arguments);
+
+/// The production launcher. Never returns.
+final installerLauncherProvider = Provider<InstallerLauncher>(
+  (_) => runInstallerAndExit,
+);
 
 /// Verifies the download against the hash published beside it, and removes
 /// it when it does not match: a corrupted or substituted installer is not
@@ -65,6 +93,7 @@ Future<bool> verifyAndCleanUp(File installer, String expectedSha256) async {
 /// network.
 final updateServicesProvider = Provider<UpdateServices>((ref) {
   final feedUrl = ref.watch(updateFeedUrlProvider);
+  final launch = ref.watch(installerLauncherProvider);
   return UpdateServices(
     localVersion: kAppVersion,
     feed: feedUrl == null
@@ -73,8 +102,7 @@ final updateServicesProvider = Provider<UpdateServices>((ref) {
     download: (release, onProgress) =>
         downloadToTemp(release.url, onProgress: onProgress),
     verify: verifyAndCleanUp,
-    run: (installer) =>
-        runInstallerAndExit(installer, args: kSilentInstallArguments),
+    run: (installer) => launch(installer.path, kSilentInstallArguments),
     autoCheck: feedUrl != null && ref.watch(updateAutoCheckProvider),
   );
 });

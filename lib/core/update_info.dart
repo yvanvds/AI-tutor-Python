@@ -173,12 +173,23 @@ Future<bool> verifySha256(File file, String expectedHex) async {
   return digest.toString().toLowerCase() == expectedHex.toLowerCase();
 }
 
+/// Spawns the installer detached and ends this process, so the installer can
+/// replace the files underneath it.
+///
+/// Does not come back: the `exit(0)` is the point. The app is brought back
+/// afterwards by the installer's own `[Run]` entry, which fires on the
+/// `/RELAUNCH=1` switch in `kSilentInstallArguments` (#49) — before that the
+/// silent install skipped every `[Run]` entry and the app was simply gone.
+///
+/// Takes a path and an argument list rather than the seams' [File] so the one
+/// call that spawns a process and kills the app is a value a test can swap
+/// out and assert on.
 Future<void> runInstallerAndExit(
-  File installer, {
-  List<String> args = const [],
-}) async {
+  String executable,
+  List<String> arguments,
+) async {
   // Spawn detached so it continues after this process exits
-  await Process.start(installer.path, args, mode: ProcessStartMode.detached);
+  await Process.start(executable, arguments, mode: ProcessStartMode.detached);
   // Close the app
   exit(0);
 }
