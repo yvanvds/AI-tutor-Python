@@ -98,39 +98,56 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
+  /// Fire-and-forget from a post-frame callback, so nothing above catches
+  /// what it throws: every failure has to be handled here or it becomes an
+  /// unhandled async error that reaches neither the user nor a log (#46).
+  /// Failures are silent for the student and logged for us; surfacing them
+  /// in Options → About waits for the update controller (#47/#48).
   Future<void> _checkForUpdate() async {
     final manifest = ref.read(updateManifestUrlProvider);
     if (manifest == null) return;
-    final info = await fetchUpdateInfo(manifest);
-    if (info == null) return;
-    if (!isNewer(info.version, kAppVersion)) return;
-    if (!mounted) return;
+    try {
+      final info = await fetchUpdateInfo(manifest);
+      // Nothing published yet — distinct from a failed check, which throws.
+      if (info == null) return;
+      if (!isNewer(info.version, kAppVersion)) return;
+      if (!mounted) return;
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        final l = AppLocalizations.of(context);
-        return AlertDialog(
-          title: Text(l.update_dialog_title),
-          content: Text(l.update_dialog_message(info.version)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l.update_dialog_ok),
-            ),
-          ],
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          final l = AppLocalizations.of(context);
+          return AlertDialog(
+            title: Text(l.update_dialog_title),
+            content: Text(l.update_dialog_message(info.version)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l.update_dialog_ok),
+              ),
+            ],
+          );
+        },
+      );
+
+      final file = await downloadToTemp(info.url);
+      if (!await verifySha256(file, info.sha256)) {
+        try {
+          file.deleteSync();
+        } catch (_) {
+          // Nothing more to do; the installer is not going to run.
+        }
+        throw UpdateCheckException(
+          'installer for ${info.version} failed its sha256 check',
         );
-      },
-    );
-
-    final file = await downloadToTemp(info.url);
-    if (file == null) return;
-    final ok = await verifySha256(file, info.sha256);
-    if (!ok) {
-      file.deleteSync();
-      return;
+      }
+      await runInstallerAndExit(
+        file,
+        args: const ['/VERYSILENT', '/NORESTART'],
+      );
+    } catch (e, stack) {
+      debugPrint('AppShell: update check failed: $e\n$stack');
     }
-    await runInstallerAndExit(file, args: const ['/VERYSILENT', '/NORESTART']);
   }
 }

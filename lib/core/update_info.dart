@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -5,13 +6,53 @@ import 'package:http/http.dart' as http;
 import 'package:pub_semver/pub_semver.dart'; // add to pubspec
 import 'package:path/path.dart' as p;
 
+/// The update check failed: the network was unreachable, the server
+/// answered with something other than a manifest, or a request ran out of
+/// time.
+///
+/// This is deliberately distinct from a `null` result (#46). `null` means
+/// "nothing is published" and is a normal, silent outcome; a thrown
+/// [UpdateCheckException] means the check itself did not complete and must
+/// reach a log. Before #46 both collapsed into `null`, which is how the BOM
+/// bug (#45) stayed invisible for the whole life of the feature.
+class UpdateCheckException implements Exception {
+  UpdateCheckException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'UpdateCheckException: $message';
+}
+
+/// How long the small manifest request may take before it is abandoned.
+/// Without it a black-hole network hangs the check forever (#46).
+const kManifestTimeout = Duration(seconds: 10);
+
+/// How long the installer download may go without delivering a single
+/// chunk. The whole download has no deadline — an installer on a slow line
+/// is legitimate — but a stalled socket is not.
+const kDownloadStallTimeout = Duration(seconds: 60);
+
 class UpdateInfo {
   final String version;
   final Uri url;
   final String sha256;
   UpdateInfo(this.version, this.url, this.sha256);
-  factory UpdateInfo.fromJson(Map<String, dynamic> j) =>
-      UpdateInfo(j['version'], Uri.parse(j['url']), j['sha256']);
+
+  /// Returns `null` for anything that is not a well-formed release
+  /// manifest: a non-object payload, a missing field, a field of the wrong
+  /// type, or a `url` that is not an absolute URI. Previously every one of
+  /// those threw a `TypeError` out of an unawaited future (#46).
+  static UpdateInfo? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final version = json['version'];
+    final url = json['url'];
+    final sha = json['sha256'];
+    if (version is! String || url is! String || sha is! String) return null;
+    if (version.isEmpty || sha.isEmpty) return null;
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return null;
+    return UpdateInfo(version, uri, sha);
+  }
 }
 
 /// A leading byte-order mark. `jsonDecode` does not skip it and fails with
@@ -21,20 +62,69 @@ const _bom = '\u{FEFF}';
 /// Parses a release manifest body into an [UpdateInfo], tolerating a BOM
 /// that a caller decoded into the string (a hand-edited file read from
 /// disk, a payload decoded elsewhere). See #45.
-UpdateInfo parseUpdateManifest(String body) {
+///
+/// Returns `null` when [body] is not JSON or not a release manifest (#46).
+UpdateInfo? parseUpdateManifest(String body) {
   final withoutBom = body.startsWith(_bom) ? body.substring(_bom.length) : body;
-  return UpdateInfo.fromJson(jsonDecode(withoutBom));
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(withoutBom);
+  } on FormatException {
+    return null;
+  }
+  return UpdateInfo.fromJson(decoded);
 }
 
-Future<UpdateInfo?> fetchUpdateInfo(Uri manifestUrl) async {
-  final res = await http.get(manifestUrl);
-  if (res.statusCode != 200) return null;
+/// Fetches the release manifest.
+///
+/// Returns `null` when nothing is published (HTTP 404). Throws an
+/// [UpdateCheckException] for every other failure — timeout, transport
+/// error, any other non-200 status, or a payload that is not a release
+/// manifest — so the caller can log it instead of mistaking it for "you
+/// are up to date" (#46).
+Future<UpdateInfo?> fetchUpdateInfo(
+  Uri manifestUrl, {
+  http.Client? client,
+  Duration timeout = kManifestTimeout,
+}) async {
+  final owned = client == null;
+  final c = client ?? http.Client();
+  final http.Response res;
+  try {
+    res = await c.get(manifestUrl).timeout(timeout);
+  } on TimeoutException {
+    throw UpdateCheckException(
+      'manifest request to $manifestUrl timed out '
+      'after ${timeout.inSeconds}s',
+    );
+  } on Object catch (e) {
+    throw UpdateCheckException('manifest request to $manifestUrl failed: $e');
+  } finally {
+    // Closing an owned client also aborts a request still in flight after
+    // the timeout above fired.
+    if (owned) c.close();
+  }
+
+  // Nothing published yet — a normal outcome, not a failure.
+  if (res.statusCode == HttpStatus.notFound) return null;
+  if (res.statusCode != HttpStatus.ok) {
+    throw UpdateCheckException(
+      'manifest request to $manifestUrl returned HTTP ${res.statusCode}',
+    );
+  }
+
   // Decode the bytes as UTF-8 rather than reading `res.body`: that getter
   // honours the response charset and falls back to latin1 for a type like
   // `application/octet-stream`, which turns the BOM the release manifest
   // carries (#45) into three characters and makes `jsonDecode` throw. JSON
   // is UTF-8 (RFC 8259), and `Utf8Decoder` drops a leading BOM.
-  return parseUpdateManifest(utf8.decode(res.bodyBytes, allowMalformed: true));
+  final info = parseUpdateManifest(
+    utf8.decode(res.bodyBytes, allowMalformed: true),
+  );
+  if (info == null) {
+    throw UpdateCheckException('$manifestUrl is not a release manifest');
+  }
+  return info;
 }
 
 bool isNewer(String remote, String local) {
@@ -55,16 +145,65 @@ bool isNewer(String remote, String local) {
   return false;
 }
 
-Future<File?> downloadToTemp(Uri url) async {
-  final res = await http.Client().send(http.Request('GET', url));
-  if (res.statusCode != 200) return null;
+/// Downloads the installer to a temp file.
+///
+/// Throws an [UpdateCheckException] on any failure — a non-200 status, a
+/// transport error, a request that never gets a response, or a stream that
+/// stalls for [stallTimeout]. It used to return `null` for a bad status and
+/// hang forever on a dead socket (#46). A partial file is removed.
+Future<File> downloadToTemp(
+  Uri url, {
+  http.Client? client,
+  Duration responseTimeout = kManifestTimeout,
+  Duration stallTimeout = kDownloadStallTimeout,
+}) async {
+  final owned = client == null;
+  final c = client ?? http.Client();
   final tmp = File(
     p.join(Directory.systemTemp.path, 'python_teacher_install.exe'),
   );
-  final sink = tmp.openWrite();
-  await res.stream.pipe(sink);
-  await sink.close();
-  return tmp;
+  try {
+    final res = await c.send(http.Request('GET', url)).timeout(responseTimeout);
+    if (res.statusCode != HttpStatus.ok) {
+      throw UpdateCheckException(
+        'installer download from $url returned HTTP ${res.statusCode}',
+      );
+    }
+    final sink = tmp.openWrite();
+    try {
+      // `addStream` rather than `pipe`: `pipe` closes the sink itself when
+      // the stream errors, so the close below would then throw "File
+      // closed" and bury the timeout that actually went wrong.
+      await sink.addStream(res.stream.timeout(stallTimeout));
+      await sink.close();
+    } catch (_) {
+      try {
+        await sink.close();
+      } catch (_) {
+        // Already broken; the real failure is the one being rethrown.
+      }
+      rethrow;
+    }
+    return tmp;
+  } on UpdateCheckException {
+    rethrow;
+  } on TimeoutException {
+    await _deleteQuietly(tmp);
+    throw UpdateCheckException('installer download from $url stalled');
+  } on Object catch (e) {
+    await _deleteQuietly(tmp);
+    throw UpdateCheckException('installer download from $url failed: $e');
+  } finally {
+    if (owned) c.close();
+  }
+}
+
+Future<void> _deleteQuietly(File file) async {
+  try {
+    if (file.existsSync()) await file.delete();
+  } on FileSystemException {
+    // A leftover temp file is not worth failing the update check over.
+  }
 }
 
 Future<bool> verifySha256(File file, String expectedHex) async {
