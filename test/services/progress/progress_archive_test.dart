@@ -154,10 +154,8 @@ void main() {
 
     await archiveFor(_to).import(data);
 
-    expect(docsOf(progress, _to).map((d) => d['goalId']).toSet(), {
-      'r1',
-      's1',
-    }, reason: 's9 should have been wiped');
+    final goalIds = docsOf(progress, _to).map((d) => d['goalId']).toSet();
+    expect(goalIds, {'r1', 's1'}, reason: 's9 should have been wiped');
     expect(docsOf(beliefs, _to), hasLength(2));
   });
 
