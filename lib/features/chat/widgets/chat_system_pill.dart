@@ -25,7 +25,7 @@ class ChatSystemPill extends StatelessWidget {
             child: Text(
               text,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.fgFaint,
                 fontSize: 11.5,
                 fontStyle: FontStyle.italic,

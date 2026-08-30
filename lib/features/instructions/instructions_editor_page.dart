@@ -216,7 +216,7 @@ class _InstructionsEditorPageState
             onImport: _importFromMarkdown,
             onSave: _hasDocSelected ? _saveDocument : null,
           ),
-          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(child: _buildBody()),
         ],
       ),
@@ -880,7 +880,7 @@ class _Toolbar extends StatelessWidget {
         children: [
           Text(
             l.instructions_toolbar_title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.fg,
               fontSize: 14,
               fontWeight: FontWeight.w600,

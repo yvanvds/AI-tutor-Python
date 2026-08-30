@@ -88,7 +88,7 @@ class UpdateOfferBar extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.system_update_alt_outlined,
                   color: AppColors.accent,
                   size: 20,

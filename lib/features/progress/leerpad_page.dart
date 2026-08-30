@@ -209,7 +209,7 @@ class _Header extends StatelessWidget {
       children: [
         Text(
           l.leerpad_header_title,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.fg,
             fontSize: 30,
             fontWeight: FontWeight.w700,
@@ -220,11 +220,7 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           topic.isEmpty ? l.leerpad_header_subtitle_default : topic,
-          style: const TextStyle(
-            color: AppColors.fgFaint,
-            fontSize: 13,
-            height: 1.4,
-          ),
+          style: TextStyle(color: AppColors.fgFaint, fontSize: 13, height: 1.4),
         ),
       ],
     );
@@ -240,7 +236,7 @@ class _Centered extends StatelessWidget {
     return Center(
       child: Text(
         text,
-        style: const TextStyle(color: AppColors.fgMute, fontSize: 14),
+        style: TextStyle(color: AppColors.fgMute, fontSize: 14),
       ),
     );
   }

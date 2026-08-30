@@ -66,13 +66,19 @@ class OpenaiConnector {
     void Function(String)? onRecordRawOutput,
     void Function(String)? onRecordStreamFailure,
     GlobalConfig? Function()? getConfig,
+    String? Function()? getModelOverride,
   }) : _onRecordRawOutput = onRecordRawOutput,
        _onRecordStreamFailure = onRecordStreamFailure,
-       _getConfig = getConfig;
+       _getConfig = getConfig,
+       _getModelOverride = getModelOverride;
 
   final void Function(String)? _onRecordRawOutput;
   final void Function(String)? _onRecordStreamFailure;
   final GlobalConfig? Function()? _getConfig;
+
+  /// This device's model choice from the Options panel (#32), or `null` to
+  /// follow the school-wide `GlobalConfig.Model`.
+  final String? Function()? _getModelOverride;
 
   final String _apiKey = Env.apiKey;
 
@@ -83,6 +89,10 @@ class OpenaiConnector {
   /// value is known.
   // ignore: unnecessary_nullable_for_final_variable_declarations
   static const String? reasoningEffort = 'low';
+
+  /// Model used when neither this device nor the school-wide config names
+  /// one — i.e. a `config/global` doc with an empty `Model` field.
+  static const String defaultModel = 'gpt-4o';
 
   /// Hard cap on each history scope. Keeps memory bounded and trims input
   /// tokens for long-lived sessions.
@@ -115,7 +125,7 @@ class OpenaiConnector {
     final messages = _buildMessages(instructions, _historyFor(inputs), input);
 
     try {
-      final model = _resolveModel();
+      final model = resolveModel();
       final response = await OpenAI.instance.chat.create(
         model: model,
         messages: messages,
@@ -154,7 +164,7 @@ class OpenaiConnector {
     // throw from `createStream` (bad key, bad model) lands in the same
     // StreamFailed path as a mid-stream transport error.
     Stream<String> deltas() async* {
-      final model = _resolveModel();
+      final model = resolveModel();
       final stream = OpenAI.instance.chat.createStream(
         model: model,
         messages: messages,
@@ -327,10 +337,19 @@ class OpenaiConnector {
     return params.isEmpty ? null : params;
   }
 
-  String _resolveModel() {
+  /// Model the next call goes to: this device's override (#32) when the user
+  /// picked one, else the school-wide `GlobalConfig.Model`, else the
+  /// hard-coded fallback for a config doc that has never been filled in.
+  @visibleForTesting
+  String resolveModel() {
+    final override = _getModelOverride?.call();
+    if (override != null && override.isNotEmpty) {
+      debugPrint('Resolved model (device override): $override');
+      return override;
+    }
     final cfg = _getConfig?.call();
     final m = cfg?.model;
-    final result = (m != null && m.isNotEmpty) ? m : 'gpt-4o';
+    final result = (m != null && m.isNotEmpty) ? m : defaultModel;
     debugPrint('Resolved model: $result');
     return result;
   }

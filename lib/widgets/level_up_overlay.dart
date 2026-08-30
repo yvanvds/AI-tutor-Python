@@ -151,7 +151,7 @@ class _Caption extends StatelessWidget {
     return Text(
       AppLocalizations.of(context).levelUp_caption(xpAwarded),
       textAlign: TextAlign.center,
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.accent2,
         fontSize: 11,
         fontWeight: FontWeight.w600,
@@ -193,11 +193,7 @@ class _Subtitle extends StatelessWidget {
     return Text(
       text,
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: AppColors.fgMute,
-        fontSize: 14,
-        height: 1.5,
-      ),
+      style: TextStyle(color: AppColors.fgMute, fontSize: 14, height: 1.5),
     );
   }
 }
@@ -242,14 +238,14 @@ class _ContinueButtonState extends State<_ContinueButton> {
             children: [
               Text(
                 AppLocalizations.of(context).levelUp_button_continue,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.ink0,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward, size: 16, color: AppColors.ink0),
+              Icon(Icons.arrow_forward, size: 16, color: AppColors.ink0),
             ],
           ),
         ),

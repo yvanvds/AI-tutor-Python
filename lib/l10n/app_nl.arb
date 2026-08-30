@@ -25,6 +25,16 @@
   "options_language_title": "Taal",
   "options_language_subtitle": "Wordt meteen toegepast; \"Systeem\" volgt het besturingssysteem.",
 
+  "options_theme_title": "Weergave",
+  "options_theme_subtitle": "Licht of donker, opgeslagen op dit toestel. \"Systeem\" volgt het besturingssysteem.",
+  "options_theme_system": "Systeem volgen",
+  "options_theme_light": "Licht",
+  "options_theme_dark": "Donker",
+
+  "options_model_title": "AI-model",
+  "options_model_subtitle": "Welk OpenAI-model de tutor bevraagt. Geldt alleen voor dit toestel; een groter model is trager en duurder.",
+  "options_model_followGlobal": "Standaard van de school ({model})",
+
   "options_progress_title": "Voortgang",
   "options_progress_subtitle": "Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.",
   "options_progress_resetAll_button": "Alle voortgang wissen",
@@ -44,6 +54,18 @@
   "options_progress_resetGoal_done": "Voortgang van \"{title}\" is gewist.",
   "options_progress_resetFailed": "Wissen mislukt: {error}",
   "options_dialog_cancel": "Annuleren",
+
+  "options_transfer_title": "Voortgang exporteren / importeren",
+  "options_transfer_subtitle": "Bewaar je leergeschiedenis in een bestand, of laad ze in dit account — handig als je naar een ander account overstapt.",
+  "options_transfer_export_button": "Voortgang exporteren…",
+  "options_transfer_import_button": "Voortgang importeren…",
+  "options_transfer_exported": "Voortgang opgeslagen in {path}",
+  "options_transfer_exportFailed": "Exporteren mislukt: {error}",
+  "options_transfer_import_dialog_title": "Je voortgang vervangen?",
+  "options_transfer_import_dialog_message": "\"{file}\" importeren verwijdert de voortgang, leergeschiedenis en tutorinschattingen die dit account nu heeft en vervangt ze door de inhoud van het bestand. Dit kan niet ongedaan gemaakt worden.",
+  "options_transfer_import_dialog_confirm": "Importeren en vervangen",
+  "options_transfer_imported": "{goals} doelen, {samples} geschiedenisitems en {beliefs} kennisinschattingen geïmporteerd.",
+  "options_transfer_importFailed": "Importeren mislukt: {error}",
 
   "options_apiKey_title": "OpenAI API-sleutel",
   "options_apiKey_subtitle": "Je eigen sleutel, opgeslagen op dit toestel. Als je ze verwijdert, kom je terug op het sleutelscherm.",
@@ -168,6 +190,7 @@
   "session_playground_openDialog_title": "Opgeslagen code openen",
   "session_playground_openDialog_empty": "Nog geen opgeslagen bestanden.",
   "session_playground_openDialog_delete_tooltip": "Verwijderen",
+  "session_playground_openDialog_conflict": "Ook op een andere computer gewijzigd. De versie van deze computer is apart bewaard als: {names}",
   "session_playground_deleteDialog_title": "\"{name}\" verwijderen?",
   "session_playground_deleteDialog_message": "Dit kan niet ongedaan gemaakt worden.",
   "session_playground_deleteDialog_confirm": "Verwijderen",
@@ -177,6 +200,8 @@
   "session_playground_snack_saved": "Opgeslagen als \"{name}\".",
   "session_playground_snack_saveFailed": "Opslaan mislukt: {error}",
   "session_playground_snack_openFailed": "Openen mislukt: {error}",
+  "session_playground_snack_tooLarge": "Deze code is te groot om op te slaan (meer dan {max} KB).",
+  "session_playground_snack_tooManyFiles": "Je hebt al {max} opgeslagen bestanden, dat is het maximum. Verwijder er eerst een.",
 
   "session_quiz_pill": "Quizvraag",
   "session_quiz_next_button": "Volgende →",
@@ -187,6 +212,8 @@
   "session_output_state_error_count": "{count, plural, =1{1 fout} other{{count} fouten}}",
   "session_output_header_label": "Output",
   "session_output_emptyState_runHint": "Druk op Run om je code uit te voeren.",
+  "session_output_meta_turtleWindow": "Er staat een turtle-venster open. Sluit het, of druk op Stop, om de uitvoering te beëindigen.",
+  "session_output_meta_stopped": "Gestopt.",
 
   "session_runControls_tooltip_resetOutput": "Output resetten",
   "session_runControls_tooltip_askHint": "Vraag een hint",

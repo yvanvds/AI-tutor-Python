@@ -65,6 +65,34 @@ class AppLocalizationsNl extends AppLocalizations {
       'Wordt meteen toegepast; \"Systeem\" volgt het besturingssysteem.';
 
   @override
+  String get options_theme_title => 'Weergave';
+
+  @override
+  String get options_theme_subtitle =>
+      'Licht of donker, opgeslagen op dit toestel. \"Systeem\" volgt het besturingssysteem.';
+
+  @override
+  String get options_theme_system => 'Systeem volgen';
+
+  @override
+  String get options_theme_light => 'Licht';
+
+  @override
+  String get options_theme_dark => 'Donker';
+
+  @override
+  String get options_model_title => 'AI-model';
+
+  @override
+  String get options_model_subtitle =>
+      'Welk OpenAI-model de tutor bevraagt. Geldt alleen voor dit toestel; een groter model is trager en duurder.';
+
+  @override
+  String options_model_followGlobal(String model) {
+    return 'Standaard van de school ($model)';
+  }
+
+  @override
   String get options_progress_title => 'Voortgang';
 
   @override
@@ -135,6 +163,51 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_dialog_cancel => 'Annuleren';
+
+  @override
+  String get options_transfer_title => 'Voortgang exporteren / importeren';
+
+  @override
+  String get options_transfer_subtitle =>
+      'Bewaar je leergeschiedenis in een bestand, of laad ze in dit account — handig als je naar een ander account overstapt.';
+
+  @override
+  String get options_transfer_export_button => 'Voortgang exporteren…';
+
+  @override
+  String get options_transfer_import_button => 'Voortgang importeren…';
+
+  @override
+  String options_transfer_exported(String path) {
+    return 'Voortgang opgeslagen in $path';
+  }
+
+  @override
+  String options_transfer_exportFailed(String error) {
+    return 'Exporteren mislukt: $error';
+  }
+
+  @override
+  String get options_transfer_import_dialog_title => 'Je voortgang vervangen?';
+
+  @override
+  String options_transfer_import_dialog_message(String file) {
+    return '\"$file\" importeren verwijdert de voortgang, leergeschiedenis en tutorinschattingen die dit account nu heeft en vervangt ze door de inhoud van het bestand. Dit kan niet ongedaan gemaakt worden.';
+  }
+
+  @override
+  String get options_transfer_import_dialog_confirm =>
+      'Importeren en vervangen';
+
+  @override
+  String options_transfer_imported(int goals, int samples, int beliefs) {
+    return '$goals doelen, $samples geschiedenisitems en $beliefs kennisinschattingen geïmporteerd.';
+  }
+
+  @override
+  String options_transfer_importFailed(String error) {
+    return 'Importeren mislukt: $error';
+  }
 
   @override
   String get options_apiKey_title => 'OpenAI API-sleutel';
@@ -532,6 +605,11 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_playground_openDialog_delete_tooltip => 'Verwijderen';
 
   @override
+  String session_playground_openDialog_conflict(String names) {
+    return 'Ook op een andere computer gewijzigd. De versie van deze computer is apart bewaard als: $names';
+  }
+
+  @override
   String session_playground_deleteDialog_title(String name) {
     return '\"$name\" verwijderen?';
   }
@@ -570,6 +648,16 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String session_playground_snack_tooLarge(int max) {
+    return 'Deze code is te groot om op te slaan (meer dan $max KB).';
+  }
+
+  @override
+  String session_playground_snack_tooManyFiles(int max) {
+    return 'Je hebt al $max opgeslagen bestanden, dat is het maximum. Verwijder er eerst een.';
+  }
+
+  @override
   String get session_quiz_pill => 'Quizvraag';
 
   @override
@@ -601,6 +689,13 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get session_output_emptyState_runHint =>
       'Druk op Run om je code uit te voeren.';
+
+  @override
+  String get session_output_meta_turtleWindow =>
+      'Er staat een turtle-venster open. Sluit het, of druk op Stop, om de uitvoering te beëindigen.';
+
+  @override
+  String get session_output_meta_stopped => 'Gestopt.';
 
   @override
   String get session_runControls_tooltip_resetOutput => 'Output resetten';

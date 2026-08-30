@@ -10,11 +10,17 @@
 // as they would for a student. The `OutputService` wraps a `PyRunner` that
 // is never started.
 //
-// Not driven through the full app: boot requires an Entra sign-in and a live
-// Cosmos endpoint, and there is no integration_test harness in the repo (#28).
+// The account side of the browser (#31) is driven here too: the store is
+// backed by a temp directory and the `playground_files` container by an
+// in-memory Cosmos, so Open reconciles and Save mirrors exactly as they do
+// for a signed-in student.
+//
+// The end-to-end run of the same flows lives in
+// `integration_test/flows/playground_files.dart` (#28).
 
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -22,12 +28,17 @@ import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
+import 'package:ai_tutor_python/services/playground/playground_files_service.dart';
+import 'package:ai_tutor_python/services/playground/playground_sync_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:py_runner/py_runner.dart';
+
+import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/localization.dart';
 
 class _FakeTutorService extends TutorService {
   @override
@@ -41,18 +52,31 @@ class _FakeTutorService extends TutorService {
 }
 
 const _code = 'for i in range(3):\n    print(i)\n';
+const _uid = 'student-1';
 
 void main() {
   late Directory root;
   late PlaygroundFileStore store;
+  late InMemoryCosmos cosmos;
+  late PlaygroundSyncService sync;
   late OutputService output;
   late ChatService chat;
 
   setUp(() {
     root = Directory.systemTemp.createTempSync('playground_files_');
     store = PlaygroundFileStore(rootDir: () async => root);
+    cosmos = InMemoryCosmos();
+    sync = PlaygroundSyncService(
+      store: store,
+      remote: PlaygroundFilesService(
+        container: cosmos.container,
+        getUid: () => _uid,
+      ),
+      getUid: () => _uid,
+    );
     output = OutputService(
       pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
+      localizations: testLocalizations(),
     );
     chat = ChatService();
   });
@@ -69,6 +93,7 @@ void main() {
       chatServiceProvider.overrideWithValue(chat),
       modeProvider.overrideWith((_) => SessionMode.playground),
       playgroundFileStoreProvider.overrideWithValue(store),
+      playgroundSyncServiceProvider.overrideWithValue(sync),
     ],
     child: MaterialApp(
       locale: const Locale('en'),
@@ -252,6 +277,51 @@ void main() {
     await unmount(tester);
   });
 
+  // #31 — the account side. Opening the browser reconciles first, so code
+  // saved on another classroom machine is there; saving mirrors back up.
+  testWidgets('Open lists a file the student saved on another computer', (
+    tester,
+  ) async {
+    cosmos.docs[CosmosDocId.playgroundFile(_uid, 'shared')] = PlaygroundFileDoc(
+      name: 'shared',
+      code: _code,
+      updatedAt: DateTime.utc(2026, 1, 1),
+    ).toMap(_uid);
+    await mount(tester);
+
+    await tester.tap(find.text('Open'));
+    await settle(tester, until: shown(find.text('shared.py')));
+
+    expect(find.text('shared.py'), findsOneWidget);
+    await tester.tap(find.text('shared.py'));
+    await settle(tester, until: () => editor(tester).getText() == _code);
+
+    expect(editor(tester).getText(), _code);
+    // It was written to this machine too, so it is there offline next time.
+    expect(fileFor('shared').readAsStringSync(), _code);
+
+    await unmount(tester);
+  });
+
+  testWidgets('Save mirrors the file to the account', (tester) async {
+    await mount(tester);
+    editor(tester).setText(_code);
+
+    await saveAs(
+      tester,
+      'loops',
+      until: () => cosmos[CosmosDocId.playgroundFile(_uid, 'loops')] != null,
+    );
+
+    final doc = PlaygroundFileDoc.fromCosmos(
+      cosmos[CosmosDocId.playgroundFile(_uid, 'loops')]!,
+    );
+    expect(doc.code, _code);
+    expect(doc.deleted, isFalse);
+
+    await unmount(tester);
+  });
+
   testWidgets('Delete in the open dialog removes the file after confirming', (
     tester,
   ) async {
@@ -269,6 +339,14 @@ void main() {
 
     expect(fileFor('loops').existsSync(), isFalse);
     expect(find.text('No saved files yet.'), findsOneWidget);
+    // A tombstone, not a missing doc — otherwise the student's other machine
+    // would push the file straight back on its next sync (#31).
+    expect(
+      PlaygroundFileDoc.fromCosmos(
+        cosmos[CosmosDocId.playgroundFile(_uid, 'loops')]!,
+      ).deleted,
+      isTrue,
+    );
 
     await unmount(tester);
   });

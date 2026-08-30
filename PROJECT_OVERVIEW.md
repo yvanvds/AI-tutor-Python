@@ -280,6 +280,8 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
 
 **`turn_history`** *(new)* — append-only audit trail; one doc per graded turn (CONDUCTOR_POLICY §8.1). Doc id = ISO timestamp + random suffix; partition key `uid`. Model: [services/student_state/turn_record.dart](lib/services/student_state/turn_record.dart). Consumed by the debug dialog and the teacher drawer's Signal Events section. Each doc captures: targets (`subgoalId`, `targetLoIds`, `selectionReason`), question (`type`, `difficulty`), result (`quality`, `signals[]` of `TurnLoSignal`, `appliedDeltas[]` of `TurnAppliedSignal`, `loStatus[]` of `TurnLoStatus`), calibration before/after, subgoal progress before/after, plus `events[]` of `TurnSignalEvent`. Each event has a `kind` (one of `stuckLoAdvance`, `singleLoDeadlock`, `repeatedDemotions`, `sustainedLlmFailure`, `cascadeHalt`, `emptyObjectivesBlock`, `subgoalDeletedRedirect`) and `severity` (`strong` drives the dashboard badge until `acknowledged: true`; `audit` is visible-only).
 
+**`playground_files`** *(new, #31)* — one doc per saved playground file. Doc id `${uid}_${name}`, partition key `uid`. Fields: `name`, `code`, `updatedAt` (ISO, the sync stamp), `deleted` (a delete leaves a tombstone so it propagates instead of the file returning on the next sync). Written by [services/playground/playground_files_service.dart](lib/services/playground/playground_files_service.dart); reconciled with the local `<documents>/AI Tutor Python/playground/<uid>/` directory by [services/playground/playground_sync_service.dart](lib/services/playground/playground_sync_service.dart), which keeps a `_sync.json` sidecar per machine (content hash + last agreed `updatedAt`) so a file changed on two machines produces a `<name> conflict` copy instead of losing either version. Local-first: the playground still works offline and every remote step is best-effort.
+
 ### Containers (single-partition: `/type`)
 
 **`goals`** — flat collection forming a tree via `parentId`. `type: "goal"`. Model: [services/goal/goal.dart](lib/services/goal/goal.dart). Subgoal-only fields are present on the type for every doc but only meaningful on subgoals.
@@ -520,7 +522,7 @@ See [TODO.md](TODO.md) for the current planning doc. The load-bearing design doc
   - "API permissions" → `openid`, `profile`, `email`, `offline_access` (delegated, Microsoft Graph).
 
 - **Cosmos DB** account with database `python-tutor` and containers:
-  - per-user (partition `/uid`): `accounts`, `progress`, `progress_history`, `status_reports`, `lo_beliefs`, `turn_history`
+  - per-user (partition `/uid`): `accounts`, `progress`, `progress_history`, `status_reports`, `lo_beliefs`, `turn_history`, `playground_files`
   - single-partition (partition `/type`): `goals`, `instructions`, `config`, `content`, `modules`
 
 ### Commands

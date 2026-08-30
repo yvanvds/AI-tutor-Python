@@ -22,7 +22,7 @@ class TopBar extends ConsumerWidget {
           // Body row
           Positioned.fill(
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.ink0,
                 border: Border(
                   bottom: BorderSide(color: AppColors.ink2, width: 1),
@@ -81,7 +81,7 @@ class _Greeting extends ConsumerWidget {
       children: [
         Text(
           l.topBar_greeting(name),
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.fg,
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -90,7 +90,7 @@ class _Greeting extends ConsumerWidget {
         ),
         Text(
           subline,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.fgMute,
             fontSize: 12.5,
             fontWeight: FontWeight.w400,
@@ -225,7 +225,7 @@ class _StreakChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.local_fire_department_outlined,
             size: 14,
             color: AppColors.accent,
@@ -235,7 +235,7 @@ class _StreakChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).topBar_streak_days,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               color: AppColors.fgMute,
               fontWeight: FontWeight.w500,
@@ -276,7 +276,7 @@ class _XpPill extends StatelessWidget {
             children: [
               Text(
                 AppLocalizations.of(context).topBar_xp_level(level),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: AppColors.fg,
@@ -335,7 +335,7 @@ class AmbientProgress extends ConsumerWidget {
             widthFactor: progress,
             alignment: Alignment.centerLeft,
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [AppColors.accent, AppColors.accent2],
                 ),

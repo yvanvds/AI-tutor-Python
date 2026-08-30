@@ -29,7 +29,7 @@ class ObjectiveBanner extends ConsumerWidget {
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.m,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.ink1,
         border: Border(bottom: BorderSide(color: AppColors.ink2, width: 1)),
       ),
@@ -51,7 +51,7 @@ class ObjectiveBanner extends ConsumerWidget {
                   AppLocalizations.of(
                     context,
                   ).session_objectiveBanner_pill.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.accent,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -63,7 +63,7 @@ class ObjectiveBanner extends ConsumerWidget {
               Expanded(
                 child: Text(
                   goal.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
@@ -79,7 +79,7 @@ class ObjectiveBanner extends ConsumerWidget {
             const SizedBox(height: 2),
             Text(
               description,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.fgMute,
                 fontSize: 12,
                 height: 1.35,

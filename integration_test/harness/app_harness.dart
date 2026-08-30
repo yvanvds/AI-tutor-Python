@@ -11,11 +11,20 @@
 //     `flutter build windows` — there is no flag in `lib/` to flip.
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
-// the system locale, SharedPreferences (in-memory), the playground file
-// directory (temp), the update check (off), the LLM (any call fails loudly)
-// and the lesson example runner (scripted). Python for the practice editor
-// stays real — pressing Run on a machine without the bundle shows the
-// in-app host error, which is what a student would see.
+// the system locale, the system light/dark setting, SharedPreferences
+// (in-memory), the playground file directory (temp), the update check (off),
+// the LLM (any call fails loudly) and the lesson example runner (scripted).
+//
+// The light/dark pin is not cosmetic (#32): with no stored preference the app
+// follows the operating system, so an unpinned run renders in whatever theme
+// the machine happens to be set to — green on a developer's dark desktop, red
+// on a CI runner that ships in light mode. Every flow therefore states the
+// brightness it wants, and the default matches the app's shipping look.
+//
+// Python for the practice editor stays real by default — pressing Run on a
+// machine without the bundle shows the in-app host error, which is what a
+// student would see; a flow that needs to drive a run deterministically
+// passes `pyRunner:`.
 
 import 'dart:async';
 import 'dart:io';
@@ -25,14 +34,18 @@ import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
+import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
+import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../test/helpers/fake_lesson_code_runner.dart';
@@ -72,11 +85,38 @@ class _OfflineTutor extends TutorService {
   Future<void> requestExercise() async {}
 }
 
+/// Replaces only the *dialog* half of progress export / import (#32): the
+/// path is fixed instead of asked for, and the file is still written to and
+/// read from the real disk, so a flow exercises the same round trip a student
+/// does.
+class _FixedPathArchiveIo implements ProgressArchiveIo {
+  _FixedPathArchiveIo(this.file);
+  final File file;
+
+  @override
+  Future<String?> save({
+    required String suggestedName,
+    required String contents,
+  }) async {
+    await file.writeAsString(contents);
+    return file.path;
+  }
+
+  @override
+  Future<ArchiveFile?> open() async {
+    if (!file.existsSync()) return null;
+    return (name: 'progress.json', contents: await file.readAsString());
+  }
+}
+
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
+    this.pyRunner,
+    this.archiveFile,
+    this.systemBrightness = Brightness.dark,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -101,6 +141,26 @@ class AppHarness {
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
   final FakeLessonCodeRunner lessonRunner;
+
+  /// Python host behind the editor's Run button. `null` (the default) leaves
+  /// the real one in place — pressing Run on a machine without the bundle
+  /// then shows the in-app host error, which is what a student would see.
+  /// Pass a [FakePyRunner] to drive a run that starts and keeps running
+  /// regardless of what is installed on the machine.
+  final PyRunner? pyRunner;
+
+  /// The operating system's light/dark setting, as the app sees it (#32).
+  ///
+  /// Defaults to dark — the theme the app shipped with, and the one the rest
+  /// of the flows describe. Pass `Brightness.light` to drive the other
+  /// resolution of "follow the system". Never left to the real machine: that
+  /// is what made the theme flow pass on a dark desktop and fail on CI.
+  final Brightness systemBrightness;
+
+  /// Where "Export progress…" writes and "Import progress…" reads (#32).
+  /// `null` (the default) leaves the real OS file dialogs in place, which no
+  /// test can click; pass a path in a temp directory to drive the round trip.
+  final File? archiveFile;
 
   /// Every installer handover the app performed, as `(executable, arguments)`
   /// (#49).
@@ -134,6 +194,11 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
+        if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
+        if (archiveFile != null)
+          progressArchiveIoProvider.overrideWithValue(
+            _FixedPathArchiveIo(archiveFile!),
+          ),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
@@ -145,6 +210,7 @@ class AppHarness {
         if (forceUpdateCheck)
           updateAutoCheckProvider.overrideWithValue(updateFeedUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
+        systemBrightnessProvider.overrideWithValue(systemBrightness),
       ],
     );
 

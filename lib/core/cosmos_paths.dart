@@ -13,6 +13,7 @@ const String _contentContainer = 'content';
 const String _modulesContainer = 'modules';
 const String _loBeliefsContainer = 'lo_beliefs';
 const String _turnHistoryContainer = 'turn_history';
+const String _playgroundFilesContainer = 'playground_files';
 
 /// Constant partition-key values for the single-partition containers
 /// (`goals`, `instructions`, `config`, `content`, `modules`). Each doc in
@@ -72,4 +73,10 @@ class CosmosPaths {
   /// per CONDUCTOR_POLICY 8.1. Consumed by debug surfaces only.
   static CosmosContainer turnHistory() =>
       _client.container(_turnHistoryContainer);
+
+  /// `/uid` partition. One doc per saved playground file. Doc id
+  /// `${uid}_${name}`; a deleted file stays behind as a tombstone so the
+  /// delete reaches the student's other machines (#31).
+  static CosmosContainer playgroundFiles() =>
+      _client.container(_playgroundFilesContainer);
 }

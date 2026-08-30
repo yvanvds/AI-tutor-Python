@@ -15,14 +15,18 @@ class ComposerChrome extends StatefulWidget {
       AppSpacing.lg,
       AppSpacing.s,
     ),
-    this.background = AppColors.ink1,
-    this.topBorder = AppColors.ink2,
+    this.background,
+    this.topBorder,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final Color background;
-  final Color topBorder;
+
+  /// Defaults resolve at build time rather than in the parameter list: the
+  /// palette they come from is swappable (#32), so a default baked into the
+  /// constructor would freeze one theme's colours.
+  final Color? background;
+  final Color? topBorder;
 
   @override
   State<ComposerChrome> createState() => _ComposerChromeState();
@@ -52,8 +56,13 @@ class _ComposerChromeState extends State<ComposerChrome> {
       child: Container(
         key: _key,
         decoration: BoxDecoration(
-          color: widget.background,
-          border: Border(top: BorderSide(color: widget.topBorder, width: 1)),
+          color: widget.background ?? AppColors.ink1,
+          border: Border(
+            top: BorderSide(
+              color: widget.topBorder ?? AppColors.ink2,
+              width: 1,
+            ),
+          ),
         ),
         padding: widget.padding,
         child: widget.child,

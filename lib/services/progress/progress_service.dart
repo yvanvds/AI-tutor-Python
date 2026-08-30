@@ -109,6 +109,23 @@ class ProgressService {
     await _writeHistorySample(uid: uid, progress: p, quality: quality);
   }
 
+  /// Writes [samples] into `progress_history` for the signed-in user. Each
+  /// gets a fresh doc id, so the caller is responsible for having cleared
+  /// whatever it is replacing — the progress import in the Options panel
+  /// (#32) wipes first.
+  Future<void> importHistory(List<ProgressSample> samples) async {
+    final uid = _uid;
+    if (samples.isEmpty) return;
+    await safeCosmos(() async {
+      for (final sample in samples) {
+        await _historyContainer.create(
+          sample.toMap(uid: uid),
+          partitionKey: uid,
+        );
+      }
+    });
+  }
+
   Future<void> delete(String goalID) async {
     final uid = _uid;
     await safeCosmos(

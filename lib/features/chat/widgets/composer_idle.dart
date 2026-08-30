@@ -134,7 +134,7 @@ class _Field extends StatelessWidget {
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.fg,
                   fontSize: 14,
                   height: 1.5,
@@ -145,7 +145,7 @@ class _Field extends StatelessWidget {
                   hintText: AppLocalizations.of(
                     context,
                   ).chat_composer_idle_hint,
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 14,
                     height: 1.5,
@@ -253,7 +253,7 @@ class _HintFooter extends StatelessWidget {
   }
 }
 
-const TextStyle _captionStyle = TextStyle(
+TextStyle _captionStyle = TextStyle(
   color: AppColors.fgFaint,
   fontSize: 10.5,
   height: 1.4,

@@ -66,4 +66,70 @@ void main() {
     );
     expect(root.listSync(), isEmpty);
   });
+
+  // Limits (#31): every saved file becomes one Cosmos doc in the student's
+  // account, so both the size of a file and the number of them are capped.
+  group('limits', () {
+    test('refuses code over the per-file cap', () async {
+      final tooBig = 'x' * (PlaygroundFileStore.maxFileBytes + 1);
+      await expectLater(
+        store.save('big', tooBig),
+        throwsA(isA<PlaygroundFileTooLarge>()),
+      );
+      expect(await store.list(), isEmpty);
+    });
+
+    test('counts bytes, not characters', () async {
+      // 'é' is two bytes in UTF-8, so this is one byte over the cap.
+      final over = 'é' * (PlaygroundFileStore.maxFileBytes ~/ 2 + 1);
+      await expectLater(
+        store.save('accents', over),
+        throwsA(isA<PlaygroundFileTooLarge>()),
+      );
+    });
+
+    test(
+      'refuses a new file past the count cap but still overwrites',
+      () async {
+        for (var i = 0; i < PlaygroundFileStore.maxFiles; i++) {
+          File(p.join(root.path, 'f$i.py')).writeAsStringSync('x');
+        }
+        await expectLater(
+          store.save('one more', 'x'),
+          throwsA(isA<PlaygroundStoreFull>()),
+        );
+        // Saving over a file that already exists adds nothing, so it is fine.
+        await store.save('f0', 'print(1)');
+        expect(await store.load('f0'), 'print(1)');
+      },
+    );
+  });
+
+  test('the sync sidecar round-trips and stays out of the listing', () async {
+    expect(await store.readSyncMeta(), isNull);
+    await store.writeSyncMeta('{"version":1}');
+    expect(await store.readSyncMeta(), '{"version":1}');
+    expect(await store.list(), isEmpty);
+  });
+
+  group('resolvePlaygroundDir', () {
+    test('gives each student their own folder', () async {
+      final a = await resolvePlaygroundDir(root, 'uid-a');
+      final b = await resolvePlaygroundDir(root, 'uid-b');
+      expect(a.path, isNot(b.path));
+      expect(p.basename(a.path), 'uid-a');
+    });
+
+    test('moves files from the flat #19 layout to the first student', () async {
+      File(p.join(root.path, 'loops.py')).writeAsStringSync('print(1)');
+
+      final a = await resolvePlaygroundDir(root, 'uid-a');
+      expect(File(p.join(a.path, 'loops.py')).readAsStringSync(), 'print(1)');
+      expect(File(p.join(root.path, 'loops.py')).existsSync(), isFalse);
+
+      // The next student to sign in does not inherit them.
+      final b = await resolvePlaygroundDir(root, 'uid-b');
+      expect(Directory(b.path).listSync(), isEmpty);
+    });
+  });
 }

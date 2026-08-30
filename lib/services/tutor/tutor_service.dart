@@ -13,6 +13,7 @@ import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -151,6 +152,7 @@ class TutorService extends Notifier<TutorState> {
           onRecordRawOutput: _debug.recordRawOutput,
           onRecordStreamFailure: _debug.recordStreamFailure,
           getConfig: () => ref.read(globalConfigServiceProvider),
+          getModelOverride: () => ref.read(modelPreferenceProvider),
         );
     _conductor = _conductorOverride ?? Conductor(deps: _buildConductorDeps());
 

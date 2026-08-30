@@ -206,6 +206,54 @@ abstract class AppLocalizations {
   /// **'Applies immediately; \"System\" follows the operating system.'**
   String get options_language_subtitle;
 
+  /// No description provided for @options_theme_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get options_theme_title;
+
+  /// No description provided for @options_theme_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Light or dark, stored on this device. \"System\" follows the operating system.'**
+  String get options_theme_subtitle;
+
+  /// No description provided for @options_theme_system.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the system'**
+  String get options_theme_system;
+
+  /// No description provided for @options_theme_light.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get options_theme_light;
+
+  /// No description provided for @options_theme_dark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get options_theme_dark;
+
+  /// No description provided for @options_model_title.
+  ///
+  /// In en, this message translates to:
+  /// **'AI model'**
+  String get options_model_title;
+
+  /// No description provided for @options_model_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which OpenAI model the tutor asks. Applies to this device only; a bigger model is slower and costs more.'**
+  String get options_model_subtitle;
+
+  /// No description provided for @options_model_followGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'School default ({model})'**
+  String options_model_followGlobal(String model);
+
   /// No description provided for @options_progress_title.
   ///
   /// In en, this message translates to:
@@ -319,6 +367,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get options_dialog_cancel;
+
+  /// No description provided for @options_transfer_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Export / import progress'**
+  String get options_transfer_title;
+
+  /// No description provided for @options_transfer_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your learning history to a file, or load it into this account — useful when you switch to another account.'**
+  String get options_transfer_subtitle;
+
+  /// No description provided for @options_transfer_export_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Export progress…'**
+  String get options_transfer_export_button;
+
+  /// No description provided for @options_transfer_import_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Import progress…'**
+  String get options_transfer_import_button;
+
+  /// No description provided for @options_transfer_exported.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress saved to {path}'**
+  String options_transfer_exported(String path);
+
+  /// No description provided for @options_transfer_exportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String options_transfer_exportFailed(String error);
+
+  /// No description provided for @options_transfer_import_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace your progress?'**
+  String get options_transfer_import_dialog_title;
+
+  /// No description provided for @options_transfer_import_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing \"{file}\" deletes the progress, learning history and tutor beliefs this account has now and replaces them with the contents of the file. This cannot be undone.'**
+  String options_transfer_import_dialog_message(String file);
+
+  /// No description provided for @options_transfer_import_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Import and replace'**
+  String get options_transfer_import_dialog_confirm;
+
+  /// No description provided for @options_transfer_imported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {goals} goals, {samples} history entries and {beliefs} skill estimates.'**
+  String options_transfer_imported(int goals, int samples, int beliefs);
+
+  /// No description provided for @options_transfer_importFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String options_transfer_importFailed(String error);
 
   /// No description provided for @options_apiKey_title.
   ///
@@ -992,6 +1106,12 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get session_playground_openDialog_delete_tooltip;
 
+  /// Shown above the file list after a sync had to keep two versions of a file
+  ///
+  /// In en, this message translates to:
+  /// **'Also changed on another computer. This computer\'s version was kept separately as: {names}'**
+  String session_playground_openDialog_conflict(String names);
+
   /// No description provided for @session_playground_deleteDialog_title.
   ///
   /// In en, this message translates to:
@@ -1046,6 +1166,18 @@ abstract class AppLocalizations {
   /// **'Opening failed: {error}'**
   String session_playground_snack_openFailed(String error);
 
+  /// No description provided for @session_playground_snack_tooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This code is too large to save (over {max} KB).'**
+  String session_playground_snack_tooLarge(int max);
+
+  /// No description provided for @session_playground_snack_tooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have {max} saved files, which is the maximum. Delete one first.'**
+  String session_playground_snack_tooManyFiles(int max);
+
   /// Quiz header pill — displayed uppercase
   ///
   /// In en, this message translates to:
@@ -1093,6 +1225,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Press Run to execute your code.'**
   String get session_output_emptyState_runHint;
+
+  /// Faint meta line pushed to the output panel when a run's code imports turtle — the Tk window opens outside the app and turtle.done() blocks until it is closed (#51)
+  ///
+  /// In en, this message translates to:
+  /// **'A turtle window is open. Close it, or press Stop, to finish the run.'**
+  String get session_output_meta_turtleWindow;
+
+  /// Faint meta line pushed to the output panel when the student presses Stop (#51)
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped.'**
+  String get session_output_meta_stopped;
 
   /// No description provided for @session_runControls_tooltip_resetOutput.
   ///

@@ -22,11 +22,10 @@ class TutorMarkdown extends StatelessWidget {
   final String text;
   final TextStyle? style;
 
-  static const TextStyle _defaultStyle = TextStyle(
-    color: AppColors.fg,
-    fontSize: 14,
-    height: 1.55,
-  );
+  /// A getter, not a cached field: `AppColors.fg` follows the active palette
+  /// (#32) and a value captured once would keep the other theme's ink.
+  static TextStyle get _defaultStyle =>
+      TextStyle(color: AppColors.fg, fontSize: 14, height: 1.55);
 
   @override
   Widget build(BuildContext context) {

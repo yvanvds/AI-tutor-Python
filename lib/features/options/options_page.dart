@@ -3,12 +3,15 @@
 // popup and the debug dialog:
 //
 //   - language (moved from the sidebar settings popup)
+//   - appearance: light / dark / follow the system (#32)
+//   - the AI model, on own-key and developer builds (#32)
 //   - progress reset: everything, or one goal / subgoal
+//   - export / import of progress to a JSON file (#32)
 //   - the user's own OpenAI key (only when the account is not on the
 //     bundled key)
 //   - bug reports to GitHub, with a recent tutor turn's debug payload
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
-//   - about / version
+//   - about / version, with the manual update check (#48)
 
 import 'dart:convert';
 
@@ -20,11 +23,17 @@ import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
+import 'package:ai_tutor_python/services/config/model_preference.dart';
+import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
+import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
@@ -70,7 +79,18 @@ class OptionsPage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
               const _LanguageCard(),
               const SizedBox(height: AppSpacing.lg),
+              const _ThemeCard(),
+              // The model is a spending decision as much as a quality one, so
+              // it is offered to whoever is paying: an own-key account, or a
+              // developer build (#32).
+              if (usesOwnKey || devTools) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const _ModelCard(),
+              ],
+              const SizedBox(height: AppSpacing.lg),
               const _ProgressCard(),
+              const SizedBox(height: AppSpacing.lg),
+              const _TransferCard(),
               if (usesOwnKey) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _ApiKeyCard(),
@@ -111,7 +131,7 @@ class _OptionsCard extends StatelessWidget {
     return Material(
       color: AppColors.ink1,
       shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppColors.ink2),
+        side: BorderSide(color: AppColors.ink2),
         borderRadius: BorderRadius.circular(AppRadius.cardLarge),
       ),
       child: Padding(
@@ -133,6 +153,25 @@ class _OptionsCard extends StatelessWidget {
   }
 }
 
+/// Radio-style row shared by the language, appearance and model cards.
+Widget _choiceRow({
+  required String label,
+  required bool selected,
+  required VoidCallback onTap,
+}) {
+  return ListTile(
+    dense: true,
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(
+      selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+      size: 18,
+      color: selected ? AppColors.accent : AppColors.fgMute,
+    ),
+    title: Text(label),
+    onTap: onTap,
+  );
+}
+
 void _snack(BuildContext context, String message) {
   ScaffoldMessenger.maybeOf(
     context,
@@ -151,22 +190,13 @@ class _LanguageCard extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final current = ref.watch(localeServiceProvider);
 
-    Widget row(String label, Locale? value) {
-      final selected = value == null
+    Widget row(String label, Locale? value) => _choiceRow(
+      label: label,
+      selected: value == null
           ? current == null
-          : current?.languageCode == value.languageCode;
-      return ListTile(
-        dense: true,
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-          size: 18,
-          color: selected ? AppColors.accent : AppColors.fgMute,
-        ),
-        title: Text(label),
-        onTap: () => ref.read(localeServiceProvider.notifier).setLocale(value),
-      );
-    }
+          : current?.languageCode == value.languageCode,
+      onTap: () => ref.read(localeServiceProvider.notifier).setLocale(value),
+    );
 
     return _OptionsCard(
       title: l.options_language_title,
@@ -176,6 +206,200 @@ class _LanguageCard extends ConsumerWidget {
           row(l.settings_language_system, null),
           row(l.settings_language_english, const Locale('en')),
           row(l.settings_language_dutch, const Locale('nl')),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Appearance (#32)
+// ---------------------------------------------------------------------------
+
+/// Light / dark / follow-the-system.
+///
+/// Picking one swaps the palette behind the flat `AppColors` tokens and
+/// remounts the shell (see `GoalsApp.build`), so the whole window — sidebar,
+/// editor, syntax colours, chat — changes on the next frame.
+class _ThemeCard extends ConsumerWidget {
+  const _ThemeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final current = ref.watch(themeServiceProvider);
+
+    Widget row(String label, AppThemeChoice value) => _choiceRow(
+      label: label,
+      selected: current == value,
+      onTap: () => ref.read(themeServiceProvider.notifier).setChoice(value),
+    );
+
+    return _OptionsCard(
+      title: l.options_theme_title,
+      subtitle: l.options_theme_subtitle,
+      child: Column(
+        children: [
+          row(l.options_theme_system, AppThemeChoice.system),
+          row(l.options_theme_light, AppThemeChoice.light),
+          row(l.options_theme_dark, AppThemeChoice.dark),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI model (#32)
+// ---------------------------------------------------------------------------
+
+/// Per-device model override on top of the school-wide `GlobalConfig.Model`.
+/// See `services/config/model_preference.dart` for why it is per device and
+/// who gets to see this card.
+class _ModelCard extends ConsumerWidget {
+  const _ModelCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final current = ref.watch(modelPreferenceProvider);
+    final global = ref.watch(globalConfigServiceProvider)?.model;
+    final fallback = (global == null || global.isEmpty)
+        ? OpenaiConnector.defaultModel
+        : global;
+
+    Widget row(String label, String? value) => _choiceRow(
+      label: label,
+      selected: current == value,
+      onTap: () => ref.read(modelPreferenceProvider.notifier).setModel(value),
+    );
+
+    return _OptionsCard(
+      title: l.options_model_title,
+      subtitle: l.options_model_subtitle,
+      child: Column(
+        children: [
+          row(l.options_model_followGlobal(fallback), null),
+          for (final model in kSelectableModels) row(model, model),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Export / import progress (#32)
+// ---------------------------------------------------------------------------
+
+class _TransferCard extends ConsumerStatefulWidget {
+  const _TransferCard();
+
+  @override
+  ConsumerState<_TransferCard> createState() => _TransferCardState();
+}
+
+class _TransferCardState extends ConsumerState<_TransferCard> {
+  bool _busy = false;
+
+  Future<void> _export() async {
+    final l = AppLocalizations.of(context);
+    setState(() => _busy = true);
+    try {
+      final data = await ref.read(progressArchiveProvider).export();
+      final stamp = DateTime.now().toUtc().toIso8601String().split('T').first;
+      final path = await ref
+          .read(progressArchiveIoProvider)
+          .save(
+            suggestedName: 'ai-tutor-progress-$stamp.json',
+            contents: const JsonEncoder.withIndent('  ').convert(data),
+          );
+      if (!mounted || path == null) return;
+      _snack(context, l.options_transfer_exported(path));
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, l.options_transfer_exportFailed(e.toString()));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _import() async {
+    final l = AppLocalizations.of(context);
+    final ArchiveFile? file;
+    try {
+      file = await ref.read(progressArchiveIoProvider).open();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, l.options_transfer_importFailed(e.toString()));
+      return;
+    }
+    if (file == null || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.options_transfer_import_dialog_title),
+        content: Text(l.options_transfer_import_dialog_message(file!.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.options_dialog_cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.options_transfer_import_dialog_confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final decoded = jsonDecode(file.contents);
+      if (decoded is! Map) {
+        throw ProgressArchiveException('The file does not contain JSON data.');
+      }
+      final summary = await ref
+          .read(progressArchiveProvider)
+          .import(decoded.cast<String, dynamic>());
+      if (!mounted) return;
+      _snack(
+        context,
+        l.options_transfer_imported(
+          summary.goals,
+          summary.samples,
+          summary.beliefs,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, l.options_transfer_importFailed(e.toString()));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _OptionsCard(
+      title: l.options_transfer_title,
+      subtitle: l.options_transfer_subtitle,
+      child: Wrap(
+        spacing: AppSpacing.s,
+        runSpacing: AppSpacing.s,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _export,
+            icon: const Icon(Icons.file_download_outlined, size: 18),
+            label: Text(l.options_transfer_export_button),
+          ),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _import,
+            icon: const Icon(Icons.file_upload_outlined, size: 18),
+            label: Text(l.options_transfer_import_button),
+          ),
         ],
       ),
     );

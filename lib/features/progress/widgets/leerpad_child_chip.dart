@@ -43,7 +43,7 @@ class LeerpadChildChip extends StatelessWidget {
                   goal.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
@@ -53,11 +53,7 @@ class LeerpadChildChip extends StatelessWidget {
               ),
               if (completed) ...[
                 const SizedBox(width: 4),
-                const Icon(
-                  Icons.check_circle,
-                  size: 14,
-                  color: AppColors.accent2,
-                ),
+                Icon(Icons.check_circle, size: 14, color: AppColors.accent2),
               ],
             ],
           ),

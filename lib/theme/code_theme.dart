@@ -7,7 +7,11 @@ import 'tokens.dart';
 ///
 /// Replaces `monokai-sublime` with a palette aligned to the new ink + leaf
 /// design tokens. Used by the editor and by the chat code bubble.
-final Map<String, TextStyle> tutorCodeTheme = {
+///
+/// A getter rather than a `final` map: the syntax hues differ per palette
+/// (#32), and a map built once at first access would keep the colours of
+/// whichever theme happened to be active when the first snippet rendered.
+Map<String, TextStyle> get tutorCodeTheme => {
   'root': GoogleFonts.jetBrainsMono(
     backgroundColor: AppColors.ink0,
     color: AppColors.fg,
@@ -52,11 +56,11 @@ final Map<String, TextStyle> tutorCodeTheme = {
 
   'addition': TextStyle(
     color: AppColors.accent2,
-    backgroundColor: Color(0x1FDCCF9A),
+    backgroundColor: AppColors.accent2.withValues(alpha: 0.12),
   ),
   'deletion': TextStyle(
     color: AppColors.danger,
-    backgroundColor: Color(0x1FD97565),
+    backgroundColor: AppColors.danger.withValues(alpha: 0.12),
   ),
 
   'operator': TextStyle(color: AppColors.fgMute),

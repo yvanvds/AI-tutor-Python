@@ -8,8 +8,12 @@
 // in-memory Cosmos fake / mock SharedPreferences / a scripted http client, so
 // every flow is exercised from the button through the dialogs to the writes.
 //
-// Not driven through the full app: boot requires an Entra sign-in and a live
-// Cosmos endpoint, and there is no integration_test harness in the repo (#28).
+// Extended for #32: appearance (light / dark), the per-device AI model, and
+// export / import of progress.
+//
+// The end-to-end half of the panel — the theme switch repainting the whole
+// shell, and the progress round trip through a real file — lives in
+// `integration_test/flows/options_panel.dart`, which boots the real app.
 
 import 'dart:convert';
 import 'dart:io';
@@ -22,13 +26,20 @@ import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/config/global_config.dart';
+import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
+import 'package:ai_tutor_python/services/config/model_preference.dart';
+import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,6 +64,40 @@ const _identity = AccountIdentity(
 class _SignedInAuth extends AuthService {
   @override
   AccountIdentity? build() => _identity;
+}
+
+/// The school-wide config doc, without a Cosmos round trip.
+class _FixedGlobalConfig extends GlobalConfigService {
+  _FixedGlobalConfig(this._config);
+  final GlobalConfig? _config;
+
+  @override
+  GlobalConfig? build() => _config;
+}
+
+/// Stands in for the OS file dialogs behind progress export / import (#32).
+class _FakeArchiveIo implements ProgressArchiveIo {
+  String? savedName;
+  String? savedContents;
+  bool cancelSave = false;
+  ArchiveFile? toOpen;
+  Object? openError;
+
+  @override
+  Future<String?> save({
+    required String suggestedName,
+    required String contents,
+  }) async {
+    savedName = suggestedName;
+    savedContents = contents;
+    return cancelSave ? null : 'C:\\Users\\sam\\$suggestedName';
+  }
+
+  @override
+  Future<ArchiveFile?> open() async {
+    if (openError != null) throw openError!;
+    return toOpen;
+  }
 }
 
 Map<String, dynamic> _goal({
@@ -131,6 +176,7 @@ void main() {
   late InMemoryCosmos accounts;
   late DebugSessionRecorder recorder;
   late List<http.Request> githubRequests;
+  late _FakeArchiveIo archiveIo;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({'local_api_key': 'sk-old'});
@@ -169,6 +215,7 @@ void main() {
       ..endTurn();
 
     githubRequests = [];
+    archiveIo = _FakeArchiveIo();
   });
 
   http.Client githubClient() => MockClient((req) async {
@@ -189,54 +236,64 @@ void main() {
     return http.Response('{"message":"Not Found"}', 404);
   });
 
-  Widget buildApp({bool devTools = false, UpdateServices? update}) =>
-      ProviderScope(
-        overrides: [
-          if (update != null) updateServicesProvider.overrideWithValue(update),
-          authServiceProvider.overrideWith(_SignedInAuth.new),
-          accountServiceProvider.overrideWith(
-            () => AccountService(container: accounts.container),
-          ),
-          goalsServiceProvider.overrideWithValue(
-            GoalsService(container: goals.container),
-          ),
-          progressServiceProvider.overrideWithValue(
-            ProgressService(
-              container: progress.container,
-              historyContainer: history.container,
-              getUid: () => _uid,
-            ),
-          ),
-          loBeliefsServiceProvider.overrideWithValue(
-            LoBeliefsService(container: beliefs.container, getUid: () => _uid),
-          ),
-          turnHistoryServiceProvider.overrideWithValue(
-            TurnHistoryService(container: turns.container, getUid: () => _uid),
-          ),
-          githubIssueServiceProvider.overrideWithValue(
-            GitHubIssueService(client: githubClient()),
-          ),
-          debugServiceProvider.overrideWithValue(recorder),
-          developerToolsProvider.overrideWithValue(devTools),
-        ],
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: OptionsPage()),
+  Widget buildApp({
+    bool devTools = false,
+    UpdateServices? update,
+    String globalModel = 'gpt-4o',
+  }) => ProviderScope(
+    overrides: [
+      if (update != null) updateServicesProvider.overrideWithValue(update),
+      globalConfigServiceProvider.overrideWith(
+        () => _FixedGlobalConfig(GlobalConfig(model: globalModel, apiKey: '')),
+      ),
+      progressArchiveIoProvider.overrideWithValue(archiveIo),
+      authServiceProvider.overrideWith(_SignedInAuth.new),
+      accountServiceProvider.overrideWith(
+        () => AccountService(container: accounts.container),
+      ),
+      goalsServiceProvider.overrideWithValue(
+        GoalsService(container: goals.container),
+      ),
+      progressServiceProvider.overrideWithValue(
+        ProgressService(
+          container: progress.container,
+          historyContainer: history.container,
+          getUid: () => _uid,
         ),
-      );
+      ),
+      loBeliefsServiceProvider.overrideWithValue(
+        LoBeliefsService(container: beliefs.container, getUid: () => _uid),
+      ),
+      turnHistoryServiceProvider.overrideWithValue(
+        TurnHistoryService(container: turns.container, getUid: () => _uid),
+      ),
+      githubIssueServiceProvider.overrideWithValue(
+        GitHubIssueService(client: githubClient()),
+      ),
+      debugServiceProvider.overrideWithValue(recorder),
+      developerToolsProvider.overrideWithValue(devTools),
+    ],
+    child: MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: OptionsPage()),
+    ),
+  );
 
   Future<void> mount(
     WidgetTester tester, {
     bool devTools = false,
     UpdateServices? update,
+    String globalModel = 'gpt-4o',
   }) async {
     // Tall viewport so every card is laid out without scrolling.
-    tester.view.physicalSize = const Size(1400, 2400);
+    tester.view.physicalSize = const Size(1400, 3200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(buildApp(devTools: devTools, update: update));
+    await tester.pumpWidget(
+      buildApp(devTools: devTools, update: update, globalModel: globalModel),
+    );
     // Account poll + SharedPreferences hydration.
     await tester.pump();
     await tester.pump();
@@ -245,6 +302,15 @@ void main() {
 
   Future<void> unmount(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
+  }
+
+  /// Drops any confirmation still on screen, so the next one asserted on is
+  /// not queued behind it.
+  Future<void> clearSnacks(WidgetTester tester) async {
+    ScaffoldMessenger.of(
+      tester.element(find.byType(OptionsPage)),
+    ).clearSnackBars();
+    await tester.pumpAndSettle();
   }
 
   ProviderContainer containerOf(WidgetTester tester) =>
@@ -528,6 +594,190 @@ void main() {
     expect(container.read(localeServiceProvider), isNull);
 
     await unmount(tester);
+  });
+
+  // #32 — appearance, model and progress transfer.
+  group('appearance', () {
+    testWidgets('picking Light stores the choice and flips the palette', (
+      tester,
+    ) async {
+      await mount(tester);
+      final container = containerOf(tester);
+      expect(container.read(themeServiceProvider), AppThemeChoice.system);
+
+      await tester.tap(find.text('Light'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(themeServiceProvider), AppThemeChoice.light);
+      expect(container.read(appPaletteProvider), AppPalette.light);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('app_theme'), 'light');
+
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+      expect(container.read(appPaletteProvider), AppPalette.dark);
+
+      await unmount(tester);
+    });
+  });
+
+  group('AI model', () {
+    testWidgets('own-key accounts see the card, and the school default is the '
+        'starting choice', (tester) async {
+      await mount(tester, globalModel: 'gpt-4.1');
+
+      expect(find.text('AI model'), findsOneWidget);
+      expect(find.text('School default (gpt-4.1)'), findsOneWidget);
+      for (final model in kSelectableModels) {
+        expect(find.text(model), findsOneWidget, reason: model);
+      }
+
+      await unmount(tester);
+    });
+
+    testWidgets('picking a model stores a per-device override', (tester) async {
+      await mount(tester);
+      final container = containerOf(tester);
+      expect(container.read(modelPreferenceProvider), isNull);
+
+      await tester.tap(find.text('gpt-5-mini'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(modelPreferenceProvider), 'gpt-5-mini');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('openai_model'), 'gpt-5-mini');
+
+      // Back to the school default.
+      await tester.tap(find.text('School default (gpt-4o)'));
+      await tester.pumpAndSettle();
+      expect(container.read(modelPreferenceProvider), isNull);
+      expect(prefs.getString('openai_model'), isNull);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a student on the bundled key cannot change the model', (
+      tester,
+    ) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester);
+
+      expect(find.text('AI model'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a developer build sees it even on the bundled key', (
+      tester,
+    ) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, devTools: true);
+
+      expect(find.text('AI model'), findsOneWidget);
+
+      await unmount(tester);
+    });
+  });
+
+  group('export / import progress', () {
+    testWidgets('export writes the account state as JSON with no identity in '
+        'it', (tester) async {
+      await mount(tester);
+
+      await tester.tap(find.text('Export progress…'));
+      await tester.pumpAndSettle();
+
+      expect(archiveIo.savedName, endsWith('.json'));
+      final written = jsonDecode(archiveIo.savedContents!) as Map;
+      expect(written['kind'], ProgressArchive.kind);
+      expect(written['progress'], hasLength(3));
+      expect(written['history'], hasLength(2));
+      expect(written['beliefs'], hasLength(2));
+      expect(archiveIo.savedContents, isNot(contains(_uid)));
+      expect(find.textContaining('Progress saved to'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    testWidgets('cancelling the save dialog reports nothing', (tester) async {
+      await mount(tester);
+      archiveIo.cancelSave = true;
+
+      await tester.tap(find.text('Export progress…'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Progress saved to'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('import asks first, then replaces the account state', (
+      tester,
+    ) async {
+      await mount(tester);
+
+      // Take a file from this account, then wipe it so the import has
+      // something to restore.
+      await tester.tap(find.text('Export progress…'));
+      await tester.pumpAndSettle();
+      final file = archiveIo.savedContents!;
+
+      await tester.tap(find.text('Reset all progress'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Reset everything'));
+      await tester.pumpAndSettle();
+      expect(progress.docs, isEmpty);
+      await clearSnacks(tester);
+
+      archiveIo.toOpen = (name: 'sam-progress.json', contents: file);
+      await tester.tap(find.text('Import progress…'));
+      await tester.pumpAndSettle();
+
+      // Cancelling leaves the wiped state alone.
+      expect(find.text('Replace your progress?'), findsOneWidget);
+      expect(
+        find.textContaining('sam-progress.json'),
+        findsOneWidget,
+        reason: 'the dialog should name the file being imported',
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(progress.docs, isEmpty);
+
+      await tester.tap(find.text('Import progress…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Import and replace'));
+      await tester.pumpAndSettle();
+
+      expect(progress.docs, hasLength(3));
+      expect(progress['${_uid}_s1']!['progress'], 1.0);
+      expect(history.docs, hasLength(2));
+      expect(beliefs.docs, hasLength(2));
+      expect(accounts[_uid]!['calibration']['difficulty'], 'hard');
+      expect(
+        find.text('Imported 3 goals, 2 history entries and 2 skill estimates.'),
+        findsOneWidget,
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('a file that is not a progress archive is refused, not '
+        'half-applied', (tester) async {
+      await mount(tester);
+      archiveIo.toOpen = (name: 'holiday.json', contents: '{"photos": 12}');
+
+      await tester.tap(find.text('Import progress…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Import and replace'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Import failed'), findsOneWidget);
+      expect(progress.docs, hasLength(3), reason: 'nothing should have moved');
+      expect(beliefs.docs, hasLength(2));
+
+      await unmount(tester);
+    });
   });
 
   testWidgets('about card shows the app version', (tester) async {

@@ -112,7 +112,7 @@ class _CardHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.fg,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -123,7 +123,7 @@ class _CardHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   description!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fgMute,
                     fontSize: 13,
                     height: 1.5,
@@ -158,7 +158,7 @@ class _IndexBadge extends StatelessWidget {
     if (completed) {
       bg = AppColors.accent2;
       fg = AppColors.ink0;
-      child = const Icon(Icons.check, size: 16, color: AppColors.ink0);
+      child = Icon(Icons.check, size: 16, color: AppColors.ink0);
     } else if (isActive) {
       bg = AppColors.accent;
       fg = AppColors.ink0;
@@ -307,14 +307,14 @@ class _VerderButtonState extends State<_VerderButton> {
             children: [
               Text(
                 AppLocalizations.of(context).leerpad_card_button_continue,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.ink0,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
+              Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
             ],
           ),
         ),
