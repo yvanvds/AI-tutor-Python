@@ -61,23 +61,18 @@ class StudentDetailDrawer extends ConsumerWidget {
                           const Divider(height: 1),
                           _SectionTitle(
                             theme: theme,
-                            label: AppLocalizations.of(context)
-                                .drawer_section_goals,
+                            label: AppLocalizations.of(
+                              context,
+                            ).drawer_section_goals,
                           ),
                           SizedBox(
                             height: 320,
                             child: StudentProgressList(uid: account.uid),
                           ),
                           const Divider(height: 1),
-                          StatusReportsSection(
-                            uid: account.uid,
-                            goals: goals,
-                          ),
+                          StatusReportsSection(uid: account.uid, goals: goals),
                           const Divider(height: 1),
-                          ProgressHistoryCharts(
-                            uid: account.uid,
-                            goals: goals,
-                          ),
+                          ProgressHistoryCharts(uid: account.uid, goals: goals),
                         ],
                       );
                     },

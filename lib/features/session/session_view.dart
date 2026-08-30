@@ -32,14 +32,9 @@ class SessionView extends ConsumerWidget {
             duration: AppDurations.modeSwap,
             switchInCurve: AppCurves.layout,
             switchOutCurve: AppCurves.layout,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
-            child: KeyedSubtree(
-              key: ValueKey(mode),
-              child: _viewFor(mode),
-            ),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(key: ValueKey(mode), child: _viewFor(mode)),
           ),
         ),
         ClipRect(
@@ -51,10 +46,7 @@ class SessionView extends ConsumerWidget {
               minWidth: chatPanelWidth,
               maxWidth: chatPanelWidth,
               alignment: Alignment.centerLeft,
-              child: const SizedBox(
-                width: chatPanelWidth,
-                child: _ChatPanel(),
-              ),
+              child: const SizedBox(width: chatPanelWidth, child: _ChatPanel()),
             ),
           ),
         ),
@@ -82,9 +74,7 @@ class _ChatPanel extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.ink1,
-        border: Border(
-          left: BorderSide(color: AppColors.ink2, width: 1),
-        ),
+        border: Border(left: BorderSide(color: AppColors.ink2, width: 1)),
       ),
       child: const ChatWidget(),
     );

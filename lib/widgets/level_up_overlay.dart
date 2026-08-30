@@ -56,9 +56,7 @@ class _LevelUpScrim extends StatelessWidget {
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
-                color: AppColors.ink0.withValues(alpha: 0.8),
-              ),
+              child: Container(color: AppColors.ink0.withValues(alpha: 0.8)),
             ),
           ),
           Center(
@@ -90,8 +88,10 @@ class _LevelUpCardState extends State<_LevelUpCard>
     duration: AppDurations.levelUpPopup,
   )..forward();
 
-  late final Animation<double> _scale = Tween(begin: 0.92, end: 1.0)
-      .animate(CurvedAnimation(parent: _ctrl, curve: AppCurves.levelUp));
+  late final Animation<double> _scale = Tween(
+    begin: 0.92,
+    end: 1.0,
+  ).animate(CurvedAnimation(parent: _ctrl, curve: AppCurves.levelUp));
 
   @override
   void dispose() {

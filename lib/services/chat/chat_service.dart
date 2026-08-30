@@ -7,8 +7,8 @@ class ChatService {
   ChatService({
     void Function(StreamState)? onStreamStateChanged,
     void Function(bool)? onMcqPendingChanged,
-  })  : _onStreamStateChanged = onStreamStateChanged,
-        _onMcqPendingChanged = onMcqPendingChanged;
+  }) : _onStreamStateChanged = onStreamStateChanged,
+       _onMcqPendingChanged = onMcqPendingChanged;
 
   final ChatController controller = InMemoryChatController();
   final void Function(StreamState)? _onStreamStateChanged;
@@ -54,11 +54,7 @@ class ChatService {
         id: _id.toString(),
         authorId: 'Teacher',
         createdAt: DateTime.now(),
-        metadata: {
-          'kind': 'mcq_options',
-          'options': options,
-          'selected': null,
-        },
+        metadata: {'kind': 'mcq_options', 'options': options, 'selected': null},
       ),
     );
     _onMcqPendingChanged?.call(true);
@@ -69,9 +65,7 @@ class ChatService {
   void markMcqAnswered(CustomMessage message, String picked) {
     controller.updateMessage(
       message,
-      message.copyWith(
-        metadata: {...?message.metadata, 'selected': picked},
-      ),
+      message.copyWith(metadata: {...?message.metadata, 'selected': picked}),
     );
     _onMcqPendingChanged?.call(false);
   }
@@ -147,8 +141,7 @@ final chatServiceProvider = Provider<ChatService>((ref) {
   final cs = ChatService(
     onStreamStateChanged: (s) =>
         ref.read(streamStateProvider.notifier).state = s,
-    onMcqPendingChanged: (v) =>
-        ref.read(mcqPendingProvider.notifier).state = v,
+    onMcqPendingChanged: (v) => ref.read(mcqPendingProvider.notifier).state = v,
   );
   ref.onDispose(cs.dispose);
   return cs;

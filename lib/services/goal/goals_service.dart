@@ -17,15 +17,12 @@ class GoalsService {
 
   final CosmosContainer? _containerOverride;
 
-  CosmosContainer get _container =>
-      _containerOverride ?? CosmosPaths.goals();
+  CosmosContainer get _container => _containerOverride ?? CosmosPaths.goals();
 
   // --- STREAMS -------------------------------------------------------------
 
   Stream<List<Goal>>? get streamRoots {
-    return safeCosmosStream(
-      pollingStream(() => safeCosmos(_fetchRoots)),
-    );
+    return safeCosmosStream(pollingStream(() => safeCosmos(_fetchRoots)));
   }
 
   Stream<Goal?> streamGoal(String id) {
@@ -41,9 +38,7 @@ class GoalsService {
   }
 
   Stream<List<Goal>> streamAllGoals() {
-    return safeCosmosStream(
-      pollingStream(() => safeCosmos(_fetchAllByTitle)),
-    );
+    return safeCosmosStream(pollingStream(() => safeCosmos(_fetchAllByTitle)));
   }
 
   // --- ONE-SHOTS -----------------------------------------------------------
@@ -62,9 +57,7 @@ class GoalsService {
   Future<void> createRoot(String title) async {
     final next = await _nextOrder(parentId: null);
     final goal = Goal(id: _uuid.v4(), title: title, order: next);
-    await safeCosmos(
-      () => _container.create(_docMap(goal), partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.create(_docMap(goal), partitionKey: _pk));
   }
 
   Future<void> createChild(String parentId, String title) async {
@@ -75,9 +68,7 @@ class GoalsService {
       parentId: parentId,
       order: next,
     );
-    await safeCosmos(
-      () => _container.create(_docMap(goal), partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.create(_docMap(goal), partitionKey: _pk));
   }
 
   Future<String> createGoalWithFields({
@@ -108,9 +99,7 @@ class GoalsService {
       contentId: contentId,
       moduleId: moduleId,
     );
-    await safeCosmos(
-      () => _container.create(_docMap(goal), partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.create(_docMap(goal), partitionKey: _pk));
     return goal.id;
   }
 
@@ -158,9 +147,7 @@ class GoalsService {
       contentId: finalContentId,
       moduleId: moduleId,
     );
-    await safeCosmos(
-      () => _container.upsert(_docMap(goal), partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.upsert(_docMap(goal), partitionKey: _pk));
   }
 
   /// Deletes the listed goal docs in a single transactional batch. All goal
@@ -170,9 +157,7 @@ class GoalsService {
     final ops = ids
         .map((id) => BatchOperation.delete(id))
         .toList(growable: false);
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.executeBatch(ops, partitionKey: _pk));
   }
 
   // --- UPDATE --------------------------------------------------------------
@@ -220,9 +205,7 @@ class GoalsService {
       ops.add(BatchOperation.upsert(doc));
     }
     if (ops.isEmpty) return 0;
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.executeBatch(ops, partitionKey: _pk));
     return ops.length;
   }
 
@@ -245,9 +228,7 @@ class GoalsService {
       ops.add(BatchOperation.upsert(doc));
     }
     if (ops.isEmpty) return;
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.executeBatch(ops, partitionKey: _pk));
   }
 
   // --- SUBTREE BACKUP/RESTORE ----------------------------------------------
@@ -281,26 +262,16 @@ class GoalsService {
     final ops = nodes
         .map((g) => BatchOperation.delete(g.id))
         .toList(growable: false);
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.executeBatch(ops, partitionKey: _pk));
   }
 
   Future<void> restoreSubtree(SubtreeBackup backup) async {
     if (backup.nodes.isEmpty) return;
     final ops = <BatchOperation>[];
     for (final (id, data) in backup.nodes) {
-      ops.add(
-        BatchOperation.upsert({
-          'id': id,
-          'type': _pk,
-          ...data,
-        }),
-      );
+      ops.add(BatchOperation.upsert({'id': id, 'type': _pk, ...data}));
     }
-    await safeCosmos(
-      () => _container.executeBatch(ops, partitionKey: _pk),
-    );
+    await safeCosmos(() => _container.executeBatch(ops, partitionKey: _pk));
   }
 
   Future<int> countDescendants(String rootId) async {
@@ -331,9 +302,7 @@ class GoalsService {
   }
 
   Future<void> _patch(String id, Map<String, Object?> changes) async {
-    final doc = await safeCosmos(
-      () => _container.read(id, partitionKey: _pk),
-    );
+    final doc = await safeCosmos(() => _container.read(id, partitionKey: _pk));
     if (doc == null) return;
     doc.addAll(changes);
     await safeCosmos(() => _container.replace(id, doc, partitionKey: _pk));
@@ -362,10 +331,7 @@ class GoalsService {
       parentId == null ? _fetchRoots() : _fetchChildren(parentId);
 
   Future<List<Goal>> _fetchAll() async {
-    final docs = await _container.query(
-      'SELECT * FROM c',
-      partitionKey: _pk,
-    );
+    final docs = await _container.query('SELECT * FROM c', partitionKey: _pk);
     return docs.map(Goal.fromCosmos).toList();
   }
 
@@ -420,6 +386,4 @@ class GoalsService {
   }
 }
 
-final goalsServiceProvider = Provider<GoalsService>(
-  (_) => GoalsService(),
-);
+final goalsServiceProvider = Provider<GoalsService>((_) => GoalsService());

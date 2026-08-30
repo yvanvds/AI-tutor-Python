@@ -25,9 +25,7 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
   Future<GlobalConfig?> getConfig() => safeCosmos(_fetchOnce);
 
   Stream<GlobalConfig?> watchConfig() {
-    return safeCosmosStream(
-      pollingStream(() => safeCosmos(_fetchOnce)),
-    );
+    return safeCosmosStream(pollingStream(() => safeCosmos(_fetchOnce)));
   }
 
   Future<GlobalConfig?> _fetchOnce() async {
@@ -39,5 +37,5 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
 
 final globalConfigServiceProvider =
     NotifierProvider<GlobalConfigService, GlobalConfig?>(
-  GlobalConfigService.new,
-);
+      GlobalConfigService.new,
+    );

@@ -66,10 +66,10 @@ final sectionProvider = StateProvider<Section>((_) => Section.session);
 /// Streams the persisted `Progress` doc for a single goal id, used by the
 /// ambient rim. autoDispose so a stream isn't held open after the active
 /// child goal changes.
-final _progressByGoalIdStreamProvider =
-    StreamProvider.autoDispose.family<Progress?, String>((ref, goalId) {
-  return ref.watch(progressServiceProvider).streamByGoalId(goalId);
-});
+final _progressByGoalIdStreamProvider = StreamProvider.autoDispose
+    .family<Progress?, String>((ref, goalId) {
+      return ref.watch(progressServiceProvider).streamByGoalId(goalId);
+    });
 
 /// Aggregated session-progress signal driving the 2px ambient progress line
 /// at the top of the workspace. Tracks the active child goal's persisted
@@ -77,7 +77,9 @@ final _progressByGoalIdStreamProvider =
 final ambientProgressProvider = Provider<double>((ref) {
   final goalId = ref.watch(goalSelectionProvider).activeChildGoal?.id;
   if (goalId == null) return 0.0;
-  return ref.watch(_progressByGoalIdStreamProvider(goalId)).maybeWhen(
+  return ref
+      .watch(_progressByGoalIdStreamProvider(goalId))
+      .maybeWhen(
         data: (p) => (p?.progress ?? 0.0).clamp(0.0, 1.0),
         orElse: () => 0.0,
       );
@@ -111,8 +113,7 @@ final xpStateProvider = StreamProvider<XpState>((ref) async* {
   // the account doc — Account has no `==` override, so each 5 s
   // accountServiceProvider tick is a "new" object and would otherwise
   // tear this provider down and flash the XP pill back to 0.
-  final signedIn =
-      ref.watch(accountServiceProvider.select((a) => a != null));
+  final signedIn = ref.watch(accountServiceProvider.select((a) => a != null));
   if (!signedIn) {
     yield _defaultXpState;
     return;
@@ -142,10 +143,9 @@ final xpStateProvider = StreamProvider<XpState>((ref) async* {
 final profileProvider = Provider<Profile>((ref) {
   final account = ref.watch(accountServiceProvider);
   final isTeacher = ref.watch(isTeacherProvider);
-  final xpState = ref.watch(xpStateProvider).maybeWhen(
-        data: (s) => s,
-        orElse: () => _defaultXpState,
-      );
+  final xpState = ref
+      .watch(xpStateProvider)
+      .maybeWhen(data: (s) => s, orElse: () => _defaultXpState);
   return Profile(
     name: account?.firstName ?? '',
     topic: account?.targetGoal ?? '',

@@ -35,7 +35,9 @@ Future<void> main() async {
   final container = ProviderContainer();
   await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
 
-  runApp(UncontrolledProviderScope(container: container, child: const GoalsApp()));
+  runApp(
+    UncontrolledProviderScope(container: container, child: const GoalsApp()),
+  );
 }
 
 class GoalsApp extends ConsumerWidget {

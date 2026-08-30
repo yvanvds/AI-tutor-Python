@@ -87,9 +87,9 @@ class TutorService extends Notifier<TutorState> {
     OpenaiConnector? connectorOverride,
     Conductor? conductorOverride,
     InstructionGenerator? instructionGeneratorOverride,
-  })  : _connectorOverride = connectorOverride,
-        _conductorOverride = conductorOverride,
-        _instructionGeneratorOverride = instructionGeneratorOverride;
+  }) : _connectorOverride = connectorOverride,
+       _conductorOverride = conductorOverride,
+       _instructionGeneratorOverride = instructionGeneratorOverride;
 
   final OpenaiConnector? _connectorOverride;
   final Conductor? _conductorOverride;
@@ -145,40 +145,33 @@ class TutorService extends Notifier<TutorState> {
   TutorState build() {
     _chat = ref.read(chatServiceProvider);
     _debug = ref.read(debugServiceProvider);
-    _connector = _connectorOverride ?? OpenaiConnector(
-      onRecordRawOutput: _debug.recordRawOutput,
-      onRecordStreamFailure: _debug.recordStreamFailure,
-      getConfig: () => ref.read(globalConfigServiceProvider),
-    );
-    _conductor = _conductorOverride ??
-        Conductor(deps: _buildConductorDeps());
+    _connector =
+        _connectorOverride ??
+        OpenaiConnector(
+          onRecordRawOutput: _debug.recordRawOutput,
+          onRecordStreamFailure: _debug.recordStreamFailure,
+          getConfig: () => ref.read(globalConfigServiceProvider),
+        );
+    _conductor = _conductorOverride ?? Conductor(deps: _buildConductorDeps());
 
-    ref.listen<AccountIdentity?>(
-      authServiceProvider,
-      (prev, next) {
-        if (next == null) {
-          _initialized = false;
-          _stopCurriculumWatch();
-          return;
-        }
-        if (!_initialized) unawaited(Future.microtask(initializeSession));
-      },
-      fireImmediately: true,
-    );
+    ref.listen<AccountIdentity?>(authServiceProvider, (prev, next) {
+      if (next == null) {
+        _initialized = false;
+        _stopCurriculumWatch();
+        return;
+      }
+      if (!_initialized) unawaited(Future.microtask(initializeSession));
+    }, fireImmediately: true);
 
     // Track active root + child so we can re-subscribe to the right
     // children stream when the student moves between goals (and tear
     // down the watch when nothing is selected).
-    ref.listen<GoalSelectionState>(
-      goalSelectionProvider,
-      (prev, next) {
-        final newRootId = next.activeRootGoal?.id;
-        if (newRootId != _curriculumWatchedRootId) {
-          _startCurriculumWatch(newRootId);
-        }
-      },
-      fireImmediately: true,
-    );
+    ref.listen<GoalSelectionState>(goalSelectionProvider, (prev, next) {
+      final newRootId = next.activeRootGoal?.id;
+      if (newRootId != _curriculumWatchedRootId) {
+        _startCurriculumWatch(newRootId);
+      }
+    }, fireImmediately: true);
 
     ref.onDispose(_stopCurriculumWatch);
 
@@ -250,8 +243,7 @@ class TutorService extends Notifier<TutorState> {
     // Snapshot the LO ids per subgoal for the diff. Skip the first tick —
     // we only care about *changes* mid-session.
     final next = <String, Set<String>>{
-      for (final c in children)
-        c.id: c.objectives.map((o) => o.id).toSet(),
+      for (final c in children) c.id: c.objectives.map((o) => o.id).toSet(),
     };
     final prev = _lastSubgoalLoIds;
     _lastSubgoalLoIds = next;
@@ -261,12 +253,13 @@ class TutorService extends Notifier<TutorState> {
     if (activeChild == null) return;
 
     // Subgoal-deleted redirect.
-    if (prev.containsKey(activeChild.id) &&
-        !next.containsKey(activeChild.id)) {
-      unawaited(_guarded(
-        'subgoal-deleted redirect',
-        () => _handleActiveSubgoalDeleted(deletedId: activeChild.id),
-      ));
+    if (prev.containsKey(activeChild.id) && !next.containsKey(activeChild.id)) {
+      unawaited(
+        _guarded(
+          'subgoal-deleted redirect',
+          () => _handleActiveSubgoalDeleted(deletedId: activeChild.id),
+        ),
+      );
       return;
     }
 
@@ -279,10 +272,12 @@ class TutorService extends Notifier<TutorState> {
     final nextLos = next[activeChild.id] ?? const <String>{};
     final added = nextLos.difference(prevLos);
     if (added.isNotEmpty) {
-      unawaited(_guarded(
-        'LO-added cache recompute',
-        _recomputeActiveSubgoalCacheAfterLoAdded,
-      ));
+      unawaited(
+        _guarded(
+          'LO-added cache recompute',
+          _recomputeActiveSubgoalCacheAfterLoAdded,
+        ),
+      );
     }
   }
 
@@ -290,7 +285,9 @@ class TutorService extends Notifier<TutorState> {
     _chat.addSystemNotice(
       const ChatNotice(ChatNoticeKind.subgoalDeletedRedirect),
     );
-    await ref.read(turnHistoryServiceProvider).appendAudit(
+    await ref
+        .read(turnHistoryServiceProvider)
+        .appendAudit(
           subgoalId: deletedId,
           event: TurnSignalEvent.of(
             TurnSignalEventKind.subgoalDeletedRedirect,
@@ -311,8 +308,9 @@ class TutorService extends Notifier<TutorState> {
         .read(loBeliefsServiceProvider)
         .getAllForSubgoal(activeChild.id);
     final byId = {for (final b in beliefs) b.loId: b};
-    final nonOptional =
-        activeChild.objectives.where((lo) => !lo.optional).toList();
+    final nonOptional = activeChild.objectives
+        .where((lo) => !lo.optional)
+        .toList();
     if (nonOptional.isEmpty) return;
     int mastered = 0;
     final now = DateTime.now().toUtc();
@@ -331,7 +329,9 @@ class TutorService extends Notifier<TutorState> {
       }
     }
     final cached = mastered / nonOptional.length;
-    await ref.read(progressServiceProvider).upsert(
+    await ref
+        .read(progressServiceProvider)
+        .upsert(
           Progress(goalID: activeChild.id, progress: cached),
           recordHistory: false,
         );
@@ -342,11 +342,12 @@ class TutorService extends Notifier<TutorState> {
   /// a throttled level-up overlay push. Reads the current derived XP/level
   /// from [xpStateProvider]; throttle lives on [LevelUpController].
   void _onConceptMastered(String conceptName) {
-    final xpState = ref.read(xpStateProvider).maybeWhen(
-          data: (s) => s,
-          orElse: () => null,
-        );
-    ref.read(levelUpControllerProvider.notifier).pushThrottled(
+    final xpState = ref
+        .read(xpStateProvider)
+        .maybeWhen(data: (s) => s, orElse: () => null);
+    ref
+        .read(levelUpControllerProvider.notifier)
+        .pushThrottled(
           LevelUpEvent(
             newLevel: xpState?.level ?? 1,
             xpAwarded: 100,
@@ -367,14 +368,10 @@ class TutorService extends Notifier<TutorState> {
         ref.read(goalSelectionProvider.notifier).setPreferredChild(null);
       },
       getRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
-      getChildren: (id) =>
-          ref.read(goalsServiceProvider).getChildrenOnce(id),
-      upsertProgress: (p, {quality, recordHistory = true}) =>
-          ref.read(progressServiceProvider).upsert(
-            p,
-            quality: quality,
-            recordHistory: recordHistory,
-          ),
+      getChildren: (id) => ref.read(goalsServiceProvider).getChildrenOnce(id),
+      upsertProgress: (p, {quality, recordHistory = true}) => ref
+          .read(progressServiceProvider)
+          .upsert(p, quality: quality, recordHistory: recordHistory),
       getProgressAll: () => ref.read(progressServiceProvider).getAll(),
       getProgressByGoalId: (id) =>
           ref.read(progressServiceProvider).getByGoalId(id),
@@ -386,22 +383,18 @@ class TutorService extends Notifier<TutorState> {
           unawaited(ref.read(soundServiceProvider).correctAnswer()),
       playGoalReached: () =>
           unawaited(ref.read(soundServiceProvider).playGoalReached()),
-      showGoalReached: ({required goalTitle, required description}) =>
-          ref.read(splashServiceProvider).showGoalReached(
-            goalTitle: goalTitle,
-            description: description,
-          ),
+      showGoalReached: ({required goalTitle, required description}) => ref
+          .read(splashServiceProvider)
+          .showGoalReached(goalTitle: goalTitle, description: description),
       pushConceptMastered: _onConceptMastered,
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
           StudentCalibration.fresh(),
       setCalibration: (cal) =>
           ref.read(accountServiceProvider.notifier).setCalibration(cal),
-      getLoBelief: ({required subgoalId, required loId}) =>
-          ref.read(loBeliefsServiceProvider).getOne(
-                subgoalId: subgoalId,
-                loId: loId,
-              ),
+      getLoBelief: ({required subgoalId, required loId}) => ref
+          .read(loBeliefsServiceProvider)
+          .getOne(subgoalId: subgoalId, loId: loId),
       getLoBeliefsForSubgoal: (id) =>
           ref.read(loBeliefsServiceProvider).getAllForSubgoal(id),
       upsertLoBelief: (b) => ref.read(loBeliefsServiceProvider).upsert(b),
@@ -438,7 +431,10 @@ class TutorService extends Notifier<TutorState> {
       // (#7). Drop the initialised flag so the next ChatWidget mount (any
       // mode switch) retries from scratch.
       debugPrint('TutorService: initializeSession failed: $e\n$stack');
-      _debug.recordEvent('tutor.error', {'where': 'initializeSession', 'error': '$e'});
+      _debug.recordEvent('tutor.error', {
+        'where': 'initializeSession',
+        'error': '$e',
+      });
       _initialized = false;
       _chat.addSystemNotice(
         ChatNotice(
@@ -480,7 +476,9 @@ class TutorService extends Notifier<TutorState> {
     final subgoalId = ref.read(goalSelectionProvider).activeChildGoal?.id;
     if (subgoalId == null) return;
     if (_emptyObjectivesAuditFiredFor.add(subgoalId)) {
-      await ref.read(turnHistoryServiceProvider).appendAudit(
+      await ref
+          .read(turnHistoryServiceProvider)
+          .appendAudit(
             subgoalId: subgoalId,
             event: TurnSignalEvent.of(
               TurnSignalEventKind.emptyObjectivesBlock,
@@ -551,11 +549,9 @@ class TutorService extends Notifier<TutorState> {
           'chosenReason': plan.reason.chosenReason,
           'notchDropFired': plan.reason.notchDropFired,
           'candidateLOs': plan.reason.candidateLOs
-              .map((c) => {
-                    'loId': c.loId,
-                    'mean': c.mean,
-                    'evidence': c.evidence,
-                  })
+              .map(
+                (c) => {'loId': c.loId, 'mean': c.mean, 'evidence': c.evidence},
+              )
               .toList(),
         });
         _conductor.notePlannedQuestion(plan);
@@ -712,19 +708,16 @@ class TutorService extends Notifier<TutorState> {
     return _buildGoalScopeLOs(selection);
   }
 
-  _RequestInput _buildQuestionRequest(
-    ChatRequestType type,
-    QuestionPlan plan,
-  ) {
+  _RequestInput _buildQuestionRequest(ChatRequestType type, QuestionPlan plan) {
     final input = switch (type) {
       ChatRequestType.socraticQuestion => QuestionFormatter.socraticQuestion(
-          plan.difficulty,
-          targetLOs: plan.targetLOs,
-        ),
+        plan.difficulty,
+        targetLOs: plan.targetLOs,
+      ),
       ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
-          plan.difficulty,
-          targetLOs: plan.targetLOs,
-        ),
+        plan.difficulty,
+        targetLOs: plan.targetLOs,
+      ),
       ChatRequestType.explainCodeQuestion =>
         QuestionFormatter.explainCodeQuestion(
           plan.difficulty,
@@ -736,9 +729,9 @@ class TutorService extends Notifier<TutorState> {
           targetLOs: plan.targetLOs,
         ),
       ChatRequestType.writeCodeQuestion => QuestionFormatter.writeCodeQuestion(
-          plan.difficulty,
-          targetLOs: plan.targetLOs,
-        ),
+        plan.difficulty,
+        targetLOs: plan.targetLOs,
+      ),
       _ => '',
     };
     return _RequestInput(input, PreviousInputs.newSession);
@@ -769,7 +762,8 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
 
-    final response = completed ?? AIResponseParser.parse(accumulated.toString());
+    final response =
+        completed ?? AIResponseParser.parse(accumulated.toString());
     _connector.addResponse(response);
     _chat.completeStream(_finalTextFor(response, accumulated));
 
@@ -780,8 +774,8 @@ class TutorService extends Notifier<TutorState> {
           .read(accountServiceProvider.notifier)
           .registerSessionTurn()
           .catchError((Object e, StackTrace _) {
-        debugPrint('TutorService: streak update failed: $e');
-      }),
+            debugPrint('TutorService: streak update failed: $e');
+          }),
     );
 
     final dispatched = await dispatchResponse(response, _streamingContext());
@@ -828,9 +822,9 @@ class TutorService extends Notifier<TutorState> {
     final report = ref.read(reportServiceProvider);
     return TutorContext(
       conductor: _conductor,
-      startNewCode: (code) => ref.read(codeServiceProvider(SessionMode.practice)).setText(code),
-      addTutorMessage:
-          addTutorMessageOverride ?? _chat.addTutorMessage,
+      startNewCode: (code) =>
+          ref.read(codeServiceProvider(SessionMode.practice)).setText(code),
+      addTutorMessage: addTutorMessageOverride ?? _chat.addTutorMessage,
       addSystemNotice: _chat.addSystemNotice,
       // The editor comment a write-code exercise starts with. Read lazily so
       // it follows the language in effect when the exercise arrives.
@@ -875,14 +869,15 @@ class TutorService extends Notifier<TutorState> {
       overallQuality: overallQuality,
       rawSignals: loSignals,
       scopeSubgoals: scopeSubgoals,
-      intendedTargetLO:
-          plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
+      intendedTargetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
       intendedTargetSubgoalId: activeChild?.id,
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
     );
-    final outcome =
-        await _conductor.integrateAnswer(plan: plan, answer: answer);
+    final outcome = await _conductor.integrateAnswer(
+      plan: plan,
+      answer: answer,
+    );
 
     final now = DateTime.now().toUtc();
     final record = PersistedTurnRecord(
@@ -964,8 +959,7 @@ class TutorService extends Notifier<TutorState> {
     //   2. depth boundary (default 1, 2 with allowChains).
     //   3. target LO not stuck.
     //   4. subgoal didn't just advance (caller already checked).
-    final activeChild =
-        ref.read(goalSelectionProvider).activeChildGoal;
+    final activeChild = ref.read(goalSelectionProvider).activeChildGoal;
     if (activeChild == null) return false;
 
     final allowChains = activeChild.allowChains;
@@ -981,8 +975,9 @@ class TutorService extends Notifier<TutorState> {
 
     // Target-LO-stuck check.
     if (targetLO != null) {
-      final status = outcome.loStatusAfter
-          .firstWhereOrNull((s) => s.loId == targetLO.id);
+      final status = outcome.loStatusAfter.firstWhereOrNull(
+        (s) => s.loId == targetLO.id,
+      );
       if (status != null && status.stuck) return false;
     }
     return true;
@@ -1009,8 +1004,10 @@ class TutorService extends Notifier<TutorState> {
   void _trackedSetExerciseType(String type) {
     final from = _currentExerciseType;
     _currentExerciseType = type;
-    _currentExerciseGoalId =
-        ref.read(goalSelectionProvider).activeChildGoal?.id;
+    _currentExerciseGoalId = ref
+        .read(goalSelectionProvider)
+        .activeChildGoal
+        ?.id;
     _debug.recordEvent('tutor.exercise_type_set', {
       'from': from,
       'to': type,
@@ -1046,8 +1043,9 @@ class TutorService extends Notifier<TutorState> {
   Future<void> submitMcqAnswer(String picked) async {
     final current = ref.read(activeMcqProvider);
     if (current == null || current.selected != null) return;
-    ref.read(activeMcqProvider.notifier).state =
-        current.copyWith(selected: picked);
+    ref.read(activeMcqProvider.notifier).state = current.copyWith(
+      selected: picked,
+    );
     await queryTutor(type: ChatRequestType.mcqAnswer, prompt: picked);
   }
 
@@ -1118,10 +1116,7 @@ class TutorService extends Notifier<TutorState> {
       // target LO and gets the difficulty field. Conductor will treat the
       // grading as follow-up via the `_followUpInFlight != null` flag.
       _inFlightPlan = _followUpInFlight!.originalPlan;
-      await queryTutor(
-        type: ChatRequestType.followUpAnswer,
-        prompt: message,
-      );
+      await queryTutor(type: ChatRequestType.followUpAnswer, prompt: message);
       return;
     }
     if (_currentExerciseType == 'multiple_choice') {
@@ -1161,8 +1156,7 @@ class TutorService extends Notifier<TutorState> {
     _debug.recordEvent('tutor.request_exercise.next', {
       'type': plan.type.name,
       'difficulty': plan.difficulty.name,
-      'targetLO':
-          plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id,
+      'targetLO': plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id,
     });
 
     if (plan.blockedEmptyObjectives) {

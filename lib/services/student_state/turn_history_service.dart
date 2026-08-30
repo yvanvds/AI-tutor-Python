@@ -17,8 +17,8 @@ class TurnHistoryService {
   TurnHistoryService({
     CosmosContainer? container,
     required String? Function() getUid,
-  })  : _containerOverride = container,
-        _getUid = getUid;
+  }) : _containerOverride = container,
+       _getUid = getUid;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;
@@ -212,7 +212,5 @@ class TurnHistoryService {
 }
 
 final turnHistoryServiceProvider = Provider<TurnHistoryService>((ref) {
-  return TurnHistoryService(
-    getUid: () => ref.read(authServiceProvider)?.oid,
-  );
+  return TurnHistoryService(getUid: () => ref.read(authServiceProvider)?.oid);
 });

@@ -84,44 +84,47 @@ ConductorDeps _buildDeps(_Fakes f) {
 
 void main() {
   group('entry algorithm — Section 1.1 cold start', () {
-    test('first question targets first LO in curriculum order at medium', () async {
-      final f = _Fakes();
-      final root = Goal(id: 'root-1', title: 'Conditionals', order: 0);
-      final subgoal = Goal(
-        id: 'sub-1',
-        title: 'Use if/else',
-        parentId: 'root-1',
-        order: 1000,
-        objectives: const [
-          LearningObjective(
-            id: 'predict_branch',
-            statement: 'pb',
-            kind: LoKind.predict,
-          ),
-          LearningObjective(
-            id: 'write_if_else',
-            statement: 'wi',
-            kind: LoKind.apply,
-          ),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
+    test(
+      'first question targets first LO in curriculum order at medium',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'root-1', title: 'Conditionals', order: 0);
+        final subgoal = Goal(
+          id: 'sub-1',
+          title: 'Use if/else',
+          parentId: 'root-1',
+          order: 1000,
+          objectives: const [
+            LearningObjective(
+              id: 'predict_branch',
+              statement: 'pb',
+              kind: LoKind.predict,
+            ),
+            LearningObjective(
+              id: 'write_if_else',
+              statement: 'wi',
+              kind: LoKind.apply,
+            ),
+          ],
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
 
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      final plan = _expectQuestion(await c.planNext());
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        final plan = _expectQuestion(await c.planNext());
 
-      expect(plan.targetLOs.single.id, 'predict_branch');
-      expect(plan.difficulty, QuestionDifficulty.medium); // new students
-      // Cold start default for `predict` is mcQuestion.
-      expect(plan.type, ChatRequestType.mcQuestion);
-      expect(plan.reason.chosenReason, contains('cold start'));
-    });
+        expect(plan.targetLOs.single.id, 'predict_branch');
+        expect(plan.difficulty, QuestionDifficulty.medium); // new students
+        // Cold start default for `predict` is mcQuestion.
+        expect(plan.type, ChatRequestType.mcQuestion);
+        expect(plan.reason.chosenReason, contains('cold start'));
+      },
+    );
   });
 
   group('entry algorithm — empty objectives blocks', () {
@@ -150,115 +153,110 @@ void main() {
   });
 
   group('integrate answer — basic belief update + cache', () {
-    test('a strong-positive @ medium increases α and updates progress cache',
-        () async {
-      final f = _Fakes();
-      final root = Goal(id: 'r', title: 'r', order: 0);
-      final subgoal = Goal(
-        id: 's',
-        title: 's',
-        parentId: 'r',
-        order: 0,
-        objectives: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
+    test(
+      'a strong-positive @ medium increases α and updates progress cache',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'r', title: 'r', order: 0);
+        final subgoal = Goal(
+          id: 's',
+          title: 's',
+          parentId: 'r',
+          order: 0,
+          objectives: const [
+            LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+          ],
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
+        f.calibration = const StudentCalibration(
+          difficulty: QuestionDifficulty.medium,
+        );
+
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        final outcome = await c.integrateAnswer(
+          plan: plan,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.correct,
+            signals: [
+              GradedSignal(
+                subgoalId: 's',
+                loId: 'lo1',
+                kind: LoSignalKind.positive,
+                strength: LoSignalStrength.strong,
+              ),
+            ],
           ),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
-      f.calibration = const StudentCalibration(
-        difficulty: QuestionDifficulty.medium,
-      );
+        );
 
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      final plan = _expectQuestion(await c.planNext());
-      c.notePlannedQuestion(plan);
+        // Belief moved (α rose by 2.0 × 1.0 = 2.0).
+        final b = f.beliefs.values.single;
+        expect(b.alpha, closeTo(3.0, 1e-6));
+        expect(b.beta, closeTo(1.0, 1e-6));
+        // `lastPositiveAtCalibratedAt` set since signal was at calibration.
+        expect(b.lastPositiveAtCalibratedAt, isNotNull);
+        // Subgoal progress cached < 1.0 (one positive signal isn't yet mastery).
+        expect(outcome.subgoalAdvanced, isFalse);
+        expect(f.progressById[subgoal.id], isNotNull);
+      },
+    );
+  });
 
-      final outcome = await c.integrateAnswer(
-        plan: plan,
-        answer: GradedAnswer(
+  group('integrate answer — fallback synthesised on empty signals', () {
+    test(
+      'empty loSignals produce a weak fallback on the intended LO',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'r', title: 'r', order: 0);
+        final subgoal = Goal(
+          id: 's',
+          title: 's',
+          parentId: 'r',
+          order: 0,
+          objectives: const [
+            LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+          ],
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
+
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        // Pretend the parser already failed to find any LO signals: build
+        // GradedAnswer directly with the fallback flag set.
+        final fallback = GradedAnswer(
           overallQuality: AnswerQuality.correct,
-          signals: [
+          signals: const [
             GradedSignal(
               subgoalId: 's',
               loId: 'lo1',
               kind: LoSignalKind.positive,
-              strength: LoSignalStrength.strong,
+              strength: LoSignalStrength.weak,
             ),
           ],
-        ),
-      );
-
-      // Belief moved (α rose by 2.0 × 1.0 = 2.0).
-      final b = f.beliefs.values.single;
-      expect(b.alpha, closeTo(3.0, 1e-6));
-      expect(b.beta, closeTo(1.0, 1e-6));
-      // `lastPositiveAtCalibratedAt` set since signal was at calibration.
-      expect(b.lastPositiveAtCalibratedAt, isNotNull);
-      // Subgoal progress cached < 1.0 (one positive signal isn't yet mastery).
-      expect(outcome.subgoalAdvanced, isFalse);
-      expect(f.progressById[subgoal.id], isNotNull);
-    });
-  });
-
-  group('integrate answer — fallback synthesised on empty signals', () {
-    test('empty loSignals produce a weak fallback on the intended LO',
-        () async {
-      final f = _Fakes();
-      final root = Goal(id: 'r', title: 'r', order: 0);
-      final subgoal = Goal(
-        id: 's',
-        title: 's',
-        parentId: 'r',
-        order: 0,
-        objectives: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
-          ),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
-
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      final plan = _expectQuestion(await c.planNext());
-      c.notePlannedQuestion(plan);
-
-      // Pretend the parser already failed to find any LO signals: build
-      // GradedAnswer directly with the fallback flag set.
-      final fallback = GradedAnswer(
-        overallQuality: AnswerQuality.correct,
-        signals: const [
-          GradedSignal(
-            subgoalId: 's',
-            loId: 'lo1',
-            kind: LoSignalKind.positive,
-            strength: LoSignalStrength.weak,
-          ),
-        ],
-        hadFallback: true,
-      );
-      final outcome =
-          await c.integrateAnswer(plan: plan, answer: fallback);
-      expect(outcome.hadFallback, isTrue);
-      // α rose by weak (0.5) × medium (1.0) = 0.5.
-      expect(f.beliefs.values.single.alpha, closeTo(1.5, 1e-6));
-    });
+          hadFallback: true,
+        );
+        final outcome = await c.integrateAnswer(plan: plan, answer: fallback);
+        expect(outcome.hadFallback, isTrue);
+        // α rose by weak (0.5) × medium (1.0) = 0.5.
+        expect(f.beliefs.values.single.alpha, closeTo(1.5, 1e-6));
+      },
+    );
   });
 
   group('§2.3 notch-drop counter', () {
@@ -273,11 +271,7 @@ void main() {
         parentId: 'r',
         order: 0,
         objectives: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
-          ),
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
         ],
       );
       f.roots.add(root);
@@ -302,11 +296,7 @@ void main() {
         type: ChatRequestType.completeCodeQuestion,
         difficulty: difficulty,
         targetLOs: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
-          ),
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
         ],
         reason: const TurnSelectionReason(
           candidateLOs: [],
@@ -489,11 +479,7 @@ void main() {
         parentId: 'r',
         order: 0,
         objectives: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
-          ),
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
         ],
       );
       f.roots.add(root);
@@ -515,11 +501,7 @@ void main() {
         type: ChatRequestType.writeCodeQuestion,
         difficulty: QuestionDifficulty.hard,
         targetLOs: const [
-          LearningObjective(
-            id: 'lo1',
-            statement: 'one',
-            kind: LoKind.apply,
-          ),
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
         ],
         reason: const TurnSelectionReason(
           candidateLOs: [],
@@ -584,35 +566,36 @@ void main() {
       expect(s.f.calibration.recentAnswers, isEmpty);
     });
 
-    test('follow-up strong-negative does NOT bump notch-drop counter',
-        () async {
-      final s = await setup();
-      // Seed prior calibration counter: a primary strong-negative would
-      // increment to 1; a follow-up strong-negative must leave it at 0.
-      await s.c.integrateAnswer(
-        plan: s.plan,
-        answer: GradedAnswer(
-          overallQuality: AnswerQuality.wrong,
-          signals: const [
-            GradedSignal(
-              subgoalId: 's',
-              loId: 'lo1',
-              kind: LoSignalKind.negative,
-              strength: LoSignalStrength.strong,
-            ),
-          ],
-          isFollowUp: true,
-        ),
-      );
-      final b = s.f.beliefs.values.single;
-      expect(b.recentNegativesAtCalibrated, 0);
-    });
+    test(
+      'follow-up strong-negative does NOT bump notch-drop counter',
+      () async {
+        final s = await setup();
+        // Seed prior calibration counter: a primary strong-negative would
+        // increment to 1; a follow-up strong-negative must leave it at 0.
+        await s.c.integrateAnswer(
+          plan: s.plan,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.wrong,
+            signals: const [
+              GradedSignal(
+                subgoalId: 's',
+                loId: 'lo1',
+                kind: LoSignalKind.negative,
+                strength: LoSignalStrength.strong,
+              ),
+            ],
+            isFollowUp: true,
+          ),
+        );
+        final b = s.f.beliefs.values.single;
+        expect(b.recentNegativesAtCalibrated, 0);
+      },
+    );
   });
 
   // ---- §8.2 signalEvents ---------------------------------------------------
   group('§8.2 signalEvents emission', () {
-    test('stuck-LO advance emits stuckLoAdvance + advances subgoal',
-        () async {
+    test('stuck-LO advance emits stuckLoAdvance + advances subgoal', () async {
       final f = _Fakes();
       final root = Goal(id: 'r', title: 'r', order: 0);
       final subgoal = Goal(
@@ -670,11 +653,7 @@ void main() {
         type: ChatRequestType.writeCodeQuestion,
         difficulty: QuestionDifficulty.medium,
         targetLOs: const [
-          LearningObjective(
-            id: 'mastered',
-            statement: 'm',
-            kind: LoKind.apply,
-          ),
+          LearningObjective(id: 'mastered', statement: 'm', kind: LoKind.apply),
         ],
         reason: const TurnSelectionReason(
           candidateLOs: [],
@@ -706,75 +685,77 @@ void main() {
       expect(stuckEvents.single.details['stuckLoIds'], contains('stucky'));
     });
 
-    test('single-LO deadlock emits singleLoDeadlock + does NOT advance',
-        () async {
-      final f = _Fakes();
-      final root = Goal(id: 'r', title: 'r', order: 0);
-      final subgoal = Goal(
-        id: 's',
-        title: 's',
-        parentId: 'r',
-        order: 0,
-        objectives: const [
-          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
-      // Seed near-stuck so the next answer crosses the threshold.
-      f.beliefs[f._key('s', 'lo')] = LoBelief(
-        subgoalId: 's',
-        loId: 'lo',
-        alpha: 2,
-        beta: 5,
-        lastUpdatedAt: DateTime.now().toUtc(),
-      );
-      f.calibration = const StudentCalibration(
-        difficulty: QuestionDifficulty.medium,
-      );
-
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      final plan = QuestionPlan(
-        type: ChatRequestType.writeCodeQuestion,
-        difficulty: QuestionDifficulty.medium,
-        targetLOs: const [
-          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
-        ],
-        reason: const TurnSelectionReason(
-          candidateLOs: [],
-          chosenReason: 'test',
-          notchDropFired: false,
-        ),
-      );
-      c.notePlannedQuestion(plan);
-      // Push evidence past stuck threshold (β += 2.0 → α=2, β=7).
-      final outcome = await c.integrateAnswer(
-        plan: plan,
-        answer: GradedAnswer(
-          overallQuality: AnswerQuality.wrong,
-          signals: const [
-            GradedSignal(
-              subgoalId: 's',
-              loId: 'lo',
-              kind: LoSignalKind.negative,
-              strength: LoSignalStrength.strong,
-            ),
+    test(
+      'single-LO deadlock emits singleLoDeadlock + does NOT advance',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'r', title: 'r', order: 0);
+        final subgoal = Goal(
+          id: 's',
+          title: 's',
+          parentId: 'r',
+          order: 0,
+          objectives: const [
+            LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
           ],
-        ),
-      );
-      expect(outcome.subgoalAdvanced, isFalse);
-      final dead = outcome.signalEvents
-          .where((e) => e.kind == TurnSignalEventKind.singleLoDeadlock)
-          .toList();
-      expect(dead, hasLength(1));
-      expect(dead.single.severity, TurnSignalEventSeverity.strong);
-      expect(dead.single.details['loId'], 'lo');
-    });
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
+        // Seed near-stuck so the next answer crosses the threshold.
+        f.beliefs[f._key('s', 'lo')] = LoBelief(
+          subgoalId: 's',
+          loId: 'lo',
+          alpha: 2,
+          beta: 5,
+          lastUpdatedAt: DateTime.now().toUtc(),
+        );
+        f.calibration = const StudentCalibration(
+          difficulty: QuestionDifficulty.medium,
+        );
+
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        final plan = QuestionPlan(
+          type: ChatRequestType.writeCodeQuestion,
+          difficulty: QuestionDifficulty.medium,
+          targetLOs: const [
+            LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+          ],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'test',
+            notchDropFired: false,
+          ),
+        );
+        c.notePlannedQuestion(plan);
+        // Push evidence past stuck threshold (β += 2.0 → α=2, β=7).
+        final outcome = await c.integrateAnswer(
+          plan: plan,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.wrong,
+            signals: const [
+              GradedSignal(
+                subgoalId: 's',
+                loId: 'lo',
+                kind: LoSignalKind.negative,
+                strength: LoSignalStrength.strong,
+              ),
+            ],
+          ),
+        );
+        expect(outcome.subgoalAdvanced, isFalse);
+        final dead = outcome.signalEvents
+            .where((e) => e.kind == TurnSignalEventKind.singleLoDeadlock)
+            .toList();
+        expect(dead, hasLength(1));
+        expect(dead.single.severity, TurnSignalEventSeverity.strong);
+        expect(dead.single.details['loId'], 'lo');
+      },
+    );
 
     test('singleLoDeadlock fires once per (session, subgoal)', () async {
       final f = _Fakes();
@@ -843,96 +824,31 @@ void main() {
       );
     });
 
-    test('sustained LLM failure fires sustainedLlmFailure exactly once',
-        () async {
-      final f = _Fakes();
-      final root = Goal(id: 'r', title: 'r', order: 0);
-      final subgoal = Goal(
-        id: 's',
-        title: 's',
-        parentId: 'r',
-        order: 0,
-        objectives: const [
-          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      final plan = QuestionPlan(
-        type: ChatRequestType.writeCodeQuestion,
-        difficulty: QuestionDifficulty.medium,
-        targetLOs: const [
-          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
-        ],
-        reason: const TurnSelectionReason(
-          candidateLOs: [],
-          chosenReason: 'test',
-          notchDropFired: false,
-        ),
-      );
-      c.notePlannedQuestion(plan);
-      final fb = GradedAnswer(
-        overallQuality: AnswerQuality.wrong,
-        signals: const [
-          GradedSignal(
-            subgoalId: 's',
-            loId: 'lo',
-            kind: LoSignalKind.negative,
-            strength: LoSignalStrength.weak,
-          ),
-        ],
-        hadFallback: true,
-      );
-      // Need degradedThreshold (3) of last degradedWindow (5) to fall back.
-      final outcomes = <TurnOutcome>[];
-      for (var i = 0; i < 4; i++) {
-        outcomes.add(await c.integrateAnswer(plan: plan, answer: fb));
-      }
-      final fired = outcomes
-          .expand((o) => o.signalEvents)
-          .where((e) => e.kind == TurnSignalEventKind.sustainedLlmFailure)
-          .toList();
-      expect(fired, hasLength(1));
-      expect(fired.single.severity, TurnSignalEventSeverity.strong);
-      expect(c.isDegraded, isTrue);
-    });
-
-    test('repeatedDemotions fires after threshold consecutive demotions',
-        () async {
-      final f = _Fakes();
-      final root = Goal(id: 'r', title: 'r', order: 0);
-      final subgoal = Goal(
-        id: 's',
-        title: 's',
-        parentId: 'r',
-        order: 0,
-        objectives: const [
-          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
-        ],
-      );
-      f.roots.add(root);
-      f.children[root.id] = [subgoal];
-      f.selection = GoalSelectionState(
-        selectedRoot: root,
-        selectedChild: subgoal,
-      );
-      f.calibration = const StudentCalibration(
-        difficulty: QuestionDifficulty.hard,
-      );
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      // Force three consecutive demotions by feeding 60% bad answers in a
-      // row at each calibration level. demotionMinSamples = 3, ratio 0.6.
-      Future<TurnOutcome> badAt(QuestionDifficulty d) async {
+    test(
+      'sustained LLM failure fires sustainedLlmFailure exactly once',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'r', title: 'r', order: 0);
+        final subgoal = Goal(
+          id: 's',
+          title: 's',
+          parentId: 'r',
+          order: 0,
+          objectives: const [
+            LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+          ],
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
         final plan = QuestionPlan(
           type: ChatRequestType.writeCodeQuestion,
-          difficulty: d,
+          difficulty: QuestionDifficulty.medium,
           targetLOs: const [
             LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
           ],
@@ -943,49 +859,118 @@ void main() {
           ),
         );
         c.notePlannedQuestion(plan);
-        return c.integrateAnswer(
-          plan: plan,
-          answer: GradedAnswer(
-            overallQuality: AnswerQuality.wrong,
-            signals: const [
-              GradedSignal(
-                subgoalId: 's',
-                loId: 'lo',
-                kind: LoSignalKind.negative,
-                strength: LoSignalStrength.weak,
-              ),
-            ],
-          ),
+        final fb = GradedAnswer(
+          overallQuality: AnswerQuality.wrong,
+          signals: const [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'lo',
+              kind: LoSignalKind.negative,
+              strength: LoSignalStrength.weak,
+            ),
+          ],
+          hadFallback: true,
         );
-      }
+        // Need degradedThreshold (3) of last degradedWindow (5) to fall back.
+        final outcomes = <TurnOutcome>[];
+        for (var i = 0; i < 4; i++) {
+          outcomes.add(await c.integrateAnswer(plan: plan, answer: fb));
+        }
+        final fired = outcomes
+            .expand((o) => o.signalEvents)
+            .where((e) => e.kind == TurnSignalEventKind.sustainedLlmFailure)
+            .toList();
+        expect(fired, hasLength(1));
+        expect(fired.single.severity, TurnSignalEventSeverity.strong);
+        expect(c.isDegraded, isTrue);
+      },
+    );
 
-      // hard → medium (3 wrongs at hard).
-      await badAt(QuestionDifficulty.hard);
-      await badAt(QuestionDifficulty.hard);
-      var out = await badAt(QuestionDifficulty.hard);
-      expect(out.calibrationAfter, QuestionDifficulty.medium);
-      // medium → easy (3 wrongs at medium).
-      await badAt(QuestionDifficulty.medium);
-      await badAt(QuestionDifficulty.medium);
-      out = await badAt(QuestionDifficulty.medium);
-      expect(out.calibrationAfter, QuestionDifficulty.easy);
+    test(
+      'repeatedDemotions fires after threshold consecutive demotions',
+      () async {
+        final f = _Fakes();
+        final root = Goal(id: 'r', title: 'r', order: 0);
+        final subgoal = Goal(
+          id: 's',
+          title: 's',
+          parentId: 'r',
+          order: 0,
+          objectives: const [
+            LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+          ],
+        );
+        f.roots.add(root);
+        f.children[root.id] = [subgoal];
+        f.selection = GoalSelectionState(
+          selectedRoot: root,
+          selectedChild: subgoal,
+        );
+        f.calibration = const StudentCalibration(
+          difficulty: QuestionDifficulty.hard,
+        );
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        // Force three consecutive demotions by feeding 60% bad answers in a
+        // row at each calibration level. demotionMinSamples = 3, ratio 0.6.
+        Future<TurnOutcome> badAt(QuestionDifficulty d) async {
+          final plan = QuestionPlan(
+            type: ChatRequestType.writeCodeQuestion,
+            difficulty: d,
+            targetLOs: const [
+              LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+            ],
+            reason: const TurnSelectionReason(
+              candidateLOs: [],
+              chosenReason: 'test',
+              notchDropFired: false,
+            ),
+          );
+          c.notePlannedQuestion(plan);
+          return c.integrateAnswer(
+            plan: plan,
+            answer: GradedAnswer(
+              overallQuality: AnswerQuality.wrong,
+              signals: const [
+                GradedSignal(
+                  subgoalId: 's',
+                  loId: 'lo',
+                  kind: LoSignalKind.negative,
+                  strength: LoSignalStrength.weak,
+                ),
+              ],
+            ),
+          );
+        }
 
-      // We have 2 demotions at this point. One more would need an even
-      // lower notch — easy is already the floor — so the threshold of 3 is
-      // hit only when we tune the constant down. Sanity-check by clearing
-      // the threshold to 2 via a direct call: instead, assert the counter
-      // is at the configured threshold-1 boundary by inspecting that no
-      // event has fired yet (default threshold is 3).
-      final allEvents = out.signalEvents
-          .where((e) => e.kind == TurnSignalEventKind.repeatedDemotions);
-      expect(allEvents, isEmpty);
-    });
+        // hard → medium (3 wrongs at hard).
+        await badAt(QuestionDifficulty.hard);
+        await badAt(QuestionDifficulty.hard);
+        var out = await badAt(QuestionDifficulty.hard);
+        expect(out.calibrationAfter, QuestionDifficulty.medium);
+        // medium → easy (3 wrongs at medium).
+        await badAt(QuestionDifficulty.medium);
+        await badAt(QuestionDifficulty.medium);
+        out = await badAt(QuestionDifficulty.medium);
+        expect(out.calibrationAfter, QuestionDifficulty.easy);
+
+        // We have 2 demotions at this point. One more would need an even
+        // lower notch — easy is already the floor — so the threshold of 3 is
+        // hit only when we tune the constant down. Sanity-check by clearing
+        // the threshold to 2 via a direct call: instead, assert the counter
+        // is at the configured threshold-1 boundary by inspecting that no
+        // event has fired yet (default threshold is 3).
+        final allEvents = out.signalEvents.where(
+          (e) => e.kind == TurnSignalEventKind.repeatedDemotions,
+        );
+        expect(allEvents, isEmpty);
+      },
+    );
   });
 
   // ---- §7 mid-flight curriculum / orphans ----------------------------------
   group('§7.5 follow-up grader emits orphan signal', () {
-    test('signal on a deleted/orphan LO is dropped via scope check',
-        () async {
+    test('signal on a deleted/orphan LO is dropped via scope check', () async {
       // GradedAnswerBuilder is the validation entry point per LLM_CONTRACT.
       // A `(subgoalId, loId)` not in scope must drop and trigger fallback.
       // Test lives here to keep the conductor-side assertion close to the

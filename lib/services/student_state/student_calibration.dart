@@ -16,10 +16,10 @@ class CalibrationAnswer {
   });
 
   Map<String, dynamic> toJson() => {
-        'quality': quality.name,
-        'difficulty': difficulty.name,
-        'at': at.toUtc().toIso8601String(),
-      };
+    'quality': quality.name,
+    'difficulty': difficulty.name,
+    'at': at.toUtc().toIso8601String(),
+  };
 
   factory CalibrationAnswer.fromJson(Map<String, dynamic> map) {
     return CalibrationAnswer(
@@ -65,9 +65,8 @@ class StudentCalibration {
     this.recentQuestionTypes = const [],
   });
 
-  factory StudentCalibration.fresh() => const StudentCalibration(
-        difficulty: defaultDifficulty,
-      );
+  factory StudentCalibration.fresh() =>
+      const StudentCalibration(difficulty: defaultDifficulty);
 
   StudentCalibration copyWith({
     QuestionDifficulty? difficulty,
@@ -82,10 +81,10 @@ class StudentCalibration {
   }
 
   Map<String, dynamic> toJson() => {
-        'difficulty': difficulty.name,
-        'recentAnswers': recentAnswers.map((a) => a.toJson()).toList(),
-        'recentQuestionTypes': recentQuestionTypes,
-      };
+    'difficulty': difficulty.name,
+    'recentAnswers': recentAnswers.map((a) => a.toJson()).toList(),
+    'recentQuestionTypes': recentQuestionTypes,
+  };
 
   factory StudentCalibration.fromJson(Map<String, dynamic> map) {
     final diffRaw = map['difficulty'];
@@ -103,9 +102,9 @@ class StudentCalibration {
     if (rawAnswers is List) {
       for (final entry in rawAnswers) {
         if (entry is Map) {
-          answers.add(CalibrationAnswer.fromJson(
-            entry.cast<String, dynamic>(),
-          ));
+          answers.add(
+            CalibrationAnswer.fromJson(entry.cast<String, dynamic>()),
+          );
         }
       }
     }

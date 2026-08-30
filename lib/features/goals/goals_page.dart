@@ -105,7 +105,8 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       };
       final json = const JsonEncoder.withIndent('  ').convert(payload);
 
-      final dir = await getDownloadsDirectory() ??
+      final dir =
+          await getDownloadsDirectory() ??
           await getApplicationDocumentsDirectory();
       final stamp = DateTime.now().toIso8601String().split('T').first;
       final file = File(p.join(dir.path, 'goals-export-$stamp.json'));
@@ -144,10 +145,12 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         final collisions = importedIds.intersection(existingIds);
         if (collisions.isNotEmpty) {
           if (mounted) {
-            _showSnack(l.goals_snack_addAborted(
-              collisions.length,
-              collisions.take(3).join(', '),
-            ));
+            _showSnack(
+              l.goals_snack_addAborted(
+                collisions.length,
+                collisions.take(3).join(', '),
+              ),
+            );
           }
           return;
         }
@@ -163,9 +166,11 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         await svc.deleteGoalsByIds(leftovers);
       }
       if (mounted) {
-        _showSnack(leftovers.isEmpty
-            ? l.goals_snack_imported(totalCount)
-            : l.goals_snack_importedWithRemoved(totalCount, leftovers.length));
+        _showSnack(
+          leftovers.isEmpty
+              ? l.goals_snack_imported(totalCount)
+              : l.goals_snack_importedWithRemoved(totalCount, leftovers.length),
+        );
       }
     } catch (e) {
       if (mounted) _showSnack(l.goals_snack_importFailed(e.toString()));
@@ -242,13 +247,15 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .where((e) => e['goal'] is Map && e['subgoals'] is List)
-          .map((e) => {
-                'goal': Map<String, dynamic>.from(e['goal'] as Map),
-                'subgoals': (e['subgoals'] as List)
-                    .whereType<Map>()
-                    .map((s) => Map<String, dynamic>.from(s))
-                    .toList(),
-              })
+          .map(
+            (e) => {
+              'goal': Map<String, dynamic>.from(e['goal'] as Map),
+              'subgoals': (e['subgoals'] as List)
+                  .whereType<Map>()
+                  .map((s) => Map<String, dynamic>.from(s))
+                  .toList(),
+            },
+          )
           .toList();
       if (entries.isEmpty) {
         if (mounted) _showSnack(l.goals_snack_invalidFile);
@@ -278,8 +285,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         moduleId: (goal['moduleId'] as String?) ?? '',
       );
 
-      final subgoals =
-          (entry['subgoals'] as List).cast<Map<String, dynamic>>();
+      final subgoals = (entry['subgoals'] as List).cast<Map<String, dynamic>>();
       for (final sg in subgoals) {
         await svc.createGoalWithFields(
           id: (sg['id'] as String?)?.trim().isEmpty == false
@@ -299,8 +305,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
     }
   }
 
-  Future<void> _insertEntriesReplace(
-      List<Map<String, dynamic>> entries) async {
+  Future<void> _insertEntriesReplace(List<Map<String, dynamic>> entries) async {
     final svc = ref.read(goalsServiceProvider);
     for (final entry in entries) {
       final goal = entry['goal'] as Map<String, dynamic>;
@@ -325,8 +330,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
         moduleId: (goal['moduleId'] as String?) ?? '',
       );
 
-      final subgoals =
-          (entry['subgoals'] as List).cast<Map<String, dynamic>>();
+      final subgoals = (entry['subgoals'] as List).cast<Map<String, dynamic>>();
       for (final sg in subgoals) {
         final rawSgId = sg['id'] as String?;
         if (rawSgId == null || rawSgId.trim().isEmpty) {
@@ -360,8 +364,9 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       final gid = goal['id'];
       if (gid is String && gid.trim().isNotEmpty) ids.add(gid);
 
-      final subgoals = (entry['subgoals'] as List?)?.cast<Map<String, dynamic>>()
-          ?? const <Map<String, dynamic>>[];
+      final subgoals =
+          (entry['subgoals'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
       for (final sg in subgoals) {
         final sid = sg['id'];
         if (sid is String && sid.trim().isNotEmpty) ids.add(sid);
@@ -387,23 +392,23 @@ List<Map<String, dynamic>> _buildExportEntries(List<Goal> goals) {
   }
 
   Map<String, dynamic> goalMap(Goal g) => {
-        'title': g.title,
-        'description': g.description,
-        'moduleId': g.moduleId,
-        'order': g.order,
-        'optional': g.optional,
-      };
+    'title': g.title,
+    'description': g.description,
+    'moduleId': g.moduleId,
+    'order': g.order,
+    'optional': g.optional,
+  };
 
   Map<String, dynamic> subgoalMap(Goal g) => {
-        'title': g.title,
-        'description': g.description,
-        'order': g.order,
-        'optional': g.optional,
-        'contentId': g.contentId,
-        'teachingTips': g.teachingTips,
-        'allowChains': g.allowChains,
-        'objectives': g.objectives.map((o) => o.toMap()).toList(),
-      };
+    'title': g.title,
+    'description': g.description,
+    'order': g.order,
+    'optional': g.optional,
+    'contentId': g.contentId,
+    'teachingTips': g.teachingTips,
+    'allowChains': g.allowChains,
+    'objectives': g.objectives.map((o) => o.toMap()).toList(),
+  };
 
   final roots = byParent[null] ?? const <Goal>[];
   return roots.map((root) {
@@ -432,10 +437,7 @@ List<String> _stringList(dynamic v) {
 
 List<Map<String, dynamic>> _objectiveList(dynamic v) {
   if (v is List) {
-    return v
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    return v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
   return const [];
 }

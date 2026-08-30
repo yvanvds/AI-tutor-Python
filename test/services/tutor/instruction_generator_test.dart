@@ -8,19 +8,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   Goal subgoal({String teaching = 'Tip A'}) => Goal(
-        id: 'sub-1',
-        title: 'Loops',
-        parentId: 'root-1',
-        order: 1000,
-        teachingTips: [teaching],
-        objectives: const [
-          LearningObjective(
-            id: 'iter_fixed_count',
-            statement: 'You can iterate N times.',
-            kind: LoKind.apply,
-          ),
-        ],
-      );
+    id: 'sub-1',
+    title: 'Loops',
+    parentId: 'root-1',
+    order: 1000,
+    teachingTips: [teaching],
+    objectives: const [
+      LearningObjective(
+        id: 'iter_fixed_count',
+        statement: 'You can iterate N times.',
+        kind: LoKind.apply,
+      ),
+    ],
+  );
 
   Goal root() => Goal(id: 'root-1', title: 'Iteration', order: 0);
 
@@ -41,7 +41,8 @@ void main() {
       goalSelection: selection,
       cachedInstructions: [
         makeInstruction('alwaysInclude', {
-          'main': 'Goal {goal} - subgoal {subgoal}; tips: {teachingTips}; '
+          'main':
+              'Goal {goal} - subgoal {subgoal}; tips: {teachingTips}; '
               'known:[{known concepts}]',
         }),
         makeInstruction('mcQuestion', {

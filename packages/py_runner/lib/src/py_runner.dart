@@ -222,17 +222,21 @@ class PyRunner {
 
     _activeRuns[ctrl.id] = ctrl;
     ctrl._markExecSent();
-    _host!.send(ExecFrame(
-      id: ctrl.id,
-      code: code,
-      cwd: cwd,
-      timeoutMs: timeout?.inMilliseconds,
-    ));
+    _host!.send(
+      ExecFrame(
+        id: ctrl.id,
+        code: code,
+        cwd: cwd,
+        timeoutMs: timeout?.inMilliseconds,
+      ),
+    );
 
-    unawaited(ctrl.handle.done.whenComplete(() {
-      _activeRuns.remove(ctrl.id);
-      if (identical(_inFlight, ctrl)) _inFlight = null;
-    }));
+    unawaited(
+      ctrl.handle.done.whenComplete(() {
+        _activeRuns.remove(ctrl.id);
+        if (identical(_inFlight, ctrl)) _inFlight = null;
+      }),
+    );
   }
 
   void _onFrame(HostOutboundFrame frame) {

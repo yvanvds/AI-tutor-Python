@@ -18,8 +18,9 @@ class ObjectiveBanner extends ConsumerWidget {
     if (goal == null) return const SizedBox.shrink();
 
     final description = (goal.description ?? '').trim();
-    final progress =
-        activeChildGoal == null ? 0.0 : ref.watch(ambientProgressProvider).clamp(0.0, 1.0);
+    final progress = activeChildGoal == null
+        ? 0.0
+        : ref.watch(ambientProgressProvider).clamp(0.0, 1.0);
     final completed = progress >= 0.999;
 
     return Container(
@@ -30,9 +31,7 @@ class ObjectiveBanner extends ConsumerWidget {
       ),
       decoration: const BoxDecoration(
         color: AppColors.ink1,
-        border: Border(
-          bottom: BorderSide(color: AppColors.ink2, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.ink2, width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,9 +48,9 @@ class ObjectiveBanner extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
-                  AppLocalizations.of(context)
-                      .session_objectiveBanner_pill
-                      .toUpperCase(),
+                  AppLocalizations.of(
+                    context,
+                  ).session_objectiveBanner_pill.toUpperCase(),
                   style: const TextStyle(
                     color: AppColors.accent,
                     fontSize: 10,

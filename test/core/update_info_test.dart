@@ -7,11 +7,26 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('isNewer', () {
-    test('higher patch is newer', () => expect(isNewer('1.0.1', '1.0.0'), isTrue));
-    test('higher minor is newer', () => expect(isNewer('1.1.0', '1.0.0'), isTrue));
-    test('higher major is newer', () => expect(isNewer('2.0.0', '1.9.9'), isTrue));
-    test('same version without build is not newer', () => expect(isNewer('1.0.0', '1.0.0'), isFalse));
-    test('lower version is not newer', () => expect(isNewer('0.9.0', '1.0.0'), isFalse));
+    test(
+      'higher patch is newer',
+      () => expect(isNewer('1.0.1', '1.0.0'), isTrue),
+    );
+    test(
+      'higher minor is newer',
+      () => expect(isNewer('1.1.0', '1.0.0'), isTrue),
+    );
+    test(
+      'higher major is newer',
+      () => expect(isNewer('2.0.0', '1.9.9'), isTrue),
+    );
+    test(
+      'same version without build is not newer',
+      () => expect(isNewer('1.0.0', '1.0.0'), isFalse),
+    );
+    test(
+      'lower version is not newer',
+      () => expect(isNewer('0.9.0', '1.0.0'), isFalse),
+    );
 
     test('same semver, higher build number is newer', () {
       expect(isNewer('1.0.0+2', '1.0.0+1'), isTrue);

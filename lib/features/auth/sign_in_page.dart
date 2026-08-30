@@ -72,7 +72,9 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   label: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      _busy ? l.auth_signIn_button_busy : l.auth_signIn_button_idle,
+                      _busy
+                          ? l.auth_signIn_button_busy
+                          : l.auth_signIn_button_idle,
                     ),
                   ),
                 ),

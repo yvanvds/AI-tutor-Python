@@ -24,11 +24,11 @@ void main() {
   });
 
   PyRunner buildRunner() => PyRunner(
-        locator: ExplicitPyHostLocator(
-          pythonExecutable: pythonExe,
-          hostScript: fixturePath('echo_host.py'),
-        ),
-      );
+    locator: ExplicitPyHostLocator(
+      pythonExecutable: pythonExe,
+      hostScript: fixturePath('echo_host.py'),
+    ),
+  );
 
   test('start() transitions stopped → starting → ready', () async {
     final runner = buildRunner();
@@ -92,9 +92,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       final second = runner.run('print("second")');
 
-      final firstResult = await first.done.timeout(
-        const Duration(seconds: 5),
-      );
+      final firstResult = await first.done.timeout(const Duration(seconds: 5));
       final secondResult = await second.done.timeout(
         const Duration(seconds: 5),
       );
@@ -126,8 +124,7 @@ void main() {
     // running `tooling/python/build_bundle.ps1`).
     final e2ePython = Platform.environment['PY_RUNNER_E2E_PYTHON'];
     final sep = Platform.pathSeparator;
-    final realHostScript =
-        '${Directory.current.path}${sep}python${sep}host.py';
+    final realHostScript = '${Directory.current.path}${sep}python${sep}host.py';
 
     test(
       'print("hi") yields stdout and done(ok) on the real host',
@@ -144,8 +141,7 @@ void main() {
         final handle = runner.run('print("hi")');
         final stdoutLines = <String>[];
         handle.stdout.listen(stdoutLines.add);
-        final result =
-            await handle.done.timeout(const Duration(seconds: 30));
+        final result = await handle.done.timeout(const Duration(seconds: 30));
         expect(result.status, RunStatus.ok);
         expect(stdoutLines.join(), contains('hi'));
       },

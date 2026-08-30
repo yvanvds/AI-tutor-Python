@@ -66,9 +66,9 @@ class OpenaiConnector {
     void Function(String)? onRecordRawOutput,
     void Function(String)? onRecordStreamFailure,
     GlobalConfig? Function()? getConfig,
-  })  : _onRecordRawOutput = onRecordRawOutput,
-        _onRecordStreamFailure = onRecordStreamFailure,
-        _getConfig = getConfig;
+  }) : _onRecordRawOutput = onRecordRawOutput,
+       _onRecordStreamFailure = onRecordStreamFailure,
+       _getConfig = getConfig;
 
   final void Function(String)? _onRecordRawOutput;
   final void Function(String)? _onRecordStreamFailure;
@@ -320,8 +320,7 @@ class OpenaiConnector {
   /// when there's nothing to add so the field is omitted entirely.
   Map<String, dynamic>? _extraParams(String model) {
     final params = <String, dynamic>{};
-    final supportsReasoning =
-        RegExp(r'^o\d|^gpt-5').hasMatch(model);
+    final supportsReasoning = RegExp(r'^o\d|^gpt-5').hasMatch(model);
     if (reasoningEffort != null && supportsReasoning) {
       params['reasoning_effort'] = reasoningEffort;
     }

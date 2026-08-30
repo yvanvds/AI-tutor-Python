@@ -44,16 +44,20 @@ void main() {
       expect(container.read(localApiKeyStorageProvider), isFalse);
     });
 
-    test('isKeyPresent updates asynchronously on construction when key exists',
-        () async {
-      SharedPreferences.setMockInitialValues({'local_api_key': 'existing-key'});
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      // Trigger build by reading.
-      container.read(localApiKeyStorageProvider);
-      // Let the constructor's async init complete
-      await Future.delayed(Duration.zero);
-      expect(container.read(localApiKeyStorageProvider), isTrue);
-    });
+    test(
+      'isKeyPresent updates asynchronously on construction when key exists',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'local_api_key': 'existing-key',
+        });
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        // Trigger build by reading.
+        container.read(localApiKeyStorageProvider);
+        // Let the constructor's async init complete
+        await Future.delayed(Duration.zero);
+        expect(container.read(localApiKeyStorageProvider), isTrue);
+      },
+    );
   });
 }

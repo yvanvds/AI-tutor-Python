@@ -109,11 +109,7 @@ TextTheme _buildTextTheme() {
     ),
     // Title (between section and page)
     headlineSmall: GoogleFonts.interTight(
-      textStyle: s(
-        size: 20,
-        weight: FontWeight.w600,
-        height: 1.2,
-      ),
+      textStyle: s(size: 20, weight: FontWeight.w600, height: 1.2),
     ),
     titleLarge: GoogleFonts.interTight(
       textStyle: s(size: 18, weight: FontWeight.w600, height: 1.3),

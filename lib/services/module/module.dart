@@ -22,12 +22,12 @@ class Module {
   static const String defaultId = 'python-basics';
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'type': 'module',
-        'title': title,
-        'order': order,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+    'id': id,
+    'type': 'module',
+    'title': title,
+    'order': order,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
 
   factory Module.fromCosmos(Map<String, dynamic> doc) {
     final raw = doc['updatedAt'];

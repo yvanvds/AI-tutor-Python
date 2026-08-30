@@ -32,8 +32,10 @@ void main() {
 
   void stubReadReturns(Map<String, Map<String, dynamic>> idToDoc) {
     when(
-      () => container.read(any<String>(),
-          partitionKey: any<Object>(named: 'partitionKey')),
+      () => container.read(
+        any<String>(),
+        partitionKey: any<Object>(named: 'partitionKey'),
+      ),
     ).thenAnswer((invocation) async {
       final id = invocation.positionalArguments.first as String;
       return idToDoc[id];
@@ -58,12 +60,14 @@ void main() {
 
       await build().createRoot('first');
 
-      final captured = verify(
-        () => container.create(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final captured =
+          verify(
+                () => container.create(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(captured['order'], 1000);
       expect(captured['title'], 'first');
       expect(captured['parentId'], isNull);
@@ -77,9 +81,11 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => [
-            {'o': 3000},
-          ]);
+      ).thenAnswer(
+        (_) async => [
+          {'o': 3000},
+        ],
+      );
       when(
         () => container.create(
           any<Map<String, Object?>>(),
@@ -89,12 +95,14 @@ void main() {
 
       await build().createRoot('next');
 
-      final captured = verify(
-        () => container.create(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final captured =
+          verify(
+                () => container.create(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(captured['order'], 4000);
     });
 
@@ -105,9 +113,11 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => [
-            {'o': 2000},
-          ]);
+      ).thenAnswer(
+        (_) async => [
+          {'o': 2000},
+        ],
+      );
       when(
         () => container.create(
           any<Map<String, Object?>>(),
@@ -127,64 +137,70 @@ void main() {
       expect(captured[0], contains('c.parentId = @parentId'));
       expect(captured[1], {'@parentId': 'parent-1'});
 
-      final createCaptured = verify(
-        () => container.create(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final createCaptured =
+          verify(
+                () => container.create(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(createCaptured['parentId'], 'parent-1');
       expect(createCaptured['order'], 3000);
     });
   });
 
   group('reparent', () {
-    test('reads the doc, then patches parentId + bumps order to end-of-list',
-        () async {
-      // First call (the read inside _nextOrder via query) returns 5000;
-      // second is the actual doc read.
-      when(
-        () => container.query(
-          any<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).thenAnswer((_) async => [
+    test(
+      'reads the doc, then patches parentId + bumps order to end-of-list',
+      () async {
+        // First call (the read inside _nextOrder via query) returns 5000;
+        // second is the actual doc read.
+        when(
+          () => container.query(
+            any<String>(),
+            parameters: any<Map<String, Object?>>(named: 'parameters'),
+            partitionKey: any<Object?>(named: 'partitionKey'),
+          ),
+        ).thenAnswer(
+          (_) async => [
             {'o': 5000},
-          ]);
-      stubReadReturns({
-        'goal-1': {
-          'id': 'goal-1',
-          'type': _pk,
-          'title': 'Loops',
-          'parentId': 'old-parent',
-          'order': 1000,
-        },
-      });
-      when(
-        () => container.replace(
-          any<String>(),
-          any<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).thenAnswer((_) async => <String, dynamic>{});
+          ],
+        );
+        stubReadReturns({
+          'goal-1': {
+            'id': 'goal-1',
+            'type': _pk,
+            'title': 'Loops',
+            'parentId': 'old-parent',
+            'order': 1000,
+          },
+        });
+        when(
+          () => container.replace(
+            any<String>(),
+            any<Map<String, Object?>>(),
+            partitionKey: any<Object>(named: 'partitionKey'),
+          ),
+        ).thenAnswer((_) async => <String, dynamic>{});
 
-      await build().reparent('goal-1', 'new-parent');
+        await build().reparent('goal-1', 'new-parent');
 
-      final captured = verify(
-        () => container.replace(
-          captureAny<String>(),
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured;
-      expect(captured[0], 'goal-1');
-      final doc = captured[1] as Map<String, Object?>;
-      expect(doc['parentId'], 'new-parent');
-      expect(doc['order'], 6000);
-      // Other fields preserved.
-      expect(doc['title'], 'Loops');
-    });
+        final captured = verify(
+          () => container.replace(
+            captureAny<String>(),
+            captureAny<Map<String, Object?>>(),
+            partitionKey: any<Object>(named: 'partitionKey'),
+          ),
+        ).captured;
+        expect(captured[0], 'goal-1');
+        final doc = captured[1] as Map<String, Object?>;
+        expect(doc['parentId'], 'new-parent');
+        expect(doc['order'], 6000);
+        // Other fields preserved.
+        expect(doc['title'], 'Loops');
+      },
+    );
   });
 
   group('applyOrder', () {
@@ -204,12 +220,14 @@ void main() {
 
       await build().applyOrder('parent-1', ['a', 'b', 'c']);
 
-      final captured = verify(
-        () => container.executeBatch(
-          captureAny<List<BatchOperation>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as List<BatchOperation>;
+      final captured =
+          verify(
+                () => container.executeBatch(
+                  captureAny<List<BatchOperation>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as List<BatchOperation>;
       expect(captured, hasLength(3));
       // Each op should be an Upsert with the new order + parentId.
       final docs = captured
@@ -236,17 +254,16 @@ void main() {
 
       await build().applyOrder(null, ['a', 'gone', 'also-gone']);
 
-      final captured = verify(
-        () => container.executeBatch(
-          captureAny<List<BatchOperation>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as List<BatchOperation>;
+      final captured =
+          verify(
+                () => container.executeBatch(
+                  captureAny<List<BatchOperation>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as List<BatchOperation>;
       expect(captured, hasLength(1));
-      expect(
-        (captured.single.toJson()['resourceBody'] as Map)['id'],
-        'a',
-      );
+      expect((captured.single.toJson()['resourceBody'] as Map)['id'], 'a');
     });
 
     test('empty input is a no-op (no batch call at all)', () async {
@@ -262,43 +279,43 @@ void main() {
 
   group('backupSubtree → deleteSubtree → restoreSubtree round-trip', () {
     Map<String, Map<String, dynamic>> tree() => {
-          'root': {
-            'id': 'root',
-            'type': _pk,
-            'title': 'Root',
-            'description': 'root desc',
-            'parentId': null,
-            'order': 1000,
-            'optional': false,
-            'teachingTips': const <String>[],
-            'allowChains': false,
-            'objectives': const <Map<String, dynamic>>[],
-          },
-          'child-a': {
-            'id': 'child-a',
-            'type': _pk,
-            'title': 'A',
-            'description': null,
-            'parentId': 'root',
-            'order': 1000,
-            'optional': false,
-            'teachingTips': const <String>[],
-            'allowChains': false,
-            'objectives': const <Map<String, dynamic>>[],
-          },
-          'child-b': {
-            'id': 'child-b',
-            'type': _pk,
-            'title': 'B',
-            'description': null,
-            'parentId': 'root',
-            'order': 2000,
-            'optional': true,
-            'teachingTips': const ['x', 'y'],
-            'allowChains': true,
-            'objectives': const <Map<String, dynamic>>[],
-          },
-        };
+      'root': {
+        'id': 'root',
+        'type': _pk,
+        'title': 'Root',
+        'description': 'root desc',
+        'parentId': null,
+        'order': 1000,
+        'optional': false,
+        'teachingTips': const <String>[],
+        'allowChains': false,
+        'objectives': const <Map<String, dynamic>>[],
+      },
+      'child-a': {
+        'id': 'child-a',
+        'type': _pk,
+        'title': 'A',
+        'description': null,
+        'parentId': 'root',
+        'order': 1000,
+        'optional': false,
+        'teachingTips': const <String>[],
+        'allowChains': false,
+        'objectives': const <Map<String, dynamic>>[],
+      },
+      'child-b': {
+        'id': 'child-b',
+        'type': _pk,
+        'title': 'B',
+        'description': null,
+        'parentId': 'root',
+        'order': 2000,
+        'optional': true,
+        'teachingTips': const ['x', 'y'],
+        'allowChains': true,
+        'objectives': const <Map<String, dynamic>>[],
+      },
+    };
 
     setUp(() {
       // _collectSubtree calls _fetchAll via container.query
@@ -320,17 +337,22 @@ void main() {
     test('backup then restore preserves ids and core fields', () async {
       final svc = build();
       final backup = await svc.backupSubtree('root');
-      expect(backup.nodes.map((n) => n.$1).toSet(),
-          {'root', 'child-a', 'child-b'});
+      expect(backup.nodes.map((n) => n.$1).toSet(), {
+        'root',
+        'child-a',
+        'child-b',
+      });
 
       await svc.restoreSubtree(backup);
 
-      final captured = verify(
-        () => container.executeBatch(
-          captureAny<List<BatchOperation>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as List<BatchOperation>;
+      final captured =
+          verify(
+                () => container.executeBatch(
+                  captureAny<List<BatchOperation>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as List<BatchOperation>;
       expect(captured, hasLength(3));
       final ids = captured
           .map((o) => (o.toJson()['resourceBody'] as Map)['id'])
@@ -342,20 +364,27 @@ void main() {
       }
     });
 
-    test('deleteSubtree fires one Delete op per node in a single batch',
-        () async {
-      await build().deleteSubtree('root');
-      final captured = verify(
-        () => container.executeBatch(
-          captureAny<List<BatchOperation>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as List<BatchOperation>;
-      expect(captured, hasLength(3));
-      expect(captured.map((o) => o.operationType).toSet(), {'Delete'});
-      expect(captured.map((o) => o.toJson()['id']).toSet(),
-          {'root', 'child-a', 'child-b'});
-    });
+    test(
+      'deleteSubtree fires one Delete op per node in a single batch',
+      () async {
+        await build().deleteSubtree('root');
+        final captured =
+            verify(
+                  () => container.executeBatch(
+                    captureAny<List<BatchOperation>>(),
+                    partitionKey: any<Object>(named: 'partitionKey'),
+                  ),
+                ).captured.single
+                as List<BatchOperation>;
+        expect(captured, hasLength(3));
+        expect(captured.map((o) => o.operationType).toSet(), {'Delete'});
+        expect(captured.map((o) => o.toJson()['id']).toSet(), {
+          'root',
+          'child-a',
+          'child-b',
+        });
+      },
+    );
 
     test('countDescendants = subtree size minus 1', () async {
       expect(await build().countDescendants('root'), 2);
@@ -380,10 +409,12 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {'id': 'r1', 'title': 'Root 1', 'order': 1000},
-            {'id': 'r2', 'title': 'Root 2', 'order': 2000},
-          ]);
+      ).thenAnswer(
+        (_) async => <Map<String, dynamic>>[
+          {'id': 'r1', 'title': 'Root 1', 'order': 1000},
+          {'id': 'r2', 'title': 'Root 2', 'order': 2000},
+        ],
+      );
 
       final roots = await build().getRootGoalsOnce();
       expect(roots.map((g) => g.id).toList(), ['r1', 'r2']);
@@ -408,11 +439,7 @@ void main() {
           any<String>(),
           partitionKey: any<Object>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => {
-            'id': 'g1',
-            'title': 'Loops',
-            'order': 1000,
-          });
+      ).thenAnswer((_) async => {'id': 'g1', 'title': 'Loops', 'order': 1000});
 
       final goal = await build().getGoalOnce('g1');
       expect(goal, isNotNull);
@@ -429,21 +456,25 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {'id': 'r1', 'title': 'Root 1', 'order': 1000},
-          ]);
+      ).thenAnswer(
+        (_) async => <Map<String, dynamic>>[
+          {'id': 'r1', 'title': 'Root 1', 'order': 1000},
+        ],
+      );
 
       final out = await build().getChildrenOnce(null);
       expect(out, hasLength(1));
       expect(out.first.id, 'r1');
 
-      final captured = verify(
-        () => container.query(
-          captureAny<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).captured.single as String;
+      final captured =
+          verify(
+                () => container.query(
+                  captureAny<String>(),
+                  parameters: any<Map<String, Object?>>(named: 'parameters'),
+                  partitionKey: any<Object?>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as String;
       expect(captured, isNot(contains('@parentId')));
     });
 
@@ -454,9 +485,16 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {'id': 'c1', 'title': 'Child 1', 'parentId': 'parent-x', 'order': 1000},
-          ]);
+      ).thenAnswer(
+        (_) async => <Map<String, dynamic>>[
+          {
+            'id': 'c1',
+            'title': 'Child 1',
+            'parentId': 'parent-x',
+            'order': 1000,
+          },
+        ],
+      );
 
       final out = await build().getChildrenOnce('parent-x');
       expect(out, hasLength(1));
@@ -482,21 +520,25 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {'id': 'g1', 'title': 'A', 'order': 1000},
-            {'id': 'g2', 'title': 'B', 'order': 2000},
-          ]);
+      ).thenAnswer(
+        (_) async => <Map<String, dynamic>>[
+          {'id': 'g1', 'title': 'A', 'order': 1000},
+          {'id': 'g2', 'title': 'B', 'order': 2000},
+        ],
+      );
 
       final out = await build().getAllGoalsOnce();
       expect(out, hasLength(2));
 
-      final sql = verify(
-        () => container.query(
-          captureAny<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).captured.single as String;
+      final sql =
+          verify(
+                () => container.query(
+                  captureAny<String>(),
+                  parameters: any<Map<String, Object?>>(named: 'parameters'),
+                  partitionKey: any<Object?>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as String;
       expect(sql, contains('SELECT * FROM c'));
     });
   });
@@ -529,12 +571,14 @@ void main() {
 
       expect(id, isNotEmpty);
 
-      final captured = verify(
-        () => container.create(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final captured =
+          verify(
+                () => container.create(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(captured['title'], 'Lists');
       expect(captured['description'], 'Working with lists');
       expect(captured['parentId'], 'parent-1');
@@ -554,16 +598,18 @@ void main() {
           id,
           partitionKey: any<Object>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => {
-            'id': id,
-            'type': _pk,
-            'title': 'Old title',
-            'parentId': null,
-            'order': 1000,
-            'teachingTips': const <String>[],
-            'allowChains': false,
-            'objectives': const <Map<String, dynamic>>[],
-          });
+      ).thenAnswer(
+        (_) async => {
+          'id': id,
+          'type': _pk,
+          'title': 'Old title',
+          'parentId': null,
+          'order': 1000,
+          'teachingTips': const <String>[],
+          'allowChains': false,
+          'objectives': const <Map<String, dynamic>>[],
+        },
+      );
       when(
         () => container.replace(
           any<String>(),

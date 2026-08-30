@@ -17,11 +17,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 /// - Streaming chat bubbles (already use `instantMarkdown` from
 ///   `flyer_chat_text_stream_message`)
 class TutorMarkdown extends StatelessWidget {
-  const TutorMarkdown(
-    this.text, {
-    super.key,
-    this.style,
-  });
+  const TutorMarkdown(this.text, {super.key, this.style});
 
   final String text;
   final TextStyle? style;
@@ -62,10 +58,7 @@ class _InlineCode extends StatelessWidget {
         color: AppColors.ink2,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        text,
-        style: AppMono.code(size: size),
-      ),
+      child: Text(text, style: AppMono.code(size: size)),
     );
   }
 }

@@ -62,24 +62,24 @@ class LoBelief {
     required String uid,
     required String subgoalId,
     required String loId,
-  }) =>
-      '${uid}_${subgoalId}_$loId';
+  }) => '${uid}_${subgoalId}_$loId';
 
   Map<String, dynamic> toMap({required String uid}) => {
-        'id': docIdFor(uid: uid, subgoalId: subgoalId, loId: loId),
-        'type': 'lo_belief',
-        'uid': uid,
-        'subgoalId': subgoalId,
-        'loId': loId,
-        'alpha': alpha,
-        'beta': beta,
-        'lastUpdatedAt': lastUpdatedAt.toUtc().toIso8601String(),
-        if (lastQuestionType != null) 'lastQuestionType': lastQuestionType,
-        if (lastPositiveAtCalibratedAt != null)
-          'lastPositiveAtCalibratedAt':
-              lastPositiveAtCalibratedAt!.toUtc().toIso8601String(),
-        'recentNegativesAtCalibrated': recentNegativesAtCalibrated,
-      };
+    'id': docIdFor(uid: uid, subgoalId: subgoalId, loId: loId),
+    'type': 'lo_belief',
+    'uid': uid,
+    'subgoalId': subgoalId,
+    'loId': loId,
+    'alpha': alpha,
+    'beta': beta,
+    'lastUpdatedAt': lastUpdatedAt.toUtc().toIso8601String(),
+    if (lastQuestionType != null) 'lastQuestionType': lastQuestionType,
+    if (lastPositiveAtCalibratedAt != null)
+      'lastPositiveAtCalibratedAt': lastPositiveAtCalibratedAt!
+          .toUtc()
+          .toIso8601String(),
+    'recentNegativesAtCalibrated': recentNegativesAtCalibrated,
+  };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
     final updatedRaw = doc['lastUpdatedAt'];
@@ -93,8 +93,9 @@ class LoBelief {
           ? (DateTime.tryParse(updatedRaw) ?? DateTime.utc(1970))
           : DateTime.utc(1970),
       lastQuestionType: doc['lastQuestionType'] as String?,
-      lastPositiveAtCalibratedAt:
-          positiveRaw is String ? DateTime.tryParse(positiveRaw) : null,
+      lastPositiveAtCalibratedAt: positiveRaw is String
+          ? DateTime.tryParse(positiveRaw)
+          : null,
       recentNegativesAtCalibrated:
           (doc['recentNegativesAtCalibrated'] as num?)?.toInt() ?? 0,
     );

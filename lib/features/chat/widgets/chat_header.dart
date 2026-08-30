@@ -48,8 +48,9 @@ class ChatHeader extends ConsumerWidget {
             ),
           ),
           _RestartButton(
-            onTap: () =>
-                ref.read(tutorServiceProvider.notifier).initializeSession(force: true),
+            onTap: () => ref
+                .read(tutorServiceProvider.notifier)
+                .initializeSession(force: true),
           ),
         ],
       ),
@@ -133,11 +134,7 @@ class _RestartButtonState extends State<_RestartButton> {
               color: _hovering ? AppColors.ink2 : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.inputSmall),
             ),
-            child: const Icon(
-              Icons.refresh,
-              size: 16,
-              color: AppColors.fgMute,
-            ),
+            child: const Icon(Icons.refresh, size: 16, color: AppColors.fgMute),
           ),
         ),
       ),

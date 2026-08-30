@@ -205,7 +205,10 @@ class DebugSessionRecorder {
     try {
       final t = _current;
       if (t == null) return;
-      final atMs = DateTime.now().toUtc().difference(t.startedAt).inMilliseconds;
+      final atMs = DateTime.now()
+          .toUtc()
+          .difference(t.startedAt)
+          .inMilliseconds;
       t.events.add(TurnEvent(atMs: atMs, name: name, data: data));
     } catch (e) {
       debugPrint('DebugRecorder.recordEvent: $e');

@@ -50,9 +50,11 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
                     onPressed: (n == 0 || _ackBusy)
                         ? null
                         : () => _acknowledge(context),
-                    child: Text(_ackBusy
-                        ? l.drawer_signals_button_busy
-                        : l.drawer_signals_button_acknowledge(n)),
+                    child: Text(
+                      _ackBusy
+                          ? l.drawer_signals_button_busy
+                          : l.drawer_signals_button_acknowledge(n),
+                    ),
                   );
                 },
               ),
@@ -121,9 +123,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
               shape: BoxShape.circle,
               color: ack
                   ? Colors.grey.shade400
-                  : (isStrong
-                      ? Colors.red.shade400
-                      : Colors.amber.shade600),
+                  : (isStrong ? Colors.red.shade400 : Colors.amber.shade600),
             ),
           ),
           Expanded(
@@ -170,11 +170,14 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
 
   String _detailSummary(Map<String, Object?> details) {
     if (details.isEmpty) return '';
-    final entries = details.entries.take(2).map((e) {
-      final v = e.value;
-      final rendered = v is List ? v.join(', ') : v?.toString() ?? '';
-      return '${e.key}: $rendered';
-    }).join(' · ');
+    final entries = details.entries
+        .take(2)
+        .map((e) {
+          final v = e.value;
+          final rendered = v is List ? v.join(', ') : v?.toString() ?? '';
+          return '${e.key}: $rendered';
+        })
+        .join(' · ');
     return ' — $entries';
   }
 
@@ -183,9 +186,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
     final l = AppLocalizations.of(context);
     setState(() => _ackBusy = true);
     try {
-      await ref
-          .read(turnHistoryServiceProvider)
-          .acknowledgeAllFor(widget.uid);
+      await ref.read(turnHistoryServiceProvider).acknowledgeAllFor(widget.uid);
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text(l.drawer_signals_ackFailed(e.toString()))),

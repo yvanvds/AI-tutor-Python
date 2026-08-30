@@ -50,10 +50,7 @@ class _PracticeViewState extends ConsumerState<PracticeView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (widget.showObjective) const ObjectiveBanner(),
-          if (!mcqActive) ...[
-            const RunControls(),
-            const _ThinDivider(),
-          ],
+          if (!mcqActive) ...[const RunControls(), const _ThinDivider()],
           Expanded(
             child: mcqActive
                 ? const QuizView()

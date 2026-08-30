@@ -79,7 +79,10 @@ class GoalSplashOverlay extends ConsumerWidget {
                 ),
                 child: Stack(
                   children: [
-                    Lottie.asset('assets/images/Confetti.json', fit: BoxFit.cover),
+                    Lottie.asset(
+                      'assets/images/Confetti.json',
+                      fit: BoxFit.cover,
+                    ),
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [

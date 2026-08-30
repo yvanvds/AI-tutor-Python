@@ -89,9 +89,7 @@ class AccountService extends Notifier<Account?> {
   // --- READS --------------------------------------------------------------
 
   Future<Account?> getAccount(String uid) async {
-    final doc = await safeCosmos(
-      () => _container.read(uid, partitionKey: uid),
-    );
+    final doc = await safeCosmos(() => _container.read(uid, partitionKey: uid));
     if (doc == null) return null;
     return Account.fromMap(doc);
   }
@@ -127,9 +125,7 @@ class AccountService extends Notifier<Account?> {
   }
 
   Stream<List<Account>> streamAllAccounts() {
-    return safeCosmosStream(
-      pollingStream(() => safeCosmos(_fetchAllAccounts)),
-    );
+    return safeCosmosStream(pollingStream(() => safeCosmos(_fetchAllAccounts)));
   }
 
   Future<List<Account>> getAllAccounts() => safeCosmos(_fetchAllAccounts);
@@ -222,9 +218,7 @@ class AccountService extends Notifier<Account?> {
   // --- HELPERS ------------------------------------------------------------
 
   Future<void> _patch(String uid, Map<String, Object?> changes) async {
-    final doc = await safeCosmos(
-      () => _container.read(uid, partitionKey: uid),
-    );
+    final doc = await safeCosmos(() => _container.read(uid, partitionKey: uid));
     if (doc == null) return;
     doc.addAll(changes);
     doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();

@@ -43,7 +43,7 @@ class ProgressSample {
       quality: _parseQuality(doc['quality']),
       at: atRaw is String
           ? (DateTime.tryParse(atRaw) ??
-              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true))
+                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true))
           : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
     );
   }

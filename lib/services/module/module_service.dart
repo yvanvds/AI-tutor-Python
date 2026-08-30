@@ -12,8 +12,7 @@ class ModuleService extends Notifier<List<Module>> {
 
   final CosmosContainer? _containerOverride;
 
-  CosmosContainer get _container =>
-      _containerOverride ?? CosmosPaths.modules();
+  CosmosContainer get _container => _containerOverride ?? CosmosPaths.modules();
 
   @override
   List<Module> build() {
@@ -68,5 +67,6 @@ class ModuleService extends Notifier<List<Module>> {
   }
 }
 
-final moduleServiceProvider =
-    NotifierProvider<ModuleService, List<Module>>(ModuleService.new);
+final moduleServiceProvider = NotifierProvider<ModuleService, List<Module>>(
+  ModuleService.new,
+);

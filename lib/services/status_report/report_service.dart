@@ -16,9 +16,9 @@ class ReportService {
     CosmosContainer? container,
     required String? Function() getUid,
     String? Function()? getCurrentChildGoalId,
-  })  : _containerOverride = container,
-        _getUid = getUid,
-        _getCurrentChildGoalId = getCurrentChildGoalId;
+  }) : _containerOverride = container,
+       _getUid = getUid,
+       _getCurrentChildGoalId = getCurrentChildGoalId;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;

@@ -40,11 +40,7 @@ void main() {
       title: 't',
       order: 0,
       objectives: const [
-        LearningObjective(
-          id: 'lo1',
-          statement: 's1',
-          kind: LoKind.recall,
-        ),
+        LearningObjective(id: 'lo1', statement: 's1', kind: LoKind.recall),
       ],
     );
     final m = g.toMap();

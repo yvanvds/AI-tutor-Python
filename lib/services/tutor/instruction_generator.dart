@@ -130,8 +130,10 @@ class InstructionGenerator {
   ) {
     if (entries.isEmpty) return '';
     return entries
-        .map((e) =>
-            '- [${e.subgoalId}] (${e.lo.kind.name}) ${e.lo.id}: ${e.lo.statement}')
+        .map(
+          (e) =>
+              '- [${e.subgoalId}] (${e.lo.kind.name}) ${e.lo.id}: ${e.lo.statement}',
+        )
         .join('\n');
   }
 }

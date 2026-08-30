@@ -21,12 +21,12 @@ class LearningObjective {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'statement': statement,
-        'kind': kind.name,
-        'weight': weight,
-        'optional': optional,
-      };
+    'id': id,
+    'statement': statement,
+    'kind': kind.name,
+    'weight': weight,
+    'optional': optional,
+  };
 
   factory LearningObjective.fromMap(Map<String, dynamic> map) {
     return LearningObjective(

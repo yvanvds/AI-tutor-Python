@@ -225,7 +225,8 @@ class ConductorDeps {
     Progress p, {
     AnswerQuality? quality,
     bool recordHistory,
-  }) upsertProgress;
+  })
+  upsertProgress;
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
   final void Function(double) setCurrentProgress;
@@ -237,7 +238,7 @@ class ConductorDeps {
   final void Function() playCorrectAnswer;
   final void Function() playGoalReached;
   final void Function({required String goalTitle, required String description})
-      showGoalReached;
+  showGoalReached;
 
   /// Invoked when a subgoal with `kind == 'concept'` masters. The host
   /// (tutor_service) decides whether to show the level-up overlay and what
@@ -252,9 +253,10 @@ class ConductorDeps {
   final Future<LoBelief?> Function({
     required String subgoalId,
     required String loId,
-  }) getLoBelief;
+  })
+  getLoBelief;
   final Future<List<LoBelief>> Function(String subgoalId)
-      getLoBeliefsForSubgoal;
+  getLoBeliefsForSubgoal;
   final Future<void> Function(LoBelief belief) upsertLoBelief;
 
   final Future<void> Function(PersistedTurnRecord record) appendTurnHistory;
@@ -324,9 +326,7 @@ class Conductor {
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
     _pendingCascadeHaltEvent = null;
-    _deps.recordDebugEvent('conductor.subgoal_set', {
-      'subgoalId': goal?.id,
-    });
+    _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
   }
 
   /// Pick the next question. CONDUCTOR_POLICY §1 (entry) and §2 (per-question).
@@ -359,8 +359,10 @@ class Conductor {
     for (final lo in objectives) {
       final b = byId[lo.id];
       if (b == null) {
-        snapshots[lo.id] =
-            const BeliefSnapshot(PolicyConstants.prior, PolicyConstants.prior);
+        snapshots[lo.id] = const BeliefSnapshot(
+          PolicyConstants.prior,
+          PolicyConstants.prior,
+        );
         continue;
       }
       final snap = applyDecay(
@@ -433,8 +435,9 @@ class Conductor {
         // closest to mastery so the slow climb has the best chance to flip
         // an LO and unblock subgoal advance.
         final sorted = unmastered.toList()
-          ..sort((a, b) =>
-              snapshots[b.id]!.mean.compareTo(snapshots[a.id]!.mean));
+          ..sort(
+            (a, b) => snapshots[b.id]!.mean.compareTo(snapshots[a.id]!.mean),
+          );
         target = sorted.first;
         chosenReason = 'all unmastered saturated: highest-mean fallback';
       }
@@ -448,8 +451,9 @@ class Conductor {
         return QuestionPlan.saturated();
       }
       final sorted = practiceable.toList()
-        ..sort((a, b) =>
-            snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean));
+        ..sort(
+          (a, b) => snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean),
+        );
       target = sorted.first;
       chosenReason = 'all mastered: lowest-mean practiceable';
     }
@@ -470,11 +474,13 @@ class Conductor {
 
     final candidateStats = (unmastered.isNotEmpty ? unmastered : objectives)
         .take(3)
-        .map((lo) => CandidateLoStat(
-              loId: lo.id,
-              mean: snapshots[lo.id]!.mean,
-              evidence: snapshots[lo.id]!.evidence,
-            ))
+        .map(
+          (lo) => CandidateLoStat(
+            loId: lo.id,
+            mean: snapshots[lo.id]!.mean,
+            evidence: snapshots[lo.id]!.evidence,
+          ),
+        )
         .toList(growable: false);
 
     final reason = TurnSelectionReason(
@@ -529,14 +535,12 @@ class Conductor {
     ChatRequestType.socraticQuestion,
   ];
 
-  ChatRequestType _pickType(
-    LearningObjective lo,
-    BeliefSnapshot snap,
-  ) {
+  ChatRequestType _pickType(LearningObjective lo, BeliefSnapshot snap) {
     final acceptable =
         _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
     final priorOnly =
-        snap.alpha == PolicyConstants.prior && snap.beta == PolicyConstants.prior;
+        snap.alpha == PolicyConstants.prior &&
+        snap.beta == PolicyConstants.prior;
     if (priorOnly) {
       // Cold-start default per kind. Fall back to the first acceptable if
       // the default is somehow not in the acceptable set.
@@ -602,8 +606,7 @@ class Conductor {
   /// question. TutorService calls this immediately after deciding to fire
   /// a request so per-LO recency tracking lines up with the actual probe.
   void notePlannedQuestion(QuestionPlan plan) {
-    _lastTargetLoId =
-        plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
+    _lastTargetLoId = plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
     _lastQuestionType = plan.type;
   }
 
@@ -618,8 +621,7 @@ class Conductor {
   }) async {
     final selection = _deps.getGoalSelection();
     final subgoal = selection.activeChildGoal;
-    final targetLo =
-        plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
+    final targetLo = plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
 
     final events = <TurnSignalEvent>[];
 
@@ -642,13 +644,15 @@ class Conductor {
       }
       if (!_sustainedLlmFailureFired) {
         _sustainedLlmFailureFired = true;
-        events.add(TurnSignalEvent.of(
-          TurnSignalEventKind.sustainedLlmFailure,
-          details: {
-            'fallbackCount': fallbackCount,
-            'window': PolicyConstants.degradedWindow,
-          },
-        ));
+        events.add(
+          TurnSignalEvent.of(
+            TurnSignalEventKind.sustainedLlmFailure,
+            details: {
+              'fallbackCount': fallbackCount,
+              'window': PolicyConstants.degradedWindow,
+            },
+          ),
+        );
       }
     }
 
@@ -710,11 +714,12 @@ class Conductor {
       // weaker-than `weak` (i.e. weak), otherwise we floor it to `weak`.
       final effectiveStrength = answer.isFollowUp
           ? (sig.strength.index >= LoSignalStrength.weak.index
-              ? sig.strength
-              : LoSignalStrength.weak)
+                ? sig.strength
+                : LoSignalStrength.weak)
           : sig.strength;
-      final effectiveDifficulty =
-          answer.isFollowUp ? QuestionDifficulty.medium : plan.difficulty;
+      final effectiveDifficulty = answer.isFollowUp
+          ? QuestionDifficulty.medium
+          : plan.difficulty;
       final deltas = signalDeltas(
         kind: sig.kind,
         strength: effectiveStrength,
@@ -729,8 +734,7 @@ class Conductor {
       final hasPositive = sig.kind == LoSignalKind.positive;
       final hasNegative = sig.kind == LoSignalKind.negative;
       final isStrong = effectiveStrength == LoSignalStrength.strong;
-      final atOrAbove =
-          _difficultyAtLeast(plan.difficulty, calibrationBefore);
+      final atOrAbove = _difficultyAtLeast(plan.difficulty, calibrationBefore);
       final exactlyAtCalibration = plan.difficulty == calibrationBefore;
       // Follow-up grading does not satisfy the §4.3 ratchet (no calibrated
       // probe); skip both the timestamp set and the notch-drop counter.
@@ -758,18 +762,21 @@ class Conductor {
         alpha: next.alpha,
         beta: next.beta,
         lastUpdatedAt: now,
-        lastQuestionType:
-            sig.loId == targetLo?.id ? plan.type.name : existing?.lastQuestionType,
+        lastQuestionType: sig.loId == targetLo?.id
+            ? plan.type.name
+            : existing?.lastQuestionType,
         lastPositiveAtCalibratedAt:
             newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt,
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
       );
       await _deps.upsertLoBelief(updated);
-      appliedSignals.add(TurnAppliedSignal(
-        loId: sig.loId,
-        alphaDelta: next.alpha - alpha,
-        betaDelta: next.beta - beta,
-      ));
+      appliedSignals.add(
+        TurnAppliedSignal(
+          loId: sig.loId,
+          alphaDelta: next.alpha - alpha,
+          betaDelta: next.beta - beta,
+        ),
+      );
       touchedLoIds.add(sig.loId);
     }
 
@@ -789,16 +796,19 @@ class Conductor {
               lastUpdatedAt: b.lastUpdatedAt,
               now: DateTime.now().toUtc(),
             );
-      final isMastered = meetsMasteryMeanAndEvidence(snap) &&
+      final isMastered =
+          meetsMasteryMeanAndEvidence(snap) &&
           (b?.lastPositiveAtCalibratedAt != null);
       final stuck = isStuck(snap);
-      loStatus.add(TurnLoStatus(
-        loId: lo.id,
-        mean: snap.mean,
-        evidence: snap.evidence,
-        mastered: isMastered,
-        stuck: stuck,
-      ));
+      loStatus.add(
+        TurnLoStatus(
+          loId: lo.id,
+          mean: snap.mean,
+          evidence: snap.evidence,
+          mastered: isMastered,
+          stuck: stuck,
+        ),
+      );
       if (!lo.optional) {
         masteredCount.add(isMastered);
         stuckCount.add(stuck);
@@ -807,9 +817,12 @@ class Conductor {
 
     // Subgoal mastery: all non-optional LOs are mastered or stuck.
     // §7.7 deadlock: stuck-only single-LO subgoals do not advance.
-    final allDoneOrStuck = masteredCount.every((m) => m) ||
-        List.generate(masteredCount.length,
-            (i) => masteredCount[i] || stuckCount[i]).every((v) => v);
+    final allDoneOrStuck =
+        masteredCount.every((m) => m) ||
+        List.generate(
+          masteredCount.length,
+          (i) => masteredCount[i] || stuckCount[i],
+        ).every((v) => v);
     final hasAtLeastOneMastered = masteredCount.any((m) => m);
     final subgoalMastered = allDoneOrStuck && hasAtLeastOneMastered;
 
@@ -818,9 +831,10 @@ class Conductor {
     // count for advancement but the chip honestly reflects mastery.
     final nonOptional = subgoal.objectives.where((lo) => !lo.optional).toList();
     final masteredNonOptional = loStatus
-        .where((s) => !subgoal.objectives
-            .firstWhere((lo) => lo.id == s.loId)
-            .optional)
+        .where(
+          (s) =>
+              !subgoal.objectives.firstWhere((lo) => lo.id == s.loId).optional,
+        )
         .where((s) => s.mastered)
         .length;
     final cached = nonOptional.isEmpty
@@ -846,13 +860,12 @@ class Conductor {
         }
       }
       if (stuckLoIds.isNotEmpty) {
-        events.add(TurnSignalEvent.of(
-          TurnSignalEventKind.stuckLoAdvance,
-          details: {
-            'subgoalId': subgoal.id,
-            'stuckLoIds': stuckLoIds,
-          },
-        ));
+        events.add(
+          TurnSignalEvent.of(
+            TurnSignalEventKind.stuckLoAdvance,
+            details: {'subgoalId': subgoal.id, 'stuckLoIds': stuckLoIds},
+          ),
+        );
       }
 
       _pendingStatusReportGoalId = subgoal.id;
@@ -885,20 +898,20 @@ class Conductor {
       // §7.7 single-LO deadlock detection: only fires when a non-optional
       // single-LO subgoal is stuck and (therefore) blocked from advancing.
       // Emit once per (session, subgoal) — `_singleLoDeadlockSubgoalId`.
-      final nonOptionalLos =
-          subgoal.objectives.where((lo) => !lo.optional).toList();
+      final nonOptionalLos = subgoal.objectives
+          .where((lo) => !lo.optional)
+          .toList();
       if (nonOptionalLos.length == 1 &&
           stuckCount.isNotEmpty &&
           stuckCount.first &&
           _singleLoDeadlockSubgoalId != subgoal.id) {
         _singleLoDeadlockSubgoalId = subgoal.id;
-        events.add(TurnSignalEvent.of(
-          TurnSignalEventKind.singleLoDeadlock,
-          details: {
-            'subgoalId': subgoal.id,
-            'loId': nonOptionalLos.first.id,
-          },
-        ));
+        events.add(
+          TurnSignalEvent.of(
+            TurnSignalEventKind.singleLoDeadlock,
+            details: {'subgoalId': subgoal.id, 'loId': nonOptionalLos.first.id},
+          ),
+        );
       }
 
       await _persistSubgoalCache(
@@ -940,17 +953,18 @@ class Conductor {
     // session. Promotion resets; "no change" leaves the counter alone.
     if (calibrationAfter.index < calibrationBefore.index) {
       _consecutiveDemotions += 1;
-      if (_consecutiveDemotions >=
-              PolicyConstants.repeatedDemotionsThreshold &&
+      if (_consecutiveDemotions >= PolicyConstants.repeatedDemotionsThreshold &&
           !_repeatedDemotionsFired) {
         _repeatedDemotionsFired = true;
-        events.add(TurnSignalEvent.of(
-          TurnSignalEventKind.repeatedDemotions,
-          details: {
-            'count': _consecutiveDemotions,
-            'calibrationAfter': calibrationAfter.name,
-          },
-        ));
+        events.add(
+          TurnSignalEvent.of(
+            TurnSignalEventKind.repeatedDemotions,
+            details: {
+              'count': _consecutiveDemotions,
+              'calibrationAfter': calibrationAfter.name,
+            },
+          ),
+        );
       }
     } else if (calibrationAfter.index > calibrationBefore.index) {
       _consecutiveDemotions = 0;
@@ -962,12 +976,14 @@ class Conductor {
       subgoalAdvanced: advanced,
       degraded: _degraded,
       loSignals: answer.signals
-          .map((s) => TurnLoSignal(
-                subgoalId: s.subgoalId,
-                loId: s.loId,
-                signal: s.kind.name,
-                strength: s.strength.name,
-              ))
+          .map(
+            (s) => TurnLoSignal(
+              subgoalId: s.subgoalId,
+              loId: s.loId,
+              signal: s.kind.name,
+              strength: s.strength.name,
+            ),
+          )
           .toList(growable: false),
       appliedSignals: appliedSignals,
       loStatusAfter: loStatus,
@@ -1007,9 +1023,11 @@ class Conductor {
     }
     if (atCalibrated.length >= PolicyConstants.demotionMinSamples) {
       final bad = atCalibrated
-          .where((a) =>
-              a.quality == AnswerQuality.wrong ||
-              a.quality == AnswerQuality.partial)
+          .where(
+            (a) =>
+                a.quality == AnswerQuality.wrong ||
+                a.quality == AnswerQuality.partial,
+          )
           .length;
       final ratio = bad / atCalibrated.length;
       if (ratio >= PolicyConstants.demotionBadRatio) {
@@ -1085,10 +1103,7 @@ class Conductor {
         // record persists alongside the turn that triggered the cascade.
         _pendingCascadeHaltEvent = TurnSignalEvent.of(
           TurnSignalEventKind.cascadeHalt,
-          details: {
-            'haltedAtSubgoalId': next.id,
-            'depth': _cascadeDepth,
-          },
+          details: {'haltedAtSubgoalId': next.id, 'depth': _cascadeDepth},
         );
         _lastTargetLoId = null;
         _lastQuestionType = null;

@@ -83,10 +83,10 @@ class AIResponseParser {
   }
 
   static ErrorResponse _unparseable(String raw) => ErrorResponse(
-        type: 'error',
-        message: 'Could not process the response: $raw',
-        notice: ChatNotice(ChatNoticeKind.unparseableResponse, args: [raw]),
-      );
+    type: 'error',
+    message: 'Could not process the response: $raw',
+    notice: ChatNotice(ChatNoticeKind.unparseableResponse, args: [raw]),
+  );
 
   static ChatResponse? _tryLegacyJson(String raw) {
     final cleaned = _stripCodeFences(raw).trim();
@@ -96,7 +96,9 @@ class AIResponseParser {
       Map<String, dynamic>? map;
       if (decoded is Map<String, dynamic>) {
         map = decoded;
-      } else if (decoded is List && decoded.isNotEmpty && decoded.first is Map) {
+      } else if (decoded is List &&
+          decoded.isNotEmpty &&
+          decoded.first is Map) {
         map = (decoded.first as Map).cast<String, dynamic>();
       }
       if (map == null) return null;

@@ -168,20 +168,26 @@ class AuthService extends Notifier<AccountIdentity?> {
           ),
         );
       } else if (code == null) {
-        request.response.write(_browserBody(
-          title: l.auth_browser_failed_title,
-          body: l.auth_browser_failed_noCode,
-        ));
+        request.response.write(
+          _browserBody(
+            title: l.auth_browser_failed_title,
+            body: l.auth_browser_failed_noCode,
+          ),
+        );
       } else if (returnedState != expectedState) {
-        request.response.write(_browserBody(
-          title: l.auth_browser_failed_title,
-          body: l.auth_browser_failed_stateMismatch,
-        ));
+        request.response.write(
+          _browserBody(
+            title: l.auth_browser_failed_title,
+            body: l.auth_browser_failed_stateMismatch,
+          ),
+        );
       } else {
-        request.response.write(_browserBody(
-          title: l.auth_browser_signedIn_title,
-          body: l.auth_browser_signedIn_body,
-        ));
+        request.response.write(
+          _browserBody(
+            title: l.auth_browser_signedIn_title,
+            body: l.auth_browser_signedIn_body,
+          ),
+        );
       }
       await request.response.close();
       if (completer.isCompleted) return;
@@ -190,9 +196,7 @@ class AuthService extends Notifier<AccountIdentity?> {
           Exception('Authorization failed: ${errorDesc ?? error}'),
         );
       } else if (code == null) {
-        completer.completeError(
-          Exception('No authorization code returned.'),
-        );
+        completer.completeError(Exception('No authorization code returned.'));
       } else if (returnedState != expectedState) {
         completer.completeError(Exception('State mismatch.'));
       } else {
@@ -377,8 +381,10 @@ class AuthService extends Notifier<AccountIdentity?> {
     const chars =
         'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     final r = Random.secure();
-    return List<String>.generate(length, (_) => chars[r.nextInt(chars.length)])
-        .join();
+    return List<String>.generate(
+      length,
+      (_) => chars[r.nextInt(chars.length)],
+    ).join();
   }
 }
 

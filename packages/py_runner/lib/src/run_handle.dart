@@ -172,11 +172,7 @@ class _RunController {
 
   void _respondToInput(int requestId, String value) {
     if (_done.isCompleted) return;
-    _sendFrame(InputResponseFrame(
-      id: id,
-      requestId: requestId,
-      value: value,
-    ));
+    _sendFrame(InputResponseFrame(id: id, requestId: requestId, value: value));
   }
 
   Future<void> _cancel() async {

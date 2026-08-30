@@ -81,14 +81,13 @@ class TutorContext {
     required String prompt,
     required String code,
     required List<String> options,
-  }) setActiveMcq;
+  })
+  setActiveMcq;
 
   /// Land tutor feedback onto the in-flight MCQ so the practice view can
   /// reveal correct/wrong styling and the "Volgende" button.
-  final void Function({
-    required String prompt,
-    required AnswerQuality quality,
-  }) applyMcqFeedback;
+  final void Function({required String prompt, required AnswerQuality quality})
+  applyMcqFeedback;
 
   final Future<void> Function(String goalId, String report) updateReportForGoal;
   final Future<void> Function(String report) updateReportForCurrentGoal;
@@ -102,7 +101,8 @@ class TutorContext {
     required AnswerQuality overallQuality,
     required List<LoSignal> loSignals,
     required FollowUp? followUp,
-  }) integrateGradedAnswer;
+  })
+  integrateGradedAnswer;
 
   /// Goal id the StatusSummaryHandler should write against. Set by
   /// TutorService when firing a post-mastery status query so the report

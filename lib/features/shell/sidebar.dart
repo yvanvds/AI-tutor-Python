@@ -10,10 +10,7 @@ const double sidebarWidth = 72;
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
-  static const _studentSections = [
-    Section.session,
-    Section.map,
-  ];
+  static const _studentSections = [Section.session, Section.map];
 
   static const _teacherSections = [
     Section.goals,
@@ -27,8 +24,9 @@ class Sidebar extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final selected = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
-    final teacherSections =
-        _teacherSections.where((s) => devTools || !s.isDeveloperOnly);
+    final teacherSections = _teacherSections.where(
+      (s) => devTools || !s.isDeveloperOnly,
+    );
 
     return Container(
       width: sidebarWidth,
@@ -75,8 +73,7 @@ class Sidebar extends ConsumerWidget {
           _SidebarIconButton(
             tooltip: AppLocalizations.of(context).sidebar_signOut_tooltip,
             icon: Icons.logout,
-            onTap: () =>
-                ref.read(authServiceProvider.notifier).signOut(),
+            onTap: () => ref.read(authServiceProvider.notifier).signOut(),
           ),
           const SizedBox(height: AppSpacing.m),
         ],
@@ -177,7 +174,9 @@ class _SidebarItemState extends State<_SidebarItem> {
   Widget build(BuildContext context) {
     final tinted = widget.active
         ? AppColors.ink2
-        : (_hovering ? AppColors.ink2.withValues(alpha: 0.6) : Colors.transparent);
+        : (_hovering
+              ? AppColors.ink2.withValues(alpha: 0.6)
+              : Colors.transparent);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -208,9 +207,7 @@ class _SidebarItemState extends State<_SidebarItem> {
                     ),
                   ),
                 Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.m,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
                   decoration: BoxDecoration(
                     color: tinted,
                     borderRadius: BorderRadius.circular(AppRadius.inputLarge),
@@ -219,9 +216,7 @@ class _SidebarItemState extends State<_SidebarItem> {
                     child: Icon(
                       widget.icon,
                       size: 20,
-                      color: widget.active
-                          ? AppColors.fg
-                          : AppColors.fgMute,
+                      color: widget.active ? AppColors.fg : AppColors.fgMute,
                     ),
                   ),
                 ),

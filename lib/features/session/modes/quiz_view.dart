@@ -206,7 +206,13 @@ class _OptionGrid extends StatelessWidget {
   }
 }
 
-enum _OptionState { idle, selectedPending, correctChosen, wrongChosen, dismissed }
+enum _OptionState {
+  idle,
+  selectedPending,
+  correctChosen,
+  wrongChosen,
+  dismissed,
+}
 
 class _Option extends StatefulWidget {
   const _Option({
@@ -264,8 +270,10 @@ class _OptionRowState extends State<_Option> {
                 ),
                 child: Text(
                   widget.badge,
-                  style: AppMono.code(color: visuals.badgeFg, size: 13)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: AppMono.code(
+                    color: visuals.badgeFg,
+                    size: 13,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: AppSpacing.m),
@@ -367,11 +375,7 @@ class _FeedbackPanel extends StatelessWidget {
       ),
       child: TutorMarkdown(
         text,
-        style: const TextStyle(
-          color: AppColors.fg,
-          fontSize: 14,
-          height: 1.5,
-        ),
+        style: const TextStyle(color: AppColors.fg, fontSize: 14, height: 1.5),
       ),
     );
   }

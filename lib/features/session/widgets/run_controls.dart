@@ -30,8 +30,9 @@ class RunControls extends ConsumerWidget {
         children: [
           ValueListenableBuilder<bool>(
             valueListenable: output.isRunning,
-            builder: (context, running, _) =>
-                running ? _StopButton(output: output) : _RunButton(ref: ref, mode: mode),
+            builder: (context, running, _) => running
+                ? _StopButton(output: output)
+                : _RunButton(ref: ref, mode: mode),
           ),
           const SizedBox(width: AppSpacing.s),
           _GhostIconButton(
@@ -176,7 +177,10 @@ class _PillButtonState extends State<_PillButton> {
           ),
           decoration: BoxDecoration(
             color: _hovering
-                ? Color.alphaBlend(Colors.white.withValues(alpha: 0.05), widget.bg)
+                ? Color.alphaBlend(
+                    Colors.white.withValues(alpha: 0.05),
+                    widget.bg,
+                  )
                 : widget.bg,
             border: widget.borderColor != null
                 ? Border.all(color: widget.borderColor!)

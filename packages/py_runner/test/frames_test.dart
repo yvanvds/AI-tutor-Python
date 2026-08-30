@@ -251,9 +251,11 @@ void main() {
     });
 
     test('optional cwd of wrong type is treated as absent (lenient)', () {
-      final decoded = HostInboundFrame.decode(
-        '{"type":"exec","id":"x","code":"pass","cwd":123}',
-      ) as ExecFrame;
+      final decoded =
+          HostInboundFrame.decode(
+                '{"type":"exec","id":"x","code":"pass","cwd":123}',
+              )
+              as ExecFrame;
       expect(decoded.cwd, isNull);
     });
 
@@ -270,9 +272,11 @@ void main() {
     test(
       'optional timeout_ms of wrong type is treated as absent (lenient)',
       () {
-        final decoded = HostInboundFrame.decode(
-          '{"type":"exec","id":"x","code":"pass","timeout_ms":"5000"}',
-        ) as ExecFrame;
+        final decoded =
+            HostInboundFrame.decode(
+                  '{"type":"exec","id":"x","code":"pass","timeout_ms":"5000"}',
+                )
+                as ExecFrame;
         expect(decoded.timeoutMs, isNull);
       },
     );

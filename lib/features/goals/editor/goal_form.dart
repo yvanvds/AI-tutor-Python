@@ -103,10 +103,8 @@ class GoalFormState extends ConsumerState<GoalForm> {
               labelText: l.goals_editor_field_description,
               border: const OutlineInputBorder(),
             ),
-            onChanged: (t) => svc.updateDescription(
-              widget.goal.id,
-              t.isEmpty ? null : t,
-            ),
+            onChanged: (t) =>
+                svc.updateDescription(widget.goal.id, t.isEmpty ? null : t),
           ),
           const SizedBox(height: 12),
           SwitchListTile(
@@ -141,8 +139,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
               deleteTooltip: l.goals_editor_teachingTips_delete,
               saveLabel: l.goals_editor_teachingTips_save,
               cancelLabel: l.goals_editor_teachingTips_cancel,
-              onChanged: (vals) =>
-                  svc.updateTeachingTips(widget.goal.id, vals),
+              onChanged: (vals) => svc.updateTeachingTips(widget.goal.id, vals),
             ),
             const SizedBox(height: 12),
             _LesinhoudRow(goal: widget.goal),
@@ -169,9 +166,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
     await svc.deleteSubtree(id);
 
     if (mounted) {
-      ref
-          .read(goalSelectionProvider.notifier)
-          .setEditorSelectedGoal(null);
+      ref.read(goalSelectionProvider.notifier).setEditorSelectedGoal(null);
     }
 
     showUndoSnackBar(
@@ -195,7 +190,9 @@ class GoalFormState extends ConsumerState<GoalForm> {
             count == 0
                 ? l.goals_editor_delete_dialog_message_single(widget.goal.title)
                 : l.goals_editor_delete_dialog_message_withDescendants(
-                    widget.goal.title, count),
+                    widget.goal.title,
+                    count,
+                  ),
           ),
           actions: [
             TextButton(
@@ -231,10 +228,10 @@ class _LesinhoudRow extends ConsumerWidget {
     final cached = ref.watch(contentServiceProvider);
     final title = hasContent
         ? cached
-            .where((c) => c.id == cid)
-            .map((c) => c.title)
-            .cast<String?>()
-            .firstWhere((_) => true, orElse: () => null)
+              .where((c) => c.id == cid)
+              .map((c) => c.title)
+              .cast<String?>()
+              .firstWhere((_) => true, orElse: () => null)
         : null;
 
     void openInLesinhoud() {
@@ -266,7 +263,9 @@ class _LesinhoudRow extends ConsumerWidget {
                 Text(
                   l.goals_editor_lesinhoud_label,
                   style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   hasContent
@@ -275,8 +274,7 @@ class _LesinhoudRow extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 12,
                     color: hasContent ? null : Theme.of(context).disabledColor,
-                    fontStyle:
-                        hasContent ? FontStyle.normal : FontStyle.italic,
+                    fontStyle: hasContent ? FontStyle.normal : FontStyle.italic,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -286,9 +284,11 @@ class _LesinhoudRow extends ConsumerWidget {
           ),
           TextButton(
             onPressed: openInLesinhoud,
-            child: Text(hasContent
-                ? l.goals_editor_lesinhoud_edit
-                : l.goals_editor_lesinhoud_create),
+            child: Text(
+              hasContent
+                  ? l.goals_editor_lesinhoud_edit
+                  : l.goals_editor_lesinhoud_create,
+            ),
           ),
         ],
       ),

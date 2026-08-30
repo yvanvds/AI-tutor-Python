@@ -225,63 +225,65 @@ class _InstructionsEditorPageState
 
   Widget _buildBody() {
     return Row(
-        children: [
-          SizedBox(
-            width: 280,
-            child: StreamBuilder<List<Instruction>>(
-              stream: _docsStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        AppLocalizations.of(context).instructions_body_loadError(
-                            snapshot.error.toString()),
-                      ),
+      children: [
+        SizedBox(
+          width: 280,
+          child: StreamBuilder<List<Instruction>>(
+            stream: _docsStream,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      AppLocalizations.of(
+                        context,
+                      ).instructions_body_loadError(snapshot.error.toString()),
                     ),
-                  );
-                }
-                final docs = snapshot.data ?? [];
-                return DocsList(
-                  docs: docs,
-                  selectedId: _selectedDocId,
-                  onSelect: (doc) => _selectDocument(doc),
-                );
-              },
-            ),
-          ),
-
-          const VerticalDivider(width: 1),
-
-          SizedBox(
-            width: 280,
-            child: Column(
-              children: [
-                DocHeader(
-                  selectedDocId: _selectedDocId,
-                  onRename: _renameDocument,
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: SectionsList(
-                    sections: _workingSections,
-                    selectedKey: _selectedSectionKey,
-                    onSelect: (k) {
-                      setState(() {
-                        _selectedSectionKey = k;
-                        _refreshEditorFromSelection();
-                      });
-                    },
                   ),
+                );
+              }
+              final docs = snapshot.data ?? [];
+              return DocsList(
+                docs: docs,
+                selectedId: _selectedDocId,
+                onSelect: (doc) => _selectDocument(doc),
+              );
+            },
+          ),
+        ),
+
+        const VerticalDivider(width: 1),
+
+        SizedBox(
+          width: 280,
+          child: Column(
+            children: [
+              DocHeader(
+                selectedDocId: _selectedDocId,
+                onRename: _renameDocument,
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SectionsList(
+                  sections: _workingSections,
+                  selectedKey: _selectedSectionKey,
+                  onSelect: (k) {
+                    setState(() {
+                      _selectedSectionKey = k;
+                      _refreshEditorFromSelection();
+                    });
+                  },
                 ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Builder(builder: (context) {
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Builder(
+                  builder: (context) {
                     final l = AppLocalizations.of(context);
                     return Row(
                       children: [
@@ -300,29 +302,30 @@ class _InstructionsEditorPageState
                         ),
                       ],
                     );
-                  }),
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
 
-          const VerticalDivider(width: 1),
+        const VerticalDivider(width: 1),
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SectionHeader(
-                  keyName: _selectedSectionKey,
-                  onRename: _renameSection,
-                  enabled: _hasSectionSelected,
-                ),
-                const Divider(height: 1),
-                Expanded(child: EditorPane(controller: _codeCtrl)),
-              ],
-            ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(
+                keyName: _selectedSectionKey,
+                onRename: _renameSection,
+                enabled: _hasSectionSelected,
+              ),
+              const Divider(height: 1),
+              Expanded(child: EditorPane(controller: _codeCtrl)),
+            ],
           ),
-        ],
+        ),
+      ],
     );
   }
 
@@ -443,8 +446,13 @@ class _InstructionsEditorPageState
 
     final stats = _ImportStats();
     for (final entry in parsed.entries) {
-      final touched =
-          await _importDocEntry(entry.key, entry.value, byId, stats, mode);
+      final touched = await _importDocEntry(
+        entry.key,
+        entry.value,
+        byId,
+        stats,
+        mode,
+      );
       if (touched && entry.key == _selectedDocId) stats.refreshSelected = true;
     }
     return stats;
@@ -519,11 +527,13 @@ class _InstructionsEditorPageState
       }
       if (stats.addedSections > 0) {
         parts.add(
-            l.instructions_snack_stats_addedSections(stats.addedSections));
+          l.instructions_snack_stats_addedSections(stats.addedSections),
+        );
       }
       if (stats.replacedSections > 0) {
-        parts.add(l.instructions_snack_stats_replacedSections(
-            stats.replacedSections));
+        parts.add(
+          l.instructions_snack_stats_replacedSections(stats.replacedSections),
+        );
       }
       return parts.join(', ');
     }
@@ -582,9 +592,7 @@ class _InstructionsEditorPageState
     if (_workingSections.containsKey(nk)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.instructions_snack_sectionExistsRename(nk)),
-        ),
+        SnackBar(content: Text(l.instructions_snack_sectionExistsRename(nk))),
       );
       return;
     }
@@ -730,8 +738,10 @@ class _MarkdownImportParser {
     final doc = currentDoc;
     final section = currentSection;
     if (doc != null && section != null) {
-      final text =
-          body.toString().replaceFirst(_leadingNewlinesRe, '').trimRight();
+      final text = body
+          .toString()
+          .replaceFirst(_leadingNewlinesRe, '')
+          .trimRight();
       result.putIfAbsent(doc, () => <String, String>{})[section] = text;
     }
     body.clear();
@@ -901,9 +911,11 @@ class _Toolbar extends StatelessWidget {
           FilledButton.icon(
             icon: const Icon(Icons.save, size: 16),
             onPressed: onSave,
-            label: Text(isDirty
-                ? l.instructions_toolbar_save_dirty
-                : l.instructions_toolbar_save),
+            label: Text(
+              isDirty
+                  ? l.instructions_toolbar_save_dirty
+                  : l.instructions_toolbar_save,
+            ),
           ),
         ],
       ),

@@ -35,7 +35,8 @@ class _ParentFieldState extends ConsumerState<ParentField> {
         }
         if (snapshot.hasError) {
           return Text(
-              l.goals_parentField_loadFailed(snapshot.error.toString()));
+            l.goals_parentField_loadFailed(snapshot.error.toString()),
+          );
         }
         final roots = snapshot.data ?? [];
         final items = <DropdownMenuItem<String?>>[
@@ -44,8 +45,7 @@ class _ParentFieldState extends ConsumerState<ParentField> {
             child: Text(l.goals_parentField_noParent),
           ),
           ...roots.map(
-            (g) =>
-                DropdownMenuItem<String?>(value: g.id, child: Text(g.title)),
+            (g) => DropdownMenuItem<String?>(value: g.id, child: Text(g.title)),
           ),
         ];
         return DropdownButtonFormField<String?>(
@@ -53,10 +53,9 @@ class _ParentFieldState extends ConsumerState<ParentField> {
           items: items,
           onChanged: (newParent) async {
             if (newParent == widget.goal.parentId) return;
-            await ref.read(goalsServiceProvider).reparent(
-              widget.goal.id,
-              newParent,
-            );
+            await ref
+                .read(goalsServiceProvider)
+                .reparent(widget.goal.id, newParent);
           },
           decoration: InputDecoration(
             labelText: l.goals_parentField_label,

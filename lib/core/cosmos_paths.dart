@@ -66,8 +66,7 @@ class CosmosPaths {
 
   /// `/uid` partition. One doc per `(uid, subgoalId, loId)` Beta belief.
   /// Source of truth for student mastery state per STUDENT_MODEL.
-  static CosmosContainer loBeliefs() =>
-      _client.container(_loBeliefsContainer);
+  static CosmosContainer loBeliefs() => _client.container(_loBeliefsContainer);
 
   /// `/uid` partition. Append-only audit trail; one doc per graded turn
   /// per CONDUCTOR_POLICY 8.1. Consumed by debug surfaces only.

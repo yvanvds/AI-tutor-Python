@@ -53,7 +53,9 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
     _controller.clear();
 
     if (text == '?') {
-      final code = ref.read(codeServiceProvider(SessionMode.practice)).getText();
+      final code = ref
+          .read(codeServiceProvider(SessionMode.practice))
+          .getText();
       chat.addMessage(
         AppLocalizations.of(context).chat_composer_idle_hintMessage,
       );
@@ -140,8 +142,9 @@ class _Field extends StatelessWidget {
                 decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
-                  hintText:
-                      AppLocalizations.of(context).chat_composer_idle_hint,
+                  hintText: AppLocalizations.of(
+                    context,
+                  ).chat_composer_idle_hint,
                   hintStyle: const TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 14,
@@ -178,11 +181,11 @@ class _SendButtonState extends State<_SendButton> {
     final bg = disabled
         ? AppColors.ink3
         : (_hovering
-            ? Color.alphaBlend(
-                Colors.white.withValues(alpha: 0.06),
-                AppColors.accent,
-              )
-            : AppColors.accent);
+              ? Color.alphaBlend(
+                  Colors.white.withValues(alpha: 0.06),
+                  AppColors.accent,
+                )
+              : AppColors.accent);
     final fg = disabled ? AppColors.fgFaint : AppColors.ink0;
 
     return MouseRegion(
