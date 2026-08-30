@@ -126,7 +126,13 @@ class _OutputPanelState extends ConsumerState<OutputPanel>
                     label: _stateLabel(state, lines),
                     pulse: _pulse,
                   ),
-                  Expanded(child: _Body(state: state, lines: lines, scroll: _scrollCtrl)),
+                  Expanded(
+                    child: _Body(
+                      state: state,
+                      lines: lines,
+                      scroll: _scrollCtrl,
+                    ),
+                  ),
                   ValueListenableBuilder<InputRequest?>(
                     valueListenable: _output.pendingInputRequest,
                     builder: (context, req, _) {
@@ -202,10 +208,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: AppSpacing.xs),
           Text(
             '· $label',
-            style: const TextStyle(
-              color: AppColors.fgMute,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.fgMute, fontSize: 12),
           ),
         ],
       ),
@@ -234,6 +237,10 @@ class _Body extends StatelessWidget {
       );
     }
 
+    // All lines live in one `SelectableText.rich` (one styled span per line)
+    // rather than one `SelectableText` per line: a selection can only span a
+    // single selectable, so per-line widgets made it impossible to highlight
+    // a stack trace or a table and ask the tutor about it (#17).
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.m,
@@ -243,22 +250,34 @@ class _Body extends StatelessWidget {
       ),
       child: Scrollbar(
         controller: scroll,
-        child: ListView.builder(
+        child: SingleChildScrollView(
           controller: scroll,
-          itemCount: lines.length,
-          itemBuilder: (context, i) {
-            final line = lines[i];
-            final color = line.isError
-                ? AppColors.danger
-                : (line.isMeta ? AppColors.fgFaint : AppColors.fg);
-            return SelectableText(
-              line.text,
-              style: AppMono.output(color: color),
-            );
-          },
+          child: SizedBox(
+            width: double.infinity,
+            child: SelectableText.rich(
+              TextSpan(
+                children: [
+                  for (var i = 0; i < lines.length; i++)
+                    TextSpan(
+                      text: i == lines.length - 1
+                          ? lines[i].text
+                          : '${lines[i].text}\n',
+                      style: AppMono.output(color: _lineColor(lines[i])),
+                    ),
+                ],
+              ),
+              style: AppMono.output(),
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  static Color _lineColor(OutputLine line) {
+    if (line.isError) return AppColors.danger;
+    if (line.isMeta) return AppColors.fgFaint;
+    return AppColors.fg;
   }
 }
 
@@ -310,8 +329,9 @@ class _InputRow extends StatelessWidget {
                 filled: true,
                 fillColor: AppColors.ink2,
                 border: OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.all(Radius.circular(AppRadius.inputSmall)),
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(AppRadius.inputSmall),
+                  ),
                   borderSide: BorderSide.none,
                 ),
               ),
