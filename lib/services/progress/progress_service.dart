@@ -30,10 +30,10 @@ class ProgressService {
     CosmosContainer? historyContainer,
     required String? Function() getUid,
     void Function(double)? updateCurrentProgress,
-  })  : _containerOverride = container,
-        _historyContainerOverride = historyContainer,
-        _getUid = getUid,
-        _updateCurrentProgress = updateCurrentProgress;
+  }) : _containerOverride = container,
+       _historyContainerOverride = historyContainer,
+       _getUid = getUid,
+       _updateCurrentProgress = updateCurrentProgress;
 
   final CosmosContainer? _containerOverride;
   final CosmosContainer? _historyContainerOverride;
@@ -202,9 +202,7 @@ class ProgressService {
     DateTime? since,
     int? limit,
   }) {
-    return safeCosmos(
-      () => _fetchHistory(uid, since: since, limit: limit),
-    );
+    return safeCosmos(() => _fetchHistory(uid, since: since, limit: limit));
   }
 
   Stream<List<ProgressSample>> watchHistoryForUser(
@@ -214,9 +212,7 @@ class ProgressService {
   }) {
     return safeCosmosStream(
       pollingStream(
-        () => safeCosmos(
-          () => _fetchHistory(uid, since: since, limit: limit),
-        ),
+        () => safeCosmos(() => _fetchHistory(uid, since: since, limit: limit)),
       ),
     );
   }
@@ -234,9 +230,7 @@ class ProgressService {
 
   Future<List<ProgressSample>> getAllHistory({DateTime? since, int? limit}) {
     final uid = _uid;
-    return safeCosmos(
-      () => _fetchHistory(uid, since: since, limit: limit),
-    );
+    return safeCosmos(() => _fetchHistory(uid, since: since, limit: limit));
   }
 
   Stream<List<ProgressSample>> watchHistoryByGoalId(
@@ -258,9 +252,7 @@ class ProgressService {
     final uid = _uid;
     return safeCosmosStream(
       pollingStream(
-        () => safeCosmos(
-          () => _fetchHistory(uid, since: since, limit: limit),
-        ),
+        () => safeCosmos(() => _fetchHistory(uid, since: since, limit: limit)),
       ),
     );
   }
@@ -338,10 +330,7 @@ class ProgressService {
       at: DateTime.now().toUtc(),
     );
     try {
-      await _historyContainer.create(
-        sample.toMap(uid: uid),
-        partitionKey: uid,
-      );
+      await _historyContainer.create(sample.toMap(uid: uid), partitionKey: uid);
     } catch (e) {
       debugPrint('ProgressService: history sample write failed: $e');
     }

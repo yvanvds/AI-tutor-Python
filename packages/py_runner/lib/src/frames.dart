@@ -77,14 +77,19 @@ class FrameDecodeException implements Exception {
 
 @immutable
 final class ExecFrame extends HostInboundFrame {
-  const ExecFrame({required this.id, required this.code, this.cwd, this.timeoutMs});
+  const ExecFrame({
+    required this.id,
+    required this.code,
+    this.cwd,
+    this.timeoutMs,
+  });
 
   factory ExecFrame._fromJson(Map<String, Object?> json) => ExecFrame(
-        id: _requireString(json, 'id'),
-        code: _requireString(json, 'code'),
-        cwd: _optionalString(json, 'cwd'),
-        timeoutMs: _optionalInt(json, 'timeout_ms'),
-      );
+    id: _requireString(json, 'id'),
+    code: _requireString(json, 'code'),
+    cwd: _optionalString(json, 'cwd'),
+    timeoutMs: _optionalInt(json, 'timeout_ms'),
+  );
 
   final String id;
   final String code;
@@ -98,12 +103,12 @@ final class ExecFrame extends HostInboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'id': id,
-        'code': code,
-        if (cwd != null) 'cwd': cwd,
-        if (timeoutMs != null) 'timeout_ms': timeoutMs,
-      };
+    'type': type,
+    'id': id,
+    'code': code,
+    if (cwd != null) 'cwd': cwd,
+    if (timeoutMs != null) 'timeout_ms': timeoutMs,
+  };
 }
 
 @immutable
@@ -146,11 +151,11 @@ final class InputResponseFrame extends HostInboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'id': id,
-        'request_id': requestId,
-        'value': value,
-      };
+    'type': type,
+    'id': id,
+    'request_id': requestId,
+    'value': value,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -167,11 +172,11 @@ final class ReadyFrame extends HostOutboundFrame {
   });
 
   factory ReadyFrame._fromJson(Map<String, Object?> json) => ReadyFrame(
-        pythonVersion: _requireString(json, 'python_version'),
-        platform: _requireString(json, 'platform'),
-        capabilities: _requireStringList(json, 'capabilities'),
-        protocolVersion: _optionalInt(json, 'protocol_version'),
-      );
+    pythonVersion: _requireString(json, 'python_version'),
+    platform: _requireString(json, 'platform'),
+    capabilities: _requireStringList(json, 'capabilities'),
+    protocolVersion: _optionalInt(json, 'protocol_version'),
+  );
 
   final String pythonVersion;
   final String platform;
@@ -187,12 +192,12 @@ final class ReadyFrame extends HostOutboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'python_version': pythonVersion,
-        'platform': platform,
-        'capabilities': List<String>.unmodifiable(capabilities),
-        if (protocolVersion != null) 'protocol_version': protocolVersion,
-      };
+    'type': type,
+    'python_version': pythonVersion,
+    'platform': platform,
+    'capabilities': List<String>.unmodifiable(capabilities),
+    if (protocolVersion != null) 'protocol_version': protocolVersion,
+  };
 }
 
 @immutable
@@ -200,9 +205,9 @@ final class StdoutFrame extends HostOutboundFrame {
   const StdoutFrame({required this.id, required this.text});
 
   factory StdoutFrame._fromJson(Map<String, Object?> json) => StdoutFrame(
-        id: _requireString(json, 'id'),
-        text: _requireString(json, 'text'),
-      );
+    id: _requireString(json, 'id'),
+    text: _requireString(json, 'text'),
+  );
 
   final String id;
   final String text;
@@ -219,9 +224,9 @@ final class StderrFrame extends HostOutboundFrame {
   const StderrFrame({required this.id, required this.text});
 
   factory StderrFrame._fromJson(Map<String, Object?> json) => StderrFrame(
-        id: _requireString(json, 'id'),
-        text: _requireString(json, 'text'),
-      );
+    id: _requireString(json, 'id'),
+    text: _requireString(json, 'text'),
+  );
 
   final String id;
   final String text;
@@ -257,11 +262,11 @@ final class InputRequestFrame extends HostOutboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'id': id,
-        'request_id': requestId,
-        'prompt': prompt,
-      };
+    'type': type,
+    'id': id,
+    'request_id': requestId,
+    'prompt': prompt,
+  };
 }
 
 @immutable
@@ -274,11 +279,11 @@ final class ExceptionFrame extends HostOutboundFrame {
   });
 
   factory ExceptionFrame._fromJson(Map<String, Object?> json) => ExceptionFrame(
-        id: _requireString(json, 'id'),
-        excType: _requireString(json, 'exc_type'),
-        message: _requireString(json, 'message'),
-        traceback: _requireString(json, 'traceback'),
-      );
+    id: _requireString(json, 'id'),
+    excType: _requireString(json, 'exc_type'),
+    message: _requireString(json, 'message'),
+    traceback: _requireString(json, 'traceback'),
+  );
 
   final String id;
   final String excType;
@@ -290,12 +295,12 @@ final class ExceptionFrame extends HostOutboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'id': id,
-        'exc_type': excType,
-        'message': message,
-        'traceback': traceback,
-      };
+    'type': type,
+    'id': id,
+    'exc_type': excType,
+    'message': message,
+    'traceback': traceback,
+  };
 }
 
 enum DoneStatus {
@@ -324,10 +329,10 @@ final class DoneFrame extends HostOutboundFrame {
   });
 
   factory DoneFrame._fromJson(Map<String, Object?> json) => DoneFrame(
-        id: _requireString(json, 'id'),
-        status: DoneStatus.fromWire(_requireString(json, 'status')),
-        durationMs: _requireInt(json, 'duration_ms'),
-      );
+    id: _requireString(json, 'id'),
+    status: DoneStatus.fromWire(_requireString(json, 'status')),
+    durationMs: _requireInt(json, 'duration_ms'),
+  );
 
   final String id;
   final DoneStatus status;
@@ -338,11 +343,11 @@ final class DoneFrame extends HostOutboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'id': id,
-        'status': status.wire,
-        'duration_ms': durationMs,
-      };
+    'type': type,
+    'id': id,
+    'status': status.wire,
+    'duration_ms': durationMs,
+  };
 }
 
 enum HostLogLevel {
@@ -367,9 +372,9 @@ final class HostLogFrame extends HostOutboundFrame {
   const HostLogFrame({required this.level, required this.message});
 
   factory HostLogFrame._fromJson(Map<String, Object?> json) => HostLogFrame(
-        level: HostLogLevel.fromWire(_requireString(json, 'level')),
-        message: _requireString(json, 'message'),
-      );
+    level: HostLogLevel.fromWire(_requireString(json, 'level')),
+    message: _requireString(json, 'message'),
+  );
 
   final HostLogLevel level;
   final String message;
@@ -379,10 +384,10 @@ final class HostLogFrame extends HostOutboundFrame {
 
   @override
   Map<String, Object?> toJson() => {
-        'type': type,
-        'level': level.wire,
-        'message': message,
-      };
+    'type': type,
+    'level': level.wire,
+    'message': message,
+  };
 }
 
 // ---------------------------------------------------------------------------

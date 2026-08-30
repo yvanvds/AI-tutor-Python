@@ -19,8 +19,7 @@ void main() {
     pc.dispose();
   });
 
-  GoalSelectionNotifier notifier() =>
-      pc.read(goalSelectionProvider.notifier);
+  GoalSelectionNotifier notifier() => pc.read(goalSelectionProvider.notifier);
 
   GoalSelectionState state() => pc.read(goalSelectionProvider);
 

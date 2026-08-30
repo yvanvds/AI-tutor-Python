@@ -26,7 +26,10 @@ void main() {
       expect(tracked!.description, 'You understand for loops!');
       // The phrase itself is localized by the overlay (#23); the service
       // only picks which one.
-      expect(tracked!.phraseIndex, inInclusiveRange(0, SplashService.phraseCount - 1));
+      expect(
+        tracked!.phraseIndex,
+        inInclusiveRange(0, SplashService.phraseCount - 1),
+      );
     });
 
     test('hide clears state', () {

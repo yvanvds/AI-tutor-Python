@@ -64,7 +64,8 @@ class Account {
     if (updatedAt != null) 'updatedAt': updatedAt!.toUtc().toIso8601String(),
     'calibration': calibration.toJson(),
     'streakDays': streakDays,
-    if (streakLastAt != null) 'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
+    if (streakLastAt != null)
+      'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
   };
 
   factory Account.fromMap(Map<String, dynamic> data) {

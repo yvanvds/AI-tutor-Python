@@ -29,18 +29,18 @@ class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
     final l = AppLocalizations.of(context);
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.auth_localKey_validation_empty)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.auth_localKey_validation_empty)));
       return;
     }
     setState(() => _saving = true);
     try {
       await ref.read(localApiKeyStorageProvider.notifier).saveKey(text);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.auth_localKey_saved)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.auth_localKey_saved)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

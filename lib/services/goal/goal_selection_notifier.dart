@@ -56,12 +56,24 @@ class GoalSelectionState {
     bool clearEditorSelectedGoal = false,
   }) {
     return GoalSelectionState(
-      selectedRoot: clearSelectedRoot ? null : (selectedRoot ?? this.selectedRoot),
-      selectedChild: clearSelectedChild ? null : (selectedChild ?? this.selectedChild),
-      preferredRoot: clearPreferredRoot ? null : (preferredRoot ?? this.preferredRoot),
-      preferredChild: clearPreferredChild ? null : (preferredChild ?? this.preferredChild),
-      editorSelectedRoot: clearEditorSelectedRoot ? null : (editorSelectedRoot ?? this.editorSelectedRoot),
-      editorSelectedGoal: clearEditorSelectedGoal ? null : (editorSelectedGoal ?? this.editorSelectedGoal),
+      selectedRoot: clearSelectedRoot
+          ? null
+          : (selectedRoot ?? this.selectedRoot),
+      selectedChild: clearSelectedChild
+          ? null
+          : (selectedChild ?? this.selectedChild),
+      preferredRoot: clearPreferredRoot
+          ? null
+          : (preferredRoot ?? this.preferredRoot),
+      preferredChild: clearPreferredChild
+          ? null
+          : (preferredChild ?? this.preferredChild),
+      editorSelectedRoot: clearEditorSelectedRoot
+          ? null
+          : (editorSelectedRoot ?? this.editorSelectedRoot),
+      editorSelectedGoal: clearEditorSelectedGoal
+          ? null
+          : (editorSelectedGoal ?? this.editorSelectedGoal),
       cachedRoots: cachedRoots ?? this.cachedRoots,
     );
   }
@@ -75,41 +87,35 @@ class GoalSelectionNotifier extends Notifier<GoalSelectionState> {
   /// notifier directly (e.g. after a WidgetRef has been disposed).
   GoalSelectionState get current => state;
 
-  void setSelectedRoot(Goal? goal) =>
-      state = state.copyWith(
-        selectedRoot: goal,
-        clearSelectedRoot: goal == null,
-      );
+  void setSelectedRoot(Goal? goal) => state = state.copyWith(
+    selectedRoot: goal,
+    clearSelectedRoot: goal == null,
+  );
 
-  void setSelectedChild(Goal? goal) =>
-      state = state.copyWith(
-        selectedChild: goal,
-        clearSelectedChild: goal == null,
-      );
+  void setSelectedChild(Goal? goal) => state = state.copyWith(
+    selectedChild: goal,
+    clearSelectedChild: goal == null,
+  );
 
-  void setPreferredRoot(Goal? goal) =>
-      state = state.copyWith(
-        preferredRoot: goal,
-        clearPreferredRoot: goal == null,
-      );
+  void setPreferredRoot(Goal? goal) => state = state.copyWith(
+    preferredRoot: goal,
+    clearPreferredRoot: goal == null,
+  );
 
-  void setPreferredChild(Goal? goal) =>
-      state = state.copyWith(
-        preferredChild: goal,
-        clearPreferredChild: goal == null,
-      );
+  void setPreferredChild(Goal? goal) => state = state.copyWith(
+    preferredChild: goal,
+    clearPreferredChild: goal == null,
+  );
 
-  void setEditorSelectedRoot(Goal? goal) =>
-      state = state.copyWith(
-        editorSelectedRoot: goal,
-        clearEditorSelectedRoot: goal == null,
-      );
+  void setEditorSelectedRoot(Goal? goal) => state = state.copyWith(
+    editorSelectedRoot: goal,
+    clearEditorSelectedRoot: goal == null,
+  );
 
-  void setEditorSelectedGoal(Goal? goal) =>
-      state = state.copyWith(
-        editorSelectedGoal: goal,
-        clearEditorSelectedGoal: goal == null,
-      );
+  void setEditorSelectedGoal(Goal? goal) => state = state.copyWith(
+    editorSelectedGoal: goal,
+    clearEditorSelectedGoal: goal == null,
+  );
 
   void setCachedRoots(List<Goal> roots) =>
       state = state.copyWith(cachedRoots: List.unmodifiable(roots));
@@ -117,5 +123,5 @@ class GoalSelectionNotifier extends Notifier<GoalSelectionState> {
 
 final goalSelectionProvider =
     NotifierProvider<GoalSelectionNotifier, GoalSelectionState>(
-  GoalSelectionNotifier.new,
-);
+      GoalSelectionNotifier.new,
+    );

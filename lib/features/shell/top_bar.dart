@@ -28,9 +28,7 @@ class TopBar extends ConsumerWidget {
                   bottom: BorderSide(color: AppColors.ink2, width: 1),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xxl,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
               child: Row(
                 children: [
                   const Expanded(child: _Greeting()),
@@ -53,12 +51,7 @@ class TopBar extends ConsumerWidget {
             ),
           ),
           // 2px ambient progress line at the very top edge
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: AmbientProgress(),
-          ),
+          const Positioned(top: 0, left: 0, right: 0, child: AmbientProgress()),
         ],
       ),
     );
@@ -76,8 +69,8 @@ class _Greeting extends ConsumerWidget {
 
     final subline = section == Section.session
         ? (profile.topic.isEmpty
-            ? l.topBar_subline_default
-            : l.topBar_subline_withTopic(profile.topic))
+              ? l.topBar_subline_default
+              : l.topBar_subline_withTopic(profile.topic))
         : section.label(context);
 
     final name = profile.name.isEmpty ? '...' : profile.name;
@@ -238,10 +231,7 @@ class _StreakChip extends StatelessWidget {
             color: AppColors.accent,
           ),
           const SizedBox(width: 4),
-          Text(
-            '$streak',
-            style: AppMono.tnum(size: 12.5, color: AppColors.fg),
-          ),
+          Text('$streak', style: AppMono.tnum(size: 12.5, color: AppColors.fg)),
           const SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).topBar_streak_days,
@@ -258,11 +248,7 @@ class _StreakChip extends StatelessWidget {
 }
 
 class _XpPill extends StatelessWidget {
-  const _XpPill({
-    required this.level,
-    required this.xp,
-    required this.xpNext,
-  });
+  const _XpPill({required this.level, required this.xp, required this.xpNext});
 
   final int level;
   final int xp;

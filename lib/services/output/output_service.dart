@@ -61,9 +61,11 @@ class OutputService {
 
     _runSubs.add(handle.stdout.listen((t) => _appendChunk(t, isError: false)));
     _runSubs.add(handle.stderr.listen((t) => _appendChunk(t, isError: true)));
-    _runSubs.add(handle.inputRequests.listen((req) {
-      pendingInputRequest.value = req;
-    }));
+    _runSubs.add(
+      handle.inputRequests.listen((req) {
+        pendingInputRequest.value = req;
+      }),
+    );
 
     final capturedHandle = handle;
     unawaited(() async {

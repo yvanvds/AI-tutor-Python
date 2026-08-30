@@ -110,8 +110,7 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('hasFollowUp state renders the ComposerContinue',
-      (tester) async {
+  testWidgets('hasFollowUp state renders the ComposerContinue', (tester) async {
     await tester.pumpWidget(buildApp());
     fakeTutor.set(TutorState.hasFollowUp);
     await tester.pump();

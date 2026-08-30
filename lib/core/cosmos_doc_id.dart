@@ -15,10 +15,7 @@ class CosmosDocId {
   /// for samples written within the same millisecond.
   static String progressHistory(DateTime at, {Random? random}) {
     final r = random ?? _random;
-    final suffix = r
-        .nextInt(1 << 32)
-        .toRadixString(36)
-        .padLeft(7, '0');
+    final suffix = r.nextInt(1 << 32).toRadixString(36).padLeft(7, '0');
     return '${at.toUtc().toIso8601String()}_$suffix';
   }
 
@@ -26,10 +23,7 @@ class CosmosDocId {
   /// `progressHistory` — sortable timestamp prefix + random suffix.
   static String turnHistory(DateTime at, {Random? random}) {
     final r = random ?? _random;
-    final suffix = r
-        .nextInt(1 << 32)
-        .toRadixString(36)
-        .padLeft(7, '0');
+    final suffix = r.nextInt(1 << 32).toRadixString(36).padLeft(7, '0');
     return '${at.toUtc().toIso8601String()}_$suffix';
   }
 

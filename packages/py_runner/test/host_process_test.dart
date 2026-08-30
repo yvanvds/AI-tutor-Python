@@ -25,9 +25,9 @@ void main() {
   });
 
   Future<HostProcess> spawnEcho() => HostProcess.spawn(
-        pythonExecutable: pythonExe,
-        hostScript: fixturePath('echo_host.py'),
-      );
+    pythonExecutable: pythonExe,
+    hostScript: fixturePath('echo_host.py'),
+  );
 
   test('emits a ready frame on startup', () async {
     final host = await spawnEcho();

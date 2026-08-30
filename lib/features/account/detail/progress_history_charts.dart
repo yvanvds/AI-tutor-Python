@@ -24,10 +24,12 @@ class ProgressHistoryCharts extends ConsumerWidget {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
     return StreamBuilder<List<ProgressSample>>(
-      stream: ref.read(progressServiceProvider).watchHistoryForUser(
-        uid,
-        since: DateTime.now().toUtc().subtract(_kHistoryWindow),
-      ),
+      stream: ref
+          .read(progressServiceProvider)
+          .watchHistoryForUser(
+            uid,
+            since: DateTime.now().toUtc().subtract(_kHistoryWindow),
+          ),
       builder: (context, snap) {
         if (snap.hasError) {
           return _frame(
@@ -64,8 +66,7 @@ class ProgressHistoryCharts extends ConsumerWidget {
         final roots2 = roots.where((root) {
           final children = childrenByParent[root.id] ?? const <Goal>[];
           return children.any(
-            (c) =>
-                (samplesByGoal[c.id] ?? const <ProgressSample>[]).isNotEmpty,
+            (c) => (samplesByGoal[c.id] ?? const <ProgressSample>[]).isNotEmpty,
           );
         }).toList();
 
@@ -150,8 +151,10 @@ class _RootGoalChart extends StatelessWidget {
             children: [
               Text(root.title, style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
-              Text(l.drawer_history_card_empty,
-                  style: theme.textTheme.bodySmall),
+              Text(
+                l.drawer_history_card_empty,
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           ),
         ),
@@ -243,9 +246,7 @@ class _RootGoalChart extends StatelessWidget {
                         reservedSize: 22,
                         interval: maxX <= 0 ? 1 : maxX / 4,
                         getTitlesWidget: (value, _) {
-                          final ts = start.add(
-                            Duration(hours: value.round()),
-                          );
+                          final ts = start.add(Duration(hours: value.round()));
                           return Text(
                             '${ts.month}/${ts.day}',
                             style: theme.textTheme.bodySmall,
@@ -317,15 +318,15 @@ class _RootGoalChart extends StatelessWidget {
   }
 
   List<Color> _palette(ThemeData theme) => [
-        theme.colorScheme.primary,
-        theme.colorScheme.tertiary,
-        theme.colorScheme.secondary,
-        Colors.orange.shade400,
-        Colors.purple.shade400,
-        Colors.teal.shade400,
-        Colors.brown.shade400,
-        Colors.pink.shade400,
-      ];
+    theme.colorScheme.primary,
+    theme.colorScheme.tertiary,
+    theme.colorScheme.secondary,
+    Colors.orange.shade400,
+    Colors.purple.shade400,
+    Colors.teal.shade400,
+    Colors.brown.shade400,
+    Colors.pink.shade400,
+  ];
 }
 
 class _ChildSeries {
@@ -352,11 +353,7 @@ class _LegendDot extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: thick ? 18 : 12,
-          height: thick ? 4 : 2,
-          color: color,
-        ),
+        Container(width: thick ? 18 : 12, height: thick ? 4 : 2, color: color),
         const SizedBox(width: 6),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],

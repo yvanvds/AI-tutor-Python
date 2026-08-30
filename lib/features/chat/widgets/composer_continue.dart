@@ -43,9 +43,7 @@ class _ComposerContinueState extends ConsumerState<ComposerContinue> {
       background: AppColors.accent.withValues(alpha: 0.06),
       topBorder: AppColors.accent.withValues(alpha: 0.3),
       child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.enter): _go,
-        },
+        bindings: {const SingleActivator(LogicalKeyboardKey.enter): _go},
         child: Focus(
           focusNode: _focus,
           autofocus: true,

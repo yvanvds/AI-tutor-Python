@@ -38,17 +38,16 @@ class _AddInputState extends State<AddInput> {
       onSubmitted: _handleSubmit,
       decoration: InputDecoration(
         hintText: widget.hint,
-        suffixIcon:
-            _busy
-                ? const Padding(
-                  padding: EdgeInsets.all(10.0),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-                : const Icon(Icons.keyboard_return),
+        suffixIcon: _busy
+            ? const Padding(
+                padding: EdgeInsets.all(10.0),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(Icons.keyboard_return),
         isDense: true,
         border: const OutlineInputBorder(),
       ),

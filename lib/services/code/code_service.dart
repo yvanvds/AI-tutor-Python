@@ -32,8 +32,10 @@ class CodeService {
 /// `CodeController`s so switching mode preserves what the student was
 /// typing in each. Explain mode has no editor but is included so call
 /// sites can pass the current `modeProvider` value without special-casing.
-final codeServiceProvider =
-    Provider.family<CodeService, SessionMode>((ref, mode) {
+final codeServiceProvider = Provider.family<CodeService, SessionMode>((
+  ref,
+  mode,
+) {
   final s = CodeService();
   ref.onDispose(s.dispose);
   return s;

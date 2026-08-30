@@ -34,12 +34,18 @@ void main() {
         (
           subgoalId: 'sub-1',
           lo: const LearningObjective(
-              id: 'l1', statement: 'one', kind: LoKind.recall),
+            id: 'l1',
+            statement: 'one',
+            kind: LoKind.recall,
+          ),
         ),
         (
           subgoalId: 'sub-2',
           lo: const LearningObjective(
-              id: 'l2', statement: 'two', kind: LoKind.reason),
+            id: 'l2',
+            statement: 'two',
+            kind: LoKind.reason,
+          ),
         ),
       ],
     );

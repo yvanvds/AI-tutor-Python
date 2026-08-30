@@ -18,11 +18,11 @@ class LoSignal {
   });
 
   Map<String, dynamic> toJson() => {
-        'subgoalId': subgoalId,
-        'loId': loId,
-        'signal': kind.name,
-        'strength': strength.name,
-      };
+    'subgoalId': subgoalId,
+    'loId': loId,
+    'signal': kind.name,
+    'strength': strength.name,
+  };
 }
 
 class FollowUp {
@@ -33,9 +33,9 @@ class FollowUp {
   const FollowUp({required this.question, this.rationale});
 
   Map<String, dynamic> toJson() => {
-        'question': question,
-        if (rationale != null) 'rationale': rationale,
-      };
+    'question': question,
+    if (rationale != null) 'rationale': rationale,
+  };
 
   static FollowUp? tryParse(Object? raw) {
     if (raw is! Map) return null;
@@ -65,12 +65,9 @@ List<LoSignal> parseLoSignals(Object? raw) {
     final kind = _parseKind(signal);
     final str = _parseStrength(strength);
     if (kind == null || str == null) continue;
-    out.add(LoSignal(
-      subgoalId: subgoalId,
-      loId: loId,
-      kind: kind,
-      strength: str,
-    ));
+    out.add(
+      LoSignal(subgoalId: subgoalId, loId: loId, kind: kind, strength: str),
+    );
   }
   return out;
 }

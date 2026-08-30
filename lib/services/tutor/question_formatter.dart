@@ -21,11 +21,13 @@ class QuestionFormatter {
 
   static List<Map<String, dynamic>> encodeLOs(List<LearningObjective> los) {
     return los
-        .map((lo) => {
-              'id': lo.id,
-              'statement': lo.statement,
-              'kind': lo.kind.name,
-            })
+        .map(
+          (lo) => {
+            'id': lo.id,
+            'statement': lo.statement,
+            'kind': lo.kind.name,
+          },
+        )
         .toList(growable: false);
   }
 
@@ -42,52 +44,47 @@ class QuestionFormatter {
   static String socraticQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
-  }) =>
-      _encodeRequest(
-        "socratic_question",
-        difficulty: difficulty,
-        additionalFields: _withLOs({}, targetLOs: targetLOs),
-      );
+  }) => _encodeRequest(
+    "socratic_question",
+    difficulty: difficulty,
+    additionalFields: _withLOs({}, targetLOs: targetLOs),
+  );
 
   static String mcQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
-  }) =>
-      _encodeRequest(
-        "multiple_choice",
-        difficulty: difficulty,
-        additionalFields: _withLOs({}, targetLOs: targetLOs),
-      );
+  }) => _encodeRequest(
+    "multiple_choice",
+    difficulty: difficulty,
+    additionalFields: _withLOs({}, targetLOs: targetLOs),
+  );
 
   static String explainCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
-  }) =>
-      _encodeRequest(
-        "explain_code",
-        difficulty: difficulty,
-        additionalFields: _withLOs({}, targetLOs: targetLOs),
-      );
+  }) => _encodeRequest(
+    "explain_code",
+    difficulty: difficulty,
+    additionalFields: _withLOs({}, targetLOs: targetLOs),
+  );
 
   static String completeCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
-  }) =>
-      _encodeRequest(
-        "complete_code",
-        difficulty: difficulty,
-        additionalFields: _withLOs({}, targetLOs: targetLOs),
-      );
+  }) => _encodeRequest(
+    "complete_code",
+    difficulty: difficulty,
+    additionalFields: _withLOs({}, targetLOs: targetLOs),
+  );
 
   static String writeCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
-  }) =>
-      _encodeRequest(
-        "write_code",
-        difficulty: difficulty,
-        additionalFields: _withLOs({}, targetLOs: targetLOs),
-      );
+  }) => _encodeRequest(
+    "write_code",
+    difficulty: difficulty,
+    additionalFields: _withLOs({}, targetLOs: targetLOs),
+  );
 
   static String requestHint(String currentCode) => _encodeRequest(
     "request_hint",
@@ -104,57 +101,53 @@ class QuestionFormatter {
     String answer, {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
-  }) =>
-      _encodeRequest(
-        "explain_answer",
-        additionalFields: _gradingFields(
-          {"answer": answer},
-          targetLOs: targetLOs,
-          goalScopeLOs: goalScopeLOs,
-        ),
-      );
+  }) => _encodeRequest(
+    "explain_answer",
+    additionalFields: _gradingFields(
+      {"answer": answer},
+      targetLOs: targetLOs,
+      goalScopeLOs: goalScopeLOs,
+    ),
+  );
 
   static String socraticFeedback(
     String answer, {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
-  }) =>
-      _encodeRequest(
-        "socratic_feedback",
-        additionalFields: _gradingFields(
-          {"answer": answer},
-          targetLOs: targetLOs,
-          goalScopeLOs: goalScopeLOs,
-        ),
-      );
+  }) => _encodeRequest(
+    "socratic_feedback",
+    additionalFields: _gradingFields(
+      {"answer": answer},
+      targetLOs: targetLOs,
+      goalScopeLOs: goalScopeLOs,
+    ),
+  );
 
   static String submitCode(
     String code, {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
-  }) =>
-      _encodeRequest(
-        "submit_code",
-        additionalFields: _gradingFields(
-          {"code": code},
-          targetLOs: targetLOs,
-          goalScopeLOs: goalScopeLOs,
-        ),
-      );
+  }) => _encodeRequest(
+    "submit_code",
+    additionalFields: _gradingFields(
+      {"code": code},
+      targetLOs: targetLOs,
+      goalScopeLOs: goalScopeLOs,
+    ),
+  );
 
   static String mcqAnswer(
     String answer, {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
-  }) =>
-      _encodeRequest(
-        "mcq_answer",
-        additionalFields: _gradingFields(
-          {"answer": answer},
-          targetLOs: targetLOs,
-          goalScopeLOs: goalScopeLOs,
-        ),
-      );
+  }) => _encodeRequest(
+    "mcq_answer",
+    additionalFields: _gradingFields(
+      {"answer": answer},
+      targetLOs: targetLOs,
+      goalScopeLOs: goalScopeLOs,
+    ),
+  );
 
   /// Grading payload for a chained follow-up answer
   /// (CONDUCTOR_POLICY §6 / LLM_CONTRACT "Grading follow-up answers"). The
@@ -168,21 +161,20 @@ class QuestionFormatter {
     int chainDepth = 1,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
-  }) =>
-      _encodeRequest(
-        "follow_up_answer",
-        additionalFields: _gradingFields(
-          {
-            "follow_up_question": followUpQuestion,
-            "answer": studentAnswer,
-            "chain_depth": chainDepth,
-            if (rationale != null && rationale.isNotEmpty)
-              "follow_up_rationale": rationale,
-          },
-          targetLOs: targetLOs,
-          goalScopeLOs: goalScopeLOs,
-        ),
-      );
+  }) => _encodeRequest(
+    "follow_up_answer",
+    additionalFields: _gradingFields(
+      {
+        "follow_up_question": followUpQuestion,
+        "answer": studentAnswer,
+        "chain_depth": chainDepth,
+        if (rationale != null && rationale.isNotEmpty)
+          "follow_up_rationale": rationale,
+      },
+      targetLOs: targetLOs,
+      goalScopeLOs: goalScopeLOs,
+    ),
+  );
 
   static String status() => _encodeRequest("status");
 
@@ -196,12 +188,14 @@ class QuestionFormatter {
     }
     if (goalScopeLOs.isNotEmpty) {
       base['goal_scope_los'] = goalScopeLOs
-          .map((e) => {
-                'subgoalId': e.subgoalId,
-                'id': e.lo.id,
-                'statement': e.lo.statement,
-                'kind': e.lo.kind.name,
-              })
+          .map(
+            (e) => {
+              'subgoalId': e.subgoalId,
+              'id': e.lo.id,
+              'statement': e.lo.statement,
+              'kind': e.lo.kind.name,
+            },
+          )
           .toList(growable: false);
     }
     return base;

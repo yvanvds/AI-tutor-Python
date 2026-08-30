@@ -26,8 +26,9 @@ class ExplainView extends ConsumerWidget {
 
     if (child == null) {
       return _PlaceholderScreen(
-        message:
-            AppLocalizations.of(context).session_explain_placeholder_noSubgoal,
+        message: AppLocalizations.of(
+          context,
+        ).session_explain_placeholder_noSubgoal,
       );
     }
 
@@ -154,9 +155,10 @@ class _ChromeHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pill = (root?.title ??
-            AppLocalizations.of(context).session_explain_defaultPillLabel)
-        .toUpperCase();
+    final pill =
+        (root?.title ??
+                AppLocalizations.of(context).session_explain_defaultPillLabel)
+            .toUpperCase();
     return StreamBuilder<List<Goal>>(
       stream: root == null
           ? const Stream.empty()
@@ -358,11 +360,7 @@ class _AccentButtonState extends State<_AccentButton> {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
-                Icons.arrow_forward,
-                size: 14,
-                color: AppColors.ink0,
-              ),
+              const Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
             ],
           ),
         ),

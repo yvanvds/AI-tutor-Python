@@ -9,12 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class CrashRecoveryScreen extends ConsumerWidget {
   /// [message] is raw diagnostic text (an exception string) shown verbatim.
   const CrashRecoveryScreen({super.key, this.message})
-      : _permissionDenied = false;
+    : _permissionDenied = false;
 
   /// Cosmos answered 401/403: show the localized permission-denied line.
   const CrashRecoveryScreen.permissionDenied({super.key})
-      : message = null,
-        _permissionDenied = true;
+    : message = null,
+      _permissionDenied = true;
 
   final String? message;
   final bool _permissionDenied;
@@ -28,8 +28,8 @@ class CrashRecoveryScreen extends ConsumerWidget {
     final defaultMessage = _permissionDenied
         ? (l?.crash_permissionDenied ?? 'Permission denied while reading data.')
         : l?.crash_defaultMessage ??
-            'This can happen after permission or rules changes.\n'
-                'Try resetting the app. You’ll be signed out and caches will be cleared.';
+              'This can happen after permission or rules changes.\n'
+                  'Try resetting the app. You’ll be signed out and caches will be cleared.';
     final resetLabel = l?.crash_resetButton ?? 'Reset app (fix permissions)';
     return Scaffold(
       body: Center(
@@ -50,10 +50,7 @@ class CrashRecoveryScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  message ?? defaultMessage,
-                  textAlign: TextAlign.center,
-                ),
+                Text(message ?? defaultMessage, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () async {

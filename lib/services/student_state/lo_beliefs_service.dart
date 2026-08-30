@@ -14,8 +14,8 @@ class LoBeliefsService {
   LoBeliefsService({
     CosmosContainer? container,
     required String? Function() getUid,
-  })  : _containerOverride = container,
-        _getUid = getUid;
+  }) : _containerOverride = container,
+       _getUid = getUid;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;
@@ -41,10 +41,7 @@ class LoBeliefsService {
     });
   }
 
-  Future<LoBelief?> getOne({
-    required String subgoalId,
-    required String loId,
-  }) {
+  Future<LoBelief?> getOne({required String subgoalId, required String loId}) {
     final uid = _uid;
     return safeCosmos(() async {
       final doc = await _container.read(
@@ -99,7 +96,5 @@ class LoBeliefsService {
 }
 
 final loBeliefsServiceProvider = Provider<LoBeliefsService>((ref) {
-  return LoBeliefsService(
-    getUid: () => ref.read(authServiceProvider)?.oid,
-  );
+  return LoBeliefsService(getUid: () => ref.read(authServiceProvider)?.oid);
 });

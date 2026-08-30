@@ -37,12 +37,14 @@ class GradedAnswerBuilder {
       final loIds = scopeIndex[sig.subgoalId];
       if (loIds == null) continue;
       if (!loIds.contains(sig.loId)) continue;
-      accepted.add(GradedSignal(
-        subgoalId: sig.subgoalId,
-        loId: sig.loId,
-        kind: sig.kind,
-        strength: sig.strength,
-      ));
+      accepted.add(
+        GradedSignal(
+          subgoalId: sig.subgoalId,
+          loId: sig.loId,
+          kind: sig.kind,
+          strength: sig.strength,
+        ),
+      );
     }
 
     if (accepted.isNotEmpty) {

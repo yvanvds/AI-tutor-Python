@@ -53,7 +53,9 @@ Future<T> safeCosmos<T>(Future<T> Function() op) async {
 /// vanished without a trace.
 Stream<T> safeCosmosStream<T>(Stream<T> source) {
   return source.handleError((Object error, StackTrace stack) {
-    final code = error is CosmosException ? '${error.statusCode}' : 'non-Cosmos';
+    final code = error is CosmosException
+        ? '${error.statusCode}'
+        : 'non-Cosmos';
     debugPrint('safeCosmosStream: $code error absorbed: $error');
   });
 }
@@ -114,7 +116,9 @@ Stream<T> pollingStream<T>(
 }
 
 /// Azure-aware nuke-and-restart, called from `CrashRecoveryScreen`.
-Future<void> resetAuthAndCacheAndExit([Future<void> Function()? signOut]) async {
+Future<void> resetAuthAndCacheAndExit([
+  Future<void> Function()? signOut,
+]) async {
   if (signOut != null) {
     try {
       await signOut();

@@ -39,16 +39,21 @@ void main() {
     final stray = await _strayErrorsOf(() async {
       await expectLater(
         runner.start(),
-        throwsA(isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          'no python host here',
-        )),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'no python host here',
+          ),
+        ),
       );
     });
 
-    expect(stray, isEmpty,
-        reason: 'the start completer must not leak an unobserved error');
+    expect(
+      stray,
+      isEmpty,
+      reason: 'the start completer must not leak an unobserved error',
+    );
     expect(runner.status, PyRunnerStatus.crashed);
   });
 

@@ -40,8 +40,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   @override
   void initState() {
     super.initState();
-    _accountsStream =
-        ref.read(accountServiceProvider.notifier).streamAllAccounts();
+    _accountsStream = ref
+        .read(accountServiceProvider.notifier)
+        .streamAllAccounts();
     _progressStream = ref.read(progressServiceProvider).watchAllProgress();
     _goalsStream = ref.read(goalsServiceProvider).streamAllGoals();
   }
@@ -132,8 +133,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     if (accountsSnap.hasError) {
       return Center(
         child: Text(
-          AppLocalizations.of(context)
-              .accounts_loadError(accountsSnap.error.toString()),
+          AppLocalizations.of(
+            context,
+          ).accounts_loadError(accountsSnap.error.toString()),
         ),
       );
     }
@@ -145,7 +147,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         .where((g) => g.parentId == null && !g.optional)
         .map((g) => g.id)
         .toSet();
-    final rootById = {for (final g in goals) if (g.parentId == null) g.id: g};
+    final rootById = {
+      for (final g in goals)
+        if (g.parentId == null) g.id: g,
+    };
     final parentByChild = <String, String?>{
       for (final g in goals) g.id: g.parentId,
     };
@@ -276,40 +281,39 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.6,
                     ),
-                    dataTextStyle: TextStyle(
-                      color: AppColors.fg,
-                      fontSize: 13,
-                    ),
+                    dataTextStyle: TextStyle(color: AppColors.fg, fontSize: 13),
                   ),
                 ),
-                child: Builder(builder: (context) {
-                  final l = AppLocalizations.of(context);
-                  return DataTable(
-                  showCheckboxColumn: false,
-                  columns: [
-                    DataColumn(label: Text(l.accounts_column_email)),
-                    DataColumn(label: Text(l.accounts_column_name)),
-                    DataColumn(label: Text(l.accounts_column_streak)),
-                    DataColumn(label: Text(l.accounts_column_currentGoal)),
-                    DataColumn(label: Text(l.accounts_column_progress)),
-                    DataColumn(label: Text(l.accounts_column_status)),
-                    DataColumn(label: Text(l.accounts_column_key)),
-                    DataColumn(label: Text(l.accounts_column_actions)),
-                  ],
-                  rows: pageItems
-                      .map(
-                        (a) => _buildAccountRow(
-                          a,
-                          progress: progressByUid[a.uid] ?? const [],
-                          rootIds: rootIds,
-                          rootById: rootById,
-                          goalById: goalById,
-                          parentByChild: parentByChild,
-                        ),
-                      )
-                      .toList(),
-                );
-                }),
+                child: Builder(
+                  builder: (context) {
+                    final l = AppLocalizations.of(context);
+                    return DataTable(
+                      showCheckboxColumn: false,
+                      columns: [
+                        DataColumn(label: Text(l.accounts_column_email)),
+                        DataColumn(label: Text(l.accounts_column_name)),
+                        DataColumn(label: Text(l.accounts_column_streak)),
+                        DataColumn(label: Text(l.accounts_column_currentGoal)),
+                        DataColumn(label: Text(l.accounts_column_progress)),
+                        DataColumn(label: Text(l.accounts_column_status)),
+                        DataColumn(label: Text(l.accounts_column_key)),
+                        DataColumn(label: Text(l.accounts_column_actions)),
+                      ],
+                      rows: pageItems
+                          .map(
+                            (a) => _buildAccountRow(
+                              a,
+                              progress: progressByUid[a.uid] ?? const [],
+                              rootIds: rootIds,
+                              rootById: rootById,
+                              goalById: goalById,
+                              parentByChild: parentByChild,
+                            ),
+                          )
+                          .toList(),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -327,8 +331,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     required Map<String, String?> parentByChild,
   }) {
     final lastActive = a.updatedAt ?? a.createdAt;
-    final lastActiveStr =
-        lastActive == null ? '—' : formatTs(lastActive, context);
+    final lastActiveStr = lastActive == null
+        ? '—'
+        : formatTs(lastActive, context);
 
     final activeRootTitle = _activeRootTitle(
       progress: progress,
@@ -345,21 +350,17 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
     final status = computeStudentStatus(progress: progress);
 
-    final fullName = [a.firstName, a.lastName]
-        .where((s) => s.trim().isNotEmpty)
-        .join(' ');
+    final fullName = [
+      a.firstName,
+      a.lastName,
+    ].where((s) => s.trim().isNotEmpty).join(' ');
 
     return DataRow(
       onSelectChanged: (_) => _openDrawerFor(a),
       cells: [
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
-        DataCell(
-          Text(
-            '—',
-            style: const TextStyle(color: AppColors.fgFaint),
-          ),
-        ),
+        DataCell(Text('—', style: const TextStyle(color: AppColors.fgFaint))),
         DataCell(Text(activeRootTitle ?? '—')),
         DataCell(_OverallProgressBar(value: overall)),
         DataCell(_StatusCell(status: status, uid: a.uid)),
@@ -376,8 +377,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip:
-                    AppLocalizations.of(context).accounts_tooltip_deleteAccount,
+                tooltip: AppLocalizations.of(
+                  context,
+                ).accounts_tooltip_deleteAccount,
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _confirmDelete(context, a),
               ),
@@ -444,8 +446,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           children: [
             IconButton(
               tooltip: l.accounts_tooltip_firstPage,
-              onPressed:
-                  _pageIndex > 0 ? () => setState(() => _pageIndex = 0) : null,
+              onPressed: _pageIndex > 0
+                  ? () => setState(() => _pageIndex = 0)
+                  : null,
               icon: const Icon(Icons.first_page),
             ),
             IconButton(
@@ -455,10 +458,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   : null,
               icon: const Icon(Icons.chevron_left),
             ),
-            Text(l.accounts_pagination_pageOf(
-              _pageIndex + 1,
-              page.maxPage + 1,
-            )),
+            Text(
+              l.accounts_pagination_pageOf(_pageIndex + 1, page.maxPage + 1),
+            ),
             IconButton(
               tooltip: l.accounts_tooltip_nextPage,
               onPressed: _pageIndex < page.maxPage
@@ -507,9 +509,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     if (ok != true) return;
 
     try {
-      await ref
-          .read(accountServiceProvider.notifier)
-          .deleteAccountDoc(a.uid);
+      await ref.read(accountServiceProvider.notifier).deleteAccountDoc(a.uid);
       messenger.showSnackBar(
         SnackBar(content: Text(l.accounts_delete_success(a.email))),
       );
@@ -634,10 +634,7 @@ class _OverallProgressBar extends StatelessWidget {
           const SizedBox(width: AppSpacing.s),
           Text(
             '${(value * 100).round()}%',
-            style: const TextStyle(
-              color: AppColors.fgMute,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.fgMute, fontSize: 12),
           ),
         ],
       ),
@@ -687,10 +684,7 @@ class _StatusCell extends ConsumerWidget {
             return Tooltip(
               message: l.accounts_badge_unackTooltip,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.red.shade400,
                   borderRadius: BorderRadius.circular(AppRadius.pill),

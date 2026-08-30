@@ -37,9 +37,7 @@ class RootRow extends ConsumerWidget {
         ),
         onTap: () {
           ref.read(goalSelectionProvider.notifier).setEditorSelectedGoal(goal);
-          ref
-              .read(goalSelectionProvider.notifier)
-              .setEditorSelectedRoot(goal);
+          ref.read(goalSelectionProvider.notifier).setEditorSelectedRoot(goal);
         },
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

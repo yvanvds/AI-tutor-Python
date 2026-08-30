@@ -15,13 +15,13 @@ import '../../helpers/mocks.dart';
 const _uid = 'oid-report-user';
 
 AccountIdentity _identity() => const AccountIdentity(
-      oid: _uid,
-      displayName: 'Test',
-      email: 'test@example.com',
-      firstName: 'Test',
-      lastName: 'User',
-      isTeacher: false,
-    );
+  oid: _uid,
+  displayName: 'Test',
+  email: 'test@example.com',
+  firstName: 'Test',
+  lastName: 'User',
+  isTeacher: false,
+);
 
 void main() {
   late MockCosmosContainer container;
@@ -52,8 +52,10 @@ void main() {
       final svc = build();
       expect(() => svc.getAll(), throwsA(isA<StateError>()));
       expect(() => svc.getByGoalId('g'), throwsA(isA<StateError>()));
-      expect(() => svc.upsert(StatusReport(goalID: 'g', statusReport: 'x')),
-          throwsA(isA<StateError>()));
+      expect(
+        () => svc.upsert(StatusReport(goalID: 'g', statusReport: 'x')),
+        throwsA(isA<StateError>()),
+      );
       expect(() => svc.delete('g'), throwsA(isA<StateError>()));
     });
   });
@@ -61,34 +63,38 @@ void main() {
   group('getAll', () {
     setUp(() => currentUser.value = _identity());
 
-    test('queries uid as partition key and parameter, maps rows to reports',
-        () async {
-      when(
-        () => container.query(
-          any<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
+    test(
+      'queries uid as partition key and parameter, maps rows to reports',
+      () async {
+        when(
+          () => container.query(
+            any<String>(),
+            parameters: any<Map<String, Object?>>(named: 'parameters'),
+            partitionKey: any<Object?>(named: 'partitionKey'),
+          ),
+        ).thenAnswer(
+          (_) async => <Map<String, dynamic>>[
             {'goalId': 'g1', 'statusReport': 'good'},
             {'goalId': 'g2', 'statusReport': 'needs work'},
-          ]);
+          ],
+        );
 
-      final out = await build().getAll();
-      expect(out.map((r) => r.goalID).toList(), ['g1', 'g2']);
-      expect(out.first.statusReport, 'good');
+        final out = await build().getAll();
+        expect(out.map((r) => r.goalID).toList(), ['g1', 'g2']);
+        expect(out.first.statusReport, 'good');
 
-      final captured = verify(
-        () => container.query(
-          captureAny<String>(),
-          parameters: captureAny<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: captureAny<Object?>(named: 'partitionKey'),
-        ),
-      ).captured;
-      expect(captured[0], contains('c.uid = @uid'));
-      expect(captured[1], {'@uid': _uid});
-      expect(captured[2], _uid);
-    });
+        final captured = verify(
+          () => container.query(
+            captureAny<String>(),
+            parameters: captureAny<Map<String, Object?>>(named: 'parameters'),
+            partitionKey: captureAny<Object?>(named: 'partitionKey'),
+          ),
+        ).captured;
+        expect(captured[0], contains('c.uid = @uid'));
+        expect(captured[1], {'@uid': _uid});
+        expect(captured[2], _uid);
+      },
+    );
   });
 
   group('watchAll', () {
@@ -136,10 +142,7 @@ void main() {
           any<String>(),
           partitionKey: any<Object>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => {
-            'goalId': 'g1',
-            'statusReport': 'on track',
-          });
+      ).thenAnswer((_) async => {'goalId': 'g1', 'statusReport': 'on track'});
 
       final report = await build().getByGoalId('g1');
       expect(report, isNotNull);
@@ -159,8 +162,9 @@ void main() {
         ),
       ).thenAnswer((_) async => <String, dynamic>{});
 
-      await build()
-          .upsert(StatusReport(goalID: 'g1', statusReport: 'did well'));
+      await build().upsert(
+        StatusReport(goalID: 'g1', statusReport: 'did well'),
+      );
 
       final captured = verify(
         () => container.upsert(
@@ -189,8 +193,9 @@ void main() {
       ).thenAnswer((_) async {});
 
       await build().delete('g1');
-      verify(() => container.delete('${_uid}_g1', partitionKey: _uid))
-          .called(1);
+      verify(
+        () => container.delete('${_uid}_g1', partitionKey: _uid),
+      ).called(1);
     });
   });
 
@@ -198,8 +203,9 @@ void main() {
     setUp(() => currentUser.value = _identity());
 
     test('no-op when getCurrentChildGoalId returns null', () async {
-      await build(getCurrentChildGoalId: () => null)
-          .updateForCurrentChildGoal('report text');
+      await build(
+        getCurrentChildGoalId: () => null,
+      ).updateForCurrentChildGoal('report text');
       verifyNever(
         () => container.upsert(
           any<Map<String, Object?>>(),
@@ -216,15 +222,18 @@ void main() {
         ),
       ).thenAnswer((_) async => <String, dynamic>{});
 
-      await build(getCurrentChildGoalId: () => 'goal-child-1')
-          .updateForCurrentChildGoal('passed the quiz');
+      await build(
+        getCurrentChildGoalId: () => 'goal-child-1',
+      ).updateForCurrentChildGoal('passed the quiz');
 
-      final captured = verify(
-        () => container.upsert(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final captured =
+          verify(
+                () => container.upsert(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(captured['goalId'], 'goal-child-1');
       expect(captured['statusReport'], 'passed the quiz');
     });
@@ -243,12 +252,14 @@ void main() {
 
       await build().updateForGoal('explicit-goal', 'mastered loops');
 
-      final captured = verify(
-        () => container.upsert(
-          captureAny<Map<String, Object?>>(),
-          partitionKey: any<Object>(named: 'partitionKey'),
-        ),
-      ).captured.single as Map<String, Object?>;
+      final captured =
+          verify(
+                () => container.upsert(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
       expect(captured['goalId'], 'explicit-goal');
       expect(captured['statusReport'], 'mastered loops');
     });
@@ -263,9 +274,11 @@ void main() {
           parameters: any<Map<String, Object?>>(named: 'parameters'),
           partitionKey: any<Object?>(named: 'partitionKey'),
         ),
-      ).thenAnswer((_) async => <Map<String, dynamic>>[
-            {'goalId': 'g1', 'statusReport': 'looking good'},
-          ]);
+      ).thenAnswer(
+        (_) async => <Map<String, dynamic>>[
+          {'goalId': 'g1', 'statusReport': 'looking good'},
+        ],
+      );
 
       final out = await build().getStatusReportsForUser('teacher-target-uid');
       expect(out, hasLength(1));
@@ -284,27 +297,29 @@ void main() {
       expect(captured[2], 'teacher-target-uid');
     });
 
-    test('watchStatusReportsForUser exposes a stream backed by the same fetch',
-        () async {
-      when(
-        () => container.query(
-          any<String>(),
-          parameters: any<Map<String, Object?>>(named: 'parameters'),
-          partitionKey: any<Object?>(named: 'partitionKey'),
-        ),
-      ).thenAnswer((_) async => const <Map<String, dynamic>>[]);
+    test(
+      'watchStatusReportsForUser exposes a stream backed by the same fetch',
+      () async {
+        when(
+          () => container.query(
+            any<String>(),
+            parameters: any<Map<String, Object?>>(named: 'parameters'),
+            partitionKey: any<Object?>(named: 'partitionKey'),
+          ),
+        ).thenAnswer((_) async => const <Map<String, dynamic>>[]);
 
-      final stream = build().watchStatusReportsForUser('teacher-target-uid');
-      final first = await stream.first;
-      expect(first, isEmpty);
+        final stream = build().watchStatusReportsForUser('teacher-target-uid');
+        final first = await stream.first;
+        expect(first, isEmpty);
 
-      verify(
-        () => container.query(
-          any<String>(),
-          parameters: {'@uid': 'teacher-target-uid'},
-          partitionKey: 'teacher-target-uid',
-        ),
-      ).called(greaterThanOrEqualTo(1));
-    });
+        verify(
+          () => container.query(
+            any<String>(),
+            parameters: {'@uid': 'teacher-target-uid'},
+            partitionKey: 'teacher-target-uid',
+          ),
+        ).called(greaterThanOrEqualTo(1));
+      },
+    );
   });
 }

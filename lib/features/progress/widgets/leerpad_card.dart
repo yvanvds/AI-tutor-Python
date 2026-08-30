@@ -33,10 +33,10 @@ class LeerpadCard extends StatelessWidget {
     final progress = required.isEmpty
         ? 0.0
         : (required
-                    .map((c) => progressById[c.id]?.progress ?? 0)
-                    .fold<double>(0, (a, b) => a + b) /
-                required.length)
-            .clamp(0.0, 1.0);
+                      .map((c) => progressById[c.id]?.progress ?? 0)
+                      .fold<double>(0, (a, b) => a + b) /
+                  required.length)
+              .clamp(0.0, 1.0);
     final completed = required.isNotEmpty && progress >= 0.999;
 
     final bg = isActive

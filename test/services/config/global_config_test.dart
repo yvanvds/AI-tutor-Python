@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('GlobalConfig.fromMap', () {
     test('parses all fields', () {
-      final config = GlobalConfig.fromMap({'Model': 'gpt-4o', 'ApiKey': 'sk-123'});
+      final config = GlobalConfig.fromMap({
+        'Model': 'gpt-4o',
+        'ApiKey': 'sk-123',
+      });
       expect(config.model, 'gpt-4o');
       expect(config.apiKey, 'sk-123');
     });

@@ -32,7 +32,8 @@ BeliefSnapshot applyDecay({
     return BeliefSnapshot(alpha, beta);
   }
   final halfLifeDays =
-      PolicyConstants.decayHalfLife.inMicroseconds / Duration.microsecondsPerDay;
+      PolicyConstants.decayHalfLife.inMicroseconds /
+      Duration.microsecondsPerDay;
   final elapsedDays = elapsed.inMicroseconds / Duration.microsecondsPerDay;
   final d = math.pow(0.5, elapsedDays / halfLifeDays).toDouble();
   final aEff = PolicyConstants.prior + (alpha - PolicyConstants.prior) * d;
@@ -41,6 +42,7 @@ BeliefSnapshot applyDecay({
 }
 
 enum LoSignalKind { positive, negative, neutral }
+
 enum LoSignalStrength { strong, moderate, weak }
 
 double baseWeight(LoSignalStrength s) {
@@ -123,9 +125,11 @@ bool meetsMasteryMeanAndEvidence(BeliefSnapshot snap) {
 ///    The cap-then-shrink rule in `applyEvidence` makes mean movement too
 ///    slow to catch up once here, so further probes mostly spin in place.
 bool isStuck(BeliefSnapshot snap) {
-  final classic = snap.evidence >= PolicyConstants.stuckEvidenceMin &&
+  final classic =
+      snap.evidence >= PolicyConstants.stuckEvidenceMin &&
       snap.mean < PolicyConstants.stuckMeanCeiling;
-  final saturated = snap.evidence >=
+  final saturated =
+      snap.evidence >=
           PolicyConstants.evidenceCap - PolicyConstants.saturationSlack &&
       snap.mean < PolicyConstants.stuckSaturatedMeanCeiling;
   return classic || saturated;

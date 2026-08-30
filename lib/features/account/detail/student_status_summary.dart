@@ -24,8 +24,7 @@ class StudentStatusSummary extends StatelessWidget {
     final reference = mostRecentlyActive(progress);
 
     final goalById = {for (final g in goals) g.id: g};
-    final activeGoal =
-        reference == null ? null : goalById[reference.goalID];
+    final activeGoal = reference == null ? null : goalById[reference.goalID];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

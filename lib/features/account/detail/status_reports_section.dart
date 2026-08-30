@@ -44,14 +44,15 @@ class StatusReportsSection extends ConsumerWidget {
             ),
           );
         }
-        final reports = [...snap.data!]..sort((a, b) {
-          final ad = a.updatedAt;
-          final bd = b.updatedAt;
-          if (ad == null && bd == null) return 0;
-          if (ad == null) return 1;
-          if (bd == null) return -1;
-          return bd.compareTo(ad);
-        });
+        final reports = [...snap.data!]
+          ..sort((a, b) {
+            final ad = a.updatedAt;
+            final bd = b.updatedAt;
+            if (ad == null && bd == null) return 0;
+            if (ad == null) return 1;
+            if (bd == null) return -1;
+            return bd.compareTo(ad);
+          });
         if (reports.isEmpty) {
           return _section(
             theme,
@@ -78,13 +79,20 @@ class StatusReportsSection extends ConsumerWidget {
     );
   }
 
-  Widget _section(ThemeData theme, AppLocalizations l, {required Widget child}) {
+  Widget _section(
+    ThemeData theme,
+    AppLocalizations l, {
+    required Widget child,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.drawer_statusReports_title, style: theme.textTheme.titleMedium),
+          Text(
+            l.drawer_statusReports_title,
+            style: theme.textTheme.titleMedium,
+          ),
           const SizedBox(height: 4),
           child,
         ],
@@ -121,5 +129,4 @@ class _ReportTile extends StatelessWidget {
       ],
     );
   }
-
 }

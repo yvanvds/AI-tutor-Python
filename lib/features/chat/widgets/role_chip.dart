@@ -44,7 +44,10 @@ class RoleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = _styleFor(role);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: s.bg,
         border: Border.all(color: s.border),

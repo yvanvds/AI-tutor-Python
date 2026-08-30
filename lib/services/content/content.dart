@@ -30,12 +30,12 @@ class Content {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'type': 'content',
-        'title': title,
-        'body': body,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+    'id': id,
+    'type': 'content',
+    'title': title,
+    'body': body,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
 
   factory Content.fromCosmos(Map<String, dynamic> doc) {
     final raw = doc['updatedAt'];

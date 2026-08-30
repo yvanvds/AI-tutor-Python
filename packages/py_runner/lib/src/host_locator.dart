@@ -22,10 +22,7 @@ class PyRunnerNotInstalled implements Exception {
 
 /// Bundle of paths returned by [PyHostLocator.resolve].
 class PyHostPaths {
-  const PyHostPaths({
-    required this.pythonExecutable,
-    required this.hostScript,
-  });
+  const PyHostPaths({required this.pythonExecutable, required this.hostScript});
 
   /// Absolute path to `python.exe` (or the platform equivalent).
   final String pythonExecutable;
@@ -48,10 +45,8 @@ class ExplicitPyHostLocator extends PyHostLocator {
   final String hostScript;
 
   @override
-  Future<PyHostPaths> resolve() async => PyHostPaths(
-        pythonExecutable: pythonExecutable,
-        hostScript: hostScript,
-      );
+  Future<PyHostPaths> resolve() async =>
+      PyHostPaths(pythonExecutable: pythonExecutable, hostScript: hostScript);
 }
 
 /// Production locator: derives paths from [Platform.resolvedExecutable] and
@@ -81,8 +76,8 @@ class InstallerPyHostLocator extends PyHostLocator {
   const InstallerPyHostLocator({
     String? appDir,
     Map<String, String>? environment,
-  })  : _appDir = appDir,
-        _environment = environment;
+  }) : _appDir = appDir,
+       _environment = environment;
 
   /// Override for the application directory. Defaults to the directory
   /// containing [Platform.resolvedExecutable]. Exposed for unit testing.

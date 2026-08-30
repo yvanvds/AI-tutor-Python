@@ -28,11 +28,9 @@ Future<String?> resolveTestPython() async {
 
 Future<bool> _probe(String executable) async {
   try {
-    final result = await Process.run(
-      executable,
-      <String>['--version'],
-      runInShell: false,
-    ).timeout(const Duration(seconds: 5));
+    final result = await Process.run(executable, <String>[
+      '--version',
+    ], runInShell: false).timeout(const Duration(seconds: 5));
     return result.exitCode == 0;
   } catch (_) {
     return false;

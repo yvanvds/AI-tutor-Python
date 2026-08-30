@@ -32,11 +32,21 @@ class AppColors {
 
   // Code syntax — converted from oklch values in the README. These pair
   // with the ink-0 editor background.
-  static const Color syntaxKw = Color(0xFFE0A4D3); // keywords — soft pink (oklch(.78 .16 320))
-  static const Color syntaxStr = Color(0xFF7AD2A4); // strings — leaf (oklch(.78 .16 150))
-  static const Color syntaxNum = Color(0xFFDABA6E); // numbers — amber (oklch(.78 .16 65))
-  static const Color syntaxCom = Color(0xFF877F71); // comments — muted (oklch(.55 .014 80))
-  static const Color syntaxFn = Color(0xFF7EB7DF); // function calls — blue (oklch(.78 .16 250))
+  static const Color syntaxKw = Color(
+    0xFFE0A4D3,
+  ); // keywords — soft pink (oklch(.78 .16 320))
+  static const Color syntaxStr = Color(
+    0xFF7AD2A4,
+  ); // strings — leaf (oklch(.78 .16 150))
+  static const Color syntaxNum = Color(
+    0xFFDABA6E,
+  ); // numbers — amber (oklch(.78 .16 65))
+  static const Color syntaxCom = Color(
+    0xFF877F71,
+  ); // comments — muted (oklch(.55 .014 80))
+  static const Color syntaxFn = Color(
+    0xFF7EB7DF,
+  ); // function calls — blue (oklch(.78 .16 250))
 }
 
 /// 4-pt spacing scale used throughout the redesign.

@@ -55,18 +55,18 @@ class Goal {
   });
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'description': description,
-        'parentId': parentId,
-        'order': order,
-        'optional': optional,
-        'teachingTips': teachingTips,
-        'allowChains': allowChains,
-        'objectives': objectives.map((o) => o.toMap()).toList(),
-        'contentId': contentId,
-        'moduleId': moduleId,
-        if (kind != null) 'kind': kind,
-      };
+    'title': title,
+    'description': description,
+    'parentId': parentId,
+    'order': order,
+    'optional': optional,
+    'teachingTips': teachingTips,
+    'allowChains': allowChains,
+    'objectives': objectives.map((o) => o.toMap()).toList(),
+    'contentId': contentId,
+    'moduleId': moduleId,
+    if (kind != null) 'kind': kind,
+  };
 
   factory Goal.fromMap({
     required String id,
@@ -81,10 +81,13 @@ class Goal {
       optional: map['optional'] ?? false,
       teachingTips: List<String>.from(map['teachingTips'] ?? const []),
       allowChains: map['allowChains'] ?? false,
-      objectives: (map['objectives'] as List?)
-              ?.map((e) => LearningObjective.fromMap(
-                    Map<String, dynamic>.from(e as Map),
-                  ))
+      objectives:
+          (map['objectives'] as List?)
+              ?.map(
+                (e) => LearningObjective.fromMap(
+                  Map<String, dynamic>.from(e as Map),
+                ),
+              )
               .toList() ??
           const [],
       contentId: map['contentId'] as String?,

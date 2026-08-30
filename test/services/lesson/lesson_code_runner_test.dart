@@ -44,8 +44,10 @@ void main() {
       pyRunner: PyRunner(locator: _MissingHostLocator()),
     );
 
-    final results =
-        await Future.wait([runner.run('print(1)'), runner.run('print(2)')]);
+    final results = await Future.wait([
+      runner.run('print(1)'),
+      runner.run('print(2)'),
+    ]);
 
     expect(results, hasLength(2));
     for (final r in results) {
@@ -53,24 +55,28 @@ void main() {
     }
   });
 
-  test('a host that is gone when the run is sent yields an error result (#7)',
-      () async {
-    final pyRunner = _MockPyRunner();
-    when(() => pyRunner.start()).thenAnswer((_) async {});
-    when(
-      () => pyRunner.run(
-        any(),
-        cwd: any(named: 'cwd'),
-        timeout: any(named: 'timeout'),
-      ),
-    ).thenThrow(StateError('PyRunner is not ready (status: crashed)'));
+  test(
+    'a host that is gone when the run is sent yields an error result (#7)',
+    () async {
+      final pyRunner = _MockPyRunner();
+      when(() => pyRunner.start()).thenAnswer((_) async {});
+      when(
+        () => pyRunner.run(
+          any(),
+          cwd: any(named: 'cwd'),
+          timeout: any(named: 'timeout'),
+        ),
+      ).thenThrow(StateError('PyRunner is not ready (status: crashed)'));
 
-    final result = await PyLessonCodeRunner(pyRunner: pyRunner).run('print(1)');
+      final result = await PyLessonCodeRunner(
+        pyRunner: pyRunner,
+      ).run('print(1)');
 
-    expect(result.hasError, isTrue);
-    expect(result.stderr, contains('Python host error'));
-    expect(result.stderr, contains('not ready'));
-  });
+      expect(result.hasError, isTrue);
+      expect(result.stderr, contains('Python host error'));
+      expect(result.stderr, contains('not ready'));
+    },
+  );
 
   test('LessonRunResult serialises both streams', () {
     const r = LessonRunResult(stdout: 'a', stderr: 'b');

@@ -42,10 +42,7 @@ class LevelUpController extends Notifier<LevelUpEvent?> {
   /// Pushes [event] only if at least [minGap] has elapsed since the last
   /// push (any push, including a manual debug one). Returns true when the
   /// overlay was actually triggered.
-  bool pushThrottled(
-    LevelUpEvent event, {
-    Duration minGap = defaultMinGap,
-  }) {
+  bool pushThrottled(LevelUpEvent event, {Duration minGap = defaultMinGap}) {
     final now = DateTime.now();
     final last = _lastPushAt;
     if (last != null && now.difference(last) < minGap) return false;

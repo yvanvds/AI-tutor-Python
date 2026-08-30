@@ -61,9 +61,9 @@ class _ChatBody extends ConsumerWidget {
 
     return Chat(
       theme: ChatTheme.fromThemeData(Theme.of(context)).copyWith(
-        colors: ChatColors.fromThemeData(Theme.of(context)).copyWith(
-          surface: AppColors.ink1,
-        ),
+        colors: ChatColors.fromThemeData(
+          Theme.of(context),
+        ).copyWith(surface: AppColors.ink1),
       ),
       chatController: chat.controller,
       currentUserId: 'You',
@@ -88,91 +88,97 @@ class _ChatBody extends ConsumerWidget {
         chatAnimatedListBuilder: (context, itemBuilder) {
           return ChatAnimatedListReversed(itemBuilder: itemBuilder);
         },
-        textMessageBuilder: (
-          context,
-          message,
-          index, {
-          required bool isSentByMe,
-          MessageGroupStatus? groupStatus,
-        }) => Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.xs,
-          ),
-          child: isSentByMe
-              ? StudentBubble(
-                  text: message.text,
-                  createdAt: message.createdAt,
-                )
-              : TutorBubble(
-                  text: message.text,
-                  role: tutorRoleFromMetadata(message.metadata),
-                  createdAt: message.createdAt,
-                ),
-        ),
-        textStreamMessageBuilder: (
-          context,
-          message,
-          index, {
-          required bool isSentByMe,
-          MessageGroupStatus? groupStatus,
-        }) => Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.xs,
-          ),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+        textMessageBuilder:
+            (
+              context,
+              message,
+              index, {
+              required bool isSentByMe,
+              MessageGroupStatus? groupStatus,
+            }) => Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xs,
               ),
-              child: FlyerChatTextStreamMessage(
-                index: index,
-                message: message,
-                streamState: streamState,
-                mode: TextStreamMessageMode.instantMarkdown,
-                receivedBackgroundColor: AppColors.ink1,
-                borderRadius: BorderRadius.circular(AppRadius.bubble),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
+              child: isSentByMe
+                  ? StudentBubble(
+                      text: message.text,
+                      createdAt: message.createdAt,
+                    )
+                  : TutorBubble(
+                      text: message.text,
+                      role: tutorRoleFromMetadata(message.metadata),
+                      createdAt: message.createdAt,
+                    ),
+            ),
+        textStreamMessageBuilder:
+            (
+              context,
+              message,
+              index, {
+              required bool isSentByMe,
+              MessageGroupStatus? groupStatus,
+            }) => Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xs,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+                  ),
+                  child: FlyerChatTextStreamMessage(
+                    index: index,
+                    message: message,
+                    streamState: streamState,
+                    mode: TextStreamMessageMode.instantMarkdown,
+                    receivedBackgroundColor: AppColors.ink1,
+                    borderRadius: BorderRadius.circular(AppRadius.bubble),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    receivedTextStyle: const TextStyle(
+                      color: AppColors.fg,
+                      fontSize: 14,
+                      height: 1.55,
+                    ),
+                    loadingText: AppLocalizations.of(
+                      context,
+                    ).chat_loading_thinking,
+                  ),
                 ),
-                receivedTextStyle: const TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 14,
-                  height: 1.55,
-                ),
-                loadingText: AppLocalizations.of(context).chat_loading_thinking,
               ),
             ),
-          ),
-        ),
-        systemMessageBuilder: (
-          context,
-          message,
-          index, {
-          required bool isSentByMe,
-          MessageGroupStatus? groupStatus,
-        }) => Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.xs,
-          ),
-          child: ChatSystemPill(text: _systemText(context, message)),
-        ),
-        customMessageBuilder: (
-          context,
-          message,
-          index, {
-          required bool isSentByMe,
-          MessageGroupStatus? groupStatus,
-        }) {
-          if (message.metadata?['kind'] == 'mcq_options') {
-            return McqOptionsWidget(message: message);
-          }
-          return const SizedBox.shrink();
-        },
+        systemMessageBuilder:
+            (
+              context,
+              message,
+              index, {
+              required bool isSentByMe,
+              MessageGroupStatus? groupStatus,
+            }) => Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xs,
+              ),
+              child: ChatSystemPill(text: _systemText(context, message)),
+            ),
+        customMessageBuilder:
+            (
+              context,
+              message,
+              index, {
+              required bool isSentByMe,
+              MessageGroupStatus? groupStatus,
+            }) {
+              if (message.metadata?['kind'] == 'mcq_options') {
+                return McqOptionsWidget(message: message);
+              }
+              return const SizedBox.shrink();
+            },
       ),
       resolveUser: (UserID id) async {
         final l = AppLocalizations.of(context);

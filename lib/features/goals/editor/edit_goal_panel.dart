@@ -45,7 +45,8 @@ class EditGoalPanel extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         l.goals_editorPanel_loadError(
-                            snapshot.error.toString()),
+                          snapshot.error.toString(),
+                        ),
                       ),
                     ),
                   );

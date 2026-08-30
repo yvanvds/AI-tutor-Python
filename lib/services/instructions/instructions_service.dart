@@ -61,5 +61,5 @@ class InstructionsService extends Notifier<List<Instruction>> {
 
 final instructionsServiceProvider =
     NotifierProvider<InstructionsService, List<Instruction>>(
-  InstructionsService.new,
-);
+      InstructionsService.new,
+    );

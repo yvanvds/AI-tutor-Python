@@ -172,15 +172,15 @@ class _LeerpadBody extends ConsumerWidget {
     await tutor.initializeSession(force: true);
 
     final child = sel.current.activeChildGoal;
-    final hasContent =
-        child != null && (child.contentId?.isNotEmpty ?? false);
+    final hasContent = child != null && (child.contentId?.isNotEmpty ?? false);
     final persisted = child == null
         ? null
         : await progressService.getByGoalId(child.id);
     final hasProgress = (persisted?.progress ?? 0) > 0;
 
-    mode.state =
-        (!hasContent || hasProgress) ? SessionMode.practice : SessionMode.explain;
+    mode.state = (!hasContent || hasProgress)
+        ? SessionMode.practice
+        : SessionMode.explain;
   }
 }
 

@@ -138,8 +138,10 @@ class _OptionButtonState extends State<_OptionButton> {
                 ),
                 child: Text(
                   widget.badge,
-                  style: AppMono.code(color: badgeFg, size: 12)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: AppMono.code(
+                    color: badgeFg,
+                    size: 12,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: AppSpacing.s),

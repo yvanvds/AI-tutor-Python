@@ -18,10 +18,10 @@ class CandidateLoStat {
   });
 
   Map<String, dynamic> toJson() => {
-        'loId': loId,
-        'mean': mean,
-        'evidence': evidence,
-      };
+    'loId': loId,
+    'mean': mean,
+    'evidence': evidence,
+  };
 }
 
 class TurnLoSignal {
@@ -37,11 +37,11 @@ class TurnLoSignal {
   });
 
   Map<String, dynamic> toJson() => {
-        'subgoalId': subgoalId,
-        'loId': loId,
-        'signal': signal,
-        'strength': strength,
-      };
+    'subgoalId': subgoalId,
+    'loId': loId,
+    'signal': signal,
+    'strength': strength,
+  };
 }
 
 class TurnAppliedSignal {
@@ -55,10 +55,10 @@ class TurnAppliedSignal {
   });
 
   Map<String, dynamic> toJson() => {
-        'loId': loId,
-        'alphaDelta': alphaDelta,
-        'betaDelta': betaDelta,
-      };
+    'loId': loId,
+    'alphaDelta': alphaDelta,
+    'betaDelta': betaDelta,
+  };
 }
 
 class TurnLoStatus {
@@ -76,12 +76,12 @@ class TurnLoStatus {
   });
 
   Map<String, dynamic> toJson() => {
-        'loId': loId,
-        'mean': mean,
-        'evidence': evidence,
-        'mastered': mastered,
-        'stuck': stuck,
-      };
+    'loId': loId,
+    'mean': mean,
+    'evidence': evidence,
+    'mastered': mastered,
+    'stuck': stuck,
+  };
 }
 
 /// One observability event captured on a `turn_history` doc per
@@ -137,18 +137,14 @@ class TurnSignalEvent {
     TurnSignalEventKind k, {
     Map<String, Object?> details = const {},
   }) {
-    return TurnSignalEvent(
-      kind: k,
-      severity: severityFor(k),
-      details: details,
-    );
+    return TurnSignalEvent(kind: k, severity: severityFor(k), details: details);
   }
 
   Map<String, dynamic> toJson() => {
-        'kind': kind.name,
-        'severity': severity.name,
-        if (details.isNotEmpty) 'details': details,
-      };
+    'kind': kind.name,
+    'severity': severity.name,
+    if (details.isNotEmpty) 'details': details,
+  };
 
   static TurnSignalEvent? tryFromJson(Map<String, dynamic> map) {
     final kindRaw = map['kind'];
@@ -189,10 +185,10 @@ class TurnSelectionReason {
   });
 
   Map<String, dynamic> toJson() => {
-        'candidateLOs': candidateLOs.map((c) => c.toJson()).toList(),
-        'chosenReason': chosenReason,
-        'notchDropFired': notchDropFired,
-      };
+    'candidateLOs': candidateLOs.map((c) => c.toJson()).toList(),
+    'chosenReason': chosenReason,
+    'notchDropFired': notchDropFired,
+  };
 }
 
 /// Persisted shape for one graded turn (CONDUCTOR_POLICY 8.1).
@@ -256,36 +252,35 @@ class PersistedTurnRecord {
     this.signalEvents = const [],
   });
 
-  bool get hasStrongEvent => signalEvents
-      .any((e) => e.severity == TurnSignalEventSeverity.strong);
+  bool get hasStrongEvent =>
+      signalEvents.any((e) => e.severity == TurnSignalEventSeverity.strong);
 
   Map<String, dynamic> toMap({required String uid}) => {
-        'id': id,
-        'type': 'turn_history',
-        'uid': uid,
-        'turnAt': turnAt.toUtc().toIso8601String(),
-        'subgoalId': subgoalId,
-        'targetLOIds': targetLOIds,
-        'questionType': questionType,
-        if (difficulty != null) 'difficulty': difficulty!.name,
-        'isFollowUp': isFollowUp,
-        'chainDepth': chainDepth,
-        if (selectionReason != null)
-          'selectionReason': selectionReason!.toJson(),
-        'overallQuality': overallQuality.name,
-        'loSignals': loSignals.map((s) => s.toJson()).toList(),
-        'hadFallback': hadFallback,
-        'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
-        'calibrationBefore': calibrationBefore.name,
-        'calibrationAfter': calibrationAfter.name,
-        'subgoalProgressAfter': subgoalProgressAfter,
-        'loStatusAfter': loStatusAfter.map((s) => s.toJson()).toList(),
-        'subgoalAdvanced': subgoalAdvanced,
-        if (acknowledgedAt != null)
-          'acknowledgedAt': acknowledgedAt!.toUtc().toIso8601String(),
-        if (signalEvents.isNotEmpty)
-          'signalEvents': signalEvents.map((e) => e.toJson()).toList(),
-      };
+    'id': id,
+    'type': 'turn_history',
+    'uid': uid,
+    'turnAt': turnAt.toUtc().toIso8601String(),
+    'subgoalId': subgoalId,
+    'targetLOIds': targetLOIds,
+    'questionType': questionType,
+    if (difficulty != null) 'difficulty': difficulty!.name,
+    'isFollowUp': isFollowUp,
+    'chainDepth': chainDepth,
+    if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
+    'overallQuality': overallQuality.name,
+    'loSignals': loSignals.map((s) => s.toJson()).toList(),
+    'hadFallback': hadFallback,
+    'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
+    'calibrationBefore': calibrationBefore.name,
+    'calibrationAfter': calibrationAfter.name,
+    'subgoalProgressAfter': subgoalProgressAfter,
+    'loStatusAfter': loStatusAfter.map((s) => s.toJson()).toList(),
+    'subgoalAdvanced': subgoalAdvanced,
+    if (acknowledgedAt != null)
+      'acknowledgedAt': acknowledgedAt!.toUtc().toIso8601String(),
+    if (signalEvents.isNotEmpty)
+      'signalEvents': signalEvents.map((e) => e.toJson()).toList(),
+  };
 
   /// Best-effort parse of a `turn_history` doc as written by `toMap`.
   /// Designed for the teacher-dashboard query path; defaults are conservative
@@ -321,9 +316,7 @@ class PersistedTurnRecord {
     if (eventsRaw is List) {
       for (final entry in eventsRaw) {
         if (entry is Map) {
-          final ev = TurnSignalEvent.tryFromJson(
-            entry.cast<String, dynamic>(),
-          );
+          final ev = TurnSignalEvent.tryFromJson(entry.cast<String, dynamic>());
           if (ev != null) events.add(ev);
         }
       }
@@ -333,9 +326,10 @@ class PersistedTurnRecord {
       id: (doc['id'] as String?) ?? '',
       turnAt: parseDate(doc['turnAt']),
       subgoalId: (doc['subgoalId'] as String?) ?? '',
-      targetLOIds: (doc['targetLOIds'] as List?)
-              ?.whereType<String>()
-              .toList(growable: false) ??
+      targetLOIds:
+          (doc['targetLOIds'] as List?)?.whereType<String>().toList(
+            growable: false,
+          ) ??
           const [],
       questionType: (doc['questionType'] as String?) ?? '',
       difficulty: parseDifficulty(doc['difficulty']),

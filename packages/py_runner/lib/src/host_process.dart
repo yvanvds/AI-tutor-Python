@@ -16,10 +16,10 @@ class HostProcess {
     required Stream<HostOutboundFrame> frames,
     required Stream<String> stderrLines,
     required Stream<FrameDecodeException> decodeErrors,
-  })  : _process = process,
-        _frames = frames,
-        _stderrLines = stderrLines,
-        _decodeErrors = decodeErrors;
+  }) : _process = process,
+       _frames = frames,
+       _stderrLines = stderrLines,
+       _decodeErrors = decodeErrors;
 
   final Process _process;
   final Stream<HostOutboundFrame> _frames;
@@ -83,44 +83,44 @@ class HostProcess {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen(
-      (line) {
-        if (line.isEmpty) return;
-        try {
-          frameController.add(HostOutboundFrame.decode(line));
-        } on FrameDecodeException catch (e) {
-          if (!decodeErrorController.isClosed) {
-            decodeErrorController.add(e);
-          }
-        }
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        if (!frameController.isClosed) {
-          frameController.addError(error, stackTrace);
-        }
-      },
-      onDone: () {
-        if (!frameController.isClosed) frameController.close();
-        if (!decodeErrorController.isClosed) decodeErrorController.close();
-      },
-    );
+          (line) {
+            if (line.isEmpty) return;
+            try {
+              frameController.add(HostOutboundFrame.decode(line));
+            } on FrameDecodeException catch (e) {
+              if (!decodeErrorController.isClosed) {
+                decodeErrorController.add(e);
+              }
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!frameController.isClosed) {
+              frameController.addError(error, stackTrace);
+            }
+          },
+          onDone: () {
+            if (!frameController.isClosed) frameController.close();
+            if (!decodeErrorController.isClosed) decodeErrorController.close();
+          },
+        );
 
     final stderrController = StreamController<String>.broadcast();
     process.stderr
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen(
-      (line) {
-        if (!stderrController.isClosed) stderrController.add(line);
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        if (!stderrController.isClosed) {
-          stderrController.addError(error, stackTrace);
-        }
-      },
-      onDone: () {
-        if (!stderrController.isClosed) stderrController.close();
-      },
-    );
+          (line) {
+            if (!stderrController.isClosed) stderrController.add(line);
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!stderrController.isClosed) {
+              stderrController.addError(error, stackTrace);
+            }
+          },
+          onDone: () {
+            if (!stderrController.isClosed) stderrController.close();
+          },
+        );
 
     return HostProcess._(
       process: process,
@@ -147,9 +147,7 @@ class HostProcess {
 
   /// Closes stdin (signals graceful shutdown) and awaits process exit.
   /// Hard-kills if the process doesn't exit within [grace].
-  Future<int> shutdown({
-    Duration grace = const Duration(seconds: 2),
-  }) async {
+  Future<int> shutdown({Duration grace = const Duration(seconds: 2)}) async {
     try {
       await _process.stdin.close();
     } catch (_) {

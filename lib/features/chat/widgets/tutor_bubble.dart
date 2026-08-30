@@ -7,12 +7,7 @@ import 'package:flutter/material.dart';
 /// Receiver bubble for tutor messages. Renders an optional [RoleChip]
 /// above the bubble and a small timestamp below.
 class TutorBubble extends StatelessWidget {
-  const TutorBubble({
-    super.key,
-    required this.text,
-    this.role,
-    this.createdAt,
-  });
+  const TutorBubble({super.key, required this.text, this.role, this.createdAt});
 
   final String text;
   final TutorRole? role;

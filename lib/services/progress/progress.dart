@@ -45,8 +45,9 @@ class Progress {
       goalID: (doc['goalId'] as String?) ?? '',
       progress: (doc['progress'] as num?)?.toDouble() ?? 0.0,
       updatedAt: updatedRaw is String ? DateTime.tryParse(updatedRaw) : null,
-      lastSessionAt:
-          lastSessionRaw is String ? DateTime.tryParse(lastSessionRaw) : null,
+      lastSessionAt: lastSessionRaw is String
+          ? DateTime.tryParse(lastSessionRaw)
+          : null,
     );
   }
 }

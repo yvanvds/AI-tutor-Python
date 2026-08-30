@@ -85,12 +85,7 @@ void main() {
 
   group('applyEvidence', () {
     test('below cap → simple addition', () {
-      final s = applyEvidence(
-        alpha: 4,
-        beta: 1,
-        alphaDelta: 2,
-        betaDelta: 0,
-      );
+      final s = applyEvidence(alpha: 4, beta: 1, alphaDelta: 2, betaDelta: 0);
       expect(s.alpha, 6);
       expect(s.beta, 1);
     });
@@ -110,12 +105,7 @@ void main() {
     });
 
     test('zero-delta is a no-op', () {
-      final s = applyEvidence(
-        alpha: 4,
-        beta: 2,
-        alphaDelta: 0,
-        betaDelta: 0,
-      );
+      final s = applyEvidence(alpha: 4, beta: 2, alphaDelta: 0, betaDelta: 0);
       expect(s.alpha, 4);
       expect(s.beta, 2);
     });
@@ -127,8 +117,10 @@ void main() {
       // Just one signal short on mean.
       expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(3, 1)), isFalse);
       // Just one short on evidence.
-      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(2.4, 0.6)),
-          isFalse);
+      expect(
+        meetsMasteryMeanAndEvidence(const BeliefSnapshot(2.4, 0.6)),
+        isFalse,
+      );
     });
 
     test('stuck: ≥ 8 evidence and mean < 0.6', () {
@@ -154,10 +146,12 @@ void main() {
       expect(isPracticeable(const BeliefSnapshot(10, 5)), isTrue);
       // Right at the threshold.
       expect(
-        isPracticeable(BeliefSnapshot(
-          PolicyConstants.evidenceCap - PolicyConstants.saturationSlack,
-          0,
-        )),
+        isPracticeable(
+          BeliefSnapshot(
+            PolicyConstants.evidenceCap - PolicyConstants.saturationSlack,
+            0,
+          ),
+        ),
         isFalse,
       );
     });

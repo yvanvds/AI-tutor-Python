@@ -57,16 +57,19 @@ class GoalTile extends ConsumerWidget {
                     ElevatedButton.icon(
                       onPressed: () async {
                         final newProgress = (progress + 0.1).clamp(0.0, 1.0);
-                        await ref.read(progressServiceProvider).upsert(
-                          Progress(goalID: goal.id, progress: newProgress),
-                        );
+                        await ref
+                            .read(progressServiceProvider)
+                            .upsert(
+                              Progress(goalID: goal.id, progress: newProgress),
+                            );
                         ref
                             .read(progressServiceProvider)
                             .setCurrentProgress(newProgress);
                       },
                       icon: const Icon(Icons.fast_forward),
-                      label:
-                          Text(AppLocalizations.of(context).goalTile_button_faster),
+                      label: Text(
+                        AppLocalizations.of(context).goalTile_button_faster,
+                      ),
                     ),
                   if (!readOnly && isSubgoal)
                     ElevatedButton.icon(
@@ -76,9 +79,9 @@ class GoalTile extends ConsumerWidget {
                         sel.setPreferredRoot(rootGoal);
 
                         if (progress >= 1.0) {
-                          await ref.read(progressServiceProvider).upsert(
-                            Progress(goalID: goal.id, progress: 0.5),
-                          );
+                          await ref
+                              .read(progressServiceProvider)
+                              .upsert(Progress(goalID: goal.id, progress: 0.5));
                           ref
                               .read(progressServiceProvider)
                               .setCurrentProgress(0.5);
@@ -92,8 +95,9 @@ class GoalTile extends ConsumerWidget {
                             .read(tutorServiceProvider.notifier)
                             .initializeSession(force: true);
                       },
-                      label:
-                          Text(AppLocalizations.of(context).goalTile_button_workOn),
+                      label: Text(
+                        AppLocalizations.of(context).goalTile_button_workOn,
+                      ),
                       icon: const Icon(Icons.play_arrow),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,

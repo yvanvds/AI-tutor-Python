@@ -20,24 +20,33 @@ void main() {
       expect(paths.hostScript, r'C:\bundle\host.py');
     });
 
-    test('falls through to installer layout when only PY_RUNNER_PYTHON is set',
-        () async {
-      final locator = InstallerPyHostLocator(
-        appDir: r'C:\does-not-exist',
-        environment: const {'PY_RUNNER_PYTHON': r'C:\bundle\python.exe'},
-      );
-      await expectLater(locator.resolve(), throwsA(isA<PyRunnerNotInstalled>()));
-    });
+    test(
+      'falls through to installer layout when only PY_RUNNER_PYTHON is set',
+      () async {
+        final locator = InstallerPyHostLocator(
+          appDir: r'C:\does-not-exist',
+          environment: const {'PY_RUNNER_PYTHON': r'C:\bundle\python.exe'},
+        );
+        await expectLater(
+          locator.resolve(),
+          throwsA(isA<PyRunnerNotInstalled>()),
+        );
+      },
+    );
 
     test(
-        'falls through to installer layout when only PY_RUNNER_HOST_SCRIPT is set',
-        () async {
-      final locator = InstallerPyHostLocator(
-        appDir: r'C:\does-not-exist',
-        environment: const {'PY_RUNNER_HOST_SCRIPT': r'C:\bundle\host.py'},
-      );
-      await expectLater(locator.resolve(), throwsA(isA<PyRunnerNotInstalled>()));
-    });
+      'falls through to installer layout when only PY_RUNNER_HOST_SCRIPT is set',
+      () async {
+        final locator = InstallerPyHostLocator(
+          appDir: r'C:\does-not-exist',
+          environment: const {'PY_RUNNER_HOST_SCRIPT': r'C:\bundle\host.py'},
+        );
+        await expectLater(
+          locator.resolve(),
+          throwsA(isA<PyRunnerNotInstalled>()),
+        );
+      },
+    );
 
     test('falls through when env vars are empty strings', () async {
       final locator = InstallerPyHostLocator(
@@ -47,7 +56,10 @@ void main() {
           'PY_RUNNER_HOST_SCRIPT': '',
         },
       );
-      await expectLater(locator.resolve(), throwsA(isA<PyRunnerNotInstalled>()));
+      await expectLater(
+        locator.resolve(),
+        throwsA(isA<PyRunnerNotInstalled>()),
+      );
     });
   });
 
