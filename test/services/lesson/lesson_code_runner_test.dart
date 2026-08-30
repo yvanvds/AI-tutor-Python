@@ -68,9 +68,8 @@ void main() {
         ),
       ).thenThrow(StateError('PyRunner is not ready (status: crashed)'));
 
-      final result = await PyLessonCodeRunner(
-        pyRunner: pyRunner,
-      ).run('print(1)');
+      final result = await PyLessonCodeRunner(pyRunner: pyRunner)
+          .run('print(1)');
 
       expect(result.hasError, isTrue);
       expect(result.stderr, contains('Python host error'));

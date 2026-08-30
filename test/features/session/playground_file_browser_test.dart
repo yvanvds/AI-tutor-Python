@@ -150,9 +150,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   }
 
-  CodeService editor(WidgetTester tester) => ProviderScope.containerOf(
-    tester.element(find.byType(PlaygroundView)),
-  ).read(codeServiceProvider(SessionMode.playground));
+  CodeService editor(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(PlaygroundView)))
+          .read(codeServiceProvider(SessionMode.playground));
 
   File fileFor(String name) => File(p.join(root.path, '$name.py'));
 

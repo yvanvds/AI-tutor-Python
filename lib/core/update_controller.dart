@@ -61,16 +61,17 @@ typedef ReleaseFeed = Future<UpdateInfo?> Function();
 
 /// Downloads [release]'s installer, reporting progress as a 0..1 fraction
 /// where the server declared a content length.
-typedef ReleaseDownloader =
-    Future<File> Function(
-      UpdateInfo release,
-      void Function(double fraction) onProgress,
-    );
+typedef ReleaseDownloader = Future<File> Function(
+  UpdateInfo release,
+  void Function(double fraction) onProgress,
+);
 
 /// Checks a downloaded installer against the hash published beside it.
 /// A `false` here is the one failure that must never reach [InstallerRunner].
-typedef ReleaseVerifier =
-    Future<bool> Function(File installer, String expectedSha256);
+typedef ReleaseVerifier = Future<bool> Function(
+  File installer,
+  String expectedSha256,
+);
 
 /// Hands the downloaded installer to Windows and ends this process so the
 /// installer can replace the files underneath it. Returns only if the

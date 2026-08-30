@@ -71,9 +71,8 @@ void main() {
 
       final svc = build();
       expect(await svc.getAccount('missing'), isNull);
-      verify(
-        () => container.read('missing', partitionKey: 'missing'),
-      ).called(1);
+      verify(() => container.read('missing', partitionKey: 'missing'))
+          .called(1);
     });
 
     test('maps a doc to an Account on hit', () async {

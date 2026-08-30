@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../core/debounce.dart';
 
 typedef TitleChanged = Future<void> Function(String newTitle);

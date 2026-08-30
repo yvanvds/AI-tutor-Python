@@ -382,9 +382,8 @@ void main() {
 
       testWidgets('a Cosmos failure during session start is reported instead '
           'of leaving an empty chat', (tester) async {
-        when(
-          () => conductor.setTarget(),
-        ).thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
+        when(() => conductor.setTarget())
+            .thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
 
         await mount(tester, locale);
 
@@ -399,9 +398,8 @@ void main() {
 
   testWidgets('switching the language re-renders the pills already in the '
       'chat', (tester) async {
-    when(
-      () => conductor.setTarget(),
-    ).thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
+    when(() => conductor.setTarget())
+        .thenThrow(CosmosException(kCosmosNetworkStatus, 'no route'));
 
     await mount(tester, const Locale('en'));
     expect(

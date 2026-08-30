@@ -142,9 +142,8 @@ class _Field extends StatelessWidget {
                 decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
-                  hintText: AppLocalizations.of(
-                    context,
-                  ).chat_composer_idle_hint,
+                  hintText: AppLocalizations.of(context)
+                      .chat_composer_idle_hint,
                   hintStyle: TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 14,

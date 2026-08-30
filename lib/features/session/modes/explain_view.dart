@@ -26,9 +26,8 @@ class ExplainView extends ConsumerWidget {
 
     if (child == null) {
       return _PlaceholderScreen(
-        message: AppLocalizations.of(
-          context,
-        ).session_explain_placeholder_noSubgoal,
+        message: AppLocalizations.of(context)
+            .session_explain_placeholder_noSubgoal,
       );
     }
 

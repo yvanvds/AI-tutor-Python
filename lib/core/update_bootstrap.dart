@@ -64,8 +64,10 @@ const List<String> kSilentInstallArguments = <String>[
 /// suite and `exit(0)` would take the test runner with it. Overriding
 /// [installerLauncherProvider] lets an end-to-end run drive the real feed,
 /// download and checksum wiring and then assert on the handover itself.
-typedef InstallerLauncher =
-    Future<void> Function(String executable, List<String> arguments);
+typedef InstallerLauncher = Future<void> Function(
+  String executable,
+  List<String> arguments,
+);
 
 /// The production launcher. Never returns.
 final installerLauncherProvider = Provider<InstallerLauncher>(

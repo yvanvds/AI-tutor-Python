@@ -61,9 +61,8 @@ class _ChatBody extends ConsumerWidget {
 
     return Chat(
       theme: ChatTheme.fromThemeData(Theme.of(context)).copyWith(
-        colors: ChatColors.fromThemeData(
-          Theme.of(context),
-        ).copyWith(surface: AppColors.ink1),
+        colors: ChatColors.fromThemeData(Theme.of(context))
+            .copyWith(surface: AppColors.ink1),
       ),
       chatController: chat.controller,
       currentUserId: 'You',
@@ -145,9 +144,8 @@ class _ChatBody extends ConsumerWidget {
                       fontSize: 14,
                       height: 1.55,
                     ),
-                    loadingText: AppLocalizations.of(
-                      context,
-                    ).chat_loading_thinking,
+                    loadingText: AppLocalizations.of(context)
+                        .chat_loading_thinking,
                   ),
                 ),
               ),

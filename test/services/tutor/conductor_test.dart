@@ -153,61 +153,58 @@ void main() {
   });
 
   group('integrate answer — basic belief update + cache', () {
-    test(
-      'a strong-positive @ medium increases α and updates progress cache',
-      () async {
-        final f = _Fakes();
-        final root = Goal(id: 'r', title: 'r', order: 0);
-        final subgoal = Goal(
-          id: 's',
-          title: 's',
-          parentId: 'r',
-          order: 0,
-          objectives: const [
-            LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+    test('a strong-positive @ medium increases α and updates progress cache', () async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 0,
+        objectives: const [
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+        ],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final plan = _expectQuestion(await c.planNext());
+      c.notePlannedQuestion(plan);
+
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'lo1',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
           ],
-        );
-        f.roots.add(root);
-        f.children[root.id] = [subgoal];
-        f.selection = GoalSelectionState(
-          selectedRoot: root,
-          selectedChild: subgoal,
-        );
-        f.calibration = const StudentCalibration(
-          difficulty: QuestionDifficulty.medium,
-        );
+        ),
+      );
 
-        final c = Conductor(deps: _buildDeps(f));
-        await c.setTarget();
-        final plan = _expectQuestion(await c.planNext());
-        c.notePlannedQuestion(plan);
-
-        final outcome = await c.integrateAnswer(
-          plan: plan,
-          answer: GradedAnswer(
-            overallQuality: AnswerQuality.correct,
-            signals: [
-              GradedSignal(
-                subgoalId: 's',
-                loId: 'lo1',
-                kind: LoSignalKind.positive,
-                strength: LoSignalStrength.strong,
-              ),
-            ],
-          ),
-        );
-
-        // Belief moved (α rose by 2.0 × 1.0 = 2.0).
-        final b = f.beliefs.values.single;
-        expect(b.alpha, closeTo(3.0, 1e-6));
-        expect(b.beta, closeTo(1.0, 1e-6));
-        // `lastPositiveAtCalibratedAt` set since signal was at calibration.
-        expect(b.lastPositiveAtCalibratedAt, isNotNull);
-        // Subgoal progress cached < 1.0 (one positive signal isn't yet mastery).
-        expect(outcome.subgoalAdvanced, isFalse);
-        expect(f.progressById[subgoal.id], isNotNull);
-      },
-    );
+      // Belief moved (α rose by 2.0 × 1.0 = 2.0).
+      final b = f.beliefs.values.single;
+      expect(b.alpha, closeTo(3.0, 1e-6));
+      expect(b.beta, closeTo(1.0, 1e-6));
+      // `lastPositiveAtCalibratedAt` set since signal was at calibration.
+      expect(b.lastPositiveAtCalibratedAt, isNotNull);
+      // Subgoal progress cached < 1.0 (one positive signal isn't yet mastery).
+      expect(outcome.subgoalAdvanced, isFalse);
+      expect(f.progressById[subgoal.id], isNotNull);
+    });
   });
 
   group('integrate answer — fallback synthesised on empty signals', () {

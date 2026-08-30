@@ -307,9 +307,8 @@ void main() {
   /// Drops any confirmation still on screen, so the next one asserted on is
   /// not queued behind it.
   Future<void> clearSnacks(WidgetTester tester) async {
-    ScaffoldMessenger.of(
-      tester.element(find.byType(OptionsPage)),
-    ).clearSnackBars();
+    ScaffoldMessenger.of(tester.element(find.byType(OptionsPage)))
+        .clearSnackBars();
     await tester.pumpAndSettle();
   }
 

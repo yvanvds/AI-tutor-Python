@@ -159,9 +159,8 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
 
   Future<void> _uploadHtml() async {
     if (_selectedGoalId == null) return;
-    final couldNotReadMessage = AppLocalizations.of(
-      context,
-    ).lesson_snack_couldNotRead;
+    final couldNotReadMessage = AppLocalizations.of(context)
+        .lesson_snack_couldNotRead;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['html', 'htm'],
@@ -357,9 +356,8 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
