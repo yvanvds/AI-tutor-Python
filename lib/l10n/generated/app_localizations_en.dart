@@ -559,6 +559,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lesson_default_moduleTitle => 'Python basics';
 
   @override
+  String get lesson_orphans_header => 'Orphaned lesson content';
+
+  @override
+  String get lesson_orphans_hint =>
+      'Not linked to any subgoal. Click to reassign.';
+
+  @override
+  String get lesson_reassign_dialog_title => 'Reassign lesson content';
+
+  @override
+  String lesson_reassign_dialog_message(String title) {
+    return 'Pick the subgoal that \"$title\" belongs to.';
+  }
+
+  @override
+  String get lesson_reassign_dialog_cancel => 'Cancel';
+
+  @override
+  String get lesson_reassign_dialog_noSubgoals =>
+      'There are no subgoals to assign to.';
+
+  @override
+  String get lesson_reassign_overwrite_title =>
+      'Replace existing lesson content?';
+
+  @override
+  String lesson_reassign_overwrite_message(String target, String title) {
+    return '\"$target\" already has lesson content. It will be replaced by \"$title\".';
+  }
+
+  @override
+  String get lesson_reassign_overwrite_cancel => 'Cancel';
+
+  @override
+  String get lesson_reassign_overwrite_confirm => 'Replace';
+
+  @override
+  String lesson_snack_reassigned(String target) {
+    return 'Lesson content linked to \"$target\".';
+  }
+
+  @override
   String get instructions_toolbar_title => 'Instructions';
 
   @override

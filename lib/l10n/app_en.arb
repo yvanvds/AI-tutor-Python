@@ -300,6 +300,26 @@
   "lesson_preview_empty": "The preview appears here as soon as you add HTML.",
   "lesson_subgoal_noContent": "(no lesson content)",
   "lesson_default_moduleTitle": "Python basics",
+  "lesson_orphans_header": "Orphaned lesson content",
+  "lesson_orphans_hint": "Not linked to any subgoal. Click to reassign.",
+  "lesson_reassign_dialog_title": "Reassign lesson content",
+  "lesson_reassign_dialog_message": "Pick the subgoal that \"{title}\" belongs to.",
+  "@lesson_reassign_dialog_message": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "lesson_reassign_dialog_cancel": "Cancel",
+  "lesson_reassign_dialog_noSubgoals": "There are no subgoals to assign to.",
+  "lesson_reassign_overwrite_title": "Replace existing lesson content?",
+  "lesson_reassign_overwrite_message": "\"{target}\" already has lesson content. It will be replaced by \"{title}\".",
+  "@lesson_reassign_overwrite_message": {
+    "placeholders": { "target": { "type": "String" }, "title": { "type": "String" } }
+  },
+  "lesson_reassign_overwrite_cancel": "Cancel",
+  "lesson_reassign_overwrite_confirm": "Replace",
+  "lesson_snack_reassigned": "Lesson content linked to \"{target}\".",
+  "@lesson_snack_reassigned": {
+    "placeholders": { "target": { "type": "String" } }
+  },
 
   "instructions_toolbar_title": "Instructions",
   "instructions_toolbar_tooltip_new": "New document",

@@ -12,8 +12,7 @@ class ContentService extends Notifier<List<Content>> {
 
   final CosmosContainer? _containerOverride;
 
-  CosmosContainer get _container =>
-      _containerOverride ?? CosmosPaths.content();
+  CosmosContainer get _container => _containerOverride ?? CosmosPaths.content();
 
   @override
   List<Content> build() {
@@ -47,6 +46,32 @@ class ContentService extends Notifier<List<Content>> {
     await safeCosmos(() => _container.delete(id, partitionKey: _pk));
   }
 
+  /// Moves an orphaned content doc under [targetGoalId], keeping the
+  /// "content id mirrors the subgoal id" invariant: the body is upserted as a
+  /// new doc with id == [targetGoalId] (overwriting whatever was there), and
+  /// the old doc is deleted when its id differs. Returns the new doc.
+  ///
+  /// The caller is responsible for setting `Goal.contentId` on the target;
+  /// this service doesn't know about goals. The cached list is patched
+  /// optimistically so the UI doesn't have to wait for the next poll.
+  Future<Content> reassign(Content orphan, String targetGoalId) async {
+    final moved = Content(
+      id: targetGoalId,
+      title: orphan.title,
+      body: orphan.body,
+    );
+    await upsert(moved);
+    if (orphan.id != targetGoalId) {
+      await delete(orphan.id);
+    }
+    state = List.unmodifiable([
+      for (final c in state)
+        if (c.id != orphan.id && c.id != targetGoalId) c,
+      moved,
+    ]);
+    return moved;
+  }
+
   Future<List<Content>> _fetchAll() async {
     final docs = await _container.query(
       'SELECT * FROM c ORDER BY c.title',
@@ -62,5 +87,6 @@ class ContentService extends Notifier<List<Content>> {
   }
 }
 
-final contentServiceProvider =
-    NotifierProvider<ContentService, List<Content>>(ContentService.new);
+final contentServiceProvider = NotifierProvider<ContentService, List<Content>>(
+  ContentService.new,
+);

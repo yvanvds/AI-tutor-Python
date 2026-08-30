@@ -565,6 +565,48 @@ class AppLocalizationsNl extends AppLocalizations {
   String get lesson_default_moduleTitle => 'Python basics';
 
   @override
+  String get lesson_orphans_header => 'Verweesde lesinhoud';
+
+  @override
+  String get lesson_orphans_hint =>
+      'Aan geen enkel subdoel gekoppeld. Klik om opnieuw te koppelen.';
+
+  @override
+  String get lesson_reassign_dialog_title => 'Lesinhoud opnieuw koppelen';
+
+  @override
+  String lesson_reassign_dialog_message(String title) {
+    return 'Kies het subdoel waar \"$title\" bij hoort.';
+  }
+
+  @override
+  String get lesson_reassign_dialog_cancel => 'Annuleren';
+
+  @override
+  String get lesson_reassign_dialog_noSubgoals =>
+      'Er zijn geen subdoelen om aan te koppelen.';
+
+  @override
+  String get lesson_reassign_overwrite_title =>
+      'Bestaande lesinhoud vervangen?';
+
+  @override
+  String lesson_reassign_overwrite_message(String target, String title) {
+    return '\"$target\" heeft al lesinhoud. Die wordt vervangen door \"$title\".';
+  }
+
+  @override
+  String get lesson_reassign_overwrite_cancel => 'Annuleren';
+
+  @override
+  String get lesson_reassign_overwrite_confirm => 'Vervangen';
+
+  @override
+  String lesson_snack_reassigned(String target) {
+    return 'Lesinhoud gekoppeld aan \"$target\".';
+  }
+
+  @override
   String get instructions_toolbar_title => 'Instructies';
 
   @override

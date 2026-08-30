@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
+import 'package:ai_tutor_python/services/content/orphaned_content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/module/module.dart';
@@ -88,8 +89,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     if (_original == null) {
       return _workingTitle.isNotEmpty || _workingBody.isNotEmpty;
     }
-    return _original!.title != _workingTitle ||
-        _original!.body != _workingBody;
+    return _original!.title != _workingTitle || _original!.body != _workingBody;
   }
 
   void _onEditorChanged() {
@@ -110,10 +110,10 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     if (cid != null && cid.isNotEmpty) {
       // Cache fast-path; fall back to a fetch if not in the latest poll.
       final cached = ref.read(contentServiceProvider);
-      loaded = cached.where((c) => c.id == cid).cast<Content?>().firstWhere(
-            (c) => true,
-            orElse: () => null,
-          );
+      loaded = cached
+          .where((c) => c.id == cid)
+          .cast<Content?>()
+          .firstWhere((c) => true, orElse: () => null);
       loaded ??= await ref.read(contentServiceProvider.notifier).getById(cid);
     }
 
@@ -159,8 +159,9 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
 
   Future<void> _uploadHtml() async {
     if (_selectedGoalId == null) return;
-    final couldNotReadMessage =
-        AppLocalizations.of(context).lesson_snack_couldNotRead;
+    final couldNotReadMessage = AppLocalizations.of(
+      context,
+    ).lesson_snack_couldNotRead;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['html', 'htm'],
@@ -235,6 +236,126 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     });
   }
 
+  /// Reassign flow for a content doc no goal points to (see
+  /// `orphanedContent`). Asks for a target subgoal, confirms an overwrite
+  /// when that subgoal already has content, then moves the doc under the
+  /// target id and links the goal to it.
+  Future<void> _reassignOrphan(Content orphan, List<Goal> goals) async {
+    final target = await _pickReassignTarget(orphan, goals);
+    if (target == null || !mounted) return;
+
+    final existingCid = target.contentId;
+    if (existingCid != null && existingCid.isNotEmpty) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final l = AppLocalizations.of(ctx);
+          return AlertDialog(
+            title: Text(l.lesson_reassign_overwrite_title),
+            content: Text(
+              l.lesson_reassign_overwrite_message(target.title, orphan.title),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(l.lesson_reassign_overwrite_cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(l.lesson_reassign_overwrite_confirm),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true || !mounted) return;
+    }
+
+    final contentSvc = ref.read(contentServiceProvider.notifier);
+    final goalsSvc = ref.read(goalsServiceProvider);
+    final moved = await contentSvc.reassign(orphan, target.id);
+    if (target.contentId != moved.id) {
+      await goalsSvc.setContentId(target.id, moved.id);
+    }
+    if (!mounted) return;
+    // If the target was open in the editor, refresh it with the moved doc.
+    if (_selectedGoalId == target.id) {
+      setState(() {
+        _original = moved;
+        _workingTitle = moved.title;
+        _workingBody = moved.body;
+        _titleCtrl.value = TextEditingValue(
+          text: _workingTitle,
+          selection: TextSelection.collapsed(offset: _workingTitle.length),
+        );
+        _bodyCtrl.text = _workingBody;
+      });
+    }
+    _showSnack(
+      AppLocalizations.of(context).lesson_snack_reassigned(target.title),
+    );
+  }
+
+  Future<Goal?> _pickReassignTarget(Content orphan, List<Goal> goals) {
+    final byId = {for (final g in goals) g.id: g};
+    final subgoals = goals.where((g) => g.parentId != null).toList()
+      ..sort((a, b) {
+        final pa = byId[a.parentId]?.order ?? 0;
+        final pb = byId[b.parentId]?.order ?? 0;
+        if (pa != pb) return pa.compareTo(pb);
+        return a.order.compareTo(b.order);
+      });
+
+    return showDialog<Goal>(
+      context: context,
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.lesson_reassign_dialog_title),
+          content: SizedBox(
+            width: 420,
+            child: subgoals.isEmpty
+                ? Text(l.lesson_reassign_dialog_noSubgoals)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l.lesson_reassign_dialog_message(orphan.title)),
+                      const SizedBox(height: AppSpacing.m),
+                      Flexible(
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            for (final sg in subgoals)
+                              ListTile(
+                                dense: true,
+                                leading: Icon(
+                                  sg.contentId == null
+                                      ? Icons.add_circle_outline
+                                      : Icons.article_outlined,
+                                  size: 16,
+                                ),
+                                title: Text(sg.title),
+                                subtitle: Text(byId[sg.parentId]?.title ?? ''),
+                                onTap: () => Navigator.of(ctx).pop(sg),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(l.lesson_reassign_dialog_cancel),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showSnack(String message) {
     ScaffoldMessenger.of(
       context,
@@ -279,8 +400,9 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Text(
-                                    AppLocalizations.of(context).lesson_loadError(
-                                        snap.error.toString()),
+                                    AppLocalizations.of(
+                                      context,
+                                    ).lesson_loadError(snap.error.toString()),
                                   ),
                                 ),
                               );
@@ -288,10 +410,12 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                             final goals = snap.data ?? const <Goal>[];
                             return Consumer(
                               builder: (context, ref, _) {
-                                final modules =
-                                    ref.watch(moduleServiceProvider);
-                                final contentList =
-                                    ref.watch(contentServiceProvider);
+                                final modules = ref.watch(
+                                  moduleServiceProvider,
+                                );
+                                final contentList = ref.watch(
+                                  contentServiceProvider,
+                                );
                                 return _GoalTree(
                                   goals: goals,
                                   modules: modules,
@@ -300,6 +424,9 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                                   },
                                   selectedGoalId: _selectedGoalId,
                                   onSelect: _selectGoal,
+                                  orphans: orphanedContent(goals, contentList),
+                                  onReassignOrphan: (c) =>
+                                      _reassignOrphan(c, goals),
                                 );
                               },
                             );
@@ -459,7 +586,8 @@ class _Toolbar extends StatelessWidget {
             icon: const Icon(Icons.save, size: 16),
             onPressed: hasSelection ? onSave : null,
             label: Text(
-                isDirty ? l.lesson_toolbar_save_dirty : l.lesson_toolbar_save),
+              isDirty ? l.lesson_toolbar_save_dirty : l.lesson_toolbar_save,
+            ),
           ),
         ],
       ),
@@ -474,6 +602,8 @@ class _GoalTree extends StatelessWidget {
     required this.contentById,
     required this.selectedGoalId,
     required this.onSelect,
+    required this.orphans,
+    required this.onReassignOrphan,
   });
 
   final List<Goal> goals;
@@ -481,6 +611,12 @@ class _GoalTree extends StatelessWidget {
   final Map<String, Content> contentById;
   final String? selectedGoalId;
   final ValueChanged<Goal> onSelect;
+
+  /// Content docs no goal references (typically left behind by a Replace
+  /// import that changed subgoal ids). Rendered in a trailing section so the
+  /// teacher can see them and reassign instead of losing the work.
+  final List<Content> orphans;
+  final ValueChanged<Content> onReassignOrphan;
 
   @override
   Widget build(BuildContext context) {
@@ -501,11 +637,13 @@ class _GoalTree extends StatelessWidget {
 
     final ordered = [...modules]..sort((a, b) => a.order.compareTo(b.order));
     if (ordered.isEmpty || !ordered.any((m) => m.id == Module.defaultId)) {
-      ordered.add(Module(
-        id: Module.defaultId,
-        title: AppLocalizations.of(context).lesson_default_moduleTitle,
-        order: 0,
-      ));
+      ordered.add(
+        Module(
+          id: Module.defaultId,
+          title: AppLocalizations.of(context).lesson_default_moduleTitle,
+          order: 0,
+        ),
+      );
     }
 
     return ListView(
@@ -515,8 +653,7 @@ class _GoalTree extends StatelessWidget {
           _ModuleHeader(title: m.title),
           for (final root in byModule[m.id] ?? const <Goal>[]) ...[
             _RootRow(goal: root),
-            for (final child
-                in (byParent[root.id] ?? const <Goal>[]))
+            for (final child in (byParent[root.id] ?? const <Goal>[]))
               _SubgoalRow(
                 goal: child,
                 content: child.contentId == null
@@ -527,7 +664,70 @@ class _GoalTree extends StatelessWidget {
               ),
           ],
         ],
+        if (orphans.isNotEmpty) ...[
+          _ModuleHeader(
+            title: AppLocalizations.of(context).lesson_orphans_header,
+          ),
+          for (final c in orphans)
+            _OrphanRow(content: c, onTap: () => onReassignOrphan(c)),
+        ],
       ],
+    );
+  }
+}
+
+class _OrphanRow extends StatelessWidget {
+  const _OrphanRow({required this.content, required this.onTap});
+
+  final Content content;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: 6,
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: AppSpacing.m),
+            const Icon(Icons.link_off, size: 14, color: AppColors.danger),
+            const SizedBox(width: AppSpacing.s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    content.title.isEmpty ? content.id : content.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.fg,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    l.lesson_orphans_hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.fgFaint,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -612,7 +812,9 @@ class _SubgoalRowState extends State<_SubgoalRow> {
 
     final bg = widget.selected
         ? AppColors.ink2
-        : (_hovering ? AppColors.ink2.withValues(alpha: 0.6) : Colors.transparent);
+        : (_hovering
+              ? AppColors.ink2.withValues(alpha: 0.6)
+              : Colors.transparent);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -631,9 +833,7 @@ class _SubgoalRowState extends State<_SubgoalRow> {
             children: [
               const SizedBox(width: AppSpacing.m),
               Icon(
-                hasContent
-                    ? Icons.article_outlined
-                    : Icons.add_circle_outline,
+                hasContent ? Icons.article_outlined : Icons.add_circle_outline,
                 size: 14,
                 color: hasContent ? AppColors.accent : AppColors.fgFaint,
               ),

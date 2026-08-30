@@ -1061,6 +1061,72 @@ abstract class AppLocalizations {
   /// **'Python basics'**
   String get lesson_default_moduleTitle;
 
+  /// No description provided for @lesson_orphans_header.
+  ///
+  /// In en, this message translates to:
+  /// **'Orphaned lesson content'**
+  String get lesson_orphans_header;
+
+  /// No description provided for @lesson_orphans_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not linked to any subgoal. Click to reassign.'**
+  String get lesson_orphans_hint;
+
+  /// No description provided for @lesson_reassign_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassign lesson content'**
+  String get lesson_reassign_dialog_title;
+
+  /// No description provided for @lesson_reassign_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the subgoal that \"{title}\" belongs to.'**
+  String lesson_reassign_dialog_message(String title);
+
+  /// No description provided for @lesson_reassign_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lesson_reassign_dialog_cancel;
+
+  /// No description provided for @lesson_reassign_dialog_noSubgoals.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no subgoals to assign to.'**
+  String get lesson_reassign_dialog_noSubgoals;
+
+  /// No description provided for @lesson_reassign_overwrite_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing lesson content?'**
+  String get lesson_reassign_overwrite_title;
+
+  /// No description provided for @lesson_reassign_overwrite_message.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{target}\" already has lesson content. It will be replaced by \"{title}\".'**
+  String lesson_reassign_overwrite_message(String target, String title);
+
+  /// No description provided for @lesson_reassign_overwrite_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lesson_reassign_overwrite_cancel;
+
+  /// No description provided for @lesson_reassign_overwrite_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get lesson_reassign_overwrite_confirm;
+
+  /// No description provided for @lesson_snack_reassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson content linked to \"{target}\".'**
+  String lesson_snack_reassigned(String target);
+
   /// No description provided for @instructions_toolbar_title.
   ///
   /// In en, this message translates to:
