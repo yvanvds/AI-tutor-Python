@@ -12,9 +12,6 @@ class AppLocalizationsNl extends AppLocalizations {
   String get appTitle => 'Python Cursus';
 
   @override
-  String get settings_menuTitle => 'Instellingen';
-
-  @override
   String get settings_language_label => 'Taal';
 
   @override
@@ -27,13 +24,7 @@ class AppLocalizationsNl extends AppLocalizations {
   String get settings_language_dutch => 'Nederlands';
 
   @override
-  String get sidebar_settings_tooltip => 'Instellingen';
-
-  @override
   String get sidebar_signOut_tooltip => 'Afmelden';
-
-  @override
-  String get sidebar_debug_tooltip => 'Debug';
 
   @override
   String get sidebar_teacherHeader => 'Docent';
@@ -55,6 +46,269 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get sidebar_section_students => 'Studenten';
+
+  @override
+  String get sidebar_section_options => 'Opties';
+
+  @override
+  String get options_page_title => 'Opties';
+
+  @override
+  String get options_page_subtitle =>
+      'Instellingen, onderhoud en bugmeldingen.';
+
+  @override
+  String get options_language_title => 'Taal';
+
+  @override
+  String get options_language_subtitle =>
+      'Wordt meteen toegepast; \"Systeem\" volgt het besturingssysteem.';
+
+  @override
+  String get options_progress_title => 'Voortgang';
+
+  @override
+  String get options_progress_subtitle =>
+      'Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetAll_button => 'Alle voortgang wissen';
+
+  @override
+  String get options_progress_resetAll_dialog_title => 'Alle voortgang wissen?';
+
+  @override
+  String get options_progress_resetAll_dialog_message =>
+      'Dit verwijdert alle voortgang, leergeschiedenis en tutorinschattingen van je account en zet de moeilijkheidsgraad terug op gemiddeld. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetAll_dialog_confirm => 'Alles wissen';
+
+  @override
+  String get options_progress_resetAll_done => 'Alle voortgang is gewist.';
+
+  @override
+  String get options_progress_resetGoal_button => 'Eén doel wissen…';
+
+  @override
+  String get options_progress_resetGoal_dialog_title =>
+      'Voortgang van een doel wissen';
+
+  @override
+  String get options_progress_resetGoal_dialog_message =>
+      'Kies een doel of subdoel. Een doel wissen wist al zijn subdoelen.';
+
+  @override
+  String get options_progress_resetGoal_dialog_empty =>
+      'Er zijn nog geen doelen.';
+
+  @override
+  String options_progress_resetGoal_dialog_loadError(String error) {
+    return 'Doelen laden mislukt: $error';
+  }
+
+  @override
+  String options_progress_resetGoal_confirm_title(String title) {
+    return '\"$title\" wissen?';
+  }
+
+  @override
+  String get options_progress_resetGoal_confirm_message_subgoal =>
+      'Voortgang, leergeschiedenis en tutorinschattingen voor dit subdoel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetGoal_confirm_message_root =>
+      'Voortgang, leergeschiedenis en tutorinschattingen voor elk subdoel van dit doel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetGoal_confirm_button => 'Wissen';
+
+  @override
+  String options_progress_resetGoal_done(String title) {
+    return 'Voortgang van \"$title\" is gewist.';
+  }
+
+  @override
+  String options_progress_resetFailed(String error) {
+    return 'Wissen mislukt: $error';
+  }
+
+  @override
+  String get options_dialog_cancel => 'Annuleren';
+
+  @override
+  String get options_apiKey_title => 'OpenAI API-sleutel';
+
+  @override
+  String get options_apiKey_subtitle =>
+      'Je eigen sleutel, opgeslagen op dit toestel. Als je ze verwijdert, kom je terug op het sleutelscherm.';
+
+  @override
+  String get options_apiKey_status_present =>
+      'Er is een sleutel opgeslagen op dit toestel.';
+
+  @override
+  String get options_apiKey_status_missing =>
+      'Geen sleutel opgeslagen op dit toestel.';
+
+  @override
+  String get options_apiKey_change_button => 'Sleutel wijzigen';
+
+  @override
+  String get options_apiKey_remove_button => 'Sleutel verwijderen';
+
+  @override
+  String get options_apiKey_dialog_title => 'API-sleutel wijzigen';
+
+  @override
+  String get options_apiKey_dialog_field => 'Nieuwe API-sleutel';
+
+  @override
+  String get options_apiKey_dialog_save => 'Opslaan';
+
+  @override
+  String get options_apiKey_saved => 'API-sleutel bijgewerkt.';
+
+  @override
+  String get options_apiKey_remove_dialog_title => 'API-sleutel verwijderen?';
+
+  @override
+  String get options_apiKey_remove_dialog_message =>
+      'Zonder sleutel kan de tutor niet antwoorden. Je wordt meteen om een nieuwe sleutel gevraagd.';
+
+  @override
+  String get options_apiKey_remove_dialog_confirm => 'Verwijderen';
+
+  @override
+  String get options_apiKey_removed => 'API-sleutel verwijderd.';
+
+  @override
+  String get options_bugReport_title => 'Bugmeldingen';
+
+  @override
+  String get options_bugReport_subtitle =>
+      'Maak rechtstreeks vanuit de app een issue aan op GitHub, met de debuggegevens van een recente tutorbeurt erbij.';
+
+  @override
+  String get options_bugReport_github_notConnected =>
+      'Niet verbonden met GitHub.';
+
+  @override
+  String options_bugReport_github_connectedAs(String login) {
+    return 'Verbonden met GitHub als $login.';
+  }
+
+  @override
+  String get options_bugReport_github_connect_button => 'GitHub verbinden';
+
+  @override
+  String get options_bugReport_github_disconnect_button =>
+      'Verbinding verbreken';
+
+  @override
+  String get options_bugReport_github_dialog_title => 'GitHub verbinden';
+
+  @override
+  String options_bugReport_github_dialog_explainer(String repo) {
+    return 'Plak een personal access token dat issues mag aanmaken op $repo. Het token wordt enkel op dit toestel bewaard.';
+  }
+
+  @override
+  String get options_bugReport_github_dialog_field => 'Personal access token';
+
+  @override
+  String get options_bugReport_github_dialog_connect => 'Verbinden';
+
+  @override
+  String options_bugReport_github_connectFailed(String error) {
+    return 'Verbinden mislukt: $error';
+  }
+
+  @override
+  String get options_bugReport_report_button => 'Bug melden…';
+
+  @override
+  String get options_bugReport_dialog_title => 'Bug melden';
+
+  @override
+  String get options_bugReport_dialog_titleField => 'Titel';
+
+  @override
+  String get options_bugReport_dialog_titleRequired => 'Geef een titel op.';
+
+  @override
+  String get options_bugReport_dialog_descriptionField => 'Wat ging er mis?';
+
+  @override
+  String get options_bugReport_dialog_turnField => 'Tutorbeurt bijvoegen';
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'Geen beurt';
+
+  @override
+  String options_bugReport_dialog_turnLabel(int id, String type) {
+    return '#$id $type';
+  }
+
+  @override
+  String get options_bugReport_dialog_submit => 'Issue plaatsen';
+
+  @override
+  String options_bugReport_posted(String url) {
+    return 'Issue geplaatst: $url';
+  }
+
+  @override
+  String options_bugReport_postFailed(String error) {
+    return 'Plaatsen mislukt: $error';
+  }
+
+  @override
+  String get options_developer_title => 'Ontwikkelaarstools';
+
+  @override
+  String get options_developer_subtitle =>
+      'Enkel zichtbaar in ontwikkelaarsbuilds.';
+
+  @override
+  String get options_developer_levelUp_button => 'Level-up-overlay tonen';
+
+  @override
+  String get options_developer_triggerQuestion_title => 'Vraag starten';
+
+  @override
+  String get options_developer_difficulty_label => 'Moeilijkheid:';
+
+  @override
+  String get options_developer_recentTurns_title => 'Recente beurten';
+
+  @override
+  String get options_developer_recentTurns_copyAll => 'Alles kopiëren';
+
+  @override
+  String options_developer_recentTurns_copied(int count) {
+    return '$count beurten naar het klembord gekopieerd.';
+  }
+
+  @override
+  String get options_developer_recentTurns_empty =>
+      'Nog geen beurten opgenomen.';
+
+  @override
+  String options_developer_turnDetail_title(int id) {
+    return 'Beurt #$id';
+  }
+
+  @override
+  String get options_developer_turnDetail_close => 'Sluiten';
+
+  @override
+  String get options_about_title => 'Over';
+
+  @override
+  String options_about_version(String version) {
+    return 'Versie $version';
+  }
 
   @override
   String get session_mode_explain => 'Uitleg';
@@ -194,6 +448,94 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get session_playground_subtitle => 'Geen doel — alleen jij en Python.';
+
+  @override
+  String get session_playground_open_button => 'Openen';
+
+  @override
+  String get session_playground_open_tooltip => 'Opgeslagen code openen';
+
+  @override
+  String get session_playground_save_button => 'Opslaan';
+
+  @override
+  String get session_playground_save_tooltip => 'Deze code opslaan';
+
+  @override
+  String get session_playground_dialog_cancel => 'Annuleren';
+
+  @override
+  String get session_playground_saveDialog_title => 'Code opslaan';
+
+  @override
+  String get session_playground_saveDialog_nameLabel => 'Bestandsnaam';
+
+  @override
+  String get session_playground_saveDialog_invalidName =>
+      'Gebruik letters, cijfers, spaties, - of _ (max. 60 tekens).';
+
+  @override
+  String get session_playground_saveDialog_confirm => 'Opslaan';
+
+  @override
+  String session_playground_overwriteDialog_title(String name) {
+    return '\"$name\" overschrijven?';
+  }
+
+  @override
+  String get session_playground_overwriteDialog_message =>
+      'Er bestaat al een bestand met deze naam.';
+
+  @override
+  String get session_playground_overwriteDialog_confirm => 'Overschrijven';
+
+  @override
+  String get session_playground_openDialog_title => 'Opgeslagen code openen';
+
+  @override
+  String get session_playground_openDialog_empty =>
+      'Nog geen opgeslagen bestanden.';
+
+  @override
+  String get session_playground_openDialog_delete_tooltip => 'Verwijderen';
+
+  @override
+  String session_playground_deleteDialog_title(String name) {
+    return '\"$name\" verwijderen?';
+  }
+
+  @override
+  String get session_playground_deleteDialog_message =>
+      'Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get session_playground_deleteDialog_confirm => 'Verwijderen';
+
+  @override
+  String get session_playground_discardDialog_title =>
+      'Huidige code vervangen?';
+
+  @override
+  String get session_playground_discardDialog_message =>
+      'Je niet-opgeslagen wijzigingen gaan verloren.';
+
+  @override
+  String get session_playground_discardDialog_confirm => 'Vervangen';
+
+  @override
+  String session_playground_snack_saved(String name) {
+    return 'Opgeslagen als \"$name\".';
+  }
+
+  @override
+  String session_playground_snack_saveFailed(String error) {
+    return 'Opslaan mislukt: $error';
+  }
+
+  @override
+  String session_playground_snack_openFailed(String error) {
+    return 'Openen mislukt: $error';
+  }
 
   @override
   String get session_quiz_pill => 'Quizvraag';
@@ -412,6 +754,24 @@ class AppLocalizationsNl extends AppLocalizations {
       'Typ een lestip en druk op Enter';
 
   @override
+  String get goals_editor_teachingTips_empty => 'Nog geen lestips.';
+
+  @override
+  String get goals_editor_teachingTips_add => 'Toevoegen';
+
+  @override
+  String get goals_editor_teachingTips_edit => 'Tip bewerken';
+
+  @override
+  String get goals_editor_teachingTips_delete => 'Tip verwijderen';
+
+  @override
+  String get goals_editor_teachingTips_save => 'Opslaan';
+
+  @override
+  String get goals_editor_teachingTips_cancel => 'Annuleer';
+
+  @override
   String get goals_editor_lesinhoud_label => 'Lesinhoud';
 
   @override
@@ -563,6 +923,61 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get lesson_default_moduleTitle => 'Python basics';
+
+  @override
+  String get lesson_orphans_header => 'Verweesde lesinhoud';
+
+  @override
+  String get lesson_orphans_hint =>
+      'Aan geen enkel subdoel gekoppeld. Klik om opnieuw te koppelen.';
+
+  @override
+  String get lesson_reassign_dialog_title => 'Lesinhoud opnieuw koppelen';
+
+  @override
+  String lesson_reassign_dialog_message(String title) {
+    return 'Kies het subdoel waar \"$title\" bij hoort.';
+  }
+
+  @override
+  String get lesson_reassign_dialog_cancel => 'Annuleren';
+
+  @override
+  String get lesson_reassign_dialog_noSubgoals =>
+      'Er zijn geen subdoelen om aan te koppelen.';
+
+  @override
+  String get lesson_reassign_overwrite_title =>
+      'Bestaande lesinhoud vervangen?';
+
+  @override
+  String lesson_reassign_overwrite_message(String target, String title) {
+    return '\"$target\" heeft al lesinhoud. Die wordt vervangen door \"$title\".';
+  }
+
+  @override
+  String get lesson_reassign_overwrite_cancel => 'Annuleren';
+
+  @override
+  String get lesson_reassign_overwrite_confirm => 'Vervangen';
+
+  @override
+  String lesson_snack_reassigned(String target) {
+    return 'Lesinhoud gekoppeld aan \"$target\".';
+  }
+
+  @override
+  String get lesson_run_output_label => 'Uitvoer';
+
+  @override
+  String get lesson_run_button => 'Uitvoeren';
+
+  @override
+  String get lesson_run_running => 'Aan het uitvoeren…';
+
+  @override
+  String get lesson_run_unavailable =>
+      'Het voorbeeld kan alleen in de app worden uitgevoerd.';
 
   @override
   String get instructions_toolbar_title => 'Instructies';

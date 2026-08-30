@@ -1,9 +1,9 @@
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
-import 'package:ai_tutor_python/features/dashboard/debug_dialog.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
+import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -14,7 +14,6 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,11 +35,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
+    final devTools = ref.watch(developerToolsProvider);
 
-    // If a teacher-only section is active but the user is not a teacher,
-    // bounce back to the default section. Schedule the state mutation for
-    // after this build to keep Riverpod happy.
-    if (section.isTeacherOnly && !profile.isTeacher) {
+    // If a teacher-only section is active but the user is not a teacher (or
+    // a developer-only section without developer tools), bounce back to the
+    // default section. Schedule the state mutation for after this build to
+    // keep Riverpod happy.
+    if ((section.isTeacherOnly && !profile.isTeacher) ||
+        (section.isDeveloperOnly && !devTools)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(sectionProvider.notifier).state = Section.session;
       });
@@ -52,9 +54,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           Row(
             children: [
-              Sidebar(
-                onDebug: kDebugMode ? () => _openDebugDialog(context) : null,
-              ),
+              const Sidebar(),
               Expanded(
                 child: Column(
                   children: [
@@ -86,14 +86,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const InstructionsEditorPage();
       case Section.students:
         return const AccountsPage();
+      case Section.options:
+        return const OptionsPage();
     }
-  }
-
-  void _openDebugDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => const DebugDialog(),
-    );
   }
 
   Future<void> _checkForUpdate() async {

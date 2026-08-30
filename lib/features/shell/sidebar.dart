@@ -1,4 +1,3 @@
-import 'package:ai_tutor_python/features/shell/settings_menu.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -9,9 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const double sidebarWidth = 72;
 
 class Sidebar extends ConsumerWidget {
-  const Sidebar({super.key, this.onDebug});
-
-  final VoidCallback? onDebug;
+  const Sidebar({super.key});
 
   static const _studentSections = [
     Section.session,
@@ -29,6 +26,9 @@ class Sidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
     final selected = ref.watch(sectionProvider);
+    final devTools = ref.watch(developerToolsProvider);
+    final teacherSections =
+        _teacherSections.where((s) => devTools || !s.isDeveloperOnly);
 
     return Container(
       width: sidebarWidth,
@@ -53,7 +53,7 @@ class Sidebar extends ConsumerWidget {
               label: AppLocalizations.of(context).sidebar_teacherHeader,
             ),
             const SizedBox(height: AppSpacing.s),
-            ..._teacherSections.map(
+            ...teacherSections.map(
               (s) => _SidebarItem(
                 section: s,
                 icon: _iconFor(s),
@@ -63,18 +63,14 @@ class Sidebar extends ConsumerWidget {
             ),
           ],
           const Spacer(),
-          if (onDebug != null)
-            _SidebarIconButton(
-              tooltip: AppLocalizations.of(context).sidebar_debug_tooltip,
-              icon: Icons.bug_report_outlined,
-              onTap: onDebug!,
-            ),
-          Builder(
-            builder: (settingsCtx) => _SidebarIconButton(
-              tooltip: AppLocalizations.of(context).sidebar_settings_tooltip,
-              icon: Icons.settings_outlined,
-              onTap: () => showSettingsMenu(settingsCtx, ref),
-            ),
+          // Options panel (issue #25): settings, progress reset, API key,
+          // bug reports and — behind the developer gate — the debug tools.
+          _SidebarItem(
+            section: Section.options,
+            icon: _iconFor(Section.options),
+            active: selected == Section.options,
+            onTap: () =>
+                ref.read(sectionProvider.notifier).state = Section.options,
           ),
           _SidebarIconButton(
             tooltip: AppLocalizations.of(context).sidebar_signOut_tooltip,
@@ -102,6 +98,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.integration_instructions_outlined;
       case Section.students:
         return Icons.people_outline;
+      case Section.options:
+        return Icons.settings_outlined;
     }
   }
 }

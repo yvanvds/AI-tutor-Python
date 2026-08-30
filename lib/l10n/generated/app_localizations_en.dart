@@ -12,9 +12,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Python Course';
 
   @override
-  String get settings_menuTitle => 'Settings';
-
-  @override
   String get settings_language_label => 'Language';
 
   @override
@@ -27,13 +24,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_language_dutch => 'Nederlands';
 
   @override
-  String get sidebar_settings_tooltip => 'Settings';
-
-  @override
   String get sidebar_signOut_tooltip => 'Sign out';
-
-  @override
-  String get sidebar_debug_tooltip => 'Debug';
 
   @override
   String get sidebar_teacherHeader => 'Teacher';
@@ -55,6 +46,263 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebar_section_students => 'Students';
+
+  @override
+  String get sidebar_section_options => 'Options';
+
+  @override
+  String get options_page_title => 'Options';
+
+  @override
+  String get options_page_subtitle => 'Settings, maintenance and bug reports.';
+
+  @override
+  String get options_language_title => 'Language';
+
+  @override
+  String get options_language_subtitle =>
+      'Applies immediately; \"System\" follows the operating system.';
+
+  @override
+  String get options_progress_title => 'Progress';
+
+  @override
+  String get options_progress_subtitle =>
+      'Clearing progress also clears the tutor\'s memory of what you know. It cannot be undone.';
+
+  @override
+  String get options_progress_resetAll_button => 'Reset all progress';
+
+  @override
+  String get options_progress_resetAll_dialog_title => 'Reset all progress?';
+
+  @override
+  String get options_progress_resetAll_dialog_message =>
+      'This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.';
+
+  @override
+  String get options_progress_resetAll_dialog_confirm => 'Reset everything';
+
+  @override
+  String get options_progress_resetAll_done => 'All progress has been reset.';
+
+  @override
+  String get options_progress_resetGoal_button => 'Reset one goal…';
+
+  @override
+  String get options_progress_resetGoal_dialog_title =>
+      'Reset progress for a goal';
+
+  @override
+  String get options_progress_resetGoal_dialog_message =>
+      'Pick a goal or subgoal. Resetting a goal resets all of its subgoals.';
+
+  @override
+  String get options_progress_resetGoal_dialog_empty =>
+      'There are no goals yet.';
+
+  @override
+  String options_progress_resetGoal_dialog_loadError(String error) {
+    return 'Could not load goals: $error';
+  }
+
+  @override
+  String options_progress_resetGoal_confirm_title(String title) {
+    return 'Reset \"$title\"?';
+  }
+
+  @override
+  String get options_progress_resetGoal_confirm_message_subgoal =>
+      'Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.';
+
+  @override
+  String get options_progress_resetGoal_confirm_message_root =>
+      'Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.';
+
+  @override
+  String get options_progress_resetGoal_confirm_button => 'Reset';
+
+  @override
+  String options_progress_resetGoal_done(String title) {
+    return 'Progress for \"$title\" has been reset.';
+  }
+
+  @override
+  String options_progress_resetFailed(String error) {
+    return 'Reset failed: $error';
+  }
+
+  @override
+  String get options_dialog_cancel => 'Cancel';
+
+  @override
+  String get options_apiKey_title => 'OpenAI API key';
+
+  @override
+  String get options_apiKey_subtitle =>
+      'Your own key, stored on this device. Removing it takes you back to the key screen.';
+
+  @override
+  String get options_apiKey_status_present => 'A key is stored on this device.';
+
+  @override
+  String get options_apiKey_status_missing => 'No key stored on this device.';
+
+  @override
+  String get options_apiKey_change_button => 'Change key';
+
+  @override
+  String get options_apiKey_remove_button => 'Remove key';
+
+  @override
+  String get options_apiKey_dialog_title => 'Change API key';
+
+  @override
+  String get options_apiKey_dialog_field => 'New API key';
+
+  @override
+  String get options_apiKey_dialog_save => 'Save';
+
+  @override
+  String get options_apiKey_saved => 'API key updated.';
+
+  @override
+  String get options_apiKey_remove_dialog_title => 'Remove API key?';
+
+  @override
+  String get options_apiKey_remove_dialog_message =>
+      'The tutor cannot answer without a key. You will be asked for a new key right away.';
+
+  @override
+  String get options_apiKey_remove_dialog_confirm => 'Remove';
+
+  @override
+  String get options_apiKey_removed => 'API key removed.';
+
+  @override
+  String get options_bugReport_title => 'Bug reports';
+
+  @override
+  String get options_bugReport_subtitle =>
+      'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.';
+
+  @override
+  String get options_bugReport_github_notConnected =>
+      'Not connected to GitHub.';
+
+  @override
+  String options_bugReport_github_connectedAs(String login) {
+    return 'Connected to GitHub as $login.';
+  }
+
+  @override
+  String get options_bugReport_github_connect_button => 'Connect GitHub';
+
+  @override
+  String get options_bugReport_github_disconnect_button => 'Disconnect';
+
+  @override
+  String get options_bugReport_github_dialog_title => 'Connect GitHub';
+
+  @override
+  String options_bugReport_github_dialog_explainer(String repo) {
+    return 'Paste a personal access token with permission to create issues on $repo. The token is stored on this device only.';
+  }
+
+  @override
+  String get options_bugReport_github_dialog_field => 'Personal access token';
+
+  @override
+  String get options_bugReport_github_dialog_connect => 'Connect';
+
+  @override
+  String options_bugReport_github_connectFailed(String error) {
+    return 'Could not connect: $error';
+  }
+
+  @override
+  String get options_bugReport_report_button => 'Report a bug…';
+
+  @override
+  String get options_bugReport_dialog_title => 'Report a bug';
+
+  @override
+  String get options_bugReport_dialog_titleField => 'Title';
+
+  @override
+  String get options_bugReport_dialog_titleRequired => 'Please enter a title.';
+
+  @override
+  String get options_bugReport_dialog_descriptionField => 'What went wrong?';
+
+  @override
+  String get options_bugReport_dialog_turnField => 'Attach tutor turn';
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'No turn';
+
+  @override
+  String options_bugReport_dialog_turnLabel(int id, String type) {
+    return '#$id $type';
+  }
+
+  @override
+  String get options_bugReport_dialog_submit => 'Post issue';
+
+  @override
+  String options_bugReport_posted(String url) {
+    return 'Issue posted: $url';
+  }
+
+  @override
+  String options_bugReport_postFailed(String error) {
+    return 'Posting failed: $error';
+  }
+
+  @override
+  String get options_developer_title => 'Developer tools';
+
+  @override
+  String get options_developer_subtitle => 'Only visible in developer builds.';
+
+  @override
+  String get options_developer_levelUp_button => 'Show level-up overlay';
+
+  @override
+  String get options_developer_triggerQuestion_title => 'Trigger question';
+
+  @override
+  String get options_developer_difficulty_label => 'Difficulty:';
+
+  @override
+  String get options_developer_recentTurns_title => 'Recent turns';
+
+  @override
+  String get options_developer_recentTurns_copyAll => 'Copy all';
+
+  @override
+  String options_developer_recentTurns_copied(int count) {
+    return 'Copied $count turns to clipboard.';
+  }
+
+  @override
+  String get options_developer_recentTurns_empty => 'No turns recorded yet.';
+
+  @override
+  String options_developer_turnDetail_title(int id) {
+    return 'Turn #$id';
+  }
+
+  @override
+  String get options_developer_turnDetail_close => 'Close';
+
+  @override
+  String get options_about_title => 'About';
+
+  @override
+  String options_about_version(String version) {
+    return 'Version $version';
+  }
 
   @override
   String get session_mode_explain => 'Explain';
@@ -194,6 +442,92 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get session_playground_subtitle => 'No goal — just you and Python.';
+
+  @override
+  String get session_playground_open_button => 'Open';
+
+  @override
+  String get session_playground_open_tooltip => 'Open saved code';
+
+  @override
+  String get session_playground_save_button => 'Save';
+
+  @override
+  String get session_playground_save_tooltip => 'Save this code';
+
+  @override
+  String get session_playground_dialog_cancel => 'Cancel';
+
+  @override
+  String get session_playground_saveDialog_title => 'Save code';
+
+  @override
+  String get session_playground_saveDialog_nameLabel => 'File name';
+
+  @override
+  String get session_playground_saveDialog_invalidName =>
+      'Use letters, digits, spaces, - or _ (max 60 characters).';
+
+  @override
+  String get session_playground_saveDialog_confirm => 'Save';
+
+  @override
+  String session_playground_overwriteDialog_title(String name) {
+    return 'Overwrite \"$name\"?';
+  }
+
+  @override
+  String get session_playground_overwriteDialog_message =>
+      'A file with this name already exists.';
+
+  @override
+  String get session_playground_overwriteDialog_confirm => 'Overwrite';
+
+  @override
+  String get session_playground_openDialog_title => 'Open saved code';
+
+  @override
+  String get session_playground_openDialog_empty => 'No saved files yet.';
+
+  @override
+  String get session_playground_openDialog_delete_tooltip => 'Delete';
+
+  @override
+  String session_playground_deleteDialog_title(String name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get session_playground_deleteDialog_message =>
+      'This cannot be undone.';
+
+  @override
+  String get session_playground_deleteDialog_confirm => 'Delete';
+
+  @override
+  String get session_playground_discardDialog_title => 'Replace current code?';
+
+  @override
+  String get session_playground_discardDialog_message =>
+      'Your unsaved changes will be lost.';
+
+  @override
+  String get session_playground_discardDialog_confirm => 'Replace';
+
+  @override
+  String session_playground_snack_saved(String name) {
+    return 'Saved as \"$name\".';
+  }
+
+  @override
+  String session_playground_snack_saveFailed(String error) {
+    return 'Saving failed: $error';
+  }
+
+  @override
+  String session_playground_snack_openFailed(String error) {
+    return 'Opening failed: $error';
+  }
 
   @override
   String get session_quiz_pill => 'Quiz question';
@@ -408,6 +742,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Type a teaching tip and hit Enter';
 
   @override
+  String get goals_editor_teachingTips_empty => 'No teaching tips yet.';
+
+  @override
+  String get goals_editor_teachingTips_add => 'Add';
+
+  @override
+  String get goals_editor_teachingTips_edit => 'Edit tip';
+
+  @override
+  String get goals_editor_teachingTips_delete => 'Delete tip';
+
+  @override
+  String get goals_editor_teachingTips_save => 'Save';
+
+  @override
+  String get goals_editor_teachingTips_cancel => 'Cancel';
+
+  @override
   String get goals_editor_lesinhoud_label => 'Lesson content';
 
   @override
@@ -557,6 +909,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lesson_default_moduleTitle => 'Python basics';
+
+  @override
+  String get lesson_orphans_header => 'Orphaned lesson content';
+
+  @override
+  String get lesson_orphans_hint =>
+      'Not linked to any subgoal. Click to reassign.';
+
+  @override
+  String get lesson_reassign_dialog_title => 'Reassign lesson content';
+
+  @override
+  String lesson_reassign_dialog_message(String title) {
+    return 'Pick the subgoal that \"$title\" belongs to.';
+  }
+
+  @override
+  String get lesson_reassign_dialog_cancel => 'Cancel';
+
+  @override
+  String get lesson_reassign_dialog_noSubgoals =>
+      'There are no subgoals to assign to.';
+
+  @override
+  String get lesson_reassign_overwrite_title =>
+      'Replace existing lesson content?';
+
+  @override
+  String lesson_reassign_overwrite_message(String target, String title) {
+    return '\"$target\" already has lesson content. It will be replaced by \"$title\".';
+  }
+
+  @override
+  String get lesson_reassign_overwrite_cancel => 'Cancel';
+
+  @override
+  String get lesson_reassign_overwrite_confirm => 'Replace';
+
+  @override
+  String lesson_snack_reassigned(String target) {
+    return 'Lesson content linked to \"$target\".';
+  }
+
+  @override
+  String get lesson_run_output_label => 'Output';
+
+  @override
+  String get lesson_run_button => 'Run';
+
+  @override
+  String get lesson_run_running => 'Running…';
+
+  @override
+  String get lesson_run_unavailable =>
+      'The example can only run inside the app.';
 
   @override
   String get instructions_toolbar_title => 'Instructions';

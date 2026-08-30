@@ -6,7 +6,6 @@
     "description": "Window title and application brand name"
   },
 
-  "settings_menuTitle": "Settings",
   "settings_language_label": "Language",
   "settings_language_system": "System",
   "settings_language_english": "English",
@@ -15,9 +14,7 @@
     "description": "Dutch language name, kept in Dutch in both locales"
   },
 
-  "sidebar_settings_tooltip": "Settings",
   "sidebar_signOut_tooltip": "Sign out",
-  "sidebar_debug_tooltip": "Debug",
   "sidebar_teacherHeader": "Teacher",
 
   "sidebar_section_session": "Session",
@@ -26,6 +23,125 @@
   "sidebar_section_lessonContent": "Lesson content",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
+  "sidebar_section_options": "Options",
+
+  "options_page_title": "Options",
+  "options_page_subtitle": "Settings, maintenance and bug reports.",
+
+  "options_language_title": "Language",
+  "options_language_subtitle": "Applies immediately; \"System\" follows the operating system.",
+
+  "options_progress_title": "Progress",
+  "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
+  "options_progress_resetAll_button": "Reset all progress",
+  "options_progress_resetAll_dialog_title": "Reset all progress?",
+  "options_progress_resetAll_dialog_message": "This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.",
+  "options_progress_resetAll_dialog_confirm": "Reset everything",
+  "options_progress_resetAll_done": "All progress has been reset.",
+  "options_progress_resetGoal_button": "Reset one goal…",
+  "options_progress_resetGoal_dialog_title": "Reset progress for a goal",
+  "options_progress_resetGoal_dialog_message": "Pick a goal or subgoal. Resetting a goal resets all of its subgoals.",
+  "options_progress_resetGoal_dialog_empty": "There are no goals yet.",
+  "options_progress_resetGoal_dialog_loadError": "Could not load goals: {error}",
+  "@options_progress_resetGoal_dialog_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_progress_resetGoal_confirm_title": "Reset \"{title}\"?",
+  "@options_progress_resetGoal_confirm_title": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "options_progress_resetGoal_confirm_message_subgoal": "Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.",
+  "options_progress_resetGoal_confirm_message_root": "Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.",
+  "options_progress_resetGoal_confirm_button": "Reset",
+  "options_progress_resetGoal_done": "Progress for \"{title}\" has been reset.",
+  "@options_progress_resetGoal_done": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "options_progress_resetFailed": "Reset failed: {error}",
+  "@options_progress_resetFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_dialog_cancel": "Cancel",
+
+  "options_apiKey_title": "OpenAI API key",
+  "options_apiKey_subtitle": "Your own key, stored on this device. Removing it takes you back to the key screen.",
+  "options_apiKey_status_present": "A key is stored on this device.",
+  "options_apiKey_status_missing": "No key stored on this device.",
+  "options_apiKey_change_button": "Change key",
+  "options_apiKey_remove_button": "Remove key",
+  "options_apiKey_dialog_title": "Change API key",
+  "options_apiKey_dialog_field": "New API key",
+  "options_apiKey_dialog_save": "Save",
+  "options_apiKey_saved": "API key updated.",
+  "options_apiKey_remove_dialog_title": "Remove API key?",
+  "options_apiKey_remove_dialog_message": "The tutor cannot answer without a key. You will be asked for a new key right away.",
+  "options_apiKey_remove_dialog_confirm": "Remove",
+  "options_apiKey_removed": "API key removed.",
+
+  "options_bugReport_title": "Bug reports",
+  "options_bugReport_subtitle": "Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.",
+  "options_bugReport_github_notConnected": "Not connected to GitHub.",
+  "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
+  "@options_bugReport_github_connectedAs": {
+    "placeholders": { "login": { "type": "String" } }
+  },
+  "options_bugReport_github_connect_button": "Connect GitHub",
+  "options_bugReport_github_disconnect_button": "Disconnect",
+  "options_bugReport_github_dialog_title": "Connect GitHub",
+  "options_bugReport_github_dialog_explainer": "Paste a personal access token with permission to create issues on {repo}. The token is stored on this device only.",
+  "@options_bugReport_github_dialog_explainer": {
+    "placeholders": { "repo": { "type": "String" } }
+  },
+  "options_bugReport_github_dialog_field": "Personal access token",
+  "options_bugReport_github_dialog_connect": "Connect",
+  "options_bugReport_github_connectFailed": "Could not connect: {error}",
+  "@options_bugReport_github_connectFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_bugReport_report_button": "Report a bug…",
+  "options_bugReport_dialog_title": "Report a bug",
+  "options_bugReport_dialog_titleField": "Title",
+  "options_bugReport_dialog_titleRequired": "Please enter a title.",
+  "options_bugReport_dialog_descriptionField": "What went wrong?",
+  "options_bugReport_dialog_turnField": "Attach tutor turn",
+  "options_bugReport_dialog_turnNone": "No turn",
+  "options_bugReport_dialog_turnLabel": "#{id} {type}",
+  "@options_bugReport_dialog_turnLabel": {
+    "placeholders": { "id": { "type": "int" }, "type": { "type": "String" } }
+  },
+  "options_bugReport_dialog_submit": "Post issue",
+  "options_bugReport_posted": "Issue posted: {url}",
+  "@options_bugReport_posted": {
+    "placeholders": { "url": { "type": "String" } }
+  },
+  "options_bugReport_postFailed": "Posting failed: {error}",
+  "@options_bugReport_postFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "options_developer_title": "Developer tools",
+  "options_developer_subtitle": "Only visible in developer builds.",
+  "options_developer_levelUp_button": "Show level-up overlay",
+  "options_developer_triggerQuestion_title": "Trigger question",
+  "options_developer_difficulty_label": "Difficulty:",
+  "options_developer_recentTurns_title": "Recent turns",
+  "options_developer_recentTurns_copyAll": "Copy all",
+  "options_developer_recentTurns_copied": "Copied {count} turns to clipboard.",
+  "@options_developer_recentTurns_copied": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "options_developer_recentTurns_empty": "No turns recorded yet.",
+  "options_developer_turnDetail_title": "Turn #{id}",
+  "@options_developer_turnDetail_title": {
+    "placeholders": { "id": { "type": "int" } }
+  },
+  "options_developer_turnDetail_close": "Close",
+
+  "options_about_title": "About",
+  "options_about_version": "Version {version}",
+  "@options_about_version": {
+    "placeholders": { "version": { "type": "String" } }
+  },
 
   "session_mode_explain": "Explain",
   "session_mode_practice": "Practice",
@@ -107,6 +223,45 @@
 
   "session_playground_pill": "playground",
   "session_playground_subtitle": "No goal — just you and Python.",
+  "session_playground_open_button": "Open",
+  "session_playground_open_tooltip": "Open saved code",
+  "session_playground_save_button": "Save",
+  "session_playground_save_tooltip": "Save this code",
+  "session_playground_dialog_cancel": "Cancel",
+  "session_playground_saveDialog_title": "Save code",
+  "session_playground_saveDialog_nameLabel": "File name",
+  "session_playground_saveDialog_invalidName": "Use letters, digits, spaces, - or _ (max 60 characters).",
+  "session_playground_saveDialog_confirm": "Save",
+  "session_playground_overwriteDialog_title": "Overwrite \"{name}\"?",
+  "@session_playground_overwriteDialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_overwriteDialog_message": "A file with this name already exists.",
+  "session_playground_overwriteDialog_confirm": "Overwrite",
+  "session_playground_openDialog_title": "Open saved code",
+  "session_playground_openDialog_empty": "No saved files yet.",
+  "session_playground_openDialog_delete_tooltip": "Delete",
+  "session_playground_deleteDialog_title": "Delete \"{name}\"?",
+  "@session_playground_deleteDialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_deleteDialog_message": "This cannot be undone.",
+  "session_playground_deleteDialog_confirm": "Delete",
+  "session_playground_discardDialog_title": "Replace current code?",
+  "session_playground_discardDialog_message": "Your unsaved changes will be lost.",
+  "session_playground_discardDialog_confirm": "Replace",
+  "session_playground_snack_saved": "Saved as \"{name}\".",
+  "@session_playground_snack_saved": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_snack_saveFailed": "Saving failed: {error}",
+  "@session_playground_snack_saveFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "session_playground_snack_openFailed": "Opening failed: {error}",
+  "@session_playground_snack_openFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "session_quiz_pill": "Quiz question",
   "@session_quiz_pill": {
@@ -223,6 +378,12 @@
   "goals_editor_switch_concept_subtitle": "Mastering this subgoal triggers the level-up overlay.",
   "goals_editor_teachingTips_label": "Teaching tips",
   "goals_editor_teachingTips_hint": "Type a teaching tip and hit Enter",
+  "goals_editor_teachingTips_empty": "No teaching tips yet.",
+  "goals_editor_teachingTips_add": "Add",
+  "goals_editor_teachingTips_edit": "Edit tip",
+  "goals_editor_teachingTips_delete": "Delete tip",
+  "goals_editor_teachingTips_save": "Save",
+  "goals_editor_teachingTips_cancel": "Cancel",
   "goals_editor_lesinhoud_label": "Lesson content",
   "goals_editor_lesinhoud_linked": "Lesson content linked",
   "goals_editor_lesinhoud_none": "(no lesson content)",
@@ -300,6 +461,33 @@
   "lesson_preview_empty": "The preview appears here as soon as you add HTML.",
   "lesson_subgoal_noContent": "(no lesson content)",
   "lesson_default_moduleTitle": "Python basics",
+  "lesson_orphans_header": "Orphaned lesson content",
+  "lesson_orphans_hint": "Not linked to any subgoal. Click to reassign.",
+  "lesson_reassign_dialog_title": "Reassign lesson content",
+  "lesson_reassign_dialog_message": "Pick the subgoal that \"{title}\" belongs to.",
+  "@lesson_reassign_dialog_message": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "lesson_reassign_dialog_cancel": "Cancel",
+  "lesson_reassign_dialog_noSubgoals": "There are no subgoals to assign to.",
+  "lesson_reassign_overwrite_title": "Replace existing lesson content?",
+  "lesson_reassign_overwrite_message": "\"{target}\" already has lesson content. It will be replaced by \"{title}\".",
+  "@lesson_reassign_overwrite_message": {
+    "placeholders": { "target": { "type": "String" }, "title": { "type": "String" } }
+  },
+  "lesson_reassign_overwrite_cancel": "Cancel",
+  "lesson_reassign_overwrite_confirm": "Replace",
+  "lesson_snack_reassigned": "Lesson content linked to \"{target}\".",
+  "@lesson_snack_reassigned": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "lesson_run_output_label": "Output",
+  "@lesson_run_output_label": {
+    "description": "Header above the live output of a runnable code block inside a lesson"
+  },
+  "lesson_run_button": "Run",
+  "lesson_run_running": "Running…",
+  "lesson_run_unavailable": "The example can only run inside the app.",
 
   "instructions_toolbar_title": "Instructions",
   "instructions_toolbar_tooltip_new": "New document",

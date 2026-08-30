@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,8 +13,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 enum SessionMode { explain, practice, playground }
 
 /// Top-level sidebar destinations. Student sees the first two; teacher
-/// additionally sees the last four.
-enum Section { session, map, goals, lessonContent, instructions, students }
+/// additionally sees goals / lessonContent / students. `instructions` is a
+/// developer tool (tutor system-prompt editor) and is only reachable when
+/// [developerToolsProvider] is true (issue #26). `options` is the settings /
+/// maintenance panel pinned to the bottom of the sidebar (issue #25).
+enum Section {
+  session,
+  map,
+  goals,
+  lessonContent,
+  instructions,
+  students,
+  options,
+}
+
+/// Whether developer-only surfaces (the instructions editor, the developer
+/// section of the options panel) are exposed in the shell. Defaults to
+/// [kDebugMode]; overridden in tests.
+final developerToolsProvider = Provider<bool>((_) => kDebugMode);
 
 enum Role { student, teacher }
 
@@ -181,6 +198,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_instructions;
       case Section.students:
         return l.sidebar_section_students;
+      case Section.options:
+        return l.sidebar_section_options;
     }
   }
 
@@ -193,7 +212,11 @@ extension SectionLabel on Section {
         return true;
       case Section.session:
       case Section.map:
+      case Section.options:
         return false;
     }
   }
+
+  /// Sections that are hidden unless [developerToolsProvider] is true.
+  bool get isDeveloperOnly => this == Section.instructions;
 }

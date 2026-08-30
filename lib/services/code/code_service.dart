@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:highlight/languages/python.dart';
 
 class CodeService {
+  /// Placeholder a fresh editor buffer starts with.
+  static const String starterText = '# Start coding here';
+
   late CodeController controller;
   CodeService() {
-    controller = CodeController(text: "# Start coding here", language: python);
+    controller = CodeController(text: starterText, language: python);
   }
 
   void setText(String code) {
