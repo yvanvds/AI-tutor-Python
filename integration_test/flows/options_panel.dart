@@ -72,7 +72,10 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('Options: light theme repaints the whole shell', (tester) async {
-    final harness = AppHarness();
+    // The starting theme is stated, not inherited. With no stored preference
+    // the app follows the operating system, so a flow that assumed dark was
+    // really asserting that whoever ran it had a dark desktop.
+    final harness = AppHarness(systemBrightness: Brightness.dark);
     await harness.boot(tester);
 
     Brightness themeBrightness() =>
@@ -130,8 +133,53 @@ void main() {
     expect(prefs.getString('app_theme'), 'light');
 
     await tester.tap(find.text('Dark'));
-    await pumpUntil(tester, () => themeBrightness() == Brightness.dark);
+    await pumpUntil(
+      tester,
+      () => themeBrightness() == Brightness.dark,
+      reason: 'the app never went back to the dark theme',
+    );
     expect(pageBackground(), AppPalette.dark.ink0);
+
+    await harness.dispose(tester);
+  });
+
+  // The other resolution of "follow the system" — and the one that broke the
+  // aggregated CI run, whose Windows runner ships in light mode while the
+  // machine this was written on is dark.
+  testWidgets('Options: a light desktop starts the app light, until the '
+      'student says otherwise', (tester) async {
+    final harness = AppHarness(systemBrightness: Brightness.light);
+    await harness.boot(tester);
+
+    Brightness themeBrightness() =>
+        Theme.of(tester.element(find.byType(OptionsPage))).brightness;
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+
+    // Nothing stored yet: the app takes the desktop's word for it.
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('app_theme'), isNull);
+    expect(themeBrightness(), Brightness.light);
+
+    // An explicit choice overrides the system, in the direction the system
+    // was not pointing.
+    await tester.tap(find.text('Dark'));
+    await pumpUntil(
+      tester,
+      () => themeBrightness() == Brightness.dark,
+      reason: 'the explicit Dark choice never overrode the light desktop',
+    );
+    expect(prefs.getString('app_theme'), 'dark');
+
+    // …and handing it back to the system returns to light.
+    await tester.tap(find.text('Follow the system'));
+    await pumpUntil(
+      tester,
+      () => themeBrightness() == Brightness.light,
+      reason: 'the app never went back to following the desktop',
+    );
+    expect(prefs.getString('app_theme'), isNull);
 
     await harness.dispose(tester);
   });

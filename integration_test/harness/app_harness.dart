@@ -11,12 +11,20 @@
 //     `flutter build windows` — there is no flag in `lib/` to flip.
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
-// the system locale, SharedPreferences (in-memory), the playground file
-// directory (temp), the update check (off), the LLM (any call fails loudly)
-// and the lesson example runner (scripted). Python for the practice editor
-// stays real by default — pressing Run on a machine without the bundle shows
-// the in-app host error, which is what a student would see; a flow that needs
-// to drive a run deterministically passes `pyRunner:`.
+// the system locale, the system light/dark setting, SharedPreferences
+// (in-memory), the playground file directory (temp), the update check (off),
+// the LLM (any call fails loudly) and the lesson example runner (scripted).
+//
+// The light/dark pin is not cosmetic (#32): with no stored preference the app
+// follows the operating system, so an unpinned run renders in whatever theme
+// the machine happens to be set to — green on a developer's dark desktop, red
+// on a CI runner that ships in light mode. Every flow therefore states the
+// brightness it wants, and the default matches the app's shipping look.
+//
+// Python for the practice editor stays real by default — pressing Run on a
+// machine without the bundle shows the in-app host error, which is what a
+// student would see; a flow that needs to drive a run deterministically
+// passes `pyRunner:`.
 
 import 'dart:async';
 import 'dart:io';
@@ -26,6 +34,7 @@ import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
+import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
@@ -107,6 +116,7 @@ class AppHarness {
     this.forceUpdateCheck = true,
     this.pyRunner,
     this.archiveFile,
+    this.systemBrightness = Brightness.dark,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -138,6 +148,14 @@ class AppHarness {
   /// Pass a [FakePyRunner] to drive a run that starts and keeps running
   /// regardless of what is installed on the machine.
   final PyRunner? pyRunner;
+
+  /// The operating system's light/dark setting, as the app sees it (#32).
+  ///
+  /// Defaults to dark — the theme the app shipped with, and the one the rest
+  /// of the flows describe. Pass `Brightness.light` to drive the other
+  /// resolution of "follow the system". Never left to the real machine: that
+  /// is what made the theme flow pass on a dark desktop and fail on CI.
+  final Brightness systemBrightness;
 
   /// Where "Export progress…" writes and "Import progress…" reads (#32).
   /// `null` (the default) leaves the real OS file dialogs in place, which no
@@ -192,6 +210,7 @@ class AppHarness {
         if (forceUpdateCheck)
           updateAutoCheckProvider.overrideWithValue(updateFeedUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
+        systemBrightnessProvider.overrideWithValue(systemBrightness),
       ],
     );
 
