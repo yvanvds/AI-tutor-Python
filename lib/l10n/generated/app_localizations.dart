@@ -806,6 +806,42 @@ abstract class AppLocalizations {
   /// **'Type a teaching tip and hit Enter'**
   String get goals_editor_teachingTips_hint;
 
+  /// No description provided for @goals_editor_teachingTips_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No teaching tips yet.'**
+  String get goals_editor_teachingTips_empty;
+
+  /// No description provided for @goals_editor_teachingTips_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get goals_editor_teachingTips_add;
+
+  /// No description provided for @goals_editor_teachingTips_edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tip'**
+  String get goals_editor_teachingTips_edit;
+
+  /// No description provided for @goals_editor_teachingTips_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tip'**
+  String get goals_editor_teachingTips_delete;
+
+  /// No description provided for @goals_editor_teachingTips_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get goals_editor_teachingTips_save;
+
+  /// No description provided for @goals_editor_teachingTips_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get goals_editor_teachingTips_cancel;
+
   /// No description provided for @goals_editor_lesinhoud_label.
   ///
   /// In en, this message translates to:

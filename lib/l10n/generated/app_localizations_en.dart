@@ -408,6 +408,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Type a teaching tip and hit Enter';
 
   @override
+  String get goals_editor_teachingTips_empty => 'No teaching tips yet.';
+
+  @override
+  String get goals_editor_teachingTips_add => 'Add';
+
+  @override
+  String get goals_editor_teachingTips_edit => 'Edit tip';
+
+  @override
+  String get goals_editor_teachingTips_delete => 'Delete tip';
+
+  @override
+  String get goals_editor_teachingTips_save => 'Save';
+
+  @override
+  String get goals_editor_teachingTips_cancel => 'Cancel';
+
+  @override
   String get goals_editor_lesinhoud_label => 'Lesson content';
 
   @override

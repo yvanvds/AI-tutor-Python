@@ -412,6 +412,24 @@ class AppLocalizationsNl extends AppLocalizations {
       'Typ een lestip en druk op Enter';
 
   @override
+  String get goals_editor_teachingTips_empty => 'Nog geen lestips.';
+
+  @override
+  String get goals_editor_teachingTips_add => 'Toevoegen';
+
+  @override
+  String get goals_editor_teachingTips_edit => 'Tip bewerken';
+
+  @override
+  String get goals_editor_teachingTips_delete => 'Tip verwijderen';
+
+  @override
+  String get goals_editor_teachingTips_save => 'Opslaan';
+
+  @override
+  String get goals_editor_teachingTips_cancel => 'Annuleer';
+
+  @override
   String get goals_editor_lesinhoud_label => 'Lesinhoud';
 
   @override

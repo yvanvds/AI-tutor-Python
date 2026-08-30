@@ -7,7 +7,7 @@ import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
-import 'package:ai_tutor_python/widgets/chips_editor.dart';
+import 'package:ai_tutor_python/widgets/text_list_editor.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -131,10 +131,16 @@ class GoalFormState extends ConsumerState<GoalForm> {
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 12),
-            ChipsEditor(
+            TextListEditor(
               label: l.goals_editor_teachingTips_label,
               values: widget.goal.teachingTips,
               hintText: l.goals_editor_teachingTips_hint,
+              emptyText: l.goals_editor_teachingTips_empty,
+              addLabel: l.goals_editor_teachingTips_add,
+              editTooltip: l.goals_editor_teachingTips_edit,
+              deleteTooltip: l.goals_editor_teachingTips_delete,
+              saveLabel: l.goals_editor_teachingTips_save,
+              cancelLabel: l.goals_editor_teachingTips_cancel,
               onChanged: (vals) =>
                   svc.updateTeachingTips(widget.goal.id, vals),
             ),
