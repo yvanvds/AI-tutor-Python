@@ -138,8 +138,7 @@ void main() {
         id: '7f1c',
         excType: 'ZeroDivisionError',
         message: 'division by zero',
-        traceback:
-            'Traceback (most recent call last):\n  File "<student>", line 1, in <module>\nZeroDivisionError: division by zero\n',
+        traceback: 'Traceback (most recent call last):\n  File "<student>", line 1, in <module>\nZeroDivisionError: division by zero\n',
       );
       final decoded =
           HostOutboundFrame.decode(frame.encode()) as ExceptionFrame;
@@ -251,32 +250,25 @@ void main() {
     });
 
     test('optional cwd of wrong type is treated as absent (lenient)', () {
-      final decoded =
-          HostInboundFrame.decode(
-                '{"type":"exec","id":"x","code":"pass","cwd":123}',
-              )
-              as ExecFrame;
+      final decoded = HostInboundFrame.decode(
+        '{"type":"exec","id":"x","code":"pass","cwd":123}',
+      ) as ExecFrame;
       expect(decoded.cwd, isNull);
     });
 
-    test(
-      'optional protocol_version of wrong type is treated as absent (lenient)',
-      () {
-        const json =
-            '{"type":"ready","python_version":"3.14.0","platform":"win_amd64","capabilities":["exec"],"protocol_version":"1"}';
-        final decoded = HostOutboundFrame.decode(json) as ReadyFrame;
-        expect(decoded.protocolVersion, isNull);
-      },
-    );
+    test('optional protocol_version of wrong type is treated as absent (lenient)', () {
+      const json =
+          '{"type":"ready","python_version":"3.14.0","platform":"win_amd64","capabilities":["exec"],"protocol_version":"1"}';
+      final decoded = HostOutboundFrame.decode(json) as ReadyFrame;
+      expect(decoded.protocolVersion, isNull);
+    });
 
     test(
       'optional timeout_ms of wrong type is treated as absent (lenient)',
       () {
-        final decoded =
-            HostInboundFrame.decode(
-                  '{"type":"exec","id":"x","code":"pass","timeout_ms":"5000"}',
-                )
-                as ExecFrame;
+        final decoded = HostInboundFrame.decode(
+          '{"type":"exec","id":"x","code":"pass","timeout_ms":"5000"}',
+        ) as ExecFrame;
         expect(decoded.timeoutMs, isNull);
       },
     );
