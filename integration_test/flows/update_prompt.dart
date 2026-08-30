@@ -1,73 +1,58 @@
-// End-to-end (#45): the real app, booted against a release manifest that
-// carries a UTF-8 BOM and is served without a charset, still offers the
-// update.
+// End-to-end (#50): the real app, booted against GitHub's Releases API,
+// offers the release the API publishes.
 //
-// The BOM is what `tooling/build_release.ps1` wrote into the published
-// `public/version.json`. It survives today only because GitHub Pages sends
-// `application/json; charset=utf-8`, so `package:http` decodes with
-// `Utf8Decoder`, which happens to drop a leading U+FEFF. Serve the very
-// same bytes as `application/octet-stream` — what a GitHub *release asset*
-// returns, which is where #50 wants to read the manifest from — and
-// `package:http` falls back to latin1, the BOM becomes three characters,
-// and `jsonDecode` throws inside an unawaited post-frame callback: no
-// dialog, no error, no update, ever. That is the shape asserted here.
+// The app used to read a `version.json` manifest written by
+// `build_release.ps1` and served from GitHub Pages — a second artifact that
+// had to stay in lockstep with the release, and once did not (#45). Now the
+// release *is* the manifest: the tag carries the version, the assets carry
+// the installer and the `.sha256` that replaces the manifest's hash field.
+// This flow serves exactly that from a loopback server and asserts a student
+// is offered the update. It fails on the pre-#50 code, which asks the same
+// URL for a manifest, gets a release payload, and offers nothing.
+//
+// It also keeps #45's guarantee on the path where it now bites: the checksum
+// asset is served as `application/octet-stream` with a leading UTF-8 BOM —
+// the content type a real release asset carries, and the byte sequence the
+// release script has emitted before. Read through `res.body` instead of
+// `res.bodyBytes` those three bytes become three characters in front of the
+// hash, and the update is never offered.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
 //   flutter test integration_test/flows/update_prompt.dart -d windows
 
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import '../harness/app_harness.dart';
+import '../harness/fake_release_server.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('a BOM-prefixed version.json still offers the update', (
+  testWidgets('a release published on the API is offered to the student', (
     tester,
   ) async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final base = 'http://${server.address.address}:${server.port}';
-    final manifest =
-        '{\n'
-        '  "version": "99.0.0+1",\n'
-        '  "url": "$base/python_teacher_install.exe",\n'
-        '  "sha256": "not-a-real-hash"\n'
-        '}\n';
-
-    server.listen((request) async {
-      if (request.uri.path == '/version.json') {
-        // No charset: `package:http` falls back to latin1 for this type.
-        request.response.headers.contentType = ContentType(
-          'application',
-          'octet-stream',
-        );
-        // The three BOM bytes, exactly as the published file carried them.
-        request.response.add(const [0xEF, 0xBB, 0xBF]);
-        request.response.add(utf8.encode(manifest));
-      } else {
-        // The installer download is deliberately unavailable: this flow
-        // proves the check reaches the user, and must never spawn a setup
-        // binary on the machine running the tests.
-        request.response.statusCode = HttpStatus.notFound;
-      }
-      await request.response.close();
-    });
-
-    final harness = AppHarness(
-      updateManifestUrl: Uri.parse('$base/version.json'),
+    final server = await FakeReleaseServer.start(
+      version: '99.0.0+1',
+      // The BOM the release script has written in front of a generated file
+      // before, on an asset served as octet-stream (#45).
+      checksumBom: true,
     );
+
+    final harness = AppHarness(updateFeedUrl: server.feedUrl);
     await harness.boot(tester);
 
     await pumpUntilFound(tester, find.byType(AlertDialog));
     expect(find.text('Update available'), findsOneWidget);
     expect(find.textContaining('99.0.0+1'), findsOneWidget);
+    expect(
+      server.checksumRequests,
+      greaterThan(0),
+      reason: 'the release was offered without fetching its checksum',
+    );
 
     await tester.tap(
       find.descendant(of: find.byType(AlertDialog), matching: find.text('OK')),
@@ -75,6 +60,6 @@ void main() {
     await pumpUntilGone(tester, find.byType(AlertDialog));
 
     await harness.dispose(tester);
-    await server.close(force: true);
+    await server.close();
   });
 }

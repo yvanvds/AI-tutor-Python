@@ -66,7 +66,7 @@ typedef ReleaseDownloader =
       void Function(double fraction) onProgress,
     );
 
-/// Checks a downloaded installer against the hash the manifest published.
+/// Checks a downloaded installer against the hash published beside it.
 /// A `false` here is the one failure that must never reach [InstallerRunner].
 typedef ReleaseVerifier =
     Future<bool> Function(File installer, String expectedSha256);
@@ -291,8 +291,8 @@ class UpdateController extends Notifier<UpdateState> {
     }
   }
 
-  /// Downloads the offered installer, verifies it against the manifest hash,
-  /// and hands it to Windows.
+  /// Downloads the offered installer, verifies it against the hash published
+  /// with the release, and hands it to Windows.
   ///
   /// Only ever reached from a user action. Nothing in [start] or [check]
   /// calls this and no timer can: an update that installs itself while a

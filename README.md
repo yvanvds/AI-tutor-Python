@@ -30,7 +30,7 @@ The rest of this README walks through that. No prior Flutter/Dart experience is 
 
 ## What you will end up with
 
-A `python_teacher_install.exe` (Inno Setup installer, ~150 MB) that you can hand to students. After install they sign in once with their school Microsoft account and the app remembers them. There is also a built-in updater: if you publish a new `version.json` to a web host, every running copy will offer to update itself.
+A `python_teacher_install.exe` (Inno Setup installer, ~150 MB) that you can hand to students. After install they sign in once with their school Microsoft account and the app remembers them. There is also a built-in updater: publish a GitHub release with the installer attached and every running copy will offer to update itself.
 
 ---
 
@@ -186,14 +186,25 @@ Once that is done, hand the installer to a student. They sign in with their scho
 
 ---
 
-## Step 7 (optional) — Self-hosted updates
+## Step 7 (optional) — Updates
 
-The app checks `https://ai-tutor-python.web.app/version.json` on launch and offers to download a new installer if the version is higher. To redirect that to your own host:
+On launch a release build asks GitHub for this repository's latest release
+(`https://api.github.com/repos/yvanvds/AI-tutor-Python/releases/latest`,
+unauthenticated) and offers to download the new installer if the tag is
+higher than the running version. A release has to carry two assets:
 
-- Edit the URL in [lib/core/update_info.dart](lib/core/update_info.dart) (search for `version.json`).
-- Host a JSON file with `{ "version": "1.0.2+17", "url": "https://your.host/python_teacher_install.exe", "sha256": "..." }`.
+- `python_teacher_install.exe` — the installer, found by that name (a lone
+  `.exe` under another name is accepted too).
+- `python_teacher_install.exe.sha256` — its checksum, in `sha256sum` shape.
+  Without it the download cannot be verified and the release is not offered.
 
-If you do not need auto-updates, you can ignore this entirely; the app still works.
+`tooling/build_release.ps1` builds, tags and publishes both. Drafts and
+pre-releases are skipped by GitHub's `/releases/latest` itself, so a
+pre-release tag is never pushed at a student.
+
+To point the app at your own fork, change `kReleaseOwner` / `kReleaseRepo` in
+[lib/core/github_release.dart](lib/core/github_release.dart). If you do not
+need auto-updates, you can ignore this entirely; the app still works.
 
 ---
 

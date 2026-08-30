@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -7,7 +6,7 @@ import 'package:pub_semver/pub_semver.dart'; // add to pubspec
 import 'package:path/path.dart' as p;
 
 /// The update check failed: the network was unreachable, the server
-/// answered with something other than a manifest, or a request ran out of
+/// answered with something other than a release, or a request ran out of
 /// time.
 ///
 /// This is deliberately distinct from a `null` result (#46). `null` means
@@ -23,108 +22,31 @@ class UpdateCheckException implements Exception {
   String toString() => 'UpdateCheckException: $message';
 }
 
-/// How long the small manifest request may take before it is abandoned.
-/// Without it a black-hole network hangs the check forever (#46).
-const kManifestTimeout = Duration(seconds: 10);
+/// How long a small update request — the release lookup, the checksum —
+/// may take before it is abandoned. Without it a black-hole network hangs
+/// the check forever (#46).
+const kUpdateRequestTimeout = Duration(seconds: 10);
 
 /// How long the installer download may go without delivering a single
 /// chunk. The whole download has no deadline — an installer on a slow line
 /// is legitimate — but a stalled socket is not.
 const kDownloadStallTimeout = Duration(seconds: 60);
 
+/// A release the app can offer: which version, which installer, and the
+/// hash the download has to match.
+///
+/// Built from the GitHub Releases API by `github_release.dart` (#50); it used
+/// to come from a hand-published `version.json`.
 class UpdateInfo {
+  UpdateInfo(this.version, this.url, this.sha256, {this.notes = ''});
+
   final String version;
   final Uri url;
   final String sha256;
-  UpdateInfo(this.version, this.url, this.sha256);
 
-  /// Returns `null` for anything that is not a well-formed release
-  /// manifest: a non-object payload, a missing field, a field of the wrong
-  /// type, or a `url` that is not an absolute URI. Previously every one of
-  /// those threw a `TypeError` out of an unawaited future (#46).
-  static UpdateInfo? fromJson(Object? json) {
-    if (json is! Map) return null;
-    final version = json['version'];
-    final url = json['url'];
-    final sha = json['sha256'];
-    if (version is! String || url is! String || sha is! String) return null;
-    if (version.isEmpty || sha.isEmpty) return null;
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return null;
-    return UpdateInfo(version, uri, sha);
-  }
-}
-
-/// A leading byte-order mark. `jsonDecode` does not skip it and fails with
-/// `FormatException: Unexpected character (at character 1)`.
-const _bom = '\u{FEFF}';
-
-/// Parses a release manifest body into an [UpdateInfo], tolerating a BOM
-/// that a caller decoded into the string (a hand-edited file read from
-/// disk, a payload decoded elsewhere). See #45.
-///
-/// Returns `null` when [body] is not JSON or not a release manifest (#46).
-UpdateInfo? parseUpdateManifest(String body) {
-  final withoutBom = body.startsWith(_bom) ? body.substring(_bom.length) : body;
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(withoutBom);
-  } on FormatException {
-    return null;
-  }
-  return UpdateInfo.fromJson(decoded);
-}
-
-/// Fetches the release manifest.
-///
-/// Returns `null` when nothing is published (HTTP 404). Throws an
-/// [UpdateCheckException] for every other failure — timeout, transport
-/// error, any other non-200 status, or a payload that is not a release
-/// manifest — so the caller can log it instead of mistaking it for "you
-/// are up to date" (#46).
-Future<UpdateInfo?> fetchUpdateInfo(
-  Uri manifestUrl, {
-  http.Client? client,
-  Duration timeout = kManifestTimeout,
-}) async {
-  final owned = client == null;
-  final c = client ?? http.Client();
-  final http.Response res;
-  try {
-    res = await c.get(manifestUrl).timeout(timeout);
-  } on TimeoutException {
-    throw UpdateCheckException(
-      'manifest request to $manifestUrl timed out '
-      'after ${timeout.inSeconds}s',
-    );
-  } on Object catch (e) {
-    throw UpdateCheckException('manifest request to $manifestUrl failed: $e');
-  } finally {
-    // Closing an owned client also aborts a request still in flight after
-    // the timeout above fired.
-    if (owned) c.close();
-  }
-
-  // Nothing published yet — a normal outcome, not a failure.
-  if (res.statusCode == HttpStatus.notFound) return null;
-  if (res.statusCode != HttpStatus.ok) {
-    throw UpdateCheckException(
-      'manifest request to $manifestUrl returned HTTP ${res.statusCode}',
-    );
-  }
-
-  // Decode the bytes as UTF-8 rather than reading `res.body`: that getter
-  // honours the response charset and falls back to latin1 for a type like
-  // `application/octet-stream`, which turns the BOM the release manifest
-  // carries (#45) into three characters and makes `jsonDecode` throw. JSON
-  // is UTF-8 (RFC 8259), and `Utf8Decoder` drops a leading BOM.
-  final info = parseUpdateManifest(
-    utf8.decode(res.bodyBytes, allowMalformed: true),
-  );
-  if (info == null) {
-    throw UpdateCheckException('$manifestUrl is not a release manifest');
-  }
-  return info;
+  /// The release notes, as written on the GitHub release. Empty when the
+  /// release has none. The manifest could not carry these at all.
+  final String notes;
 }
 
 bool isNewer(String remote, String local) {
@@ -154,7 +76,7 @@ bool isNewer(String remote, String local) {
 Future<File> downloadToTemp(
   Uri url, {
   http.Client? client,
-  Duration responseTimeout = kManifestTimeout,
+  Duration responseTimeout = kUpdateRequestTimeout,
   Duration stallTimeout = kDownloadStallTimeout,
 }) async {
   final owned = client == null;

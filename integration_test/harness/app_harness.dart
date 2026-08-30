@@ -74,18 +74,19 @@ class _OfflineTutor extends TutorService {
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
-    this.updateManifestUrl,
+    this.updateFeedUrl,
     this.forceUpdateCheck = true,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
   final AccountIdentity identity;
 
-  /// Where the shell looks for a release manifest on launch. `null` (the
-  /// default) switches the update check off, so a flow never fetches,
-  /// downloads or runs an installer. The update flow (#45) points this at a
-  /// local test server instead.
-  final Uri? updateManifestUrl;
+  /// Where the shell looks for a published release on launch — GitHub's
+  /// `/releases/latest` in production (#50). `null` (the default) switches
+  /// the update check off, so a flow never fetches, downloads or runs an
+  /// installer. The update flows point this at a local test server that
+  /// answers with the same API shape.
+  final Uri? updateFeedUrl;
 
   /// Whether the harness forces the launch check on.
   ///
@@ -121,9 +122,9 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
-        updateManifestUrlProvider.overrideWithValue(updateManifestUrl),
+        updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         if (forceUpdateCheck)
-          updateAutoCheckProvider.overrideWithValue(updateManifestUrl != null),
+          updateAutoCheckProvider.overrideWithValue(updateFeedUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
       ],
     );

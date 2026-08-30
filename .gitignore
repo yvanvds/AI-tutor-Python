@@ -14,6 +14,7 @@ __pycache__/
 .swiftpm/
 migrate_working_dir/
 public/*.exe
+public/*.exe.sha256
 .emulator-data/
 
 # security sensitive files

@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/github_release.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
@@ -149,7 +150,7 @@ void main() {
     // About panel renders `message` in #48.
     test('parks a failed check on the state instead of throwing', () async {
       final seams = _Seams(
-        feedError: UpdateCheckException('manifest returned HTTP 500'),
+        feedError: UpdateCheckException('release lookup returned HTTP 500'),
       );
       final container = _containerFor(seams);
 
@@ -359,10 +360,10 @@ void main() {
   });
 
   group('production wiring', () {
-    test('a null manifest URL means no feed and no auto check', () async {
+    test('a null feed URL means no feed and no auto check', () async {
       final container = ProviderContainer(
         overrides: [
-          updateManifestUrlProvider.overrideWithValue(null),
+          updateFeedUrlProvider.overrideWithValue(null),
           updateAutoCheckProvider.overrideWithValue(true),
         ],
       );
@@ -373,11 +374,11 @@ void main() {
       expect(await services.feed(), isNull);
     });
 
-    test('the manifest URL alone does not turn the check on', () {
+    test('the feed URL alone does not turn the check on', () {
       final container = ProviderContainer(
         overrides: [
-          updateManifestUrlProvider.overrideWithValue(
-            Uri.parse('https://example.com/version.json'),
+          updateFeedUrlProvider.overrideWithValue(
+            Uri.parse('https://example.com/releases/latest'),
           ),
           updateAutoCheckProvider.overrideWithValue(false),
         ],
@@ -385,6 +386,15 @@ void main() {
       addTearDown(container.dispose);
 
       expect(container.read(updateServicesProvider).autoCheck, isFalse);
+    });
+
+    // #50: the shipped default is the Releases API, not a manifest on a
+    // static host that has to be kept in lockstep with the release.
+    test('the shipped feed is this repository\'s latest release', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(updateFeedUrlProvider), kLatestReleaseEndpoint);
     });
   });
 }
