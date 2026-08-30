@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -55,6 +56,44 @@ void main() {
       expect(info.version, '2.0.0');
       expect(info.url, Uri.parse('https://example.com/installer.exe'));
       expect(info.sha256, 'abc123');
+    });
+  });
+
+  group('parseUpdateManifest', () {
+    const manifest =
+        '{\n'
+        '  "version": "2.0.0+18",\n'
+        '  "url": "https://example.com/python_teacher_install.exe",\n'
+        '  "sha256": "2D224ED88E427AB535399AEB35069"\n'
+        '}\n';
+
+    test('parses a plain manifest', () {
+      final info = parseUpdateManifest(manifest);
+      expect(info.version, '2.0.0+18');
+      expect(
+        info.url,
+        Uri.parse('https://example.com/python_teacher_install.exe'),
+      );
+      expect(info.sha256, '2D224ED88E427AB535399AEB35069');
+    });
+
+    // #45: the published version.json was served with a UTF-8 BOM, and
+    // `jsonDecode` throws on the leading U+FEFF instead of skipping it, so
+    // every update check died before comparing versions.
+    test('parses a manifest with a leading UTF-8 BOM', () {
+      expect(
+        () => jsonDecode('\u{FEFF}$manifest'),
+        throwsFormatException,
+        reason: 'guards the premise: jsonDecode does not skip a BOM',
+      );
+
+      final info = parseUpdateManifest('\u{FEFF}$manifest');
+      expect(info.version, '2.0.0+18');
+      expect(
+        info.url,
+        Uri.parse('https://example.com/python_teacher_install.exe'),
+      );
+      expect(info.sha256, '2D224ED88E427AB535399AEB35069');
     });
   });
 

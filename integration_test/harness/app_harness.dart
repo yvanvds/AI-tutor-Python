@@ -73,10 +73,17 @@ class _OfflineTutor extends TutorService {
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
+    this.updateManifestUrl,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
   final AccountIdentity identity;
+
+  /// Where the shell looks for a release manifest on launch. `null` (the
+  /// default) switches the update check off, so a flow never fetches,
+  /// downloads or runs an installer. The update flow (#45) points this at a
+  /// local test server instead.
+  final Uri? updateManifestUrl;
 
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
@@ -103,7 +110,7 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
-        updateManifestUrlProvider.overrideWithValue(null),
+        updateManifestUrlProvider.overrideWithValue(updateManifestUrl),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
       ],
     );

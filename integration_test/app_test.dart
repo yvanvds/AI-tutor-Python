@@ -16,6 +16,7 @@ import 'package:integration_test/integration_test.dart';
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/playground_files.dart' as playground_files;
+import 'flows/update_prompt.dart' as update_prompt;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -23,4 +24,5 @@ void main() {
   lesson_flow.main();
   language_switch.main();
   playground_files.main();
+  update_prompt.main();
 }

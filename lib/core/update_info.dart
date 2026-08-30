@@ -14,11 +14,27 @@ class UpdateInfo {
       UpdateInfo(j['version'], Uri.parse(j['url']), j['sha256']);
 }
 
+/// A leading byte-order mark. `jsonDecode` does not skip it and fails with
+/// `FormatException: Unexpected character (at character 1)`.
+const _bom = '\u{FEFF}';
+
+/// Parses a release manifest body into an [UpdateInfo], tolerating a BOM
+/// that a caller decoded into the string (a hand-edited file read from
+/// disk, a payload decoded elsewhere). See #45.
+UpdateInfo parseUpdateManifest(String body) {
+  final withoutBom = body.startsWith(_bom) ? body.substring(_bom.length) : body;
+  return UpdateInfo.fromJson(jsonDecode(withoutBom));
+}
+
 Future<UpdateInfo?> fetchUpdateInfo(Uri manifestUrl) async {
   final res = await http.get(manifestUrl);
   if (res.statusCode != 200) return null;
-  final j = jsonDecode(res.body);
-  return UpdateInfo.fromJson(j);
+  // Decode the bytes as UTF-8 rather than reading `res.body`: that getter
+  // honours the response charset and falls back to latin1 for a type like
+  // `application/octet-stream`, which turns the BOM the release manifest
+  // carries (#45) into three characters and makes `jsonDecode` throw. JSON
+  // is UTF-8 (RFC 8259), and `Utf8Decoder` drops a leading BOM.
+  return parseUpdateManifest(utf8.decode(res.bodyBytes, allowMalformed: true));
 }
 
 bool isNewer(String remote, String local) {

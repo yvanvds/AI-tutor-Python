@@ -190,13 +190,17 @@ if ($sizeMB -gt 300) {
 
 Write-Step 'Step 7/9: compute SHA256 + write public/version.json'
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Installer).Hash
-@"
+# BOM-less: the app fetches this file and `jsonDecode` chokes on a leading
+# U+FEFF, which silently killed every update check (#45).
+$manifestContent = @"
 {
   "version": "$fullVersion",
   "url": "$ReleaseAssetUrl",
   "sha256": "$hash"
 }
-"@ | Set-Content -LiteralPath $Manifest -Encoding UTF8
+
+"@
+Write-Utf8NoBom -Path $Manifest -Content $manifestContent
 Write-Ok "SHA256: $hash"
 
 if ($SkipPublish) {
