@@ -2,12 +2,17 @@
 // developer tool and must not be reachable from the regular teacher UI. It is
 // gated behind [developerToolsProvider] (kDebugMode in the shipping app).
 //
+// Issue #25 — the sidebar's bottom strip is an Options entry (a real section,
+// routed like the others) plus sign-out. The former Settings popup and Debug
+// icon buttons are gone: language moved into the Options page and the debug
+// tools live in its developer-gated section.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
-// what a signed-in teacher actually sees in the navigation rail.
+// what a signed-in user actually sees in the navigation rail.
 //
 // Not driven through the full app: boot requires an Entra sign-in and a live
-// Cosmos endpoint, and there is no integration_test harness in the repo.
+// Cosmos endpoint, and there is no integration_test harness in the repo (#28).
 
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
@@ -61,6 +66,9 @@ void main() {
     await tester.pump();
   }
 
+  ProviderContainer containerOf(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(Sidebar)));
+
   testWidgets('teacher without developer tools does not see the instructions '
       'entry but keeps the other teacher sections', (tester) async {
     await mount(tester, profile: _teacher, devTools: false);
@@ -88,10 +96,55 @@ void main() {
     expect(find.byTooltip('Goals'), findsNothing);
   });
 
+  testWidgets('bottom strip is Options + sign out for a student; the old '
+      'Settings and Debug buttons are gone', (tester) async {
+    await mount(tester, profile: _student, devTools: true);
+
+    expect(find.byTooltip('Options'), findsOneWidget);
+    expect(find.byTooltip('Sign out'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsNothing);
+    expect(find.byTooltip('Debug'), findsNothing);
+  });
+
+  testWidgets('teacher also gets the Options entry', (tester) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    expect(find.byTooltip('Options'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsNothing);
+  });
+
+  testWidgets('tapping Options routes to the options section and highlights '
+      'it', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+    final container = containerOf(tester);
+    expect(container.read(sectionProvider), Section.session);
+
+    await tester.tap(find.byTooltip('Options'));
+    await tester.pump();
+
+    expect(container.read(sectionProvider), Section.options);
+    // The active indicator is the accent bar; only one item carries it.
+    final activeIcons = tester
+        .widgetList<Icon>(find.byType(Icon))
+        .where((i) => i.icon == Icons.settings_outlined)
+        .toList();
+    expect(activeIcons, hasLength(1));
+    expect(activeIcons.single.color, isNot(equals(Colors.transparent)));
+
+    await tester.tap(find.byTooltip('Session'));
+    await tester.pump();
+    expect(container.read(sectionProvider), Section.session);
+  });
+
   test('Section.instructions is the only developer-only section', () {
     expect(Section.values.where((s) => s.isDeveloperOnly), [
       Section.instructions,
     ]);
     expect(Section.instructions.isTeacherOnly, isTrue);
+  });
+
+  test('Section.options is reachable by students', () {
+    expect(Section.options.isTeacherOnly, isFalse);
+    expect(Section.options.isDeveloperOnly, isFalse);
   });
 }

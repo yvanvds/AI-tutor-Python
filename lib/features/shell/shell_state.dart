@@ -15,12 +15,21 @@ enum SessionMode { explain, practice, playground }
 /// Top-level sidebar destinations. Student sees the first two; teacher
 /// additionally sees goals / lessonContent / students. `instructions` is a
 /// developer tool (tutor system-prompt editor) and is only reachable when
-/// [developerToolsProvider] is true (issue #26).
-enum Section { session, map, goals, lessonContent, instructions, students }
+/// [developerToolsProvider] is true (issue #26). `options` is the settings /
+/// maintenance panel pinned to the bottom of the sidebar (issue #25).
+enum Section {
+  session,
+  map,
+  goals,
+  lessonContent,
+  instructions,
+  students,
+  options,
+}
 
-/// Whether developer-only surfaces (the instructions editor, the debug
-/// dialog) are exposed in the shell. Defaults to [kDebugMode]; overridden in
-/// tests.
+/// Whether developer-only surfaces (the instructions editor, the developer
+/// section of the options panel) are exposed in the shell. Defaults to
+/// [kDebugMode]; overridden in tests.
 final developerToolsProvider = Provider<bool>((_) => kDebugMode);
 
 enum Role { student, teacher }
@@ -189,6 +198,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_instructions;
       case Section.students:
         return l.sidebar_section_students;
+      case Section.options:
+        return l.sidebar_section_options;
     }
   }
 
@@ -201,6 +212,7 @@ extension SectionLabel on Section {
         return true;
       case Section.session:
       case Section.map:
+      case Section.options:
         return false;
     }
   }

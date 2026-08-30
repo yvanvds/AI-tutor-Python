@@ -146,6 +146,35 @@ class ProgressService {
     setCurrentProgress(0.0);
   }
 
+  /// Removes the current user's `progress` doc and every `progress_history`
+  /// sample for a single goal (issue #25, granular reset). Missing docs are
+  /// not an error.
+  Future<void> deleteForGoal(String goalID) async {
+    final uid = _uid;
+    await safeCosmos(() async {
+      final existing = await _container.read(
+        CosmosDocId.progress(uid, goalID),
+        partitionKey: uid,
+      );
+      if (existing != null) {
+        await _container.delete(
+          CosmosDocId.progress(uid, goalID),
+          partitionKey: uid,
+        );
+      }
+      final historyDocs = await _historyContainer.query(
+        'SELECT c.id FROM c WHERE c.uid = @uid AND c.goalId = @goalId',
+        parameters: {'@uid': uid, '@goalId': goalID},
+        partitionKey: uid,
+      );
+      for (final doc in historyDocs) {
+        final id = doc['id'] as String?;
+        if (id == null) continue;
+        await _historyContainer.delete(id, partitionKey: uid);
+      }
+    });
+  }
+
   // ---- teacher-scoped reads -----------------------------------------------
 
   Future<Map<String, List<Progress>>> getAllProgress() {

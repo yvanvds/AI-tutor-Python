@@ -131,6 +131,18 @@ class InMemoryCosmos {
       rows = rows.where((d) => d['parentId'] == null);
     }
 
+    // Per-user containers (progress, progress_history, lo_beliefs,
+    // turn_history) filter on uid and optionally on goal / subgoal.
+    if (sql.contains('c.uid = @uid')) {
+      rows = rows.where((d) => d['uid'] == params['@uid']);
+    }
+    if (sql.contains('c.goalId = @goalId')) {
+      rows = rows.where((d) => d['goalId'] == params['@goalId']);
+    }
+    if (sql.contains('c.subgoalId = @sid')) {
+      rows = rows.where((d) => d['subgoalId'] == params['@sid']);
+    }
+
     var list = rows.toList();
     if (sql.contains('ORDER BY c.title')) {
       list.sort(

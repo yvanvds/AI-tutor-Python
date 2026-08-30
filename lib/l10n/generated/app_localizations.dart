@@ -104,12 +104,6 @@ abstract class AppLocalizations {
   /// **'Python Course'**
   String get appTitle;
 
-  /// No description provided for @settings_menuTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get settings_menuTitle;
-
   /// No description provided for @settings_language_label.
   ///
   /// In en, this message translates to:
@@ -134,23 +128,11 @@ abstract class AppLocalizations {
   /// **'Nederlands'**
   String get settings_language_dutch;
 
-  /// No description provided for @sidebar_settings_tooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get sidebar_settings_tooltip;
-
   /// No description provided for @sidebar_signOut_tooltip.
   ///
   /// In en, this message translates to:
   /// **'Sign out'**
   String get sidebar_signOut_tooltip;
-
-  /// No description provided for @sidebar_debug_tooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Debug'**
-  String get sidebar_debug_tooltip;
 
   /// No description provided for @sidebar_teacherHeader.
   ///
@@ -193,6 +175,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Students'**
   String get sidebar_section_students;
+
+  /// No description provided for @sidebar_section_options.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get sidebar_section_options;
+
+  /// No description provided for @options_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get options_page_title;
+
+  /// No description provided for @options_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings, maintenance and bug reports.'**
+  String get options_page_subtitle;
+
+  /// No description provided for @options_language_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get options_language_title;
+
+  /// No description provided for @options_language_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies immediately; \"System\" follows the operating system.'**
+  String get options_language_subtitle;
+
+  /// No description provided for @options_progress_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get options_progress_title;
+
+  /// No description provided for @options_progress_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clearing progress also clears the tutor\'s memory of what you know. It cannot be undone.'**
+  String get options_progress_subtitle;
+
+  /// No description provided for @options_progress_resetAll_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all progress'**
+  String get options_progress_resetAll_button;
+
+  /// No description provided for @options_progress_resetAll_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all progress?'**
+  String get options_progress_resetAll_dialog_title;
+
+  /// No description provided for @options_progress_resetAll_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.'**
+  String get options_progress_resetAll_dialog_message;
+
+  /// No description provided for @options_progress_resetAll_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset everything'**
+  String get options_progress_resetAll_dialog_confirm;
+
+  /// No description provided for @options_progress_resetAll_done.
+  ///
+  /// In en, this message translates to:
+  /// **'All progress has been reset.'**
+  String get options_progress_resetAll_done;
+
+  /// No description provided for @options_progress_resetGoal_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset one goal…'**
+  String get options_progress_resetGoal_button;
+
+  /// No description provided for @options_progress_resetGoal_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset progress for a goal'**
+  String get options_progress_resetGoal_dialog_title;
+
+  /// No description provided for @options_progress_resetGoal_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a goal or subgoal. Resetting a goal resets all of its subgoals.'**
+  String get options_progress_resetGoal_dialog_message;
+
+  /// No description provided for @options_progress_resetGoal_dialog_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no goals yet.'**
+  String get options_progress_resetGoal_dialog_empty;
+
+  /// No description provided for @options_progress_resetGoal_dialog_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load goals: {error}'**
+  String options_progress_resetGoal_dialog_loadError(String error);
+
+  /// No description provided for @options_progress_resetGoal_confirm_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset \"{title}\"?'**
+  String options_progress_resetGoal_confirm_title(String title);
+
+  /// No description provided for @options_progress_resetGoal_confirm_message_subgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.'**
+  String get options_progress_resetGoal_confirm_message_subgoal;
+
+  /// No description provided for @options_progress_resetGoal_confirm_message_root.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.'**
+  String get options_progress_resetGoal_confirm_message_root;
+
+  /// No description provided for @options_progress_resetGoal_confirm_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get options_progress_resetGoal_confirm_button;
+
+  /// No description provided for @options_progress_resetGoal_done.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress for \"{title}\" has been reset.'**
+  String options_progress_resetGoal_done(String title);
+
+  /// No description provided for @options_progress_resetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset failed: {error}'**
+  String options_progress_resetFailed(String error);
+
+  /// No description provided for @options_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get options_dialog_cancel;
+
+  /// No description provided for @options_apiKey_title.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI API key'**
+  String get options_apiKey_title;
+
+  /// No description provided for @options_apiKey_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own key, stored on this device. Removing it takes you back to the key screen.'**
+  String get options_apiKey_subtitle;
+
+  /// No description provided for @options_apiKey_status_present.
+  ///
+  /// In en, this message translates to:
+  /// **'A key is stored on this device.'**
+  String get options_apiKey_status_present;
+
+  /// No description provided for @options_apiKey_status_missing.
+  ///
+  /// In en, this message translates to:
+  /// **'No key stored on this device.'**
+  String get options_apiKey_status_missing;
+
+  /// No description provided for @options_apiKey_change_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Change key'**
+  String get options_apiKey_change_button;
+
+  /// No description provided for @options_apiKey_remove_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove key'**
+  String get options_apiKey_remove_button;
+
+  /// No description provided for @options_apiKey_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Change API key'**
+  String get options_apiKey_dialog_title;
+
+  /// No description provided for @options_apiKey_dialog_field.
+  ///
+  /// In en, this message translates to:
+  /// **'New API key'**
+  String get options_apiKey_dialog_field;
+
+  /// No description provided for @options_apiKey_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get options_apiKey_dialog_save;
+
+  /// No description provided for @options_apiKey_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'API key updated.'**
+  String get options_apiKey_saved;
+
+  /// No description provided for @options_apiKey_remove_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove API key?'**
+  String get options_apiKey_remove_dialog_title;
+
+  /// No description provided for @options_apiKey_remove_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The tutor cannot answer without a key. You will be asked for a new key right away.'**
+  String get options_apiKey_remove_dialog_message;
+
+  /// No description provided for @options_apiKey_remove_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get options_apiKey_remove_dialog_confirm;
+
+  /// No description provided for @options_apiKey_removed.
+  ///
+  /// In en, this message translates to:
+  /// **'API key removed.'**
+  String get options_apiKey_removed;
+
+  /// No description provided for @options_bugReport_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug reports'**
+  String get options_bugReport_title;
+
+  /// No description provided for @options_bugReport_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.'**
+  String get options_bugReport_subtitle;
+
+  /// No description provided for @options_bugReport_github_notConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected to GitHub.'**
+  String get options_bugReport_github_notConnected;
+
+  /// No description provided for @options_bugReport_github_connectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to GitHub as {login}.'**
+  String options_bugReport_github_connectedAs(String login);
+
+  /// No description provided for @options_bugReport_github_connect_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect GitHub'**
+  String get options_bugReport_github_connect_button;
+
+  /// No description provided for @options_bugReport_github_disconnect_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get options_bugReport_github_disconnect_button;
+
+  /// No description provided for @options_bugReport_github_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect GitHub'**
+  String get options_bugReport_github_dialog_title;
+
+  /// No description provided for @options_bugReport_github_dialog_explainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a personal access token with permission to create issues on {repo}. The token is stored on this device only.'**
+  String options_bugReport_github_dialog_explainer(String repo);
+
+  /// No description provided for @options_bugReport_github_dialog_field.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal access token'**
+  String get options_bugReport_github_dialog_field;
+
+  /// No description provided for @options_bugReport_github_dialog_connect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get options_bugReport_github_dialog_connect;
+
+  /// No description provided for @options_bugReport_github_connectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect: {error}'**
+  String options_bugReport_github_connectFailed(String error);
+
+  /// No description provided for @options_bugReport_report_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a bug…'**
+  String get options_bugReport_report_button;
+
+  /// No description provided for @options_bugReport_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a bug'**
+  String get options_bugReport_dialog_title;
+
+  /// No description provided for @options_bugReport_dialog_titleField.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get options_bugReport_dialog_titleField;
+
+  /// No description provided for @options_bugReport_dialog_titleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a title.'**
+  String get options_bugReport_dialog_titleRequired;
+
+  /// No description provided for @options_bugReport_dialog_descriptionField.
+  ///
+  /// In en, this message translates to:
+  /// **'What went wrong?'**
+  String get options_bugReport_dialog_descriptionField;
+
+  /// No description provided for @options_bugReport_dialog_turnField.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach tutor turn'**
+  String get options_bugReport_dialog_turnField;
+
+  /// No description provided for @options_bugReport_dialog_turnNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No turn'**
+  String get options_bugReport_dialog_turnNone;
+
+  /// No description provided for @options_bugReport_dialog_turnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'#{id} {type}'**
+  String options_bugReport_dialog_turnLabel(int id, String type);
+
+  /// No description provided for @options_bugReport_dialog_submit.
+  ///
+  /// In en, this message translates to:
+  /// **'Post issue'**
+  String get options_bugReport_dialog_submit;
+
+  /// No description provided for @options_bugReport_posted.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue posted: {url}'**
+  String options_bugReport_posted(String url);
+
+  /// No description provided for @options_bugReport_postFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Posting failed: {error}'**
+  String options_bugReport_postFailed(String error);
+
+  /// No description provided for @options_developer_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer tools'**
+  String get options_developer_title;
+
+  /// No description provided for @options_developer_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only visible in developer builds.'**
+  String get options_developer_subtitle;
+
+  /// No description provided for @options_developer_levelUp_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Show level-up overlay'**
+  String get options_developer_levelUp_button;
+
+  /// No description provided for @options_developer_triggerQuestion_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger question'**
+  String get options_developer_triggerQuestion_title;
+
+  /// No description provided for @options_developer_difficulty_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Difficulty:'**
+  String get options_developer_difficulty_label;
+
+  /// No description provided for @options_developer_recentTurns_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent turns'**
+  String get options_developer_recentTurns_title;
+
+  /// No description provided for @options_developer_recentTurns_copyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy all'**
+  String get options_developer_recentTurns_copyAll;
+
+  /// No description provided for @options_developer_recentTurns_copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied {count} turns to clipboard.'**
+  String options_developer_recentTurns_copied(int count);
+
+  /// No description provided for @options_developer_recentTurns_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No turns recorded yet.'**
+  String get options_developer_recentTurns_empty;
+
+  /// No description provided for @options_developer_turnDetail_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn #{id}'**
+  String options_developer_turnDetail_title(int id);
+
+  /// No description provided for @options_developer_turnDetail_close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get options_developer_turnDetail_close;
+
+  /// No description provided for @options_about_title.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get options_about_title;
+
+  /// No description provided for @options_about_version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String options_about_version(String version);
 
   /// No description provided for @session_mode_explain.
   ///

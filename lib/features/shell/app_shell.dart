@@ -1,9 +1,9 @@
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
-import 'package:ai_tutor_python/features/dashboard/debug_dialog.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
+import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -54,9 +54,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           Row(
             children: [
-              Sidebar(
-                onDebug: devTools ? () => _openDebugDialog(context) : null,
-              ),
+              const Sidebar(),
               Expanded(
                 child: Column(
                   children: [
@@ -88,14 +86,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const InstructionsEditorPage();
       case Section.students:
         return const AccountsPage();
+      case Section.options:
+        return const OptionsPage();
     }
-  }
-
-  void _openDebugDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => const DebugDialog(),
-    );
   }
 
   Future<void> _checkForUpdate() async {

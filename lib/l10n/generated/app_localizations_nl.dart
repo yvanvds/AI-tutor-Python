@@ -12,9 +12,6 @@ class AppLocalizationsNl extends AppLocalizations {
   String get appTitle => 'Python Cursus';
 
   @override
-  String get settings_menuTitle => 'Instellingen';
-
-  @override
   String get settings_language_label => 'Taal';
 
   @override
@@ -27,13 +24,7 @@ class AppLocalizationsNl extends AppLocalizations {
   String get settings_language_dutch => 'Nederlands';
 
   @override
-  String get sidebar_settings_tooltip => 'Instellingen';
-
-  @override
   String get sidebar_signOut_tooltip => 'Afmelden';
-
-  @override
-  String get sidebar_debug_tooltip => 'Debug';
 
   @override
   String get sidebar_teacherHeader => 'Docent';
@@ -55,6 +46,269 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get sidebar_section_students => 'Studenten';
+
+  @override
+  String get sidebar_section_options => 'Opties';
+
+  @override
+  String get options_page_title => 'Opties';
+
+  @override
+  String get options_page_subtitle =>
+      'Instellingen, onderhoud en bugmeldingen.';
+
+  @override
+  String get options_language_title => 'Taal';
+
+  @override
+  String get options_language_subtitle =>
+      'Wordt meteen toegepast; \"Systeem\" volgt het besturingssysteem.';
+
+  @override
+  String get options_progress_title => 'Voortgang';
+
+  @override
+  String get options_progress_subtitle =>
+      'Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetAll_button => 'Alle voortgang wissen';
+
+  @override
+  String get options_progress_resetAll_dialog_title => 'Alle voortgang wissen?';
+
+  @override
+  String get options_progress_resetAll_dialog_message =>
+      'Dit verwijdert alle voortgang, leergeschiedenis en tutorinschattingen van je account en zet de moeilijkheidsgraad terug op gemiddeld. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetAll_dialog_confirm => 'Alles wissen';
+
+  @override
+  String get options_progress_resetAll_done => 'Alle voortgang is gewist.';
+
+  @override
+  String get options_progress_resetGoal_button => 'Eén doel wissen…';
+
+  @override
+  String get options_progress_resetGoal_dialog_title =>
+      'Voortgang van een doel wissen';
+
+  @override
+  String get options_progress_resetGoal_dialog_message =>
+      'Kies een doel of subdoel. Een doel wissen wist al zijn subdoelen.';
+
+  @override
+  String get options_progress_resetGoal_dialog_empty =>
+      'Er zijn nog geen doelen.';
+
+  @override
+  String options_progress_resetGoal_dialog_loadError(String error) {
+    return 'Doelen laden mislukt: $error';
+  }
+
+  @override
+  String options_progress_resetGoal_confirm_title(String title) {
+    return '\"$title\" wissen?';
+  }
+
+  @override
+  String get options_progress_resetGoal_confirm_message_subgoal =>
+      'Voortgang, leergeschiedenis en tutorinschattingen voor dit subdoel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetGoal_confirm_message_root =>
+      'Voortgang, leergeschiedenis en tutorinschattingen voor elk subdoel van dit doel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get options_progress_resetGoal_confirm_button => 'Wissen';
+
+  @override
+  String options_progress_resetGoal_done(String title) {
+    return 'Voortgang van \"$title\" is gewist.';
+  }
+
+  @override
+  String options_progress_resetFailed(String error) {
+    return 'Wissen mislukt: $error';
+  }
+
+  @override
+  String get options_dialog_cancel => 'Annuleren';
+
+  @override
+  String get options_apiKey_title => 'OpenAI API-sleutel';
+
+  @override
+  String get options_apiKey_subtitle =>
+      'Je eigen sleutel, opgeslagen op dit toestel. Als je ze verwijdert, kom je terug op het sleutelscherm.';
+
+  @override
+  String get options_apiKey_status_present =>
+      'Er is een sleutel opgeslagen op dit toestel.';
+
+  @override
+  String get options_apiKey_status_missing =>
+      'Geen sleutel opgeslagen op dit toestel.';
+
+  @override
+  String get options_apiKey_change_button => 'Sleutel wijzigen';
+
+  @override
+  String get options_apiKey_remove_button => 'Sleutel verwijderen';
+
+  @override
+  String get options_apiKey_dialog_title => 'API-sleutel wijzigen';
+
+  @override
+  String get options_apiKey_dialog_field => 'Nieuwe API-sleutel';
+
+  @override
+  String get options_apiKey_dialog_save => 'Opslaan';
+
+  @override
+  String get options_apiKey_saved => 'API-sleutel bijgewerkt.';
+
+  @override
+  String get options_apiKey_remove_dialog_title => 'API-sleutel verwijderen?';
+
+  @override
+  String get options_apiKey_remove_dialog_message =>
+      'Zonder sleutel kan de tutor niet antwoorden. Je wordt meteen om een nieuwe sleutel gevraagd.';
+
+  @override
+  String get options_apiKey_remove_dialog_confirm => 'Verwijderen';
+
+  @override
+  String get options_apiKey_removed => 'API-sleutel verwijderd.';
+
+  @override
+  String get options_bugReport_title => 'Bugmeldingen';
+
+  @override
+  String get options_bugReport_subtitle =>
+      'Maak rechtstreeks vanuit de app een issue aan op GitHub, met de debuggegevens van een recente tutorbeurt erbij.';
+
+  @override
+  String get options_bugReport_github_notConnected =>
+      'Niet verbonden met GitHub.';
+
+  @override
+  String options_bugReport_github_connectedAs(String login) {
+    return 'Verbonden met GitHub als $login.';
+  }
+
+  @override
+  String get options_bugReport_github_connect_button => 'GitHub verbinden';
+
+  @override
+  String get options_bugReport_github_disconnect_button =>
+      'Verbinding verbreken';
+
+  @override
+  String get options_bugReport_github_dialog_title => 'GitHub verbinden';
+
+  @override
+  String options_bugReport_github_dialog_explainer(String repo) {
+    return 'Plak een personal access token dat issues mag aanmaken op $repo. Het token wordt enkel op dit toestel bewaard.';
+  }
+
+  @override
+  String get options_bugReport_github_dialog_field => 'Personal access token';
+
+  @override
+  String get options_bugReport_github_dialog_connect => 'Verbinden';
+
+  @override
+  String options_bugReport_github_connectFailed(String error) {
+    return 'Verbinden mislukt: $error';
+  }
+
+  @override
+  String get options_bugReport_report_button => 'Bug melden…';
+
+  @override
+  String get options_bugReport_dialog_title => 'Bug melden';
+
+  @override
+  String get options_bugReport_dialog_titleField => 'Titel';
+
+  @override
+  String get options_bugReport_dialog_titleRequired => 'Geef een titel op.';
+
+  @override
+  String get options_bugReport_dialog_descriptionField => 'Wat ging er mis?';
+
+  @override
+  String get options_bugReport_dialog_turnField => 'Tutorbeurt bijvoegen';
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'Geen beurt';
+
+  @override
+  String options_bugReport_dialog_turnLabel(int id, String type) {
+    return '#$id $type';
+  }
+
+  @override
+  String get options_bugReport_dialog_submit => 'Issue plaatsen';
+
+  @override
+  String options_bugReport_posted(String url) {
+    return 'Issue geplaatst: $url';
+  }
+
+  @override
+  String options_bugReport_postFailed(String error) {
+    return 'Plaatsen mislukt: $error';
+  }
+
+  @override
+  String get options_developer_title => 'Ontwikkelaarstools';
+
+  @override
+  String get options_developer_subtitle =>
+      'Enkel zichtbaar in ontwikkelaarsbuilds.';
+
+  @override
+  String get options_developer_levelUp_button => 'Level-up-overlay tonen';
+
+  @override
+  String get options_developer_triggerQuestion_title => 'Vraag starten';
+
+  @override
+  String get options_developer_difficulty_label => 'Moeilijkheid:';
+
+  @override
+  String get options_developer_recentTurns_title => 'Recente beurten';
+
+  @override
+  String get options_developer_recentTurns_copyAll => 'Alles kopiëren';
+
+  @override
+  String options_developer_recentTurns_copied(int count) {
+    return '$count beurten naar het klembord gekopieerd.';
+  }
+
+  @override
+  String get options_developer_recentTurns_empty =>
+      'Nog geen beurten opgenomen.';
+
+  @override
+  String options_developer_turnDetail_title(int id) {
+    return 'Beurt #$id';
+  }
+
+  @override
+  String get options_developer_turnDetail_close => 'Sluiten';
+
+  @override
+  String get options_about_title => 'Over';
+
+  @override
+  String options_about_version(String version) {
+    return 'Versie $version';
+  }
 
   @override
   String get session_mode_explain => 'Uitleg';

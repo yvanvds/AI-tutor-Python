@@ -170,6 +170,25 @@ class TurnHistoryService {
     });
   }
 
+  /// Removes the current user's turn records for one subgoal (issue #25,
+  /// granular reset).
+  Future<void> deleteAllForSubgoal(String subgoalId) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.id FROM c WHERE c.uid = @uid AND c.subgoalId = @sid',
+        parameters: {'@uid': uid, '@sid': subgoalId},
+        partitionKey: uid,
+      );
+      for (final doc in docs) {
+        final id = doc['id'] as String?;
+        if (id == null) continue;
+        await _container.delete(id, partitionKey: uid);
+      }
+    });
+  }
+
   Future<void> deleteAllForCurrentUser() async {
     final uid = _uid;
     if (uid == null) return;
