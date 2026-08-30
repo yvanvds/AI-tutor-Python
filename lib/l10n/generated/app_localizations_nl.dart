@@ -967,6 +967,19 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get lesson_run_output_label => 'Uitvoer';
+
+  @override
+  String get lesson_run_button => 'Uitvoeren';
+
+  @override
+  String get lesson_run_running => 'Aan het uitvoeren…';
+
+  @override
+  String get lesson_run_unavailable =>
+      'Het voorbeeld kan alleen in de app worden uitgevoerd.';
+
+  @override
   String get instructions_toolbar_title => 'Instructies';
 
   @override

@@ -481,6 +481,13 @@
   "@lesson_snack_reassigned": {
     "placeholders": { "target": { "type": "String" } }
   },
+  "lesson_run_output_label": "Output",
+  "@lesson_run_output_label": {
+    "description": "Header above the live output of a runnable code block inside a lesson"
+  },
+  "lesson_run_button": "Run",
+  "lesson_run_running": "Running…",
+  "lesson_run_unavailable": "The example can only run inside the app.",
 
   "instructions_toolbar_title": "Instructions",
   "instructions_toolbar_tooltip_new": "New document",

@@ -953,6 +953,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get lesson_run_output_label => 'Output';
+
+  @override
+  String get lesson_run_button => 'Run';
+
+  @override
+  String get lesson_run_running => 'Running…';
+
+  @override
+  String get lesson_run_unavailable =>
+      'The example can only run inside the app.';
+
+  @override
   String get instructions_toolbar_title => 'Instructions';
 
   @override

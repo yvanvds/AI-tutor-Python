@@ -1727,6 +1727,30 @@ abstract class AppLocalizations {
   /// **'Lesson content linked to \"{target}\".'**
   String lesson_snack_reassigned(String target);
 
+  /// Header above the live output of a runnable code block inside a lesson
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get lesson_run_output_label;
+
+  /// No description provided for @lesson_run_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get lesson_run_button;
+
+  /// No description provided for @lesson_run_running.
+  ///
+  /// In en, this message translates to:
+  /// **'Running…'**
+  String get lesson_run_running;
+
+  /// No description provided for @lesson_run_unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The example can only run inside the app.'**
+  String get lesson_run_unavailable;
+
   /// No description provided for @instructions_toolbar_title.
   ///
   /// In en, this message translates to:

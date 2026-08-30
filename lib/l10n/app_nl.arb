@@ -299,6 +299,10 @@
   "lesson_reassign_overwrite_cancel": "Annuleren",
   "lesson_reassign_overwrite_confirm": "Vervangen",
   "lesson_snack_reassigned": "Lesinhoud gekoppeld aan \"{target}\".",
+  "lesson_run_output_label": "Uitvoer",
+  "lesson_run_button": "Uitvoeren",
+  "lesson_run_running": "Aan het uitvoeren…",
+  "lesson_run_unavailable": "Het voorbeeld kan alleen in de app worden uitgevoerd.",
 
   "instructions_toolbar_title": "Instructies",
   "instructions_toolbar_tooltip_new": "Nieuw document",

@@ -84,7 +84,8 @@ stylesheet styles deliberately:
 - Inline: `<code>`, `<strong>`, `<em>`, `<small>`, `<a>` (links only when
   there is a real reason — usually there isn't).
 - Lists: `<ul>`, `<ol>`, `<li>`.
-- Code blocks: `<pre><code>...</code></pre>`.
+- Code blocks: `<pre><code>...</code></pre>`; add `class="run"` on the
+  `<pre>` for a live preview of the output (see "Code blocks").
 - Blockquote: `<blockquote>` (rarely; usually a callout is better).
 - Callouts: `<div class="callout">`, `<div class="callout tip">`,
   `<div class="callout warn">`. Inside a callout, use `<p>` for the text.
@@ -124,6 +125,32 @@ Indentation in `<pre><code>` is preserved verbatim — write Python
 with 4-space indent, no leading whitespace before `print(...)` at
 column 0. Don't escape Python code as `&lt;` etc. unless the literal
 character `<` appears (it usually doesn't in early Python).
+
+#### Live preview blocks
+
+Add `class="run"` to a `<pre>` and the app runs the snippet for real
+when the lesson opens, showing the actual output in a pane directly
+under the code (with a button to run it again). Use this instead of a
+hand-written "Uitvoer:" block whenever the output is deterministic:
+
+```html
+<pre class="run"><code>naam = "Mira"
+print("Hallo", naam)</code></pre>
+```
+
+Rules for `run` blocks:
+
+- The snippet must be self-contained and finish on its own — no
+  `input()` (it receives an empty line), no infinite loops (the app
+  stops a block after ten seconds), no file or network access.
+- Don't add a separate output block after it; the app renders one.
+- Keep a plain `<pre><code>` (no `run`) when the point is the code
+  itself, when the output would be random or time-dependent, or when
+  the snippet is intentionally broken and the traceback is not what
+  you want the student to look at first. (A broken `run` block does
+  show its traceback, in red — occasionally that *is* the lesson.)
+- The pane is added by the app; a standalone browser preview shows
+  only the code.
 
 ### Callouts — use sparingly
 
