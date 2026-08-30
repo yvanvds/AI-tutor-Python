@@ -45,7 +45,7 @@ last_updated_at: 2026-05-09
 - `path`, `path_provider`, `pub_semver`, `uuid`, `collection`.
 
 **Dev**
-- `flutter_test`, `mocktail`, `fake_async`, `flutter_lints`, `build_runner`.
+- `flutter_test`, `integration_test`, `mocktail`, `fake_async`, `flutter_lints`, `build_runner`.
 
 ### Python execution approach
 
@@ -221,7 +221,11 @@ lib/
     ├── add_input.dart, chips_editor.dart, inline_title.dart
 
 packages/py_runner/                    # Local Flutter package — PyRunner, InstallerPyHostLocator, RunHandle, InputRequest
-test/                                  # mocktail-based unit + widget tests
+test/                                  # mocktail-based unit + widget tests; helpers/in_memory_cosmos.dart is the shared Cosmos fake
+integration_test/                      # End-to-end flows on Windows desktop (#28)
+├── app_test.dart                      # Single entrypoint running every flow in one app process
+├── flows/                             # One file per user-visible flow (lesson, language switch, playground files)
+└── harness/                           # AppHarness: GoalsApp over InMemoryCosmosClient + signed-in AuthService + seed data
 public/version.json                    # Update manifest (now served from GitHub Pages)
 firebase.json                          # Vestigial Firebase Hosting config; not deployed
 distribute_options.yaml                # flutter_distributor windows-exe job
@@ -536,6 +540,12 @@ flutter analyze
 
 # Tests (mocktail-based unit + widget tests under test/)
 flutter test
+
+# End-to-end flows on the Windows desktop (integration_test/, issue #28):
+# real app root + shell + services, in-memory Cosmos, bypassed sign-in.
+# All flows run from one entrypoint (app_test.dart) in one app process;
+# a single flow: flutter test integration_test/flows/<flow>.dart -d windows
+flutter test integration_test -d windows
 
 # Build a release Windows executable
 flutter build windows --release

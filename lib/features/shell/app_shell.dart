@@ -17,6 +17,13 @@ import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Where the shell looks for a newer installer on launch. `null` disables
+/// the check — the integration harness (#28) overrides it so a test boot
+/// never fetches, downloads, or runs an installer.
+final updateManifestUrlProvider = Provider<Uri?>(
+  (_) => Uri.parse('https://yvanvds.github.io/AI-tutor-Python/version.json'),
+);
+
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
@@ -92,9 +99,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Future<void> _checkForUpdate() async {
-    final manifest = Uri.parse(
-      'https://yvanvds.github.io/AI-tutor-Python/version.json',
-    );
+    final manifest = ref.read(updateManifestUrlProvider);
+    if (manifest == null) return;
     final info = await fetchUpdateInfo(manifest);
     if (info == null) return;
     if (!isNewer(info.version, kAppVersion)) return;
