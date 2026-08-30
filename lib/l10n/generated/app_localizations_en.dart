@@ -196,6 +196,92 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_playground_subtitle => 'No goal — just you and Python.';
 
   @override
+  String get session_playground_open_button => 'Open';
+
+  @override
+  String get session_playground_open_tooltip => 'Open saved code';
+
+  @override
+  String get session_playground_save_button => 'Save';
+
+  @override
+  String get session_playground_save_tooltip => 'Save this code';
+
+  @override
+  String get session_playground_dialog_cancel => 'Cancel';
+
+  @override
+  String get session_playground_saveDialog_title => 'Save code';
+
+  @override
+  String get session_playground_saveDialog_nameLabel => 'File name';
+
+  @override
+  String get session_playground_saveDialog_invalidName =>
+      'Use letters, digits, spaces, - or _ (max 60 characters).';
+
+  @override
+  String get session_playground_saveDialog_confirm => 'Save';
+
+  @override
+  String session_playground_overwriteDialog_title(String name) {
+    return 'Overwrite \"$name\"?';
+  }
+
+  @override
+  String get session_playground_overwriteDialog_message =>
+      'A file with this name already exists.';
+
+  @override
+  String get session_playground_overwriteDialog_confirm => 'Overwrite';
+
+  @override
+  String get session_playground_openDialog_title => 'Open saved code';
+
+  @override
+  String get session_playground_openDialog_empty => 'No saved files yet.';
+
+  @override
+  String get session_playground_openDialog_delete_tooltip => 'Delete';
+
+  @override
+  String session_playground_deleteDialog_title(String name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get session_playground_deleteDialog_message =>
+      'This cannot be undone.';
+
+  @override
+  String get session_playground_deleteDialog_confirm => 'Delete';
+
+  @override
+  String get session_playground_discardDialog_title => 'Replace current code?';
+
+  @override
+  String get session_playground_discardDialog_message =>
+      'Your unsaved changes will be lost.';
+
+  @override
+  String get session_playground_discardDialog_confirm => 'Replace';
+
+  @override
+  String session_playground_snack_saved(String name) {
+    return 'Saved as \"$name\".';
+  }
+
+  @override
+  String session_playground_snack_saveFailed(String error) {
+    return 'Saving failed: $error';
+  }
+
+  @override
+  String session_playground_snack_openFailed(String error) {
+    return 'Opening failed: $error';
+  }
+
+  @override
   String get session_quiz_pill => 'Quiz question';
 
   @override

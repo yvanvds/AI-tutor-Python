@@ -107,6 +107,45 @@
 
   "session_playground_pill": "playground",
   "session_playground_subtitle": "No goal — just you and Python.",
+  "session_playground_open_button": "Open",
+  "session_playground_open_tooltip": "Open saved code",
+  "session_playground_save_button": "Save",
+  "session_playground_save_tooltip": "Save this code",
+  "session_playground_dialog_cancel": "Cancel",
+  "session_playground_saveDialog_title": "Save code",
+  "session_playground_saveDialog_nameLabel": "File name",
+  "session_playground_saveDialog_invalidName": "Use letters, digits, spaces, - or _ (max 60 characters).",
+  "session_playground_saveDialog_confirm": "Save",
+  "session_playground_overwriteDialog_title": "Overwrite \"{name}\"?",
+  "@session_playground_overwriteDialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_overwriteDialog_message": "A file with this name already exists.",
+  "session_playground_overwriteDialog_confirm": "Overwrite",
+  "session_playground_openDialog_title": "Open saved code",
+  "session_playground_openDialog_empty": "No saved files yet.",
+  "session_playground_openDialog_delete_tooltip": "Delete",
+  "session_playground_deleteDialog_title": "Delete \"{name}\"?",
+  "@session_playground_deleteDialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_deleteDialog_message": "This cannot be undone.",
+  "session_playground_deleteDialog_confirm": "Delete",
+  "session_playground_discardDialog_title": "Replace current code?",
+  "session_playground_discardDialog_message": "Your unsaved changes will be lost.",
+  "session_playground_discardDialog_confirm": "Replace",
+  "session_playground_snack_saved": "Saved as \"{name}\".",
+  "@session_playground_snack_saved": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "session_playground_snack_saveFailed": "Saving failed: {error}",
+  "@session_playground_snack_saveFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "session_playground_snack_openFailed": "Opening failed: {error}",
+  "@session_playground_snack_openFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "session_quiz_pill": "Quiz question",
   "@session_quiz_pill": {

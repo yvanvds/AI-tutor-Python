@@ -196,6 +196,94 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_playground_subtitle => 'Geen doel — alleen jij en Python.';
 
   @override
+  String get session_playground_open_button => 'Openen';
+
+  @override
+  String get session_playground_open_tooltip => 'Opgeslagen code openen';
+
+  @override
+  String get session_playground_save_button => 'Opslaan';
+
+  @override
+  String get session_playground_save_tooltip => 'Deze code opslaan';
+
+  @override
+  String get session_playground_dialog_cancel => 'Annuleren';
+
+  @override
+  String get session_playground_saveDialog_title => 'Code opslaan';
+
+  @override
+  String get session_playground_saveDialog_nameLabel => 'Bestandsnaam';
+
+  @override
+  String get session_playground_saveDialog_invalidName =>
+      'Gebruik letters, cijfers, spaties, - of _ (max. 60 tekens).';
+
+  @override
+  String get session_playground_saveDialog_confirm => 'Opslaan';
+
+  @override
+  String session_playground_overwriteDialog_title(String name) {
+    return '\"$name\" overschrijven?';
+  }
+
+  @override
+  String get session_playground_overwriteDialog_message =>
+      'Er bestaat al een bestand met deze naam.';
+
+  @override
+  String get session_playground_overwriteDialog_confirm => 'Overschrijven';
+
+  @override
+  String get session_playground_openDialog_title => 'Opgeslagen code openen';
+
+  @override
+  String get session_playground_openDialog_empty =>
+      'Nog geen opgeslagen bestanden.';
+
+  @override
+  String get session_playground_openDialog_delete_tooltip => 'Verwijderen';
+
+  @override
+  String session_playground_deleteDialog_title(String name) {
+    return '\"$name\" verwijderen?';
+  }
+
+  @override
+  String get session_playground_deleteDialog_message =>
+      'Dit kan niet ongedaan gemaakt worden.';
+
+  @override
+  String get session_playground_deleteDialog_confirm => 'Verwijderen';
+
+  @override
+  String get session_playground_discardDialog_title =>
+      'Huidige code vervangen?';
+
+  @override
+  String get session_playground_discardDialog_message =>
+      'Je niet-opgeslagen wijzigingen gaan verloren.';
+
+  @override
+  String get session_playground_discardDialog_confirm => 'Vervangen';
+
+  @override
+  String session_playground_snack_saved(String name) {
+    return 'Opgeslagen als \"$name\".';
+  }
+
+  @override
+  String session_playground_snack_saveFailed(String error) {
+    return 'Opslaan mislukt: $error';
+  }
+
+  @override
+  String session_playground_snack_openFailed(String error) {
+    return 'Openen mislukt: $error';
+  }
+
+  @override
   String get session_quiz_pill => 'Quizvraag';
 
   @override

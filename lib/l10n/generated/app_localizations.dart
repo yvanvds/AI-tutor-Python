@@ -434,6 +434,150 @@ abstract class AppLocalizations {
   /// **'No goal — just you and Python.'**
   String get session_playground_subtitle;
 
+  /// No description provided for @session_playground_open_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get session_playground_open_button;
+
+  /// No description provided for @session_playground_open_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open saved code'**
+  String get session_playground_open_tooltip;
+
+  /// No description provided for @session_playground_save_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get session_playground_save_button;
+
+  /// No description provided for @session_playground_save_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this code'**
+  String get session_playground_save_tooltip;
+
+  /// No description provided for @session_playground_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get session_playground_dialog_cancel;
+
+  /// No description provided for @session_playground_saveDialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Save code'**
+  String get session_playground_saveDialog_title;
+
+  /// No description provided for @session_playground_saveDialog_nameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'File name'**
+  String get session_playground_saveDialog_nameLabel;
+
+  /// No description provided for @session_playground_saveDialog_invalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'Use letters, digits, spaces, - or _ (max 60 characters).'**
+  String get session_playground_saveDialog_invalidName;
+
+  /// No description provided for @session_playground_saveDialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get session_playground_saveDialog_confirm;
+
+  /// No description provided for @session_playground_overwriteDialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite \"{name}\"?'**
+  String session_playground_overwriteDialog_title(String name);
+
+  /// No description provided for @session_playground_overwriteDialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'A file with this name already exists.'**
+  String get session_playground_overwriteDialog_message;
+
+  /// No description provided for @session_playground_overwriteDialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite'**
+  String get session_playground_overwriteDialog_confirm;
+
+  /// No description provided for @session_playground_openDialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Open saved code'**
+  String get session_playground_openDialog_title;
+
+  /// No description provided for @session_playground_openDialog_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved files yet.'**
+  String get session_playground_openDialog_empty;
+
+  /// No description provided for @session_playground_openDialog_delete_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get session_playground_openDialog_delete_tooltip;
+
+  /// No description provided for @session_playground_deleteDialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"?'**
+  String session_playground_deleteDialog_title(String name);
+
+  /// No description provided for @session_playground_deleteDialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get session_playground_deleteDialog_message;
+
+  /// No description provided for @session_playground_deleteDialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get session_playground_deleteDialog_confirm;
+
+  /// No description provided for @session_playground_discardDialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace current code?'**
+  String get session_playground_discardDialog_title;
+
+  /// No description provided for @session_playground_discardDialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Your unsaved changes will be lost.'**
+  String get session_playground_discardDialog_message;
+
+  /// No description provided for @session_playground_discardDialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get session_playground_discardDialog_confirm;
+
+  /// No description provided for @session_playground_snack_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as \"{name}\".'**
+  String session_playground_snack_saved(String name);
+
+  /// No description provided for @session_playground_snack_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving failed: {error}'**
+  String session_playground_snack_saveFailed(String error);
+
+  /// No description provided for @session_playground_snack_openFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening failed: {error}'**
+  String session_playground_snack_openFailed(String error);
+
   /// Quiz header pill — displayed uppercase
   ///
   /// In en, this message translates to:
