@@ -26,6 +26,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:py_runner/py_runner.dart';
 
+import '../../helpers/localization.dart';
+
 class _FakeTutorService extends TutorService {
   @override
   TutorState build() => TutorState.idle;
@@ -50,6 +52,7 @@ void main() {
   setUp(() {
     output = OutputService(
       pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
+      localizations: testLocalizations(),
     );
     chat = ChatService();
   });

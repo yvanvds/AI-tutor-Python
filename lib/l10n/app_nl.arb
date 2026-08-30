@@ -187,6 +187,8 @@
   "session_output_state_error_count": "{count, plural, =1{1 fout} other{{count} fouten}}",
   "session_output_header_label": "Output",
   "session_output_emptyState_runHint": "Druk op Run om je code uit te voeren.",
+  "session_output_meta_turtleWindow": "Er staat een turtle-venster open. Sluit het, of druk op Stop, om de uitvoering te beëindigen.",
+  "session_output_meta_stopped": "Gestopt.",
 
   "session_runControls_tooltip_resetOutput": "Output resetten",
   "session_runControls_tooltip_askHint": "Vraag een hint",

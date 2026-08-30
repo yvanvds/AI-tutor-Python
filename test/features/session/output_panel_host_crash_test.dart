@@ -23,6 +23,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:py_runner/py_runner.dart';
 
+import '../../helpers/localization.dart';
+
 class _MockPyRunner extends Mock implements PyRunner {}
 
 class _MockRunHandle extends Mock implements RunHandle {}
@@ -70,7 +72,10 @@ void main() {
     when(() => handle.done).thenAnswer((_) => done.future);
     when(() => handle.cancel()).thenAnswer((_) async {});
 
-    output = OutputService(pyRunner: runner);
+    output = OutputService(
+      pyRunner: runner,
+      localizations: testLocalizations(),
+    );
     chat = ChatService();
   });
 

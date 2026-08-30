@@ -14,8 +14,9 @@
 // the system locale, SharedPreferences (in-memory), the playground file
 // directory (temp), the update check (off), the LLM (any call fails loudly)
 // and the lesson example runner (scripted). Python for the practice editor
-// stays real — pressing Run on a machine without the bundle shows the
-// in-app host error, which is what a student would see.
+// stays real by default — pressing Run on a machine without the bundle shows
+// the in-app host error, which is what a student would see; a flow that needs
+// to drive a run deterministically passes `pyRunner:`.
 
 import 'dart:async';
 import 'dart:io';
@@ -26,6 +27,7 @@ import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
+import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
@@ -33,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../test/helpers/fake_lesson_code_runner.dart';
@@ -77,6 +80,7 @@ class AppHarness {
     this.identity = studentIdentity,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
+    this.pyRunner,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -101,6 +105,13 @@ class AppHarness {
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
   final FakeLessonCodeRunner lessonRunner;
+
+  /// Python host behind the editor's Run button. `null` (the default) leaves
+  /// the real one in place — pressing Run on a machine without the bundle
+  /// then shows the in-app host error, which is what a student would see.
+  /// Pass a [FakePyRunner] to drive a run that starts and keeps running
+  /// regardless of what is installed on the machine.
+  final PyRunner? pyRunner;
 
   /// Every installer handover the app performed, as `(executable, arguments)`
   /// (#49).
@@ -134,6 +145,7 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
+        if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));

@@ -16,6 +16,7 @@ import 'package:integration_test/integration_test.dart';
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/playground_files.dart' as playground_files;
+import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
@@ -28,6 +29,7 @@ void main() {
   lesson_flow.main();
   language_switch.main();
   playground_files.main();
+  turtle_run_notice.main();
   update_prompt.main();
   update_failure.main();
   update_install.main();

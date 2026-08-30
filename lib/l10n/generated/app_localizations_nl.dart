@@ -603,6 +603,13 @@ class AppLocalizationsNl extends AppLocalizations {
       'Druk op Run om je code uit te voeren.';
 
   @override
+  String get session_output_meta_turtleWindow =>
+      'Er staat een turtle-venster open. Sluit het, of druk op Stop, om de uitvoering te beëindigen.';
+
+  @override
+  String get session_output_meta_stopped => 'Gestopt.';
+
+  @override
   String get session_runControls_tooltip_resetOutput => 'Output resetten';
 
   @override

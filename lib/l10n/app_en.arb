@@ -308,6 +308,14 @@
   },
   "session_output_header_label": "Output",
   "session_output_emptyState_runHint": "Press Run to execute your code.",
+  "session_output_meta_turtleWindow": "A turtle window is open. Close it, or press Stop, to finish the run.",
+  "@session_output_meta_turtleWindow": {
+    "description": "Faint meta line pushed to the output panel when a run's code imports turtle — the Tk window opens outside the app and turtle.done() blocks until it is closed (#51)"
+  },
+  "session_output_meta_stopped": "Stopped.",
+  "@session_output_meta_stopped": {
+    "description": "Faint meta line pushed to the output panel when the student presses Stop (#51)"
+  },
 
   "session_runControls_tooltip_resetOutput": "Reset output",
   "session_runControls_tooltip_askHint": "Ask for a hint",

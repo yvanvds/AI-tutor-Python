@@ -29,6 +29,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:py_runner/py_runner.dart';
 
+import '../../helpers/localization.dart';
+
 class _FakeTutorService extends TutorService {
   @override
   TutorState build() => TutorState.idle;
@@ -53,6 +55,7 @@ void main() {
     store = PlaygroundFileStore(rootDir: () async => root);
     output = OutputService(
       pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
+      localizations: testLocalizations(),
     );
     chat = ChatService();
   });

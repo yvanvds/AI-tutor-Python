@@ -595,6 +595,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Press Run to execute your code.';
 
   @override
+  String get session_output_meta_turtleWindow =>
+      'A turtle window is open. Close it, or press Stop, to finish the run.';
+
+  @override
+  String get session_output_meta_stopped => 'Stopped.';
+
+  @override
   String get session_runControls_tooltip_resetOutput => 'Reset output';
 
   @override

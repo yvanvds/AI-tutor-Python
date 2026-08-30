@@ -1094,6 +1094,18 @@ abstract class AppLocalizations {
   /// **'Press Run to execute your code.'**
   String get session_output_emptyState_runHint;
 
+  /// Faint meta line pushed to the output panel when a run's code imports turtle — the Tk window opens outside the app and turtle.done() blocks until it is closed (#51)
+  ///
+  /// In en, this message translates to:
+  /// **'A turtle window is open. Close it, or press Stop, to finish the run.'**
+  String get session_output_meta_turtleWindow;
+
+  /// Faint meta line pushed to the output panel when the student presses Stop (#51)
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped.'**
+  String get session_output_meta_stopped;
+
   /// No description provided for @session_runControls_tooltip_resetOutput.
   ///
   /// In en, this message translates to:
