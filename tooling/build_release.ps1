@@ -15,11 +15,17 @@
 #   3. tooling/python/build_bundle.ps1
 #   4. flutter build windows --release
 #   5. iscc.exe windows/packaging/exe/installer.iss -> public/PythonTeacherSetup.exe
-#   6. Rename to public/python_teacher_install.exe (canonical asset filename used
-#      by public/version.json + auto-updater in lib/core/update_info.dart)
-#   7. Compute SHA256, write public/version.json
-#   8. Commit pubspec/version.dart/version.json + tag v<version> + push
-#   9. gh release create v<version> with installer attached
+#   6. Rename to public/python_teacher_install.exe (canonical asset filename the
+#      auto-updater looks for - see kInstallerAssetName in
+#      lib/core/github_release.dart)
+#   7. Compute SHA256, write public/python_teacher_install.exe.sha256
+#   8. Commit pubspec/version.dart + tag v<version> + push
+#   9. gh release create v<version> with the installer AND its .sha256 attached
+#
+# The app reads the release straight from the GitHub Releases API (#50), so the
+# tag and the two assets are the whole contract - there is no version.json to
+# keep in lockstep any more. The .sha256 asset is not optional: without it the
+# app cannot verify the download and refuses to offer the release.
 #
 # Output: public/python_teacher_install.exe (~250 MB; warns if >300 MB)
 #
@@ -46,9 +52,8 @@ $IsccOutput  = Join-Path $PublicDir 'PythonTeacherSetup.exe'
 $Installer   = Join-Path $PublicDir 'python_teacher_install.exe'
 $Pubspec     = Join-Path $RepoRoot 'pubspec.yaml'
 $VersionDart = Join-Path $RepoRoot 'lib\version.dart'
-$Manifest    = Join-Path $PublicDir 'version.json'
-$Repo            = 'yvanvds/AI-tutor-Python'
-$ReleaseAssetUrl = "https://github.com/$Repo/releases/latest/download/python_teacher_install.exe"
+$Checksum    = Join-Path $PublicDir 'python_teacher_install.exe.sha256'
+$Repo        = 'yvanvds/AI-tutor-Python'
 
 function Write-Step { param([string]$Msg) Write-Host "`n[build_release] $Msg" -ForegroundColor Cyan }
 function Write-Ok   { param([string]$Msg) Write-Host "[build_release] $Msg" -ForegroundColor Green }
@@ -114,6 +119,9 @@ $ver         = $matches[1]
 $build       = [int]$matches[2] + 1
 $fullVersion = "$ver+$build"
 $newYaml     = $yaml -replace 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', "version: $fullVersion"
+# The numeric a.b.c.d form Inno Setup's VersionInfoVersion requires; '+' is a
+# compile error there, so the build number becomes the fourth field (#55).
+$versionInfo = "$ver.$build"
 # $newYaml already ends with the file's own trailing newline (Get-Content -Raw).
 Write-Utf8NoBom -Path $Pubspec -Content $newYaml
 Write-Ok "Version: $fullVersion"
@@ -164,7 +172,11 @@ New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
 $IssDir = Split-Path -Parent $IssScript
 Push-Location $IssDir
 try {
-    & $iscc (Split-Path -Leaf $IssScript)
+    # Stamp the version in (#55). Without these the .iss falls back to its
+    # 0.0.0 defaults and the install registers itself with Windows at that
+    # version, which is what Apps & Features and the uninstall key's
+    # DisplayVersion show. pubspec.yaml stays the single source of truth.
+    & $iscc "/DAppVersion=$fullVersion" "/DAppVersionInfo=$versionInfo" (Split-Path -Leaf $IssScript)
     if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed (exit $LASTEXITCODE)" }
 } finally {
     Pop-Location
@@ -186,17 +198,14 @@ if ($sizeMB -gt 300) {
     Write-Warning "Installer is ${sizeMB} MB - larger than expected ~250 MB. Check bundle contents."
 }
 
-# --- 7. Write version.json ---------------------------------------------------
+# --- 7. Write the checksum asset ---------------------------------------------
 
-Write-Step 'Step 7/9: compute SHA256 + write public/version.json'
-$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Installer).Hash
-@"
-{
-  "version": "$fullVersion",
-  "url": "$ReleaseAssetUrl",
-  "sha256": "$hash"
-}
-"@ | Set-Content -LiteralPath $Manifest -Encoding UTF8
+Write-Step 'Step 7/9: compute SHA256 + write the .sha256 asset'
+$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Installer).Hash.ToLowerInvariant()
+# `sha256sum` shape, so it is usable by hand as well as by the app. BOM-less:
+# a leading U+FEFF ends up in front of the hash and turns every comparison
+# into a mismatch, which is how the old manifest died (#45).
+Write-Utf8NoBom -Path $Checksum -Content "$hash  python_teacher_install.exe`n"
 Write-Ok "SHA256: $hash"
 
 if ($SkipPublish) {
@@ -234,7 +243,7 @@ Size: $sizeMB MB
 $notesFile = New-TemporaryFile
 $notesBody | Set-Content -LiteralPath $notesFile.FullName -Encoding UTF8
 
-& git add $Pubspec $VersionDart $Manifest
+& git add $Pubspec $VersionDart
 if ($LASTEXITCODE -ne 0) { throw 'git add failed.' }
 & git commit -m "release: $fullVersion"
 if ($LASTEXITCODE -ne 0) { throw 'git commit failed.' }
@@ -248,7 +257,9 @@ if ($LASTEXITCODE -ne 0) { throw 'git push (tag) failed.' }
 # --- 9. GitHub release -------------------------------------------------------
 
 Write-Step "Step 9/9: gh release create $tag"
-& gh release create $tag $Installer `
+# Both assets: the app finds the installer by name and reads its hash from the
+# .sha256 next to it. A release without the second one is not offerable (#50).
+& gh release create $tag $Installer $Checksum `
     --repo $Repo `
     --title $fullVersion `
     --notes-file $notesFile.FullName

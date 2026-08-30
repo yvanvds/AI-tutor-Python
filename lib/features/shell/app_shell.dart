@@ -1,4 +1,6 @@
-import 'package:ai_tutor_python/core/update_info.dart';
+import 'dart:async';
+
+import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
@@ -9,20 +11,12 @@ import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
-import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
-import 'package:ai_tutor_python/version.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
+import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-/// Where the shell looks for a newer installer on launch. `null` disables
-/// the check — the integration harness (#28) overrides it so a test boot
-/// never fetches, downloads, or runs an installer.
-final updateManifestUrlProvider = Provider<Uri?>(
-  (_) => Uri.parse('https://yvanvds.github.io/AI-tutor-Python/version.json'),
-);
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -35,11 +29,24 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+    // Fire and forget: `start()` handles every failure itself and returns
+    // immediately on a build that does not check by itself (#47), so the
+    // first frame never waits on the network.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ref.read(updateControllerProvider.notifier).start());
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // The only place an update is offered — as a strip of chrome that waits,
+    // not a modal that announces (#48). Everything else about the flow —
+    // deciding, downloading, hashing, launching — lives in the controller,
+    // and `apply()` is reachable only from the bar's own button.
+    final offering = ref.watch(
+      updateControllerProvider.select((s) => s.isOffering),
+    );
+
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
@@ -57,23 +64,32 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       backgroundColor: AppColors.ink0,
-      body: Stack(
+      body: Column(
         children: [
-          Row(
-            children: [
-              const Sidebar(),
-              Expanded(
-                child: Column(
+          // Above the sidebar as well as the content: this is the app telling
+          // the student something, not one page's business.
+          if (offering) const UpdateOfferBar(),
+          Expanded(
+            child: Stack(
+              children: [
+                Row(
                   children: [
-                    const TopBar(),
-                    Expanded(child: _bodyFor(section)),
+                    const Sidebar(),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const TopBar(),
+                          Expanded(child: _bodyFor(section)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const GoalSplashOverlay(),
+                const LevelUpOverlay(),
+              ],
+            ),
           ),
-          const GoalSplashOverlay(),
-          const LevelUpOverlay(),
         ],
       ),
     );
@@ -96,41 +112,5 @@ class _AppShellState extends ConsumerState<AppShell> {
       case Section.options:
         return const OptionsPage();
     }
-  }
-
-  Future<void> _checkForUpdate() async {
-    final manifest = ref.read(updateManifestUrlProvider);
-    if (manifest == null) return;
-    final info = await fetchUpdateInfo(manifest);
-    if (info == null) return;
-    if (!isNewer(info.version, kAppVersion)) return;
-    if (!mounted) return;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        final l = AppLocalizations.of(context);
-        return AlertDialog(
-          title: Text(l.update_dialog_title),
-          content: Text(l.update_dialog_message(info.version)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l.update_dialog_ok),
-            ),
-          ],
-        );
-      },
-    );
-
-    final file = await downloadToTemp(info.url);
-    if (file == null) return;
-    final ok = await verifySha256(file, info.sha256);
-    if (!ok) {
-      file.deleteSync();
-      return;
-    }
-    await runInstallerAndExit(file, args: const ['/VERYSILENT', '/NORESTART']);
   }
 }

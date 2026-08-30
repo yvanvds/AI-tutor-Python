@@ -14,6 +14,7 @@ import 'dart:convert';
 
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -30,6 +31,7 @@ import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
+import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1133,23 +1135,71 @@ class _RecentTurnsList extends StatelessWidget {
 // About
 // ---------------------------------------------------------------------------
 
-class _AboutCard extends StatelessWidget {
+/// The running build's version and the only place the update check can be
+/// *asked* for (#48).
+///
+/// The shell's offer bar reacts to a check; the check itself, and the reason
+/// one failed, are read here on demand. That split is what lets a failed
+/// check stay silent — the news has somewhere to sit without going looking
+/// for the student. It also has to work on a build that never checks by
+/// itself: `autoCheck` is `kReleaseMode` (#47), so on a `flutter run`
+/// checkout this button is the *only* way the feature runs at all.
+class _AboutCard extends ConsumerWidget {
   const _AboutCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+    final update = ref.watch(updateControllerProvider);
+    final controller = ref.read(updateControllerProvider.notifier);
+    final release = update.release;
+
     return _OptionsCard(
       title: l.options_about_title,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.appTitle, style: Theme.of(context).textTheme.titleSmall),
+          Text(l.appTitle, style: text.titleSmall),
           const SizedBox(height: AppSpacing.xxs),
+          Text(l.options_about_version(kAppVersion), style: text.bodySmall),
+          const SizedBox(height: AppSpacing.m),
           Text(
-            l.options_about_version(kAppVersion),
-            style: Theme.of(context).textTheme.bodySmall,
+            updateStatusText(l, update),
+            key: const ValueKey('about-update-status'),
+            style: text.bodySmall,
           ),
+          const SizedBox(height: AppSpacing.s),
+          Wrap(
+            spacing: AppSpacing.s,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('about-update-check'),
+                onPressed: update.busy ? null : controller.check,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l.update_action_check),
+              ),
+              // Offered only when there is genuinely something to apply. With
+              // the shell's Update button this is the whole consent gate: no
+              // other code path reaches `apply()`.
+              if (release != null)
+                FilledButton.icon(
+                  key: const ValueKey('about-update-apply'),
+                  onPressed: update.busy ? null : controller.apply,
+                  icon: const Icon(Icons.system_update_alt_outlined, size: 18),
+                  label: Text(l.update_action_applyVersion(release.version)),
+                ),
+            ],
+          ),
+          if (update.phase == UpdatePhase.downloading) ...[
+            const SizedBox(height: AppSpacing.m),
+            UpdateProgressBar(
+              key: const ValueKey('about-update-progress'),
+              progress: update.progress,
+            ),
+          ],
         ],
       ),
     );

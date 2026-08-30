@@ -17,8 +17,10 @@
 // stays real — pressing Run on a machine without the bundle shows the
 // in-app host error, which is what a student would see.
 
+import 'dart:async';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -73,14 +75,43 @@ class _OfflineTutor extends TutorService {
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
+    this.updateFeedUrl,
+    this.forceUpdateCheck = true,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
   final AccountIdentity identity;
 
+  /// Where the shell looks for a published release on launch — GitHub's
+  /// `/releases/latest` in production (#50). `null` (the default) switches
+  /// the update check off, so a flow never fetches, downloads or runs an
+  /// installer. The update flows point this at a local test server that
+  /// answers with the same API shape.
+  final Uri? updateFeedUrl;
+
+  /// Whether the harness forces the launch check on.
+  ///
+  /// The app itself checks only in a release build (#47), and an
+  /// integration-test binary is never one, so a flow that wants to drive the
+  /// check has to say so. Pass `false` to leave the app's own
+  /// `kReleaseMode` default in place — which is how `update_dev_build.dart`
+  /// proves a debug build never reaches out at all.
+  final bool forceUpdateCheck;
+
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
   final FakeLessonCodeRunner lessonRunner;
+
+  /// Every installer handover the app performed, as `(executable, arguments)`
+  /// (#49).
+  ///
+  /// The launcher is *always* replaced, in every flow: the production one
+  /// spawns a real setup binary on the machine running the suite and then
+  /// calls `exit(0)`, which would take the test runner with it. Everything
+  /// above it — the feed, the download, the checksum — stays the real wiring,
+  /// so a flow can assert on the switches the app passes the installer.
+  final List<({String executable, List<String> arguments})> installerLaunches =
+      <({String executable, List<String> arguments})>[];
 
   late final InMemoryCosmosClient cosmos;
   late final Directory playgroundDir;
@@ -103,7 +134,16 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
-        updateManifestUrlProvider.overrideWithValue(null),
+        updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
+        installerLauncherProvider.overrideWithValue((executable, arguments) {
+          installerLaunches.add((executable: executable, arguments: arguments));
+          // The real launcher never returns — it exits the process. Hanging
+          // here keeps the app in `applying`, which is the state a student
+          // actually sees for the moment before the window closes.
+          return Completer<void>().future;
+        }),
+        if (forceUpdateCheck)
+          updateAutoCheckProvider.overrideWithValue(updateFeedUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
       ],
     );

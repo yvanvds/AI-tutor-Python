@@ -410,15 +410,47 @@ class AppLocalizationsNl extends AppLocalizations {
   String get crash_resetButton => 'App resetten (rechten herstellen)';
 
   @override
-  String get update_dialog_title => 'Update beschikbaar';
+  String get update_status_idle => 'Er is nog niet gecontroleerd op updates.';
 
   @override
-  String update_dialog_message(String version) {
-    return 'Er is een nieuwere versie ($version) van de applicatie beschikbaar. De update wordt nu geïnstalleerd. Je kunt de app over enkele momenten opnieuw openen.';
+  String get update_status_checking => 'Er wordt gecontroleerd op updates…';
+
+  @override
+  String get update_status_upToDate => 'Je hebt de nieuwste versie.';
+
+  @override
+  String update_status_available(String version) {
+    return 'Versie $version is beschikbaar.';
   }
 
   @override
-  String get update_dialog_ok => 'OK';
+  String update_status_downloading(String version) {
+    return 'Versie $version wordt gedownload…';
+  }
+
+  @override
+  String update_status_applying(String version) {
+    return 'Het installatieprogramma start. De app sluit zichzelf en komt terug als versie $version.';
+  }
+
+  @override
+  String update_status_failed(String reason) {
+    return 'De update is niet gelukt: $reason';
+  }
+
+  @override
+  String get update_action_apply => 'Bijwerken';
+
+  @override
+  String update_action_applyVersion(String version) {
+    return 'Bijwerken naar $version';
+  }
+
+  @override
+  String get update_action_later => 'Later';
+
+  @override
+  String get update_action_check => 'Controleren op updates';
 
   @override
   String get session_explain_placeholder_noSubgoal =>

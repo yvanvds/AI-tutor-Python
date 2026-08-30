@@ -12,7 +12,11 @@
 // Cosmos endpoint, and there is no integration_test harness in the repo (#28).
 
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
+import 'package:ai_tutor_python/core/update_controller.dart';
+import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -185,48 +189,54 @@ void main() {
     return http.Response('{"message":"Not Found"}', 404);
   });
 
-  Widget buildApp({bool devTools = false}) => ProviderScope(
-    overrides: [
-      authServiceProvider.overrideWith(_SignedInAuth.new),
-      accountServiceProvider.overrideWith(
-        () => AccountService(container: accounts.container),
-      ),
-      goalsServiceProvider.overrideWithValue(
-        GoalsService(container: goals.container),
-      ),
-      progressServiceProvider.overrideWithValue(
-        ProgressService(
-          container: progress.container,
-          historyContainer: history.container,
-          getUid: () => _uid,
+  Widget buildApp({bool devTools = false, UpdateServices? update}) =>
+      ProviderScope(
+        overrides: [
+          if (update != null) updateServicesProvider.overrideWithValue(update),
+          authServiceProvider.overrideWith(_SignedInAuth.new),
+          accountServiceProvider.overrideWith(
+            () => AccountService(container: accounts.container),
+          ),
+          goalsServiceProvider.overrideWithValue(
+            GoalsService(container: goals.container),
+          ),
+          progressServiceProvider.overrideWithValue(
+            ProgressService(
+              container: progress.container,
+              historyContainer: history.container,
+              getUid: () => _uid,
+            ),
+          ),
+          loBeliefsServiceProvider.overrideWithValue(
+            LoBeliefsService(container: beliefs.container, getUid: () => _uid),
+          ),
+          turnHistoryServiceProvider.overrideWithValue(
+            TurnHistoryService(container: turns.container, getUid: () => _uid),
+          ),
+          githubIssueServiceProvider.overrideWithValue(
+            GitHubIssueService(client: githubClient()),
+          ),
+          debugServiceProvider.overrideWithValue(recorder),
+          developerToolsProvider.overrideWithValue(devTools),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: OptionsPage()),
         ),
-      ),
-      loBeliefsServiceProvider.overrideWithValue(
-        LoBeliefsService(container: beliefs.container, getUid: () => _uid),
-      ),
-      turnHistoryServiceProvider.overrideWithValue(
-        TurnHistoryService(container: turns.container, getUid: () => _uid),
-      ),
-      githubIssueServiceProvider.overrideWithValue(
-        GitHubIssueService(client: githubClient()),
-      ),
-      debugServiceProvider.overrideWithValue(recorder),
-      developerToolsProvider.overrideWithValue(devTools),
-    ],
-    child: MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: const Scaffold(body: OptionsPage()),
-    ),
-  );
+      );
 
-  Future<void> mount(WidgetTester tester, {bool devTools = false}) async {
+  Future<void> mount(
+    WidgetTester tester, {
+    bool devTools = false,
+    UpdateServices? update,
+  }) async {
     // Tall viewport so every card is laid out without scrolling.
     tester.view.physicalSize = const Size(1400, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(buildApp(devTools: devTools));
+    await tester.pumpWidget(buildApp(devTools: devTools, update: update));
     // Account poll + SharedPreferences hydration.
     await tester.pump();
     await tester.pump();
@@ -524,5 +534,99 @@ void main() {
     await mount(tester);
     expect(find.text('Version $kAppVersion'), findsOneWidget);
     await unmount(tester);
+  });
+
+  // #48 — before this the About card was a version string and nothing else:
+  // there was no way to ask for an update, and a check that failed left no
+  // trace anywhere in the UI.
+  group('about — update', () {
+    UpdateServices services({
+      UpdateInfo? latest,
+      Object? feedError,
+      List<File>? ran,
+    }) => UpdateServices(
+      localVersion: '1.0.0',
+      autoCheck: false,
+      feed: () async {
+        if (feedError != null) throw feedError;
+        return latest;
+      },
+      download: (_, _) async => File('not-a-real-installer.exe'),
+      verify: (_, _) async => true,
+      run: (file) async => ran?.add(file),
+      log: (_) {},
+    );
+
+    String statusText(WidgetTester tester) => tester
+        .widget<Text>(find.byKey(const ValueKey('about-update-status')))
+        .data!;
+
+    testWidgets('starts idle and offers only a check', (tester) async {
+      await mount(tester, update: services());
+
+      expect(statusText(tester), 'No update check has run yet.');
+      expect(find.byKey(const ValueKey('about-update-check')), findsOneWidget);
+      expect(find.byKey(const ValueKey('about-update-apply')), findsNothing);
+
+      await unmount(tester);
+    });
+
+    // The manual check has to work on a build that never checks by itself —
+    // `autoCheck` is `kReleaseMode` (#47), so on a debug build this button is
+    // the only way the feature runs at all.
+    testWidgets('the check button finds a release and offers to apply it', (
+      tester,
+    ) async {
+      final ran = <File>[];
+      await mount(
+        tester,
+        update: services(
+          latest: UpdateInfo(
+            '2.0.0',
+            Uri.parse('https://example.com/setup.exe'),
+            'abc',
+          ),
+          ran: ran,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('about-update-check')));
+      await tester.pumpAndSettle();
+
+      expect(statusText(tester), 'Version 2.0.0 is available.');
+      expect(find.text('Update to 2.0.0'), findsOneWidget);
+      expect(ran, isEmpty, reason: 'the check installed something by itself');
+
+      await unmount(tester);
+    });
+
+    testWidgets('the check button reports a failure it would otherwise '
+        'have swallowed', (tester) async {
+      await mount(
+        tester,
+        update: services(
+          feedError: UpdateCheckException('release lookup returned HTTP 500'),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('about-update-check')));
+      await tester.pumpAndSettle();
+
+      expect(statusText(tester), contains('HTTP 500'));
+      expect(find.byKey(const ValueKey('about-update-apply')), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('an up-to-date build says so', (tester) async {
+      await mount(tester, update: services(latest: null));
+
+      await tester.tap(find.byKey(const ValueKey('about-update-check')));
+      await tester.pumpAndSettle();
+
+      expect(statusText(tester), 'You have the newest version.');
+
+      await unmount(tester);
+    });
   });
 }

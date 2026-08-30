@@ -782,23 +782,71 @@ abstract class AppLocalizations {
   /// **'Reset app (fix permissions)'**
   String get crash_resetButton;
 
-  /// No description provided for @update_dialog_title.
+  /// No description provided for @update_status_idle.
   ///
   /// In en, this message translates to:
-  /// **'Update available'**
-  String get update_dialog_title;
+  /// **'No update check has run yet.'**
+  String get update_status_idle;
 
-  /// No description provided for @update_dialog_message.
+  /// No description provided for @update_status_checking.
   ///
   /// In en, this message translates to:
-  /// **'A newer version ({version}) of the application is available. The update will now be installed. You can open it again in a moment.'**
-  String update_dialog_message(String version);
+  /// **'Checking for updates…'**
+  String get update_status_checking;
 
-  /// No description provided for @update_dialog_ok.
+  /// No description provided for @update_status_upToDate.
   ///
   /// In en, this message translates to:
-  /// **'OK'**
-  String get update_dialog_ok;
+  /// **'You have the newest version.'**
+  String get update_status_upToDate;
+
+  /// No description provided for @update_status_available.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available.'**
+  String update_status_available(String version);
+
+  /// No description provided for @update_status_downloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading version {version}…'**
+  String update_status_downloading(String version);
+
+  /// No description provided for @update_status_applying.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the installer. The app closes itself and comes back as version {version}.'**
+  String update_status_applying(String version);
+
+  /// No description provided for @update_status_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The update did not succeed: {reason}'**
+  String update_status_failed(String reason);
+
+  /// No description provided for @update_action_apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get update_action_apply;
+
+  /// No description provided for @update_action_applyVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to {version}'**
+  String update_action_applyVersion(String version);
+
+  /// No description provided for @update_action_later.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get update_action_later;
+
+  /// No description provided for @update_action_check.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get update_action_check;
 
   /// No description provided for @session_explain_placeholder_noSubgoal.
   ///

@@ -404,15 +404,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crash_resetButton => 'Reset app (fix permissions)';
 
   @override
-  String get update_dialog_title => 'Update available';
+  String get update_status_idle => 'No update check has run yet.';
 
   @override
-  String update_dialog_message(String version) {
-    return 'A newer version ($version) of the application is available. The update will now be installed. You can open it again in a moment.';
+  String get update_status_checking => 'Checking for updates…';
+
+  @override
+  String get update_status_upToDate => 'You have the newest version.';
+
+  @override
+  String update_status_available(String version) {
+    return 'Version $version is available.';
   }
 
   @override
-  String get update_dialog_ok => 'OK';
+  String update_status_downloading(String version) {
+    return 'Downloading version $version…';
+  }
+
+  @override
+  String update_status_applying(String version) {
+    return 'Starting the installer. The app closes itself and comes back as version $version.';
+  }
+
+  @override
+  String update_status_failed(String reason) {
+    return 'The update did not succeed: $reason';
+  }
+
+  @override
+  String get update_action_apply => 'Update';
+
+  @override
+  String update_action_applyVersion(String version) {
+    return 'Update to $version';
+  }
+
+  @override
+  String get update_action_later => 'Later';
+
+  @override
+  String get update_action_check => 'Check for updates';
 
   @override
   String get session_explain_placeholder_noSubgoal =>

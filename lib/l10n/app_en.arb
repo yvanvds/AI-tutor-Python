@@ -201,14 +201,42 @@
   "crash_defaultMessage": "This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.",
   "crash_resetButton": "Reset app (fix permissions)",
 
-  "update_dialog_title": "Update available",
-  "update_dialog_message": "A newer version ({version}) of the application is available. The update will now be installed. You can open it again in a moment.",
-  "@update_dialog_message": {
+  "update_status_idle": "No update check has run yet.",
+  "update_status_checking": "Checking for updates…",
+  "update_status_upToDate": "You have the newest version.",
+  "update_status_available": "Version {version} is available.",
+  "@update_status_available": {
     "placeholders": {
       "version": { "type": "String" }
     }
   },
-  "update_dialog_ok": "OK",
+  "update_status_downloading": "Downloading version {version}…",
+  "@update_status_downloading": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "update_status_applying": "Starting the installer. The app closes itself and comes back as version {version}.",
+  "@update_status_applying": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "update_status_failed": "The update did not succeed: {reason}",
+  "@update_status_failed": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "update_action_apply": "Update",
+  "update_action_applyVersion": "Update to {version}",
+  "@update_action_applyVersion": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "update_action_later": "Later",
+  "update_action_check": "Check for updates",
 
   "session_explain_placeholder_noSubgoal": "Pick a subgoal in the learning path to see the explanation.",
   "session_explain_loading": "Loading lesson…",
