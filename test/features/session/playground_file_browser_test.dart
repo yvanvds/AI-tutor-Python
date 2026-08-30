@@ -96,14 +96,30 @@ void main() {
   /// store's file IO — kicked off by the taps — needs real time to complete.
   /// Alternate a slice of real time with a fake-clock frame so dialog
   /// animations and IO both make progress.
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 10; i++) {
+  ///
+  /// Ten slices always run (enough for the dialog animations, which are on
+  /// the fake clock). When [until] is given, slices keep running until it
+  /// holds, bounded by a real-time deadline: how long `save(flush: true)` or
+  /// `list()` takes is the runner's disk speed, not a fixed number of slices
+  /// — the fixed budget passed on a warm developer machine and failed on a
+  /// cold CI runner under `--coverage` (#28).
+  Future<void> settle(WidgetTester tester, {bool Function()? until}) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    var i = 0;
+    while (i < 10 || (until != null && !until())) {
+      if (i >= 10 && DateTime.now().isAfter(deadline)) {
+        fail('settle: condition still false after 10 s');
+      }
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
       await tester.pump(const Duration(milliseconds: 50));
+      i++;
     }
   }
+
+  bool Function() shown(Finder finder) =>
+      () => finder.evaluate().isNotEmpty;
 
   Future<void> unmount(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -115,9 +131,13 @@ void main() {
 
   File fileFor(String name) => File(p.join(root.path, '$name.py'));
 
-  Future<void> saveAs(WidgetTester tester, String name) async {
+  Future<void> saveAs(
+    WidgetTester tester,
+    String name, {
+    bool Function()? until,
+  }) async {
     await tester.tap(find.text('Save'));
-    await settle(tester);
+    await settle(tester, until: shown(find.byType(AlertDialog)));
     await tester.enterText(
       find.descendant(
         of: find.byType(AlertDialog),
@@ -131,7 +151,7 @@ void main() {
         matching: find.text('Save'),
       ),
     );
-    await settle(tester);
+    await settle(tester, until: until);
   }
 
   testWidgets('Save writes the editor buffer to <name>.py and shows the name', (
@@ -140,7 +160,9 @@ void main() {
     await mount(tester);
     editor(tester).setText(_code);
 
-    await saveAs(tester, 'loops');
+    // The header names the file once the write has completed *and* the
+    // provider update has been pumped; wait for that, not for a clock.
+    await saveAs(tester, 'loops', until: shown(find.text('loops.py')));
 
     expect(fileFor('loops').readAsStringSync(), _code);
     expect(find.text('loops.py'), findsOneWidget);
@@ -174,13 +196,13 @@ void main() {
     await mount(tester);
 
     await tester.tap(find.text('Open'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('loops.py')));
 
     expect(find.text('hello.py'), findsOneWidget);
     expect(find.text('loops.py'), findsOneWidget);
 
     await tester.tap(find.text('loops.py'));
-    await settle(tester);
+    await settle(tester, until: () => editor(tester).getText() == _code);
 
     expect(find.byType(AlertDialog), findsNothing);
     expect(editor(tester).getText(), _code);
@@ -197,9 +219,9 @@ void main() {
     editor(tester).setText('x = 1\n');
 
     await tester.tap(find.text('Open'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('loops.py')));
     await tester.tap(find.text('loops.py'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('Replace current code?')));
 
     expect(find.text('Replace current code?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
@@ -207,11 +229,11 @@ void main() {
     expect(editor(tester).getText(), 'x = 1\n');
 
     await tester.tap(find.text('Open'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('loops.py')));
     await tester.tap(find.text('loops.py'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('Replace current code?')));
     await tester.tap(find.text('Replace'));
-    await settle(tester);
+    await settle(tester, until: () => editor(tester).getText() == _code);
     expect(editor(tester).getText(), _code);
 
     await unmount(tester);
@@ -223,7 +245,7 @@ void main() {
     await mount(tester);
 
     await tester.tap(find.text('Open'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('No saved files yet.')));
 
     expect(find.text('No saved files yet.'), findsOneWidget);
 
@@ -237,13 +259,13 @@ void main() {
     await mount(tester);
 
     await tester.tap(find.text('Open'));
-    await settle(tester);
+    await settle(tester, until: shown(find.byIcon(Icons.delete_outline)));
     await tester.tap(find.byIcon(Icons.delete_outline));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('Delete "loops"?')));
 
     expect(find.text('Delete "loops"?'), findsOneWidget);
     await tester.tap(find.text('Delete'));
-    await settle(tester);
+    await settle(tester, until: shown(find.text('No saved files yet.')));
 
     expect(fileFor('loops').existsSync(), isFalse);
     expect(find.text('No saved files yet.'), findsOneWidget);
