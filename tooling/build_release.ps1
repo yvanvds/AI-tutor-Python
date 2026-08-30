@@ -55,6 +55,23 @@ function Write-Ok   { param([string]$Msg) Write-Host "[build_release] $Msg" -For
 
 function Test-Cmd { param([string]$Name) return [bool](Get-Command $Name -ErrorAction SilentlyContinue) }
 
+# Write a text file as UTF-8 WITHOUT a byte-order mark.
+#
+# `Set-Content -Encoding UTF8` emits a BOM on Windows PowerShell 5.1 (PowerShell
+# 7 does not). The CI format gate (`dart format --set-exit-if-changed`) strips
+# the BOM from lib/version.dart, so a release commit made from 5.1 would turn
+# `main` red. [IO.File]::WriteAllText with UTF8Encoding($false) is BOM-less on
+# every PowerShell version. Content is written verbatim, so callers pass the
+# trailing newline themselves.
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Content
+    )
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function Find-Iscc {
     $inPath = Get-Command iscc.exe -ErrorAction SilentlyContinue
     if ($inPath) { return $inPath.Source }
@@ -97,16 +114,19 @@ $ver         = $matches[1]
 $build       = [int]$matches[2] + 1
 $fullVersion = "$ver+$build"
 $newYaml     = $yaml -replace 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', "version: $fullVersion"
-Set-Content -LiteralPath $Pubspec -Value $newYaml -Encoding UTF8
+# $newYaml already ends with the file's own trailing newline (Get-Content -Raw).
+Write-Utf8NoBom -Path $Pubspec -Content $newYaml
 Write-Ok "Version: $fullVersion"
 
 # --- 2. Regenerate lib/version.dart -----------------------------------------
 
 Write-Step 'Step 2/9: regenerate lib/version.dart'
-@"
+$versionDartContent = @"
 /// Generated. Do not edit.
 const String kAppVersion = '$fullVersion';
-"@ | Set-Content -LiteralPath $VersionDart -Encoding UTF8
+
+"@
+Write-Utf8NoBom -Path $VersionDart -Content $versionDartContent
 
 # --- 3. Python bundle --------------------------------------------------------
 
