@@ -25,6 +25,16 @@
   "options_language_title": "Taal",
   "options_language_subtitle": "Wordt meteen toegepast; \"Systeem\" volgt het besturingssysteem.",
 
+  "options_theme_title": "Weergave",
+  "options_theme_subtitle": "Licht of donker, opgeslagen op dit toestel. \"Systeem\" volgt het besturingssysteem.",
+  "options_theme_system": "Systeem volgen",
+  "options_theme_light": "Licht",
+  "options_theme_dark": "Donker",
+
+  "options_model_title": "AI-model",
+  "options_model_subtitle": "Welk OpenAI-model de tutor bevraagt. Geldt alleen voor dit toestel; een groter model is trager en duurder.",
+  "options_model_followGlobal": "Standaard van de school ({model})",
+
   "options_progress_title": "Voortgang",
   "options_progress_subtitle": "Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.",
   "options_progress_resetAll_button": "Alle voortgang wissen",
@@ -44,6 +54,18 @@
   "options_progress_resetGoal_done": "Voortgang van \"{title}\" is gewist.",
   "options_progress_resetFailed": "Wissen mislukt: {error}",
   "options_dialog_cancel": "Annuleren",
+
+  "options_transfer_title": "Voortgang exporteren / importeren",
+  "options_transfer_subtitle": "Bewaar je leergeschiedenis in een bestand, of laad ze in dit account — handig als je naar een ander account overstapt.",
+  "options_transfer_export_button": "Voortgang exporteren…",
+  "options_transfer_import_button": "Voortgang importeren…",
+  "options_transfer_exported": "Voortgang opgeslagen in {path}",
+  "options_transfer_exportFailed": "Exporteren mislukt: {error}",
+  "options_transfer_import_dialog_title": "Je voortgang vervangen?",
+  "options_transfer_import_dialog_message": "\"{file}\" importeren verwijdert de voortgang, leergeschiedenis en tutorinschattingen die dit account nu heeft en vervangt ze door de inhoud van het bestand. Dit kan niet ongedaan gemaakt worden.",
+  "options_transfer_import_dialog_confirm": "Importeren en vervangen",
+  "options_transfer_imported": "{goals} doelen, {samples} geschiedenisitems en {beliefs} kennisinschattingen geïmporteerd.",
+  "options_transfer_importFailed": "Importeren mislukt: {error}",
 
   "options_apiKey_title": "OpenAI API-sleutel",
   "options_apiKey_subtitle": "Je eigen sleutel, opgeslagen op dit toestel. Als je ze verwijdert, kom je terug op het sleutelscherm.",

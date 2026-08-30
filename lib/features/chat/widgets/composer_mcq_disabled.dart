@@ -14,11 +14,7 @@ class ComposerMcqDisabled extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.touch_app_outlined,
-            size: 16,
-            color: AppColors.accent,
-          ),
+          Icon(Icons.touch_app_outlined, size: 16, color: AppColors.accent),
           const SizedBox(width: AppSpacing.s),
           Text(
             AppLocalizations.of(context).chat_composer_mcqDisabled_label,

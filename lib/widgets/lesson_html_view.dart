@@ -134,7 +134,7 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
         children: [
           WebViewWidget(controller: _controller),
           if (!_ready)
-            const Positioned.fill(child: ColoredBox(color: AppColors.ink0)),
+            Positioned.fill(child: ColoredBox(color: AppColors.ink0)),
         ],
       ),
     );

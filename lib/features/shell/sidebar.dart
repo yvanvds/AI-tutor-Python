@@ -111,14 +111,14 @@ class _Logo extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [AppColors.accent, AppColors.accent2],
           ),
           borderRadius: BorderRadius.circular(AppRadius.cardLarge),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.auto_awesome_outlined,
           color: AppColors.ink0,
           size: 22,
@@ -139,7 +139,7 @@ class _SidebarHeader extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.fgFaint,
           fontSize: 9.5,
           fontWeight: FontWeight.w600,

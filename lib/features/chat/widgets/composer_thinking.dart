@@ -31,7 +31,7 @@ class ComposerThinking extends StatelessWidget {
               const SizedBox(width: AppSpacing.s),
               Text(
                 AppLocalizations.of(context).chat_composer_thinking_label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.fgMute,
                   fontSize: 12,
                   fontStyle: FontStyle.italic,

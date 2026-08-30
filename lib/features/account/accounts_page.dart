@@ -268,7 +268,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               child: Theme(
                 data: Theme.of(context).copyWith(
                   dividerColor: AppColors.ink2,
-                  dataTableTheme: const DataTableThemeData(
+                  dataTableTheme: DataTableThemeData(
                     dividerThickness: 1,
                     headingRowHeight: 40,
                     dataRowMinHeight: 48,
@@ -360,7 +360,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       cells: [
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
-        DataCell(Text('—', style: const TextStyle(color: AppColors.fgFaint))),
+        DataCell(Text('—', style: TextStyle(color: AppColors.fgFaint))),
         DataCell(Text(activeRootTitle ?? '—')),
         DataCell(_OverallProgressBar(value: overall)),
         DataCell(_StatusCell(status: status, uid: a.uid)),
@@ -547,7 +547,7 @@ class _PageHeader extends StatelessWidget {
       children: [
         Text(
           l.accounts_page_title,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.fg,
             fontSize: 30,
             fontWeight: FontWeight.w700,
@@ -558,11 +558,7 @@ class _PageHeader extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           l.accounts_page_subtitle,
-          style: const TextStyle(
-            color: AppColors.fgFaint,
-            fontSize: 13,
-            height: 1.4,
-          ),
+          style: TextStyle(color: AppColors.fgFaint, fontSize: 13, height: 1.4),
         ),
       ],
     );
@@ -582,16 +578,12 @@ class _EmailCell extends StatelessWidget {
       children: [
         SelectableText(
           email,
-          style: const TextStyle(
-            color: AppColors.fg,
-            fontSize: 13,
-            height: 1.3,
-          ),
+          style: TextStyle(color: AppColors.fg, fontSize: 13, height: 1.3),
         ),
         if (lastActive != '—')
           Text(
             AppLocalizations.of(context).accounts_email_lastActive(lastActive),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.fgFaint,
               fontSize: 10.5,
               height: 1.4,
@@ -634,7 +626,7 @@ class _OverallProgressBar extends StatelessWidget {
           const SizedBox(width: AppSpacing.s),
           Text(
             '${(value * 100).round()}%',
-            style: const TextStyle(color: AppColors.fgMute, fontSize: 12),
+            style: TextStyle(color: AppColors.fgMute, fontSize: 12),
           ),
         ],
       ),

@@ -40,19 +40,19 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       child: Column(
         children: [
           const _GoalsHeader(),
-          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(
             child: Row(
               children: [
                 Expanded(child: RootPane(rootsAsync: _rootsStream)),
-                const VerticalDivider(width: 1, color: AppColors.ink2),
+                VerticalDivider(width: 1, color: AppColors.ink2),
                 const Expanded(child: ChildPane()),
-                const VerticalDivider(width: 1, color: AppColors.ink2),
+                VerticalDivider(width: 1, color: AppColors.ink2),
                 const SizedBox(width: 720, child: EditGoalPanel()),
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.m,
@@ -456,7 +456,7 @@ class _GoalsHeader extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Text(
         AppLocalizations.of(context).goals_header_title,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.fg,
           fontSize: 14,
           fontWeight: FontWeight.w600,

@@ -31,6 +31,19 @@
   "options_language_title": "Language",
   "options_language_subtitle": "Applies immediately; \"System\" follows the operating system.",
 
+  "options_theme_title": "Appearance",
+  "options_theme_subtitle": "Light or dark, stored on this device. \"System\" follows the operating system.",
+  "options_theme_system": "Follow the system",
+  "options_theme_light": "Light",
+  "options_theme_dark": "Dark",
+
+  "options_model_title": "AI model",
+  "options_model_subtitle": "Which OpenAI model the tutor asks. Applies to this device only; a bigger model is slower and costs more.",
+  "options_model_followGlobal": "School default ({model})",
+  "@options_model_followGlobal": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+
   "options_progress_title": "Progress",
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",
@@ -62,6 +75,37 @@
     "placeholders": { "error": { "type": "String" } }
   },
   "options_dialog_cancel": "Cancel",
+
+  "options_transfer_title": "Export / import progress",
+  "options_transfer_subtitle": "Save your learning history to a file, or load it into this account — useful when you switch to another account.",
+  "options_transfer_export_button": "Export progress…",
+  "options_transfer_import_button": "Import progress…",
+  "options_transfer_exported": "Progress saved to {path}",
+  "@options_transfer_exported": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "options_transfer_exportFailed": "Export failed: {error}",
+  "@options_transfer_exportFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_transfer_import_dialog_title": "Replace your progress?",
+  "options_transfer_import_dialog_message": "Importing \"{file}\" deletes the progress, learning history and tutor beliefs this account has now and replaces them with the contents of the file. This cannot be undone.",
+  "@options_transfer_import_dialog_message": {
+    "placeholders": { "file": { "type": "String" } }
+  },
+  "options_transfer_import_dialog_confirm": "Import and replace",
+  "options_transfer_imported": "Imported {goals} goals, {samples} history entries and {beliefs} skill estimates.",
+  "@options_transfer_imported": {
+    "placeholders": {
+      "goals": { "type": "int" },
+      "samples": { "type": "int" },
+      "beliefs": { "type": "int" }
+    }
+  },
+  "options_transfer_importFailed": "Import failed: {error}",
+  "@options_transfer_importFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "options_apiKey_title": "OpenAI API key",
   "options_apiKey_subtitle": "Your own key, stored on this device. Removing it takes you back to the key screen.",

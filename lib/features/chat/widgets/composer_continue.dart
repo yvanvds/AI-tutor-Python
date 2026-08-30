@@ -52,7 +52,7 @@ class _ComposerContinueState extends ConsumerState<ComposerContinue> {
               Expanded(
                 child: Text(
                   AppLocalizations.of(context).chat_composer_continue_prompt,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -108,7 +108,7 @@ class _GoButtonState extends State<_GoButton> {
             children: [
               Text(
                 AppLocalizations.of(context).chat_composer_continue_button,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.ink0,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,

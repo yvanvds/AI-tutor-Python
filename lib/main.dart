@@ -6,7 +6,9 @@ import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
+import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/sign_in_page.dart';
@@ -52,11 +54,15 @@ class GoalsApp extends ConsumerWidget {
     // (#23). Resolved once in `appLocaleProvider` so services that need a
     // locale (see `appLocalizationsProvider`) agree with the widget tree.
     final locale = ref.watch(appLocaleProvider);
+    // Light / dark (#32). The flat `AppColors.x` tokens read a single active
+    // palette, so it has to be installed before anything below builds.
+    final palette = ref.watch(appPaletteProvider);
+    AppColors.use(palette);
 
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: buildAppTheme(),
+      theme: buildAppTheme(palette),
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -76,7 +82,16 @@ class GoalsApp extends ConsumerWidget {
             return const LocalKeyGateScreen();
           }
 
-          return const AppShell();
+          // Keyed on the palette so switching theme remounts the shell.
+          // Changing `ThemeData` rebuilds everything that reads
+          // `Theme.of(context)`, but a `const` widget that reads only
+          // `AppColors` is not a theme dependent and its element would be
+          // reused with the colours of the old palette. A remount is cheap
+          // here — all session state lives in providers above this scope.
+          return KeyedSubtree(
+            key: ValueKey(palette.brightness),
+            child: const AppShell(),
+          );
         },
       ),
     );

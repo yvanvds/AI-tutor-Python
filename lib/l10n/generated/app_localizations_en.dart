@@ -64,6 +64,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Applies immediately; \"System\" follows the operating system.';
 
   @override
+  String get options_theme_title => 'Appearance';
+
+  @override
+  String get options_theme_subtitle =>
+      'Light or dark, stored on this device. \"System\" follows the operating system.';
+
+  @override
+  String get options_theme_system => 'Follow the system';
+
+  @override
+  String get options_theme_light => 'Light';
+
+  @override
+  String get options_theme_dark => 'Dark';
+
+  @override
+  String get options_model_title => 'AI model';
+
+  @override
+  String get options_model_subtitle =>
+      'Which OpenAI model the tutor asks. Applies to this device only; a bigger model is slower and costs more.';
+
+  @override
+  String options_model_followGlobal(String model) {
+    return 'School default ($model)';
+  }
+
+  @override
   String get options_progress_title => 'Progress';
 
   @override
@@ -134,6 +162,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_dialog_cancel => 'Cancel';
+
+  @override
+  String get options_transfer_title => 'Export / import progress';
+
+  @override
+  String get options_transfer_subtitle =>
+      'Save your learning history to a file, or load it into this account — useful when you switch to another account.';
+
+  @override
+  String get options_transfer_export_button => 'Export progress…';
+
+  @override
+  String get options_transfer_import_button => 'Import progress…';
+
+  @override
+  String options_transfer_exported(String path) {
+    return 'Progress saved to $path';
+  }
+
+  @override
+  String options_transfer_exportFailed(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String get options_transfer_import_dialog_title => 'Replace your progress?';
+
+  @override
+  String options_transfer_import_dialog_message(String file) {
+    return 'Importing \"$file\" deletes the progress, learning history and tutor beliefs this account has now and replaces them with the contents of the file. This cannot be undone.';
+  }
+
+  @override
+  String get options_transfer_import_dialog_confirm => 'Import and replace';
+
+  @override
+  String options_transfer_imported(int goals, int samples, int beliefs) {
+    return 'Imported $goals goals, $samples history entries and $beliefs skill estimates.';
+  }
+
+  @override
+  String options_transfer_importFailed(String error) {
+    return 'Import failed: $error';
+  }
 
   @override
   String get options_apiKey_title => 'OpenAI API key';

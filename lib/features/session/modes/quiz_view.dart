@@ -41,7 +41,7 @@ class QuizView extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.xl),
                 TutorMarkdown(
                   mcq.prompt,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -103,7 +103,7 @@ class _QuizHeader extends StatelessWidget {
           ),
           child: Text(
             AppLocalizations.of(context).session_quiz_pill.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.accent,
               fontSize: 10,
               fontWeight: FontWeight.w600,
@@ -375,7 +375,7 @@ class _FeedbackPanel extends StatelessWidget {
       ),
       child: TutorMarkdown(
         text,
-        style: const TextStyle(color: AppColors.fg, fontSize: 14, height: 1.5),
+        style: TextStyle(color: AppColors.fg, fontSize: 14, height: 1.5),
       ),
     );
   }

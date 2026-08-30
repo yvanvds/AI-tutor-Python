@@ -29,6 +29,7 @@ import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
+import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
@@ -75,12 +76,37 @@ class _OfflineTutor extends TutorService {
   Future<void> requestExercise() async {}
 }
 
+/// Replaces only the *dialog* half of progress export / import (#32): the
+/// path is fixed instead of asked for, and the file is still written to and
+/// read from the real disk, so a flow exercises the same round trip a student
+/// does.
+class _FixedPathArchiveIo implements ProgressArchiveIo {
+  _FixedPathArchiveIo(this.file);
+  final File file;
+
+  @override
+  Future<String?> save({
+    required String suggestedName,
+    required String contents,
+  }) async {
+    await file.writeAsString(contents);
+    return file.path;
+  }
+
+  @override
+  Future<ArchiveFile?> open() async {
+    if (!file.existsSync()) return null;
+    return (name: 'progress.json', contents: await file.readAsString());
+  }
+}
+
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.pyRunner,
+    this.archiveFile,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -112,6 +138,11 @@ class AppHarness {
   /// Pass a [FakePyRunner] to drive a run that starts and keeps running
   /// regardless of what is installed on the machine.
   final PyRunner? pyRunner;
+
+  /// Where "Export progress…" writes and "Import progress…" reads (#32).
+  /// `null` (the default) leaves the real OS file dialogs in place, which no
+  /// test can click; pass a path in a temp directory to drive the round trip.
+  final File? archiveFile;
 
   /// Every installer handover the app performed, as `(executable, arguments)`
   /// (#49).
@@ -146,6 +177,10 @@ class AppHarness {
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
         if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
+        if (archiveFile != null)
+          progressArchiveIoProvider.overrideWithValue(
+            _FixedPathArchiveIo(archiveFile!),
+          ),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));

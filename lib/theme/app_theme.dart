@@ -3,51 +3,32 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'tokens.dart';
 
-/// Single dark `ThemeData` for the redesigned tutor app.
+/// `ThemeData` for the redesigned tutor app, built from whatever palette is
+/// active in [AppColors].
 ///
-/// There is no light mode — the design is always the warm "study lamp"
-/// palette defined in [AppColors].
-ThemeData buildAppTheme() {
-  const colorScheme = ColorScheme.dark(
-    primary: AppColors.accent,
-    onPrimary: AppColors.ink0,
-    secondary: AppColors.accent2,
-    onSecondary: AppColors.ink0,
-    tertiary: AppColors.accent3,
-    onTertiary: AppColors.ink0,
-    surface: AppColors.ink1,
-    onSurface: AppColors.fg,
-    surfaceContainerLowest: AppColors.ink0,
-    surfaceContainerLow: AppColors.ink1,
-    surfaceContainer: AppColors.ink2,
-    surfaceContainerHigh: AppColors.ink3,
-    surfaceContainerHighest: AppColors.ink4,
-    onSurfaceVariant: AppColors.fgMute,
-    outline: AppColors.ink3,
-    outlineVariant: AppColors.ink2,
-    error: AppColors.danger,
-    onError: AppColors.ink0,
-  );
-
-  final textTheme = _buildTextTheme();
+/// The app ships two: the warm "study lamp" dark palette it has always had,
+/// and the daylight variant added in #32. Which one is active is decided in
+/// `GoalsApp.build` from `appPaletteProvider`; this function only translates
+/// the tokens into Material's slots, so both modes get exactly the same
+/// component styling.
+ThemeData buildAppTheme([AppPalette? palette]) {
+  final p = palette ?? AppColors.palette;
+  final colorScheme = buildAppColorScheme(p);
+  final textTheme = _buildTextTheme(p);
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: p.brightness,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: AppColors.ink0,
-    canvasColor: AppColors.ink0,
+    scaffoldBackgroundColor: p.ink0,
+    canvasColor: p.ink0,
     textTheme: textTheme,
     primaryTextTheme: textTheme,
-    iconTheme: const IconThemeData(color: AppColors.fg, size: 20),
-    dividerTheme: const DividerThemeData(
-      color: AppColors.ink3,
-      thickness: 1,
-      space: 1,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.ink1,
-      foregroundColor: AppColors.fg,
+    iconTheme: IconThemeData(color: p.fg, size: 20),
+    dividerTheme: DividerThemeData(color: p.ink3, thickness: 1, space: 1),
+    appBarTheme: AppBarTheme(
+      backgroundColor: p.ink1,
+      foregroundColor: p.fg,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -55,12 +36,36 @@ ThemeData buildAppTheme() {
   );
 }
 
-TextTheme _buildTextTheme() {
-  // Start from Inter Tight applied to Material's default dark TextTheme so
-  // every slot has a sensible base, then override the slots we care about
-  // to match the type scale in the README.
+/// The token → Material colour-slot mapping, split out of [buildAppTheme] so
+/// it can be checked without pulling in the web-fetched text theme.
+ColorScheme buildAppColorScheme(AppPalette p) => ColorScheme(
+  brightness: p.brightness,
+  primary: p.accent,
+  onPrimary: p.ink0,
+  secondary: p.accent2,
+  onSecondary: p.ink0,
+  tertiary: p.accent3,
+  onTertiary: p.ink0,
+  surface: p.ink1,
+  onSurface: p.fg,
+  surfaceContainerLowest: p.ink0,
+  surfaceContainerLow: p.ink1,
+  surfaceContainer: p.ink2,
+  surfaceContainerHigh: p.ink3,
+  surfaceContainerHighest: p.ink4,
+  onSurfaceVariant: p.fgMute,
+  outline: p.ink3,
+  outlineVariant: p.ink2,
+  error: p.danger,
+  onError: p.isDark ? p.ink0 : p.ink1,
+);
+
+TextTheme _buildTextTheme(AppPalette p) {
+  // Start from Inter Tight applied to Material's default TextTheme for this
+  // brightness so every slot has a sensible base, then override the slots we
+  // care about to match the type scale in the README.
   final base = GoogleFonts.interTightTextTheme(
-    ThemeData(brightness: Brightness.dark).textTheme,
+    ThemeData(brightness: p.brightness).textTheme,
   );
 
   TextStyle s({
@@ -68,14 +73,14 @@ TextTheme _buildTextTheme() {
     required FontWeight weight,
     required double height,
     double letterSpacing = 0,
-    Color color = AppColors.fg,
+    Color? color,
   }) {
     return TextStyle(
       fontSize: size,
       fontWeight: weight,
       height: height,
       letterSpacing: letterSpacing,
-      color: color,
+      color: color ?? p.fg,
     );
   }
 
@@ -136,7 +141,7 @@ TextTheme _buildTextTheme() {
         size: 11.5,
         weight: FontWeight.w400,
         height: 1.4,
-        color: AppColors.fgMute,
+        color: p.fgMute,
       ),
     ),
     // Button label / large label
@@ -153,7 +158,7 @@ TextTheme _buildTextTheme() {
         weight: FontWeight.w600,
         height: 1.4,
         letterSpacing: 0.4,
-        color: AppColors.fgFaint,
+        color: p.fgFaint,
       ),
     ),
   );
@@ -165,32 +170,32 @@ class AppMono {
   AppMono._();
 
   /// Code body — JetBrains Mono 14 / 400 / lh 1.6.
-  static TextStyle code({Color color = AppColors.fg, double size = 14}) {
+  static TextStyle code({Color? color, double size = 14}) {
     return GoogleFonts.jetBrainsMono(
       fontSize: size,
       fontWeight: FontWeight.w400,
       height: 1.6,
-      color: color,
+      color: color ?? AppColors.fg,
     );
   }
 
   /// Terminal / output text — JetBrains Mono 12.5 / 400 / lh 1.55.
-  static TextStyle output({Color color = AppColors.fg}) {
+  static TextStyle output({Color? color}) {
     return GoogleFonts.jetBrainsMono(
       fontSize: 12.5,
       fontWeight: FontWeight.w400,
       height: 1.55,
-      color: color,
+      color: color ?? AppColors.fg,
     );
   }
 
   /// Keyboard glyph — JetBrains Mono 10.5 / 400 / lh 1.4.
-  static TextStyle kbd({Color color = AppColors.fgMute}) {
+  static TextStyle kbd({Color? color}) {
     return GoogleFonts.jetBrainsMono(
       fontSize: 10.5,
       fontWeight: FontWeight.w400,
       height: 1.4,
-      color: color,
+      color: color ?? AppColors.fgMute,
     );
   }
 
@@ -198,13 +203,13 @@ class AppMono {
   static TextStyle tnum({
     double size = 14,
     FontWeight weight = FontWeight.w600,
-    Color color = AppColors.fg,
+    Color? color,
   }) {
     return GoogleFonts.interTight(
       fontSize: size,
       fontWeight: weight,
       height: 1.2,
-      color: color,
+      color: color ?? AppColors.fg,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
   }

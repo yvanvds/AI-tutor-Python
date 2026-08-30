@@ -41,6 +41,21 @@ class LoBeliefsService {
     });
   }
 
+  /// Every belief doc of the signed-in user, across subgoals. Used by the
+  /// progress export in the Options panel (#32) — the conductor never wants
+  /// this wide a read.
+  Future<List<LoBelief>> getAllForCurrentUser() {
+    final uid = _uid;
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT * FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      return docs.map(LoBelief.fromCosmos).toList();
+    });
+  }
+
   Future<LoBelief?> getOne({required String subgoalId, required String loId}) {
     final uid = _uid;
     return safeCosmos(() async {

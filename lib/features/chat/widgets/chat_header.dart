@@ -20,7 +20,7 @@ class ChatHeader extends ConsumerWidget {
         horizontal: AppSpacing.xl,
         vertical: AppSpacing.md,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.ink1,
         border: Border(bottom: BorderSide(color: AppColors.ink2, width: 1)),
       ),
@@ -35,7 +35,7 @@ class ChatHeader extends ConsumerWidget {
               children: [
                 Text(
                   AppLocalizations.of(context).chat_tutorName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -70,7 +70,7 @@ class _PresenceLine extends StatelessWidget {
         Container(
           width: 6,
           height: 6,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.accent2,
             shape: BoxShape.circle,
           ),
@@ -80,7 +80,7 @@ class _PresenceLine extends StatelessWidget {
           child: RichText(
             overflow: TextOverflow.ellipsis,
             text: TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.fgFaint,
                 fontSize: 11.5,
                 height: 1.3,
@@ -134,7 +134,7 @@ class _RestartButtonState extends State<_RestartButton> {
               color: _hovering ? AppColors.ink2 : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.inputSmall),
             ),
-            child: const Icon(Icons.refresh, size: 16, color: AppColors.fgMute),
+            child: Icon(Icons.refresh, size: 16, color: AppColors.fgMute),
           ),
         ),
       ),

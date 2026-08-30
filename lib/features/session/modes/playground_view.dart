@@ -29,7 +29,7 @@ class PlaygroundView extends ConsumerWidget {
               horizontal: AppSpacing.lg,
               vertical: AppSpacing.s,
             ),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.ink1,
               border: Border(
                 bottom: BorderSide(color: AppColors.ink2, width: 1),
@@ -48,7 +48,7 @@ class PlaygroundView extends ConsumerWidget {
                   ),
                   child: Text(
                     l.session_playground_pill,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.fgMute,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -61,10 +61,7 @@ class PlaygroundView extends ConsumerWidget {
                   child: Text(
                     l.session_playground_subtitle,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.fgMute,
-                      fontSize: 12.5,
-                    ),
+                    style: TextStyle(color: AppColors.fgMute, fontSize: 12.5),
                   ),
                 ),
                 if (current != null) ...[

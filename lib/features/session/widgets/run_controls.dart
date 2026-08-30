@@ -87,11 +87,11 @@ class _RunButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ink0),
+          Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ink0),
           const SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).session_runControls_button_run,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.ink0,
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -122,11 +122,11 @@ class _StopButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.stop_rounded, size: 16, color: AppColors.danger),
+          Icon(Icons.stop_rounded, size: 16, color: AppColors.danger),
           const SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).session_runControls_button_stop,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.danger,
               fontSize: 13,
               fontWeight: FontWeight.w600,

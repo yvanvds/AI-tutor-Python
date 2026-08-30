@@ -32,7 +32,7 @@ class StudentBubble extends StatelessWidget {
               ),
               child: SelectableText(
                 text,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.ink0,
                   fontSize: 14,
                   height: 1.55,
@@ -46,7 +46,7 @@ class StudentBubble extends StatelessWidget {
                 padding: const EdgeInsets.only(right: AppSpacing.xxs),
                 child: Text(
                   formatChatTime(createdAt),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 10.5,
                     height: 1.4,

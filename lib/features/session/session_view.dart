@@ -72,7 +72,7 @@ class _ChatPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.ink1,
         border: Border(left: BorderSide(color: AppColors.ink2, width: 1)),
       ),

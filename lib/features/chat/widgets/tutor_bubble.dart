@@ -55,7 +55,7 @@ class TutorBubble extends StatelessWidget {
                 padding: const EdgeInsets.only(left: AppSpacing.xxs),
                 child: Text(
                   formatChatTime(createdAt),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 10.5,
                     height: 1.4,

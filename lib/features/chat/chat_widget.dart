@@ -140,7 +140,7 @@ class _ChatBody extends ConsumerWidget {
                       horizontal: AppSpacing.md,
                       vertical: AppSpacing.sm,
                     ),
-                    receivedTextStyle: const TextStyle(
+                    receivedTextStyle: TextStyle(
                       color: AppColors.fg,
                       fontSize: 14,
                       height: 1.55,

@@ -377,7 +377,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
             onSave: _isDirty ? _save : null,
             onUpload: _selectedGoalId != null ? _uploadHtml : null,
           ),
-          const Divider(height: 1, thickness: 1, color: AppColors.ink2),
+          Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(
             child: _bootstrapping
                 ? const Center(child: CircularProgressIndicator())
@@ -433,7 +433,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                           },
                         ),
                       ),
-                      const VerticalDivider(width: 1, color: AppColors.ink2),
+                      VerticalDivider(width: 1, color: AppColors.ink2),
                       Expanded(child: _buildEditorPane()),
                     ],
                   ),
@@ -449,7 +449,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
       return Center(
         child: Text(
           l.lesson_editor_empty_pickSubgoal,
-          style: const TextStyle(color: AppColors.fgMute),
+          style: TextStyle(color: AppColors.fgMute),
         ),
       );
     }
@@ -485,13 +485,13 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
             ],
           ),
         ),
-        const Divider(height: 1, color: AppColors.ink2),
+        Divider(height: 1, color: AppColors.ink2),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: _buildHtmlEditor()),
-              const VerticalDivider(width: 1, color: AppColors.ink2),
+              VerticalDivider(width: 1, color: AppColors.ink2),
               Expanded(child: _buildPreview()),
             ],
           ),
@@ -513,7 +513,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
         expands: true,
         textAlignVertical: TextAlignVertical.top,
         keyboardType: TextInputType.multiline,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 13,
           height: 1.45,
@@ -536,7 +536,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Text(
             AppLocalizations.of(context).lesson_preview_empty,
-            style: const TextStyle(color: AppColors.fgFaint, fontSize: 12),
+            style: TextStyle(color: AppColors.fgFaint, fontSize: 12),
           ),
         ),
       );
@@ -569,7 +569,7 @@ class _Toolbar extends StatelessWidget {
         children: [
           Text(
             l.lesson_toolbar_title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.fg,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -695,7 +695,7 @@ class _OrphanRow extends StatelessWidget {
         child: Row(
           children: [
             const SizedBox(width: AppSpacing.m),
-            const Icon(Icons.link_off, size: 14, color: AppColors.danger),
+            Icon(Icons.link_off, size: 14, color: AppColors.danger),
             const SizedBox(width: AppSpacing.s),
             Expanded(
               child: Column(
@@ -706,7 +706,7 @@ class _OrphanRow extends StatelessWidget {
                     content.title.isEmpty ? content.id : content.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.fg,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -716,7 +716,7 @@ class _OrphanRow extends StatelessWidget {
                     l.lesson_orphans_hint,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.fgFaint,
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
@@ -747,7 +747,7 @@ class _ModuleHeader extends StatelessWidget {
       ),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.fgFaint,
           fontSize: 10,
           fontWeight: FontWeight.w600,
@@ -773,7 +773,7 @@ class _RootRow extends StatelessWidget {
       ),
       child: Text(
         goal.title,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.fg,
           fontSize: 13,
           fontWeight: FontWeight.w600,
@@ -847,7 +847,7 @@ class _SubgoalRowState extends State<_SubgoalRow> {
                       widget.goal.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.fg,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,

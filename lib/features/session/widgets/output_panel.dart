@@ -106,7 +106,7 @@ class _OutputPanelState extends ConsumerState<OutputPanel>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.ink1,
         border: Border(top: BorderSide(color: AppColors.ink2, width: 1)),
       ),
@@ -175,7 +175,7 @@ class _Header extends StatelessWidget {
         horizontal: AppSpacing.m,
         vertical: AppSpacing.s,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.ink2)),
       ),
       child: Row(
@@ -199,7 +199,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: AppSpacing.s),
           Text(
             AppLocalizations.of(context).session_output_header_label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.fg,
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
@@ -208,7 +208,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: AppSpacing.xs),
           Text(
             '· $label',
-            style: const TextStyle(color: AppColors.fgMute, fontSize: 12),
+            style: TextStyle(color: AppColors.fgMute, fontSize: 12),
           ),
         ],
       ),
@@ -231,7 +231,7 @@ class _Body extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Text(
             AppLocalizations.of(context).session_output_emptyState_runHint,
-            style: const TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
+            style: TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
           ),
         ),
       );
@@ -303,7 +303,7 @@ class _InputRow extends StatelessWidget {
         AppSpacing.m,
         AppSpacing.s,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.ink2)),
       ),
       child: Row(
@@ -320,7 +320,7 @@ class _InputRow extends StatelessWidget {
               controller: controller,
               focusNode: focusNode,
               style: AppMono.output(),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: AppSpacing.s,

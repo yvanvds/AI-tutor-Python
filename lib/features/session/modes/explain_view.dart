@@ -104,7 +104,7 @@ class _MissingContent extends StatelessWidget {
             ),
             child: Text(
               AppLocalizations.of(context).session_explain_missingContent,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.fgMute,
                 fontSize: 13,
                 height: 1.5,
@@ -141,7 +141,7 @@ class _Placeholder extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xxxl),
         child: Text(
           message,
-          style: const TextStyle(color: AppColors.fgMute, fontSize: 13),
+          style: TextStyle(color: AppColors.fgMute, fontSize: 13),
         ),
       ),
     );
@@ -188,7 +188,7 @@ class _ChromeHeader extends ConsumerWidget {
                 ),
                 child: Text(
                   pill,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.accent,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -237,7 +237,7 @@ class _ChromeFooter extends ConsumerWidget {
           const Spacer(),
           Text(
             l.session_explain_completeXp,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.fgFaint,
               fontSize: 11,
               fontWeight: FontWeight.w500,
@@ -298,7 +298,7 @@ class _GhostButtonState extends State<_GhostButton> {
               const SizedBox(width: 6),
               Text(
                 widget.label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.fgMute,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -353,14 +353,14 @@ class _AccentButtonState extends State<_AccentButton> {
             children: [
               Text(
                 widget.label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.ink0,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
+              Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
             ],
           ),
         ),
