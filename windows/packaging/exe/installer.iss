@@ -5,8 +5,28 @@
 ; directory (resolved before SourceDir is applied).
 ; Run via: tooling/build_release.ps1  (which cd's to this directory first)
 
+; --- version, passed in by the build script (#55) ----------------------------
+; AppVersion was hardcoded here and never bumped, so every installer ever built
+; registered itself with Windows as 1.0.1: Apps & Features and the uninstall
+; key's DisplayVersion said 1.0.1 no matter which release was actually
+; installed. pubspec.yaml is the single source of truth, and
+; tooling/build_release.ps1 passes it through after the step-1 bump:
+;
+;   ISCC /DAppVersion=2.0.0+17 /DAppVersionInfo=2.0.0.17 installer.iss
+;
+; Two defines because they are not interchangeable: AppVersion is free text and
+; carries the full `x.y.z+build` exactly as the app's own About panel shows it,
+; while VersionInfoVersion (the .exe's file properties) must be numeric
+; `a.b.c.d` — a '+' there is a compile error. Both default so that a bare
+; `ISCC installer.iss` still compiles for a syntax check.
+#ifndef AppVersion
+  #define AppVersion "0.0.0"
+#endif
+#ifndef AppVersionInfo
+  #define AppVersionInfo "0.0.0.0"
+#endif
+
 #define AppName "Python Teacher"
-#define AppVersion "1.0.1"
 #define AppPublisher "yvan vander sanden"
 #define AppURL "https://github.com/yvanvds/AI-tutor-Python"
 #define AppExeName "ai_tutor_python.exe"
@@ -15,6 +35,8 @@
 AppId={{4B3F2E7A-9C41-4D92-BF5E-91D9B7D2A68C}
 AppName={#AppName}
 AppVersion={#AppVersion}
+AppVerName={#AppName} {#AppVersion}
+VersionInfoVersion={#AppVersionInfo}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}

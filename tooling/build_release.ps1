@@ -119,6 +119,9 @@ $ver         = $matches[1]
 $build       = [int]$matches[2] + 1
 $fullVersion = "$ver+$build"
 $newYaml     = $yaml -replace 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', "version: $fullVersion"
+# The numeric a.b.c.d form Inno Setup's VersionInfoVersion requires; '+' is a
+# compile error there, so the build number becomes the fourth field (#55).
+$versionInfo = "$ver.$build"
 # $newYaml already ends with the file's own trailing newline (Get-Content -Raw).
 Write-Utf8NoBom -Path $Pubspec -Content $newYaml
 Write-Ok "Version: $fullVersion"
@@ -169,7 +172,11 @@ New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
 $IssDir = Split-Path -Parent $IssScript
 Push-Location $IssDir
 try {
-    & $iscc (Split-Path -Leaf $IssScript)
+    # Stamp the version in (#55). Without these the .iss falls back to its
+    # 0.0.0 defaults and the install registers itself with Windows at that
+    # version, which is what Apps & Features and the uninstall key's
+    # DisplayVersion show. pubspec.yaml stays the single source of truth.
+    & $iscc "/DAppVersion=$fullVersion" "/DAppVersionInfo=$versionInfo" (Split-Path -Leaf $IssScript)
     if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed (exit $LASTEXITCODE)" }
 } finally {
     Pop-Location
