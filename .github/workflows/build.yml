@@ -57,3 +57,84 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # End-to-end flows (integration_test/, #28) on the Windows desktop (#38).
+  # Separate from the fast gate above: it builds the desktop runner (CMake +
+  # MSVC, ~1 min) and launches the real app, including a real WebView2 for the
+  # lesson page. The setup steps mirror the SonarQube job exactly.
+  #
+  # The test command must stay `flutter test integration_test -d windows`
+  # without listing files: on Windows, Flutter 3.44 launches the app only for
+  # the first test file of an invocation, so every flow is registered in
+  # integration_test/app_test.dart and runs in one app process.
+  #
+  # If WebView2 ever proves unusable on the runner: guard the harness with
+  # `FakeWebViewPlatform.install()` (test/helpers/fake_webview_platform.dart)
+  # behind `bool.fromEnvironment('FAKE_WEBVIEW')`, pass
+  # `--dart-define=FAKE_WEBVIEW=true` here, and have the lesson flow post the
+  # runner-channel message itself instead of waiting on the page's JS. Local
+  # runs keep the real WebView.
+  integration:
+    name: Integration tests (Windows desktop)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      FLUTTER_VERSION: 3.44.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        shell: pwsh
+        run: |
+          $zip = "$env:RUNNER_TEMP/flutter_windows_${env:FLUTTER_VERSION}-stable.zip"
+          $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_${env:FLUTTER_VERSION}-stable.zip"
+          $flutterBin = "$env:RUNNER_TEMP\flutter\bin"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+          $flutterBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $env:PATH = "$flutterBin;$env:PATH"
+          & "$flutterBin\flutter.bat" --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create dummy .env for analysis
+        shell: pwsh
+        run: |
+          @"
+          OPEN_AI_API_KEY=dummy
+          COSMOS_ENDPOINT=https://dummy.documents.azure.com:443/
+          COSMOS_KEY=dummy
+          ENTRA_TENANT_ID=00000000-0000-0000-0000-000000000000
+          ENTRA_CLIENT_ID=00000000-0000-0000-0000-000000000000
+          ENTRA_REDIRECT_URI=http://localhost
+          "@ | Out-File -FilePath .env -Encoding utf8 -NoNewline
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      # The lesson flow drives a real WebView2. windows-latest ships Microsoft
+      # Edge but does not list the WebView2 Runtime as a component, so install
+      # the Evergreen runtime (silent bootstrapper) when the machine-wide
+      # registration is missing.
+      - name: Ensure WebView2 runtime
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $pv = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv
+          if ($pv) { Write-Host "WebView2 runtime $pv already installed"; exit 0 }
+          $exe = "$env:RUNNER_TEMP\MicrosoftEdgeWebView2Setup.exe"
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $exe
+          $p = Start-Process -FilePath $exe -ArgumentList '/silent', '/install' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "WebView2 bootstrapper exited with $($p.ExitCode)" }
+          $pv = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv
+          Write-Host "WebView2 runtime $pv installed"
+
+      - name: Doctor
+        run: flutter doctor -v
+
+      - name: Integration tests
+        run: flutter test integration_test -d windows --reporter expanded

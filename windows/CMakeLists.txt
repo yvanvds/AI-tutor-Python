@@ -38,6 +38,15 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Plugins compile as C++17 (see APPLY_STANDARD_SETTINGS below), so C++/WinRT
+# in audioplayers_windows and webview_all_windows falls back to
+# <experimental/coroutine>. MSVC 14.51+ (Visual Studio 2026, the current
+# windows-latest CI image) turns that header's deprecation into a hard
+# static_assert error (STL1011) unless this macro is defined; MSVC 14.50 and
+# VS 2022 only warn. Directory-scope so it reaches every plugin target added by
+# flutter/generated_plugins.cmake (#38).
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

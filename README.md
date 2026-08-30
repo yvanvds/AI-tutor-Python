@@ -224,6 +224,11 @@ Flutter can only launch the app for the first test file of a
 `flutter test integration_test` invocation, so the flows under `flows/`
 deliberately carry no `_test` suffix.
 
+Both layers run in CI ([.github/workflows/build.yml](.github/workflows/build.yml)):
+the unit tests in the `SonarQube` job, the flows in a separate `integration`
+job that builds the desktop runner and launches the real app on a Windows
+runner.
+
 ## Project structure
 
 For a deeper architectural tour — services, data model, how the tutor decides what to ask next — read [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). It is the source of truth for the codebase shape and stays current as the code evolves.
