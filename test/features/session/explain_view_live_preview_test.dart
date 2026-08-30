@@ -254,6 +254,22 @@ void main() {
       await unmount(tester);
     });
 
+    testWidgets('a run request that arrives after the view was unmounted is '
+        'ignored', (tester) async {
+      // Found by the integration harness (#28): the real WebView delivers
+      // the page's run request after the student has already navigated
+      // away, and a defunct State has no `ref` to read the runner from.
+      await mount(tester, const ExplainView());
+      final controller = page();
+      await unmount(tester);
+
+      controller.postMessage(kLessonRunnerChannel, _runMessage(0, _helloCode));
+      await tester.pump();
+
+      expect(runner.ran, isEmpty);
+      expect(controller.executedJs, isEmpty);
+    });
+
     testWidgets('a run that finishes after the lesson was replaced is not '
         'delivered into the new page', (tester) async {
       runner = FakeLessonCodeRunner(manual: true);

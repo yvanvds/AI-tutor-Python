@@ -108,6 +108,10 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
   Future<void> _onRunRequested(JavaScriptMessage message) async {
     final request = LessonRunRequest.tryParse(message.message);
     if (request == null) return;
+    // The WebView can deliver the page's request after this view was
+    // unmounted (the student navigated away while the lesson was still
+    // loading); a defunct State has no `ref` (#28).
+    if (!mounted) return;
     final generation = _generation;
     final result = await ref.read(lessonCodeRunnerProvider).run(request.code);
     if (!mounted || generation != _generation) return;

@@ -197,6 +197,33 @@ If you do not need auto-updates, you can ignore this entirely; the app still wor
 
 ---
 
+## Running the tests
+
+Two layers, both without an Entra tenant or a live Cosmos DB:
+
+```powershell
+# Unit + widget tests (test/): real widgets and services over in-memory fakes
+flutter test
+
+# End-to-end flows (integration_test/): the real app on the Windows desktop,
+# with Cosmos swapped for an in-memory database and sign-in bypassed
+flutter test integration_test -d windows
+
+# One flow on its own
+flutter test integration_test/flows/lesson_flow.dart -d windows
+```
+
+The integration harness lives in `integration_test/harness/`. It boots the real
+root widget (`GoalsApp`) with an in-memory `CosmosClient`, a signed-in
+`AuthService`, an in-memory `SharedPreferences`, a temp playground directory,
+the update check off and the LLM blocked, so a flow drives the real shell,
+pages and services end to end. The bypass exists only under `integration_test/`
+— it is never compiled into `flutter build windows`. Every flow is registered in
+`integration_test/app_test.dart` and runs in one app process: on Windows,
+Flutter can only launch the app for the first test file of a
+`flutter test integration_test` invocation, so the flows under `flows/`
+deliberately carry no `_test` suffix.
+
 ## Project structure
 
 For a deeper architectural tour — services, data model, how the tutor decides what to ask next — read [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). It is the source of truth for the codebase shape and stays current as the code evolves.
