@@ -20,3 +20,11 @@ numpy      = "2.3.*"
 pandas     = "2.3.*"
 matplotlib = "3.10.*"
 requests   = "2.32.*"
+
+[verify]
+# Stdlib modules that must import from the bundle in addition to every
+# package listed above. build_bundle.ps1 runs tooling/python/verify_bundle.py
+# with the bundled interpreter and fails the build if any check fails.
+# tkinter/turtle prove the relocated Tcl/Tk actually starts (turtle windows);
+# matplotlib is additionally checked for Agg rendering (savefig to PNG).
+stdlib = "tkinter turtle"

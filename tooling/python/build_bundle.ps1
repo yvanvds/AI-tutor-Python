@@ -4,8 +4,8 @@
 # See PYTHON_IMPLEMENTATION.md section 4.1 for context.
 #
 # Idempotent: if build/python_bundle/MANIFEST_LOCK.json already records
-# the same release_tag + sha256 + package set as the manifest, exits as
-# a no-op.
+# the same release_tag + sha256 + package set as the manifest, only the
+# import verification (verify_bundle.py) is re-run; nothing is rebuilt.
 
 [CmdletBinding()]
 param()
@@ -27,6 +27,7 @@ $BundleDir    = Join-Path $RepoRoot  'build\python_bundle'
 $PythonDir    = Join-Path $BundleDir 'python'
 $PythonExe    = Join-Path $PythonDir 'python.exe'
 $LockFile     = Join-Path $BundleDir 'MANIFEST_LOCK.json'
+$VerifyScript = Join-Path $ScriptDir 'verify_bundle.py'
 
 function Read-Manifest {
     param([string]$Path)
@@ -51,6 +52,18 @@ function Read-Manifest {
 
 function Write-Step { param([string]$msg) Write-Host "[build_bundle] $msg" }
 
+# Run tooling/python/verify_bundle.py with the bundled interpreter. Every
+# [packages] key plus every module in [verify].stdlib must import, Tcl/Tk must
+# start (turtle), and matplotlib must render via Agg. Throws on failure so a
+# broken bundle never reaches the installer.
+function Test-Bundle {
+    param([string[]]$Modules)
+    if (-not (Test-Path -LiteralPath $VerifyScript)) { throw "Verify script not found: $VerifyScript" }
+    Write-Step "Verifying bundle imports: $($Modules -join ', ')"
+    & $PythonExe -s -X utf8 $VerifyScript @Modules
+    if ($LASTEXITCODE -ne 0) { throw "Bundle verification failed (exit $LASTEXITCODE)" }
+}
+
 # --- Parse + validate manifest -------------------------------------------------
 
 $cfg = Read-Manifest -Path $ManifestFile
@@ -70,6 +83,13 @@ if ($python['sha256'] -match '<.*>') {
 }
 if ($pkgs.Count -eq 0) {
     throw "manifest.toml [packages] is empty; expected at least one package"
+}
+
+# Modules that must import from the finished bundle: every package plus the
+# stdlib extras (tkinter/turtle) from [verify].
+$verifyModules = @($pkgs.Keys | Sort-Object)
+if ($cfg.ContainsKey('verify') -and $cfg['verify'].ContainsKey('stdlib')) {
+    $verifyModules += @($cfg['verify']['stdlib'] -split '\s+' | Where-Object { $_ })
 }
 
 # --- Idempotency: skip if lock file matches ------------------------------------
@@ -93,7 +113,9 @@ if ((Test-Path -LiteralPath $LockFile) -and (Test-Path -LiteralPath $PythonExe))
             }
         }
         if ($sameInterp -and $samePkgs) {
-            Write-Step "Bundle already matches manifest (cache hit). Nothing to do."
+            Write-Step "Bundle already matches manifest (cache hit); re-verifying imports."
+            Test-Bundle -Modules $verifyModules
+            Write-Step "Nothing to rebuild."
             exit 0
         }
     } catch {
@@ -166,6 +188,10 @@ Write-Step "Pre-compiling to .pyc ..."
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "[build_bundle] compileall reported errors (exit $LASTEXITCODE) - non-fatal."
 }
+
+# --- Verify the bundle is usable ------------------------------------------------
+
+Test-Bundle -Modules $verifyModules
 
 # --- Resolve installed versions ------------------------------------------------
 

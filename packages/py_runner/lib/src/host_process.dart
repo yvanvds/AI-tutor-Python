@@ -69,6 +69,12 @@ class HostProcess {
 
     process.stdin.encoding = utf8;
 
+    // A write to a host that has already died errors asynchronously on the
+    // stdin sink. Nobody awaits `done` in normal operation, so that error
+    // would surface as an uncaught async error in the app; the crash itself
+    // is already reported through the frame stream closing (`_onHostExit`).
+    unawaited(process.stdin.done.catchError((Object _) {}));
+
     final frameController = StreamController<HostOutboundFrame>();
     final decodeErrorController =
         StreamController<FrameDecodeException>.broadcast();
@@ -130,7 +136,13 @@ class HostProcess {
   /// nor [IOSink.encoding] can corrupt non-ASCII characters in student code or
   /// in `input_response` payloads.
   void send(HostInboundFrame frame) {
-    _process.stdin.add(utf8.encode('${frame.encode()}\n'));
+    try {
+      _process.stdin.add(utf8.encode('${frame.encode()}\n'));
+    } on StateError {
+      // stdin already closed (host exited / shutdown in progress). The run
+      // this frame belonged to is terminated via `_onHostExit`; a cancel or
+      // input reply for it has nothing left to act on.
+    }
   }
 
   /// Closes stdin (signals graceful shutdown) and awaits process exit.

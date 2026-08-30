@@ -57,6 +57,12 @@ class EnvelopeAssembler {
   bool get sawOpenTag => _state != _State.preamble;
   bool get isDone => _state == _State.done;
 
+  /// True once the closing `</META>` tag has actually arrived. [isDone] is
+  /// also set by [close] when the stream ends mid-META, so this is the only
+  /// way to tell a complete envelope from one cut off by the transport.
+  bool get sawCloseMeta => _sawCloseMeta;
+  bool _sawCloseMeta = false;
+
   String _drain() {
     final s = _raw.toString();
     final delta = StringBuffer();
@@ -126,6 +132,7 @@ class EnvelopeAssembler {
             _meta.write(s.substring(_pos, idx));
             _pos = idx + _closeMeta.length;
             _state = _State.done;
+            _sawCloseMeta = true;
             return delta.toString();
           }
         case _State.done:

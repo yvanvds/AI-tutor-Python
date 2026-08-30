@@ -79,7 +79,9 @@ class TurnHistoryService {
   /// Polling stream of unacknowledged-strong-event counts for one student.
   /// Drives the "needs attention" badge on the accounts page.
   Stream<int> watchStrongUnacknowledgedFor(String uid) {
-    return pollingStream(() => countStrongUnacknowledgedFor(uid));
+    return safeCosmosStream(
+      pollingStream(() => countStrongUnacknowledgedFor(uid)),
+    );
   }
 
   /// Polling stream of recent event-bearing turns for one student.
@@ -87,7 +89,9 @@ class TurnHistoryService {
     String uid, {
     int take = 50,
   }) {
-    return pollingStream(() => listEventsFor(uid, take: take));
+    return safeCosmosStream(
+      pollingStream(() => listEventsFor(uid, take: take)),
+    );
   }
 
   /// Recent strong-or-audit events for one student, newest-first. Used by

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -191,7 +192,45 @@ class TutorService extends Notifier<TutorState> {
     _curriculumSub = ref
         .read(goalsServiceProvider)
         .streamChildren(rootId)
-        .listen(_onCurriculumTick);
+        .listen(
+          _onCurriculumTick,
+          // `safeCosmosStream` absorbs poll errors upstream; this is the
+          // belt for anything that still gets through (#7) so the watch
+          // subscription is never torn down by an unhandled stream error.
+          onError: (Object e) =>
+              debugPrint('TutorService: curriculum watch error: $e'),
+        );
+  }
+
+  // ---- Error surfacing (#7) ------------------------------------------------
+
+  /// One student-facing line for an exception that escaped a tutor flow.
+  /// Cosmos transient failures already went through the client's retries
+  /// by the time they get here, so "try again" is honest advice.
+  static String describeFailure(Object e) {
+    if (e is CosmosException && e.isTransient) {
+      return 'De verbinding met de database is even weg. Probeer het zo opnieuw.';
+    }
+    return OpenaiConnector.describeTransportError(e);
+  }
+
+  /// Runs [body]; on failure posts a system message and resets whatever
+  /// in-flight turn state would otherwise leak into the next request.
+  /// `unawaited` entry points (curriculum ticks, MCQ advance, session
+  /// start) had no catch at all before #7, so a Cosmos blip there was an
+  /// uncaught async error and a silently stuck session.
+  Future<void> _guarded(String what, Future<void> Function() body) async {
+    try {
+      await body();
+    } catch (e, stack) {
+      debugPrint('TutorService: $what failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {'where': what, 'error': '$e'});
+      _chat.failStream();
+      _chat.addSystemMessage('Er ging iets mis bij de tutor: ${describeFailure(e)}');
+      _inFlightPlan = null;
+      _followUpInFlight = null;
+      if (state == TutorState.working) state = TutorState.idle;
+    }
   }
 
   void _stopCurriculumWatch() {
@@ -218,7 +257,10 @@ class TutorService extends Notifier<TutorState> {
     // Subgoal-deleted redirect.
     if (prev.containsKey(activeChild.id) &&
         !next.containsKey(activeChild.id)) {
-      unawaited(_handleActiveSubgoalDeleted(deletedId: activeChild.id));
+      unawaited(_guarded(
+        'subgoal-deleted redirect',
+        () => _handleActiveSubgoalDeleted(deletedId: activeChild.id),
+      ));
       return;
     }
 
@@ -231,7 +273,10 @@ class TutorService extends Notifier<TutorState> {
     final nextLos = next[activeChild.id] ?? const <String>{};
     final added = nextLos.difference(prevLos);
     if (added.isNotEmpty) {
-      unawaited(_recomputeActiveSubgoalCacheAfterLoAdded());
+      unawaited(_guarded(
+        'LO-added cache recompute',
+        _recomputeActiveSubgoalCacheAfterLoAdded,
+      ));
     }
   }
 
@@ -379,6 +424,23 @@ class TutorService extends Notifier<TutorState> {
       );
     }
 
+    try {
+      await _initializeSessionBody();
+    } catch (e, stack) {
+      // Session start reads goals, progress and beliefs from Cosmos. If
+      // that fails the student used to get an empty chat and nothing else
+      // (#7). Drop the initialised flag so the next ChatWidget mount (any
+      // mode switch) retries from scratch.
+      debugPrint('TutorService: initializeSession failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {'where': 'initializeSession', 'error': '$e'});
+      _initialized = false;
+      _chat.addSystemMessage(
+        'De sessie kon niet starten: ${describeFailure(e)}',
+      );
+    }
+  }
+
+  Future<void> _initializeSessionBody() async {
     await _conductor.setTarget();
     _emptyObjectivesAuditFiredFor.clear();
 
@@ -514,9 +576,19 @@ class TutorService extends Notifier<TutorState> {
         );
         await _processNonStreamingResult(result);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      // Anything past the connector: instruction fetch, response dispatch,
+      // belief/progress writes while integrating a grade. The turn is
+      // lost either way, so clear the in-flight plan — leaving it set made
+      // the *next* student message grade against a stale question (#7).
+      debugPrint('TutorService: queryTutor(${type.name}) failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {'where': 'queryTutor', 'error': '$e'});
       _chat.failStream();
-      _chat.addSystemMessage('Er ging iets mis bij de tutor: $e');
+      _chat.addSystemMessage(
+        'Er ging iets mis bij de tutor: ${describeFailure(e)}',
+      );
+      _inFlightPlan = null;
+      _followUpInFlight = null;
     } finally {
       if (turnOpened) _debug.endTurn();
       if (state == TutorState.working) state = TutorState.idle;
@@ -985,7 +1057,7 @@ class TutorService extends Notifier<TutorState> {
       ref.read(modeProvider.notifier).state = SessionMode.explain;
       return;
     }
-    await requestExercise();
+    await _guarded('advanceFromMcq', requestExercise);
   }
 
   /// Whether there's an exercise rendered (or being prepared) for the
@@ -1067,7 +1139,13 @@ class TutorService extends Notifier<TutorState> {
     await queryTutor(type: ChatRequestType.submitCode, code: code);
   }
 
-  Future<void> requestExercise() async {
+  /// Public entry (PracticeView mount, "Volgende" after an MCQ). The
+  /// conductor's `planNext` reads beliefs from Cosmos; a failure there is
+  /// reported in chat instead of escaping the widget callback (#7).
+  Future<void> requestExercise() =>
+      _guarded('requestExercise', _requestExerciseBody);
+
+  Future<void> _requestExerciseBody() async {
     _debug.recordEvent('tutor.request_exercise.entered');
 
     final pendingStatusGoalId = _conductor.takePendingStatusReportGoalId();

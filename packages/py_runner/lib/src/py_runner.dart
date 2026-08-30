@@ -105,6 +105,11 @@ class PyRunner {
     } catch (error, stackTrace) {
       _setStatus(PyRunnerStatus.crashed);
       if (!completer.isCompleted) {
+        // The first caller gets the error via `rethrow` below; the completer
+        // only exists so concurrent callers (and shutdown()) can await the
+        // same attempt. Mark its future observed so an error with no other
+        // waiters isn't reported as unhandled in the calling zone (#33).
+        completer.future.ignore();
         completer.completeError(error, stackTrace);
       }
       _startCompleter = null;

@@ -10,7 +10,7 @@ jobs:
     name: SonarQube
     runs-on: windows-latest
     env:
-      FLUTTER_VERSION: 3.38.3
+      FLUTTER_VERSION: 3.44.0
     steps:
       - uses: actions/checkout@v4
         with:

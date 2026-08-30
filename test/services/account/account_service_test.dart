@@ -6,6 +6,7 @@
 // exercise the listener flip it explicitly and await the microtask queue so
 // `_ensureProfile` has a chance to run.
 
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -459,6 +460,45 @@ void main() {
       ).captured;
       expect(upserts, hasLength(1));
       expect((upserts.single as Map)['firstName'], 'Yvan');
+    });
+
+    test('a transient Cosmos failure during profile creation is retried on '
+        'the next poll instead of escaping as an uncaught error (#7)',
+        () async {
+      var reads = 0;
+      when(
+        () => container.read(any<String>(),
+            partitionKey: any<Object>(named: 'partitionKey')),
+      ).thenAnswer((_) async {
+        reads++;
+        // First read (the ensureProfile lookup) fails; the account watch
+        // and the retried lookup then see "no doc yet".
+        if (reads == 1) throw CosmosException(503, 'unavailable');
+        return null;
+      });
+      when(
+        () => container.upsert(
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+
+      build();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth)
+          .set(_identity(firstName: 'Retry'));
+      // Failed ensureProfile → first poll (null) → retried ensureProfile.
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      final upserts = verify(
+        () => container.upsert(
+          captureAny<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).captured;
+      expect(upserts, hasLength(1));
+      expect((upserts.single as Map)['firstName'], 'Retry');
     });
 
     test('signing out (identity → null) clears currentAccount', () async {

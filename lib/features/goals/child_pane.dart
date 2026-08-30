@@ -13,13 +13,14 @@ class ChildPane extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedRoot =
-        ref.watch(goalSelectionProvider).editorSelectedRoot;
+    final selectedRoot = ref.watch(goalSelectionProvider).editorSelectedRoot;
     final selectedRootId = selectedRoot?.id;
 
     if (selectedRootId == null) {
       return Center(
-        child: Text(AppLocalizations.of(context).goals_childPane_empty_pickRoot),
+        child: Text(
+          AppLocalizations.of(context).goals_childPane_empty_pickRoot,
+        ),
       );
     }
 
@@ -61,16 +62,15 @@ class ChildPane extends ConsumerWidget {
               } else if (snapshot.hasData) {
                 final children = snapshot.data!;
                 if (children.isEmpty) {
-                  return Center(
-                    child: Text(l.goals_childPane_empty_addOne),
-                  );
+                  return Center(child: Text(l.goals_childPane_empty_addOne));
                 }
                 return ReorderableListView.builder(
                   buildDefaultDragHandles: false,
-                  onReorder: (oldIndex, newIndex) async {
+                  // onReorderItem already delivers newIndex adjusted for the
+                  // removed item, so no manual index correction here.
+                  onReorderItem: (oldIndex, newIndex) async {
                     final before = [...children];
-                    var list = [...children];
-                    if (newIndex > oldIndex) newIndex -= 1;
+                    final list = [...children];
                     final item = list.removeAt(oldIndex);
                     list.insert(newIndex, item);
                     final messenger = ScaffoldMessenger.of(context);
