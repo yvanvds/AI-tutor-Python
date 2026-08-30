@@ -47,62 +47,56 @@ void main() {
       expect(buf.last.turnId, kBufferCapacity + 5);
     });
 
-    test(
-      'beginTurn → payload → events → parsed → endTurn produces one stitched record',
-      () {
-        final r = DebugSessionRecorder();
-        _begin(r);
-        r.recordRequestPayload(
-          userInput: '{"x":1}',
-          instructions: 'be brief',
-          instructionsDocId: 'submitCode',
-        );
-        r.recordEvent('a');
-        r.recordEvent('b', {'k': 1});
-        r.recordEvent('c');
-        r.recordRawOutput('raw');
-        r.recordParsedResponse(const _OkResponse());
-        r.endTurn();
+    test('beginTurn → payload → events → parsed → endTurn produces one stitched record', () {
+      final r = DebugSessionRecorder();
+      _begin(r);
+      r.recordRequestPayload(
+        userInput: '{"x":1}',
+        instructions: 'be brief',
+        instructionsDocId: 'submitCode',
+      );
+      r.recordEvent('a');
+      r.recordEvent('b', {'k': 1});
+      r.recordEvent('c');
+      r.recordRawOutput('raw');
+      r.recordParsedResponse(const _OkResponse());
+      r.endTurn();
 
-        expect(r.currentForTest, isNull);
-        final t = r.bufferForTest.single;
-        expect(t.userInput, '{"x":1}');
-        expect(t.instructions, 'be brief');
-        expect(t.instructionsDocId, 'submitCode');
-        expect(t.rawOutput, 'raw');
-        expect(t.parsedType, 'ok');
-        expect(t.parsedResponse, {'type': 'ok', 'value': 1});
-        expect(t.events.map((e) => e.name).toList(), ['a', 'b', 'c']);
-        expect(t.events[1].data, {'k': 1});
-        expect(t.endedAt, isNotNull);
-      },
-    );
+      expect(r.currentForTest, isNull);
+      final t = r.bufferForTest.single;
+      expect(t.userInput, '{"x":1}');
+      expect(t.instructions, 'be brief');
+      expect(t.instructionsDocId, 'submitCode');
+      expect(t.rawOutput, 'raw');
+      expect(t.parsedType, 'ok');
+      expect(t.parsedResponse, {'type': 'ok', 'value': 1});
+      expect(t.events.map((e) => e.name).toList(), ['a', 'b', 'c']);
+      expect(t.events[1].data, {'k': 1});
+      expect(t.endedAt, isNotNull);
+    });
 
-    test(
-      'exportJson exposes the current schema version plus the documented top-level keys',
-      () {
-        final r = DebugSessionRecorder();
-        r.resetSession(
-          uid: 'u-123',
-          email: 'student@x.test',
-          modelName: 'gpt-test',
-        );
-        _begin(r);
-        r.endTurn();
+    test('exportJson exposes the current schema version plus the documented top-level keys', () {
+      final r = DebugSessionRecorder();
+      r.resetSession(
+        uid: 'u-123',
+        email: 'student@x.test',
+        modelName: 'gpt-test',
+      );
+      _begin(r);
+      r.endTurn();
 
-        final out = r.exportJson();
-        expect(out['schema'], kSchemaVersion);
-        expect(out['sessionId'], isA<String>());
-        expect(out['sessionStartedAt'], isA<String>());
-        expect(out['exportedAt'], isA<String>());
-        expect(out, contains('appVersion'));
-        expect(out['modelName'], 'gpt-test');
-        expect(out['uid'], 'u-123');
-        expect(out['email'], 'student@x.test');
-        expect(out['turns'], isA<List>());
-        expect((out['turns'] as List), hasLength(1));
-      },
-    );
+      final out = r.exportJson();
+      expect(out['schema'], kSchemaVersion);
+      expect(out['sessionId'], isA<String>());
+      expect(out['sessionStartedAt'], isA<String>());
+      expect(out['exportedAt'], isA<String>());
+      expect(out, contains('appVersion'));
+      expect(out['modelName'], 'gpt-test');
+      expect(out['uid'], 'u-123');
+      expect(out['email'], 'student@x.test');
+      expect(out['turns'], isA<List>());
+      expect((out['turns'] as List), hasLength(1));
+    });
 
     test('recordParsedResponse swallows a toJson() that throws', () {
       final r = DebugSessionRecorder();

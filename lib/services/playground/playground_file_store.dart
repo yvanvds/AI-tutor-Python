@@ -46,8 +46,7 @@ class PlaygroundStoreFull implements Exception {
 /// resolved lazily through [rootDir] so tests can point the store at a temp
 /// directory.
 class PlaygroundFileStore {
-  PlaygroundFileStore({required Future<Directory> Function() rootDir})
-    : _rootDir = rootDir;
+  PlaygroundFileStore({required this._rootDir});
 
   final Future<Directory> Function() _rootDir;
 

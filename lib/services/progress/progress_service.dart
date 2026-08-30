@@ -28,12 +28,10 @@ class ProgressService {
   ProgressService({
     CosmosContainer? container,
     CosmosContainer? historyContainer,
-    required String? Function() getUid,
-    void Function(double)? updateCurrentProgress,
+    required this._getUid,
+    this._updateCurrentProgress,
   }) : _containerOverride = container,
-       _historyContainerOverride = historyContainer,
-       _getUid = getUid,
-       _updateCurrentProgress = updateCurrentProgress;
+       _historyContainerOverride = historyContainer;
 
   final CosmosContainer? _containerOverride;
   final CosmosContainer? _historyContainerOverride;

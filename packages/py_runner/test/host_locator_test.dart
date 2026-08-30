@@ -34,19 +34,16 @@ void main() {
       },
     );
 
-    test(
-      'falls through to installer layout when only PY_RUNNER_HOST_SCRIPT is set',
-      () async {
-        final locator = InstallerPyHostLocator(
-          appDir: r'C:\does-not-exist',
-          environment: const {'PY_RUNNER_HOST_SCRIPT': r'C:\bundle\host.py'},
-        );
-        await expectLater(
-          locator.resolve(),
-          throwsA(isA<PyRunnerNotInstalled>()),
-        );
-      },
-    );
+    test('falls through to installer layout when only PY_RUNNER_HOST_SCRIPT is set', () async {
+      final locator = InstallerPyHostLocator(
+        appDir: r'C:\does-not-exist',
+        environment: const {'PY_RUNNER_HOST_SCRIPT': r'C:\bundle\host.py'},
+      );
+      await expectLater(
+        locator.resolve(),
+        throwsA(isA<PyRunnerNotInstalled>()),
+      );
+    });
 
     test('falls through when env vars are empty strings', () async {
       final locator = InstallerPyHostLocator(

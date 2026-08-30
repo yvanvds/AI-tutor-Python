@@ -61,9 +61,8 @@ class StudentDetailDrawer extends ConsumerWidget {
                           const Divider(height: 1),
                           _SectionTitle(
                             theme: theme,
-                            label: AppLocalizations.of(
-                              context,
-                            ).drawer_section_goals,
+                            label: AppLocalizations.of(context)
+                                .drawer_section_goals,
                           ),
                           SizedBox(
                             height: 320,

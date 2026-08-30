@@ -88,10 +88,7 @@ class RunHandle {
 /// Internal state machine for one run. Owns the broadcast controllers and the
 /// done completer; [RunHandle] is a thin read-only view.
 class _RunController {
-  _RunController({
-    required this.id,
-    required void Function(HostInboundFrame frame) sendFrame,
-  }) : _sendFrame = sendFrame {
+  _RunController({required this.id, required this._sendFrame}) {
     handle = RunHandle._(this);
   }
 

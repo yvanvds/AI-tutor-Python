@@ -133,9 +133,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     if (accountsSnap.hasError) {
       return Center(
         child: Text(
-          AppLocalizations.of(
-            context,
-          ).accounts_loadError(accountsSnap.error.toString()),
+          AppLocalizations.of(context)
+              .accounts_loadError(accountsSnap.error.toString()),
         ),
       );
     }
@@ -377,9 +376,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: AppLocalizations.of(
-                  context,
-                ).accounts_tooltip_deleteAccount,
+                tooltip: AppLocalizations.of(context)
+                    .accounts_tooltip_deleteAccount,
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _confirmDelete(context, a),
               ),

@@ -56,11 +56,8 @@ class PlaygroundFileDoc {
 }
 
 class PlaygroundFilesService {
-  PlaygroundFilesService({
-    CosmosContainer? container,
-    required String? Function() getUid,
-  }) : _containerOverride = container,
-       _getUid = getUid;
+  PlaygroundFilesService({CosmosContainer? container, required this._getUid})
+    : _containerOverride = container;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;

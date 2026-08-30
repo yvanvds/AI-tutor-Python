@@ -73,12 +73,10 @@ class _Agreed {
 
 class PlaygroundSyncService {
   PlaygroundSyncService({
-    required PlaygroundFileStore store,
-    required PlaygroundFilesService remote,
-    required String? Function() getUid,
-  }) : _store = store,
-       _remote = remote,
-       _getUid = getUid;
+    required this._store,
+    required this._remote,
+    required this._getUid,
+  });
 
   final PlaygroundFileStore _store;
   final PlaygroundFilesService _remote;

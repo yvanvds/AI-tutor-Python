@@ -139,9 +139,8 @@ void main() {
       await pumpUntilGone(tester, find.byType(AlertDialog));
       // It is on this machine now, so it is there again offline.
       expect(
-        File(
-          p.join(harness.playgroundDir.path, 'from school.py'),
-        ).readAsStringSync(),
+        File(p.join(harness.playgroundDir.path, 'from school.py'))
+            .readAsStringSync(),
         _otherMachineCode,
       );
 

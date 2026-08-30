@@ -14,11 +14,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TurnHistoryService {
-  TurnHistoryService({
-    CosmosContainer? container,
-    required String? Function() getUid,
-  }) : _containerOverride = container,
-       _getUid = getUid;
+  TurnHistoryService({CosmosContainer? container, required this._getUid})
+    : _containerOverride = container;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;

@@ -12,14 +12,11 @@ import 'frames.dart';
 /// dispatch by id) lives in `PyRunner`; this class is a dumb pipe.
 class HostProcess {
   HostProcess._({
-    required Process process,
-    required Stream<HostOutboundFrame> frames,
-    required Stream<String> stderrLines,
-    required Stream<FrameDecodeException> decodeErrors,
-  }) : _process = process,
-       _frames = frames,
-       _stderrLines = stderrLines,
-       _decodeErrors = decodeErrors;
+    required this._process,
+    required this._frames,
+    required this._stderrLines,
+    required this._decodeErrors,
+  });
 
   final Process _process;
   final Stream<HostOutboundFrame> _frames;

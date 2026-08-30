@@ -41,14 +41,11 @@ typedef ProgressImportSummary = ({int goals, int samples, int beliefs});
 
 class ProgressArchive {
   ProgressArchive({
-    required ProgressService progress,
-    required LoBeliefsService loBeliefs,
-    required StudentCalibration? Function() calibration,
-    required Future<void> Function(StudentCalibration) setCalibration,
-  }) : _progress = progress,
-       _loBeliefs = loBeliefs,
-       _calibration = calibration,
-       _setCalibration = setCalibration;
+    required this._progress,
+    required this._loBeliefs,
+    required this._calibration,
+    required this._setCalibration,
+  });
 
   final ProgressService _progress;
   final LoBeliefsService _loBeliefs;

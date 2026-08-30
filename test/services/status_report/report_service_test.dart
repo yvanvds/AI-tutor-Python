@@ -193,9 +193,8 @@ void main() {
       ).thenAnswer((_) async {});
 
       await build().delete('g1');
-      verify(
-        () => container.delete('${_uid}_g1', partitionKey: _uid),
-      ).called(1);
+      verify(() => container.delete('${_uid}_g1', partitionKey: _uid))
+          .called(1);
     });
   });
 
@@ -203,9 +202,8 @@ void main() {
     setUp(() => currentUser.value = _identity());
 
     test('no-op when getCurrentChildGoalId returns null', () async {
-      await build(
-        getCurrentChildGoalId: () => null,
-      ).updateForCurrentChildGoal('report text');
+      await build(getCurrentChildGoalId: () => null)
+          .updateForCurrentChildGoal('report text');
       verifyNever(
         () => container.upsert(
           any<Map<String, Object?>>(),
@@ -222,9 +220,8 @@ void main() {
         ),
       ).thenAnswer((_) async => <String, dynamic>{});
 
-      await build(
-        getCurrentChildGoalId: () => 'goal-child-1',
-      ).updateForCurrentChildGoal('passed the quiz');
+      await build(getCurrentChildGoalId: () => 'goal-child-1')
+          .updateForCurrentChildGoal('passed the quiz');
 
       final captured =
           verify(

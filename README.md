@@ -38,7 +38,7 @@ A `python_teacher_install.exe` (Inno Setup installer, ~150 MB) that you can hand
 
 You need these tools installed once. All free.
 
-1. **Flutter SDK 3.47.1** — <https://docs.flutter.dev/get-started/install/windows>. After installing run `flutter doctor` and fix any red items, especially the Visual Studio "Desktop development with C++" workload (required for Windows builds). This is the exact version CI installs (`FLUTTER_VERSION` in [.github/workflows/build.yml](.github/workflows/build.yml)); building works on newer ones, but `dart format` output differs between Dart versions, so only this one is guaranteed to agree with CI's format gate.
+1. **Flutter SDK 3.47.1** — <https://docs.flutter.dev/get-started/install/windows>. After installing run `flutter doctor` and fix any red items, especially the Visual Studio "Desktop development with C++" workload (required for Windows builds). This is the exact version CI installs (`FLUTTER_VERSION` in [.github/workflows/build.yml](.github/workflows/build.yml)). An older SDK now fails `flutter pub get` outright, because `pubspec.yaml` requires `sdk: ^3.13.1` (the Dart version bundled with Flutter 3.47.1). Building works on newer ones, but `dart format` output differs between Dart versions, so only this one is guaranteed to agree with CI's format gate.
 2. **Git** — <https://git-scm.com/download/win>.
 3. **Inno Setup 6** — <https://jrsoftware.org/isdl.php>. Used by the packaging step to produce the `.exe` installer.
 4. A code editor (VS Code recommended) — only needed if you want to edit Dutch text or tweak settings.

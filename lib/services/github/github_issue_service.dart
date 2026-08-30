@@ -58,10 +58,9 @@ class GitHubApiException implements Exception {
 class GitHubIssueService {
   GitHubIssueService({
     http.Client? client,
-    String repo = kBugReportRepo,
+    this._repo = kBugReportRepo,
     Uri? apiBase,
   }) : _client = client ?? http.Client(),
-       _repo = repo,
        _apiBase = apiBase ?? Uri.parse('https://api.github.com');
 
   final http.Client _client;

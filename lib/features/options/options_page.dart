@@ -173,9 +173,8 @@ Widget _choiceRow({
 }
 
 void _snack(BuildContext context, String message) {
-  ScaffoldMessenger.maybeOf(
-    context,
-  )?.showSnackBar(SnackBar(content: Text(message)));
+  ScaffoldMessenger.maybeOf(context)
+      ?.showSnackBar(SnackBar(content: Text(message)));
 }
 
 // ---------------------------------------------------------------------------
@@ -1153,9 +1152,8 @@ class _DeveloperCardState extends ConsumerState<_DeveloperCard> {
 
   Future<void> _copyAllTurns(List<TurnRecord> turns) async {
     final l = AppLocalizations.of(context);
-    final encoded = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(turns.map((t) => t.toJson()).toList(growable: false));
+    final encoded = const JsonEncoder.withIndent('  ')
+        .convert(turns.map((t) => t.toJson()).toList(growable: false));
     await Clipboard.setData(ClipboardData(text: encoded));
     if (!mounted) return;
     _snack(context, l.options_developer_recentTurns_copied(turns.length));

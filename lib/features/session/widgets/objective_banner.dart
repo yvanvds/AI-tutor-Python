@@ -48,9 +48,8 @@ class ObjectiveBanner extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
-                  AppLocalizations.of(
-                    context,
-                  ).session_objectiveBanner_pill.toUpperCase(),
+                  AppLocalizations.of(context).session_objectiveBanner_pill
+                      .toUpperCase(),
                   style: TextStyle(
                     color: AppColors.accent,
                     fontSize: 10,

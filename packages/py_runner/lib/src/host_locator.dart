@@ -73,11 +73,7 @@ class ExplicitPyHostLocator extends PyHostLocator {
 /// an argument list — they are never shell-joined, so spaces in `{appDir}` are
 /// handled correctly.
 class InstallerPyHostLocator extends PyHostLocator {
-  const InstallerPyHostLocator({
-    String? appDir,
-    Map<String, String>? environment,
-  }) : _appDir = appDir,
-       _environment = environment;
+  const InstallerPyHostLocator({this._appDir, this._environment});
 
   /// Override for the application directory. Defaults to the directory
   /// containing [Platform.resolvedExecutable]. Exposed for unit testing.

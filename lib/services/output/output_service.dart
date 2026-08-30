@@ -39,11 +39,7 @@ bool codeImportsTurtle(String code) {
 }
 
 class OutputService {
-  OutputService({
-    required PyRunner pyRunner,
-    required AppLocalizations Function() localizations,
-  }) : _pyRunner = pyRunner,
-       _localizations = localizations;
+  OutputService({required this._pyRunner, required this._localizations});
 
   final PyRunner _pyRunner;
 
