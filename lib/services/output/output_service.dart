@@ -45,15 +45,18 @@ class OutputService {
     _stderrBuf.clear();
     isRunning.value = true;
 
+    final RunHandle handle;
     try {
       await _pyRunner.start();
+      // `run` throws synchronously when the host died between `start`
+      // resolving and the exec being sent (#7); without the guard that
+      // StateError escaped the Run button's tap handler.
+      handle = _pyRunner.run(code);
     } catch (e) {
       _pushLine('[Python host error] $e', isError: true);
       isRunning.value = false;
       return;
     }
-
-    final handle = _pyRunner.run(code);
     _currentHandle = handle;
 
     _runSubs.add(handle.stdout.listen((t) => _appendChunk(t, isError: false)));
@@ -68,15 +71,27 @@ class OutputService {
         final result = await handle.done;
         if (!identical(_currentHandle, capturedHandle)) return;
         _flushBuffers();
-        if (result.exception != null) {
-          _appendChunk(result.exception!.traceback, isError: true);
-          _flushBuffers();
+        final exception = result.exception;
+        if (exception != null) {
+          if (exception.traceback.isNotEmpty) {
+            _appendChunk(exception.traceback, isError: true);
+            _flushBuffers();
+          } else {
+            // Synthesised by py_runner when the host process died mid-run
+            // (`HostExited`) or was no longer ready: there is no Python
+            // traceback, so without this the run just stopped silently
+            // and the panel reported "Done" (#7).
+            _pushLine(
+              '[Python host error] ${exception.type}: ${exception.message}',
+              isError: true,
+            );
+          }
         }
         pendingInputRequest.value = null;
         isRunning.value = false;
-      } catch (_) {
+      } catch (e) {
         if (!identical(_currentHandle, capturedHandle)) return;
-        _flushBuffers();
+        _pushLine('[Python host error] $e', isError: true);
         pendingInputRequest.value = null;
         isRunning.value = false;
       }

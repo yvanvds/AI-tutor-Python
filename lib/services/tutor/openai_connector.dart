@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/tutor/env.dart';
@@ -121,7 +122,7 @@ class OpenaiConnector {
       return ConnectorOk(text);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequest failed: $e');
-      return ConnectorFailure(e, stack, e.toString());
+      return ConnectorFailure(e, stack, describeTransportError(e));
     }
   }
 
@@ -132,7 +133,7 @@ class OpenaiConnector {
     required String instructions,
     required String input,
     PreviousInputs inputs = PreviousInputs.includeSession,
-  }) async* {
+  }) {
     debugPrint('system prompt: ${instructions.length} chars');
     _rememberForResend(instructions, input, inputs);
     OpenAI.apiKey = _apiKey;
@@ -143,17 +144,17 @@ class OpenaiConnector {
     }
 
     final messages = _buildMessages(instructions, _historyFor(inputs), input);
-    final assembler = EnvelopeAssembler();
-    final raw = StringBuffer();
 
-    try {
+    // Opening the stream is deferred into the generator so a synchronous
+    // throw from `createStream` (bad key, bad model) lands in the same
+    // StreamFailed path as a mid-stream transport error.
+    Stream<String> deltas() async* {
       final model = _resolveModel();
       final stream = OpenAI.instance.chat.createStream(
         model: model,
         messages: messages,
         extraParams: _extraParams(model),
       );
-
       await for (final event in stream) {
         if (event.choices.isEmpty) continue;
         final delta = event.choices.first.delta;
@@ -162,16 +163,60 @@ class OpenaiConnector {
         for (final item in content) {
           final t = item?.text;
           if (t == null || t.isEmpty) continue;
-          raw.write(t);
-          final visible = assembler.add(t);
-          if (visible.isNotEmpty) yield StreamTextDelta(visible);
+          yield t;
         }
+      }
+    }
+
+    return assembleStream(deltas(), input: input, inputs: inputs);
+  }
+
+  /// Longest gap tolerated between two streamed chunks. `OpenAI.requestsTimeOut`
+  /// only bounds opening the connection; a stream that stalls after the
+  /// first token would otherwise hang the tutor forever (#7).
+  static const Duration streamIdleTimeout = Duration(seconds: 45);
+
+  /// Turns raw text deltas into [StreamChunk]s: incremental envelope
+  /// parsing, idle-timeout, truncation detection, history recording. Split
+  /// from [sendRequestStream] so the failure paths can be tested without
+  /// an OpenAI socket.
+  @visibleForTesting
+  Stream<StreamChunk> assembleStream(
+    Stream<String> textDeltas, {
+    required String input,
+    required PreviousInputs inputs,
+    Duration idleTimeout = streamIdleTimeout,
+  }) async* {
+    final assembler = EnvelopeAssembler();
+    final raw = StringBuffer();
+
+    try {
+      await for (final t in textDeltas.timeout(idleTimeout)) {
+        raw.write(t);
+        final visible = assembler.add(t);
+        if (visible.isNotEmpty) yield StreamTextDelta(visible);
       }
 
       final tail = assembler.close();
       if (tail.isNotEmpty) yield StreamTextDelta(tail);
 
       _onRecordRawOutput?.call(raw.toString());
+
+      // The stream ended cleanly but the envelope never closed: the reply
+      // was cut off in transit (proxy reset, model stopped mid-token).
+      // Treat it like a transport failure — the partial text is not a
+      // usable answer and the caller's retry gets a fresh, complete one.
+      if (assembler.sawOpenTag && !assembler.sawCloseMeta) {
+        const message = 'Het antwoord van de tutor werd afgebroken.';
+        debugPrint('OpenaiConnector: stream truncated before </META>');
+        _onRecordStreamFailure?.call('truncated: ${raw.length} chars');
+        yield StreamFailed(
+          StateError('stream ended before </META>'),
+          StackTrace.current,
+          message,
+        );
+        return;
+      }
 
       final ChatResponse parsed = assembler.sawOpenTag
           ? AIResponseParser.fromEnvelopePieces(
@@ -187,8 +232,20 @@ class OpenaiConnector {
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequestStream failed: $e');
       _onRecordStreamFailure?.call(e.toString());
-      yield StreamFailed(e, stack, e.toString());
+      yield StreamFailed(e, stack, describeTransportError(e));
     }
+  }
+
+  /// Student-facing one-liner for a transport failure. The raw exception
+  /// (`SocketException: Failed host lookup ...`) stays in the debug log.
+  static String describeTransportError(Object e) {
+    if (e is TimeoutException) {
+      return 'De tutor reageerde niet op tijd.';
+    }
+    if (e is SocketException || e is HttpException) {
+      return 'Geen verbinding met de tutor.';
+    }
+    return e.toString();
   }
 
   Future<ConnectorResult> resendRequest() async {

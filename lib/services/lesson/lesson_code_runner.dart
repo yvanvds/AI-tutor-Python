@@ -47,13 +47,15 @@ class PyLessonCodeRunner implements LessonCodeRunner {
   }
 
   Future<LessonRunResult> _runOne(String code) async {
+    final RunHandle handle;
     try {
       await _pyRunner.start();
+      // `run` throws synchronously if the host died right after `start`
+      // resolved (#7); the lesson page must get a result either way.
+      handle = _pyRunner.run(code, timeout: timeout);
     } catch (e) {
       return LessonRunResult(stderr: '[Python host error] $e');
     }
-
-    final handle = _pyRunner.run(code, timeout: timeout);
     final out = StringBuffer();
     final err = StringBuffer();
     final subs = <StreamSubscription<dynamic>>[

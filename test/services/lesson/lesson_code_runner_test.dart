@@ -14,7 +14,10 @@ import 'dart:async';
 
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:py_runner/py_runner.dart';
+
+class _MockPyRunner extends Mock implements PyRunner {}
 
 class _MissingHostLocator implements PyHostLocator {
   @override
@@ -70,6 +73,25 @@ void main() {
     for (final r in results) {
       expect(r.hasError, isTrue);
     }
+  });
+
+  test('a host that is gone when the run is sent yields an error result (#7)',
+      () async {
+    final pyRunner = _MockPyRunner();
+    when(() => pyRunner.start()).thenAnswer((_) async {});
+    when(
+      () => pyRunner.run(
+        any(),
+        cwd: any(named: 'cwd'),
+        timeout: any(named: 'timeout'),
+      ),
+    ).thenThrow(StateError('PyRunner is not ready (status: crashed)'));
+
+    final result = await PyLessonCodeRunner(pyRunner: pyRunner).run('print(1)');
+
+    expect(result.hasError, isTrue);
+    expect(result.stderr, contains('Python host error'));
+    expect(result.stderr, contains('not ready'));
   });
 
   test('LessonRunResult serialises both streams', () {

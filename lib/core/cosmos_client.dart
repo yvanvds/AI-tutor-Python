@@ -9,11 +9,13 @@
 // [MasterKeyAuth] reading the obfuscated key from [AzureConfig]. When MSAL
 // lands in Step 3, swap in an [AadTokenAuth] without touching call sites.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/services/config/azure_config.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 const String _apiVersion = '2018-12-31';
@@ -22,11 +24,37 @@ const Duration _requestTimeout = Duration(seconds: 15);
 const int _maxThrottleRetries = 3;
 const Duration _maxThrottleBackoff = Duration(seconds: 5);
 
+/// Transient failures (#7) — a dropped socket, a request timeout, or a
+/// 408 / 449 / 5xx from Cosmos — are retried in-client with exponential
+/// backoff before they surface, so a single blip during a graded turn
+/// doesn't lose the student's answer. Cosmos' own guidance is to retry
+/// 449 ("RetryWith") and 503 immediately; 5xx in general is safe to retry
+/// because every write we do is an idempotent upsert / replace / delete
+/// or a batch that either commits or doesn't.
+const int _maxTransientRetries = 3;
+const Duration _kTransientRetryBaseDelay = Duration(milliseconds: 200);
+
+/// Status code used for [CosmosException]s that wrap a network-level
+/// failure (no HTTP response at all: connection refused, DNS, timeout).
+const int kCosmosNetworkStatus = 0;
+
+const Set<int> _transientStatusCodes = {
+  kCosmosNetworkStatus,
+  408,
+  449,
+  500,
+  502,
+  503,
+  504,
+};
+
 /// Thrown for any non-2xx response from Cosmos. Callers (and `safeCosmos`)
 /// branch on [statusCode] — 401/403 means a bad key or revoked role
 /// (force the user back through sign-in / reset), 429 means throttling
 /// (the client retries internally, so by the time this surfaces we've
-/// already exhausted retries).
+/// already exhausted retries). Network-level failures are wrapped with
+/// [kCosmosNetworkStatus] so callers see one exception type for "Cosmos
+/// didn't answer" regardless of where in the stack it failed.
 class CosmosException implements Exception {
   CosmosException(this.statusCode, this.message, {this.code, this.activityId});
 
@@ -38,6 +66,14 @@ class CosmosException implements Exception {
   bool get isAuthError => statusCode == 401 || statusCode == 403;
   bool get isThrottled => statusCode == 429;
   bool get isNotFound => statusCode == 404;
+
+  /// No HTTP response at all (socket / DNS / timeout).
+  bool get isNetworkError => statusCode == kCosmosNetworkStatus;
+
+  /// Worth retrying: the client already did, so by the time this surfaces
+  /// the retries are exhausted — but callers can still treat it as "try
+  /// again later" rather than "something is broken".
+  bool get isTransient => _transientStatusCodes.contains(statusCode);
 
   @override
   String toString() {
@@ -118,9 +154,26 @@ class CosmosClient {
     required Uri endpoint,
     required CosmosAuth auth,
     http.Client? httpClient,
+    Duration transientRetryBaseDelay = _kTransientRetryBaseDelay,
   }) : _endpoint = endpoint,
        _auth = auth,
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? http.Client(),
+       _transientRetryBaseDelay = transientRetryBaseDelay;
+
+  /// Test seam: a client over an injected [http.Client]. Production code
+  /// goes through [instance].
+  @visibleForTesting
+  factory CosmosClient.withHttpClient({
+    required Uri endpoint,
+    required CosmosAuth auth,
+    required http.Client httpClient,
+    Duration transientRetryBaseDelay = _kTransientRetryBaseDelay,
+  }) => CosmosClient._(
+    endpoint: endpoint,
+    auth: auth,
+    httpClient: httpClient,
+    transientRetryBaseDelay: transientRetryBaseDelay,
+  );
 
   static CosmosClient? _instance;
 
@@ -136,6 +189,7 @@ class CosmosClient {
   final Uri _endpoint;
   final CosmosAuth _auth;
   final http.Client _http;
+  final Duration _transientRetryBaseDelay;
 
   CosmosContainer container(String containerId) =>
       CosmosContainer._(this, _databaseId, containerId);
@@ -151,7 +205,8 @@ class CosmosClient {
     final url = _endpoint.resolve(pathSegment);
     final encodedBody = body == null ? null : utf8.encode(jsonEncode(body));
 
-    int attempt = 0;
+    int throttleAttempt = 0;
+    int transientAttempt = 0;
     while (true) {
       final date = HttpDate.format(DateTime.now().toUtc());
       final headers = <String, String>{
@@ -170,24 +225,59 @@ class CosmosClient {
       final request = http.Request(verb, url)..headers.addAll(headers);
       if (encodedBody != null) request.bodyBytes = encodedBody;
 
-      final streamed = await _http.send(request).timeout(_requestTimeout);
-      final response = await http.Response.fromStream(streamed);
+      final http.Response response;
+      try {
+        final streamed = await _http.send(request).timeout(_requestTimeout);
+        response = await http.Response.fromStream(streamed);
+      } on Object catch (e) {
+        if (!_isNetworkFailure(e)) rethrow;
+        if (transientAttempt < _maxTransientRetries) {
+          await Future.delayed(_transientBackoff(transientAttempt));
+          transientAttempt++;
+          continue;
+        }
+        throw CosmosException(
+          kCosmosNetworkStatus,
+          'No response from Cosmos after ${transientAttempt + 1} attempts: $e',
+          code: 'NetworkError',
+        );
+      }
 
-      if (response.statusCode == 429 && attempt < _maxThrottleRetries) {
+      if (response.statusCode == 429 && throttleAttempt < _maxThrottleRetries) {
         final retryMs =
             int.tryParse(response.headers['x-ms-retry-after-ms'] ?? '') ??
-            (200 * (1 << attempt));
+            (200 * (1 << throttleAttempt));
         final delay = Duration(
           milliseconds: retryMs.clamp(0, _maxThrottleBackoff.inMilliseconds),
         );
         await Future.delayed(delay);
-        attempt++;
+        throttleAttempt++;
+        continue;
+      }
+
+      if (_transientStatusCodes.contains(response.statusCode) &&
+          transientAttempt < _maxTransientRetries) {
+        await Future.delayed(_transientBackoff(transientAttempt));
+        transientAttempt++;
         continue;
       }
 
       return response;
     }
   }
+
+  Duration _transientBackoff(int attempt) {
+    final ms = _transientRetryBaseDelay.inMilliseconds * (1 << attempt);
+    return Duration(
+      milliseconds: ms.clamp(0, _maxThrottleBackoff.inMilliseconds),
+    );
+  }
+
+  static bool _isNetworkFailure(Object e) =>
+      e is SocketException ||
+      e is TimeoutException ||
+      e is http.ClientException ||
+      e is HttpException;
 }
 
 /// Handle to one container. Cheap to create — `CosmosPaths` makes new

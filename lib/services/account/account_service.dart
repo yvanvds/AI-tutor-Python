@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'account.dart';
@@ -43,11 +44,35 @@ class AccountService extends Notifier<Account?> {
       return;
     }
 
-    unawaited(_ensureProfile(identity));
+    unawaited(_ensureProfileGuarded(identity));
 
     _accountSub = watchAccount(identity.oid).listen((account) {
       state = account;
+      // First sign-in with Cosmos unreachable (#7): the profile create
+      // failed, so the account doc never appears and `main.dart` would sit
+      // on its spinner forever. Retry the create on every poll that still
+      // comes back empty.
+      if (account == null && _ensureProfileFailed) {
+        unawaited(_ensureProfileGuarded(identity));
+      }
     });
+  }
+
+  bool _ensureProfileFailed = false;
+  bool _ensureProfileInFlight = false;
+
+  Future<void> _ensureProfileGuarded(AccountIdentity identity) async {
+    if (_ensureProfileInFlight) return;
+    _ensureProfileInFlight = true;
+    try {
+      await _ensureProfile(identity);
+      _ensureProfileFailed = false;
+    } catch (e) {
+      debugPrint('AccountService: ensureProfile failed, will retry: $e');
+      _ensureProfileFailed = true;
+    } finally {
+      _ensureProfileInFlight = false;
+    }
   }
 
   Future<void> _ensureProfile(AccountIdentity identity) async {

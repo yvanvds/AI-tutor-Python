@@ -2,9 +2,10 @@
 //
 //   1. `safeCosmos` — wraps a one-shot async op; on auth failure (401/403)
 //      pushes the CrashRecoveryScreen so the user can reset and re-sign-in.
-//   2. `safeCosmosStream` — passive guard that logs auth/throttle errors
-//      flowing through a stream without swallowing them (StreamBuilder still
-//      sees the error).
+//   2. `safeCosmosStream` — absorbs errors flowing through a polling
+//      stream (logs them, keeps the last good value on screen). The polling
+//      source keeps ticking, so a transient blip self-heals on the next
+//      fetch instead of flipping every StreamBuilder into an error state.
 //   3. `pollingStream` — periodic-fetch stream. Cosmos has a change feed but
 //      consuming it from a desktop client is awkward; we poll on a fixed
 //      cadence instead.
@@ -46,16 +47,16 @@ Future<T> safeCosmos<T>(Future<T> Function() op) async {
   }
 }
 
-/// Stream guard. Logs auth/throttle errors but lets them propagate so
-/// StreamBuilder can react.
+/// Stream guard. `Stream.handleError` *absorbs* the error when the handler
+/// returns normally, so consumers never see it: they keep the last value
+/// and pick up the next successful poll. Auth errors have already routed
+/// to the recovery screen inside `safeCosmos` by the time they get here.
+/// Every error is logged (#7) — before, anything that wasn't a 401/403/429
+/// vanished without a trace.
 Stream<T> safeCosmosStream<T>(Stream<T> source) {
   return source.handleError((Object error, StackTrace stack) {
-    if (error is CosmosException &&
-        (error.isAuthError || error.isThrottled)) {
-      debugPrint(
-        'safeCosmosStream: ${error.statusCode} from Cosmos stream: $error',
-      );
-    }
+    final code = error is CosmosException ? '${error.statusCode}' : 'non-Cosmos';
+    debugPrint('safeCosmosStream: $code error absorbed: $error');
   });
 }
 
