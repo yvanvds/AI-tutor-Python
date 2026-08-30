@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
@@ -11,18 +14,10 @@ import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
-import 'package:ai_tutor_python/version.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-/// Where the shell looks for a newer installer on launch. `null` disables
-/// the check — the integration harness (#28) overrides it so a test boot
-/// never fetches, downloads, or runs an installer.
-final updateManifestUrlProvider = Provider<Uri?>(
-  (_) => Uri.parse('https://yvanvds.github.io/AI-tutor-Python/version.json'),
-);
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -32,14 +27,29 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
+  /// Whether the offer dialog is on screen, so a rebuild that re-enters
+  /// [UpdatePhase.available] cannot stack a second one.
+  bool _offering = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+    // Fire and forget: `start()` handles every failure itself and returns
+    // immediately on a build that does not check by itself (#47), so the
+    // first frame never waits on the network.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ref.read(updateControllerProvider.notifier).start());
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // The only place an update is offered. Everything else about the flow —
+    // deciding, downloading, hashing, launching — lives in the controller.
+    ref.listen(updateControllerProvider.select((s) => s.release), (_, release) {
+      if (release != null) _offerUpdate(release);
+    });
+
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
@@ -98,21 +108,18 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
-  /// Fire-and-forget from a post-frame callback, so nothing above catches
-  /// what it throws: every failure has to be handled here or it becomes an
-  /// unhandled async error that reaches neither the user nor a log (#46).
-  /// Failures are silent for the student and logged for us; surfacing them
-  /// in Options → About waits for the update controller (#47/#48).
-  Future<void> _checkForUpdate() async {
-    final manifest = ref.read(updateManifestUrlProvider);
-    if (manifest == null) return;
+  /// Tells the student an update is waiting, and applies it once they close
+  /// the dialog.
+  ///
+  /// The shell's whole remaining part in the flow: no fetching, no version
+  /// comparison, no download, no `Process.start`. Failures below this point
+  /// are handled by the controller and left on `UpdateState.message` for the
+  /// About panel (#48), which is also where a real accept/decline choice and
+  /// a progress indicator land.
+  Future<void> _offerUpdate(UpdateInfo release) async {
+    if (_offering || !mounted) return;
+    _offering = true;
     try {
-      final info = await fetchUpdateInfo(manifest);
-      // Nothing published yet — distinct from a failed check, which throws.
-      if (info == null) return;
-      if (!isNewer(info.version, kAppVersion)) return;
-      if (!mounted) return;
-
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -120,7 +127,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           final l = AppLocalizations.of(context);
           return AlertDialog(
             title: Text(l.update_dialog_title),
-            content: Text(l.update_dialog_message(info.version)),
+            content: Text(l.update_dialog_message(release.version)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -130,24 +137,10 @@ class _AppShellState extends ConsumerState<AppShell> {
           );
         },
       );
-
-      final file = await downloadToTemp(info.url);
-      if (!await verifySha256(file, info.sha256)) {
-        try {
-          file.deleteSync();
-        } catch (_) {
-          // Nothing more to do; the installer is not going to run.
-        }
-        throw UpdateCheckException(
-          'installer for ${info.version} failed its sha256 check',
-        );
-      }
-      await runInstallerAndExit(
-        file,
-        args: const ['/VERYSILENT', '/NORESTART'],
-      );
-    } catch (e, stack) {
-      debugPrint('AppShell: update check failed: $e\n$stack');
+      if (!mounted) return;
+      await ref.read(updateControllerProvider.notifier).apply();
+    } finally {
+      _offering = false;
     }
   }
 }

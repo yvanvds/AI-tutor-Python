@@ -19,6 +19,7 @@
 
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -74,6 +75,7 @@ class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
     this.updateManifestUrl,
+    this.forceUpdateCheck = true,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -84,6 +86,15 @@ class AppHarness {
   /// downloads or runs an installer. The update flow (#45) points this at a
   /// local test server instead.
   final Uri? updateManifestUrl;
+
+  /// Whether the harness forces the launch check on.
+  ///
+  /// The app itself checks only in a release build (#47), and an
+  /// integration-test binary is never one, so a flow that wants to drive the
+  /// check has to say so. Pass `false` to leave the app's own
+  /// `kReleaseMode` default in place — which is how `update_dev_build.dart`
+  /// proves a debug build never reaches out at all.
+  final bool forceUpdateCheck;
 
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
@@ -111,6 +122,8 @@ class AppHarness {
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
         updateManifestUrlProvider.overrideWithValue(updateManifestUrl),
+        if (forceUpdateCheck)
+          updateAutoCheckProvider.overrideWithValue(updateManifestUrl != null),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
       ],
     );
