@@ -22,16 +22,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ProgressReset {
   ProgressReset({
-    required GoalsService goals,
-    required ProgressService progress,
-    required LoBeliefsService loBeliefs,
-    required TurnHistoryService turnHistory,
-    required Future<void> Function(StudentCalibration) setCalibration,
-  }) : _goals = goals,
-       _progress = progress,
-       _loBeliefs = loBeliefs,
-       _turnHistory = turnHistory,
-       _setCalibration = setCalibration;
+    required this._goals,
+    required this._progress,
+    required this._loBeliefs,
+    required this._turnHistory,
+    required this._setCalibration,
+  });
 
   final GoalsService _goals;
   final ProgressService _progress;

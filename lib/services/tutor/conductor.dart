@@ -263,7 +263,7 @@ class ConductorDeps {
 }
 
 class Conductor {
-  Conductor({required ConductorDeps deps}) : _deps = deps;
+  Conductor({required this._deps});
 
   final ConductorDeps _deps;
 

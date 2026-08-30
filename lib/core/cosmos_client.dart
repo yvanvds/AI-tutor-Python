@@ -151,14 +151,11 @@ class AadTokenAuth implements CosmosAuth {
 /// the Step 3 auth swap can pre-seed via [overrideInstance].
 class CosmosClient {
   CosmosClient._({
-    required Uri endpoint,
-    required CosmosAuth auth,
+    required this._endpoint,
+    required this._auth,
     http.Client? httpClient,
-    Duration transientRetryBaseDelay = _kTransientRetryBaseDelay,
-  }) : _endpoint = endpoint,
-       _auth = auth,
-       _http = httpClient ?? http.Client(),
-       _transientRetryBaseDelay = transientRetryBaseDelay;
+    this._transientRetryBaseDelay = _kTransientRetryBaseDelay,
+  }) : _http = httpClient ?? http.Client();
 
   /// Test seam: a client over an injected [http.Client]. Production code
   /// goes through [instance].

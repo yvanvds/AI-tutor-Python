@@ -63,14 +63,11 @@ class StreamFailed extends StreamChunk {
 
 class OpenaiConnector {
   OpenaiConnector({
-    void Function(String)? onRecordRawOutput,
-    void Function(String)? onRecordStreamFailure,
-    GlobalConfig? Function()? getConfig,
-    String? Function()? getModelOverride,
-  }) : _onRecordRawOutput = onRecordRawOutput,
-       _onRecordStreamFailure = onRecordStreamFailure,
-       _getConfig = getConfig,
-       _getModelOverride = getModelOverride;
+    this._onRecordRawOutput,
+    this._onRecordStreamFailure,
+    this._getConfig,
+    this._getModelOverride,
+  });
 
   final void Function(String)? _onRecordRawOutput;
   final void Function(String)? _onRecordStreamFailure;

@@ -14,11 +14,9 @@ import 'status_report.dart';
 class ReportService {
   ReportService({
     CosmosContainer? container,
-    required String? Function() getUid,
-    String? Function()? getCurrentChildGoalId,
-  }) : _containerOverride = container,
-       _getUid = getUid,
-       _getCurrentChildGoalId = getCurrentChildGoalId;
+    required this._getUid,
+    this._getCurrentChildGoalId,
+  }) : _containerOverride = container;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;

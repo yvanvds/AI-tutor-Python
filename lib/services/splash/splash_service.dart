@@ -22,8 +22,7 @@ class GoalSplashState {
 }
 
 class SplashService {
-  SplashService({void Function(GoalSplashState?)? onStateChanged})
-    : _onStateChanged = onStateChanged;
+  SplashService({this._onStateChanged});
 
   final void Function(GoalSplashState?)? _onStateChanged;
   GoalSplashState? _current;

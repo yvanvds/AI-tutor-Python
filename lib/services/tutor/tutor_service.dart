@@ -85,12 +85,10 @@ class _RequestInput {
 
 class TutorService extends Notifier<TutorState> {
   TutorService({
-    OpenaiConnector? connectorOverride,
-    Conductor? conductorOverride,
-    InstructionGenerator? instructionGeneratorOverride,
-  }) : _connectorOverride = connectorOverride,
-       _conductorOverride = conductorOverride,
-       _instructionGeneratorOverride = instructionGeneratorOverride;
+    this._connectorOverride,
+    this._conductorOverride,
+    this._instructionGeneratorOverride,
+  });
 
   final OpenaiConnector? _connectorOverride;
   final Conductor? _conductorOverride;

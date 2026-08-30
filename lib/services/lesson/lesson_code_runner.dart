@@ -28,9 +28,9 @@ abstract class LessonCodeRunner {
 /// several examples fires all of them at once on load.
 class PyLessonCodeRunner implements LessonCodeRunner {
   PyLessonCodeRunner({
-    required PyRunner pyRunner,
+    required this._pyRunner,
     this.timeout = const Duration(seconds: 10),
-  }) : _pyRunner = pyRunner;
+  });
 
   final PyRunner _pyRunner;
 

@@ -11,11 +11,8 @@ import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class LoBeliefsService {
-  LoBeliefsService({
-    CosmosContainer? container,
-    required String? Function() getUid,
-  }) : _containerOverride = container,
-       _getUid = getUid;
+  LoBeliefsService({CosmosContainer? container, required this._getUid})
+    : _containerOverride = container;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;

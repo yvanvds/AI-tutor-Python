@@ -4,11 +4,7 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 
 class ChatService {
-  ChatService({
-    void Function(StreamState)? onStreamStateChanged,
-    void Function(bool)? onMcqPendingChanged,
-  }) : _onStreamStateChanged = onStreamStateChanged,
-       _onMcqPendingChanged = onMcqPendingChanged;
+  ChatService({this._onStreamStateChanged, this._onMcqPendingChanged});
 
   final ChatController controller = InMemoryChatController();
   final void Function(StreamState)? _onStreamStateChanged;
