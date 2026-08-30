@@ -11,6 +11,12 @@ jobs:
     runs-on: windows-latest
     env:
       FLUTTER_VERSION: 3.44.0
+      # Secrets are not exposed to workflow runs triggered by a pull request
+      # from a fork, so `secrets.SONAR_TOKEN` is empty there and the scan can
+      # only fail with an auth error (#35). Resolve the availability once here
+      # — the `secrets` context is usable in `jobs.<id>.env` but not in a
+      # step's `if:` — and gate the scan step on it below.
+      HAS_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,10 +66,20 @@ jobs:
       - name: Test with coverage
         run: flutter test --coverage
 
+      # SonarQube Cloud: host is the action's default, project key and
+      # organization come from sonar-project.properties
+      # (yvanvds_AI-tutor-Python / yvanvds).
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
+        if: env.HAS_SONAR_TOKEN == 'true'
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarQube Scan skipped (no token)
+        if: env.HAS_SONAR_TOKEN != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning title=SonarQube scan skipped::SONAR_TOKEN is not available to this run (pull request from a fork). Code quality is not analysed; the format, analyze and test gates above still apply."
 
   # End-to-end flows (integration_test/, #28) on the Windows desktop (#38).
   # Separate from the fast gate above: it builds the desktop runner (CMake +
