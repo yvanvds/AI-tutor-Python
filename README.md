@@ -90,7 +90,7 @@ This stores accounts, goals, progress, instructions, and status reports.
 1. In the Azure portal, **Create a resource** → **Azure Cosmos DB** → **Azure Cosmos DB for NoSQL**.
 2. Pick a subscription and resource group, give it an account name (e.g. `mypython-tutor`), pick a region close to you, **Capacity mode: Serverless** (cheapest for classroom use). Click **Review + create**.
 3. Once deployed, open the account → **Data Explorer** → **New Database** named exactly **`python-tutor`**.
-4. Inside that database, create six containers. The **partition key** column matters — get it right.
+4. Inside that database, create the containers below. The **partition key** column matters — get it right.
 
    | Container name   | Partition key |
    |------------------|---------------|
@@ -98,6 +98,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `progress`       | `/uid`        |
    | `progress_history` | `/uid`      |
    | `status_reports` | `/uid`        |
+   | `playground_files` | `/uid`      |
    | `goals`          | `/type`       |
    | `instructions`   | `/type`       |
    | `config`         | `/type`       |

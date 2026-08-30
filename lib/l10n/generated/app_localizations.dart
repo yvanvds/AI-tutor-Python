@@ -1106,6 +1106,12 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get session_playground_openDialog_delete_tooltip;
 
+  /// Shown above the file list after a sync had to keep two versions of a file
+  ///
+  /// In en, this message translates to:
+  /// **'Also changed on another computer. This computer\'s version was kept separately as: {names}'**
+  String session_playground_openDialog_conflict(String names);
+
   /// No description provided for @session_playground_deleteDialog_title.
   ///
   /// In en, this message translates to:
@@ -1159,6 +1165,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening failed: {error}'**
   String session_playground_snack_openFailed(String error);
+
+  /// No description provided for @session_playground_snack_tooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This code is too large to save (over {max} KB).'**
+  String session_playground_snack_tooLarge(int max);
+
+  /// No description provided for @session_playground_snack_tooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have {max} saved files, which is the maximum. Delete one first.'**
+  String session_playground_snack_tooManyFiles(int max);
 
   /// Quiz header pill — displayed uppercase
   ///

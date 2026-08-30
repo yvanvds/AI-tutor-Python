@@ -27,6 +27,12 @@ class CosmosDocId {
     return '${at.toUtc().toIso8601String()}_$suffix';
   }
 
+  /// Doc id for the `playground_files` container. The name is already
+  /// restricted by `PlaygroundFileStore.normalizeName` to letters, digits,
+  /// spaces, `-` and `_`, so it can never contain a character Cosmos rejects
+  /// in an id (`/`, `\`, `?`, `#`) or a leading/trailing space.
+  static String playgroundFile(String uid, String name) => '${uid}_$name';
+
   /// Single global config doc.
   static const String globalConfig = 'global';
 

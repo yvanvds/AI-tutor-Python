@@ -605,6 +605,11 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_playground_openDialog_delete_tooltip => 'Verwijderen';
 
   @override
+  String session_playground_openDialog_conflict(String names) {
+    return 'Ook op een andere computer gewijzigd. De versie van deze computer is apart bewaard als: $names';
+  }
+
+  @override
   String session_playground_deleteDialog_title(String name) {
     return '\"$name\" verwijderen?';
   }
@@ -640,6 +645,16 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String session_playground_snack_openFailed(String error) {
     return 'Openen mislukt: $error';
+  }
+
+  @override
+  String session_playground_snack_tooLarge(int max) {
+    return 'Deze code is te groot om op te slaan (meer dan $max KB).';
+  }
+
+  @override
+  String session_playground_snack_tooManyFiles(int max) {
+    return 'Je hebt al $max opgeslagen bestanden, dat is het maximum. Verwijder er eerst een.';
   }
 
   @override

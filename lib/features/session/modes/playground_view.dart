@@ -3,6 +3,7 @@ import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
+import 'package:ai_tutor_python/services/playground/playground_sync_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -103,6 +104,7 @@ class _PlaygroundFiles {
 
   AppLocalizations get _l => AppLocalizations.of(context);
   PlaygroundFileStore get _store => ref.read(playgroundFileStoreProvider);
+  PlaygroundSyncService get _sync => ref.read(playgroundSyncServiceProvider);
   CodeService get _code =>
       ref.read(codeServiceProvider(SessionMode.playground));
 
@@ -131,6 +133,18 @@ class _PlaygroundFiles {
     final text = _code.getText();
     try {
       await _store.save(name, text);
+    } on PlaygroundFileTooLarge {
+      _snack(
+        _l.session_playground_snack_tooLarge(
+          PlaygroundFileStore.maxFileBytes ~/ 1024,
+        ),
+      );
+      return;
+    } on PlaygroundStoreFull {
+      _snack(
+        _l.session_playground_snack_tooManyFiles(PlaygroundFileStore.maxFiles),
+      );
+      return;
     } catch (e) {
       _snack(_l.session_playground_snack_saveFailed(e.toString()));
       return;
@@ -140,6 +154,9 @@ class _PlaygroundFiles {
       content: text,
     );
     _snack(_l.session_playground_snack_saved(name));
+    // Mirror to the account (#31). Best-effort: offline, the file stays on
+    // this machine and the next sync uploads it.
+    await _sync.push(name, text);
   }
 
   Future<void> open() async {
@@ -190,7 +207,7 @@ class _PlaygroundFiles {
   Future<String?> _pickFile() {
     return showDialog<String>(
       context: context,
-      builder: (_) => _OpenFileDialog(store: _store),
+      builder: (_) => _OpenFileDialog(store: _store, sync: _sync),
     );
   }
 
@@ -290,16 +307,28 @@ class _SaveNameDialogState extends State<_SaveNameDialog> {
   }
 }
 
+/// The listing behind the open dialog: the names on disk after the account
+/// has been reconciled, plus any conflict copies that reconcile just made.
+typedef _Listing = ({List<String> names, List<String> conflicts});
+
 class _OpenFileDialog extends StatefulWidget {
-  const _OpenFileDialog({required this.store});
+  const _OpenFileDialog({required this.store, required this.sync});
   final PlaygroundFileStore store;
+  final PlaygroundSyncService sync;
 
   @override
   State<_OpenFileDialog> createState() => _OpenFileDialogState();
 }
 
 class _OpenFileDialogState extends State<_OpenFileDialog> {
-  late Future<List<String>> _names = widget.store.list();
+  late Future<_Listing> _listing = _load();
+
+  /// Pulls in what the student saved on their other machines before listing
+  /// (#31). `sync` never throws, so offline this is just the local listing.
+  Future<_Listing> _load() async {
+    final result = await widget.sync.sync();
+    return (names: await widget.store.list(), conflicts: result.conflicts);
+  }
 
   Future<void> _delete(String name) async {
     final l = AppLocalizations.of(context);
@@ -322,10 +351,15 @@ class _OpenFileDialogState extends State<_OpenFileDialog> {
     );
     if (ok != true || !mounted) return;
     await widget.store.delete(name);
+    // Tombstone the file in the account so it does not come back on this
+    // student's other machines (#31).
+    await widget.sync.pushDelete(name);
     if (!mounted) return;
-    final refreshed = widget.store.list();
+    final refreshed = widget.store.list().then<_Listing>(
+      (names) => (names: names, conflicts: const <String>[]),
+    );
     setState(() {
-      _names = refreshed;
+      _listing = refreshed;
     });
   }
 
@@ -337,8 +371,8 @@ class _OpenFileDialogState extends State<_OpenFileDialog> {
       content: SizedBox(
         width: 400,
         height: 320,
-        child: FutureBuilder<List<String>>(
-          future: _names,
+        child: FutureBuilder<_Listing>(
+          future: _listing,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Text(
@@ -350,25 +384,47 @@ class _OpenFileDialogState extends State<_OpenFileDialog> {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final names = snapshot.data!;
+            final names = snapshot.data!.names;
+            final conflicts = snapshot.data!.conflicts;
             if (names.isEmpty) {
               return Center(child: Text(l.session_playground_openDialog_empty));
             }
-            return ListView.builder(
-              itemCount: names.length,
-              itemBuilder: (context, i) {
-                final name = names[i];
-                return ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: Text('$name${PlaygroundFileStore.extension}'),
-                  onTap: () => Navigator.of(context).pop(name),
-                  trailing: IconButton(
-                    tooltip: l.session_playground_openDialog_delete_tooltip,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _delete(name),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (conflicts.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                    child: Text(
+                      l.session_playground_openDialog_conflict(
+                        conflicts.join(', '),
+                      ),
+                      style: TextStyle(
+                        color: AppColors.accent3,
+                        fontSize: 12.5,
+                      ),
+                    ),
                   ),
-                );
-              },
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: names.length,
+                    itemBuilder: (context, i) {
+                      final name = names[i];
+                      return ListTile(
+                        leading: const Icon(Icons.description_outlined),
+                        title: Text('$name${PlaygroundFileStore.extension}'),
+                        onTap: () => Navigator.of(context).pop(name),
+                        trailing: IconButton(
+                          tooltip:
+                              l.session_playground_openDialog_delete_tooltip,
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _delete(name),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             );
           },
         ),

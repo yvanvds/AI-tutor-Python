@@ -313,6 +313,11 @@
   "session_playground_openDialog_title": "Open saved code",
   "session_playground_openDialog_empty": "No saved files yet.",
   "session_playground_openDialog_delete_tooltip": "Delete",
+  "session_playground_openDialog_conflict": "Also changed on another computer. This computer's version was kept separately as: {names}",
+  "@session_playground_openDialog_conflict": {
+    "description": "Shown above the file list after a sync had to keep two versions of a file",
+    "placeholders": { "names": { "type": "String" } }
+  },
   "session_playground_deleteDialog_title": "Delete \"{name}\"?",
   "@session_playground_deleteDialog_title": {
     "placeholders": { "name": { "type": "String" } }
@@ -333,6 +338,14 @@
   "session_playground_snack_openFailed": "Opening failed: {error}",
   "@session_playground_snack_openFailed": {
     "placeholders": { "error": { "type": "String" } }
+  },
+  "session_playground_snack_tooLarge": "This code is too large to save (over {max} KB).",
+  "@session_playground_snack_tooLarge": {
+    "placeholders": { "max": { "type": "int" } }
+  },
+  "session_playground_snack_tooManyFiles": "You already have {max} saved files, which is the maximum. Delete one first.",
+  "@session_playground_snack_tooManyFiles": {
+    "placeholders": { "max": { "type": "int" } }
   },
 
   "session_quiz_pill": "Quiz question",

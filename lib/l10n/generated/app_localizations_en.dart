@@ -597,6 +597,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_playground_openDialog_delete_tooltip => 'Delete';
 
   @override
+  String session_playground_openDialog_conflict(String names) {
+    return 'Also changed on another computer. This computer\'s version was kept separately as: $names';
+  }
+
+  @override
   String session_playground_deleteDialog_title(String name) {
     return 'Delete \"$name\"?';
   }
@@ -631,6 +636,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String session_playground_snack_openFailed(String error) {
     return 'Opening failed: $error';
+  }
+
+  @override
+  String session_playground_snack_tooLarge(int max) {
+    return 'This code is too large to save (over $max KB).';
+  }
+
+  @override
+  String session_playground_snack_tooManyFiles(int max) {
+    return 'You already have $max saved files, which is the maximum. Delete one first.';
   }
 
   @override
