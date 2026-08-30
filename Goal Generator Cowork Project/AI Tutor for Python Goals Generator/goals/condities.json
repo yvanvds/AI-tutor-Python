@@ -1,0 +1,224 @@
+{
+  "goal": {
+    "id": "condities",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Beslissingen programmeren met condities",
+    "description": "Je kan vergelijkingen schrijven die True of False opleveren, beslissingen programmeren met if, elif en else, voorwaarden combineren met and, or en not, en met de turtle-module tekeningen maken waarin condities bepalen wat er getekend wordt.",
+    "order": 2000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "vergelijkingen-booleans",
+      "type": "goal",
+      "parentId": "condities",
+      "title": "Vergelijkingen en booleans",
+      "description": "Je kan vergelijkingsoperatoren (==, !=, <, >, <=, >=) gebruiken om expressies te schrijven die True of False opleveren, dat resultaat opslaan in een variabele, en voorspellen wat een vergelijking oplevert.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the = vs == distinction before if is introduced: show `x = 5` and `x == 5` side by side and ask what each does — assignment stores, comparison asks.",
+        "Probe string-vs-number comparison via input: `input()` returns a string, so `'5' == 5` is False — tie this back to the conversion rule from the invoer-input subgoal.",
+        "Watch for lowercase `true`/`false`; contrast with Python's capitalized `True`/`False` and note there are exactly two boolean values.",
+        "Frame a comparison as an expression with a value, like `2 + 3` — it can be printed and stored in a variable, not only used later inside an if."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "recall_comparison_operators",
+          "statement": "Je kan de vergelijkingsoperatoren benoemen: ==, !=, <, >, <= en >=.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_comparison_result",
+          "statement": "Je kan voorspellen of een vergelijking True of False oplevert voor gegeven waarden.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_comparison_from_dutch",
+          "statement": "Je kan een voorwaarde in natuurlijke taal omzetten naar een Python-vergelijking.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_bool_variable",
+          "statement": "Je kan voorspellen welke waarde een variabele heeft nadat het resultaat van een vergelijking eraan is toegekend.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_assign_vs_equals",
+          "statement": "Je kan uitleggen waarom = en == verschillende dingen doen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "beslissingen-if-else",
+      "type": "goal",
+      "parentId": "condities",
+      "title": "Beslissingen met if en else",
+      "description": "Je kan een if-statement schrijven dat code uitvoert als een voorwaarde waar is, een else-tak toevoegen om tussen twee blokken te kiezen, en voorspellen welke tak uitgevoerd wordt.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Novices often think the condition needs to print or assign something — probe whether they read it as a question with a True/False answer.",
+        "Watch for confusion between = and == inside conditions; lean on `if x = 5` as a probe.",
+        "Probe block boundaries with a dedented line after the if-block: whether the student sees that it always runs, regardless of the condition, is the indentation deliverable.",
+        "Prefer concrete numeric comparisons over abstract boolean variables for first probes; bring in boolean variables only once comparisons sit."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_branch_from_comparison",
+          "statement": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een numerieke vergelijking is zoals x > 0.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_branch_from_boolean",
+          "statement": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een booleaanse variabele is.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_if_only",
+          "statement": "Je kan een if-statement schrijven dat één blok uitvoert als de voorwaarde waar is.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_if_else",
+          "statement": "Je kan een if/else schrijven dat kiest tussen twee blokken op basis van een voorwaarde.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "explain_indent_role",
+          "statement": "Je kan uitleggen waarom de insprong bepaalt welke code bij de if-tak hoort.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "elif-samengestelde-voorwaarden",
+      "type": "goal",
+      "parentId": "condities",
+      "title": "Meer keuzes met elif, and, or en not",
+      "description": "Je kan meerdere gevallen onderscheiden met een if/elif/else-keten en voorwaarden combineren met and, or en not.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the all-true-branches-run misconception: give a chain where two conditions are true and ask what prints — only the first true branch runs.",
+        "Contrast an if/elif/else-keten with a series of separate if-statements on the same example; the behavioral difference is the deliverable.",
+        "Watch for `x == 5 or 6`-style conditions: students translate Dutch 'of' literally; surface that `6` is always truthy and show the correct `x == 5 or x == 6`.",
+        "Probe boundary off-by-ones in grade-style chains (`>= 90` vs `> 90`); boundary values make good test inputs."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_elif_branch",
+          "statement": "Je kan voorspellen welke tak van een if/elif/else-keten uitgevoerd wordt voor gegeven waarden.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_elif_chain",
+          "statement": "Je kan een if/elif/else-keten schrijven die drie of meer gevallen onderscheidt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_elif_order",
+          "statement": "Je kan uitleggen waarom de volgorde van voorwaarden in een elif-keten het resultaat kan veranderen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_compound_result",
+          "statement": "Je kan voorspellen of een samengestelde voorwaarde met and, or of not True of False oplevert.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_compound_condition",
+          "statement": "Je kan een samengestelde voorwaarde schrijven met and, or en not.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "tekenen-turtle",
+      "type": "goal",
+      "parentId": "condities",
+      "title": "Tekenen met turtle",
+      "description": "Je kan met de turtle-module een tekening programmeren: een turtle aanmaken, hem bewegen en draaien, de pen en kleur instellen, en condities gebruiken om te bepalen wat er getekend wordt.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Use the object style consistently: `import turtle` then `t = turtle.Turtle()`, calling methods on `t` — probe whether the student sets this up rather than calling bare functions.",
+        "Turns are relative to the turtle's current heading, not to screen directions — probe with a script that mixes left and right; students who track absolute compass directions mispredict.",
+        "Angles are in degrees; prefer 90-degree square figures for first probes, and use the triangle's 120-degree exterior turn as a harder probe of the turn-angle model.",
+        "Stay within t.forward, t.backward, t.left, t.right, t.penup, t.pendown and t.pencolor here — drawing with loops belongs in the next goal.",
+        "Every turtle script must end with `turtle.done()` — without it the window misbehaves; the window then stays open until the student closes it manually. Treat a missing done() as a bug worth probing, not an afterthought."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "recall_turtle_commands",
+          "statement": "Je kan de turtle-basiscommando's benoemen om te bewegen, te draaien en de pen in te stellen.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_turtle_drawing",
+          "statement": "Je kan voorspellen welke figuur een gegeven turtle-script tekent.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_figure",
+          "statement": "Je kan een turtle-script schrijven dat een eenvoudige figuur tekent, zoals een vierkant of driehoek.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_with_condition",
+          "statement": "Je kan een turtle-script schrijven waarin een conditie bepaalt wat er getekend wordt, zoals de kleur of de vorm.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}

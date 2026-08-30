@@ -7,7 +7,7 @@ changes will be overwritten._
 
 ### 1. Eenvoudige Python-scripts schrijven en begrijpen (`eenvoudige-python-scripts`)
 
-De student kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken.
+Je kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken.
 
 - **Uitvoer met print** (`uitvoer-print`)
   - LOs: `predict_print_output`, `write_print_value`, `write_print_multi`, `predict_comma_vs_plus`, `recall_quotes_for_strings`
@@ -19,3 +19,29 @@ De student kan korte Python-scripts schrijven die getallen en tekst uitvoeren, v
   - LOs: `write_input_call`, `recall_input_returns_string`, `write_input_with_conversion`, `predict_unconverted_input_bug`, `predict_conversion_error`
 - **Een klein script samenstellen** (`klein-script`)
   - LOs: `write_simple_script`, `predict_script_output`, `predict_script_runtime_error`, `fix_simple_script_bug`
+
+### 2. Beslissingen programmeren met condities (`condities`)
+
+Je kan vergelijkingen schrijven die True of False opleveren, beslissingen programmeren met if, elif en else, voorwaarden combineren met and, or en not, en met de turtle-module tekeningen maken waarin condities bepalen wat er getekend wordt.
+
+- **Vergelijkingen en booleans** (`vergelijkingen-booleans`)
+  - LOs: `recall_comparison_operators`, `predict_comparison_result`, `write_comparison_from_dutch`, `predict_bool_variable`, `reason_assign_vs_equals`
+- **Beslissingen met if en else** (`beslissingen-if-else`)
+  - LOs: `predict_branch_from_comparison`, `predict_branch_from_boolean`, `write_if_only`, `write_if_else`, `explain_indent_role`
+- **Meer keuzes met elif, and, or en not** (`elif-samengestelde-voorwaarden`)
+  - LOs: `predict_elif_branch`, `write_elif_chain`, `reason_elif_order`, `predict_compound_result`, `write_compound_condition`
+- **Tekenen met turtle** (`tekenen-turtle`)
+  - LOs: `recall_turtle_commands`, `predict_turtle_drawing`, `write_turtle_figure`, `write_turtle_with_condition`
+
+### 3. Herhalingen programmeren met lussen (`herhaling`)
+
+Je kan herhalingen implementeren met for en while, programma's systematisch testen en debuggen met verschillende testgevallen, en complexere probleemstellingen vertalen naar werkende Python-code, ook met turtle-tekeningen.
+
+- **Herhalen met for en range** (`herhalen-for`)
+  - LOs: `recall_range_bounds`, `predict_for_output`, `write_for_loop`, `write_for_accumulator`, `write_turtle_polygon`
+- **Herhalen met while** (`herhalen-while`)
+  - LOs: `predict_while_output`, `write_while_loop`, `predict_infinite_loop`, `write_input_validation`, `reason_for_vs_while`
+- **Testen en debuggen** (`testen-debuggen`)
+  - LOs: `choose_test_cases`, `predict_testcase_output`, `diagnose_from_error`, `fix_bug_via_testing`
+- **Van probleem naar programma** (`probleem-naar-programma`)
+  - LOs: `decompose_problem`, `write_program_from_problem`, `predict_program_behavior`, `fix_logic_error`

@@ -3,7 +3,8 @@
     "allow": [
       "mcp__sonarqube__get_file_coverage_details",
       "Skill(projcect-overview-bootstrap)",
-      "Skill(projcect-overview-bootstrap:*)"
+      "Skill(projcect-overview-bootstrap:*)",
+      "Read(//c/Users/yvan/AppData/Local/Pub/Cache/**)"
     ]
   }
 }

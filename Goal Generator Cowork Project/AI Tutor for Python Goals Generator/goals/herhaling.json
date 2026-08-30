@@ -1,0 +1,216 @@
+{
+  "goal": {
+    "id": "herhaling",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Herhalingen programmeren met lussen",
+    "description": "Je kan herhalingen implementeren met for en while, programma's systematisch testen en debuggen met verschillende testgevallen, en complexere probleemstellingen vertalen naar werkende Python-code, ook met turtle-tekeningen.",
+    "order": 3000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "herhalen-for",
+      "type": "goal",
+      "parentId": "herhaling",
+      "title": "Herhalen met for en range",
+      "description": "Je kan een for-lus met range schrijven om een bewerking een vast aantal keer te herhalen, de uitvoer van zo'n lus voorspellen, een resultaat opbouwen in een variabele, en met turtle regelmatige figuren tekenen.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the range off-by-one two ways: how many times does the body run, and what is the loop variable's last value — these are separate failure modes.",
+        "Trace the loop variable inside the body: probe whether the student sees that it takes a new value each iteration rather than only its final value.",
+        "For turtle polygons, lean on the exterior-angle mistake: for a triangle students turn 60 degrees (the interior angle) instead of 120 — eliciting the 360/n rule is the deliverable.",
+        "Tie the accumulator pattern back to `x = x + 1` from the variables subgoal; probe right-to-left reading of `totaal = totaal + getal`."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "recall_range_bounds",
+          "statement": "Je kan benoemen welke getallen range(n) en range(a, b) opleveren.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_for_output",
+          "statement": "Je kan voorspellen wat een for-lus met range als uitvoer geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_for_loop",
+          "statement": "Je kan een for-lus schrijven die een bewerking een vast aantal keer herhaalt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_for_accumulator",
+          "statement": "Je kan een for-lus schrijven die een resultaat opbouwt in een variabele, zoals een som of een teller.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_polygon",
+          "statement": "Je kan met een for-lus en turtle een regelmatige veelhoek of ster tekenen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "herhalen-while",
+      "type": "goal",
+      "parentId": "herhaling",
+      "title": "Herhalen met while",
+      "description": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is, voorspellen wanneer zo'n lus stopt, oneindige lussen herkennen, en een lus gebruiken om invoer te valideren.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe infinite-loop recognition with a counter that never updates inside the body; the update line is the load-bearing insight.",
+        "Students negate conditions wrongly when the task says 'stop wanneer' — probe translation of 'totdat' phrasing into a 'zolang' condition.",
+        "Surface that the condition is checked only at the top of each iteration, not continuously — probe with a script that makes the condition false mid-body.",
+        "For input validation, combine while with the int/float conversion from goal 1; keep try/except out of scope."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "predict_while_output",
+          "statement": "Je kan voorspellen wat een while-lus als uitvoer geeft en wanneer hij stopt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_while_loop",
+          "statement": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_infinite_loop",
+          "statement": "Je kan herkennen wanneer een while-lus nooit zal stoppen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_input_validation",
+          "statement": "Je kan een while-lus schrijven die invoer blijft opvragen tot de gebruiker iets geldigs typt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_for_vs_while",
+          "statement": "Je kan uitleggen wanneer je een for-lus dan wel een while-lus kiest.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "testen-debuggen",
+      "type": "goal",
+      "parentId": "herhaling",
+      "title": "Testen en debuggen",
+      "description": "Je kan een programma systematisch testen door verschillende testgevallen uit te proberen, zinvolle testgevallen kiezen inclusief randgevallen, foutmeldingen interpreteren, en fouten opsporen en verbeteren.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe whether the student tests only the happy path — push for 0, negative numbers and boundary values as test cases.",
+        "Have the student predict the output for a test case before running it; the mismatch between prediction and actual output is the teaching moment.",
+        "Distinguish syntax errors, runtime errors and logic errors — probe with one example of each on similar code.",
+        "Use programs with conditions and loops from earlier subgoals as debugging material; introduce no new language mechanics here."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "choose_test_cases",
+          "statement": "Je kan zinvolle testgevallen kiezen voor een programma, inclusief randgevallen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_testcase_output",
+          "statement": "Je kan voorspellen wat een programma doet voor een gegeven testgeval.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "diagnose_from_error",
+          "statement": "Je kan uit een foutmelding afleiden waar en waarom een programma faalt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_bug_via_testing",
+          "statement": "Je kan een fout in een programma opsporen en verbeteren door testgevallen uit te proberen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "probleem-naar-programma",
+      "type": "goal",
+      "parentId": "herhaling",
+      "title": "Van probleem naar programma",
+      "description": "Je kan een complexere probleemstelling opdelen in stappen en vertalen naar een werkend Python-programma dat condities, lussen en eventueel turtle combineert, en logische fouten daarin opsporen en verbeteren.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Elicit a plan in Dutch (stappen: invoer, verwerking, herhaling, uitvoer) before any code on larger tasks; probe decomposition separately from coding.",
+        "Combine building blocks from both goals — input with conversion, conditions, loops, turtle — but introduce no new mechanics: no functions, no lists, no try/except.",
+        "Turtle capstone exercises are welcome, e.g. a drawing whose colour, size or shape depends on user input, drawn with a loop.",
+        "When the program is wrong, resist giving the fix — direct the student to choose a test case that exposes the bug, linking back to the testen-debuggen subgoal."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "decompose_problem",
+          "statement": "Je kan een probleemstelling opdelen in stappen (invoer, verwerking, herhaling, uitvoer) voor je begint te programmeren.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_program_from_problem",
+          "statement": "Je kan een complexere probleemstelling vertalen naar een werkend Python-programma met condities en lussen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_program_behavior",
+          "statement": "Je kan van een programma met condities en lussen voorspellen wat het doet voor een concrete invoer.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_logic_error",
+          "statement": "Je kan een logische fout in een groter programma opsporen en verbeteren.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}
