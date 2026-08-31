@@ -546,6 +546,7 @@
   "chat_notice_unparseableResponse": "Kon respons niet verwerken: {raw}",
   "chat_notice_unknownResponseType": "Onbekend antwoordtype: {type}",
   "chat_notice_unknownResponse": "Onbekend antwoord ontvangen.",
+  "chat_notice_exerciseWithoutBlank": "In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.",
   "chat_notice_subgoalDeletedRedirect": "Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.",
   "chat_notice_subgoalSaturated": "Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?",
   "chat_notice_noGoalsLeft": "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",

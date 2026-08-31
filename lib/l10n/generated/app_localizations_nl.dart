@@ -1768,6 +1768,10 @@ class AppLocalizationsNl extends AppLocalizations {
   String get chat_notice_unknownResponse => 'Onbekend antwoord ontvangen.';
 
   @override
+  String get chat_notice_exerciseWithoutBlank =>
+      'In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.';
+
+  @override
   String get chat_notice_subgoalDeletedRedirect =>
       'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
 

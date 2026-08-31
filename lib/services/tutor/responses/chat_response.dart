@@ -35,7 +35,21 @@ class ChatResponseFactory {
       case 'explain_code':
         return ExplainCode.fromMap(map);
       case 'complete_code':
-        return CompleteCode.fromMap(map);
+        final completeCode = CompleteCode.fromMap(map);
+        // A code-completion exercise with nothing removed is unusable: the
+        // student is handed a finished program and asked to fill in the
+        // missing part (#78). Reject it here, where every other response the
+        // app cannot use is rejected, so the ErrorResponse handler's
+        // retry/fallback path recovers instead of the widget rendering it.
+        if (!completeCode.hasBlank) {
+          return ErrorResponse(
+            type: 'error',
+            message:
+                'complete_code without a blank marker: ${completeCode.code}',
+            notice: const ChatNotice(ChatNoticeKind.exerciseWithoutBlank),
+          );
+        }
+        return completeCode;
       case 'write_code':
         return WriteCode.fromMap(map);
 

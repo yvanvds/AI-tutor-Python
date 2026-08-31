@@ -907,6 +907,7 @@
     "placeholders": { "type": { "type": "String" } }
   },
   "chat_notice_unknownResponse": "Received an unknown response.",
+  "chat_notice_exerciseWithoutBlank": "That exercise had nothing left to fill in. Fetching a new one.",
   "chat_notice_subgoalDeletedRedirect": "Your previous topic was removed by your teacher. Continuing with the next one.",
   "chat_notice_subgoalSaturated": "You already have a good grip on this subgoal. Ready to move on?",
   "chat_notice_noGoalsLeft": "There are no goals left to work on. Congratulations!",

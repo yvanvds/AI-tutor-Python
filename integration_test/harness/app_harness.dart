@@ -13,8 +13,9 @@
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the system locale, the system light/dark setting, SharedPreferences
 // (in-memory), the playground file directory (temp), the update check (off),
-// the LLM (any call fails loudly), the lesson example runner (scripted) and
-// the browser launcher (recorded, never opened — see [browserLaunches]).
+// the LLM (any call fails loudly unless a flow passes `llm:`), the lesson
+// example runner (scripted) and the browser launcher (recorded, never opened
+// — see [browserLaunches]).
 //
 // The light/dark pin is not cosmetic (#32): with no stored preference the app
 // follows the operating system, so an unpinned run renders in whatever theme
@@ -54,6 +55,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../test/helpers/fake_lesson_code_runner.dart';
 import '../../test/helpers/in_memory_cosmos.dart';
 import 'fake_github_server.dart';
+import 'scripted_llm.dart';
 import 'seed.dart';
 
 /// Signed in from the first frame; `tryAcquireTokenSilent` / `signIn` are
@@ -123,6 +125,7 @@ class AppHarness {
     this.systemBrightness = Brightness.dark,
     this.github,
     this.githubOAuthClientId,
+    this.llm,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -182,6 +185,16 @@ class AppHarness {
   /// passes `''` explicitly rather than relying on the machine's `.env`.
   final String? githubOAuthClientId;
 
+  /// The model behind the tutor (#78).
+  ///
+  /// `null` (the default) leaves the LLM off entirely: any call throws and
+  /// mounting the practice editor never asks for an exercise, which is what
+  /// every flow that is not about the tutor wants. Pass a [ScriptedLlm] to
+  /// run the *real* `TutorService` — session init, conductor, request
+  /// building, streaming, response dispatch and retry — against canned
+  /// assistant text.
+  final ScriptedLlm? llm;
+
   /// Every URL the app asked the operating system to open (#57).
   ///
   /// The launcher is always replaced, in every flow: the production one hands
@@ -216,7 +229,11 @@ class AppHarness {
     _container = ProviderContainer(
       overrides: [
         authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
-        tutorServiceProvider.overrideWith(_OfflineTutor.new),
+        tutorServiceProvider.overrideWith(
+          llm == null
+              ? _OfflineTutor.new
+              : () => TutorService(connectorOverride: llm!),
+        ),
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
