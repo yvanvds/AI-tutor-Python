@@ -20,15 +20,44 @@ class PyRunnerNotInstalled implements Exception {
   String toString() => 'PyRunnerNotInstalled: $message';
 }
 
+/// Which branch of [InstallerPyHostLocator.resolve] produced a [PyHostPaths].
+///
+/// Recorded so a bug report can say *where* the interpreter came from without
+/// the reader having to re-derive it from the paths (#74): the three branches
+/// look similar on disk but mean very different things — a stale environment
+/// override, a real installation, and a developer checkout.
+enum PyHostSource {
+  /// Handed in directly by the caller ([ExplicitPyHostLocator]) — tests and
+  /// the smoke harness.
+  explicit,
+
+  /// `PY_RUNNER_PYTHON` + `PY_RUNNER_HOST_SCRIPT` were both set.
+  environmentOverride,
+
+  /// The installed layout next to the running executable, i.e. what the
+  /// installer lays down.
+  installedLayout,
+
+  /// The dev-mode walk-up to a source checkout's `build/python_bundle` (#75).
+  devCheckout,
+}
+
 /// Bundle of paths returned by [PyHostLocator.resolve].
 class PyHostPaths {
-  const PyHostPaths({required this.pythonExecutable, required this.hostScript});
+  const PyHostPaths({
+    required this.pythonExecutable,
+    required this.hostScript,
+    this.source = PyHostSource.explicit,
+  });
 
   /// Absolute path to `python.exe` (or the platform equivalent).
   final String pythonExecutable;
 
   /// Absolute path to `host.py`.
   final String hostScript;
+
+  /// Which locator branch produced [pythonExecutable] and [hostScript].
+  final PyHostSource source;
 }
 
 /// Step 4 placeholder: returns whatever paths the caller passed in.
@@ -191,7 +220,11 @@ class InstallerPyHostLocator extends PyHostLocator {
         envPython.isNotEmpty &&
         envHost != null &&
         envHost.isNotEmpty) {
-      return PyHostPaths(pythonExecutable: envPython, hostScript: envHost);
+      return PyHostPaths(
+        pythonExecutable: envPython,
+        hostScript: envHost,
+        source: PyHostSource.environmentOverride,
+      );
     }
 
     final dir = _appDir ?? File(Platform.resolvedExecutable).parent.path;
@@ -202,7 +235,11 @@ class InstallerPyHostLocator extends PyHostLocator {
     final pythonExists = File(python).existsSync();
     final hostExists = File(host).existsSync();
     if (pythonExists && hostExists) {
-      return PyHostPaths(pythonExecutable: python, hostScript: host);
+      return PyHostPaths(
+        pythonExecutable: python,
+        hostScript: host,
+        source: PyHostSource.installedLayout,
+      );
     }
 
     if (_devMode) {
@@ -211,6 +248,7 @@ class InstallerPyHostLocator extends PyHostLocator {
         return PyHostPaths(
           pythonExecutable: probe.pythonExecutable,
           hostScript: probe.hostScript,
+          source: PyHostSource.devCheckout,
         );
       }
       throw PyRunnerNotInstalled(_devMessage(dir, python, probe));

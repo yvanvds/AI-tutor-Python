@@ -18,6 +18,8 @@ void main() {
       final paths = await locator.resolve();
       expect(paths.pythonExecutable, r'C:\bundle\python.exe');
       expect(paths.hostScript, r'C:\bundle\host.py');
+      // Which branch answered is part of the bug-report payload (#74).
+      expect(paths.source, PyHostSource.environmentOverride);
     });
 
     test(
@@ -128,6 +130,7 @@ void main() {
       expect(paths.hostScript, endsWith('host.py'));
       expect(paths.pythonExecutable, startsWith(tempDir.path));
       expect(paths.hostScript, startsWith(tempDir.path));
+      expect(paths.source, PyHostSource.installedLayout);
     });
 
     test('handles appDir containing spaces', () async {
@@ -196,6 +199,7 @@ void main() {
       final paths = await locator.resolve();
       expect(paths.pythonExecutable, repoBundlePython());
       expect(paths.hostScript, repoHostScript());
+      expect(paths.source, PyHostSource.devCheckout);
     });
 
     test('env-var overrides still win over the dev fallback', () async {

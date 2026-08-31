@@ -11,6 +11,7 @@
 
 import 'dart:convert';
 
+import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,9 +122,20 @@ class GitHubIssueService {
 /// Builds the Markdown body for a bug report. The turn payload is attached
 /// inside a collapsed block; the tutor instructions (system prompt) are
 /// dropped because they are large and not specific to the reported turn.
+///
+/// [runner] is required rather than optional (#74): the turn payload answers
+/// questions about the tutor, and the single most likely thing a student
+/// reports — "it didn't run" — is not one of them. The runner section is
+/// always attached, whatever the student picked in the turn dropdown.
+///
+/// The whole body goes through [redactUserPaths] on the way out. These issues
+/// land on a public repository under the student's own account, and a Windows
+/// path carries their name in it; funnelling every field through one redactor
+/// means a future field cannot quietly reintroduce the leak.
 String buildBugReportBody({
   required String description,
   required String appVersion,
+  required RunnerDiagnostics runner,
   Map<String, dynamic>? turn,
 }) {
   final buffer = StringBuffer()
@@ -132,7 +144,9 @@ String buildBugReportBody({
     )
     ..writeln()
     ..writeln('---')
-    ..writeln('App version: `$appVersion`');
+    ..writeln('App version: `$appVersion`')
+    ..writeln()
+    ..write(runner.toMarkdown());
   if (turn != null) {
     final redacted = Map<String, dynamic>.from(turn)..remove('instructions');
     final encoded = const JsonEncoder.withIndent('  ').convert(redacted);
@@ -146,7 +160,7 @@ String buildBugReportBody({
       ..writeln('```')
       ..writeln('</details>');
   }
-  return buffer.toString();
+  return redactUserPaths(buffer.toString());
 }
 
 /// Where the REST API lives. A seam, like `gitHubOAuthBaseProvider`: an

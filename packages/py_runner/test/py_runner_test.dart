@@ -66,6 +66,30 @@ void main() {
     expect(handle.id, hasLength(36)); // UUID v4 with dashes.
   });
 
+  // #74: a bug report filed after the fact has to be able to say where the
+  // interpreter came from and how the last run ended, with no live host.
+  test('records the resolved paths and the last run for diagnostics', () async {
+    final runner = buildRunner();
+    addTearDown(runner.shutdown);
+
+    expect(runner.resolvedPaths, isNull);
+    expect(runner.lastRunResult, isNull);
+    expect(runner.lastStartError, isNull);
+
+    await runner.start();
+    expect(runner.resolvedPaths, isNotNull);
+    expect(runner.resolvedPaths!.pythonExecutable, pythonExe);
+    expect(runner.resolvedPaths!.source, PyHostSource.explicit);
+
+    await runner.run('print("hi")').done.timeout(const Duration(seconds: 10));
+    expect(runner.lastRunResult, isNotNull);
+    expect(runner.lastRunResult!.status, RunStatus.ok);
+
+    // The last run survives the host going away — the state the report needs.
+    await runner.shutdown();
+    expect(runner.lastRunResult!.status, RunStatus.ok);
+  });
+
   test('cancel() resolves with done(cancelled)', () async {
     final runner = buildRunner();
     addTearDown(runner.shutdown);
