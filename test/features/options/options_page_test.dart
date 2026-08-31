@@ -34,6 +34,7 @@ import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
+import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
@@ -42,6 +43,7 @@ import 'package:ai_tutor_python/services/student_state/turn_history_service.dart
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -178,6 +180,14 @@ void main() {
   late List<http.Request> githubRequests;
   late _FakeArchiveIo archiveIo;
 
+  // #57 — the device flow's two moving parts, as a test can steer them:
+  // whether the student has approved the code yet, and whether GitHub is
+  // answering with an outright refusal instead.
+  late bool githubApproved;
+  late String? githubPollError;
+  late List<Uri> browserLaunches;
+  late bool browserOpens;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({'local_api_key': 'sk-old'});
     goals = InMemoryCosmos([
@@ -216,6 +226,10 @@ void main() {
 
     githubRequests = [];
     archiveIo = _FakeArchiveIo();
+    githubApproved = false;
+    githubPollError = null;
+    browserLaunches = [];
+    browserOpens = true;
   });
 
   http.Client githubClient() => MockClient((req) async {
@@ -236,12 +250,52 @@ void main() {
     return http.Response('{"message":"Not Found"}', 404);
   });
 
+  /// GitHub's OAuth host (#57): hands out a fixed code pair and then answers
+  /// `authorization_pending` until the test says the student approved it.
+  http.Client githubOAuthClient() => MockClient((req) async {
+    githubRequests.add(req);
+    if (req.url.path == '/login/device/code') {
+      return http.Response(
+        jsonEncode({
+          'device_code': 'dev-code',
+          'user_code': 'WDJB-MJHT',
+          'verification_uri': 'https://github.com/login/device',
+          'interval': 5,
+          'expires_in': 900,
+        }),
+        200,
+      );
+    }
+    if (req.url.path == '/login/oauth/access_token') {
+      if (githubPollError != null) {
+        return http.Response('{"error":"$githubPollError"}', 200);
+      }
+      if (!githubApproved) {
+        return http.Response('{"error":"authorization_pending"}', 200);
+      }
+      return http.Response('{"access_token":"ghp_valid"}', 200);
+    }
+    return http.Response('{"message":"Not Found"}', 404);
+  });
+
   Widget buildApp({
     bool devTools = false,
     UpdateServices? update,
     String globalModel = 'gpt-4o',
+    String oauthClientId = 'Ov23liTESTCLIENTID',
   }) => ProviderScope(
     overrides: [
+      gitHubDeviceFlowProvider.overrideWithValue(
+        GitHubDeviceFlow(
+          clientId: oauthClientId,
+          client: githubOAuthClient(),
+          authBase: Uri.parse('https://github.com/'),
+        ),
+      ),
+      browserLauncherProvider.overrideWithValue((url) async {
+        browserLaunches.add(url);
+        return browserOpens;
+      }),
       if (update != null) updateServicesProvider.overrideWithValue(update),
       globalConfigServiceProvider.overrideWith(
         () => _FixedGlobalConfig(GlobalConfig(model: globalModel, apiKey: '')),
@@ -286,13 +340,19 @@ void main() {
     bool devTools = false,
     UpdateServices? update,
     String globalModel = 'gpt-4o',
+    String oauthClientId = 'Ov23liTESTCLIENTID',
   }) async {
     // Tall viewport so every card is laid out without scrolling.
     tester.view.physicalSize = const Size(1400, 3200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      buildApp(devTools: devTools, update: update, globalModel: globalModel),
+      buildApp(
+        devTools: devTools,
+        update: update,
+        globalModel: globalModel,
+        oauthClientId: oauthClientId,
+      ),
     );
     // Account poll + SharedPreferences hydration.
     await tester.pump();
@@ -453,22 +513,92 @@ void main() {
   });
 
   group('bug reports', () {
-    testWidgets('connect with a token, then post an issue with the latest '
-        'turn attached', (tester) async {
+    /// Settles the frames that are not the dialog's spinner.
+    ///
+    /// `pumpAndSettle` cannot be used while the device dialog is up: it holds
+    /// a `CircularProgressIndicator`, which never stops animating, so
+    /// "settled" never arrives.
+    Future<void> pumpFrames(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    /// Drives the device flow to the point where the code is on screen and
+    /// the app is polling.
+    Future<void> startDeviceFlow(WidgetTester tester) async {
+      await tester.tap(find.text('Connect GitHub'));
+      // The device-code request, then the dialog route animating in.
+      await tester.pump();
+      await pumpFrames(tester);
+    }
+
+    /// One poll interval: the app is parked in the 5 s wait GitHub asked for.
+    Future<void> pollOnce(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump();
+    }
+
+    /// Ends a flow a test left running, so no poll timer outlives the widget
+    /// tree (which `flutter_test` fails the test over, rightly).
+    Future<void> stopDeviceFlow(WidgetTester tester) async {
+      await tester.tap(find.text('Cancel'));
+      await pollOnce(tester);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sign in with the device flow, then post an issue with the '
+        'latest turn attached', (tester) async {
       await mount(tester);
       expect(find.text('Not connected to GitHub.'), findsOneWidget);
       expect(find.text('Report a bug…'), findsNothing);
 
-      await tester.tap(find.text('Connect GitHub'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'ghp_valid');
-      await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+      await startDeviceFlow(tester);
+
+      // The student can read the code and knows where to type it. Nothing is
+      // stored yet — approval has not happened.
+      expect(
+        find.byKey(const ValueKey('github-device-dialog')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<SelectableText>(
+              find.byKey(const ValueKey('github-device-code')),
+            )
+            .data,
+        'WDJB-MJHT',
+      );
+      expect(
+        find.text('Enter the code at https://github.com/login/device'),
+        findsOneWidget,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('github_token'), isFalse);
+
+      // It keeps polling while the student is still in the browser.
+      await pollOnce(tester);
+      expect(
+        find.byKey(const ValueKey('github-device-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('Not connected to GitHub.'), findsOneWidget);
+
+      // …and picks the token up on the first poll after approval.
+      githubApproved = true;
+      await pollOnce(tester);
       await tester.pumpAndSettle();
 
+      expect(find.byKey(const ValueKey('github-device-dialog')), findsNothing);
       // Status line plus the confirmation snackbar.
       expect(find.text('Connected to GitHub as yvan.'), findsNWidgets(2));
-      final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('github_token'), 'ghp_valid');
+
+      // The scope asked for is the one the OAuth app has to be registered
+      // with, so it is pinned here as well as in the flow's own test.
+      final deviceCode = githubRequests.firstWhere(
+        (r) => r.url.path == '/login/device/code',
+      );
+      expect(Uri.splitQueryString(deviceCode.body)['scope'], 'public_repo');
 
       // Let the confirmation snackbar expire so the next one is not queued
       // behind it.
@@ -498,7 +628,9 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
       await tester.pumpAndSettle();
 
-      final post = githubRequests.singleWhere((r) => r.method == 'POST');
+      final post = githubRequests.singleWhere(
+        (r) => r.url.path == '/repos/$kBugReportRepo/issues',
+      );
       expect(post.headers['Authorization'], 'Bearer ghp_valid');
       final body = jsonDecode(post.body) as Map<String, dynamic>;
       expect(body['title'], 'Tutor crashed');
@@ -516,19 +648,168 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('a rejected token is not stored', (tester) async {
+    testWidgets('the panel opens a browser at the verification URL and '
+        'copies the code', (tester) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied.add((call.arguments as Map)['text'] as String);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
       await mount(tester);
+      await startDeviceFlow(tester);
 
-      await tester.tap(find.text('Connect GitHub'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'ghp_bad');
-      await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+      await tester.tap(find.text('Open GitHub'));
+      await tester.pump();
+      expect(browserLaunches, [Uri.parse('https://github.com/login/device')]);
+
+      await tester.tap(find.text('Copy code'));
+      await pumpFrames(tester);
+      expect(copied, ['WDJB-MJHT']);
+      // Inside the dialog, not a snackbar behind its barrier.
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('github-device-notice')))
+            .data,
+        'Code copied to the clipboard.',
+      );
+
+      await stopDeviceFlow(tester);
+      await unmount(tester);
+    });
+
+    testWidgets('a machine with no browser is told the URL instead of being '
+        'left guessing', (tester) async {
+      await mount(tester);
+      browserOpens = false;
+      await startDeviceFlow(tester);
+
+      await tester.tap(find.text('Open GitHub'));
+      await pumpFrames(tester);
+
+      expect(
+        find.text(
+          'Could not open a browser. Go to '
+          'https://github.com/login/device yourself.',
+        ),
+        findsOneWidget,
+      );
+
+      await stopDeviceFlow(tester);
+      await unmount(tester);
+    });
+
+    testWidgets('cancelling stops the flow and stores nothing', (tester) async {
+      await mount(tester);
+      await startDeviceFlow(tester);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      // The loop is parked in GitHub's interval; it notices on the next tick.
+      await pollOnce(tester);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Could not connect'), findsOneWidget);
+      expect(find.byKey(const ValueKey('github-device-dialog')), findsNothing);
+      expect(find.text('Not connected to GitHub.'), findsOneWidget);
+      expect(find.textContaining('Could not connect'), findsNothing);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('github_token'), isFalse);
+      // Connecting is offered again, not left disabled.
+      expect(find.text('Connect GitHub'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a request declined on GitHub is reported and stores nothing', (
+      tester,
+    ) async {
+      await mount(tester);
+      await startDeviceFlow(tester);
+
+      githubPollError = 'access_denied';
+      await pollOnce(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'The request was declined on GitHub, so nothing was '
+          'connected.',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Not connected to GitHub.'), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.containsKey('github_token'), isFalse);
+
+      await unmount(tester);
+    });
+
+    testWidgets('an expired code says so rather than failing silently', (
+      tester,
+    ) async {
+      await mount(tester);
+      await startDeviceFlow(tester);
+
+      githubPollError = 'expired_token';
+      await pollOnce(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The code expired before it was approved. Try again.'),
+        findsOneWidget,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('github_token'), isFalse);
+
+      await unmount(tester);
+    });
+
+    // A fork that never registered an OAuth app is a legitimate build, and it
+    // must not offer a sign-in that can only end in `unauthorized_client`.
+    testWidgets('a build with no OAuth client id says so and offers no '
+        'sign-in', (tester) async {
+      await mount(tester, oauthClientId: '');
+
+      expect(
+        find.byKey(const ValueKey('github-not-configured')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('compiled without a GitHub OAuth client id'),
+        findsOneWidget,
+      );
+      expect(find.text('Connect GitHub'), findsNothing);
+      expect(find.text('Not connected to GitHub.'), findsNothing);
+      // The card itself is still there — the feature is unavailable, not
+      // invisible.
+      expect(find.text('Bug reports'), findsOneWidget);
+      expect(githubRequests, isEmpty);
+
+      await unmount(tester);
+    });
+
+    // A token already on the device keeps working even on such a build:
+    // taking the sign-in away is not a reason to take the reporting away.
+    testWidgets('a stored token still reports on a build with no client id', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'github_token': 'ghp_valid'});
+      await mount(tester, oauthClientId: '');
+      await tester.pump();
+
+      expect(find.text('Connected to GitHub as yvan.'), findsOneWidget);
+      expect(find.text('Report a bug…'), findsOneWidget);
 
       await unmount(tester);
     });

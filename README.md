@@ -144,6 +144,7 @@ A few things to know:
 - The file is **gitignored** — it will not get committed. Do not paste it into a chat or screenshot.
 - `OPEN_AI_API_KEY` and `COSMOS_KEY` are obfuscated into the compiled binary at build time via the `envied` package. They are *not* shipped in plaintext, but they *are* shipped — anyone determined enough can extract them from the binary. Treat the build as roughly as secret as the keys themselves.
 - `ENTRA_REDIRECT_URI` must be exactly `http://localhost` to match step 2.4.
+- There is a seventh, **optional** line — `GITHUB_OAUTH_CLIENT_ID` — for in-app bug reports. Leave it out and everything else works; the Options panel simply says it cannot sign in to GitHub. [Step 8](#step-8-optional--in-app-bug-reports-github-oauth-app) sets it up.
 
 ---
 
@@ -216,6 +217,96 @@ pre-release tag is never pushed at a student.
 To point the app at your own fork, change `kReleaseOwner` / `kReleaseRepo` in
 [lib/core/github_release.dart](lib/core/github_release.dart). If you do not
 need auto-updates, you can ignore this entirely; the app still works.
+
+---
+
+## Step 8 (optional) — In-app bug reports (GitHub OAuth app)
+
+**Options → Bug reports** lets a student file a GitHub issue from inside the
+app, with the debug payload of a recent tutor turn attached. Signing in uses
+GitHub's **OAuth device flow**: the app shows an eight-character code, the
+student approves it at `https://github.com/login/device` in a browser they are
+already signed into, and the app receives a token. No personal access token,
+no scope picking, nothing to paste.
+
+That needs one OAuth app registered under the account that owns the issue
+tracker. It is the only part of this feature that cannot come from the code.
+**Without it the app still runs**; the Bug reports card just says the build was
+compiled without a client id and offers no sign-in.
+
+### 8.1 — Register the OAuth app
+
+1. Sign in to <https://github.com> as the account that owns the repository
+   issues should be filed on (`yvanvds/AI-tutor-Python`, or your fork).
+2. Go to <https://github.com/settings/applications/new> — the same page as
+   **Settings → Developer settings → OAuth Apps → New OAuth App**. This is an
+   *OAuth App*, **not** a GitHub App and **not** a personal access token.
+3. Fill in:
+   - **Application name:** `AI Tutor Python` (students see this on the
+     approval screen, so name it something they will recognise).
+   - **Homepage URL:** `https://github.com/yvanvds/AI-tutor-Python` (your
+     fork's URL if you forked).
+   - **Authorization callback URL:** the form requires one, but the device
+     flow never uses it. Put the homepage URL again.
+   - **Enable Device Flow:** ✅ **tick this.** It is the one setting that
+     matters — without it GitHub answers every request with
+     `device_flow_disabled`. If the checkbox is not on the registration form
+     in your account, click **Register application** first, then open the new
+     app's settings page, tick **Enable Device Flow**, and click **Update
+     application**.
+4. Click **Register application**.
+5. On the app's page, copy the **Client ID** (it looks like `Ov23li…`). It is
+   public — it ships inside the installer by design.
+6. **Do not generate a client secret.** The device flow has none, which is
+   exactly why it suits an app handed out to students; a secret compiled into
+   the binary would be a secret handed out with it.
+
+### 8.2 — Put the client id in `.env`
+
+Add a seventh line to the `.env` from [Step 4](#step-4--get-the-source-code-and-configure-env):
+
+```
+GITHUB_OAUTH_CLIENT_ID=Ov23liYourClientIdHere
+```
+
+Then regenerate and rebuild:
+
+```powershell
+dart run build_runner build
+flutter build windows --release
+```
+
+### 8.3 — The scope, and what students approve
+
+The app requests exactly one scope: **`public_repo`**.
+
+- It is the narrowest OAuth-app scope that can create an issue on a public
+  repository. There is no issues-only scope in the OAuth-app model — that
+  granularity exists only for GitHub Apps and fine-grained personal access
+  tokens — and the empty scope is read-only, so it cannot post anything.
+- `repo`, which most examples use, is deliberately *not* requested: it would
+  also give the app write access to every **private** repository the student
+  can see.
+- Be aware that `public_repo` is not repository-scoped: it grants write access
+  to the student's *public* repositories too. That is a limitation of OAuth
+  apps, not of this code, and it is what the GitHub approval screen tells the
+  student before they approve.
+- Nothing is granted at registration time. The scope is requested per student,
+  each of whom approves it once on GitHub. You do not tick any scope box when
+  registering the app.
+- If you move the repository into a GitHub **organisation** that has OAuth App
+  access restrictions turned on, an org owner also has to approve this app for
+  the organisation.
+
+The scope is a single constant, `kGitHubOAuthScope` in
+[lib/services/github/github_device_flow.dart](lib/services/github/github_device_flow.dart);
+the repository issues go to is `kBugReportRepo` in
+[lib/services/github/github_issue_service.dart](lib/services/github/github_issue_service.dart).
+
+The token that comes back is stored per device in `SharedPreferences`, next to
+the student's own OpenAI key — the same place the pasted token used to live.
+A device that already has a token from the old paste-a-token flow keeps
+working; the card offers **Disconnect** to clear it.
 
 ---
 

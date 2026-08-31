@@ -20,6 +20,10 @@ public/*.exe.sha256
 lib/services/tutor/env.g.dart
 lib/services/config/azure_config.g.dart
 
+# also generated from .env (not a secret — a public OAuth client id — but it
+# is build output all the same; `dart run build_runner build` recreates it)
+lib/services/github/github_oauth_config.g.dart
+
 
 # IntelliJ related
 *.iml

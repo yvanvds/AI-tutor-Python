@@ -13,6 +13,7 @@
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
 //   - about / version, with the manual update check (#48)
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:ai_tutor_python/core/chat_request_type.dart';
@@ -26,6 +27,7 @@ import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -714,14 +716,12 @@ class _SecretInputDialog extends StatefulWidget {
     required this.fieldLabel,
     required this.confirmLabel,
     this.hint,
-    this.explainer,
   });
 
   final String title;
   final String fieldLabel;
   final String confirmLabel;
   final String? hint;
-  final String? explainer;
 
   @override
   State<_SecretInputDialog> createState() => _SecretInputDialogState();
@@ -748,13 +748,6 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (widget.explainer != null) ...[
-              Text(
-                widget.explainer!,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.m),
-            ],
             TextField(
               controller: _controller,
               autofocus: true,
@@ -813,6 +806,27 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
 // Bug reports
 // ---------------------------------------------------------------------------
 
+/// Filing a GitHub issue from inside the app, and the GitHub sign-in that
+/// makes it possible.
+///
+/// Sign-in is the OAuth **device flow** (#57): a dialog shows a short code,
+/// the student approves it in a browser, and the app polls until GitHub hands
+/// over a token. It replaced a personal access token the student had to
+/// create and paste (#25) — see `services/github/github_device_flow.dart` for
+/// why, and for the scope the app asks for.
+///
+/// The code lives in a **dialog**, not inline in the card, and the reason is
+/// not cosmetic: this card sits in a lazily-built `ListView`, so scrolling it
+/// past the fold disposes its state — which, while a sign-in is running,
+/// would silently abandon the code the student is at that moment typing into
+/// a browser. A modal route is outside the list and holds the scroll still
+/// while it is up. (It also matches the old paste-a-token dialog it replaces,
+/// and the rest of this panel.)
+///
+/// A build compiled without an OAuth client id cannot run the flow at all.
+/// That is a legitimate state (a fork that has not registered an OAuth app),
+/// so the card says so plainly and hides the button, rather than offering a
+/// sign-in that could only fail.
 class _BugReportCard extends ConsumerStatefulWidget {
   const _BugReportCard();
 
@@ -825,6 +839,10 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
   Future<String>? _login;
   bool _busy = false;
 
+  /// Set by the dialog's Cancel button; the polling loop reads it between
+  /// polls, so a cancel takes effect within one interval.
+  bool _cancelled = false;
+
   Future<String> _loginFor(String token) {
     if (_loginToken != token || _login == null) {
       _loginToken = token;
@@ -835,31 +853,105 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
 
   Future<void> _connect() async {
     final l = AppLocalizations.of(context);
-    final token = await showDialog<String>(
-      context: context,
-      builder: (_) => _SecretInputDialog(
-        title: l.options_bugReport_github_dialog_title,
-        explainer: l.options_bugReport_github_dialog_explainer(kBugReportRepo),
-        fieldLabel: l.options_bugReport_github_dialog_field,
-        confirmLabel: l.options_bugReport_github_dialog_connect,
-      ),
-    );
-    if (token == null || token.isEmpty || !mounted) return;
+    final flow = ref.read(gitHubDeviceFlowProvider);
+    setState(() {
+      _busy = true;
+      _cancelled = false;
+    });
 
-    setState(() => _busy = true);
+    NavigatorState? navigator;
+    bool dialogOpen = false;
+    // Idempotent: the dialog is closed on whichever path finishes first, and
+    // the later ones must not pop a route that is no longer ours.
+    void closeCodeDialog() {
+      if (!dialogOpen) return;
+      dialogOpen = false;
+      if (navigator?.mounted ?? false) navigator!.pop();
+    }
+
     try {
+      final grant = await flow.requestCode();
+      if (!mounted) return;
+
+      navigator = Navigator.of(context);
+      dialogOpen = true;
+      // Deliberately not awaited: the dialog is up *while* the polling runs,
+      // and it is this method that takes it down again.
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _DeviceCodeDialog(
+            grant: grant,
+            onOpenBrowser: () => _openBrowser(grant),
+            onCopyCode: () => _copyCode(grant),
+            onCancel: () {
+              _cancelled = true;
+              closeCodeDialog();
+            },
+          ),
+        ),
+      );
+
+      final token = await flow.pollForToken(
+        grant,
+        isCancelled: () => _cancelled || !mounted,
+      );
       final login = await ref.read(githubIssueServiceProvider).loginFor(token);
       _loginToken = token;
       _login = Future.value(login);
       await ref.read(githubTokenStorageProvider.notifier).saveToken(token);
+      closeCodeDialog();
       if (!mounted) return;
       _snack(context, l.options_bugReport_github_connectedAs(login));
+    } on DeviceFlowException catch (e) {
+      closeCodeDialog();
+      if (!mounted) return;
+      switch (e.reason) {
+        // The student pressed Cancel; they know what happened.
+        case DeviceFlowFailure.cancelled:
+          break;
+        case DeviceFlowFailure.expired:
+          _snack(context, l.options_bugReport_github_device_expired);
+        case DeviceFlowFailure.denied:
+          _snack(context, l.options_bugReport_github_device_denied);
+        case DeviceFlowFailure.notConfigured:
+          _snack(context, l.options_bugReport_github_notConfigured);
+        case DeviceFlowFailure.failed:
+          _snack(context, l.options_bugReport_github_connectFailed(e.message));
+      }
     } catch (e) {
+      closeCodeDialog();
       if (!mounted) return;
       _snack(context, l.options_bugReport_github_connectFailed(e.toString()));
     } finally {
+      closeCodeDialog();
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Hands the verification URL to the operating system, and reports back
+  /// what the dialog should say about it — a snackbar would come up *behind*
+  /// the modal barrier, which is exactly where a message about the dialog
+  /// must not be.
+  Future<String?> _openBrowser(DeviceCodeGrant grant) async {
+    final l = AppLocalizations.of(context);
+    bool launched;
+    try {
+      launched = await ref.read(browserLauncherProvider)(grant.verificationUri);
+    } catch (_) {
+      launched = false;
+    }
+    if (launched) return null;
+    return l.options_bugReport_github_device_browserFailed(
+      grant.verificationUri.toString(),
+    );
+  }
+
+  Future<String?> _copyCode(DeviceCodeGrant grant) async {
+    final l = AppLocalizations.of(context);
+    await Clipboard.setData(ClipboardData(text: grant.userCode));
+    return l.options_bugReport_github_device_codeCopied;
   }
 
   Future<void> _disconnect() async {
@@ -907,11 +999,10 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final token = ref.watch(githubTokenStorageProvider);
+    final configured = ref.watch(gitHubDeviceFlowProvider).isConfigured;
 
     final Widget status;
-    if (token == null) {
-      status = Text(l.options_bugReport_github_notConnected);
-    } else {
+    if (token != null) {
       status = FutureBuilder<String>(
         future: _loginFor(token),
         builder: (_, snap) {
@@ -923,6 +1014,15 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
           return Text(l.options_bugReport_github_connectedAs(snap.data ?? '…'));
         },
       );
+    } else if (!configured) {
+      // Honest rather than silent: a build with no OAuth app cannot sign in,
+      // and a disabled button with no explanation would read as a bug.
+      status = Text(
+        l.options_bugReport_github_notConfigured,
+        key: const ValueKey('github-not-configured'),
+      );
+    } else {
+      status = Text(l.options_bugReport_github_notConnected);
     }
 
     return _OptionsCard(
@@ -937,13 +1037,14 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
             spacing: AppSpacing.s,
             runSpacing: AppSpacing.s,
             children: [
-              if (token == null)
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _connect,
-                  icon: const Icon(Icons.link, size: 18),
-                  label: Text(l.options_bugReport_github_connect_button),
-                )
-              else ...[
+              if (token == null) ...[
+                if (configured)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _connect,
+                    icon: const Icon(Icons.link, size: 18),
+                    label: Text(l.options_bugReport_github_connect_button),
+                  ),
+              ] else ...[
                 FilledButton.tonalIcon(
                   onPressed: _busy ? null : () => _report(token),
                   icon: const Icon(Icons.bug_report_outlined, size: 18),
@@ -959,6 +1060,128 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The waiting half of the device flow: the code to type, where to type it,
+/// and the three things a student can do about it.
+///
+/// The code is a [SelectableText] in a monospaced face — it is eight
+/// characters that have to be transcribed exactly, and `WDJB-MJHT` in a
+/// proportional font is how an `I` becomes an `l`.
+///
+/// It is dismissed by whoever started the flow, never by the barrier: closing
+/// it has to also stop the polling, and a tap outside would leave the two
+/// disagreeing about whether a sign-in is still running.
+class _DeviceCodeDialog extends StatefulWidget {
+  const _DeviceCodeDialog({
+    required this.grant,
+    required this.onOpenBrowser,
+    required this.onCopyCode,
+    required this.onCancel,
+  });
+
+  final DeviceCodeGrant grant;
+
+  /// Each returns the line to show inside the dialog, or `null` for "nothing
+  /// to say".
+  final Future<String?> Function() onOpenBrowser;
+  final Future<String?> Function() onCopyCode;
+
+  final VoidCallback onCancel;
+
+  @override
+  State<_DeviceCodeDialog> createState() => _DeviceCodeDialogState();
+}
+
+class _DeviceCodeDialogState extends State<_DeviceCodeDialog> {
+  String? _notice;
+
+  Future<void> _run(Future<String?> Function() action) async {
+    final notice = await action();
+    if (!mounted) return;
+    setState(() => _notice = notice);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+    final notice = _notice;
+    return AlertDialog(
+      key: const ValueKey('github-device-dialog'),
+      title: Text(l.options_bugReport_github_connect_button),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l.options_bugReport_github_device_explainer(kBugReportRepo),
+              style: text.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.m),
+            SelectableText(
+              widget.grant.userCode,
+              key: const ValueKey('github-device-code'),
+              style: text.headlineSmall?.copyWith(
+                fontFamily: 'monospace',
+                letterSpacing: 4,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              l.options_bugReport_github_device_instruction(
+                widget.grant.verificationUri.toString(),
+              ),
+              style: text.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.m),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: Text(
+                    l.options_bugReport_github_device_waiting,
+                    style: text.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+            if (notice != null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                notice,
+                key: const ValueKey('github-device-notice'),
+                style: text.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: widget.onCancel,
+          child: Text(l.options_bugReport_github_device_cancel),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _run(widget.onCopyCode),
+          icon: const Icon(Icons.copy, size: 18),
+          label: Text(l.options_bugReport_github_device_copyCode),
+        ),
+        FilledButton.icon(
+          onPressed: () => _run(widget.onOpenBrowser),
+          icon: const Icon(Icons.open_in_new, size: 18),
+          label: Text(l.options_bugReport_github_device_openBrowser),
+        ),
+      ],
     );
   }
 }

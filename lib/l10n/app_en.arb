@@ -131,13 +131,26 @@
   },
   "options_bugReport_github_connect_button": "Connect GitHub",
   "options_bugReport_github_disconnect_button": "Disconnect",
-  "options_bugReport_github_dialog_title": "Connect GitHub",
-  "options_bugReport_github_dialog_explainer": "Paste a personal access token with permission to create issues on {repo}. The token is stored on this device only.",
-  "@options_bugReport_github_dialog_explainer": {
+  "options_bugReport_github_notConfigured": "This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.",
+  "options_bugReport_github_device_explainer": "Type this code on GitHub to let the app create issues on {repo}. Nothing is stored until you approve it.",
+  "@options_bugReport_github_device_explainer": {
     "placeholders": { "repo": { "type": "String" } }
   },
-  "options_bugReport_github_dialog_field": "Personal access token",
-  "options_bugReport_github_dialog_connect": "Connect",
+  "options_bugReport_github_device_instruction": "Enter the code at {url}",
+  "@options_bugReport_github_device_instruction": {
+    "placeholders": { "url": { "type": "String" } }
+  },
+  "options_bugReport_github_device_waiting": "Waiting for you to approve it on GitHub…",
+  "options_bugReport_github_device_openBrowser": "Open GitHub",
+  "options_bugReport_github_device_copyCode": "Copy code",
+  "options_bugReport_github_device_codeCopied": "Code copied to the clipboard.",
+  "options_bugReport_github_device_cancel": "Cancel",
+  "options_bugReport_github_device_browserFailed": "Could not open a browser. Go to {url} yourself.",
+  "@options_bugReport_github_device_browserFailed": {
+    "placeholders": { "url": { "type": "String" } }
+  },
+  "options_bugReport_github_device_expired": "The code expired before it was approved. Try again.",
+  "options_bugReport_github_device_denied": "The request was declined on GitHub, so nothing was connected.",
   "options_bugReport_github_connectFailed": "Could not connect: {error}",
   "@options_bugReport_github_connectFailed": {
     "placeholders": { "error": { "type": "String" } }
