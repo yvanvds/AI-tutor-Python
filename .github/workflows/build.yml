@@ -107,10 +107,18 @@ jobs:
   # MSVC, ~1 min) and launches the real app, including a real WebView2 for the
   # lesson page. The setup steps mirror the SonarQube job exactly.
   #
-  # The test command must stay `flutter test integration_test -d windows`
-  # without listing files: on Windows, Flutter launches the app only for the
-  # first test file of an invocation, so every flow is registered in
-  # integration_test/app_test.dart and runs in one app process.
+  # The suite runs through scripts/run_integration_tests.ps1 (#81). Its fast
+  # path is the mandatory aggregated invocation — on Windows, Flutter launches
+  # the app only for the first test file of an invocation, so every flow is
+  # registered in integration_test/app_test.dart and runs in one app process.
+  # But flutter_tools intermittently kills that process from the inside on the
+  # hosted runner (PathNotFoundException deleting its own temp listener file —
+  # an upstream race, flutter/flutter#144008), which used to lose all 24 tests
+  # at once. When, and only when, that exact signature appears, the script
+  # falls back to one invocation per flows/*.dart file so a repeat abort costs
+  # one flow instead of the suite; a failure without the signature is a real
+  # one and is never retried. The fallback's extra app launches are why the
+  # timeout is generous compared to the ~8 min a green fast path takes.
   #
   # If WebView2 ever proves unusable on the runner: guard the harness with
   # `FakeWebViewPlatform.install()` (test/helpers/fake_webview_platform.dart)
@@ -121,7 +129,7 @@ jobs:
   integration:
     name: Integration tests (Windows desktop)
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -182,4 +190,5 @@ jobs:
         run: flutter doctor -v
 
       - name: Integration tests
-        run: flutter test integration_test -d windows --reporter expanded
+        shell: pwsh
+        run: ./scripts/run_integration_tests.ps1

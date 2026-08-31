@@ -8,6 +8,11 @@
 // runs them all in one app process; each flow still runs on its own by
 // path (`flutter test integration_test/flows/<flow>.dart -d windows`).
 //
+// That per-flow standalone property is load-bearing (#81): when the
+// aggregated run dies in flutter_tools' own temp-file handling, CI
+// (scripts/run_integration_tests.ps1) falls back to running every file
+// under flows/ individually. Keep new flows self-contained.
+//
 // Run:
 //   flutter test integration_test -d windows
 
