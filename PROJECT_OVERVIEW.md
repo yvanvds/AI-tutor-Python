@@ -226,8 +226,7 @@ integration_test/                      # End-to-end flows on Windows desktop (#2
 ├── app_test.dart                      # Single entrypoint running every flow in one app process
 ├── flows/                             # One file per user-visible flow (lesson, language switch, playground files)
 └── harness/                           # AppHarness: GoalsApp over InMemoryCosmosClient + signed-in AuthService + seed data
-public/version.json                    # Update manifest (now served from GitHub Pages)
-firebase.json                          # Vestigial Firebase Hosting config; not deployed
+public/                                # Landing page deployed to GitHub Pages by .github/workflows/static.yml
 distribute_options.yaml                # flutter_distributor windows-exe job
 windows/                               # Windows runner + packaging/Inno Setup config
 docs/                                  # CONDUCTOR_POLICY.md, STUDENT_MODEL.md, LLM_CONTRACT.md (load-bearing for the conductor redesign)
@@ -497,7 +496,6 @@ See [TODO.md](TODO.md) for the current planning doc. The load-bearing design doc
 - **`dart_openai` is pinned to a personal fork** (`https://github.com/yvanvds/openai.git`).
 - **Windows-only.** No iOS/Android/macOS/Linux/Web target.
 - **All UI text is Dutch and hard-coded** throughout services and widgets; no i18n layer.
-- **Vestigial Firebase Hosting config.** [firebase.json](firebase.json) and [public/version.json](public/version.json) remain in-tree, but the live update endpoint is `yvanvds.github.io/AI-tutor-Python/version.json` — published from GitHub Releases now.
 - **Goal import "Replace" mode preserves contentId but not authored Content docs themselves.** A re-imported tree keeps the link, but if the imported tree omits a subgoal, the link is dropped and the orphaned `Content` doc is left in the container.
 - **`isWarmUp` is a vestigial field** on `progress_history` samples — the new conductor has no warm-up phase but writes `false` for backward compatibility with the existing time-series.
 

@@ -15,7 +15,6 @@ __pycache__/
 migrate_working_dir/
 public/*.exe
 public/*.exe.sha256
-.emulator-data/
 
 # security sensitive files
 lib/services/tutor/env.g.dart

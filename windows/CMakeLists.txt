@@ -1,8 +1,8 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
 
-# Allow legacy CMake minimums (>= 3.5) declared by transitive dependencies
-# such as the Firebase C++ SDK, which still uses cmake_minimum_required(VERSION 3.1).
+# Allow legacy CMake minimums (>= 3.5) declared by transitive dependencies,
+# some of which still use cmake_minimum_required(VERSION 3.1).
 # Required for compatibility with CMake 4.x, which dropped support for < 3.5.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
