@@ -55,6 +55,9 @@ void main() {
       reason: 'the start completer must not leak an unobserved error',
     );
     expect(runner.status, PyRunnerStatus.crashed);
+    // #74: the error a bug report has to be able to quote.
+    expect(runner.lastStartError, isA<StateError>());
+    expect(runner.resolvedPaths, isNull);
   });
 
   test('concurrent start() callers all see the failure (#33)', () async {

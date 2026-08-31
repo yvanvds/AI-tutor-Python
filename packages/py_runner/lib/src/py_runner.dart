@@ -40,7 +40,32 @@ class PyRunner {
 
   Completer<void>? _startCompleter;
 
+  PyHostPaths? _resolvedPaths;
+  Object? _lastStartError;
+  RunResult? _lastRunResult;
+
   PyRunnerStatus get status => _status;
+
+  // --- diagnostics (#74) ---------------------------------------------------
+  //
+  // "It didn't run" is the failure a student can see without understanding
+  // anything else, so a bug report has to be able to answer it. These three
+  // are the parts only the runner knows; everything else about the runner's
+  // health can be re-derived by resolving the locator again, which needs no
+  // live process.
+
+  /// Paths the last successful [locator] resolution produced, including which
+  /// branch produced them. Null until a [start] gets that far.
+  PyHostPaths? get resolvedPaths => _resolvedPaths;
+
+  /// Whatever the most recent [start] threw — typically a
+  /// [PyRunnerNotInstalled]. Cleared by a start that succeeds.
+  Object? get lastStartError => _lastStartError;
+
+  /// Terminal state of the most recently *finished* run: its status
+  /// (ok / error / cancelled), duration, and the Python exception if it had
+  /// one. Null until a run completes.
+  RunResult? get lastRunResult => _lastRunResult;
 
   /// Broadcast stream of status transitions.
   Stream<PyRunnerStatus> get statusChanges => _statusController.stream;
@@ -64,6 +89,7 @@ class PyRunner {
 
     try {
       final paths = await locator.resolve();
+      _resolvedPaths = paths;
       final host = await HostProcess.spawn(
         pythonExecutable: paths.pythonExecutable,
         hostScript: paths.hostScript,
@@ -100,9 +126,11 @@ class PyRunner {
       );
 
       _readyInfo = await readyCompleter.future;
+      _lastStartError = null;
       _setStatus(PyRunnerStatus.ready);
       completer.complete();
     } catch (error, stackTrace) {
+      _lastStartError = error;
       _setStatus(PyRunnerStatus.crashed);
       if (!completer.isCompleted) {
         // The first caller gets the error via `rethrow` below; the completer
@@ -171,6 +199,17 @@ class PyRunner {
     final ctrl = _RunController(
       id: id,
       sendFrame: (frame) => _host?.send(frame),
+    );
+
+    // Remember how every run ended, so a bug report filed after the fact can
+    // say what the last one did (#74). Attached here rather than in
+    // `_scheduleStart` so runs that never get an `exec` sent — cancelled by a
+    // successor, or overtaken by a host crash — are recorded too.
+    unawaited(
+      ctrl.handle.done.then(
+        (result) => _lastRunResult = result,
+        onError: (Object _) {},
+      ),
     );
 
     final prior = _inFlight;

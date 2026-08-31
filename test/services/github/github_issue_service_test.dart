@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,10 +86,19 @@ void main() {
   });
 
   group('buildBugReportBody', () {
+    const runner = RunnerDiagnostics(
+      status: 'crashed',
+      source: 'installed layout (next to the app)',
+      pythonExecutable: r'C:\Users\jane.doe\AI Tutor\python\python.exe',
+      hostScript: r'C:\Users\jane.doe\AI Tutor\py_runner\host.py',
+      lastRun: 'error after 12 ms — ZeroDivisionError: division by zero',
+    );
+
     test('includes description, version and the turn minus instructions', () {
       final body = buildBugReportBody(
         description: 'It broke',
         appVersion: '1.2.3',
+        runner: runner,
         turn: {
           'turnId': 4,
           'instructions': 'SECRET PROMPT',
@@ -101,13 +111,44 @@ void main() {
       expect(body, contains('"turnId": 4'));
       expect(body, contains('"userInput": "x = 1"'));
       expect(body, isNot(contains('SECRET PROMPT')));
-      expect(body, contains('<details>'));
+      expect(body, contains('Turn debug payload'));
+    });
+
+    // The whole point of #74: the turn payload is optional and the runner
+    // section is not, because "it didn't run" is not a question about the turn.
+    test('attaches the runner section even with no turn payload', () {
+      final body = buildBugReportBody(
+        description: 'the python script did not run',
+        appVersion: '1.0.0',
+        runner: runner,
+      );
+
+      expect(body, isNot(contains('Turn debug payload')));
+      expect(body, contains('Python runner state'));
+      expect(body, contains('runner status:      crashed'));
+      expect(body, contains('locator branch:     installed layout'));
+      expect(body, contains('ZeroDivisionError'));
+    });
+
+    test('redacts the account name out of every path in the body', () {
+      final body = buildBugReportBody(
+        description: r'it wrote to C:\Users\jane.doe\Desktop\out.txt',
+        appVersion: '1.0.0',
+        runner: runner,
+      );
+
+      expect(body, isNot(contains('jane.doe')));
+      expect(body, contains(r'C:\Users\<user>\AI Tutor\python\python.exe'));
+      expect(body, contains(r'C:\Users\<user>\Desktop\out.txt'));
     });
 
     test('omits the payload block when no turn is attached', () {
-      final body = buildBugReportBody(description: '', appVersion: '1.0.0');
+      final body = buildBugReportBody(
+        description: '',
+        appVersion: '1.0.0',
+        runner: runner,
+      );
       expect(body, contains('_(no description)_'));
-      expect(body, isNot(contains('<details>')));
     });
   });
 

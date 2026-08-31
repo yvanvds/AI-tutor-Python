@@ -159,9 +159,17 @@ flutter pub get
 # Generate the obfuscated env file from your .env (re-run this if you change .env)
 dart run build_runner build --delete-conflicting-outputs
 
+# Build the embedded Python interpreter students' code runs on (needs internet;
+# takes a few minutes the first time, then it is cached)
+pwsh tooling/python/build_bundle.ps1
+
 # Quick sanity check: open the app on your machine
 flutter run -d windows
 ```
+
+**About that Python bundle.** The app runs student code in an interpreter it ships itself, which the installer places next to the executable. A `flutter run` build has no installer, so it looks for a development bundle instead: if `build_bundle.ps1` has been run, `flutter run -d windows` finds `build/python_bundle/` on its own and the **Run** button works. Skip the bundle step and the app still starts, but pressing **Run** shows a red "no Python environment found" message that tells you exactly this and names the script to run. (Release builds never do this lookup — they use only what the installer put in place.)
+
+To point a dev build at some *other* interpreter, set **both** `PY_RUNNER_PYTHON` and `PY_RUNNER_HOST_SCRIPT` (an interpreter and a path to `packages/py_runner/python/host.py`) before launching; setting only one is ignored. The checked-in VS Code launch configuration already does this.
 
 If `flutter run` opens a window with a sign-in screen and you can sign in with your school account, your config is correct. Close it and build the installer:
 

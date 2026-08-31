@@ -34,6 +34,7 @@ import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../harness/app_harness.dart';
@@ -42,6 +43,18 @@ import '../harness/fake_github_server.dart';
 /// A client id shaped like the ones GitHub hands out. Its only job is to be
 /// non-empty: the fake server never checks it.
 const String _clientId = 'Ov23liINTEGRATIONTEST';
+
+/// Stands for the runner being *completely* unavailable (#74) — no bundle, no
+/// host, nothing to ask. The account name in the message is deliberate: it is
+/// what the real `PyRunnerNotInstalled` carries, and what must not reach a
+/// public repository.
+class _MissingPythonLocator implements PyHostLocator {
+  @override
+  Future<PyHostPaths> resolve() async => throw const PyRunnerNotInstalled(
+    'Bundled Python interpreter not found at: '
+    r'C:\Users\student.name\AI Tutor\python\python.exe',
+  );
+}
 
 /// Brings a card further down the Options list into view. The panel is a real
 /// `ListView` in a real window, so anything below the fold is not built yet —
@@ -178,6 +191,68 @@ void main() {
 
     expect(github.issues.single['title'], 'The Run button did nothing');
     await pumpUntilFound(tester, find.textContaining('Issue posted:'));
+
+    await harness.dispose(tester);
+    await github.close();
+  });
+
+  // #74. The report that started this said "the python script did not run",
+  // and arrived describing the tutor turn instead — the runner was never
+  // mentioned. So: file the same report with the runner genuinely absent, and
+  // check the issue that lands on GitHub can answer the question on its own.
+  //
+  // End-to-end rather than a widget test, because the thing under test is what
+  // the *app* posts: the runner behind the Run button, the panel's report
+  // button, the body builder and the real HTTP call, in that order. A widget
+  // test can only assert on a body it assembled itself.
+  testWidgets('Bug reports: the issue says what the Python runner was doing, '
+      'with no host running and no username in it', (tester) async {
+    final github = await FakeGitHubServer.start();
+    final harness = AppHarness(
+      github: github,
+      githubOAuthClientId: _clientId,
+      pyRunner: PyRunner(locator: _MissingPythonLocator()),
+    );
+    await harness.boot(tester);
+    await _openOptions(tester);
+
+    // Already approved in the browser: this flow is about the report body, and
+    // the sign-in itself is covered above.
+    github.approved = true;
+    await _scrollTo(tester, find.text('Not connected to GitHub.'));
+    await _tap(tester, find.text('Connect GitHub'));
+    await pumpUntilFound(
+      tester,
+      find.text('Connected to GitHub as $kFakeGitHubLogin.'),
+    );
+
+    await _clearSnacks(tester);
+    await _tap(tester, find.text('Report a bug…'));
+    await pumpUntilFound(tester, find.text('Report a bug'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Title'),
+      'the python script did not run',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+    await pumpUntil(
+      tester,
+      () => github.issues.isNotEmpty,
+      reason: 'the issue never reached GitHub',
+    );
+
+    final body = github.issues.single['body'] as String;
+
+    // Attached with no dropdown, no turn to attach, and no host alive.
+    expect(body, contains('Python runner state'));
+    expect(body, isNot(contains('Turn debug payload')));
+    expect(body, contains('PyRunnerNotInstalled'));
+    expect(body, contains('python.exe'));
+    expect(body, contains('(no host has started this session)'));
+    expect(body, contains('(no run has finished this session)'));
+
+    // Public repo, student's own account: the path is there, the name is not.
+    expect(body, isNot(contains('student.name')));
+    expect(body, contains(r'C:\Users\<user>\'));
 
     await harness.dispose(tester);
     await github.close();

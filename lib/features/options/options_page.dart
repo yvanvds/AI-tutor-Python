@@ -27,11 +27,13 @@ import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
+import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
@@ -966,6 +968,9 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
   Future<void> _report(String token) async {
     final l = AppLocalizations.of(context);
     final turns = ref.read(debugServiceProvider).buffer;
+    // Read before the dialog, so the async gaps below never touch `ref`.
+    final pyRunner = ref.read(pyRunnerProvider);
+    final issues = ref.read(githubIssueServiceProvider);
     final draft = await showDialog<_BugReportDraft>(
       context: context,
       builder: (_) => _BugReportDialog(turns: turns),
@@ -974,17 +979,19 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
 
     setState(() => _busy = true);
     try {
-      final url = await ref
-          .read(githubIssueServiceProvider)
-          .createIssue(
-            token: token,
-            title: draft.title,
-            body: buildBugReportBody(
-              description: draft.description,
-              appVersion: kAppVersion,
-              turn: draft.turn?.toJson(),
-            ),
-          );
+      // Always attached, with no dropdown: the turn payload describes the
+      // tutor, and "it didn't run" is a question about the runner (#74).
+      final runner = await RunnerDiagnostics.collect(pyRunner);
+      final url = await issues.createIssue(
+        token: token,
+        title: draft.title,
+        body: buildBugReportBody(
+          description: draft.description,
+          appVersion: kAppVersion,
+          runner: runner,
+          turn: draft.turn?.toJson(),
+        ),
+      );
       if (!mounted) return;
       _snack(context, l.options_bugReport_posted(url.toString()));
     } catch (e) {
