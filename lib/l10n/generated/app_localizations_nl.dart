@@ -280,18 +280,48 @@ class AppLocalizationsNl extends AppLocalizations {
       'Verbinding verbreken';
 
   @override
-  String get options_bugReport_github_dialog_title => 'GitHub verbinden';
+  String get options_bugReport_github_notConfigured =>
+      'Deze build kan niet aanmelden bij GitHub: ze is gebouwd zonder GitHub OAuth-client-id, dus bugmeldingen kunnen enkel met de hand op github.com.';
 
   @override
-  String options_bugReport_github_dialog_explainer(String repo) {
-    return 'Plak een personal access token dat issues mag aanmaken op $repo. Het token wordt enkel op dit toestel bewaard.';
+  String options_bugReport_github_device_explainer(String repo) {
+    return 'Typ deze code op GitHub zodat de app issues mag aanmaken op $repo. Er wordt niets bewaard tot je het goedkeurt.';
   }
 
   @override
-  String get options_bugReport_github_dialog_field => 'Personal access token';
+  String options_bugReport_github_device_instruction(String url) {
+    return 'Geef de code in op $url';
+  }
 
   @override
-  String get options_bugReport_github_dialog_connect => 'Verbinden';
+  String get options_bugReport_github_device_waiting =>
+      'Wachten tot je het goedkeurt op GitHub…';
+
+  @override
+  String get options_bugReport_github_device_openBrowser => 'GitHub openen';
+
+  @override
+  String get options_bugReport_github_device_copyCode => 'Code kopiëren';
+
+  @override
+  String get options_bugReport_github_device_codeCopied =>
+      'Code naar het klembord gekopieerd.';
+
+  @override
+  String get options_bugReport_github_device_cancel => 'Annuleren';
+
+  @override
+  String options_bugReport_github_device_browserFailed(String url) {
+    return 'Kon geen browser openen. Ga zelf naar $url.';
+  }
+
+  @override
+  String get options_bugReport_github_device_expired =>
+      'De code verliep voor ze werd goedgekeurd. Probeer opnieuw.';
+
+  @override
+  String get options_bugReport_github_device_denied =>
+      'De aanvraag werd geweigerd op GitHub, er is niets verbonden.';
 
   @override
   String options_bugReport_github_connectFailed(String error) {

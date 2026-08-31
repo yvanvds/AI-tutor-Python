@@ -1,10 +1,13 @@
 // GitHub bug-report support for the Options panel (issue #25).
 //
-// Auth is a personal access token the user pastes in once; it is kept in
-// SharedPreferences next to the other local settings (same place the local
-// OpenAI key lives). The token needs the `issues: write` permission on the
-// target repository (fine-grained) or the `repo` / `public_repo` scope
-// (classic).
+// Auth is an OAuth token obtained through the device flow in
+// `github_device_flow.dart` (#57) — a student approves a short code in the
+// browser instead of creating and pasting a personal access token. Either
+// kind of token works here; this file only ever sees a bearer string.
+//
+// The token is kept in SharedPreferences next to the other local settings —
+// the same storage the local OpenAI key uses (`local_api_key_storage.dart`),
+// which is the app's existing per-device secret store.
 
 import 'dart:convert';
 
@@ -146,6 +149,13 @@ String buildBugReportBody({
   return buffer.toString();
 }
 
+/// Where the REST API lives. A seam, like `gitHubOAuthBaseProvider`: an
+/// end-to-end flow points it at a loopback server so the real service, real
+/// headers and real error handling run without reaching github.com.
+final gitHubApiBaseProvider = Provider<Uri>(
+  (_) => Uri.parse('https://api.github.com'),
+);
+
 final githubIssueServiceProvider = Provider<GitHubIssueService>(
-  (_) => GitHubIssueService(),
+  (ref) => GitHubIssueService(apiBase: ref.watch(gitHubApiBaseProvider)),
 );

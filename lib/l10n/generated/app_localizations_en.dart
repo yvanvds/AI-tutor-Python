@@ -275,18 +275,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get options_bugReport_github_disconnect_button => 'Disconnect';
 
   @override
-  String get options_bugReport_github_dialog_title => 'Connect GitHub';
+  String get options_bugReport_github_notConfigured =>
+      'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.';
 
   @override
-  String options_bugReport_github_dialog_explainer(String repo) {
-    return 'Paste a personal access token with permission to create issues on $repo. The token is stored on this device only.';
+  String options_bugReport_github_device_explainer(String repo) {
+    return 'Type this code on GitHub to let the app create issues on $repo. Nothing is stored until you approve it.';
   }
 
   @override
-  String get options_bugReport_github_dialog_field => 'Personal access token';
+  String options_bugReport_github_device_instruction(String url) {
+    return 'Enter the code at $url';
+  }
 
   @override
-  String get options_bugReport_github_dialog_connect => 'Connect';
+  String get options_bugReport_github_device_waiting =>
+      'Waiting for you to approve it on GitHub…';
+
+  @override
+  String get options_bugReport_github_device_openBrowser => 'Open GitHub';
+
+  @override
+  String get options_bugReport_github_device_copyCode => 'Copy code';
+
+  @override
+  String get options_bugReport_github_device_codeCopied =>
+      'Code copied to the clipboard.';
+
+  @override
+  String get options_bugReport_github_device_cancel => 'Cancel';
+
+  @override
+  String options_bugReport_github_device_browserFailed(String url) {
+    return 'Could not open a browser. Go to $url yourself.';
+  }
+
+  @override
+  String get options_bugReport_github_device_expired =>
+      'The code expired before it was approved. Try again.';
+
+  @override
+  String get options_bugReport_github_device_denied =>
+      'The request was declined on GitHub, so nothing was connected.';
 
   @override
   String options_bugReport_github_connectFailed(String error) {

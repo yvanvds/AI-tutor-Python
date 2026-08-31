@@ -554,29 +554,71 @@ abstract class AppLocalizations {
   /// **'Disconnect'**
   String get options_bugReport_github_disconnect_button;
 
-  /// No description provided for @options_bugReport_github_dialog_title.
+  /// No description provided for @options_bugReport_github_notConfigured.
   ///
   /// In en, this message translates to:
-  /// **'Connect GitHub'**
-  String get options_bugReport_github_dialog_title;
+  /// **'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.'**
+  String get options_bugReport_github_notConfigured;
 
-  /// No description provided for @options_bugReport_github_dialog_explainer.
+  /// No description provided for @options_bugReport_github_device_explainer.
   ///
   /// In en, this message translates to:
-  /// **'Paste a personal access token with permission to create issues on {repo}. The token is stored on this device only.'**
-  String options_bugReport_github_dialog_explainer(String repo);
+  /// **'Type this code on GitHub to let the app create issues on {repo}. Nothing is stored until you approve it.'**
+  String options_bugReport_github_device_explainer(String repo);
 
-  /// No description provided for @options_bugReport_github_dialog_field.
+  /// No description provided for @options_bugReport_github_device_instruction.
   ///
   /// In en, this message translates to:
-  /// **'Personal access token'**
-  String get options_bugReport_github_dialog_field;
+  /// **'Enter the code at {url}'**
+  String options_bugReport_github_device_instruction(String url);
 
-  /// No description provided for @options_bugReport_github_dialog_connect.
+  /// No description provided for @options_bugReport_github_device_waiting.
   ///
   /// In en, this message translates to:
-  /// **'Connect'**
-  String get options_bugReport_github_dialog_connect;
+  /// **'Waiting for you to approve it on GitHub…'**
+  String get options_bugReport_github_device_waiting;
+
+  /// No description provided for @options_bugReport_github_device_openBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open GitHub'**
+  String get options_bugReport_github_device_openBrowser;
+
+  /// No description provided for @options_bugReport_github_device_copyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get options_bugReport_github_device_copyCode;
+
+  /// No description provided for @options_bugReport_github_device_codeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied to the clipboard.'**
+  String get options_bugReport_github_device_codeCopied;
+
+  /// No description provided for @options_bugReport_github_device_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get options_bugReport_github_device_cancel;
+
+  /// No description provided for @options_bugReport_github_device_browserFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open a browser. Go to {url} yourself.'**
+  String options_bugReport_github_device_browserFailed(String url);
+
+  /// No description provided for @options_bugReport_github_device_expired.
+  ///
+  /// In en, this message translates to:
+  /// **'The code expired before it was approved. Try again.'**
+  String get options_bugReport_github_device_expired;
+
+  /// No description provided for @options_bugReport_github_device_denied.
+  ///
+  /// In en, this message translates to:
+  /// **'The request was declined on GitHub, so nothing was connected.'**
+  String get options_bugReport_github_device_denied;
 
   /// No description provided for @options_bugReport_github_connectFailed.
   ///

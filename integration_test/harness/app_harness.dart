@@ -13,7 +13,8 @@
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the system locale, the system light/dark setting, SharedPreferences
 // (in-memory), the playground file directory (temp), the update check (off),
-// the LLM (any call fails loudly) and the lesson example runner (scripted).
+// the LLM (any call fails loudly), the lesson example runner (scripted) and
+// the browser launcher (recorded, never opened — see [browserLaunches]).
 //
 // The light/dark pin is not cosmetic (#32): with no stored preference the app
 // follows the operating system, so an unpinned run renders in whatever theme
@@ -35,6 +36,8 @@ import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
+import 'package:ai_tutor_python/services/github/github_device_flow.dart';
+import 'package:ai_tutor_python/services/github/github_issue_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
@@ -50,6 +53,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../test/helpers/fake_lesson_code_runner.dart';
 import '../../test/helpers/in_memory_cosmos.dart';
+import 'fake_github_server.dart';
 import 'seed.dart';
 
 /// Signed in from the first frame; `tryAcquireTokenSilent` / `signIn` are
@@ -117,6 +121,8 @@ class AppHarness {
     this.pyRunner,
     this.archiveFile,
     this.systemBrightness = Brightness.dark,
+    this.github,
+    this.githubOAuthClientId,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -162,6 +168,27 @@ class AppHarness {
   /// test can click; pass a path in a temp directory to drive the round trip.
   final File? archiveFile;
 
+  /// GitHub, as the bug reporter talks to it (#57). `null` (the default)
+  /// leaves the production hosts in place, which costs nothing: no flow
+  /// starts a sign-in by itself, and a build with no OAuth client id has no
+  /// sign-in to start.
+  final FakeGitHubServer? github;
+
+  /// The OAuth client id the app believes it was compiled with.
+  ///
+  /// `null` leaves the real one from `.env` — which on a developer checkout
+  /// and on CI is empty, i.e. "no OAuth app registered". A flow that drives
+  /// the sign-in passes one; a flow that drives the *unconfigured* card
+  /// passes `''` explicitly rather than relying on the machine's `.env`.
+  final String? githubOAuthClientId;
+
+  /// Every URL the app asked the operating system to open (#57).
+  ///
+  /// The launcher is always replaced, in every flow: the production one hands
+  /// a URL to Windows, which during a test run means a browser window opening
+  /// on the machine running the suite.
+  final List<Uri> browserLaunches = <Uri>[];
+
   /// Every installer handover the app performed, as `(executable, arguments)`
   /// (#49).
   ///
@@ -199,6 +226,16 @@ class AppHarness {
           progressArchiveIoProvider.overrideWithValue(
             _FixedPathArchiveIo(archiveFile!),
           ),
+        if (github != null) ...[
+          gitHubOAuthBaseProvider.overrideWithValue(github!.base),
+          gitHubApiBaseProvider.overrideWithValue(github!.base),
+        ],
+        if (githubOAuthClientId != null)
+          gitHubOAuthClientIdProvider.overrideWithValue(githubOAuthClientId!),
+        browserLauncherProvider.overrideWithValue((Uri url) async {
+          browserLaunches.add(url);
+          return true;
+        }),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
