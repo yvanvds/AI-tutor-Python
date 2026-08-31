@@ -246,20 +246,34 @@ compiled without a client id and offers no sign-in.
      approval screen, so name it something they will recognise).
    - **Homepage URL:** `https://github.com/yvanvds/AI-tutor-Python` (your
      fork's URL if you forked).
-   - **Authorization callback URL:** the form requires one, but the device
-     flow never uses it. Put the homepage URL again.
+   - **Redirect URI:** the form requires one, but the device flow never
+     redirects, so the value is never used. Put the homepage URL again, and
+     leave **Allow wildcard matching** off. (GitHub used to call this field
+     *Authorization callback URL*; it is the same thing renamed.)
    - **Enable Device Flow:** ✅ **tick this.** It is the one setting that
      matters — without it GitHub answers every request with
      `device_flow_disabled`. If the checkbox is not on the registration form
      in your account, click **Register application** first, then open the new
      app's settings page, tick **Enable Device Flow**, and click **Update
      application**.
+   - **Expire user access tokens:** ❌ **untick this.** It is on by default.
+     Leaving it on makes every student's token die after eight hours and hands
+     the app a `refresh_token` to exchange for a new one — which this app does
+     not do: it stores only the access token, so the next bug report after
+     eight hours fails with GitHub's raw `Bad credentials` and no prompt to
+     sign in again. Since bug reports are occasional, that is very nearly
+     every report. Unticked, the token is long-lived, scoped to
+     `public_repo`, kept per device, and revocable at any time from the app's
+     page or the student's own settings. If you would rather keep expiry on,
+     the app needs refresh-token support first.
 4. Click **Register application**.
 5. On the app's page, copy the **Client ID** (it looks like `Ov23li…`). It is
    public — it ships inside the installer by design.
-6. **Do not generate a client secret.** The device flow has none, which is
-   exactly why it suits an app handed out to students; a secret compiled into
-   the binary would be a secret handed out with it.
+6. **Do not generate a client secret.** GitHub no longer creates one for you at
+   registration; there is a **Generate a new client secret** button on the
+   app's page afterwards. Do not press it. The device flow has no secret, which
+   is exactly why it suits an app handed out to students; a secret compiled
+   into the binary would be a secret handed out with it.
 
 ### 8.2 — Put the client id in `.env`
 
