@@ -15,6 +15,7 @@ import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
+import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
@@ -36,6 +37,7 @@ void main() {
   options_panel.main();
   bug_report_oauth.main();
   goals_row_highlight.main();
+  instructions_row_highlight.main();
   update_prompt.main();
   update_failure.main();
   update_install.main();

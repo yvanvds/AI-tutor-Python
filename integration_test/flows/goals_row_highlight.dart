@@ -24,34 +24,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../../test/helpers/ink_surface.dart';
 import '../harness/app_harness.dart';
 import '../harness/seed.dart';
-
-/// Walks up from [tile] the way `ListTile` does when it works out where its
-/// background and ink will land: the first ancestor that is either a
-/// `Material` (the surface it paints on) or an opaque box (which would be
-/// painted *over* that surface and hide it).
-Widget? _firstSurfaceAbove(WidgetTester tester, Finder tile) {
-  Widget? found;
-  tester.element(tile).visitAncestorElements((ancestor) {
-    final w = ancestor.widget;
-    if (w is Material) {
-      found = w;
-      return false;
-    }
-    final Color? color = switch (w) {
-      ColoredBox(:final Color color) => color,
-      DecoratedBox(decoration: BoxDecoration(:final Color? color)) => color,
-      _ => null,
-    };
-    if (color != null && color.a > 0) {
-      found = w;
-      return false;
-    }
-    return true;
-  });
-  return found;
-}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +61,7 @@ void main() {
     // (Before the fix the app also threw the framework assertion here, once
     // per row per build, which fails this test on its own.)
     expect(
-      _firstSurfaceAbove(tester, selectedTile),
+      firstSurfaceAbove(tester, selectedTile),
       isA<Material>(),
       reason:
           'an opaque box sits between the row and its Material, so the '

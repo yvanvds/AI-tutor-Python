@@ -203,7 +203,13 @@ class _InstructionsEditorPageState
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // A Material (not a coloured Container) so the ListTile rows inside — the
+    // document list, the sections list and the two headers — paint their tile
+    // colour, their selected highlight and their ink splashes on this
+    // surface. A ColoredBox here would sit in front of the nearest Material
+    // and hide all three, which is what selecting a document or a section was
+    // losing (#69, the same defect as #68 on the goals page).
+    return Material(
       color: AppColors.ink0,
       child: Column(
         children: [
