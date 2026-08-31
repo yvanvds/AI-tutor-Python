@@ -6,9 +6,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'instruction.dart';
 
 class InstructionsService extends Notifier<List<Instruction>> {
+  /// [container] is the test seam every other Cosmos-backed service here has
+  /// (`GoalsService`, `ContentService`, `ModuleService`, …): production leaves
+  /// it null and the service resolves the process-wide `CosmosPaths` handle,
+  /// a test passes an `InMemoryCosmos().container` so the instructions editor
+  /// can be mounted without a live database (#69).
+  InstructionsService({CosmosContainer? container})
+    : _containerOverride = container;
+
   static const String _pk = CosmosPartitions.instruction;
 
-  CosmosContainer get _container => CosmosPaths.instructions();
+  final CosmosContainer? _containerOverride;
+
+  CosmosContainer get _container =>
+      _containerOverride ?? CosmosPaths.instructions();
 
   @override
   List<Instruction> build() {

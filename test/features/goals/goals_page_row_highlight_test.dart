@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/ink_surface.dart';
 import '../../helpers/localization.dart';
 
 Map<String, dynamic> _goal({
@@ -43,32 +44,6 @@ Map<String, dynamic> _goal({
   'contentId': null,
   'moduleId': 'python-basics',
 };
-
-/// Walks up from [tile] the way `ListTile` does when it works out where its
-/// background and ink will land: the first ancestor that is either a
-/// `Material` (the surface it paints on) or an opaque box (which would be
-/// painted *over* that surface and hide it).
-Widget? firstSurfaceAbove(WidgetTester tester, Finder tile) {
-  Widget? found;
-  tester.element(tile).visitAncestorElements((ancestor) {
-    final w = ancestor.widget;
-    if (w is Material) {
-      found = w;
-      return false;
-    }
-    final Color? color = switch (w) {
-      ColoredBox(:final Color color) => color,
-      DecoratedBox(decoration: BoxDecoration(:final Color? color)) => color,
-      _ => null,
-    };
-    if (color != null && color.a > 0) {
-      found = w;
-      return false;
-    }
-    return true;
-  });
-  return found;
-}
 
 void main() {
   testWidgets('the selected root row paints its highlight on a Material, not '

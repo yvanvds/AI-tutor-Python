@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/ink_surface.dart';
 
 const _poll = Duration(seconds: 6);
 
@@ -159,6 +160,34 @@ void main() {
     expect(find.text('ORPHANED LESSON CONTENT'), findsNothing);
     expect(find.text('For loops lesson'), findsOneWidget);
     expect(find.text('(no lesson content)'), findsNothing);
+
+    await unmount(tester);
+  });
+
+  // Swept up with #69: the page painted its background with a coloured
+  // `Container`, i.e. a `ColoredBox`, and an `InkWell` paints its splash into
+  // the nearest `Material` *above* it — so tapping an orphan row gave no ink
+  // at all. Same defect as the goals page (#68) and the instructions editor
+  // (#69), which report it loudly because their rows are `ListTile`s.
+  testWidgets('the orphan row paints its ink on the page surface', (
+    tester,
+  ) async {
+    await mount(tester);
+
+    final orphanInk = find
+        .ancestor(
+          of: find.text('For loops lesson'),
+          matching: find.byType(InkWell),
+        )
+        .first;
+    expect(orphanInk, findsOneWidget);
+    expect(
+      firstSurfaceAbove(tester, orphanInk),
+      isA<Material>(),
+      reason:
+          'an opaque box sits between the row and its Material, so the tap '
+          'ripple is painted and then covered',
+    );
 
     await unmount(tester);
   });

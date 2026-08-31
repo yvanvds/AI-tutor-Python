@@ -365,7 +365,12 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     // Don't watch poll-driven providers at this level — they tick every 5s
     // and would rebuild the preview WebView along with the tree. The tree
     // watches them inside its own Consumer below.
-    return Container(
+    // A Material (not a coloured Container) so the tree rows inside paint
+    // their ink on this surface: `_OrphanRow` is an `InkWell`, and a
+    // ColoredBox here would sit in front of the nearest Material and hide the
+    // splash, the same defect the goals page (#68) and the instructions
+    // editor (#69) had with their ListTiles.
+    return Material(
       color: AppColors.ink0,
       child: Column(
         children: [
