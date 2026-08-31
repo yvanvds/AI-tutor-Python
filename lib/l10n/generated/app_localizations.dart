@@ -3029,6 +3029,12 @@ abstract class AppLocalizations {
   /// **'Received an unknown response.'**
   String get chat_notice_unknownResponse;
 
+  /// No description provided for @chat_notice_exerciseWithoutBlank.
+  ///
+  /// In en, this message translates to:
+  /// **'That exercise had nothing left to fill in. Fetching a new one.'**
+  String get chat_notice_exerciseWithoutBlank;
+
   /// No description provided for @chat_notice_subgoalDeletedRedirect.
   ///
   /// In en, this message translates to:

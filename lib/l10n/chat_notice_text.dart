@@ -30,6 +30,8 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_unknownResponseType(arg(0));
       case ChatNoticeKind.unknownResponse:
         return chat_notice_unknownResponse;
+      case ChatNoticeKind.exerciseWithoutBlank:
+        return chat_notice_exerciseWithoutBlank;
       case ChatNoticeKind.subgoalDeletedRedirect:
         return chat_notice_subgoalDeletedRedirect;
       case ChatNoticeKind.subgoalSaturated:

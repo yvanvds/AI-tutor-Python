@@ -43,6 +43,10 @@ enum ChatNoticeKind {
   /// A parsed response that no dispatch entry matched.
   unknownResponse,
 
+  /// A `complete_code` exercise arrived with nothing removed — no blank for
+  /// the student to fill in, so there is no exercise (#78).
+  exerciseWithoutBlank,
+
   subgoalDeletedRedirect,
   subgoalSaturated,
   noGoalsLeft,

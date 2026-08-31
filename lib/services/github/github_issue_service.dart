@@ -12,6 +12,7 @@
 import 'dart:convert';
 
 import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
+import 'package:ai_tutor_python/services/debug/turn_payload_redaction.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,6 +133,13 @@ class GitHubIssueService {
 /// land on a public repository under the student's own account, and a Windows
 /// path carries their name in it; funnelling every field through one redactor
 /// means a future field cannot quietly reintroduce the leak.
+///
+/// The turn payload additionally goes through [redactBeliefData] (#79), for
+/// the same reason and in the same shape: the conductor's planning event and
+/// the persisted turn carry the student's mastery estimates, which say nothing
+/// about the bug and everything about the student. The redaction happens here,
+/// not in the recorder — Options → Developer tools → Recent turns keeps the
+/// full numbers.
 String buildBugReportBody({
   required String description,
   required String appVersion,
@@ -148,7 +156,12 @@ String buildBugReportBody({
     ..writeln()
     ..write(runner.toMarkdown());
   if (turn != null) {
-    final redacted = Map<String, dynamic>.from(turn)..remove('instructions');
+    // Two different reasons to drop something. `instructions` is the system
+    // prompt: large, identical every turn, and not about the reported one.
+    // The belief data is the student's own (#79).
+    final redacted = redactBeliefData(
+      Map<String, dynamic>.from(turn)..remove('instructions'),
+    );
     final encoded = const JsonEncoder.withIndent('  ').convert(redacted);
     buffer
       ..writeln()

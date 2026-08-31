@@ -31,6 +31,10 @@
 //   flutter test integration_test/flows/bug_report_oauth.dart -d windows
 
 import 'package:ai_tutor_python/features/options/options_page.dart';
+import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
+import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -39,10 +43,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../harness/app_harness.dart';
 import '../harness/fake_github_server.dart';
+import '../harness/scripted_llm.dart';
 
 /// A client id shaped like the ones GitHub hands out. Its only job is to be
 /// non-empty: the fake server never checks it.
 const String _clientId = 'Ov23liINTEGRATIONTEST';
+
+/// A perfectly ordinary code-completion exercise — this flow is about what
+/// the *report* carries, not about the exercise (that is #78's flow).
+const String _exercise = 'voornaam = ___\nprint("Welkom, " + voornaam + "!")';
 
 /// Stands for the runner being *completely* unavailable (#74) — no bundle, no
 /// host, nothing to ask. The account name in the message is deliberate: it is
@@ -253,6 +262,114 @@ void main() {
     // Public repo, student's own account: the path is there, the name is not.
     expect(body, isNot(contains('student.name')));
     expect(body, contains(r'C:\Users\<user>\'));
+
+    await harness.dispose(tester);
+    await github.close();
+  });
+
+  // #79. The report that raised this arrived on a public repository, under a
+  // named student's own account, carrying a ranked list of the things that
+  // student is worst at. The estimates are not what a bug is diagnosed from,
+  // so they must not be in the issue — while everything #78 *was* diagnosed
+  // from stays attached.
+  //
+  // End-to-end rather than a widget test because both halves of the decision
+  // only exist in the running app: the conductor has to have planned a real
+  // turn, the recorder has to be the one the report dialog reads, and the
+  // numbers have to survive in that recorder afterwards — Developer tools is
+  // the teacher's own machine and keeps them.
+  testWidgets('Bug reports: the attached turn keeps the plan and drops the '
+      "student's mastery estimates", (tester) async {
+    final github = await FakeGitHubServer.start();
+    final llm = ScriptedLlm([
+      completeCodeReply(text: 'Vul de ontbrekende invoer in.', code: _exercise),
+    ]);
+    final harness = AppHarness(
+      github: github,
+      githubOAuthClientId: _clientId,
+      llm: llm,
+    );
+    await harness.boot(tester);
+
+    // A real conductor-planned turn first: opening the practice editor asks
+    // the tutor for an exercise, and the plan behind it is what carries the
+    // candidate LOs and their beliefs.
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await tester.tap(find.text('Continue'));
+    await pumpUntilFound(tester, find.byType(ExplainView));
+    await tester.tap(find.text('Try it yourself'));
+    await pumpUntilFound(tester, find.byType(PracticeView));
+
+    final recorder = harness.container.read(debugServiceProvider);
+    await pumpUntil(
+      tester,
+      () => recorder.buffer.any(
+        (t) => t.events.any((e) => e.name == 'conductor.planned'),
+      ),
+      timeout: const Duration(seconds: 30),
+      reason: 'the tutor never planned a turn to attach',
+    );
+
+    // The belief numbers really are in what the app recorded — otherwise the
+    // assertions below would pass on an empty payload.
+    final planned = recorder.buffer
+        .expand((t) => t.events)
+        .lastWhere((e) => e.name == 'conductor.planned');
+    final candidates = (planned.data!['candidateLOs'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(candidates, isNotEmpty);
+    expect(candidates.first['mean'], isA<double>());
+
+    await _openOptions(tester);
+    github.approved = true;
+    await _scrollTo(tester, find.text('Not connected to GitHub.'));
+    await _tap(tester, find.text('Connect GitHub'));
+    await pumpUntilFound(
+      tester,
+      find.text('Connected to GitHub as $kFakeGitHubLogin.'),
+    );
+
+    // The dialog offers the newest turn by default — the one just planned.
+    await _clearSnacks(tester);
+    await _tap(tester, find.text('Report a bug…'));
+    await pumpUntilFound(tester, find.text('Report a bug'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Title'),
+      'the exercise looks wrong',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+    await pumpUntil(
+      tester,
+      () => github.issues.isNotEmpty,
+      reason: 'the issue never reached GitHub',
+    );
+
+    final body = github.issues.single['body'] as String;
+
+    // Attached, and still worth attaching.
+    expect(body, contains('Turn debug payload'));
+    expect(body, contains('conductor.planned'));
+    expect(body, contains('"chosenReason"'));
+    expect(body, contains('"targetLO"'));
+    expect(body, contains('"loId": "${candidates.first['loId']}"'));
+
+    // But not one belief number went with it.
+    expect(body, isNot(matches(RegExp(r'"(mean|evidence)":\s*[0-9]'))));
+    expect(body, contains('"mean": "<redacted>"'));
+    expect(body, isNot(contains('${candidates.first['mean']}')));
+
+    // …and the teacher's own machine still has them: filing the report must
+    // not disturb what Options → Developer tools → Recent turns shows.
+    final after =
+        (recorder.buffer
+                    .expand((t) => t.events)
+                    .lastWhere((e) => e.name == 'conductor.planned')
+                    .data!['candidateLOs']
+                as List)
+            .cast<Map<String, dynamic>>();
+    expect(after.first['mean'], candidates.first['mean']);
+    expect(after.first['evidence'], candidates.first['evidence']);
 
     await harness.dispose(tester);
     await github.close();

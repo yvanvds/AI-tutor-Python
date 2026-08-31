@@ -1741,6 +1741,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_notice_unknownResponse => 'Received an unknown response.';
 
   @override
+  String get chat_notice_exerciseWithoutBlank =>
+      'That exercise had nothing left to fill in. Fetching a new one.';
+
+  @override
   String get chat_notice_subgoalDeletedRedirect =>
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
