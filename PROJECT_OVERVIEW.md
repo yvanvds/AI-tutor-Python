@@ -7,12 +7,12 @@ last_updated_at: 2026-05-09
 
 ## 1. High-level summary
 
-`ai_tutor_python` is a Flutter desktop application that acts as a personalised Python tutor for students. A dark "study lamp" shell hosts a sidebar of sections (`Sessie`, `Leerpad`, plus teacher-only `Doelen` / `Lesinhoud` / `Instructies` / `Studenten`) and a top-bar mode switcher (`Uitleg | Oefenen | Vrij coderen`) that swaps between three workspace modes: a markdown-rendered explanation canvas tied to teacher-authored lesson content, a Python editor + runner with optional chat panel, and a free-coding playground. Multiple-choice quizzes are not a separate mode — they take over the workspace whenever an `ActiveMcq` is in flight. Behind the UI, a probabilistic LLM-backed tutor maintains a per-student Beta-distribution belief over each Learning Objective (LO) inside every subgoal, calibrates question difficulty per student, persists every graded turn for audit, and lets teachers edit the prompts and lesson content that shape its behaviour. Identity is tied to the school's Microsoft Entra tenant. Built and used by a Python teacher (Yvan) for his own classroom; UI is in Dutch.
+`ai_tutor_python` is a Flutter desktop application that acts as a personalised Python tutor for students. A "study lamp" shell — dark by default, with a light palette and a follow-the-system option in Options (#32) — hosts a sidebar of sections (session, leerpad, options, plus teacher-only goals / lesson content / instructions / students) and a top-bar mode switcher (`SessionMode.explain | practice | playground`) that swaps between three workspace modes: a markdown-rendered explanation canvas tied to teacher-authored lesson content, a Python editor + runner with optional chat panel, and a free-coding playground. Multiple-choice quizzes are not a separate mode — they take over the workspace whenever an `ActiveMcq` is in flight. Behind the UI, a probabilistic LLM-backed tutor maintains a per-student Beta-distribution belief over each Learning Objective (LO) inside every subgoal, calibrates question difficulty per student, persists every graded turn for audit, and lets teachers edit the prompts and lesson content that shape its behaviour. Identity is tied to the school's Microsoft Entra tenant. Built and used by a Python teacher (Yvan) for his own classroom; the UI is localized, with English as the base language and Dutch as the shipped translation (#23).
 
 ## 2. Tech stack
 
-- **Flutter SDK constraint:** Dart `^3.10.1` (see [pubspec.yaml](pubspec.yaml)). No explicit Flutter version pin.
-- **Target platforms:** Windows desktop only. `distribute_options.yaml` packages a Windows `.exe` installer; an in-app updater fetches a manifest from `yvanvds.github.io/AI-tutor-Python/version.json` (GitHub Pages) and re-runs the installer ([core/update_info.dart](lib/core/update_info.dart)).
+- **Flutter SDK constraint:** Dart `^3.13.1` in both [pubspec.yaml](pubspec.yaml) and [packages/py_runner/pubspec.yaml](packages/py_runner/pubspec.yaml) (#61). CI pins the toolchain that carries it — `FLUTTER_VERSION: 3.47.1` in [.github/workflows/build.yml](.github/workflows/build.yml) (#60) — so the `dart format` gate there is reproducible locally.
+- **Target platforms:** Windows desktop only. `distribute_options.yaml` packages a Windows `.exe` installer; an in-app updater reads the **GitHub Releases API** ([core/github_release.dart](lib/core/github_release.dart)), offers the update in a dismissible bar, and installs it per-user with a relaunch. See "Update channel" in §8.
 
 ### Key packages (from [pubspec.yaml](pubspec.yaml))
 
@@ -23,11 +23,11 @@ last_updated_at: 2026-05-09
 **Backend**
 - `http` + `crypto` — used by the hand-rolled [core/cosmos_client.dart](lib/core/cosmos_client.dart) to talk to Azure Cosmos DB's REST API (no third-party Cosmos SDK).
 - `url_launcher` — opens the system browser for the Microsoft Entra OAuth flow.
-- `shared_preferences` — persists the Entra token bundle and the per-user OpenAI key.
+- `shared_preferences` — persists the Entra token bundle, the per-user OpenAI key, the language, the theme choice and the per-device AI model override (#32), and the GitHub token from the device flow (#57).
 
 **AI / LLM**
 - `dart_openai` — pinned to a fork at `https://github.com/yvanvds/openai.git`. The connector uses `chat.completions` (`OpenAI.instance.chat.create` / `createStream`) plus a hand-rolled `<TEXT>...</TEXT><META>{...}</META>` envelope (see [services/tutor/responses/envelope_assembler.dart](lib/services/tutor/responses/envelope_assembler.dart)).
-- `envied` (+ `envied_generator`) — obfuscates `OPEN_AI_API_KEY` and `COSMOS_KEY` from `.env` into [services/tutor/env.g.dart](lib/services/tutor/env.g.dart) and [services/config/azure_config.g.dart](lib/services/config/azure_config.g.dart).
+- `envied` (+ `envied_generator`) — obfuscates `OPEN_AI_API_KEY` and `COSMOS_KEY` from `.env` into [services/tutor/env.g.dart](lib/services/tutor/env.g.dart) and [services/config/azure_config.g.dart](lib/services/config/azure_config.g.dart). The same generator reads the *public* `GITHUB_OAUTH_CLIENT_ID` into [services/github/github_oauth_config.g.dart](lib/services/github/github_oauth_config.g.dart) — deliberately not obfuscated, since the device flow has no secret (#57).
 
 **Code execution**
 - `py_runner` — local Flutter package at [packages/py_runner/](packages/py_runner/) wrapping a long-lived `host.py` subprocess via `InstallerPyHostLocator`.
@@ -68,12 +68,13 @@ lib/
 ├── create_text_theme.dart       # Google Fonts text-theme helper (legacy; new theme is in theme/)
 ├── version.dart                 # const String kAppVersion
 │
-├── home_shell.dart              # DEAD — old NavigationRail shell
-├── theme.dart                   # DEAD — old Material 3 schemes
+├── l10n/                        # NEW (#23) — app_en.arb / app_nl.arb, generated/ AppLocalizations,
+│                                #   chat_notice_text.dart (runtime notices → translated strings)
 │
 ├── theme/                       # Design tokens and theme
-│   ├── app_theme.dart                # buildAppTheme() + AppMono (mono/tnum text styles)
-│   ├── tokens.dart                   # AppColors / AppSpacing / AppRadius / AppDurations / AppCurves
+│   ├── app_theme.dart                # buildAppTheme([AppPalette]) + AppMono (mono/tnum text styles)
+│   ├── tokens.dart                   # AppPalette (dark + light) behind the flat AppColors accessors (#32);
+│   │                                 #   AppSpacing / AppRadius / AppDurations / AppCurves
 │   └── code_theme.dart               # Syntax highlighting map for the Python editor
 │
 ├── core/
@@ -85,7 +86,10 @@ lib/
 │   ├── cosmos_paths.dart        # Single source of truth for container handles + CosmosPartitions
 │   ├── cosmos_doc_id.dart       # Composite id conventions (incl. turnHistory)
 │   ├── cosmos_safety.dart       # safeCosmos / safeCosmosStream / pollingStream
-│   ├── update_info.dart         # In-app installer-update helpers
+│   ├── github_release.dart      # NEW (#50) — reads the GitHub Releases API + the .sha256 asset
+│   ├── update_controller.dart   # NEW (#47) — UpdatePhase/UpdateState + check/apply/dismiss; no IO
+│   ├── update_bootstrap.dart    # NEW (#47) — the only update file that touches network/disk/process
+│   ├── update_info.dart         # UpdateInfo, isNewer, downloadToTemp (progress), verifySha256, runInstallerAndExit
 │   ├── debounce.dart            # Generic debounce util
 │   └── date_format.dart         # formatTs(DateTime) — yyyy-MM-dd HH:mm
 │
@@ -94,7 +98,13 @@ lib/
 │   ├── account/                 # Account model (now embeds StudentCalibration) + AccountService
 │   ├── chat/chat_service.dart   # Wraps flutter_chat InMemoryChatController; stream + MCQ helpers
 │   ├── code/code_service.dart   # Wraps flutter_code_editor CodeController
-│   ├── config/                  # GlobalConfigService, AzureConfig (envied), LocalApiKeyStorage
+│   ├── config/                  # GlobalConfigService, AzureConfig (envied), LocalApiKeyStorage,
+│   │                            #   LocaleService (#23), ThemeService + resolveAppPalette (#32),
+│   │                            #   ModelPreference — per-device model override (#32)
+│   ├── github/                  # NEW (#57) — GitHubDeviceFlow (OAuth device flow, scope public_repo),
+│   │                            #   GitHubIssueService, GitHubOAuthConfig (envied GITHUB_OAUTH_CLIENT_ID)
+│   ├── playground/              # NEW — PlaygroundFileStore (#19) + PlaygroundFilesService and
+│   │                            #   PlaygroundSyncService over the per-uid `playground_files` container (#31)
 │   ├── debug/debug_session_recorder.dart  # Circular buffer (200 turns) of TurnRecord events; mirrors persisted turn_history doc and any follow-up the grader emitted
 │   │
 │   ├── content/                 # NEW — authored explanation blocks linked from goals
@@ -120,7 +130,8 @@ lib/
 │   │   └── turn_history_service.dart     # Append-only `turn_history`; watchStrongUnacknowledgedFor; listEventsFor; acknowledgeAllFor
 │   │
 │   ├── instructions/            # Instruction (sections map) + InstructionsService
-│   ├── output/                  # OutputService + OutputController (binds widget)
+│   ├── output/                  # OutputService + OutputController (binds widget); codeImportsTurtle()
+│   │                            #   narrates a turtle run and Stop into the output panel (#51)
 │   ├── progress/                # Progress model (now derived cache) + ProgressService + teacher_signals
 │   │   ├── progress.dart                 # Reduced to {goalID, progress, updatedAt, lastSessionAt}; recentAnswers/difficulty/concept-attribution fields removed
 │   │   ├── progress_service.dart         # Reads/writes `progress`; best-effort `progress_history` sample on change
@@ -154,7 +165,7 @@ lib/
 ├── features/
 │   ├── shell/                   # Outer chrome
 │   │   ├── app_shell.dart              # Top-level Scaffold: Sidebar + TopBar + body + overlays; switches lessonContent → LessonContentPage
-│   │   ├── shell_state.dart            # Section enum {session, map, goals, lessonContent, instructions, students}; SessionMode {explain, practice, free}; Profile, profileProvider, modeProvider, sectionProvider, ambientProgressProvider
+│   │   ├── shell_state.dart            # Section enum {session, map, goals, lessonContent, instructions, students, options}; SessionMode {explain, practice, playground}; developerToolsProvider (kDebugMode); Profile, profileProvider, modeProvider, sectionProvider, ambientProgressProvider, xpStateProvider
 │   │   ├── sidebar.dart                # 72px icon rail; student vs teacher sections; debug + sign-out; teacher group includes new "Lesinhoud"
 │   │   └── top_bar.dart                # Greeting / ModeSwitcher / StatStrip + 2px AmbientProgress
 │   │
@@ -164,7 +175,7 @@ lib/
 │   │   │   ├── explain_view.dart       # ~670 lines: full markdown renderer for authored Content (fenced code, callouts, headings, paragraphs); subgoal header pill + idx/total + "Vorige" + "Probeer het zelf" → practice mode
 │   │   │   ├── practice_view.dart      # ObjectiveBanner + RunControls + Editor + OutputPanel (vertical split); when activeMcqProvider is non-null, mounts QuizView in place of editor/output
 │   │   │   ├── quiz_view.dart          # Full MCQ surface: header pill + TutorMarkdown prompt + optional code card + 2-column option grid (badges A–F) + colored feedback panel + "Volgende"
-│   │   │   └── free_view.dart          # "Speeltuin" header + reused PracticeView (no objective)
+│   │   │   └── playground_view.dart    # Playground header + file browser + reused PracticeView (no objective)
 │   │   └── widgets/
 │   │       ├── objective_banner.dart   # "Huidig doel" pill + title from goalSelectionProvider
 │   │       ├── run_controls.dart       # Run/Stop/Reset/Hint/Send-to-tutor strip
@@ -193,13 +204,16 @@ lib/
 │   ├── auth/
 │   │   ├── sign_in_page.dart, local_key_gate_screen.dart
 │   │
-│   ├── dashboard/                       # Mostly retired; only three files still referenced
-│   │   ├── editor.dart                 # IN USE — CodeField bound to CodeService.controller
-│   │   ├── debug_dialog.dart           # IN USE — Teacher-only dialog: wipe-all-progress; level-up overlay test; difficulty + question-type buttons; recent-turns list with full PersistedTurnRecord JSON
-│   │   ├── dashboard.dart              # DEAD
-│   │   ├── controllers.dart            # DEAD
-│   │   ├── output.dart                 # DEAD
-│   │   └── editor_controller.dart      # DEAD — entirely commented out
+│   ├── dashboard/                       # Retired down to one file
+│   │   └── editor.dart                 # CodeField bound to CodeService.controller
+│   │
+│   ├── options/                         # NEW (#25, #32) — Section.options, one scrollable page
+│   │   └── options_page.dart           # Language; appearance light/dark/system (#32); AI model on
+│   │                                   #   own-key + developer builds (#32); progress reset; progress
+│   │                                   #   export/import to JSON (#32); own OpenAI key; bug reports via
+│   │                                   #   the GitHub device flow (#57); developer tools (the former
+│   │                                   #   DebugDialog, behind developerToolsProvider); About + the
+│   │                                   #   manual update check (#48)
 │   │
 │   ├── goals/                          # Teacher: goal-tree CRUD + reparent + DnD; new export/import buttons (v2 JSON envelope; Add vs Replace; preserves contentId); goal_form has inline _LesinhoudRow that opens Lesinhoud
 │   ├── instructions/                   # Teacher: doc/section editor over instructions/{id}.sections{}
@@ -218,19 +232,29 @@ lib/
     ├── goal_splash_overlay.dart            # Subgoal/goal-completion confetti splash
     ├── goal_crumb_in_app_bar.dart          # Crumb (legacy)
     ├── undo_snackbar.dart                  # Generic undo snackbar helper
-    ├── add_input.dart, chips_editor.dart, inline_title.dart
+    ├── update_status.dart                  # NEW (#48) — updateStatusText() + UpdateOfferBar (Update / Later),
+    │                                       #   the strip of shell chrome that offers an update instead of
+    │                                       #   announcing it; the same state is re-rendered in Options → About
+    ├── lesson_document.dart, lesson_html_view.dart   # Embedded HTML lesson blocks (#13, #14)
+    ├── add_input.dart, text_list_editor.dart, inline_title.dart
 
 packages/py_runner/                    # Local Flutter package — PyRunner, InstallerPyHostLocator, RunHandle, InputRequest
 test/                                  # mocktail-based unit + widget tests; helpers/in_memory_cosmos.dart is the shared Cosmos fake
 integration_test/                      # End-to-end flows on Windows desktop (#28)
 ├── app_test.dart                      # Single entrypoint running every flow in one app process
-├── flows/                             # One file per user-visible flow (lesson, language switch, playground files)
-└── harness/                           # AppHarness: GoalsApp over InMemoryCosmosClient + signed-in AuthService + seed data
+├── flows/                             # One file per user-visible flow: lesson, language switch, playground
+│                                      #   files, options panel, turtle run notice, bug-report OAuth (#57),
+│                                      #   and five update flows (prompt / install / failure / manual check /
+│                                      #   dev build) (#47, #48, #50)
+└── harness/                           # AppHarness: GoalsApp over InMemoryCosmosClient + signed-in AuthService
+                                       #   + seed data; fake_release_server.dart and fake_github_server.dart
+                                       #   are loopback stand-ins for the Releases API and GitHub's OAuth/issues
 public/                                # Landing page deployed to GitHub Pages by .github/workflows/static.yml
 distribute_options.yaml                # flutter_distributor windows-exe job
 windows/                               # Windows runner + packaging/Inno Setup config
 docs/                                  # CONDUCTOR_POLICY.md, STUDENT_MODEL.md, LLM_CONTRACT.md (load-bearing for the conductor redesign)
-TODO.md, TESTING_PLAN.md               # In-tree planning docs
+tooling/build_release.ps1              # Version stamp + build + installer + release assets (incl. the .sha256)
+.github/workflows/                     # build.yml (format gate, analyze, unit tests, integration job) + static.yml
 ```
 
 ## 4. Data model
@@ -317,7 +341,7 @@ There is no `roles/{uid}` container. The teacher flag rides on the Entra access 
 
 ### Local persistence
 
-- **`shared_preferences` key `azure_auth_tokens_v1`** — JSON bundle of `{access_token, refresh_token, id_token, access_token_expiry}` written by [auth_service.dart](lib/services/auth/auth_service.dart). Per the school's "students tampering is OK" stance (TODO.md), no OS keychain.
+- **`shared_preferences` key `azure_auth_tokens_v1`** — JSON bundle of `{access_token, refresh_token, id_token, access_token_expiry}` written by [auth_service.dart](lib/services/auth/auth_service.dart). Per the school's "students tampering is OK" stance, no OS keychain.
 - **`shared_preferences` key `local_api_key`** — per-device OpenAI key set via [LocalKeyGateScreen](lib/features/auth/local_key_gate_screen.dart).
 
 ## 5. Core features & their entry points
@@ -338,21 +362,21 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 
 [features/shell/app_shell.dart](lib/features/shell/app_shell.dart) is the top-level Scaffold. It composes:
 
-- A 72px [Sidebar](lib/features/shell/sidebar.dart) with two student sections (`Sessie`, `Leerpad`) and, for teachers only, a `Docent` group (`Doelen`, `Lesinhoud`, `Instructies`, `Studenten`). A debug button is shown in `kDebugMode` and opens [DebugDialog](lib/features/dashboard/debug_dialog.dart).
-- A [TopBar](lib/features/shell/top_bar.dart) with three slots: a `Hoi {name}` greeting + subline on the left, a centred `ModeSwitcher` pill (visible only in `Section.session`), and a `StatStrip` with a streak chip and an XP/level pill on the right (still placeholder — Phase 6). A 2px gradient `AmbientProgress` line sits along the very top edge.
-- The active body, switched on `sectionProvider`: `SessionView`, `LeerpadPage`, `GoalsPage`, **`LessonContentPage`** (new), `InstructionsEditorPage`, or `AccountsPage`. If a teacher-only section is selected and the user is not a teacher, the shell bounces back to `Section.session`.
+- A 72px [Sidebar](lib/features/shell/sidebar.dart) with two student sections (`Sessie`, `Leerpad`) and, for teachers only, a `Docent` group (`Doelen`, `Lesinhoud`, `Instructies`, `Studenten`). An options button at the foot opens `Section.options`, which is where language, appearance, progress export/import, bug reports and — behind `developerToolsProvider` — the former debug tools now live (#25, #26, #32).
+- A [TopBar](lib/features/shell/top_bar.dart) with three slots: a `Hoi {name}` greeting + subline on the left, a centred `ModeSwitcher` pill (visible only in `Section.session`), and a `StatStrip` with a streak chip and an XP/level pill on the right (fed by `xpStateProvider` and `Account.streakDays`). A 2px gradient `AmbientProgress` line sits along the very top edge.
+- The active body, switched on `sectionProvider`: `SessionView`, `LeerpadPage`, `GoalsPage`, `LessonContentPage`, `InstructionsEditorPage`, `AccountsPage`, or `OptionsPage`. [UpdateOfferBar](lib/widgets/update_status.dart) is inserted above the body while `UpdateState.isOffering` (#48). If a teacher-only section is selected and the user is not a teacher, the shell bounces back to `Section.session`.
 - Two stacked overlays: [GoalSplashOverlay](lib/widgets/goal_splash_overlay.dart) and [LevelUpOverlay](lib/widgets/level_up_overlay.dart).
 
-[shell_state.dart](lib/features/shell/shell_state.dart) defines `Section` (`session, map, goals, lessonContent, instructions, students`) and `SessionMode` (`explain, practice, free`). MCQs are not a separate `SessionMode` — they take over the practice surface whenever `activeMcqProvider` is non-null.
+[shell_state.dart](lib/features/shell/shell_state.dart) defines `Section` (`session, map, goals, lessonContent, instructions, students, options`) and `SessionMode` (`explain, practice, playground`). MCQs are not a separate `SessionMode` — they take over the practice surface whenever `activeMcqProvider` is non-null.
 
 ### Session view (mode-driven workspace)
 
-[features/session/session_view.dart](lib/features/session/session_view.dart) renders the body for `Section.session`. It watches `modeProvider` and shows one of three mode views in the left panel, with an animated 460px chat panel on the right that hides while an MCQ is active or in `free` mode:
+[features/session/session_view.dart](lib/features/session/session_view.dart) renders the body for `Section.session`. It watches `modeProvider` and shows one of three mode views in the left panel, with an animated 460px chat panel on the right that hides while an MCQ is active or in `playground` mode:
 
 - **Uitleg** ([explain_view.dart](lib/features/session/modes/explain_view.dart), ~670 lines) — full markdown-rendered explanation canvas. Parses fenced ` ```python ` blocks, callouts (`> [!info]`), headings, paragraphs and renders them as styled cards (code with syntax highlighting, colored callouts with icons, sized headings). Renders subgoal header pill with root concept and `idx / total` counter; footer has "Vorige" ghost button and "Probeer het zelf" accent button (→ practice mode). Source is the authored `Content` doc linked from `Goal.contentId`; falls back to a placeholder when no content has been authored yet.
 - **Oefenen** ([practice_view.dart](lib/features/session/modes/practice_view.dart)) — `ObjectiveBanner` + `RunControls` + `Editor` + `OutputPanel` with `multi_split_view`. When `activeMcqProvider != null`, it mounts [QuizView](lib/features/session/modes/quiz_view.dart) in place of the editor/output split.
 - **Quiz (sub-mode of Oefenen)** ([quiz_view.dart](lib/features/session/modes/quiz_view.dart)) — full MCQ surface: header pill + `TutorMarkdown` prompt + optional code card (syntax highlighted) + 2-column option grid (badges A–F) + colored feedback panel (green/red, rendered via `TutorMarkdown`) + "Volgende" advance button. Reads/writes `activeMcqProvider`.
-- **Vrij coderen** ([free_view.dart](lib/features/session/modes/free_view.dart)) — "speeltuin" header strip over a re-used `PracticeView(showObjective: false)`.
+- **Playground** ([playground_view.dart](lib/features/session/modes/playground_view.dart)) — header strip with the file browser (save / open / delete, #19) over a re-used `PracticeView(showObjective: false)`. Saved files mirror to the student's `playground_files` container so they follow them between classroom machines (#31).
 
 [ObjectiveBanner](lib/features/session/widgets/objective_banner.dart) reads the active goal from `goalSelectionProvider`. [RunControls](lib/features/session/widgets/run_controls.dart) renders Run/Stop as a pill button, plus ghost icon buttons for Reset, Hint (`tutorService.requestHint(code)`), and Send-to-tutor (`tutorService.submitCode(code)`).
 
@@ -401,7 +425,7 @@ This is the heart of the redesign — the previous three-phase (guiding/warm-up/
 
 ### Level-up overlay
 
-[services/progression/level_up_controller.dart](lib/services/progression/level_up_controller.dart) holds a nullable `LevelUpEvent`; [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens and fades in a celebration card. As of HEAD, no producer calls `push(...)` — wired but inert. TODO.md "Phase 6 — level-up trigger" tracks the open trigger decision.
+[services/progression/level_up_controller.dart](lib/services/progression/level_up_controller.dart) holds a nullable `LevelUpEvent`; [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens and fades in a celebration card. As of HEAD, no producer calls `push(...)` — wired but inert.
 
 ### Teacher dashboard
 
@@ -414,7 +438,7 @@ This is the heart of the redesign — the previous three-phase (guiding/warm-up/
   - The read-only goal/progress list (older `GoalTile` view).
   - [status_reports_section.dart](lib/features/account/detail/status_reports_section.dart) — per-subgoal AI status reports.
   - [progress_history_charts.dart](lib/features/account/detail/progress_history_charts.dart) — 30 days of progress-history line charts.
-- **Debug dialog:** [features/dashboard/debug_dialog.dart](lib/features/dashboard/debug_dialog.dart) — teacher-only, `kDebugMode` only. "Wipe all progress" deletes `progress`, `progress_history`, `lo_beliefs`, `turn_history` for the current uid and resets calibration. "Show level-up overlay" tests the overlay. Difficulty picker + 5 question-type buttons trigger probes manually. A recent-turns list shows each turn's request type, quality, selection reason, follow-up depth, target LOs, calibration before/after, fallback flag, follow-up question, and signal events; tapping a turn pops a dialog with the full `PersistedTurnRecord` JSON.
+- **Developer tools:** the former `DebugDialog`, now a section of [features/options/options_page.dart](lib/features/options/options_page.dart) behind `developerToolsProvider` (`kDebugMode`). "Wipe all progress" deletes `progress`, `progress_history`, `lo_beliefs`, `turn_history` for the current uid and resets calibration. "Show level-up overlay" tests the overlay. Difficulty picker + 5 question-type buttons trigger probes manually. A recent-turns list shows each turn's request type, quality, selection reason, follow-up depth, target LOs, calibration before/after, fallback flag, follow-up question, and signal events; tapping a turn pops a dialog with the full `PersistedTurnRecord` JSON.
 
 ### Crash recovery
 
@@ -434,7 +458,11 @@ Notable Riverpod providers:
 - **Tutor / mastery:** `tutorServiceProvider`, `chatServiceProvider`, `loBeliefsServiceProvider` *(new)*, `turnHistoryServiceProvider` *(new)*, `splashServiceProvider`, `outputServiceProvider`
 - **Shell / UI:** `sectionProvider`, `modeProvider`, `ambientProgressProvider`, `profileProvider`
 - **Chat-flow state:** `streamStateProvider`, `mcqPendingProvider`, `activeMcqProvider` *(new — non-null while an MCQ is in flight; takes over the practice surface)*
-- **Progression:** `levelUpControllerProvider`
+- **Progression:** `levelUpControllerProvider`, `xpStateProvider`
+- **Options / appearance:** `localeServiceProvider`, `themeServiceProvider` + `systemBrightnessProvider` + `appPaletteProvider` *(#32)*, `modelPreferenceProvider` *(#32)*, `developerToolsProvider`
+- **Updater:** `updateControllerProvider` *(#47)*, with `updateServicesProvider` / `updateFeedUrlProvider` / `updateAutoCheckProvider` / `installerLauncherProvider` as the seams a test overrides
+- **Playground:** `playgroundFilesServiceProvider`, `playgroundSyncServiceProvider` *(#31)*
+- **Bug reports:** `gitHubDeviceFlowProvider`, `githubIssueServiceProvider`, `githubTokenStorageProvider` *(#57)*
 
 ### Cosmos REST + polling
 
@@ -451,7 +479,7 @@ Reactivity is built on **polling**: [`pollingStream`](lib/core/cosmos_safety.dar
    - account doc still loading → spinner.
    - `!mayUseGlobalKey && !hasLocalKey` → `LocalKeyGateScreen`.
    - else → `AppShell`.
-4. `AppShell.initState` schedules `_checkForUpdate()` once after the first frame.
+4. `AppShell` fires `updateControllerProvider.notifier.start()` once after the first frame. It returns without a request unless `autoCheck` is on (`kReleaseMode`, #47), and it never installs anything by itself: a successful check only flips `UpdateState.isOffering`, which mounts `UpdateOfferBar` (#48).
 5. `AccountService` listens to the auth identity. On a new identity it calls `_ensureProfile`, subscribes to `watchAccount(uid)`, and on the first non-null emission calls `TutorService.initializeSession(force: true)` once per uid.
 
 ### One graded turn (UI → grader → beliefs → audit)
@@ -480,12 +508,11 @@ Reactivity is built on **polling**: [`pollingStream`](lib/core/cosmos_safety.dar
 
 ## 7. Known limitations / TODOs / rough edges
 
-See [TODO.md](TODO.md) for the current planning doc. The load-bearing design docs are `docs/CONDUCTOR_POLICY.md`, `docs/STUDENT_MODEL.md`, and `docs/LLM_CONTRACT.md`. Notable rough edges visible in the code itself:
+Open work is tracked as GitHub issues on `yvanvds/AI-tutor-Python`; there is no in-tree planning doc. The load-bearing design docs are `docs/CONDUCTOR_POLICY.md`, `docs/STUDENT_MODEL.md`, and `docs/LLM_CONTRACT.md`. Notable rough edges visible in the code itself:
 
 - **Lesson content is half-wired.** The Lesinhoud authoring page works end-to-end, but only some subgoals have authored `Content`. `ExplainView` falls back to a placeholder where no content exists, and the markdown renderer is the canvas's only content source — there's no curriculum tree of "lessons" yet.
 - **Module management UI is deferred.** `ModuleService.ensureDefaultModule()` bootstraps `python-basics`; there's no UI to create or rename modules. The Lesinhoud tree groups by `moduleId`, so adding more modules later is structurally cheap.
-- **Level-up overlay is wired but inert.** [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens to `levelUpControllerProvider`, but no producer calls `push(...)` yet. Profile gamification fields (`level`, `xp`, `streak`) in [shell_state.dart](lib/features/shell/shell_state.dart) are placeholders. TODO.md "Phase 6" tracks the trigger.
-- **Dead UI files left on disk.** [home_shell.dart](lib/home_shell.dart), [theme.dart](lib/theme.dart), [features/dashboard/dashboard.dart](lib/features/dashboard/dashboard.dart), [features/dashboard/output.dart](lib/features/dashboard/output.dart), [features/dashboard/controllers.dart](lib/features/dashboard/controllers.dart), and [features/dashboard/editor_controller.dart](lib/features/dashboard/editor_controller.dart) are no longer referenced.
+- **Level-up overlay is wired but inert.** [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens to `levelUpControllerProvider`, but no producer calls `push(...)` yet. The `Profile` gamification fields in [shell_state.dart](lib/features/shell/shell_state.dart) are no longer placeholders — `level` / `xp` come from `xpStateProvider` and `streak` from `Account.streakDays` — so only the celebration trigger is still missing.
 - **Cosmos auth is master-key.** [cosmos_client.dart](lib/core/cosmos_client.dart) has an `AadTokenAuth` stub for the eventual swap to per-user AAD RBAC; until then every authenticated student holds the database master key.
 - **No realtime listeners.** All cross-device updates rely on a 5 s `pollingStream` tick.
 - **Local API key not used.** `LocalApiKeyStorage.saveKey(...)` writes to `SharedPreferences`, the gate screen requires it, but `OpenaiConnector._apiKey = Env.apiKey` always uses the build-time obfuscated key.
@@ -495,7 +522,7 @@ See [TODO.md](TODO.md) for the current planning doc. The load-bearing design doc
 - **No sandboxing of student code.** The script runs in a child process via `py_runner` with full filesystem/network access.
 - **`dart_openai` is pinned to a personal fork** (`https://github.com/yvanvds/openai.git`).
 - **Windows-only.** No iOS/Android/macOS/Linux/Web target.
-- **All UI text is Dutch and hard-coded** throughout services and widgets; no i18n layer.
+- **UI text goes through `AppLocalizations`** (#23): English is the base language and Dutch the translation, both under [lib/l10n/](lib/l10n/), with the language picked in the Options panel. Teacher-authored data — goal titles, lesson content, AI instructions — is not part of the ARB files and stays in whatever language it was written in.
 - **Goal import "Replace" mode preserves contentId but not authored Content docs themselves.** A re-imported tree keeps the link, but if the imported tree omits a subgoal, the link is dropped and the orphaned `Content` doc is left in the container.
 - **`isWarmUp` is a vestigial field** on `progress_history` samples — the new conductor has no warm-up phase but writes `false` for backward compatibility with the existing time-series.
 
@@ -513,6 +540,12 @@ See [TODO.md](TODO.md) for the current planning doc. The load-bearing design doc
   ENTRA_REDIRECT_URI=http://localhost
   ```
   `OPEN_AI_API_KEY` and `COSMOS_KEY` are obfuscated at build time via `envied`; the others are not secrets.
+
+  One **optional** entry sits beside them (#57):
+  ```
+  GITHUB_OAUTH_CLIENT_ID=Ov23li...
+  ```
+  It is the public client id of the GitHub OAuth app the in-app bug reporter signs in with. The device flow has no client secret, so this is not obfuscated. It defaults to the empty string, and a build without it still compiles — `GitHubDeviceFlow.isConfigured` is then false and the Options panel says it cannot sign in to GitHub. README "Step 8" registers the app (the one setting that matters there is **Enable Device Flow**).
 
 - **Entra app registration prerequisites** (Azure Portal → App registrations → your app):
   - "Authentication" → add `http://localhost` as a redirect URI under "Mobile and desktop applications".
@@ -557,4 +590,12 @@ flutter_distributor release --name=windows
 
 ### Update channel
 
-A release build publishes a manifest at `https://yvanvds.github.io/AI-tutor-Python/version.json` (GitHub Pages, served from a GitHub Releases asset). On launch, [app_shell.dart](lib/features/shell/app_shell.dart) fetches that manifest and, if newer, downloads `python_teacher_install.exe`, verifies SHA-256, and runs it `/VERYSILENT /NORESTART` before exiting.
+The release *is* the manifest (#50). `tooling/build_release.ps1` publishes a GitHub release whose tag carries the version and whose assets are `python_teacher_install.exe` and `python_teacher_install.exe.sha256`; there is no `version.json` on GitHub Pages any more, and nothing left to keep in lockstep with the release it describes (that lockstep is what broke in #45).
+
+The flow, split across three files (#47):
+
+- [core/github_release.dart](lib/core/github_release.dart) — GETs `api.github.com/repos/yvanvds/AI-tutor-Python/releases/latest` unauthenticated (the repo is public, so no token ships to a student), reads the tag as the version, picks the installer asset, and fetches the `.sha256` beside it. `/releases/latest` already excludes drafts and pre-releases. A missing checksum asset is a failure, not an offer. Requests time out (10 s) and a spent rate limit is reported as such (#46).
+- [core/update_controller.dart](lib/core/update_controller.dart) — `UpdatePhase` (`idle → checking → upToDate | available → downloading → applying | failed`) with every side effect behind a `UpdateServices` seam, so the whole flow is testable with no network. `check()` never throws; `apply()` is only ever reached from a button a person pressed.
+- [core/update_bootstrap.dart](lib/core/update_bootstrap.dart) — the production wiring, and the only file here that touches the network, the disk or a process. `updateAutoCheckProvider` is `kReleaseMode`, so a `flutter run` checkout and every integration-test boot stay offline; `updateFeedUrlProvider` is what the harness overrides.
+
+On screen, an available update shows as [UpdateOfferBar](lib/widgets/update_status.dart) — a strip of shell chrome with **Update** and **Later**, plus download progress — rather than the old blocking dialog (#48). The same state, and a manual **Check for updates**, are in Options → About. Accepting downloads the installer to `%TEMP%`, verifies its SHA-256 (streamed, never buffered), deletes it on a mismatch, and otherwise runs it `/SILENT /NOCANCEL /NORESTART /RELAUNCH=1` before `exit(0)`. The install is **per-user** (`%LOCALAPPDATA%`), so it needs no UAC prompt, and `/RELAUNCH=1` is the custom switch `installer.iss` reads to start the app again afterwards (#49, #55).
