@@ -35,7 +35,12 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return Container(
+    // A Material (not a coloured Container) so the ListTile rows inside — the
+    // root and subgoal lists, and the editor's switches — paint their tile
+    // colour and ink splashes on this surface. A ColoredBox here would sit in
+    // front of the nearest Material and hide both, which is exactly what the
+    // selected-row highlight was losing (#68).
+    return Material(
       color: AppColors.ink0,
       child: Column(
         children: [
