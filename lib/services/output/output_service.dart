@@ -219,7 +219,7 @@ class OutputService {
 /// so the end-to-end harness can drive Run/Stop without the bundled
 /// interpreter; production always gets the real one.
 final pyRunnerProvider = Provider<PyRunner>(
-  (ref) => PyRunner(locator: const InstallerPyHostLocator()),
+  (ref) => PyRunner(locator: const InstallerPyHostLocator(devMode: kDebugMode)),
 );
 
 final outputServiceProvider = Provider<OutputService>((ref) {

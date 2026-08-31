@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:py_runner/py_runner.dart';
 
@@ -96,7 +97,9 @@ class PyLessonCodeRunner implements LessonCodeRunner {
 /// Own Python host for lesson examples, separate from the practice editor's
 /// [OutputService] host so a lesson loading never cancels a student's run.
 final lessonCodeRunnerProvider = Provider<LessonCodeRunner>((ref) {
-  final pyRunner = PyRunner(locator: const InstallerPyHostLocator());
+  final pyRunner = PyRunner(
+    locator: const InstallerPyHostLocator(devMode: kDebugMode),
+  );
   ref.onDispose(() async {
     await pyRunner.shutdown();
   });
