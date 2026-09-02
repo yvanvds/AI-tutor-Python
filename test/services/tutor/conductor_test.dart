@@ -796,7 +796,14 @@ void main() {
       loId: 'lo-print',
       alpha: 5,
       beta: 1,
-      lastUpdatedAt: lastUpdatedAt ?? DateTime.now().toUtc(),
+      // A minute in the past, never "now": the conductor stamps its own
+      // `DateTime.now()` on the write, and on Windows the clock does not
+      // always advance between two calls a few microseconds apart, so an
+      // `isAfter` against a "now" fixture is a coin flip (#109). A minute
+      // of decay on (5, 1) is ~3e-5 on α — invisible at the tolerances used.
+      lastUpdatedAt:
+          lastUpdatedAt ??
+          DateTime.now().toUtc().subtract(const Duration(minutes: 1)),
       lastQuestionType: 'completeCodeQuestion',
       lastPositiveAtCalibratedAt: DateTime.utc(2026, 4, 1),
       highestPositiveDifficulty: QuestionDifficulty.medium,
@@ -860,7 +867,8 @@ void main() {
         final outcome = await grade(s.c);
 
         final after = printAfter(s.f);
-        expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-6));
+        // 1e-3: the fixture sits a minute in the past (see masteredPrint).
+        expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-3));
         expect(after.beta, closeTo(1.0, 1e-6));
         expect(after.lastUpdatedAt.isAfter(before.lastUpdatedAt), isTrue);
         // Not a probe of this LO: no ratchet, no counter, no type rotation.
