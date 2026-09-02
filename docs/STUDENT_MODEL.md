@@ -205,6 +205,16 @@ StudentLOBelief {
                                         // when lastPositiveAtCalibratedAt
                                         // is set, absent otherwise.
   recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
+  firstMasteredAt: string?              // ISO 8601, set the first time all
+                                        // three mastery conditions held
+                                        // after a write (conductor policy
+                                        // 4.3, #101). One-way: decay and
+                                        // later negatives never clear it.
+                                        // Gate for transfer credit (3.7).
+                                        // Missing on older docs: read as
+                                        // "mastered at the last write" when
+                                        // the stored α, β and ratchet meet
+                                        // the mastery rule, else absent.
 }
 ```
 
@@ -293,6 +303,13 @@ Belief and calibration are the source of truth for decisions;
   is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
   because the symmetric difficulty multiplier keeps difficulty out of
   `(α, β)`.
+- **`firstMasteredAt` is a one-way mastery stamp** (#101). Mastery itself
+  never latches (decay can demote), but "was this LO ever mastered by
+  direct probing?" is a durable fact the model keeps, because transfer
+  credit (conductor policy 3.7) may refresh only such LOs, and the
+  warm-up review questions (#102) pick from the same set. Beliefs in
+  *other* subgoals than the active one can therefore be written by a
+  graded turn — but only upward, by that small credit.
 
 ## What this model deliberately does not do
 

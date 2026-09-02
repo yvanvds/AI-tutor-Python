@@ -25,6 +25,18 @@ class LoSignal {
   };
 }
 
+/// One `transferLOs` entry (#101, LLM_CONTRACT "transferLOs"): an LO from
+/// another subgoal of the root that the grader saw *correctly used in
+/// service of the task*. Raw contract shape; the conductor decides whether
+/// it earns transfer credit (CONDUCTOR_POLICY §3.7).
+class TransferLoRef {
+  final String subgoalId;
+  final String loId;
+  const TransferLoRef({required this.subgoalId, required this.loId});
+
+  Map<String, dynamic> toJson() => {'subgoalId': subgoalId, 'loId': loId};
+}
+
 class FollowUp {
   /// Text the conductor would show the student verbatim. Out of scope for
   /// the current step — recorded on the turn record but not acted on.
@@ -68,6 +80,23 @@ List<LoSignal> parseLoSignals(Object? raw) {
     out.add(
       LoSignal(subgoalId: subgoalId, loId: loId, kind: kind, strength: str),
     );
+  }
+  return out;
+}
+
+/// Parses a `transferLOs` array into typed refs. Malformed entries are
+/// dropped silently, like [parseLoSignals]; scope and eligibility are the
+/// conductor side's business.
+List<TransferLoRef> parseTransferLOs(Object? raw) {
+  if (raw is! List) return const [];
+  final out = <TransferLoRef>[];
+  for (final entry in raw) {
+    if (entry is! Map) continue;
+    final subgoalId = entry['subgoalId'];
+    final loId = entry['loId'];
+    if (subgoalId is! String || loId is! String) continue;
+    if (subgoalId.isEmpty || loId.isEmpty) continue;
+    out.add(TransferLoRef(subgoalId: subgoalId, loId: loId));
   }
   return out;
 }

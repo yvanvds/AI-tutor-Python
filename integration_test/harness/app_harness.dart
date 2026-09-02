@@ -147,6 +147,7 @@ class AppHarness {
     this.llm,
     this.developerTools,
     this.supervision,
+    this.extraDocs = const {},
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -233,6 +234,13 @@ class AppHarness {
   /// weight passes a stand-in that says "in session".
   final SupervisionSource? supervision;
 
+  /// Cosmos docs upserted on top of the standard seed before the app boots,
+  /// keyed by container name as `CosmosPaths` names them (#101). A doc whose
+  /// id already exists in the seed replaces it, so a flow can start a
+  /// student mid-curriculum — beliefs, progress, an edited goal — instead
+  /// of on the first exercise.
+  final Map<String, List<Map<String, dynamic>>> extraDocs;
+
   /// Every URL the app asked the operating system to open (#57).
   ///
   /// The launcher is always replaced, in every flow: the production one hands
@@ -262,6 +270,11 @@ class AppHarness {
   Future<void> boot(WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
+    for (final entry in extraDocs.entries) {
+      for (final doc in entry.value) {
+        cosmos[entry.key].upsert(doc);
+      }
+    }
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
 
     _container = ProviderContainer(

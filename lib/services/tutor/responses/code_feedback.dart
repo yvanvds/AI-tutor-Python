@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
   "suggestion": "concise next step for improvement",
   "overallQuality": "wrong | partial | correct",
   "loSignals": [...],
+  "transferLOs": [{ "subgoalId": "...", "loId": "..." }],   // optional (#101)
   "followUp": { "question": "...", "rationale": "..." }   // optional
 }
 */
@@ -20,6 +21,7 @@ class CodeFeedback implements ChatResponse {
   final String suggestion;
   final AnswerQuality quality;
   final List<LoSignal> loSignals;
+  final List<TransferLoRef> transferLOs;
   final FollowUp? followUp;
 
   CodeFeedback({
@@ -28,6 +30,7 @@ class CodeFeedback implements ChatResponse {
     required this.suggestion,
     required this.quality,
     this.loSignals = const [],
+    this.transferLOs = const [],
     this.followUp,
   });
 
@@ -38,6 +41,7 @@ class CodeFeedback implements ChatResponse {
       suggestion: map['suggestion'] ?? '',
       quality: _stringToQuality(map['overallQuality'] ?? map['quality']),
       loSignals: parseLoSignals(map['loSignals']),
+      transferLOs: parseTransferLOs(map['transferLOs']),
       followUp: FollowUp.tryParse(map['followUp']),
     );
   }
@@ -50,6 +54,8 @@ class CodeFeedback implements ChatResponse {
       'suggestion': suggestion,
       'overallQuality': quality.name,
       'loSignals': loSignals.map((s) => s.toJson()).toList(),
+      if (transferLOs.isNotEmpty)
+        'transferLOs': transferLOs.map((t) => t.toJson()).toList(),
       if (followUp != null) 'followUp': followUp!.toJson(),
     };
   }

@@ -111,11 +111,15 @@ String completeCodeReply({
 
 /// A `code_feedback` grading turn (LLM_CONTRACT "What the grader returns").
 /// Each entry of [loSignals] is one `{subgoalId, loId, signal, strength}`
-/// map, exactly as the grader emits it.
+/// map, exactly as the grader emits it; each entry of [transferLOs] (#101)
+/// is one `{subgoalId, loId}` map naming a previously mastered LO the code
+/// correctly used. The field is omitted when the list is empty, as a grader
+/// with nothing to nominate would.
 String codeFeedbackReply({
   required String text,
   required String quality,
   List<Map<String, String>> loSignals = const [],
+  List<Map<String, String>> transferLOs = const [],
 }) => llmEnvelope(
   text: text,
   meta: jsonEncode({
@@ -123,5 +127,6 @@ String codeFeedbackReply({
     'suggestion': '',
     'overallQuality': quality,
     'loSignals': loSignals,
+    if (transferLOs.isNotEmpty) 'transferLOs': transferLOs,
   }),
 );

@@ -100,6 +100,7 @@ class TutorContext {
   final Future<IntegrateOutcome> Function({
     required AnswerQuality overallQuality,
     required List<LoSignal> loSignals,
+    required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
   })
   integrateGradedAnswer;
@@ -215,6 +216,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
     final outcome = await ctx.integrateGradedAnswer(
       overallQuality: r.quality,
       loSignals: r.loSignals,
+      transferLOs: r.transferLOs,
       followUp: r.followUp,
     );
     if (outcome != IntegrateOutcome.continuing) return;
@@ -231,6 +233,7 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
     await ctx.integrateGradedAnswer(
       overallQuality: r.quality,
       loSignals: r.loSignals,
+      transferLOs: r.transferLOs,
       followUp: r.followUp,
     );
     // Advance is deferred until the student clicks "Volgende" inside the
@@ -250,6 +253,7 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
     final outcome = await ctx.integrateGradedAnswer(
       overallQuality: r.quality,
       loSignals: r.loSignals,
+      transferLOs: r.transferLOs,
       followUp: r.followUp,
     );
     if (outcome != IntegrateOutcome.continuing) return;
@@ -268,6 +272,7 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
     final outcome = await ctx.integrateGradedAnswer(
       overallQuality: r.quality,
       loSignals: r.loSignals,
+      transferLOs: r.transferLOs,
       followUp: r.followUp,
     );
     if (outcome != IntegrateOutcome.continuing) return;

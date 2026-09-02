@@ -139,4 +139,55 @@ void main() {
       );
     });
   });
+
+  group('LoBelief.firstMasteredAt (#101)', () {
+    final stamp = DateTime.utc(2026, 6, 15, 9, 30);
+
+    test('is written as ISO 8601 and read back', () {
+      final belief = LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: DateTime.utc(2026, 5, 1),
+        firstMasteredAt: stamp,
+      );
+      final map = belief.toMap(uid: 'u');
+      expect(map['firstMasteredAt'], stamp.toIso8601String());
+      expect(LoBelief.fromCosmos(map).firstMasteredAt, stamp);
+    });
+
+    test('is omitted from the doc until the LO has mastered', () {
+      final belief = LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: 1,
+        beta: 1,
+        lastUpdatedAt: DateTime.utc(2026, 5, 1),
+      );
+      expect(belief.toMap(uid: 'u').containsKey('firstMasteredAt'), isFalse);
+      expect(LoBelief.fromCosmos(_doc()).firstMasteredAt, isNull);
+    });
+
+    test('a malformed value reads as absent', () {
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'firstMasteredAt': 42}).firstMasteredAt,
+        isNull,
+      );
+    });
+
+    test('copyWith keeps the stamp unless given one', () {
+      final b = LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: DateTime.utc(2026, 5, 1),
+        firstMasteredAt: stamp,
+      );
+      expect(b.copyWith(alpha: 4).firstMasteredAt, stamp);
+      final later = DateTime.utc(2026, 7, 1);
+      expect(b.copyWith(firstMasteredAt: later).firstMasteredAt, later);
+    });
+  });
 }

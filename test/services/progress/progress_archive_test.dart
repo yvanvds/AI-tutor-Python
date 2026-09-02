@@ -49,6 +49,7 @@ Map<String, dynamic> _beliefDoc(String uid, String subgoalId, String loId) => {
   'lastQuestionType': 'socraticQuestion',
   'highestPositiveDifficulty': 'hard',
   'recentNegativesAtCalibrated': 2,
+  'firstMasteredAt': '2026-04-20T10:00:00.000Z',
 };
 
 void main() {
@@ -135,6 +136,7 @@ void main() {
     expect(belief['lastQuestionType'], 'socraticQuestion');
     expect(belief['highestPositiveDifficulty'], 'hard');
     expect(belief['recentNegativesAtCalibrated'], 2);
+    expect(belief['firstMasteredAt'], '2026-04-20T10:00:00.000Z');
 
     // The account the file came from is untouched.
     expect(progress['${_from}_s1'], isNotNull);

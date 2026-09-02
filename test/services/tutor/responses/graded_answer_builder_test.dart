@@ -69,6 +69,73 @@ void main() {
     expect(a.provenance, EvidenceProvenance.supervised);
   });
 
+  group('transferLOs (#101)', () {
+    const earlier = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    final scope = [
+      Goal(
+        id: 's0',
+        title: 'Print',
+        parentId: 'r',
+        order: 0,
+        objectives: const [earlier],
+      ),
+      ..._scope,
+    ];
+
+    test('in-scope refs are kept, out-of-scope ones dropped, duplicates '
+        'collapsed', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [_inScope],
+        rawTransferLOs: const [
+          TransferLoRef(subgoalId: 's0', loId: 'lo-print'),
+          TransferLoRef(subgoalId: 's0', loId: 'lo-print'),
+          TransferLoRef(subgoalId: 's0', loId: 'lo-nope'),
+          TransferLoRef(subgoalId: 'elsewhere', loId: 'lo-print'),
+        ],
+        scopeSubgoals: scope,
+        intendedTargetLO: _lo,
+        intendedTargetSubgoalId: 's1',
+      );
+      expect(a.hadFallback, isFalse);
+      expect(a.transferLOs, hasLength(1));
+      expect(a.transferLOs.single.subgoalId, 's0');
+      expect(a.transferLOs.single.loId, 'lo-print');
+    });
+
+    test('a valid ref does not rescue a turn whose signals all dropped', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [_outOfScope],
+        rawTransferLOs: const [
+          TransferLoRef(subgoalId: 's0', loId: 'lo-print'),
+        ],
+        scopeSubgoals: scope,
+        intendedTargetLO: _lo,
+        intendedTargetSubgoalId: 's1',
+      );
+      expect(a.hadFallback, isTrue);
+      expect(a.signals.single.loId, 'lo1');
+      // Carried along; the conductor declines it on a fallback turn.
+      expect(a.transferLOs, hasLength(1));
+    });
+
+    test('defaults to none', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [_inScope],
+        scopeSubgoals: scope,
+        intendedTargetLO: _lo,
+        intendedTargetSubgoalId: 's1',
+      );
+      expect(a.transferLOs, isEmpty);
+    });
+  });
+
   test('the no-target fallback keeps the provenance', () {
     final a = GradedAnswerBuilder.build(
       overallQuality: AnswerQuality.correct,

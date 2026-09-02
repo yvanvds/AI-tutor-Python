@@ -41,6 +41,15 @@ class LoBelief {
   /// existing belief docs without it are fine.
   final int recentNegativesAtCalibrated;
 
+  /// When this LO first met all three mastery conditions (CONDUCTOR_POLICY
+  /// §4.1) — a one-way stamp, `null` until then, never cleared by decay or
+  /// later negatives. It is the gate for transfer credit (#101, §3.7): only
+  /// an LO once mastered by direct probing can be refreshed sideways.
+  /// Docs written before the field existed are read by the conductor as
+  /// "mastered as of the last direct write" (`belief_math.everMastered`)
+  /// and get the stamp on their next write; nothing is backfilled.
+  final DateTime? firstMasteredAt;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -51,6 +60,7 @@ class LoBelief {
     this.lastPositiveAtCalibratedAt,
     this.highestPositiveDifficulty,
     this.recentNegativesAtCalibrated = 0,
+    this.firstMasteredAt,
   });
 
   LoBelief copyWith({
@@ -61,6 +71,7 @@ class LoBelief {
     DateTime? lastPositiveAtCalibratedAt,
     QuestionDifficulty? highestPositiveDifficulty,
     int? recentNegativesAtCalibrated,
+    DateTime? firstMasteredAt,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -75,6 +86,7 @@ class LoBelief {
           highestPositiveDifficulty ?? this.highestPositiveDifficulty,
       recentNegativesAtCalibrated:
           recentNegativesAtCalibrated ?? this.recentNegativesAtCalibrated,
+      firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
     );
   }
 
@@ -101,6 +113,8 @@ class LoBelief {
     if (highestPositiveDifficulty != null)
       'highestPositiveDifficulty': highestPositiveDifficulty!.name,
     'recentNegativesAtCalibrated': recentNegativesAtCalibrated,
+    if (firstMasteredAt != null)
+      'firstMasteredAt': firstMasteredAt!.toUtc().toIso8601String(),
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -130,6 +144,9 @@ class LoBelief {
       highestPositiveDifficulty: highestPositiveDifficulty,
       recentNegativesAtCalibrated:
           (doc['recentNegativesAtCalibrated'] as num?)?.toInt() ?? 0,
+      firstMasteredAt: doc['firstMasteredAt'] is String
+          ? DateTime.tryParse(doc['firstMasteredAt'] as String)
+          : null,
     );
   }
 }

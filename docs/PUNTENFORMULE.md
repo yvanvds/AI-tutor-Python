@@ -332,13 +332,17 @@ niemand oneerlijk raakt:
 - **Transfer-krediet.** Oudere leerdoelen zitten vaak impliciet in nieuw
   werk: wie in december een while-lus schrijft, gebruikt daarin nog
   steeds `print()` en variabelen. Wanneer de grader ziet dat je een
-  eerder beheerst leerdoel correct gebruikt in een nieuwe oefening, krijgt
-  dat oude leerdoel een klein positief signaal: de decay-klok wordt
-  teruggezet én de overtuiging stijgt licht. Dit werkt alleen positief
-  (een fout in nieuw werk telt niet extra tegen het oude leerdoel), alleen
-  voor leerdoelen die eerder door directe bevraging beheerst raakten, en
-  met klein gewicht — de Beta-wiskunde zorgt zelf voor afnemende
-  meeropbrengst.
+  eerder beheerst leerdoel uit een *ander* subdoel correct gebruikt in een
+  werkende oplossing van een nieuwe oefening, krijgt dat oude leerdoel een
+  klein positief signaal: de decay-klok wordt teruggezet én de overtuiging
+  stijgt licht. Dit werkt alleen positief (een foute of half-juiste
+  oplossing telt niet tegen het oude leerdoel — en levert het ook niets
+  op), alleen voor leerdoelen die eerder door directe bevraging beheerst
+  raakten (de app onthoudt per leerdoel wanneer dat voor het eerst
+  gebeurde), en met klein gewicht — de Beta-wiskunde zorgt zelf voor
+  afnemende meeropbrengst. De moeilijkheidsratel van §2.5 beweegt er
+  niet door: de moeilijkheid van de oefening was voor het nieuwe
+  leerdoel gekozen, niet voor het oude.
 - **Opfrisvragen.** Leerdoelen die *niet* vanzelf in nieuwe leerstof
   terugkeren en lang niet bevraagd zijn, krijgen af en toe een korte
   opfrisvraag in de gewone oefenflow. Dat is meteen goede didactiek
@@ -402,7 +406,7 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 | koppeling boven-50 | lineair met k, of hardere kerndrempel | voorlopig lineair met k |
 | w_M, w_G per periode | mix beheersing/groei | TBD; vroege periodes groei-zwaarder |
 | s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
-| transfergewicht | grootte van het transfer-krediet (§2.8) | TBD (klein; ≤ zwak-gewicht 0,5) |
+| transfergewicht | grootte van het transfer-krediet (§2.8) | voorlopig het zwak-gewicht 0,5 (gerekend als gemiddeld) × s in de code; definitief na schaduwrun (klein; ≤ 0,5) |
 
 Alle overige getallen in dit document (§1) zijn de vandaag werkende
 waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
@@ -422,6 +426,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0 | 2026-09-02 | Eerste versie: structuur vastgelegd, parameters TBD tot na de schaduwrun. |
 | 1.0.1 | 2026-09-02 | Geen structuurwijziging. §4 en bijlage A: de voorlopige codewaarde van s (1,25) vermeld en de stand van §2.7 in de code beschreven (#100). |
 | 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
+| 1.0.3 | 2026-09-02 | Geen structuurwijziging. §2.8 transfer-krediet staat nu in de code: alleen bij een volledig juiste oplossing, alleen voor eerder beheerste leerdoelen uit een ander subdoel, gewicht voorlopig 0,5 × s (§4, bijlage A); de ratel van §2.5 beweegt er niet door (#101). |
 
 ---
 
@@ -441,6 +446,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | moeilijkheidsfactor | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk, symmetrisch (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
 | toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
+| transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -460,9 +466,17 @@ kalibratiewijziging en niet door vervolgvragen (§1.2). Oudere opgeslagen
 leerdoelen zonder dit veld lezen als "gemiddeld" wanneer de ratel van §1.5
 gezet was, anders als "nog niets aangetoond" — er wordt niets met
 terugwerkende kracht ingevuld. De formule van deel 2 leest dit veld; de
-tutor zelf gebruikt het niet. De mechanismen van §2.8 zijn op datum van
-v1.0.2 **specificatie, nog geen werkende code**; hun implementatie volgt
-dit document. Van §2.7 staat de weging in de code
+tutor zelf gebruikt het niet. Van §2.8 staat sinds v1.0.3 het
+**transfer-krediet** in de code: de grader noemt bij een juiste oplossing
+de leerdoelen uit andere subdoelen die de code correct gebruikt
+(`transferLOs`), en de tutor kent alleen aan leerdoelen die ooit beheerst
+raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
+zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
+meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
+zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
+wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 zijn op
+datum van v1.0.3 nog specificatie, geen werkende code; hun implementatie
+volgt dit document. Van §2.7 staat de weging in de code
 (elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
 s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
 tot die er is, telt elke beurt als thuis en verandert s niets.

@@ -850,6 +850,12 @@ Brief Dutch explanation of correctness or errors. One short paragraph.
       "strength": "strong | moderate | weak"
     }
   ],
+  "transferLOs": [
+    {
+      "subgoalId": "<id from goal scope, NOT the current subgoal>",
+      "loId": "<id from goal scope>"
+    }
+  ],
   "followUp": {
     "question": "Optionele vervolgvraag voor de leerling, in het Nederlands",
     "rationale": "debug-only reason"
@@ -857,6 +863,7 @@ Brief Dutch explanation of correctness or errors. One short paragraph.
 }
 
 Omit `followUp` unless continuing the dialogue would teach more than a fresh exercise.
+Omit `transferLOs` (or leave it empty) when the code is not fully correct or uses nothing from other subgoals.
 
 ## 04 Rules
 
@@ -882,6 +889,13 @@ Mark `overallQuality` as `correct` if the concept is understood; only `wrong` if
 - Mistakes that point to a gap in an earlier subgoal of this root goal earn a signal on that LO too.
 - `neutral` is allowed but rare; commit when you can.
 - `overallQuality` must be self-consistent with the signals.
+
+#### transferLOs — what to emit
+
+- Only when `overallQuality` is `correct`: a working solution is evidence that the older constructs in it still work. Otherwise omit the field.
+- List the LOs from OTHER subgoals in GOAL SCOPE LOS that the code **correctly used in service of the task** — constructs the solution genuinely needed and got right (a `print()` that shows the result, a variable that holds the input). Do not list constructs the student added for no reason, and do not list LOs of the current subgoal (those belong in `loSignals`).
+- You are not told which of these the student has mastered; do not guess. The app keeps only nominations on LOs the student mastered earlier and gives them a small refresh.
+- Each entry is `{subgoalId, loId}` from GOAL SCOPE LOS. No signal, no strength — a nomination is never negative. A gap revealed in an earlier LO stays a `negative` entry in `loSignals`, as above.
 
 # writeCodeQuestion
 

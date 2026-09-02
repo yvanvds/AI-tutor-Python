@@ -42,6 +42,98 @@ void main() {
     });
   });
 
+  group('transferCreditDeltas (#101)', () {
+    test('is a weak positive as medium: α += 0.5, β untouched', () {
+      final d = transferCreditDeltas();
+      expect(d.alphaDelta, closeTo(PolicyConstants.weightWeak, 1e-9));
+      expect(d.betaDelta, 0);
+    });
+
+    test('is weighted by provenance like any other signal', () {
+      final d = transferCreditDeltas(provenance: EvidenceProvenance.supervised);
+      expect(
+        d.alphaDelta,
+        closeTo(
+          PolicyConstants.weightWeak * PolicyConstants.supervisedWeightFactor,
+          1e-9,
+        ),
+      );
+      expect(d.betaDelta, 0);
+    });
+
+    test('never exceeds the weak weight at home', () {
+      expect(
+        transferCreditDeltas().alphaDelta,
+        lessThanOrEqualTo(PolicyConstants.weightWeak),
+      );
+    });
+  });
+
+  group('everMastered (#101)', () {
+    final stamp = DateTime.utc(2026, 5, 1);
+    final ratchet = DateTime.utc(2026, 4, 1);
+
+    test('the stamp alone decides, whatever the stored values say', () {
+      expect(
+        everMastered(
+          firstMasteredAt: stamp,
+          alpha: 1,
+          beta: 1,
+          lastPositiveAtCalibratedAt: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('without the stamp: mastered as of the last write counts', () {
+      // (5, 1): mean 0.83, evidence 6, ratchet set → was mastered.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 5,
+          beta: 1,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isTrue,
+      );
+    });
+
+    test('without the stamp: mean or evidence below mastery is not', () {
+      // (3, 1): mean 0.75.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 3,
+          beta: 1,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isFalse,
+      );
+      // (2.5, 0.5)... evidence 3 < 4 even though mean is 0.83.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 2.5,
+          beta: 0.5,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isFalse,
+      );
+    });
+
+    test('without the stamp: no calibrated positive is never mastered', () {
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 9,
+          beta: 1,
+          lastPositiveAtCalibratedAt: null,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('signalDeltas', () {
     test('positive strong @ medium → α += 2.0', () {
       final d = signalDeltas(

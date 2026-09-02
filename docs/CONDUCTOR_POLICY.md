@@ -254,7 +254,9 @@ not now.
 candidate pool only via decay (section 1.2) or the saturation revisit
 case (section 1.3). No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
-handle"). Cross-session decay handles forgetting.
+handle"). Cross-session decay handles forgetting; mastered LOs that
+later work keeps using are refreshed without being probed, by transfer
+credit (3.7).
 
 **Saturated LOs are filtered out of the unmastered pool.** An LO at
 `α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
@@ -678,7 +680,79 @@ The progression feels right: notch-drop fires after two strikes, easy
 answers count for less than medium, mastery doesn't lock in too fast
 or too slow.
 
-### 3.7 What this section deliberately does not address
+### 3.7 Transfer credit (#101, PUNTENFORMULE §2.8)
+
+Older LOs live on inside newer work: December's while-loop exercise
+still uses September's `print()` and variables. When a *working*
+solution to a later exercise correctly uses an LO the student mastered
+earlier, that LO's belief gets a small positive update. This counters
+the 60-day decay without re-quizzing old material, and it rewards
+transfer — using a skill in a new context is a stronger demonstration
+than answering a targeted question about it.
+
+**The grader nominates, the conductor gates.** The grading response
+carries one extra field, `transferLOs: [{subgoalId, loId}]` (LLM
+contract, part 3): the goal-scope LOs from *other* subgoals that the
+solution *correctly used in service of the task*. That phrasing is the
+guard against padding code with gratuitous constructs to farm credit;
+the small weight bounds the payoff anyway. The grader is not told which
+LOs are mastered — it reports what the code demonstrates; the conductor
+decides what counts. No hand-authored mapping, no Q-matrix.
+
+A nominated LO earns credit only when **all** of these hold:
+
+1. **The answer is `correct`.** A working solution is unambiguous
+   evidence that the constructs in it still work. A `partial` or `wrong`
+   answer gives *nothing* to older LOs — not negative evidence (blame
+   assignment across old LOs is unsolvable, so nobody outside the target
+   gets blamed) and not positive evidence either. The evidence really is
+   asymmetric.
+2. **The turn is a primary probe, not a follow-up (6.2), and not a
+   fallback turn (7.2).** Dialogue is not a solution, and a response
+   whose primary signals failed validation is not trusted for extras.
+3. **The LO is outside the active subgoal.** LOs inside it already get
+   ordinary incidental signals at full weight (2.4); a nomination there
+   is dropped.
+4. **The LO was ever mastered by direct probing.** An LO that was never
+   directly probed — or probed but never mastered — cannot be brought
+   to mastery sideways. Tracked by the one-way `firstMasteredAt` stamp on
+   `lo_beliefs` (part 2), set the first time all three mastery
+   conditions (4.1) hold after a write. Docs written before the stamp
+   existed read as "mastered as of the last direct write" when their
+   stored `(α, β)` meet conditions 1–2 and the calibrated-positive
+   ratchet is set; the stamp is then written on the next update, dated
+   to that write. Nothing is backfilled.
+
+**Refresh-and-raise, small weight.** The credit is an ordinary
+`(positive, weak)` signal treated as `medium` — the same footing as a
+follow-up signal (6.2) — so it is `0.5 × s` on α, with `s` the
+provenance multiplier (3.2). Applied to the *decayed* belief and
+persisted with `lastUpdatedAt = now`: that bump is the "decay clock
+reset", and the added α is the "raise". Chosen over merely resetting
+the clock because transfer deserves reward, and kept small because
+this mechanism counters decay, it does not establish mastery. Diminishing
+returns come free from the Beta arithmetic: the more evidence an LO
+already carries, the less each credit moves its mean.
+
+**Nothing else on the old doc moves.** Neither ratchet — not
+`lastPositiveAtCalibratedAt`, not `highestPositiveDifficulty` (4.3): the
+exercise's difficulty was set for the target LO, not for the transferred
+one, and a hard loop exercise must not certify `print()` at hard — nor
+the notch-drop counter (2.3), nor `lastQuestionType`. The other subgoal's
+cached `progress` is not recomputed: positive-only credit cannot lower
+it. Credits do not enter the calibration window (section 5).
+
+**Audit.** Every credit applied is listed on the turn record as
+`transferCredits: [{subgoalId, loId, alphaDelta}]` (8.1), next to the
+target's own `appliedSignals`; declined nominations are logged in the
+debug recorder with the reason.
+
+**Complement: warm-up review (#102).** LOs that naturally recur in later
+work are refreshed here for free; LOs that nothing later builds on are
+the review questions' business. `firstMasteredAt` is the "once mastered"
+signal both mechanisms share.
+
+### 3.8 What this section deliberately does not address
 
 - **The mastery decision** (when does an LO count as mastered, given
   the belief shape we just defined). Section 4.
@@ -777,13 +851,24 @@ notch-dropped probe at easy counts as easy), absolute rather than
 relative to the calibration in force. It only ever rises: a later
 positive at a lower difficulty leaves it, and calibration shifts never
 touch it. Negatives, neutrals and follow-up grading (6.2) leave it
-alone, exactly like `lastPositiveAtCalibratedAt`. The conductor does
+alone, exactly like `lastPositiveAtCalibratedAt`. So does transfer
+credit (3.7): a credit is not a probe of the LO at any difficulty, so
+neither ratchet moves — only a direct, non-follow-up positive on the LO
+itself is ratchet-worthy. The conductor does
 not read it — mastery condition 3 stays on the calibration-relative
 timestamp — it exists for the grade formula, where it is the only
 signal that can tell medium from hard. Docs written before the field
 existed read as `medium` when `lastPositiveAtCalibratedAt` is set
 (the old flag's documented "ever demonstrated at non-easy" meaning)
 and as absent otherwise; nothing is backfilled.
+
+**Mastery stamp (#101).** A third field, `firstMasteredAt`, records
+when the LO first met all three conditions after a belief write. One-way:
+decay and later negatives unmaster the LO (4.1, no latching) but never
+clear the stamp, which answers a different question — "was this ever
+mastered by direct probing?" — the gate for transfer credit (3.7). Set in
+the same write that first satisfies the conditions; nothing is
+backfilled (3.7 says how older docs are read).
 
 ### 4.4 The stuck rule (advancing despite a missed LO)
 
@@ -1159,6 +1244,10 @@ secondary to a primary probe at medium (`1.0`).
 have a meaningful `difficulty` to file against, and they're not
 probes of the student's calibration. The section 5 promotion/demotion
 rules ignore follow-up answers entirely.
+
+**No transfer credit on follow-up answers** (3.7). A follow-up is
+dialogue, not a solution; any `transferLOs` the grader emits on one are
+dropped.
 
 ### 6.3 When follow-ups fire
 
@@ -1542,6 +1631,7 @@ TurnRecord {
   hadFallback: bool                 // grader response was unparseable
   appliedSignals: [{loId, alphaDelta, betaDelta}]   // post-modulation
   provenance: string                // home | supervised (3.2, #100); absent on older docs = home
+  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
 
   // Calibration impact
   calibrationBefore: string

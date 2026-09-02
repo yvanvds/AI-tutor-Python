@@ -62,6 +62,27 @@ class TurnAppliedSignal {
   };
 }
 
+/// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
+/// previously mastered LO in *another* subgoal that the working solution
+/// correctly used. Carries the subgoal because, unlike `appliedSignals`,
+/// the LO is not one of the active subgoal's.
+class TurnTransferCredit {
+  final String subgoalId;
+  final String loId;
+  final double alphaDelta;
+  const TurnTransferCredit({
+    required this.subgoalId,
+    required this.loId,
+    required this.alphaDelta,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'subgoalId': subgoalId,
+    'loId': loId,
+    'alphaDelta': alphaDelta,
+  };
+}
+
 class TurnLoStatus {
   final String loId;
   final double mean;
@@ -221,6 +242,10 @@ class PersistedTurnRecord {
   /// evidence. Missing on docs written before the field existed → `home`.
   final EvidenceProvenance provenance;
 
+  /// Transfer credits applied this turn (#101). Empty on most turns and on
+  /// every non-code turn; omitted from the doc when empty.
+  final List<TurnTransferCredit> transferCredits;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -259,6 +284,7 @@ class PersistedTurnRecord {
     this.acknowledgedAt,
     this.signalEvents = const [],
     this.provenance = EvidenceProvenance.home,
+    this.transferCredits = const [],
   });
 
   bool get hasStrongEvent =>
@@ -281,6 +307,8 @@ class PersistedTurnRecord {
     'hadFallback': hadFallback,
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
     'provenance': provenance.name,
+    if (transferCredits.isNotEmpty)
+      'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     'calibrationBefore': calibrationBefore.name,
     'calibrationAfter': calibrationAfter.name,
     'subgoalProgressAfter': subgoalProgressAfter,

@@ -6,30 +6,57 @@ import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PersistedTurnRecord _record({EvidenceProvenance? provenance}) =>
-    PersistedTurnRecord(
-      id: 't1',
-      turnAt: DateTime.utc(2026, 9, 2, 10),
-      subgoalId: 's1',
-      targetLOIds: const ['lo1'],
-      questionType: 'completeCodeQuestion',
-      difficulty: QuestionDifficulty.medium,
-      isFollowUp: false,
-      chainDepth: 0,
-      selectionReason: null,
-      overallQuality: AnswerQuality.correct,
-      loSignals: const [],
-      hadFallback: false,
-      appliedSignals: const [],
-      calibrationBefore: QuestionDifficulty.medium,
-      calibrationAfter: QuestionDifficulty.medium,
-      subgoalProgressAfter: 0.0,
-      loStatusAfter: const [],
-      subgoalAdvanced: false,
-      provenance: provenance ?? EvidenceProvenance.home,
-    );
+PersistedTurnRecord _record({
+  EvidenceProvenance? provenance,
+  List<TurnTransferCredit> transferCredits = const [],
+}) => PersistedTurnRecord(
+  id: 't1',
+  turnAt: DateTime.utc(2026, 9, 2, 10),
+  subgoalId: 's1',
+  targetLOIds: const ['lo1'],
+  questionType: 'completeCodeQuestion',
+  difficulty: QuestionDifficulty.medium,
+  isFollowUp: false,
+  chainDepth: 0,
+  selectionReason: null,
+  overallQuality: AnswerQuality.correct,
+  loSignals: const [],
+  hadFallback: false,
+  appliedSignals: const [],
+  calibrationBefore: QuestionDifficulty.medium,
+  calibrationAfter: QuestionDifficulty.medium,
+  subgoalProgressAfter: 0.0,
+  loStatusAfter: const [],
+  subgoalAdvanced: false,
+  provenance: provenance ?? EvidenceProvenance.home,
+  transferCredits: transferCredits,
+);
 
 void main() {
+  group('PersistedTurnRecord transferCredits (#101)', () {
+    test('an ordinary turn writes no field at all', () {
+      expect(
+        _record().toMap(uid: 'u1').containsKey('transferCredits'),
+        isFalse,
+      );
+    });
+
+    test('credits are written with their subgoal, LO and delta', () {
+      final map = _record(
+        transferCredits: const [
+          TurnTransferCredit(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            alphaDelta: 0.5,
+          ),
+        ],
+      ).toMap(uid: 'u1');
+      expect(map['transferCredits'], [
+        {'subgoalId': 's0', 'loId': 'lo-print', 'alphaDelta': 0.5},
+      ]);
+    });
+  });
+
   group('PersistedTurnRecord provenance (#100)', () {
     test('defaults to home', () {
       expect(_record().provenance, EvidenceProvenance.home);

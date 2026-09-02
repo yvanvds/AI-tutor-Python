@@ -852,6 +852,7 @@ class TutorService extends Notifier<TutorState> {
   Future<IntegrateOutcome> _integrateGradedAnswer({
     required AnswerQuality overallQuality,
     required List<LoSignal> loSignals,
+    required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
   }) async {
     final plan = _inFlightPlan;
@@ -872,6 +873,7 @@ class TutorService extends Notifier<TutorState> {
     final answer = GradedAnswerBuilder.build(
       overallQuality: overallQuality,
       rawSignals: loSignals,
+      rawTransferLOs: transferLOs,
       scopeSubgoals: scopeSubgoals,
       intendedTargetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
       intendedTargetSubgoalId: activeChild?.id,
@@ -905,6 +907,7 @@ class TutorService extends Notifier<TutorState> {
       subgoalAdvanced: outcome.subgoalAdvanced,
       signalEvents: outcome.signalEvents,
       provenance: provenance,
+      transferCredits: outcome.transferCredits,
     );
     _debug.recordPersistedTurn(record, followUp: followUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));

@@ -125,6 +125,11 @@ class TurnOutcome {
   /// cascade-halt conditions tripped.
   final List<TurnSignalEvent> signalEvents;
 
+  /// Transfer credits applied to previously mastered LOs in other subgoals
+  /// (#101, CONDUCTOR_POLICY §3.7). Post-modulation deltas, like
+  /// [appliedSignals]; refs the conductor declined are not listed.
+  final List<TurnTransferCredit> transferCredits;
+
   const TurnOutcome({
     required this.overallQuality,
     required this.subgoalAdvanced,
@@ -137,6 +142,7 @@ class TurnOutcome {
     required this.calibrationAfter,
     required this.hadFallback,
     this.signalEvents = const [],
+    this.transferCredits = const [],
   });
 }
 
@@ -155,10 +161,24 @@ class GradedSignal {
   });
 }
 
+/// One LO the grader saw correctly used in service of the task (#101),
+/// scope-validated like [GradedSignal]. Whether it earns transfer credit
+/// is decided in [Conductor.integrateAnswer] (CONDUCTOR_POLICY §3.7).
+class GradedTransfer {
+  final String subgoalId;
+  final String loId;
+  const GradedTransfer({required this.subgoalId, required this.loId});
+}
+
 /// Input the conductor consumes when integrating a graded answer.
 class GradedAnswer {
   final AnswerQuality overallQuality;
   final List<GradedSignal> signals;
+
+  /// Previously mastered LOs the grader saw *correctly used in service of
+  /// the task* (#101). Only LOs outside the active subgoal can qualify —
+  /// LOs inside it already receive ordinary incidental signals (§2.4).
+  final List<GradedTransfer> transferLOs;
 
   /// True when the grader response was unparseable / every signal failed
   /// validation and a fallback signal was synthesised. Counted toward the
@@ -195,6 +215,7 @@ class GradedAnswer {
     this.isFollowUp = false,
     this.chainDepth = 0,
     this.provenance = EvidenceProvenance.home,
+    this.transferLOs = const [],
   });
 }
 
@@ -776,6 +797,33 @@ class Conductor {
         }
       }
 
+      final nextPositiveAtCalibrated =
+          newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt;
+      // #101 one-way mastery stamp. A doc from before the field existed
+      // that reads as "mastered at its last write" keeps that verdict
+      // durably (dated to that write) even if this turn leaves it below
+      // mastery; otherwise the stamp is set the first time all three
+      // conditions hold after this write.
+      var nextFirstMasteredAt = existing?.firstMasteredAt;
+      if (nextFirstMasteredAt == null) {
+        final legacyMastered =
+            existing != null &&
+            everMastered(
+              firstMasteredAt: null,
+              alpha: existing.alpha,
+              beta: existing.beta,
+              lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
+            );
+        final masteredAfter =
+            meetsMasteryMeanAndEvidence(next) &&
+            nextPositiveAtCalibrated != null;
+        if (legacyMastered) {
+          nextFirstMasteredAt = existing.lastUpdatedAt;
+        } else if (masteredAfter) {
+          nextFirstMasteredAt = now;
+        }
+      }
+
       final updated = LoBelief(
         subgoalId: subgoal.id,
         loId: sig.loId,
@@ -785,10 +833,10 @@ class Conductor {
         lastQuestionType: sig.loId == targetLo?.id
             ? plan.type.name
             : existing?.lastQuestionType,
-        lastPositiveAtCalibratedAt:
-            newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt,
+        lastPositiveAtCalibratedAt: nextPositiveAtCalibrated,
         highestPositiveDifficulty: nextHighestPositiveDifficulty,
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
+        firstMasteredAt: nextFirstMasteredAt,
       );
       await _deps.upsertLoBelief(updated);
       appliedSignals.add(
@@ -800,6 +848,12 @@ class Conductor {
       );
       touchedLoIds.add(sig.loId);
     }
+
+    // ---- Transfer credit (#101, CONDUCTOR_POLICY §3.7) --------------------
+    final transferCredits = await _applyTransferCredit(
+      answer: answer,
+      activeSubgoalId: subgoal.id,
+    );
 
     // ---- Mastery + advancement ------------------------------------------
     final freshBeliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
@@ -1013,7 +1067,111 @@ class Conductor {
       calibrationAfter: calibrationAfter,
       hadFallback: answer.hadFallback,
       signalEvents: List.unmodifiable(events),
+      transferCredits: transferCredits,
     );
+  }
+
+  /// Transfer credit (#101, CONDUCTOR_POLICY §3.7): a small positive on
+  /// previously mastered LOs in *other* subgoals that a working solution
+  /// correctly used. The grader nominates; the conductor gates:
+  ///
+  ///   - only a `correct` answer (a working solution is unambiguous
+  ///     evidence; a failed one blames nobody outside its target),
+  ///   - never on follow-up grading (dialogue, not a solution) or a
+  ///     fallback turn (the primary signals did not validate),
+  ///   - never inside the active subgoal (those LOs get §2.4 incidental
+  ///     signals at full weight),
+  ///   - only an LO with a belief doc that was ever mastered by direct
+  ///     probing (`everMastered`) — an LO never probed cannot be brought
+  ///     to mastery sideways.
+  ///
+  /// The credit is `transferCreditDeltas` (a weak positive as medium, times
+  /// provenance) on the decayed belief; `lastUpdatedAt` is bumped, which is
+  /// the "decay clock reset". Nothing else on the doc moves: neither
+  /// ratchet (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` —
+  /// the difficulty was set for the target LO, not this one), not the
+  /// notch-drop counter, not `lastQuestionType`. The other subgoal's cached
+  /// progress is not recomputed: positive-only credit cannot lower it.
+  Future<List<TurnTransferCredit>> _applyTransferCredit({
+    required GradedAnswer answer,
+    required String activeSubgoalId,
+  }) async {
+    if (answer.transferLOs.isEmpty) return const [];
+    if (answer.isFollowUp ||
+        answer.hadFallback ||
+        answer.overallQuality != AnswerQuality.correct) {
+      _deps.recordDebugEvent('conductor.transfer_skipped', {
+        'count': answer.transferLOs.length,
+        'isFollowUp': answer.isFollowUp,
+        'hadFallback': answer.hadFallback,
+        'overallQuality': answer.overallQuality.name,
+      });
+      return const [];
+    }
+    final credits = <TurnTransferCredit>[];
+    for (final ref in answer.transferLOs) {
+      if (ref.subgoalId == activeSubgoalId) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': 'active subgoal',
+        });
+        continue;
+      }
+      final existing = await _deps.getLoBelief(
+        subgoalId: ref.subgoalId,
+        loId: ref.loId,
+      );
+      final eligible =
+          existing != null &&
+          everMastered(
+            firstMasteredAt: existing.firstMasteredAt,
+            alpha: existing.alpha,
+            beta: existing.beta,
+            lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
+          );
+      if (!eligible) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': existing == null ? 'never probed' : 'never mastered',
+        });
+        continue;
+      }
+      final now = DateTime.now().toUtc();
+      final snap = applyDecay(
+        alpha: existing.alpha,
+        beta: existing.beta,
+        lastUpdatedAt: existing.lastUpdatedAt,
+        now: now,
+      );
+      final deltas = transferCreditDeltas(provenance: answer.provenance);
+      final next = applyEvidence(
+        alpha: snap.alpha,
+        beta: snap.beta,
+        alphaDelta: deltas.alphaDelta,
+        betaDelta: deltas.betaDelta,
+      );
+      await _deps.upsertLoBelief(
+        existing.copyWith(
+          alpha: next.alpha,
+          beta: next.beta,
+          lastUpdatedAt: now,
+          // A pre-#101 doc earned its eligibility at its last direct write;
+          // stamp that so the verdict survives the decayed values we are
+          // about to persist.
+          firstMasteredAt: existing.firstMasteredAt ?? existing.lastUpdatedAt,
+        ),
+      );
+      credits.add(
+        TurnTransferCredit(
+          subgoalId: ref.subgoalId,
+          loId: ref.loId,
+          alphaDelta: next.alpha - snap.alpha,
+        ),
+      );
+    }
+    return List.unmodifiable(credits);
   }
 
   bool _difficultyAtLeast(QuestionDifficulty asked, QuestionDifficulty calib) {

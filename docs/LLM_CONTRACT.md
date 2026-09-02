@@ -99,6 +99,9 @@ by per-question signals. Keeps prompt token cost bounded.
       "strength": "strong" | "moderate" | "weak"
     }
   ],
+  "transferLOs": [
+    { "subgoalId": "use_print", "loId": "print_text" }
+  ],
   "followUp": {
     "question": "Wat als de afgeleide nul wordt?",
     "rationale": "test understanding of edge case"
@@ -111,6 +114,13 @@ judges the previous answer would benefit from a deepening or
 edge-case probe — typically because the answer was correct but
 shallow, or wrong in an instructive way that dialogue would
 clarify. Most graded turns omit it.
+
+`transferLOs` is optional (#101); absent or empty means "nothing to
+report". It lists the goal-scope LOs from *other* subgoals of the root
+that the answer **correctly used in service of the task** — the
+constructs the solution genuinely needed and got right, not everything
+that happens to appear in it. Meaningful for answers that contain code;
+prose answers rarely have anything to list.
 
 ### Field semantics
 
@@ -157,6 +167,17 @@ in real grading.
 The LLM may emit at most one signal per `(subgoalId, loId)` pair per
 question.
 
+**`transferLOs`** — the transfer-credit nominations (conductor policy
+section 3.7). Each entry is a `(subgoalId, loId)` that must identify a
+real LO in `goalScopeLOs`, in a subgoal other than the current one. The
+grader reports what the solution demonstrates; it is *not* told which
+LOs the student has mastered and must not guess — the conductor keeps
+only nominations on LOs the student once mastered by direct probing,
+and only from a `correct` answer. A nomination is not a signal: it
+carries no strength, is never negative, and does not replace the
+`loSignals` entry an LO would get if the answer *revealed a gap* in it
+(that stays a negative signal on the LO, as today).
+
 ## Grading follow-up answers
 
 When the student answers a follow-up (a question the conductor
@@ -181,7 +202,9 @@ Two semantic differences from primary probe grading:
   difficulty.
 
 Other than these two, follow-up answer grading uses the same
-schema, scope, and validation rules as primary grading.
+schema, scope, and validation rules as primary grading — except that
+`transferLOs` on a follow-up answer are ignored (conductor policy 3.7:
+dialogue is not a solution).
 
 ## Validation on the conductor side
 
@@ -200,6 +223,11 @@ model:
    surviving signal is negative (or vice versa), log it. The conductor
    trusts `loSignals` over `overallQuality` for belief updates;
    `overallQuality` is for the UI/debug only.
+5. **Transfer nominations.** Each `transferLOs` entry gets the same LO
+   id resolution and scope check; duplicates collapse to one. Surviving
+   entries never count as "a signal" for the fallback rule below, and
+   the conductor applies its own gates (conductor policy 3.7) before any
+   of them touches a belief.
 
 If the response fails to parse or every signal is dropped, the
 conductor falls back to a single weak signal on the question's
@@ -247,6 +275,11 @@ answer was just graded.
   with two semantic differences: signals are treated as
   `medium`-difficulty for weight calculation, and the conductor
   caps emitted strength at `weak`.
+- **`transferLOs` is a nomination, not evidence** (#101). The grader
+  lists what a solution correctly used from earlier subgoals; the
+  conductor turns that into a small positive only for LOs the student
+  once mastered, and only on a `correct` answer. Keeps the "which LOs
+  count" judgment in code, not in the prompt.
 
 ## What this contract deliberately does not do
 

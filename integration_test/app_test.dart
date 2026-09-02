@@ -38,6 +38,7 @@ import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
 import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
+import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
@@ -55,6 +56,7 @@ void main() {
   practice_complete_code.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
+  transfer_credit.main();
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();

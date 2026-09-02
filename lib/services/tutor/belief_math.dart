@@ -83,6 +83,44 @@ double baseWeight(LoSignalStrength s) {
   return (alphaDelta: 0.0, betaDelta: weighted);
 }
 
+/// Transfer credit (#101, CONDUCTOR_POLICY §3.7, PUNTENFORMULE §2.8): the
+/// small positive an already-mastered LO earns when a *working* solution
+/// to a later exercise correctly uses it. Deliberately not a parallel
+/// weight path: it is an ordinary `(positive, weak)` signal treated as
+/// `medium` — the same footing as a follow-up signal (§6.2) — so it is
+/// `weightWeak × 1.0 × s`, with `s` the provenance multiplier. Small by
+/// construction (≤ the weak weight), and the Beta arithmetic gives the
+/// diminishing returns for free.
+({double alphaDelta, double betaDelta}) transferCreditDeltas({
+  EvidenceProvenance provenance = EvidenceProvenance.home,
+}) => signalDeltas(
+  kind: LoSignalKind.positive,
+  strength: LoSignalStrength.weak,
+  difficulty: QuestionDifficulty.medium,
+  provenance: provenance,
+);
+
+/// Whether an LO has ever met all three mastery conditions — the gate for
+/// transfer credit (CONDUCTOR_POLICY §3.7): an LO never mastered by direct
+/// probing cannot be brought to mastery sideways.
+///
+/// [firstMasteredAt] is the persisted one-way stamp. Docs written before
+/// it existed fall back to "mastered as of the last direct write": the
+/// stored `(α, β)` are post-update values, so if they meet the mean and
+/// evidence conditions and the calibrated-positive ratchet is set, the LO
+/// was mastered the last time it was probed. Decay since then does not
+/// matter — that is exactly the gap transfer credit is meant to close.
+bool everMastered({
+  required DateTime? firstMasteredAt,
+  required double alpha,
+  required double beta,
+  required DateTime? lastPositiveAtCalibratedAt,
+}) {
+  if (firstMasteredAt != null) return true;
+  return lastPositiveAtCalibratedAt != null &&
+      meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
+}
+
 /// Apply an evidence delta with the cap-then-add rule (CONDUCTOR_POLICY 3.4).
 /// When the resulting `α + β` would exceed `PolicyConstants.evidenceCap`,
 /// existing evidence-above-prior is shrunk proportionally to make room.
