@@ -62,6 +62,7 @@ Map<String, dynamic> goalDoc({
   String? parentId,
   int order = 1000,
   String? contentId,
+  bool optional = false,
   List<Map<String, dynamic>> objectives = const [],
 }) => {
   'id': id,
@@ -69,7 +70,7 @@ Map<String, dynamic> goalDoc({
   'title': title,
   'parentId': parentId,
   'order': order,
-  'optional': false,
+  'optional': optional,
   'teachingTips': const <String>[],
   'allowChains': false,
   'objectives': objectives,

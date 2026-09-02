@@ -160,14 +160,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     final page = _paginate(filtered);
 
     final goalById = {for (final g in goals) g.id: g};
-    final rootIds = goals
-        .where((g) => g.parentId == null && !g.optional)
-        .map((g) => g.id)
-        .toSet();
-    final rootById = {
-      for (final g in goals)
-        if (g.parentId == null) g.id: g,
-    };
     final parentByChild = <String, String?>{
       for (final g in goals) g.id: g.parentId,
     };
@@ -181,8 +173,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           child: _buildAccountsTable(
             page.items,
             progressByUid: progressByUid,
-            rootIds: rootIds,
-            rootById: rootById,
             goalById: goalById,
             parentByChild: parentByChild,
           ),
@@ -308,8 +298,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   Widget _buildAccountsTable(
     List<Account> pageItems, {
     required Map<String, List<Progress>> progressByUid,
-    required Set<String> rootIds,
-    required Map<String, Goal> rootById,
     required Map<String, Goal> goalById,
     required Map<String, String?> parentByChild,
   }) {
@@ -370,8 +358,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                             (a) => _buildAccountRow(
                               a,
                               progress: progressByUid[a.uid] ?? const [],
-                              rootIds: rootIds,
-                              rootById: rootById,
                               goalById: goalById,
                               parentByChild: parentByChild,
                             ),
@@ -391,8 +377,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   DataRow _buildAccountRow(
     Account a, {
     required List<Progress> progress,
-    required Set<String> rootIds,
-    required Map<String, Goal> rootById,
     required Map<String, Goal> goalById,
     required Map<String, String?> parentByChild,
   }) {
@@ -407,9 +391,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       parentByChild: parentByChild,
     );
 
-    final overall = _overallRootProgress(
+    // Progress of the *active* root only — the root the "Current goal"
+    // column next to it names — averaged over all of its non-optional
+    // subgoals, unstarted ones counting as 0 (#89).
+    final overall = activeRootProgress(
       progress: progress,
-      rootIds: rootIds,
       goalById: goalById,
       parentByChild: parentByChild,
     );
@@ -473,31 +459,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     final parentId = parentByChild[goal.id];
     if (parentId == null) return goal.title;
     return goalById[parentId]?.title ?? goal.title;
-  }
-
-  double _overallRootProgress({
-    required List<Progress> progress,
-    required Set<String> rootIds,
-    required Map<String, Goal> goalById,
-    required Map<String, String?> parentByChild,
-  }) {
-    if (progress.isEmpty || rootIds.isEmpty) return 0.0;
-    final byChildOfRoot = <String, List<double>>{};
-    for (final p in progress) {
-      final goal = goalById[p.goalID];
-      if (goal == null) continue;
-      if (goal.parentId == null) continue;
-      if (goal.optional) continue;
-      final parentId = goal.parentId!;
-      if (!rootIds.contains(parentId)) continue;
-      byChildOfRoot.putIfAbsent(parentId, () => []).add(p.progress);
-    }
-    if (byChildOfRoot.isEmpty) return 0.0;
-    double total = 0;
-    for (final list in byChildOfRoot.values) {
-      total += list.reduce((a, b) => a + b) / list.length;
-    }
-    return total / byChildOfRoot.length;
   }
 
   Widget _buildPaginationBar(_PageView page) {

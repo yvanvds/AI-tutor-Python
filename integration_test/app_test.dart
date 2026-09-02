@@ -30,6 +30,7 @@ import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/students_class_filter.dart' as students_class_filter;
+import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
@@ -51,6 +52,7 @@ void main() {
   bug_report_oauth.main();
   goals_import_replace.main();
   students_class_filter.main();
+  students_progress_column.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();
