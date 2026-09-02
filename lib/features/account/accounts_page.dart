@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
+import 'package:ai_tutor_python/features/account/students_sort.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -36,6 +37,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   int _rowsPerPage = 25;
   int _pageIndex = 0;
   String _classFilter = _kClassFilterAll;
+
+  /// Header sort state (#87). Null column index = storage order.
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
 
   final ValueNotifier<Account?> _drawerAccount = ValueNotifier<Account?>(null);
 
@@ -154,29 +159,40 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         !classes.contains(_classFilter)) {
       _classFilter = _kClassFilterAll;
     }
-    // Pipeline: class filter → search → paginate (#86). Each stage stays
-    // separable so later stages (e.g. sorting, #87) can slot in between.
-    final filtered = _searchAccounts(_filterByClass(all));
-    final page = _paginate(filtered);
-
     final goalById = {for (final g in goals) g.id: g};
     final parentByChild = <String, String?>{
       for (final g in goals) g.id: g.parentId,
     };
+
+    // Per-account derived values (progress, goal titles, status), computed
+    // once per account so sorting over the full list and rendering the
+    // visible page share the same numbers (#87).
+    final rows = [
+      for (final a in all)
+        StudentRowData.compute(
+          a,
+          progress: progressByUid[a.uid] ?? const [],
+          goalById: goalById,
+          parentByChild: parentByChild,
+        ),
+    ];
+
+    // Pipeline: class filter → search → sort → paginate (#86, #87). Sorting
+    // runs on the full filtered set, before pagination, so the order holds
+    // across pages.
+    final filtered = _searchRows(_filterByClass(rows));
+    final sortKey = _sortKeyForColumn(_sortColumnIndex);
+    if (sortKey != null) {
+      sortStudentRows(filtered, key: sortKey, ascending: _sortAscending);
+    }
+    final page = _paginate(filtered);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSearchAndPageSizeRow(classes),
         const SizedBox(height: 12),
-        Expanded(
-          child: _buildAccountsTable(
-            page.items,
-            progressByUid: progressByUid,
-            goalById: goalById,
-            parentByChild: parentByChild,
-          ),
-        ),
+        Expanded(child: _buildAccountsTable(page.items)),
         _buildPaginationBar(page),
       ],
     );
@@ -195,35 +211,63 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   /// Stage 1 of the list pipeline: narrow to one class, to the accounts
   /// without a class, or pass everything through ("All").
-  List<Account> _filterByClass(List<Account> all) {
+  List<StudentRowData> _filterByClass(List<StudentRowData> all) {
     switch (_classFilter) {
       case _kClassFilterAll:
         return all;
       case _kClassFilterNone:
-        return all.where((a) => a.className.isEmpty).toList();
+        return all.where((r) => r.account.className.isEmpty).toList();
       default:
-        return all.where((a) => a.className == _classFilter).toList();
+        return all.where((r) => r.account.className == _classFilter).toList();
     }
   }
 
   /// Stage 2 of the list pipeline: free-text search on name / email.
-  List<Account> _searchAccounts(List<Account> all) {
+  List<StudentRowData> _searchRows(List<StudentRowData> all) {
     final q = _searchCtrl.text.trim().toLowerCase();
     if (q.isEmpty) return all;
-    return all.where((a) {
+    return all.where((r) {
+      final a = r.account;
       return a.email.toLowerCase().contains(q) ||
           a.firstName.toLowerCase().contains(q) ||
           a.lastName.toLowerCase().contains(q);
     }).toList();
   }
 
-  _PageView _paginate(List<Account> filtered) {
+  /// Maps a `DataColumn` index onto its sort key (#87). Streak, Key and
+  /// Actions are not sortable; Status doubles as the last-active sort (the
+  /// severity buckets are tie-broken by the last-active timestamp).
+  StudentsSortKey? _sortKeyForColumn(int? columnIndex) {
+    return switch (columnIndex) {
+      0 => StudentsSortKey.email,
+      1 => StudentsSortKey.name,
+      2 => StudentsSortKey.className,
+      4 => StudentsSortKey.currentGoal,
+      5 => StudentsSortKey.progress,
+      6 => StudentsSortKey.status,
+      _ => null,
+    };
+  }
+
+  void _handleSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+      // A new order means "page 1" is a different slice; jumping back keeps
+      // the result deterministic instead of showing a mid-list page.
+      _pageIndex = 0;
+    });
+  }
+
+  _PageView _paginate(List<StudentRowData> filtered) {
     final total = filtered.length;
     final maxPage = (total == 0) ? 0 : ((total - 1) ~/ _rowsPerPage);
     if (_pageIndex > maxPage) _pageIndex = 0;
     final start = _pageIndex * _rowsPerPage;
     final end = (start + _rowsPerPage).clamp(0, total);
-    final items = (total == 0) ? <Account>[] : filtered.sublist(start, end);
+    final items = (total == 0)
+        ? <StudentRowData>[]
+        : filtered.sublist(start, end);
     return _PageView(
       items: items,
       total: total,
@@ -295,12 +339,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  Widget _buildAccountsTable(
-    List<Account> pageItems, {
-    required Map<String, List<Progress>> progressByUid,
-    required Map<String, Goal> goalById,
-    required Map<String, String?> parentByChild,
-  }) {
+  Widget _buildAccountsTable(List<StudentRowData> pageItems) {
     return Scrollbar(
       controller: _hCtrl,
       thumbVisibility: true,
@@ -342,27 +381,38 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                     final l = AppLocalizations.of(context);
                     return DataTable(
                       showCheckboxColumn: false,
+                      sortColumnIndex: _sortColumnIndex,
+                      sortAscending: _sortAscending,
                       columns: [
-                        DataColumn(label: Text(l.accounts_column_email)),
-                        DataColumn(label: Text(l.accounts_column_name)),
-                        DataColumn(label: Text(l.accounts_column_class)),
+                        DataColumn(
+                          label: Text(l.accounts_column_email),
+                          onSort: _handleSort,
+                        ),
+                        DataColumn(
+                          label: Text(l.accounts_column_name),
+                          onSort: _handleSort,
+                        ),
+                        DataColumn(
+                          label: Text(l.accounts_column_class),
+                          onSort: _handleSort,
+                        ),
                         DataColumn(label: Text(l.accounts_column_streak)),
-                        DataColumn(label: Text(l.accounts_column_currentGoal)),
-                        DataColumn(label: Text(l.accounts_column_progress)),
-                        DataColumn(label: Text(l.accounts_column_status)),
+                        DataColumn(
+                          label: Text(l.accounts_column_currentGoal),
+                          onSort: _handleSort,
+                        ),
+                        DataColumn(
+                          label: Text(l.accounts_column_progress),
+                          onSort: _handleSort,
+                        ),
+                        DataColumn(
+                          label: Text(l.accounts_column_status),
+                          onSort: _handleSort,
+                        ),
                         DataColumn(label: Text(l.accounts_column_key)),
                         DataColumn(label: Text(l.accounts_column_actions)),
                       ],
-                      rows: pageItems
-                          .map(
-                            (a) => _buildAccountRow(
-                              a,
-                              progress: progressByUid[a.uid] ?? const [],
-                              goalById: goalById,
-                              parentByChild: parentByChild,
-                            ),
-                          )
-                          .toList(),
+                      rows: pageItems.map(_buildAccountRow).toList(),
                     );
                   },
                 ),
@@ -374,33 +424,18 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  DataRow _buildAccountRow(
-    Account a, {
-    required List<Progress> progress,
-    required Map<String, Goal> goalById,
-    required Map<String, String?> parentByChild,
-  }) {
-    final lastActive = a.updatedAt ?? a.createdAt;
-    final lastActiveStr = lastActive == null
+  DataRow _buildAccountRow(StudentRowData row) {
+    // All derived values (goal titles, active-root progress (#89), status)
+    // were computed once per account in `_buildContent` so sorting and
+    // rendering agree by construction (#87).
+    final a = row.account;
+    final lastActiveStr = row.lastActive == null
         ? '—'
-        : formatTs(lastActive, context);
+        : formatTs(row.lastActive!, context);
 
-    final goalTitles = activeGoalTitles(
-      progress: progress,
-      goalById: goalById,
-      parentByChild: parentByChild,
-    );
-
-    // Progress of the *active* root only — the root the "Current goal"
-    // column next to it names — averaged over all of its non-optional
-    // subgoals, unstarted ones counting as 0 (#89).
-    final overall = activeRootProgress(
-      progress: progress,
-      goalById: goalById,
-      parentByChild: parentByChild,
-    );
-
-    final status = computeStudentStatus(progress: progress);
+    final goalTitles = row.goalTitles;
+    final overall = row.overallProgress;
+    final status = row.status;
 
     final fullName = [
       a.firstName,
@@ -566,7 +601,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 }
 
 class _PageView {
-  final List<Account> items;
+  final List<StudentRowData> items;
   final int total;
   final int start;
   final int end;
