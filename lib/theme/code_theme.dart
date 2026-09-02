@@ -19,8 +19,13 @@ import 'tokens.dart';
 /// added later would silently bring `==` → ═ back on that token.
 Map<String, TextStyle> get tutorCodeTheme => {
   'root': AppMono.code().copyWith(backgroundColor: AppColors.ink0),
-  'comment': _token(AppColors.syntaxCom, italic: true),
-  'quote': _token(AppColors.syntaxCom, italic: true),
+  // Not italic (#84): a trailing space typed at the end of an italic span
+  // (before a newline) leaves the caret stuck until the next non-space
+  // character — students read that as a broken spacebar. Reproduced with
+  // the italic font file and with synthesized italic alike, so no token may
+  // be italic. Colour alone distinguishes comments.
+  'comment': _token(AppColors.syntaxCom),
+  'quote': _token(AppColors.syntaxCom),
 
   'keyword': _token(AppColors.syntaxKw),
   'selector-tag': _token(AppColors.syntaxKw),
@@ -63,15 +68,12 @@ Map<String, TextStyle> get tutorCodeTheme => {
 };
 
 /// The single way a token style is built: JetBrains Mono with ligatures off.
-TextStyle _token(
-  Color color, {
-  bool italic = false,
-  FontWeight? weight,
-  Color? background,
-}) {
+// There is deliberately no `italic:` option here (#84): typing a space at
+// the end of an italic span (before a newline) does not move the caret
+// until the next glyph is typed. `code_theme_caret_test.dart` pins this.
+TextStyle _token(Color color, {FontWeight? weight, Color? background}) {
   final style = GoogleFonts.jetBrainsMono(
     color: color,
-    fontStyle: italic ? FontStyle.italic : null,
     backgroundColor: background,
     fontFeatures: AppMono.noLigatures,
   );

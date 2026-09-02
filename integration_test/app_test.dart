@@ -19,6 +19,7 @@
 import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
+import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
@@ -40,6 +41,7 @@ void main() {
   lesson_flow.main();
   language_switch.main();
   playground_files.main();
+  editor_comment_space.main();
   practice_complete_code.main();
   quiz_ligatures.main();
   turtle_run_notice.main();
