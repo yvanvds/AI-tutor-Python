@@ -9,9 +9,12 @@
 // one paying for the calls.
 //
 // Who may change it: the Options card is shown to accounts that bring their
-// own key (`!mayUseGlobalKey`) and to developer builds. A student on the
-// school's bundled key cannot move the whole class onto a pricier model from
-// their own machine; they see no card and the global default applies.
+// own key (`!mayUseGlobalKey`), to developer builds, and to teachers
+// (`isTeacherProvider`, from the Entra role) whichever key they are on (#90).
+// A student on the school's bundled key cannot move the whole class onto a
+// pricier model from their own machine; they see no card and the global
+// default applies. A teacher's pick is still this per-device override, not a
+// write to the global doc.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';

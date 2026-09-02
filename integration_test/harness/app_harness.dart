@@ -33,6 +33,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
@@ -126,6 +127,7 @@ class AppHarness {
     this.github,
     this.githubOAuthClientId,
     this.llm,
+    this.developerTools,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -195,6 +197,16 @@ class AppHarness {
   /// assistant text.
   final ScriptedLlm? llm;
 
+  /// Whether developer-only surfaces (the instructions editor, the developer
+  /// card and — on its own — the AI model card in Options) are exposed.
+  ///
+  /// `null` (the default) leaves the app's own rule in place, which is
+  /// `kDebugMode` — and an integration-test binary is a debug build, so by
+  /// default every flow runs *with* developer tools. A flow about who gets
+  /// to see something that developer builds see anyway (#90) passes `false`,
+  /// so it proves the role gate rather than the debug gate.
+  final bool? developerTools;
+
   /// Every URL the app asked the operating system to open (#57).
   ///
   /// The launcher is always replaced, in every flow: the production one hands
@@ -249,6 +261,8 @@ class AppHarness {
         ],
         if (githubOAuthClientId != null)
           gitHubOAuthClientIdProvider.overrideWithValue(githubOAuthClientId!),
+        if (developerTools != null)
+          developerToolsProvider.overrideWithValue(developerTools!),
         browserLauncherProvider.overrideWithValue((Uri url) async {
           browserLaunches.add(url);
           return true;

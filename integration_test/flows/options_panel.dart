@@ -211,6 +211,69 @@ void main() {
     await harness.dispose(tester);
   });
 
+  // #90 — the model card was gated on paying for the calls yourself (an
+  // own-key account) or on a developer build, so a teacher on the school's
+  // key had no way to see or change the model. Both flows below switch the
+  // developer tools *off*: an integration-test binary is a debug build, and
+  // with the debug gate open the card is there for everyone — which is why
+  // the flow above never had to say who it was signed in as.
+  testWidgets('Options: a teacher on the school key sees the AI model card '
+      'and can pick a model for this device', (tester) async {
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      developerTools: false,
+    );
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+
+    await _scrollTo(tester, find.text('AI model'));
+    expect(find.text('AI model'), findsOneWidget);
+    // The seeded config doc names gpt-4o as the school-wide default, and the
+    // teacher is on that key — so no key card, and the default is named.
+    expect(find.text('School default (gpt-4o)'), findsOneWidget);
+    expect(find.text('OpenAI API key'), findsNothing);
+
+    await _tapRow(tester, 'gpt-4.1');
+    await pumpUntil(
+      tester,
+      () => harness.container.read(modelPreferenceProvider) != null,
+      reason: "the teacher's model choice never reached the app state",
+    );
+    expect(harness.container.read(modelPreferenceProvider), 'gpt-4.1');
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('openai_model'), 'gpt-4.1');
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('Options: a student on the school key still sees no AI model '
+      'card', (tester) async {
+    final harness = AppHarness(developerTools: false);
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+
+    // The list is lazy, so "not found" only means something where the card
+    // would have to be on screen. It sits between Appearance and Progress —
+    // so look right below Appearance at the top of the list, and again just
+    // above Progress once that has been scrolled in (the window is shorter
+    // than the three cards together, so the two spots are checked one at a
+    // time). The teacher flow above finds the card with this same scrolling.
+    await _scrollTo(tester, find.text('Appearance'));
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('AI model'), findsNothing);
+    await _scrollTo(tester, find.text('Progress'));
+    expect(find.text('Progress'), findsOneWidget);
+    expect(find.text('AI model'), findsNothing);
+    expect(find.text('School default (gpt-4o)'), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
   testWidgets('Options: progress survives a round trip through a file', (
     tester,
   ) async {
