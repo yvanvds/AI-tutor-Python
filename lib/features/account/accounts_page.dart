@@ -385,7 +385,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ? '—'
         : formatTs(lastActive, context);
 
-    final activeRootTitle = _activeRootTitle(
+    final goalTitles = activeGoalTitles(
       progress: progress,
       goalById: goalById,
       parentByChild: parentByChild,
@@ -418,7 +418,14 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           onTap: () => _editClass(a),
         ),
         DataCell(Text('—', style: TextStyle(color: AppColors.fgFaint))),
-        DataCell(Text(activeRootTitle ?? '—')),
+        DataCell(
+          goalTitles == null
+              ? const Text('—')
+              : _CurrentGoalCell(
+                  rootTitle: goalTitles.rootTitle,
+                  subgoalTitle: goalTitles.subgoalTitle,
+                ),
+        ),
         DataCell(_OverallProgressBar(value: overall)),
         DataCell(_StatusCell(status: status, uid: a.uid)),
         DataCell(
@@ -444,21 +451,6 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
       ],
     );
-  }
-
-  String? _activeRootTitle({
-    required List<Progress> progress,
-    required Map<String, Goal> goalById,
-    required Map<String, String?> parentByChild,
-  }) {
-    final activeRef = mostRecentlyActive(progress);
-    if (activeRef == null) return null;
-    final goal = goalById[activeRef.goalID];
-    if (goal == null) return null;
-    if (goal.parentId == null) return goal.title;
-    final parentId = parentByChild[goal.id];
-    if (parentId == null) return goal.title;
-    return goalById[parentId]?.title ?? goal.title;
   }
 
   Widget _buildPaginationBar(_PageView page) {
@@ -730,6 +722,53 @@ class _EmailCell extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Two-line "Current goal" cell (#88), same pattern as [_EmailCell]: the
+/// root goal's title, then the active subgoal in the smaller/fainter style
+/// of the "last active" line. One line when the active goal is a root. Both
+/// lines ellipsize inside a bounded width; the tooltip carries the full
+/// titles. Root and subgoal stay separate fields so sorting (#87) can key
+/// on the root title alone.
+class _CurrentGoalCell extends StatelessWidget {
+  const _CurrentGoalCell({required this.rootTitle, this.subgoalTitle});
+
+  final String rootTitle;
+  final String? subgoalTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = subgoalTitle;
+    return Tooltip(
+      message: sub == null ? rootTitle : '$rootTitle\n$sub',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 220),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              rootTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: AppColors.fg, fontSize: 13, height: 1.3),
+            ),
+            if (sub != null)
+              Text(
+                sub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.fgFaint,
+                  fontSize: 10.5,
+                  height: 1.4,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

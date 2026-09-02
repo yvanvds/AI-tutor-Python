@@ -108,6 +108,34 @@ double activeRootProgress({
   return total / subgoals.length;
 }
 
+/// Titles for the "Current goal" cell (#88): the active root goal's title
+/// plus, when the most-recently-active goal is a subgoal, that subgoal's own
+/// title. Kept as two separate fields — never concatenated — so the table
+/// can sort on the root title alone (#87).
+///
+/// The root is resolved through [activeRootId], the same walk the Progress
+/// column uses, so the two columns always describe the same root. When the
+/// walk cannot reach a known root (orphaned parent id, cycle) the cell falls
+/// back to the active goal's own title on one line — matching the previous
+/// single-line behavior. Null when the student has no progress or the active
+/// record's goal is unknown (the em-dash cases).
+({String rootTitle, String? subgoalTitle})? activeGoalTitles({
+  required List<Progress> progress,
+  required Map<String, Goal> goalById,
+  required Map<String, String?> parentByChild,
+}) {
+  final active = mostRecentlyActive(progress);
+  if (active == null) return null;
+  final goal = goalById[active.goalID];
+  if (goal == null) return null;
+  final rootId = activeRootId(progress: progress, parentByChild: parentByChild);
+  final root = rootId == null ? null : goalById[rootId];
+  if (root == null || root.id == goal.id) {
+    return (rootTitle: goal.title, subgoalTitle: null);
+  }
+  return (rootTitle: root.title, subgoalTitle: goal.title);
+}
+
 /// Average progress across [docs], skipping any goal whose id is in
 /// [excludeIds]. Returns 0.0 for an empty input.
 double averageProgress(

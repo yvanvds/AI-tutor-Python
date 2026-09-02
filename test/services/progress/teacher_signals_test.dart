@@ -142,6 +142,95 @@ void main() {
     });
   });
 
+  group('activeGoalTitles', () {
+    // Titled goals so root and subgoal lines are distinguishable.
+    final titled = <Goal>[
+      Goal(id: 'r1', title: 'Basics', parentId: null, order: 0),
+      Goal(id: 's1', title: 'Print', parentId: 'r1', order: 0),
+      Goal(id: 's2', title: 'Variables', parentId: 'r1', order: 0),
+    ];
+    final titledById = {for (final g in titled) g.id: g};
+    final titledParents = {for (final g in titled) g.id: g.parentId};
+
+    test('active subgoal yields root title plus subgoal title', () {
+      final titles = activeGoalTitles(
+        progress: [_p('s2', 0.5)],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Variables'));
+    });
+
+    test('the most recently active subgoal wins', () {
+      final titles = activeGoalTitles(
+        progress: [
+          _p('s1', 1.0, at: '2026-05-01T10:00:00Z'),
+          _p('s2', 0.5, at: '2026-05-02T10:00:00Z'),
+        ],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Variables'));
+    });
+
+    test('an active record on the root itself yields one line', () {
+      final titles = activeGoalTitles(
+        progress: [_p('r1', 0.5)],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: null));
+    });
+
+    test('no progress yields null (the em-dash case)', () {
+      final titles = activeGoalTitles(
+        progress: const [],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, isNull);
+    });
+
+    test('an active record on an unknown goal yields null', () {
+      final titles = activeGoalTitles(
+        progress: [_p('deleted-goal', 1.0)],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, isNull);
+    });
+
+    test('a subgoal whose parent is missing falls back to its own title '
+        'on one line', () {
+      final orphan = Goal(
+        id: 'o1',
+        title: 'Orphan',
+        parentId: 'ghost',
+        order: 0,
+      );
+      final titles = activeGoalTitles(
+        progress: [_p('o1', 0.5)],
+        goalById: {'o1': orphan},
+        parentByChild: {'o1': 'ghost'},
+      );
+      expect(titles, (rootTitle: 'Orphan', subgoalTitle: null));
+    });
+
+    test('a multi-level leaf reports the top root plus its own title', () {
+      final deep = <Goal>[
+        Goal(id: 'r1', title: 'Basics', parentId: null, order: 0),
+        Goal(id: 'mid', title: 'Middle', parentId: 'r1', order: 0),
+        Goal(id: 'leaf', title: 'Leaf', parentId: 'mid', order: 0),
+      ];
+      final titles = activeGoalTitles(
+        progress: [_p('leaf', 0.5)],
+        goalById: {for (final g in deep) g.id: g},
+        parentByChild: {for (final g in deep) g.id: g.parentId},
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Leaf'));
+    });
+  });
+
   group('activeRootId', () {
     test('walks multi-level parents up to the root', () {
       final deep = <Goal>[
