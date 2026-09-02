@@ -77,6 +77,7 @@ ConductorDeps _buildDeps(_Fakes f) {
         f.beliefs[f._key(subgoalId, loId)],
     getLoBeliefsForSubgoal: (id) async =>
         f.beliefs.values.where((b) => b.subgoalId == id).toList(),
+    getAllLoBeliefs: () async => f.beliefs.values.toList(),
     upsertLoBelief: (b) async {
       f.beliefs[f._key(b.subgoalId, b.loId)] = b;
     },
@@ -1631,6 +1632,362 @@ void main() {
       // Only the live LO got an applied delta.
       expect(outcome.appliedSignals, hasLength(1));
       expect(outcome.appliedSignals.single.loId, 'lo');
+    });
+  });
+
+  // ---- #102 warm-up review ------------------------------------------------
+  group('#102 warm-up review (§1.5)', () {
+    const printLo = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    const inputLo = LearningObjective(
+      id: 'lo-input',
+      statement: 'input',
+      kind: LoKind.recall,
+    );
+    const varLo = LearningObjective(
+      id: 'lo-var',
+      statement: 'variables',
+      kind: LoKind.apply,
+    );
+    final printGoal = Goal(
+      id: 's0',
+      title: 'Print',
+      parentId: 'r',
+      order: 0,
+      objectives: const [printLo, inputLo],
+    );
+    final active = Goal(
+      id: 's1',
+      title: 'Variables',
+      parentId: 'r',
+      order: 1000,
+      objectives: const [varLo],
+    );
+    final now = DateTime.now().toUtc();
+    final stale = now.subtract(
+      PolicyConstants.warmUpStaleAfter + const Duration(days: 15),
+    );
+    final fresh = now.subtract(const Duration(days: 3));
+
+    LoBelief mastered(
+      String loId, {
+      required DateTime lastUpdatedAt,
+      DateTime? firstMasteredAt,
+      double alpha = 5,
+      double beta = 1,
+      bool calibratedPositive = true,
+    }) => LoBelief(
+      subgoalId: 's0',
+      loId: loId,
+      alpha: alpha,
+      beta: beta,
+      lastUpdatedAt: lastUpdatedAt,
+      lastQuestionType: 'completeCodeQuestion',
+      lastPositiveAtCalibratedAt: calibratedPositive
+          ? DateTime.utc(2026, 4, 1)
+          : null,
+      highestPositiveDifficulty: calibratedPositive
+          ? QuestionDifficulty.medium
+          : null,
+      firstMasteredAt: firstMasteredAt,
+    );
+
+    /// The student finished "Print" and is on "Variables", with the given
+    /// beliefs on the older LOs. `calibration` is the student's level.
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LoBelief> older, {
+      QuestionDifficulty calibration = QuestionDifficulty.medium,
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [printGoal, active];
+      f.progressById['s0'] = Progress(goalID: 's0', progress: 1.0);
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: active,
+      );
+      f.calibration = StudentCalibration(difficulty: calibration);
+      for (final b in older) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    LoBelief older(_Fakes f, String loId) => f.beliefs[f._key('s0', loId)]!;
+
+    test(
+      'the first plan of a session is a review of the stale, once-'
+      'mastered LO: gentlest type for its kind, calibrated difficulty',
+      () async {
+        final s = await setup([
+          mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+        ], calibration: QuestionDifficulty.hard);
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isTrue);
+        expect(plan.warmUp!.subgoal.id, 's0');
+        expect(plan.targetLOs.single.id, 'lo-print');
+        expect(plan.type, ChatRequestType.completeCodeQuestion);
+        expect(plan.difficulty, QuestionDifficulty.hard);
+        expect(plan.reason.chosenReason, contains('warm-up'));
+        expect(plan.reason.candidateLOs.single.loId, 'lo-print');
+        expect(plan.targetSubgoalIdOr('s1'), 's0');
+      },
+    );
+
+    test('a recall LO gets an MCQ', () async {
+      final s = await setup([
+        mastered('lo-input', lastUpdatedAt: stale, firstMasteredAt: stale),
+      ]);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isWarmUp, isTrue);
+      expect(plan.targetLOs.single.id, 'lo-input');
+      expect(plan.type, ChatRequestType.mcQuestion);
+    });
+
+    test('planning is repeatable until the question is fired; then the '
+        'session has had its one warm-up', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+      ]);
+      // The host's session-start block check plans and discards.
+      expect((await s.c.planNext()).isWarmUp, isTrue);
+      final plan = await s.c.planNext();
+      expect(plan.isWarmUp, isTrue);
+      s.c.notePlannedQuestion(plan);
+      // Nothing about the old belief changed, yet the slot is spent.
+      final next = _expectQuestion(await s.c.planNext());
+      expect(next.isWarmUp, isFalse);
+      expect(next.targetLOs.single.id, 'lo-var');
+      // A new session entry re-opens it.
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isWarmUp, isTrue);
+    });
+
+    test('the most stale candidate wins; ties go to the lowest mean', () async {
+      final older = now.subtract(const Duration(days: 80));
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+        mastered('lo-input', lastUpdatedAt: older, firstMasteredAt: older),
+      ]);
+      final plan = await s.c.planNext();
+      expect(plan.targetLOs.single.id, 'lo-input');
+      expect(plan.reason.candidateLOs, hasLength(2));
+
+      final tie = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+        mastered(
+          'lo-input',
+          lastUpdatedAt: stale,
+          firstMasteredAt: stale,
+          alpha: 9,
+        ),
+      ]);
+      expect((await tie.c.planNext()).targetLOs.single.id, 'lo-print');
+    });
+
+    test('a recently written LO is not stale — a transfer credit keeps a '
+        'recurring LO out of the pool', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: fresh, firstMasteredAt: stale),
+      ]);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isWarmUp, isFalse);
+      expect(plan.targetLOs.single.id, 'lo-var');
+    });
+
+    test('an LO never mastered by direct probing is never reviewed', () async {
+      final s = await setup([
+        mastered(
+          'lo-print',
+          lastUpdatedAt: stale,
+          alpha: 3,
+          calibratedPositive: false,
+        ),
+      ]);
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+    });
+
+    test('a legacy doc without the stamp that was mastered at its last '
+        'write is eligible', () async {
+      final s = await setup([mastered('lo-print', lastUpdatedAt: stale)]);
+      expect((await s.c.planNext()).isWarmUp, isTrue);
+    });
+
+    test(
+      'an LO of the active subgoal is never a warm-up, however stale',
+      () async {
+        final s = await setup([
+          LoBelief(
+            subgoalId: 's1',
+            loId: 'lo-var',
+            alpha: 5,
+            beta: 1,
+            lastUpdatedAt: stale,
+            lastPositiveAtCalibratedAt: stale,
+            firstMasteredAt: stale,
+          ),
+        ]);
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isFalse);
+        expect(plan.targetLOs.single.id, 'lo-var');
+      },
+    );
+
+    test(
+      'an orphaned belief (LO no longer in the curriculum) is skipped',
+      () async {
+        final s = await setup([
+          mastered('lo-gone', lastUpdatedAt: stale, firstMasteredAt: stale),
+        ]);
+        expect((await s.c.planNext()).isWarmUp, isFalse);
+      },
+    );
+
+    Future<TurnOutcome> gradeWarmUp(
+      ({Conductor c, _Fakes f}) s, {
+      required QuestionPlan plan,
+      AnswerQuality quality = AnswerQuality.correct,
+      LoSignalKind kind = LoSignalKind.positive,
+      LoSignalStrength strength = LoSignalStrength.strong,
+      List<GradedTransfer> transferLOs = const [],
+    }) async {
+      s.c.notePlannedQuestion(plan);
+      return s.c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: 's0',
+              loId: plan.targetLOs.single.id,
+              kind: kind,
+              strength: strength,
+            ),
+          ],
+          transferLOs: transferLOs,
+        ),
+      );
+    }
+
+    test(
+      'a correct answer lands on the old LO like any probe: decayed α '
+      'plus the full weight, clock reset, both ratchets, type noted',
+      () async {
+        final s = await setup([
+          mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+        ], calibration: QuestionDifficulty.hard);
+        final plan = await s.c.planNext();
+        final before = older(s.f, 'lo-print');
+        final outcome = await gradeWarmUp(s, plan: plan);
+
+        final after = older(s.f, 'lo-print');
+        final decayed = applyDecay(
+          alpha: 5,
+          beta: 1,
+          lastUpdatedAt: stale,
+          now: after.lastUpdatedAt,
+        );
+        expect(decayed.alpha, lessThan(5));
+        // Strong positive at hard: 2.0 × 1.4.
+        expect(after.alpha, closeTo(decayed.alpha + 2.0 * 1.4, 1e-6));
+        expect(after.beta, closeTo(decayed.beta, 1e-6));
+        expect(after.subgoalId, 's0');
+        expect(
+          DateTime.now().toUtc().difference(after.lastUpdatedAt),
+          lessThan(const Duration(seconds: 5)),
+        );
+        // A direct probe of this LO at a difficulty chosen for it: ratchets
+        // move (unlike a transfer credit, §3.7 / §4.3).
+        expect(
+          after.lastPositiveAtCalibratedAt!.isAfter(
+            before.lastPositiveAtCalibratedAt!,
+          ),
+          isTrue,
+        );
+        expect(after.highestPositiveDifficulty, QuestionDifficulty.hard);
+        expect(after.lastQuestionType, plan.type.name);
+        expect(after.firstMasteredAt, stale);
+        expect(outcome.appliedSignals.single.loId, 'lo-print');
+        expect(outcome.appliedSignals.single.alphaDelta, closeTo(2.8, 1e-6));
+        expect(outcome.subgoalAdvanced, isFalse);
+      },
+    );
+
+    test('a wrong answer debits the old LO, but neither subgoal cache '
+        'moves and the active subgoal writes no history', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+      ]);
+      final plan = await s.c.planNext();
+      await gradeWarmUp(
+        s,
+        plan: plan,
+        quality: AnswerQuality.wrong,
+        kind: LoSignalKind.negative,
+      );
+      final after = older(s.f, 'lo-print');
+      expect(after.beta, greaterThan(1.0));
+      expect(after.recentNegativesAtCalibrated, 1);
+      expect(after.firstMasteredAt, stale);
+      // The old subgoal keeps its cached progress: a review is not a
+      // re-enrolment. The active subgoal was not touched at all.
+      expect(s.f.progressById['s0']!.progress, 1.0);
+      expect(s.f.progressById.containsKey('s1'), isFalse);
+      expect(s.f.currentProgress, 0.0);
+    });
+
+    test('warm-up answers stay out of the calibration window', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+      ]);
+      final plan = await s.c.planNext();
+      final outcome = await gradeWarmUp(s, plan: plan);
+      expect(s.f.calibration.recentAnswers, isEmpty);
+      expect(s.f.calibration.recentQuestionTypes, isEmpty);
+      expect(outcome.calibrationAfter, outcome.calibrationBefore);
+    });
+
+    test('a transfer nomination on the warm-up target itself is dropped; '
+        'other nominations still count', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+        mastered('lo-input', lastUpdatedAt: fresh, firstMasteredAt: stale),
+      ]);
+      final plan = await s.c.planNext();
+      expect(plan.targetLOs.single.id, 'lo-print');
+      final outcome = await gradeWarmUp(
+        s,
+        plan: plan,
+        transferLOs: const [
+          GradedTransfer(subgoalId: 's0', loId: 'lo-print'),
+          GradedTransfer(subgoalId: 's0', loId: 'lo-input'),
+        ],
+      );
+      expect(outcome.transferCredits, hasLength(1));
+      expect(outcome.transferCredits.single.loId, 'lo-input');
+      // The target got exactly its direct signal (2.0 at medium on the
+      // decayed belief), not a credit on top.
+      expect(outcome.appliedSignals.single.alphaDelta, closeTo(2.0, 1e-6));
+    });
+
+    test('the active subgoal is untouched by a warm-up turn', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: stale, firstMasteredAt: stale),
+      ]);
+      final plan = await s.c.planNext();
+      await gradeWarmUp(s, plan: plan);
+      expect(s.f.beliefs.containsKey(s.f._key('s1', 'lo-var')), isFalse);
+      // And the next plan is the ordinary first probe of the active subgoal.
+      final next = _expectQuestion(await s.c.planNext());
+      expect(next.isWarmUp, isFalse);
+      expect(next.targetLOs.single.id, 'lo-var');
+      expect(next.reason.chosenReason, contains('cold start'));
     });
   });
 }

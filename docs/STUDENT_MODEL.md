@@ -307,9 +307,14 @@ Belief and calibration are the source of truth for decisions;
   never latches (decay can demote), but "was this LO ever mastered by
   direct probing?" is a durable fact the model keeps, because transfer
   credit (conductor policy 3.7) may refresh only such LOs, and the
-  warm-up review questions (#102) pick from the same set. Beliefs in
-  *other* subgoals than the active one can therefore be written by a
-  graded turn — but only upward, by that small credit.
+  warm-up review question (conductor policy 1.5, #102) picks from the
+  same set. Beliefs in *other* subgoals than the active one can therefore
+  be written by a graded turn: upward only by a transfer credit, in
+  either direction by the once-per-session warm-up review, which is a
+  direct probe of that LO and updates its doc like any probe (ratchets
+  and counter included). `lastUpdatedAt` doubles as the staleness clock
+  for that review: an LO not written for `warmUpStaleAfter` is due.
+  Neither mechanism recomputes the other subgoal's cached `progress`.
 
 ## What this model deliberately does not do
 

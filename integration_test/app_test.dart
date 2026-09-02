@@ -45,6 +45,7 @@ import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
+import 'flows/warm_up_review.dart' as warm_up_review;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -57,6 +58,7 @@ void main() {
   evidence_provenance.main();
   difficulty_ratchet.main();
   transfer_credit.main();
+  warm_up_review.main();
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();

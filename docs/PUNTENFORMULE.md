@@ -346,7 +346,18 @@ niemand oneerlijk raakt:
 - **Opfrisvragen.** Leerdoelen die *niet* vanzelf in nieuwe leerstof
   terugkeren en lang niet bevraagd zijn, krijgen af en toe een korte
   opfrisvraag in de gewone oefenflow. Dat is meteen goede didactiek
-  (ophaaloefening) én houdt de meting vers.
+  (ophaaloefening) én houdt de meting vers. Concreet: een sessie kan
+  openen met **één** opfrisvraag (de app kondigt ze aan) over een eerder
+  beheerst leerdoel uit een ander subdoel van hetzelfde hoofddoel waarvan
+  de overtuiging al **30 dagen** niet meer geschreven is — het langst
+  onaangeroerde leerdoel eerst. Omdat ook transfer-krediet een schrijving
+  is, komen leerdoelen die je in nieuw werk blijft gebruiken hier
+  vanzelf niet in terecht. Het antwoord telt als een gewone meting van
+  dat leerdoel (§1.2, op je huidige moeilijkheidsniveau, met de
+  herkomst van §2.7): een juist antwoord verhoogt de overtuiging en
+  beweegt ook de ratel van §2.5, een fout antwoord verlaagt ze. De vraag
+  telt niet mee voor je kalibratieniveau (§1.6) en verandert niets aan
+  de voortgangsbalkjes.
 
 Samen betekenen ze: wie vroeg klaar was en gewoon is blijven werken,
 staat er op het rapportmoment vers en terecht goed voor.
@@ -407,6 +418,7 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 | w_M, w_G per periode | mix beheersing/groei | TBD; vroege periodes groei-zwaarder |
 | s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
 | transfergewicht | grootte van het transfer-krediet (§2.8) | voorlopig het zwak-gewicht 0,5 (gerekend als gemiddeld) × s in de code; definitief na schaduwrun (klein; ≤ 0,5) |
+| opfrisdrempel | hoe lang een beheerst leerdoel onaangeroerd moet zijn voor een opfrisvraag (§2.8) | voorlopig 30 dagen (de halve halveringstijd) in de code; definitief na schaduwrun |
 
 Alle overige getallen in dit document (§1) zijn de vandaag werkende
 waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
@@ -427,6 +439,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.1 | 2026-09-02 | Geen structuurwijziging. §4 en bijlage A: de voorlopige codewaarde van s (1,25) vermeld en de stand van §2.7 in de code beschreven (#100). |
 | 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
 | 1.0.3 | 2026-09-02 | Geen structuurwijziging. §2.8 transfer-krediet staat nu in de code: alleen bij een volledig juiste oplossing, alleen voor eerder beheerste leerdoelen uit een ander subdoel, gewicht voorlopig 0,5 × s (§4, bijlage A); de ratel van §2.5 beweegt er niet door (#101). |
+| 1.0.4 | 2026-09-02 | Geen structuurwijziging. §2.8 opfrisvragen staan nu in de code: hoogstens één per sessie, bij het begin, over het langst onaangeroerde eerder beheerste leerdoel uit een ander subdoel (drempel voorlopig 30 dagen, §4); het antwoord telt als gewone meting van dat leerdoel, inclusief de ratel van §2.5, maar niet voor het kalibratieniveau (#102). |
 
 ---
 
@@ -447,6 +460,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
 | toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
 | transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
+| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt; hoogstens één per sessie (§2.8) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -474,9 +488,16 @@ raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
 zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
 meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
 zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
-wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 zijn op
-datum van v1.0.3 nog specificatie, geen werkende code; hun implementatie
-volgt dit document. Van §2.7 staat de weging in de code
+wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 staan
+sinds v1.0.4 in de code: bij het begin van een sessie kiest de tutor
+hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
+oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel
+waarvan `lastUpdatedAt` minstens 30 dagen oud is — het oudste eerst — en
+stelt daarover de zachtste vraagvorm voor dat soort leerdoel op je
+huidige niveau. Het antwoord wordt verwerkt als een gewone meting van
+dat leerdoel (gewicht van §1.2, herkomst van §2.7, ratel van §2.5), telt
+niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
+de beurt als opfrisvraag (`isWarmUp`). Van §2.7 staat de weging in de code
 (elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
 s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
 tot die er is, telt elke beurt als thuis en verandert s niets.

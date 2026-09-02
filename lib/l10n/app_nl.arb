@@ -580,6 +580,7 @@
   "chat_notice_preparingExercise": "Je volgende oefening wordt voorbereid...",
   "chat_notice_feedbackDegraded": "Er is iets mis met de feedback. Probeer het over een paar minuten opnieuw.",
   "chat_notice_newGoalSelected": "Nieuw doel geselecteerd: {title}",
+  "chat_notice_warmUpReview": "Eerst even opwarmen: één opfrisvraag over {title}.",
   "chat_notice_difficultyChanged": "Moeilijkheid aangepast: {from} -> {to}",
   "chat_notice_submitViaEditor": "Pas je code aan in de editor links en druk op Run om je oplossing in te sturen."
 }

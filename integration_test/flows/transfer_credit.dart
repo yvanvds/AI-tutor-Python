@@ -1,6 +1,6 @@
 // End-to-end (#101): a working solution to a later exercise refreshes the
-// earlier LOs it correctly uses. The student mastered "Print" a month ago
-// and is now on "Variables"; the grader nominates `lo-print` in
+// earlier LOs it correctly uses. The student mastered "Print" three weeks
+// ago and is now on "Variables"; the grader nominates `lo-print` in
 // `transferLOs`, and the app lands a small positive on the old belief doc —
 // its decayed α plus the weak weight, its decay clock reset — and names the
 // credit on the `turn_history` doc. A never-mastered LO gets nothing.
@@ -63,7 +63,7 @@ Map<String, dynamic> printDone() => {
   'lastSessionAt': '2026-08-03T10:00:00Z',
 };
 
-/// The belief on `lo-print` as it was written a month ago.
+/// The belief on `lo-print` as it was written three weeks ago.
 Map<String, dynamic> printBelief({
   required double alpha,
   required double beta,
@@ -132,7 +132,12 @@ void main() {
   Map<String, dynamic> storedPrint(AppHarness harness) =>
       harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
 
-  final monthAgo = DateTime.now().toUtc().subtract(const Duration(days: 30));
+  // Three weeks: old enough to have decayed visibly, recent enough that the
+  // LO is not yet due for a warm-up review (#102, `warmUpStaleAfter`) —
+  // this flow is about an ordinary turn on "Variables", not the review.
+  final weeksAgo = DateTime.now().toUtc().subtract(
+    PolicyConstants.warmUpStaleAfter - const Duration(days: 9),
+  );
 
   testWidgets('a correct answer on a later subgoal refreshes the mastered '
       'LO it used: decayed α plus the weak weight, clock reset, credit '
@@ -145,8 +150,8 @@ void main() {
           printBelief(
             alpha: 5,
             beta: 1,
-            lastUpdatedAt: monthAgo,
-            firstMasteredAt: monthAgo,
+            lastUpdatedAt: weeksAgo,
+            firstMasteredAt: weeksAgo,
           ),
         ],
       },
@@ -171,11 +176,11 @@ void main() {
       DateTime.now().toUtc().difference(writtenAt),
       lessThan(const Duration(minutes: 1)),
     );
-    // A month of decay on (5, 1), then the credit.
+    // Three weeks of decay on (5, 1), then the credit.
     final decayed = applyDecay(
       alpha: 5,
       beta: 1,
-      lastUpdatedAt: monthAgo,
+      lastUpdatedAt: weeksAgo,
       now: writtenAt,
     );
     expect(decayed.alpha, lessThan(5));
@@ -186,8 +191,8 @@ void main() {
     expect(print['beta'], closeTo(decayed.beta, 1e-9));
     // Nothing else on the old doc moved.
     expect(print['highestPositiveDifficulty'], 'medium');
-    expect(print['lastPositiveAtCalibratedAt'], monthAgo.toIso8601String());
-    expect(print['firstMasteredAt'], monthAgo.toIso8601String());
+    expect(print['lastPositiveAtCalibratedAt'], weeksAgo.toIso8601String());
+    expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
 
     // The target LO got its own ordinary signal.
     final variables =
@@ -205,7 +210,7 @@ void main() {
       llm: ScriptedLlm(script()),
       extraDocs: {
         'progress': [printDone()],
-        'lo_beliefs': [printBelief(alpha: 5, beta: 1, lastUpdatedAt: monthAgo)],
+        'lo_beliefs': [printBelief(alpha: 5, beta: 1, lastUpdatedAt: weeksAgo)],
       },
     );
     await answerOnce(tester, harness);
@@ -213,7 +218,7 @@ void main() {
     expect(turn(harness)['transferCredits'], hasLength(1));
     final print = storedPrint(harness);
     expect(print['alpha'], greaterThan(4.0));
-    expect(print['firstMasteredAt'], monthAgo.toIso8601String());
+    expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
 
     await harness.dispose(tester);
   });
@@ -229,7 +234,7 @@ void main() {
           printBelief(
             alpha: 1.6,
             beta: 1,
-            lastUpdatedAt: monthAgo,
+            lastUpdatedAt: weeksAgo,
             calibratedPositive: false,
           ),
         ],
@@ -240,7 +245,7 @@ void main() {
     expect(turn(harness).containsKey('transferCredits'), isFalse);
     final print = storedPrint(harness);
     expect(print['alpha'], 1.6);
-    expect(print['lastUpdatedAt'], monthAgo.toIso8601String());
+    expect(print['lastUpdatedAt'], weeksAgo.toIso8601String());
     expect(print.containsKey('firstMasteredAt'), isFalse);
 
     await harness.dispose(tester);

@@ -1862,6 +1862,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String chat_notice_warmUpReview(String title) {
+    return 'Quick warm-up first: one review question on $title.';
+  }
+
+  @override
   String chat_notice_difficultyChanged(String from, String to) {
     return 'Difficulty adjusted: $from -> $to';
   }

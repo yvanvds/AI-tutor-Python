@@ -57,6 +57,10 @@ enum ChatNoticeKind {
   /// `args[0]` is the goal title.
   newGoalSelected,
 
+  /// The session opens with one review question on an older subgoal
+  /// (#102, CONDUCTOR_POLICY §1.5). `args[0]` is that subgoal's title.
+  warmUpReview,
+
   /// `args[0]` / `args[1]` are `QuestionDifficulty` names (before / after).
   difficultyChanged,
 

@@ -399,6 +399,8 @@ class TutorService extends Notifier<TutorState> {
           .getOne(subgoalId: subgoalId, loId: loId),
       getLoBeliefsForSubgoal: (id) =>
           ref.read(loBeliefsServiceProvider).getAllForSubgoal(id),
+      getAllLoBeliefs: () =>
+          ref.read(loBeliefsServiceProvider).getAllForCurrentUser(),
       upsertLoBelief: (b) => ref.read(loBeliefsServiceProvider).upsert(b),
       appendTurnHistory: (record) =>
           ref.read(turnHistoryServiceProvider).append(record),
@@ -503,6 +505,11 @@ class TutorService extends Notifier<TutorState> {
     var turnOpened = false;
     try {
       final selection = ref.read(goalSelectionProvider);
+      // A warm-up review (#102) is about an older subgoal: the question,
+      // its grading and any hint on it are prompted in that subgoal's
+      // context. Grading and hint calls carry no `plan`; the in-flight one
+      // is the warm-up then.
+      final warmUpSubgoal = (plan ?? _inFlightPlan)?.warmUp?.subgoal;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
         goalSelection: selection,
@@ -512,6 +519,7 @@ class TutorService extends Notifier<TutorState> {
         fetchRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
+        subgoalOverride: warmUpSubgoal,
       );
 
       final request = await _buildRequestInput(
@@ -620,6 +628,11 @@ class TutorService extends Notifier<TutorState> {
   }) async {
     final selection = ref.read(goalSelectionProvider);
     final scope = await _buildGradingScope(selection);
+    // The subgoal the in-flight target LOs belong to: the active one, or
+    // the older one a warm-up review (#102) is about.
+    final targetSubgoalId = _inFlightPlan?.targetSubgoalIdOr(
+      selection.activeChildGoal?.id,
+    );
     switch (type) {
       case ChatRequestType.socraticQuestion:
       case ChatRequestType.mcQuestion:
@@ -635,6 +648,7 @@ class TutorService extends Notifier<TutorState> {
           QuestionFormatter.submitCode(
             code,
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
+            targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
           ),
         );
@@ -645,6 +659,7 @@ class TutorService extends Notifier<TutorState> {
           QuestionFormatter.mcqAnswer(
             prompt,
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
+            targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
           ),
         );
@@ -663,6 +678,7 @@ class TutorService extends Notifier<TutorState> {
           QuestionFormatter.explainAnswer(
             prompt,
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
+            targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
           ),
         );
@@ -673,6 +689,7 @@ class TutorService extends Notifier<TutorState> {
           QuestionFormatter.socraticFeedback(
             prompt,
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
+            targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
           ),
         );
@@ -688,6 +705,9 @@ class TutorService extends Notifier<TutorState> {
             rationale: fu.question.rationale,
             chainDepth: fu.depth,
             targetLOs: fu.originalPlan.targetLOs,
+            targetSubgoalId: fu.originalPlan.targetSubgoalIdOr(
+              selection.activeChildGoal?.id,
+            ),
             goalScopeLOs: scope,
           ),
         );
@@ -870,13 +890,17 @@ class TutorService extends Notifier<TutorState> {
 
     final now = DateTime.now().toUtc();
     final provenance = await _resolveProvenance(at: now);
+    // A warm-up review (#102) targets an LO of an older subgoal: the
+    // fallback signal and the turn record name that subgoal, not the
+    // active one.
+    final targetSubgoalId = plan.targetSubgoalIdOr(activeChild?.id);
     final answer = GradedAnswerBuilder.build(
       overallQuality: overallQuality,
       rawSignals: loSignals,
       rawTransferLOs: transferLOs,
       scopeSubgoals: scopeSubgoals,
       intendedTargetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
-      intendedTargetSubgoalId: activeChild?.id,
+      intendedTargetSubgoalId: targetSubgoalId,
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
       provenance: provenance,
@@ -889,12 +913,13 @@ class TutorService extends Notifier<TutorState> {
     final record = PersistedTurnRecord(
       id: CosmosDocId.turnHistory(now),
       turnAt: now,
-      subgoalId: activeChild?.id ?? '',
+      subgoalId: targetSubgoalId ?? '',
       targetLOIds: plan.targetLOs.map((lo) => lo.id).toList(),
       questionType: plan.type.name,
       difficulty: plan.difficulty,
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
+      isWarmUp: plan.isWarmUp,
       selectionReason: plan.reason,
       overallQuality: outcome.overallQuality,
       loSignals: outcome.loSignals,
@@ -938,7 +963,10 @@ class TutorService extends Notifier<TutorState> {
       }
     }
 
+    // §6.3 condition 5: a warm-up review stays one short question — no
+    // follow-up dialogue on old material.
     if (followUp != null &&
+        !plan.isWarmUp &&
         _shouldPresentFollowUp(
           outcome: outcome,
           targetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
@@ -1205,6 +1233,14 @@ class TutorService extends Notifier<TutorState> {
       return;
     }
 
+    final warmUp = plan.warmUp;
+    if (warmUp != null) {
+      // The ritual is announced (#102): the student sees why the first
+      // question is about an older topic.
+      _chat.addSystemNotice(
+        ChatNotice(ChatNoticeKind.warmUpReview, args: [warmUp.subgoal.title]),
+      );
+    }
     _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));
 
     if (state == TutorState.working) state = TutorState.idle;

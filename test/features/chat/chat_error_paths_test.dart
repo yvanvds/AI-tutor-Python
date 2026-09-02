@@ -97,6 +97,7 @@ class _FakeInstructionGenerator extends InstructionGenerator {
     required Future<List<Goal>> Function() fetchRootGoals,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
+    Goal? subgoalOverride,
   }) async => 'system prompt';
 }
 

@@ -226,6 +226,12 @@ class PersistedTurnRecord {
   final bool isFollowUp;
   final int chainDepth;
 
+  /// True when the turn was the session's warm-up review question (#102,
+  /// CONDUCTOR_POLICY §1.5): `subgoalId` and `targetLOIds` then name an
+  /// older subgoal and its LO, not the active one. Omitted from the doc
+  /// when false.
+  final bool isWarmUp;
+
   // Why these were picked
   final TurnSelectionReason? selectionReason;
 
@@ -285,6 +291,7 @@ class PersistedTurnRecord {
     this.signalEvents = const [],
     this.provenance = EvidenceProvenance.home,
     this.transferCredits = const [],
+    this.isWarmUp = false,
   });
 
   bool get hasStrongEvent =>
@@ -301,6 +308,7 @@ class PersistedTurnRecord {
     if (difficulty != null) 'difficulty': difficulty!.name,
     'isFollowUp': isFollowUp,
     'chainDepth': chainDepth,
+    if (isWarmUp) 'isWarmUp': true,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
     'loSignals': loSignals.map((s) => s.toJson()).toList(),
@@ -373,6 +381,7 @@ class PersistedTurnRecord {
       difficulty: parseDifficulty(doc['difficulty']),
       isFollowUp: (doc['isFollowUp'] as bool?) ?? false,
       chainDepth: (doc['chainDepth'] as num?)?.toInt() ?? 0,
+      isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),
       loSignals: const [],

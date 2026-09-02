@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 PersistedTurnRecord _record({
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
+  bool isWarmUp = false,
 }) => PersistedTurnRecord(
+  isWarmUp: isWarmUp,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
   subgoalId: 's1',
@@ -33,6 +35,20 @@ PersistedTurnRecord _record({
 );
 
 void main() {
+  group('PersistedTurnRecord isWarmUp (#102)', () {
+    test('an ordinary turn writes no field and reads back false', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('isWarmUp'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).isWarmUp, isFalse);
+    });
+
+    test('a warm-up turn writes the flag and reads it back', () {
+      final map = _record(isWarmUp: true).toMap(uid: 'u1');
+      expect(map['isWarmUp'], isTrue);
+      expect(PersistedTurnRecord.fromCosmos(map).isWarmUp, isTrue);
+    });
+  });
+
   group('PersistedTurnRecord transferCredits (#101)', () {
     test('an ordinary turn writes no field at all', () {
       expect(

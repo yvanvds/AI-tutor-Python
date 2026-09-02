@@ -96,6 +96,17 @@ class PolicyConstants {
   /// At most this many subgoals can auto-skip in a row.
   static const int cascadeSkipCap = 1;
 
+  // ---- Warm-up review (CONDUCTOR_POLICY §1.5, #102) ------------------------
+
+  /// How long a once-mastered LO in another subgoal must go without a
+  /// belief write before it is due for a warm-up review question. Half the
+  /// decay half-life: at that age a `(5, 1)` belief has decayed to
+  /// `(3.8, 1)` — mean 0.79, just under the mastery threshold — so the
+  /// review lands right where decay starts to read as "forgotten". Any
+  /// write resets the clock, including a transfer credit (§3.7), which is
+  /// how LOs that recur in later work stay out of the warm-up pool.
+  static const Duration warmUpStaleAfter = Duration(days: 30);
+
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------
 
   /// Recent-answer window size on the account doc.

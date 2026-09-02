@@ -1890,6 +1890,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String chat_notice_warmUpReview(String title) {
+    return 'Eerst even opwarmen: één opfrisvraag over $title.';
+  }
+
+  @override
   String chat_notice_difficultyChanged(String from, String to) {
     return 'Moeilijkheid aangepast: $from -> $to';
   }

@@ -72,7 +72,10 @@ Inputs:
 - `goal`, `subgoal`, `teachingTips` — same as generation.
 - `targetLOs` — the LOs the question was meant to probe (the same list
   passed to generation; carried through so the grader knows the
-  intent).
+  intent). Each entry also carries `subgoalId`: the subgoal the target
+  LO belongs to — the current subgoal on an ordinary probe, an *older*
+  subgoal of the root on a warm-up review question (conductor policy
+  1.5, #102). Signals on the target go under that id.
 - `goalScopeLOs` — every LO from every subgoal in the **current root
   goal**, including earlier subgoals. `[{subgoalId, loId, statement,
   kind}, ...]`. The grader may emit signals against any of these,
@@ -84,6 +87,16 @@ Inputs:
 Note: `goalScopeLOs` does not include LOs from earlier root goals.
 Forgetting from earlier roots is handled by belief decay (part 2), not
 by per-question signals. Keeps prompt token cost bounded.
+
+**Warm-up review questions (conductor policy 1.5, #102).** Once per
+session the conductor may ask one review question on an LO of an
+*older* subgoal of the current root. For both generation and grading of
+that question, `subgoal` and `teachingTips` describe *that* older
+subgoal, not the one the student is working on, and `targetLOs` name its
+LO with its `subgoalId`. Nothing else in the contract changes: the
+grader emits the same shape, `goalScopeLOs` is the same root-wide list,
+and the scope check (below) accepts the signal because the older subgoal
+is in scope.
 
 ## What the grader returns
 
@@ -231,7 +244,8 @@ model:
 
 If the response fails to parse or every signal is dropped, the
 conductor falls back to a single weak signal on the question's
-**intended LO** (or the first `targetLO` if there were several), sign
+**intended LO** (or the first `targetLO` if there were several), filed
+under the target's own subgoal (the older one on a warm-up review), sign
 matching `overallQuality`:
 
 - `correct → (positive, weak)`

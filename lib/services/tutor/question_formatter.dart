@@ -19,13 +19,21 @@ class QuestionFormatter {
     return jsonEncode(request);
   }
 
-  static List<Map<String, dynamic>> encodeLOs(List<LearningObjective> los) {
+  /// [subgoalId], when given, is written on every entry: the subgoal the
+  /// target LOs belong to (LLM_CONTRACT "Answer grading", #102). Grading
+  /// payloads pass it so the grader files its signal under the right
+  /// subgoal even when the target is a warm-up review LO from an older one.
+  static List<Map<String, dynamic>> encodeLOs(
+    List<LearningObjective> los, {
+    String? subgoalId,
+  }) {
     return los
         .map(
           (lo) => {
             'id': lo.id,
             'statement': lo.statement,
             'kind': lo.kind.name,
+            if (subgoalId != null) 'subgoalId': subgoalId,
           },
         )
         .toList(growable: false);
@@ -100,12 +108,14 @@ class QuestionFormatter {
   static String explainAnswer(
     String answer, {
     List<LearningObjective> targetLOs = const [],
+    String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "explain_answer",
     additionalFields: _gradingFields(
       {"answer": answer},
       targetLOs: targetLOs,
+      targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,
     ),
   );
@@ -113,12 +123,14 @@ class QuestionFormatter {
   static String socraticFeedback(
     String answer, {
     List<LearningObjective> targetLOs = const [],
+    String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "socratic_feedback",
     additionalFields: _gradingFields(
       {"answer": answer},
       targetLOs: targetLOs,
+      targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,
     ),
   );
@@ -126,12 +138,14 @@ class QuestionFormatter {
   static String submitCode(
     String code, {
     List<LearningObjective> targetLOs = const [],
+    String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "submit_code",
     additionalFields: _gradingFields(
       {"code": code},
       targetLOs: targetLOs,
+      targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,
     ),
   );
@@ -139,12 +153,14 @@ class QuestionFormatter {
   static String mcqAnswer(
     String answer, {
     List<LearningObjective> targetLOs = const [],
+    String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "mcq_answer",
     additionalFields: _gradingFields(
       {"answer": answer},
       targetLOs: targetLOs,
+      targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,
     ),
   );
@@ -160,6 +176,7 @@ class QuestionFormatter {
     String? rationale,
     int chainDepth = 1,
     List<LearningObjective> targetLOs = const [],
+    String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "follow_up_answer",
@@ -172,6 +189,7 @@ class QuestionFormatter {
           "follow_up_rationale": rationale,
       },
       targetLOs: targetLOs,
+      targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,
     ),
   );
@@ -182,9 +200,10 @@ class QuestionFormatter {
     Map<String, dynamic> base, {
     required List<LearningObjective> targetLOs,
     required List<({String subgoalId, LearningObjective lo})> goalScopeLOs,
+    String? targetSubgoalId,
   }) {
     if (targetLOs.isNotEmpty) {
-      base['target_los'] = encodeLOs(targetLOs);
+      base['target_los'] = encodeLOs(targetLOs, subgoalId: targetSubgoalId);
     }
     if (goalScopeLOs.isNotEmpty) {
       base['goal_scope_los'] = goalScopeLOs

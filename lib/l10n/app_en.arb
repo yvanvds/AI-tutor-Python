@@ -972,6 +972,10 @@
   "@chat_notice_newGoalSelected": {
     "placeholders": { "title": { "type": "String" } }
   },
+  "chat_notice_warmUpReview": "Quick warm-up first: one review question on {title}.",
+  "@chat_notice_warmUpReview": {
+    "placeholders": { "title": { "type": "String" } }
+  },
   "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",
   "@chat_notice_difficultyChanged": {
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }

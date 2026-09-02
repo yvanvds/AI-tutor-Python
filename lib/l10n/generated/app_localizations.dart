@@ -3219,6 +3219,12 @@ abstract class AppLocalizations {
   /// **'New goal selected: {title}'**
   String chat_notice_newGoalSelected(String title);
 
+  /// No description provided for @chat_notice_warmUpReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick warm-up first: one review question on {title}.'**
+  String chat_notice_warmUpReview(String title);
+
   /// No description provided for @chat_notice_difficultyChanged.
   ///
   /// In en, this message translates to:
