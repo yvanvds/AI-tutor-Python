@@ -401,7 +401,7 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 | w_u, w_d | gewicht uitbreiding vs. moeilijkheid boven de 50 | TBD (som = 1) |
 | koppeling boven-50 | lineair met k, of hardere kerndrempel | voorlopig lineair met k |
 | w_M, w_G per periode | mix beheersing/groei | TBD; vroege periodes groei-zwaarder |
-| s | gewichtsfactor bewijs onder toezicht | TBD (bescheiden, s ≥ 1) |
+| s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
 | transfergewicht | grootte van het transfer-krediet (§2.8) | TBD (klein; ≤ zwak-gewicht 0,5) |
 
 Alle overige getallen in dit document (§1) zijn de vandaag werkende
@@ -420,6 +420,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | versie | datum | wijziging |
 | --- | --- | --- |
 | 1.0 | 2026-09-02 | Eerste versie: structuur vastgelegd, parameters TBD tot na de schaduwrun. |
+| 1.0.1 | 2026-09-02 | Geen structuurwijziging. §4 en bijlage A: de voorlopige codewaarde van s (1,25) vermeld en de stand van §2.7 in de code beschreven (#100). |
 
 ---
 
@@ -438,6 +439,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | gewicht sterk / matig / zwak | 2,0 / 1,0 / 0,5 | basisgewicht per signaal (§1.2) |
 | moeilijkheidsfactor | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk, symmetrisch (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
+| toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -449,9 +451,12 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | vastgelopen (klassiek) | α + β ≥ 8 én μ < 0,6 | telt voor doorstroming, niet als beheerst (§1.7) |
 | vastgelopen (verzadigd) | α + β ≥ 18 én μ < 0,75 | idem, bij vol bewijsplafond (§1.7) |
 
-De drietraps-moeilijkheidsratel van §2.5 en de mechanismen van §2.7–§2.8
-zijn op datum van v1.0 **specificatie, nog geen werkende code**; hun
-implementatie volgt dit document.
+De drietraps-moeilijkheidsratel van §2.5 en de mechanismen van §2.8 zijn
+op datum van v1.0 **specificatie, nog geen werkende code**; hun
+implementatie volgt dit document. Van §2.7 staat de weging in de code
+(elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
+s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
+tot die er is, telt elke beurt als thuis en verandert s niets.
 
 ## Bijlage B — rekenvoorbeeld
 

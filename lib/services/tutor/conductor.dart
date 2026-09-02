@@ -13,6 +13,7 @@
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -180,12 +181,20 @@ class GradedAnswer {
   /// for debug visibility.
   final int chainDepth;
 
+  /// Where this answer was produced (#100). Resolved by the host from the
+  /// supervision registry before the answer reaches the conductor; every
+  /// signal on the answer is weighted by it (CONDUCTOR_POLICY §3.2). Applies
+  /// to follow-up signals too — provenance is about where the student was,
+  /// not what kind of probe it was.
+  final EvidenceProvenance provenance;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
     this.hadFallback = false,
     this.isFollowUp = false,
     this.chainDepth = 0,
+    this.provenance = EvidenceProvenance.home,
   });
 }
 
@@ -724,6 +733,7 @@ class Conductor {
         kind: sig.kind,
         strength: effectiveStrength,
         difficulty: effectiveDifficulty,
+        provenance: answer.provenance,
       );
       final next = applyEvidence(
         alpha: alpha,

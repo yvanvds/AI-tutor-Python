@@ -5,6 +5,7 @@
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -15,6 +16,7 @@ import 'package:ai_tutor_python/services/student_state/student_calibration.dart'
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Fakes {
@@ -204,6 +206,57 @@ void main() {
       // Subgoal progress cached < 1.0 (one positive signal isn't yet mastery).
       expect(outcome.subgoalAdvanced, isFalse);
       expect(f.progressById[subgoal.id], isNotNull);
+    });
+
+    test('the same signal under supervision is weighted by s (#100)', () async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 0,
+        objectives: const [
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+        ],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final plan = _expectQuestion(await c.planNext());
+      c.notePlannedQuestion(plan);
+
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          provenance: EvidenceProvenance.supervised,
+          signals: [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'lo1',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+        ),
+      );
+
+      const s = PolicyConstants.supervisedWeightFactor;
+      final b = f.beliefs.values.single;
+      expect(b.alpha, closeTo(1.0 + 2.0 * s, 1e-6));
+      expect(b.beta, closeTo(1.0, 1e-6));
+      // The audit trail shows the post-modulation delta.
+      expect(outcome.appliedSignals.single.alphaDelta, closeTo(2.0 * s, 1e-6));
     });
   });
 

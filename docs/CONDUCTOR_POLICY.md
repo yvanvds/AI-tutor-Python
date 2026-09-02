@@ -519,6 +519,27 @@ more easy-correct answers to reach the same evidence count as one
 medium-correct. The second mechanism — requiring evidence at the
 calibrated difficulty for mastery — lives in section 4.
 
+**Provenance modulation (#100, PUNTENFORMULE §2.7).** A second
+multiplier on the same base weight says *where* the answer was
+produced:
+
+| Provenance | Multiplier |
+| --- | --- |
+| `home` | 1.0 |
+| `supervised` | `s` = 1.25 (`PolicyConstants.supervisedWeightFactor`) |
+
+`supervised` means the student was in an active, alert-free Anchor
+classroom session at grading time, as answered per student, per turn,
+by the `SupervisionSource` the host consults before building the
+`GradedAnswer`. There is no manual toggle. The factor is symmetric in
+positive and negative (like difficulty: it changes how *hard* the
+evidence is, not which way it points), applies to follow-up signals
+as well, and never drops below 1 — home evidence keeps full weight and
+is confirmed or contradicted by later supervised work on the same LO.
+Until Anchor is wired up every turn resolves to `home`, so the
+multiplier is inert and no backfill is needed. The value is provisional
+until the period-1 shadow run (PUNTENFORMULE §4).
+
 ### 3.3 Decay
 
 **Exponential decay, half-life 60 days.** Applied lazily on read.
@@ -1497,6 +1518,7 @@ TurnRecord {
   loSignals: [{subgoalId, loId, signal, strength}]
   hadFallback: bool                 // grader response was unparseable
   appliedSignals: [{loId, alphaDelta, betaDelta}]   // post-modulation
+  provenance: string                // home | supervised (3.2, #100); absent on older docs = home
 
   // Calibration impact
   calibrationBefore: string

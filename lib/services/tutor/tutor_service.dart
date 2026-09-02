@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -30,6 +31,7 @@ import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
@@ -865,6 +867,8 @@ class TutorService extends Notifier<TutorState> {
     final isFollowUpGrading = priorFollowUp != null;
     final chainDepthOnAnswer = priorFollowUp?.depth ?? 0;
 
+    final now = DateTime.now().toUtc();
+    final provenance = await _resolveProvenance(at: now);
     final answer = GradedAnswerBuilder.build(
       overallQuality: overallQuality,
       rawSignals: loSignals,
@@ -873,13 +877,13 @@ class TutorService extends Notifier<TutorState> {
       intendedTargetSubgoalId: activeChild?.id,
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
+      provenance: provenance,
     );
     final outcome = await _conductor.integrateAnswer(
       plan: plan,
       answer: answer,
     );
 
-    final now = DateTime.now().toUtc();
     final record = PersistedTurnRecord(
       id: CosmosDocId.turnHistory(now),
       turnAt: now,
@@ -900,6 +904,7 @@ class TutorService extends Notifier<TutorState> {
       loStatusAfter: outcome.loStatusAfter,
       subgoalAdvanced: outcome.subgoalAdvanced,
       signalEvents: outcome.signalEvents,
+      provenance: provenance,
     );
     _debug.recordPersistedTurn(record, followUp: followUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
@@ -999,6 +1004,26 @@ class TutorService extends Notifier<TutorState> {
       'depth': depth,
       'rationale': question.rationale,
     });
+  }
+
+  /// Asks the supervision registry where the answer being graded was
+  /// produced (#100). Fail-safe to `home`: a registry that cannot be reached
+  /// or has no signed-in student must never hand out the supervised weight.
+  Future<EvidenceProvenance> _resolveProvenance({required DateTime at}) async {
+    final uid = ref.read(authServiceProvider)?.oid;
+    if (uid == null) return EvidenceProvenance.home;
+    try {
+      final provenance = await ref
+          .read(supervisionSourceProvider)
+          .provenanceFor(uid: uid, at: at);
+      _debug.recordEvent('tutor.provenance_resolved', {
+        'provenance': provenance.name,
+      });
+      return provenance;
+    } catch (e) {
+      _debug.recordEvent('tutor.provenance_failed', {'error': e.toString()});
+      return EvidenceProvenance.home;
+    }
   }
 
   void _trackedSetExerciseType(String type) {

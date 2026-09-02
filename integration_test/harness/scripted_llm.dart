@@ -7,6 +7,8 @@
 // down. Retries pull the next entry, which is how a flow scripts "the model
 // got it wrong, then got it right".
 
+import 'dart:convert';
+
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 
@@ -105,4 +107,21 @@ String completeCodeReply({
       '{"type":"complete_code","code":"'
       '${code.replaceAll(r'\', r'\\').replaceAll('"', r'\"').replaceAll('\n', r'\n')}'
       '"}',
+);
+
+/// A `code_feedback` grading turn (LLM_CONTRACT "What the grader returns").
+/// Each entry of [loSignals] is one `{subgoalId, loId, signal, strength}`
+/// map, exactly as the grader emits it.
+String codeFeedbackReply({
+  required String text,
+  required String quality,
+  List<Map<String, String>> loSignals = const [],
+}) => llmEnvelope(
+  text: text,
+  meta: jsonEncode({
+    'type': 'code_feedback',
+    'suggestion': '',
+    'overallQuality': quality,
+    'loSignals': loSignals,
+  }),
 );

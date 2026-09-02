@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
@@ -77,6 +78,72 @@ void main() {
         kind: LoSignalKind.neutral,
         strength: LoSignalStrength.strong,
         difficulty: QuestionDifficulty.hard,
+      );
+      expect(d.alphaDelta, 0);
+      expect(d.betaDelta, 0);
+    });
+  });
+
+  group('signalDeltas provenance (#100, PUNTENFORMULE §2.7)', () {
+    const s = PolicyConstants.supervisedWeightFactor;
+
+    test('the supervised factor is modest and never below 1', () {
+      expect(s, greaterThanOrEqualTo(1.0));
+      expect(s, lessThanOrEqualTo(1.5));
+      expect(
+        PolicyConstants.provenanceMultiplier(EvidenceProvenance.home),
+        1.0,
+      );
+      expect(
+        PolicyConstants.provenanceMultiplier(EvidenceProvenance.supervised),
+        s,
+      );
+    });
+
+    test('home is the default and equals the unweighted delta', () {
+      final implicit = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+      );
+      final explicit = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.home,
+      );
+      expect(implicit.alphaDelta, closeTo(2.0, 1e-9));
+      expect(explicit.alphaDelta, closeTo(2.0, 1e-9));
+    });
+
+    test('supervised positive strong @ medium → α += 2.0 × s', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.supervised,
+      );
+      expect(d.alphaDelta, closeTo(2.0 * s, 1e-9));
+      expect(d.betaDelta, 0);
+    });
+
+    test('symmetric: supervised negative moderate @ hard → β += 1.4 × s', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.moderate,
+        difficulty: QuestionDifficulty.hard,
+        provenance: EvidenceProvenance.supervised,
+      );
+      expect(d.alphaDelta, 0);
+      expect(d.betaDelta, closeTo(1.4 * s, 1e-9));
+    });
+
+    test('neutral stays a no-op under supervision', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.neutral,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.supervised,
       );
       expect(d.alphaDelta, 0);
       expect(d.betaDelta, 0);

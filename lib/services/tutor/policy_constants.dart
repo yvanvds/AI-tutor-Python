@@ -6,6 +6,7 @@
 // named module — this is it. Where the code value differs from the doc
 // value, the code value wins; flag the discrepancy in the PR description.
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 
 class PolicyConstants {
@@ -40,6 +41,23 @@ class PolicyConstants {
         return 1.0;
       case QuestionDifficulty.hard:
         return 1.4;
+    }
+  }
+
+  /// Provenance multiplier `s` on the base weight (PUNTENFORMULE §2.7, #100).
+  /// Evidence produced under Anchor supervision is *more reliable*, not
+  /// certain, so the factor is modest. Provisional until the period-1 shadow
+  /// run fixes it (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never
+  /// discounted, it is confirmed or contradicted by later supervised work.
+  static const double supervisedWeightFactor = 1.25;
+
+  /// Multiplier for a signal's provenance. `home` is the unit weight.
+  static double provenanceMultiplier(EvidenceProvenance p) {
+    switch (p) {
+      case EvidenceProvenance.home:
+        return 1.0;
+      case EvidenceProvenance.supervised:
+        return supervisedWeightFactor;
     }
   }
 

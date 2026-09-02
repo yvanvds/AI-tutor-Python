@@ -7,6 +7,7 @@
 
 import 'dart:math' as math;
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 
@@ -57,17 +58,25 @@ double baseWeight(LoSignalStrength s) {
 }
 
 /// Compute the (αDelta, βDelta) increments for a single signal at a given
-/// difficulty. `neutral` returns (0, 0).
+/// difficulty and provenance. `neutral` returns (0, 0).
+///
+/// [provenance] applies the supervised weight factor `s`
+/// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §2.7): symmetric in positive and
+/// negative, like the difficulty multiplier, so it changes how *hard* a
+/// piece of evidence is, not which way it points.
 ({double alphaDelta, double betaDelta}) signalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,
   required QuestionDifficulty difficulty,
+  EvidenceProvenance provenance = EvidenceProvenance.home,
 }) {
   if (kind == LoSignalKind.neutral) {
     return (alphaDelta: 0.0, betaDelta: 0.0);
   }
   final weighted =
-      baseWeight(strength) * PolicyConstants.difficultyMultiplier(difficulty);
+      baseWeight(strength) *
+      PolicyConstants.difficultyMultiplier(difficulty) *
+      PolicyConstants.provenanceMultiplier(provenance);
   if (kind == LoSignalKind.positive) {
     return (alphaDelta: weighted, betaDelta: 0.0);
   }

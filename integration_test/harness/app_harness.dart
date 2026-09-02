@@ -14,8 +14,8 @@
 // the system locale, the system light/dark setting, SharedPreferences
 // (in-memory), the playground file directory (temp), the update check (off),
 // the LLM (any call fails loudly unless a flow passes `llm:`), the lesson
-// example runner (scripted) and the browser launcher (recorded, never opened
-// — see [browserLaunches]).
+// example runner (scripted), the browser launcher (recorded, never opened
+// — see [browserLaunches]) and the sound effects (silent — see [_NoSound]).
 //
 // The light/dark pin is not cosmetic (#32): with no stored preference the app
 // follows the operating system, so an unpinned run renders in whatever theme
@@ -44,6 +44,8 @@ import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
+import 'package:ai_tutor_python/services/sound/sound_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +94,22 @@ class _OfflineTutor extends TutorService {
   Future<void> requestExercise() async {}
 }
 
+/// Silent stand-in for the tutor's sound effects (#100). The real one plays
+/// through the speakers of whatever machine runs the suite, and audioplayers
+/// keeps a frame callback ticking past the end of the clip — a flow that
+/// ends while the "correct answer" note is still sounding fails with "an
+/// animation is still running even after the widget tree was disposed".
+class _NoSound extends SoundService {
+  @override
+  Future<void> correctAnswer() async {}
+  @override
+  Future<void> askQuestion() async {}
+  @override
+  Future<void> playGoalReached() async {}
+  @override
+  Future<void> guidingComplete() async {}
+}
+
 /// Replaces only the *dialog* half of progress export / import (#32): the
 /// path is fixed instead of asked for, and the file is still written to and
 /// read from the real disk, so a flow exercises the same round trip a student
@@ -128,6 +146,7 @@ class AppHarness {
     this.githubOAuthClientId,
     this.llm,
     this.developerTools,
+    this.supervision,
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -207,6 +226,13 @@ class AppHarness {
   /// so it proves the role gate rather than the debug gate.
   final bool? developerTools;
 
+  /// The classroom-supervision registry the tutor consults when it grades an
+  /// answer (#100). `null` (the default) leaves the app's own binding in
+  /// place — no registry, every turn is home work — which is also what the
+  /// shipped app does until Anchor is wired up. A flow about the supervised
+  /// weight passes a stand-in that says "in session".
+  final SupervisionSource? supervision;
+
   /// Every URL the app asked the operating system to open (#57).
   ///
   /// The launcher is always replaced, in every flow: the production one hands
@@ -263,6 +289,9 @@ class AppHarness {
           gitHubOAuthClientIdProvider.overrideWithValue(githubOAuthClientId!),
         if (developerTools != null)
           developerToolsProvider.overrideWithValue(developerTools!),
+        if (supervision != null)
+          supervisionSourceProvider.overrideWithValue(supervision!),
+        soundServiceProvider.overrideWithValue(_NoSound()),
         browserLauncherProvider.overrideWithValue((Uri url) async {
           browserLaunches.add(url);
           return true;

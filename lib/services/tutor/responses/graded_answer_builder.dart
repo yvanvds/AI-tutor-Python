@@ -4,6 +4,7 @@
 // and the single-failure fallback.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
@@ -26,6 +27,7 @@ class GradedAnswerBuilder {
     required String? intendedTargetSubgoalId,
     bool isFollowUp = false,
     int chainDepth = 0,
+    EvidenceProvenance provenance = EvidenceProvenance.home,
   }) {
     final scopeIndex = <String, Set<String>>{};
     for (final sub in scopeSubgoals) {
@@ -54,6 +56,7 @@ class GradedAnswerBuilder {
         hadFallback: false,
         isFollowUp: isFollowUp,
         chainDepth: chainDepth,
+        provenance: provenance,
       );
     }
 
@@ -65,6 +68,7 @@ class GradedAnswerBuilder {
         hadFallback: true,
         isFollowUp: isFollowUp,
         chainDepth: chainDepth,
+        provenance: provenance,
       );
     }
     final fallbackKind = switch (overallQuality) {
@@ -85,6 +89,7 @@ class GradedAnswerBuilder {
       hadFallback: true,
       isFollowUp: isFollowUp,
       chainDepth: chainDepth,
+      provenance: provenance,
     );
   }
 }

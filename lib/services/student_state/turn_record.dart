@@ -5,6 +5,7 @@
 // the persisted audit trail stay aligned.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 
 class CandidateLoStat {
@@ -213,6 +214,13 @@ class PersistedTurnRecord {
   final bool hadFallback;
   final List<TurnAppliedSignal> appliedSignals;
 
+  /// Where the answer was produced (#100): the supervision registry's
+  /// verdict for this student at `turnAt`. `appliedSignals` already carry
+  /// the resulting weight; this records *why*, so a teacher (or the
+  /// student, per PUNTENFORMULE §2.7) can tell supervised from home
+  /// evidence. Missing on docs written before the field existed → `home`.
+  final EvidenceProvenance provenance;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -250,6 +258,7 @@ class PersistedTurnRecord {
     required this.subgoalAdvanced,
     this.acknowledgedAt,
     this.signalEvents = const [],
+    this.provenance = EvidenceProvenance.home,
   });
 
   bool get hasStrongEvent =>
@@ -271,6 +280,7 @@ class PersistedTurnRecord {
     'loSignals': loSignals.map((s) => s.toJson()).toList(),
     'hadFallback': hadFallback,
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
+    'provenance': provenance.name,
     'calibrationBefore': calibrationBefore.name,
     'calibrationAfter': calibrationAfter.name,
     'subgoalProgressAfter': subgoalProgressAfter,
@@ -340,6 +350,7 @@ class PersistedTurnRecord {
       loSignals: const [],
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
       appliedSignals: const [],
+      provenance: EvidenceProvenance.parse(doc['provenance']),
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:
