@@ -859,7 +859,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String goals_import_dialog_message(int rootCount, int total) {
-    return 'Het bestand bevat $rootCount hoofd­doel(en) en $total node(s) in totaal.\n\n• Toevoegen: voeg toe met de id\'s uit het bestand. Stopt als er een id al bestaat.\n• Vervangen: upsert per id (bestaande lesinhoud-koppelingen blijven) en verwijdert alle doelen die niet in het bestand staan.';
+    return 'Het bestand bevat $rootCount hoofd­doel(en) en $total node(s) in totaal.\n\n• Toevoegen: voeg toe met de id\'s uit het bestand. Stopt als er een id al bestaat.\n• Vervangen: werkt de overeenkomstige set(s) bij per id (bestaande lesinhoud-koppelingen blijven) en verwijdert enkel doelen binnen die sets die niet in het bestand staan. Andere sets blijven onaangeroerd.\n• Alles vervangen: verwijdert elk doel dat niet in het bestand staat, over alle sets heen.';
   }
 
   @override
@@ -870,6 +870,53 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get goals_import_action_replace => 'Vervangen';
+
+  @override
+  String get goals_import_action_replaceAll => 'Alles vervangen';
+
+  @override
+  String get goals_import_action_continue => 'Ga verder';
+
+  @override
+  String get goals_import_unmatched_title => 'Geen overeenkomstige set';
+
+  @override
+  String goals_import_unmatched_message(String rootTitle) {
+    return 'De set \"$rootTitle\" uit het bestand komt met geen enkele bestaande set overeen. Kies wat ermee moet gebeuren.';
+  }
+
+  @override
+  String get goals_import_unmatched_addAsNew => 'Toevoegen als nieuwe set';
+
+  @override
+  String goals_import_unmatched_replaceOption(String rootTitle) {
+    return 'Vervang \"$rootTitle\"';
+  }
+
+  @override
+  String get goals_import_preview_title => 'Vervangen bevestigen';
+
+  @override
+  String goals_import_preview_replaceLine(
+    String rootTitle,
+    int count,
+    int removed,
+  ) {
+    return 'Vervangt \"$rootTitle\" ($count doel(en) in bestand, $removed worden verwijderd)';
+  }
+
+  @override
+  String goals_import_preview_newSetLine(String rootTitle) {
+    return 'Voegt nieuwe set \"$rootTitle\" toe';
+  }
+
+  @override
+  String get goals_import_previewAll_title => 'Alle sets vervangen';
+
+  @override
+  String goals_import_previewAll_message(int removed) {
+    return 'Dit verwijdert elk doel dat niet in het bestand staat, over alle sets heen: $removed doel(en) worden verwijderd.';
+  }
 
   @override
   String get goals_import_filePicker_title =>

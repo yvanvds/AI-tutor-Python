@@ -461,7 +461,7 @@
   "goals_snack_couldNotRead": "Could not read selected file",
   "goals_snack_invalidFile": "Invalid goals file",
   "goals_import_dialog_title": "Import goals",
-  "goals_import_dialog_message": "The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: upsert by id (keeps existing lesson content links) and remove any goals not in the file.",
+  "goals_import_dialog_message": "The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: update the matching set(s) by id (keeps existing lesson content links) and remove only goals under those sets that are not in the file. Other sets are left untouched.\n• Replace all: remove every goal not in the file, across all sets.",
   "@goals_import_dialog_message": {
     "placeholders": {
       "rootCount": { "type": "int" },
@@ -471,6 +471,36 @@
   "goals_import_action_cancel": "Cancel",
   "goals_import_action_add": "Add",
   "goals_import_action_replace": "Replace",
+  "goals_import_action_replaceAll": "Replace all",
+  "goals_import_action_continue": "Continue",
+  "goals_import_unmatched_title": "No matching set",
+  "goals_import_unmatched_message": "The set \"{rootTitle}\" in the file does not match any existing set. Choose what to do with it.",
+  "@goals_import_unmatched_message": {
+    "placeholders": { "rootTitle": { "type": "String" } }
+  },
+  "goals_import_unmatched_addAsNew": "Add as a new set",
+  "goals_import_unmatched_replaceOption": "Replace \"{rootTitle}\"",
+  "@goals_import_unmatched_replaceOption": {
+    "placeholders": { "rootTitle": { "type": "String" } }
+  },
+  "goals_import_preview_title": "Confirm replace",
+  "goals_import_preview_replaceLine": "Replaces \"{rootTitle}\" ({count} goal(s) in file, {removed} will be removed)",
+  "@goals_import_preview_replaceLine": {
+    "placeholders": {
+      "rootTitle": { "type": "String" },
+      "count": { "type": "int" },
+      "removed": { "type": "int" }
+    }
+  },
+  "goals_import_preview_newSetLine": "Adds new set \"{rootTitle}\"",
+  "@goals_import_preview_newSetLine": {
+    "placeholders": { "rootTitle": { "type": "String" } }
+  },
+  "goals_import_previewAll_title": "Replace all sets",
+  "goals_import_previewAll_message": "This removes every goal not in the file, across all sets: {removed} goal(s) will be removed.",
+  "@goals_import_previewAll_message": {
+    "placeholders": { "removed": { "type": "int" } }
+  },
   "goals_import_filePicker_title": "Select goals JSON to import",
 
   "goals_editor_title": "Edit goal",

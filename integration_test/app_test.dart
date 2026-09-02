@@ -20,6 +20,7 @@ import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
+import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
@@ -47,6 +48,7 @@ void main() {
   turtle_run_notice.main();
   options_panel.main();
   bug_report_oauth.main();
+  goals_import_replace.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

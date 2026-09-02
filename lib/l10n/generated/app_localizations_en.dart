@@ -847,7 +847,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String goals_import_dialog_message(int rootCount, int total) {
-    return 'The file contains $rootCount root goal(s) and $total total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: upsert by id (keeps existing lesson content links) and remove any goals not in the file.';
+    return 'The file contains $rootCount root goal(s) and $total total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: update the matching set(s) by id (keeps existing lesson content links) and remove only goals under those sets that are not in the file. Other sets are left untouched.\n• Replace all: remove every goal not in the file, across all sets.';
   }
 
   @override
@@ -858,6 +858,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goals_import_action_replace => 'Replace';
+
+  @override
+  String get goals_import_action_replaceAll => 'Replace all';
+
+  @override
+  String get goals_import_action_continue => 'Continue';
+
+  @override
+  String get goals_import_unmatched_title => 'No matching set';
+
+  @override
+  String goals_import_unmatched_message(String rootTitle) {
+    return 'The set \"$rootTitle\" in the file does not match any existing set. Choose what to do with it.';
+  }
+
+  @override
+  String get goals_import_unmatched_addAsNew => 'Add as a new set';
+
+  @override
+  String goals_import_unmatched_replaceOption(String rootTitle) {
+    return 'Replace \"$rootTitle\"';
+  }
+
+  @override
+  String get goals_import_preview_title => 'Confirm replace';
+
+  @override
+  String goals_import_preview_replaceLine(
+    String rootTitle,
+    int count,
+    int removed,
+  ) {
+    return 'Replaces \"$rootTitle\" ($count goal(s) in file, $removed will be removed)';
+  }
+
+  @override
+  String goals_import_preview_newSetLine(String rootTitle) {
+    return 'Adds new set \"$rootTitle\"';
+  }
+
+  @override
+  String get goals_import_previewAll_title => 'Replace all sets';
+
+  @override
+  String goals_import_previewAll_message(int removed) {
+    return 'This removes every goal not in the file, across all sets: $removed goal(s) will be removed.';
+  }
 
   @override
   String get goals_import_filePicker_title => 'Select goals JSON to import';
