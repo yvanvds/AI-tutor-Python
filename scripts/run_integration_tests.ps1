@@ -52,8 +52,12 @@ $script:abortCount = 0
 function Invoke-FlutterTest {
   param([string]$Target)
   Write-Host "== $FlutterCommand test $Target -d windows =="
-  & $FlutterCommand test $Target -d windows --reporter expanded 2>&1 |
-    Tee-Object -Variable outputLines
+  # Write-Host each line so it reaches the job log even though this function's
+  # pipeline output is captured by assignment at the call sites (#94) — a bare
+  # Tee-Object passthrough was swallowed into that assignment, leaving CI
+  # failures with no flutter output at all.
+  $outputLines = & $FlutterCommand test $Target -d windows --reporter expanded 2>&1 |
+    ForEach-Object { Write-Host "$_"; "$_" }
   $exitCode = $LASTEXITCODE
   $text = ($outputLines | ForEach-Object { "$_" }) -join "`n"
   [pscustomobject]@{
