@@ -1514,6 +1514,22 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String accounts_bulk_selectedCount(int count) {
+    return '$count geselecteerd';
+  }
+
+  @override
+  String get accounts_bulk_assignClass => 'Klas toewijzen';
+
+  @override
+  String get accounts_bulk_clearSelection => 'Selectie wissen';
+
+  @override
+  String accounts_bulk_assignSuccess(int count) {
+    return 'Klas bijgewerkt voor $count leerlingen';
+  }
+
+  @override
   String get accounts_status_tooltip_active => 'Recent vooruitgang geboekt.';
 
   @override

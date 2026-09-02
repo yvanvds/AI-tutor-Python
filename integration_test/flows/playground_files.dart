@@ -65,12 +65,14 @@ void main() {
     );
 
     final file = File(p.join(harness.playgroundDir.path, 'loops.py'));
+    // The content belongs in the wait condition: writeAsString creates the
+    // file before filling it, so existence alone can expose an empty read on
+    // a slow disk (#104).
     await pumpUntil(
       tester,
-      () => file.existsSync(),
+      () => file.existsSync() && file.readAsStringSync() == _code,
       reason: 'loops.py was not written',
     );
-    expect(file.readAsStringSync(), _code);
     await pumpUntilFound(tester, find.text('Saved as "loops".'));
     expect(find.text('loops.py'), findsOneWidget);
     // The dialog route is still animating out when the snackbar appears.
@@ -137,11 +139,16 @@ void main() {
         reason: 'the file from the account did not open',
       );
       await pumpUntilGone(tester, find.byType(AlertDialog));
-      // It is on this machine now, so it is there again offline.
-      expect(
-        File(p.join(harness.playgroundDir.path, 'from school.py'))
-            .readAsStringSync(),
-        _otherMachineCode,
+      // It is on this machine now, so it is there again offline. Waited-for
+      // rather than asserted flat: the local mirror write races the editor
+      // update that the pumpUntil above observed (#104).
+      final mirror = File(p.join(harness.playgroundDir.path, 'from school.py'));
+      await pumpUntil(
+        tester,
+        () =>
+            mirror.existsSync() &&
+            mirror.readAsStringSync() == _otherMachineCode,
+        reason: 'the account file was not mirrored to this machine',
       );
 
       // The other direction: what is saved here reaches the account.

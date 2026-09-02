@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
+import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
+import 'package:ai_tutor_python/features/account/students_sort_prefs.dart';
+import 'package:ai_tutor_python/features/account/students_view_prefs.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -42,6 +47,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
 
+  /// Uids checked for a bulk action (#91). Survives filter/search changes so
+  /// a selection can be built up across filters; pruned when an account
+  /// disappears from the stream.
+  final Set<String> _selectedUids = <String>{};
+
   final ValueNotifier<Account?> _drawerAccount = ValueNotifier<Account?>(null);
 
   late final Stream<List<Account>> _accountsStream;
@@ -51,6 +61,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   @override
   void initState() {
     super.initState();
+    _restoreSortChoice();
+    _restoreViewPrefs();
     _accountsStream = ref
         .read(accountServiceProvider.notifier)
         .streamAllAccounts();
@@ -159,6 +171,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         !classes.contains(_classFilter)) {
       _classFilter = _kClassFilterAll;
     }
+    // Same in-build normalization for the bulk selection (#91): drop uids
+    // whose account no longer exists so a bulk action can never patch a
+    // deleted doc.
+    final allUids = {for (final a in all) a.uid};
+    _selectedUids.removeWhere((uid) => !allUids.contains(uid));
     final goalById = {for (final g in goals) g.id: g};
     final parentByChild = <String, String?>{
       for (final g in goals) g.id: g.parentId,
@@ -191,8 +208,17 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSearchAndPageSizeRow(classes),
+        if (_selectedUids.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s),
+          _buildBulkActionBar(),
+        ],
         const SizedBox(height: 12),
-        Expanded(child: _buildAccountsTable(page.items)),
+        Expanded(
+          child: _buildAccountsTable(
+            page.items,
+            filteredUids: [for (final r in filtered) r.account.uid],
+          ),
+        ),
         _buildPaginationBar(page),
       ],
     );
@@ -234,19 +260,59 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     }).toList();
   }
 
-  /// Maps a `DataColumn` index onto its sort key (#87). Streak, Key and
-  /// Actions are not sortable; Status doubles as the last-active sort (the
-  /// severity buckets are tie-broken by the last-active timestamp).
+  /// `DataColumn` index per sort key (#87), the one place the table layout
+  /// and the sort model meet. The leading select column (#91), Streak, Key
+  /// and Actions are not sortable; Status doubles as the last-active sort
+  /// (the severity buckets are tie-broken by the last-active timestamp).
+  /// The persisted sort (#92) stores the key's *name* and re-derives the
+  /// column index through this map, so reordering columns — as #91 did —
+  /// can never point a stored choice at the wrong column.
+  static const Map<StudentsSortKey, int> _columnBySortKey = {
+    StudentsSortKey.email: 1,
+    StudentsSortKey.name: 2,
+    StudentsSortKey.className: 3,
+    StudentsSortKey.currentGoal: 5,
+    StudentsSortKey.progress: 6,
+    StudentsSortKey.status: 7,
+  };
+
+  /// Maps a `DataColumn` index back onto its sort key; null for the
+  /// non-sortable columns and for "no sort".
   StudentsSortKey? _sortKeyForColumn(int? columnIndex) {
-    return switch (columnIndex) {
-      0 => StudentsSortKey.email,
-      1 => StudentsSortKey.name,
-      2 => StudentsSortKey.className,
-      4 => StudentsSortKey.currentGoal,
-      5 => StudentsSortKey.progress,
-      6 => StudentsSortKey.status,
-      _ => null,
-    };
+    for (final entry in _columnBySortKey.entries) {
+      if (entry.value == columnIndex) return entry.key;
+    }
+    return null;
+  }
+
+  /// Applies the sort stored on this device (#92), if any. Runs once from
+  /// `initState`; until the prefs read completes the table shows storage
+  /// order, same as a device with no stored choice.
+  Future<void> _restoreSortChoice() async {
+    final choice = await loadStudentsSortChoice();
+    if (choice == null || !mounted) return;
+    setState(() {
+      _sortColumnIndex = _columnBySortKey[choice.key];
+      _sortAscending = choice.ascending;
+    });
+  }
+
+  /// Applies the rows-per-page and class filter stored on this device
+  /// (#95), if any. Runs once from `initState`, like [_restoreSortChoice];
+  /// until the prefs read completes the page shows the defaults, same as a
+  /// device with no stored choice. A stored class that no longer exists is
+  /// restored as-is here and normalized back to "All" by `_buildContent`'s
+  /// in-build fallback — the same path that handles a class emptied out
+  /// mid-session. Only the in-memory value falls back; the stored one is
+  /// left alone until the teacher picks a filter again.
+  Future<void> _restoreViewPrefs() async {
+    final rowsPerPage = await loadStudentsRowsPerPage();
+    final classFilter = await loadStudentsClassFilter();
+    if (!mounted || (rowsPerPage == null && classFilter == null)) return;
+    setState(() {
+      if (rowsPerPage != null) _rowsPerPage = rowsPerPage;
+      if (classFilter != null) _classFilter = classFilter;
+    });
   }
 
   void _handleSort(int columnIndex, bool ascending) {
@@ -257,6 +323,13 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       // the result deterministic instead of showing a mid-list page.
       _pageIndex = 0;
     });
+    // Remember the choice per device (#92). Fire-and-forget: the UI state
+    // above is already applied, and a failed prefs write should not block
+    // or break the sort itself.
+    final key = _sortKeyForColumn(columnIndex);
+    if (key != null) {
+      unawaited(saveStudentsSortChoice((key: key, ascending: ascending)));
+    }
   }
 
   _PageView _paginate(List<StudentRowData> filtered) {
@@ -303,6 +376,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               _classFilter = v;
               _pageIndex = 0;
             });
+            // Remember the choice per device (#95). Fire-and-forget, same
+            // as the sort (#92): the UI state is already applied.
+            unawaited(saveStudentsClassFilter(v));
           },
           items: [
             DropdownMenuItem(
@@ -318,6 +394,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
         const SizedBox(width: 12),
         DropdownButton<int>(
+          key: const Key('rows-per-page'),
           value: _rowsPerPage,
           onChanged: (v) {
             if (v == null) return;
@@ -325,8 +402,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               _rowsPerPage = v;
               _pageIndex = 0;
             });
+            // Remember the choice per device (#95). Fire-and-forget, same
+            // as the sort (#92): the UI state is already applied.
+            unawaited(saveStudentsRowsPerPage(v));
           },
-          items: const [10, 25, 50, 100]
+          items: kStudentsRowsPerPageOptions
               .map(
                 (v) => DropdownMenuItem(
                   value: v,
@@ -339,7 +419,37 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  Widget _buildAccountsTable(List<StudentRowData> pageItems) {
+  /// Bar shown while a bulk selection exists (#91): the count, the bulk
+  /// "assign class" action and a way out.
+  Widget _buildBulkActionBar() {
+    final l = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Text(
+          l.accounts_bulk_selectedCount(_selectedUids.length),
+          style: TextStyle(color: AppColors.fgMute, fontSize: 13),
+        ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          key: const Key('bulk-assign-class'),
+          onPressed: _bulkAssignClass,
+          icon: const Icon(Icons.group_add_outlined, size: 18),
+          label: Text(l.accounts_bulk_assignClass),
+        ),
+        const SizedBox(width: 12),
+        TextButton(
+          key: const Key('bulk-clear-selection'),
+          onPressed: () => setState(_selectedUids.clear),
+          child: Text(l.accounts_bulk_clearSelection),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountsTable(
+    List<StudentRowData> pageItems, {
+    required List<String> filteredUids,
+  }) {
     return Scrollbar(
       controller: _hCtrl,
       thumbVisibility: true,
@@ -384,6 +494,26 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       sortColumnIndex: _sortColumnIndex,
                       sortAscending: _sortAscending,
                       columns: [
+                        // Select column (#91). The header checkbox is
+                        // scoped to the FULL filtered set (all pages), so
+                        // "filter, select all, assign" tags every match in
+                        // one action.
+                        DataColumn(
+                          label: Checkbox(
+                            key: const Key('select-all-students'),
+                            tristate: true,
+                            value: selectAllState(_selectedUids, filteredUids),
+                            onChanged: (_) => setState(() {
+                              final next = toggleSelectAll(
+                                _selectedUids,
+                                filteredUids,
+                              );
+                              _selectedUids
+                                ..clear()
+                                ..addAll(next);
+                            }),
+                          ),
+                        ),
                         DataColumn(
                           label: Text(l.accounts_column_email),
                           onSort: _handleSort,
@@ -445,6 +575,19 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     return DataRow(
       onSelectChanged: (_) => _openDrawerFor(a),
       cells: [
+        DataCell(
+          Checkbox(
+            key: Key('select-student-${a.uid}'),
+            value: _selectedUids.contains(a.uid),
+            onChanged: (v) => setState(() {
+              if (v == true) {
+                _selectedUids.add(a.uid);
+              } else {
+                _selectedUids.remove(a.uid);
+              }
+            }),
+          ),
+        ),
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
         DataCell(
@@ -536,6 +679,38 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Opens the class-assignment dialog once and persists the result to every
+  /// selected account (#91) — one [AccountService.setClassName] patch per
+  /// account, same as the per-row edit. Saving an empty name clears the
+  /// assignment for all of them. On a failure the loop stops and the
+  /// selection is kept so the teacher can retry; accounts patched before the
+  /// failure keep their new class (each patch is independent).
+  Future<void> _bulkAssignClass() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
+    final uids = _selectedUids.toList();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ClassNameDialog(initial: ''),
+    );
+    if (result == null) return;
+    final service = ref.read(accountServiceProvider.notifier);
+    try {
+      for (final uid in uids) {
+        await service.setClassName(uid: uid, className: result);
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.accounts_class_saveFailed(e.toString()))),
+      );
+      return;
+    }
+    if (mounted) setState(_selectedUids.clear);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l.accounts_bulk_assignSuccess(uids.length))),
     );
   }
 

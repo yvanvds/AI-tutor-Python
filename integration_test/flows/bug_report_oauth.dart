@@ -357,7 +357,17 @@ void main() {
     // But not one belief number went with it.
     expect(body, isNot(matches(RegExp(r'"(mean|evidence)":\s*[0-9]'))));
     expect(body, contains('"mean": "<redacted>"'));
-    expect(body, isNot(contains('${candidates.first['mean']}')));
+    // Anchored to an unquoted JSON number value: a bare contains() on the
+    // mean's digits collides with timestamps ("…T18:26:20.516280Z" contains
+    // "0.5" when the mean is the untrained prior 0.5) — see #97.
+    expect(
+      body,
+      isNot(
+        matches(
+          RegExp(':\\s*${RegExp.escape('${candidates.first['mean']}')}[,\\s}]'),
+        ),
+      ),
+    );
 
     // …and the teacher's own machine still has them: filing the report must
     // not disturb what Options → Developer tools → Recent turns shows.

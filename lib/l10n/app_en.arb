@@ -810,6 +810,17 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "accounts_bulk_selectedCount": "{count} selected",
+  "@accounts_bulk_selectedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "accounts_bulk_assignClass": "Assign class",
+  "accounts_bulk_clearSelection": "Clear selection",
+  "accounts_bulk_assignSuccess": "Class updated for {count} students",
+  "@accounts_bulk_assignSuccess": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
   "accounts_status_tooltip_active": "Made progress recently.",
   "accounts_status_tooltip_idle": "No progress in the last 7 days.",
   "accounts_badge_unackTooltip": "Unacknowledged signal events",
