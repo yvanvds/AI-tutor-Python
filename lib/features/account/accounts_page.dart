@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
+import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
@@ -41,6 +42,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   /// Header sort state (#87). Null column index = storage order.
   int? _sortColumnIndex;
   bool _sortAscending = true;
+
+  /// Uids checked for a bulk action (#91). Survives filter/search changes so
+  /// a selection can be built up across filters; pruned when an account
+  /// disappears from the stream.
+  final Set<String> _selectedUids = <String>{};
 
   final ValueNotifier<Account?> _drawerAccount = ValueNotifier<Account?>(null);
 
@@ -159,6 +165,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         !classes.contains(_classFilter)) {
       _classFilter = _kClassFilterAll;
     }
+    // Same in-build normalization for the bulk selection (#91): drop uids
+    // whose account no longer exists so a bulk action can never patch a
+    // deleted doc.
+    final allUids = {for (final a in all) a.uid};
+    _selectedUids.removeWhere((uid) => !allUids.contains(uid));
     final goalById = {for (final g in goals) g.id: g};
     final parentByChild = <String, String?>{
       for (final g in goals) g.id: g.parentId,
@@ -191,8 +202,17 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSearchAndPageSizeRow(classes),
+        if (_selectedUids.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s),
+          _buildBulkActionBar(),
+        ],
         const SizedBox(height: 12),
-        Expanded(child: _buildAccountsTable(page.items)),
+        Expanded(
+          child: _buildAccountsTable(
+            page.items,
+            filteredUids: [for (final r in filtered) r.account.uid],
+          ),
+        ),
         _buildPaginationBar(page),
       ],
     );
@@ -234,17 +254,18 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     }).toList();
   }
 
-  /// Maps a `DataColumn` index onto its sort key (#87). Streak, Key and
-  /// Actions are not sortable; Status doubles as the last-active sort (the
-  /// severity buckets are tie-broken by the last-active timestamp).
+  /// Maps a `DataColumn` index onto its sort key (#87). The leading select
+  /// column (#91), Streak, Key and Actions are not sortable; Status doubles
+  /// as the last-active sort (the severity buckets are tie-broken by the
+  /// last-active timestamp).
   StudentsSortKey? _sortKeyForColumn(int? columnIndex) {
     return switch (columnIndex) {
-      0 => StudentsSortKey.email,
-      1 => StudentsSortKey.name,
-      2 => StudentsSortKey.className,
-      4 => StudentsSortKey.currentGoal,
-      5 => StudentsSortKey.progress,
-      6 => StudentsSortKey.status,
+      1 => StudentsSortKey.email,
+      2 => StudentsSortKey.name,
+      3 => StudentsSortKey.className,
+      5 => StudentsSortKey.currentGoal,
+      6 => StudentsSortKey.progress,
+      7 => StudentsSortKey.status,
       _ => null,
     };
   }
@@ -339,7 +360,37 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  Widget _buildAccountsTable(List<StudentRowData> pageItems) {
+  /// Bar shown while a bulk selection exists (#91): the count, the bulk
+  /// "assign class" action and a way out.
+  Widget _buildBulkActionBar() {
+    final l = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Text(
+          l.accounts_bulk_selectedCount(_selectedUids.length),
+          style: TextStyle(color: AppColors.fgMute, fontSize: 13),
+        ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          key: const Key('bulk-assign-class'),
+          onPressed: _bulkAssignClass,
+          icon: const Icon(Icons.group_add_outlined, size: 18),
+          label: Text(l.accounts_bulk_assignClass),
+        ),
+        const SizedBox(width: 12),
+        TextButton(
+          key: const Key('bulk-clear-selection'),
+          onPressed: () => setState(_selectedUids.clear),
+          child: Text(l.accounts_bulk_clearSelection),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountsTable(
+    List<StudentRowData> pageItems, {
+    required List<String> filteredUids,
+  }) {
     return Scrollbar(
       controller: _hCtrl,
       thumbVisibility: true,
@@ -384,6 +435,26 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       sortColumnIndex: _sortColumnIndex,
                       sortAscending: _sortAscending,
                       columns: [
+                        // Select column (#91). The header checkbox is
+                        // scoped to the FULL filtered set (all pages), so
+                        // "filter, select all, assign" tags every match in
+                        // one action.
+                        DataColumn(
+                          label: Checkbox(
+                            key: const Key('select-all-students'),
+                            tristate: true,
+                            value: selectAllState(_selectedUids, filteredUids),
+                            onChanged: (_) => setState(() {
+                              final next = toggleSelectAll(
+                                _selectedUids,
+                                filteredUids,
+                              );
+                              _selectedUids
+                                ..clear()
+                                ..addAll(next);
+                            }),
+                          ),
+                        ),
                         DataColumn(
                           label: Text(l.accounts_column_email),
                           onSort: _handleSort,
@@ -445,6 +516,19 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     return DataRow(
       onSelectChanged: (_) => _openDrawerFor(a),
       cells: [
+        DataCell(
+          Checkbox(
+            key: Key('select-student-${a.uid}'),
+            value: _selectedUids.contains(a.uid),
+            onChanged: (v) => setState(() {
+              if (v == true) {
+                _selectedUids.add(a.uid);
+              } else {
+                _selectedUids.remove(a.uid);
+              }
+            }),
+          ),
+        ),
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
         DataCell(
@@ -536,6 +620,38 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Opens the class-assignment dialog once and persists the result to every
+  /// selected account (#91) — one [AccountService.setClassName] patch per
+  /// account, same as the per-row edit. Saving an empty name clears the
+  /// assignment for all of them. On a failure the loop stops and the
+  /// selection is kept so the teacher can retry; accounts patched before the
+  /// failure keep their new class (each patch is independent).
+  Future<void> _bulkAssignClass() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
+    final uids = _selectedUids.toList();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ClassNameDialog(initial: ''),
+    );
+    if (result == null) return;
+    final service = ref.read(accountServiceProvider.notifier);
+    try {
+      for (final uid in uids) {
+        await service.setClassName(uid: uid, className: result);
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.accounts_class_saveFailed(e.toString()))),
+      );
+      return;
+    }
+    if (mounted) setState(_selectedUids.clear);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l.accounts_bulk_assignSuccess(uids.length))),
     );
   }
 

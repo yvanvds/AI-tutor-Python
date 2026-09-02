@@ -1494,6 +1494,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String accounts_bulk_selectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get accounts_bulk_assignClass => 'Assign class';
+
+  @override
+  String get accounts_bulk_clearSelection => 'Clear selection';
+
+  @override
+  String accounts_bulk_assignSuccess(int count) {
+    return 'Class updated for $count students';
+  }
+
+  @override
   String get accounts_status_tooltip_active => 'Made progress recently.';
 
   @override

@@ -2589,6 +2589,30 @@ abstract class AppLocalizations {
   /// **'Could not save class: {error}'**
   String accounts_class_saveFailed(String error);
 
+  /// No description provided for @accounts_bulk_selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String accounts_bulk_selectedCount(int count);
+
+  /// No description provided for @accounts_bulk_assignClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign class'**
+  String get accounts_bulk_assignClass;
+
+  /// No description provided for @accounts_bulk_clearSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get accounts_bulk_clearSelection;
+
+  /// No description provided for @accounts_bulk_assignSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Class updated for {count} students'**
+  String accounts_bulk_assignSuccess(int count);
+
   /// No description provided for @accounts_status_tooltip_active.
   ///
   /// In en, this message translates to:

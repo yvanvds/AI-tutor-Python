@@ -460,6 +460,11 @@
   "accounts_class_dialog_save": "Opslaan",
   "accounts_class_saveFailed": "Klas opslaan mislukt: {error}",
 
+  "accounts_bulk_selectedCount": "{count} geselecteerd",
+  "accounts_bulk_assignClass": "Klas toewijzen",
+  "accounts_bulk_clearSelection": "Selectie wissen",
+  "accounts_bulk_assignSuccess": "Klas bijgewerkt voor {count} leerlingen",
+
   "accounts_status_tooltip_active": "Recent vooruitgang geboekt.",
   "accounts_status_tooltip_idle": "Geen vooruitgang in de laatste 7 dagen.",
   "accounts_badge_unackTooltip": "Onbevestigde signaaleventjes",
