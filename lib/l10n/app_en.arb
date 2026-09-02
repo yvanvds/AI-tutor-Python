@@ -747,8 +747,12 @@
     "placeholders": { "n": { "type": "int" } }
   },
 
+  "accounts_classFilter_all": "All classes",
+  "accounts_classFilter_none": "No class",
+
   "accounts_column_email": "EMAIL",
   "accounts_column_name": "NAME",
+  "accounts_column_class": "CLASS",
   "accounts_column_streak": "STREAK",
   "accounts_column_currentGoal": "CURRENT GOAL",
   "accounts_column_progress": "PROGRESS",
@@ -794,6 +798,15 @@
   },
   "accounts_delete_failed": "Delete failed: {error}",
   "@accounts_delete_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "accounts_class_dialog_title": "Assign class",
+  "accounts_class_dialog_hint": "Class name (leave empty to clear)",
+  "accounts_class_dialog_cancel": "Cancel",
+  "accounts_class_dialog_save": "Save",
+  "accounts_class_saveFailed": "Could not save class: {error}",
+  "@accounts_class_saveFailed": {
     "placeholders": { "error": { "type": "String" } }
   },
 

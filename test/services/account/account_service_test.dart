@@ -138,57 +138,58 @@ void main() {
       expect(captured['email'], 'yvan@example.com');
       expect(captured['mayUseGlobalKey'], false);
       expect(captured['targetGoal'], '');
+      expect(captured['className'], '');
       expect(captured['createdAt'], isA<String>());
       expect(captured['updatedAt'], isA<String>());
     });
 
-    test(
-      'preserves existing mayUseGlobalKey, targetGoal, createdAt on update',
-      () async {
-        const existingCreatedAt = '2024-01-01T00:00:00.000Z';
-        when(
-          () => container.read(
-            any<String>(),
-            partitionKey: any<Object>(named: 'partitionKey'),
-          ),
-        ).thenAnswer(
-          (_) async => {
-            'id': _uid,
-            'uid': _uid,
-            'mayUseGlobalKey': true,
-            'targetGoal': 'goal-x',
-            'createdAt': existingCreatedAt,
-          },
-        );
-        when(
-          () => container.upsert(
-            any<Map<String, Object?>>(),
-            partitionKey: any<Object>(named: 'partitionKey'),
-          ),
-        ).thenAnswer((_) async => <String, dynamic>{});
+    test('preserves existing mayUseGlobalKey, targetGoal, className, createdAt '
+        'on update', () async {
+      const existingCreatedAt = '2024-01-01T00:00:00.000Z';
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'id': _uid,
+          'uid': _uid,
+          'mayUseGlobalKey': true,
+          'targetGoal': 'goal-x',
+          'className': '5A',
+          'createdAt': existingCreatedAt,
+        },
+      );
+      when(
+        () => container.upsert(
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
 
-        await build().upsertAccount(
-          uid: _uid,
-          firstName: 'Y',
-          lastName: 'V',
-          email: 'y@example.com',
-        );
+      await build().upsertAccount(
+        uid: _uid,
+        firstName: 'Y',
+        lastName: 'V',
+        email: 'y@example.com',
+      );
 
-        final captured =
-            verify(
-                  () => container.upsert(
-                    captureAny<Map<String, Object?>>(),
-                    partitionKey: any<Object>(named: 'partitionKey'),
-                  ),
-                ).captured.single
-                as Map<String, Object?>;
-        expect(captured['mayUseGlobalKey'], true);
-        expect(captured['targetGoal'], 'goal-x');
-        expect(captured['createdAt'], existingCreatedAt);
-        // updatedAt is fresh, distinct from createdAt.
-        expect(captured['updatedAt'], isNot(existingCreatedAt));
-      },
-    );
+      final captured =
+          verify(
+                () => container.upsert(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
+      expect(captured['mayUseGlobalKey'], true);
+      expect(captured['targetGoal'], 'goal-x');
+      expect(captured['className'], '5A');
+      expect(captured['createdAt'], existingCreatedAt);
+      // updatedAt is fresh, distinct from createdAt.
+      expect(captured['updatedAt'], isNot(existingCreatedAt));
+    });
   });
 
   group('setTargetGoal', () {
@@ -310,6 +311,83 @@ void main() {
         );
       },
     );
+  });
+
+  group('setClassName', () {
+    test('patches a trimmed className for the requested uid (#86)', () async {
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => {'id': _uid, 'uid': _uid, 'className': 'old'});
+      when(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+
+      await build().setClassName(uid: _uid, className: '  5A ');
+
+      final captured = verify(
+        () => container.replace(
+          captureAny<String>(),
+          captureAny<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).captured;
+      expect(captured[0], _uid);
+      final doc = captured[1] as Map<String, Object?>;
+      expect(doc['className'], '5A');
+      expect(doc['updatedAt'], isA<String>());
+    });
+
+    test('an empty name clears the assignment', () async {
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => {'id': _uid, 'uid': _uid, 'className': '5A'});
+      when(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+
+      await build().setClassName(uid: _uid, className: '');
+
+      final captured = verify(
+        () => container.replace(
+          any<String>(),
+          captureAny<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).captured;
+      expect((captured.single as Map)['className'], '');
+    });
+
+    test('silently no-ops when the doc is missing', () async {
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => null);
+
+      await build().setClassName(uid: 'gone', className: '5A');
+      verifyNever(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      );
+    });
   });
 
   group('getMyAccount', () {

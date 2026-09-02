@@ -425,8 +425,12 @@
   "accounts_search_hint": "Zoek op naam of e-mail…",
   "accounts_pageSize_label": "{n} per pagina",
 
+  "accounts_classFilter_all": "Alle klassen",
+  "accounts_classFilter_none": "Geen klas",
+
   "accounts_column_email": "E-MAIL",
   "accounts_column_name": "NAAM",
+  "accounts_column_class": "KLAS",
   "accounts_column_streak": "STREAK",
   "accounts_column_currentGoal": "HUIDIG DOEL",
   "accounts_column_progress": "VOORTGANG",
@@ -449,6 +453,12 @@
   "accounts_delete_dialog_confirm": "Verwijderen",
   "accounts_delete_success": "Account verwijderd: {email}",
   "accounts_delete_failed": "Verwijderen mislukt: {error}",
+
+  "accounts_class_dialog_title": "Klas toewijzen",
+  "accounts_class_dialog_hint": "Klasnaam (leeg laten om te wissen)",
+  "accounts_class_dialog_cancel": "Annuleer",
+  "accounts_class_dialog_save": "Opslaan",
+  "accounts_class_saveFailed": "Klas opslaan mislukt: {error}",
 
   "accounts_status_tooltip_active": "Recent vooruitgang geboekt.",
   "accounts_status_tooltip_idle": "Geen vooruitgang in de laatste 7 dagen.",

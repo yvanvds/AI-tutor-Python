@@ -1410,10 +1410,19 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get accounts_classFilter_all => 'Alle klassen';
+
+  @override
+  String get accounts_classFilter_none => 'Geen klas';
+
+  @override
   String get accounts_column_email => 'E-MAIL';
 
   @override
   String get accounts_column_name => 'NAAM';
+
+  @override
+  String get accounts_column_class => 'KLAS';
 
   @override
   String get accounts_column_streak => 'STREAK';
@@ -1485,6 +1494,23 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String accounts_delete_failed(String error) {
     return 'Verwijderen mislukt: $error';
+  }
+
+  @override
+  String get accounts_class_dialog_title => 'Klas toewijzen';
+
+  @override
+  String get accounts_class_dialog_hint => 'Klasnaam (leeg laten om te wissen)';
+
+  @override
+  String get accounts_class_dialog_cancel => 'Annuleer';
+
+  @override
+  String get accounts_class_dialog_save => 'Opslaan';
+
+  @override
+  String accounts_class_saveFailed(String error) {
+    return 'Klas opslaan mislukt: $error';
   }
 
   @override

@@ -2409,6 +2409,18 @@ abstract class AppLocalizations {
   /// **'{n} / page'**
   String accounts_pageSize_label(int n);
 
+  /// No description provided for @accounts_classFilter_all.
+  ///
+  /// In en, this message translates to:
+  /// **'All classes'**
+  String get accounts_classFilter_all;
+
+  /// No description provided for @accounts_classFilter_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No class'**
+  String get accounts_classFilter_none;
+
   /// No description provided for @accounts_column_email.
   ///
   /// In en, this message translates to:
@@ -2420,6 +2432,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'NAME'**
   String get accounts_column_name;
+
+  /// No description provided for @accounts_column_class.
+  ///
+  /// In en, this message translates to:
+  /// **'CLASS'**
+  String get accounts_column_class;
 
   /// No description provided for @accounts_column_streak.
   ///
@@ -2540,6 +2558,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete failed: {error}'**
   String accounts_delete_failed(String error);
+
+  /// No description provided for @accounts_class_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign class'**
+  String get accounts_class_dialog_title;
+
+  /// No description provided for @accounts_class_dialog_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Class name (leave empty to clear)'**
+  String get accounts_class_dialog_hint;
+
+  /// No description provided for @accounts_class_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get accounts_class_dialog_cancel;
+
+  /// No description provided for @accounts_class_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get accounts_class_dialog_save;
+
+  /// No description provided for @accounts_class_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save class: {error}'**
+  String accounts_class_saveFailed(String error);
 
   /// No description provided for @accounts_status_tooltip_active.
   ///

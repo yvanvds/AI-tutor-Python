@@ -1390,10 +1390,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get accounts_classFilter_all => 'All classes';
+
+  @override
+  String get accounts_classFilter_none => 'No class';
+
+  @override
   String get accounts_column_email => 'EMAIL';
 
   @override
   String get accounts_column_name => 'NAME';
+
+  @override
+  String get accounts_column_class => 'CLASS';
 
   @override
   String get accounts_column_streak => 'STREAK';
@@ -1465,6 +1474,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String accounts_delete_failed(String error) {
     return 'Delete failed: $error';
+  }
+
+  @override
+  String get accounts_class_dialog_title => 'Assign class';
+
+  @override
+  String get accounts_class_dialog_hint => 'Class name (leave empty to clear)';
+
+  @override
+  String get accounts_class_dialog_cancel => 'Cancel';
+
+  @override
+  String get accounts_class_dialog_save => 'Save';
+
+  @override
+  String accounts_class_saveFailed(String error) {
+    return 'Could not save class: $error';
   }
 
   @override

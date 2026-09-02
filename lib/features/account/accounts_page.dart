@@ -13,6 +13,11 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Sentinel values for the class filter dropdown (#86). Real class names
+/// never collide with these: they are trimmed, non-empty teacher text.
+const String _kClassFilterAll = '__all__';
+const String _kClassFilterNone = '__none__';
+
 class AccountsPage extends ConsumerStatefulWidget {
   const AccountsPage({super.key});
 
@@ -30,6 +35,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   int _rowsPerPage = 25;
   int _pageIndex = 0;
+  String _classFilter = _kClassFilterAll;
 
   final ValueNotifier<Account?> _drawerAccount = ValueNotifier<Account?>(null);
 
@@ -138,7 +144,19 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
       );
     }
-    final filtered = _filterAccounts(accountsSnap.data ?? []);
+    final all = accountsSnap.data ?? [];
+    final classes = _distinctClasses(all);
+    // A previously selected class may have disappeared (last member
+    // reassigned/deleted); fall back to "All" so the dropdown value stays
+    // valid — same in-build normalization as `_paginate` does for the page.
+    if (_classFilter != _kClassFilterAll &&
+        _classFilter != _kClassFilterNone &&
+        !classes.contains(_classFilter)) {
+      _classFilter = _kClassFilterAll;
+    }
+    // Pipeline: class filter → search → paginate (#86). Each stage stays
+    // separable so later stages (e.g. sorting, #87) can slot in between.
+    final filtered = _searchAccounts(_filterByClass(all));
     final page = _paginate(filtered);
 
     final goalById = {for (final g in goals) g.id: g};
@@ -157,7 +175,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSearchAndPageSizeRow(),
+        _buildSearchAndPageSizeRow(classes),
         const SizedBox(height: 12),
         Expanded(
           child: _buildAccountsTable(
@@ -174,7 +192,32 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  List<Account> _filterAccounts(List<Account> all) {
+  /// Distinct class names present across all accounts, sorted
+  /// case-insensitively; feeds the filter dropdown's options.
+  List<String> _distinctClasses(List<Account> all) {
+    final names = <String>{
+      for (final a in all)
+        if (a.className.isNotEmpty) a.className,
+    };
+    return names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
+  /// Stage 1 of the list pipeline: narrow to one class, to the accounts
+  /// without a class, or pass everything through ("All").
+  List<Account> _filterByClass(List<Account> all) {
+    switch (_classFilter) {
+      case _kClassFilterAll:
+        return all;
+      case _kClassFilterNone:
+        return all.where((a) => a.className.isEmpty).toList();
+      default:
+        return all.where((a) => a.className == _classFilter).toList();
+    }
+  }
+
+  /// Stage 2 of the list pipeline: free-text search on name / email.
+  List<Account> _searchAccounts(List<Account> all) {
     final q = _searchCtrl.text.trim().toLowerCase();
     if (q.isEmpty) return all;
     return all.where((a) {
@@ -200,7 +243,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  Widget _buildSearchAndPageSizeRow() {
+  Widget _buildSearchAndPageSizeRow(List<String> classes) {
     final l = AppLocalizations.of(context);
     return Row(
       children: [
@@ -215,6 +258,29 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             ),
             onChanged: (_) => setState(_resetPaging),
           ),
+        ),
+        const SizedBox(width: 12),
+        DropdownButton<String>(
+          key: const Key('class-filter'),
+          value: _classFilter,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() {
+              _classFilter = v;
+              _pageIndex = 0;
+            });
+          },
+          items: [
+            DropdownMenuItem(
+              value: _kClassFilterAll,
+              child: Text(l.accounts_classFilter_all),
+            ),
+            DropdownMenuItem(
+              value: _kClassFilterNone,
+              child: Text(l.accounts_classFilter_none),
+            ),
+            ...classes.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+          ],
         ),
         const SizedBox(width: 12),
         DropdownButton<int>(
@@ -256,7 +322,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         primary: false,
         scrollDirection: Axis.horizontal,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1100),
+          constraints: const BoxConstraints(minWidth: 1200),
           child: Scrollbar(
             controller: _vCtrl,
             thumbVisibility: true,
@@ -291,6 +357,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       columns: [
                         DataColumn(label: Text(l.accounts_column_email)),
                         DataColumn(label: Text(l.accounts_column_name)),
+                        DataColumn(label: Text(l.accounts_column_class)),
                         DataColumn(label: Text(l.accounts_column_streak)),
                         DataColumn(label: Text(l.accounts_column_currentGoal)),
                         DataColumn(label: Text(l.accounts_column_progress)),
@@ -359,6 +426,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       cells: [
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
+        DataCell(
+          _ClassBadge(key: Key('class-cell-${a.uid}'), className: a.className),
+          showEditIcon: true,
+          onTap: () => _editClass(a),
+        ),
         DataCell(Text('—', style: TextStyle(color: AppColors.fgFaint))),
         DataCell(Text(activeRootTitle ?? '—')),
         DataCell(_OverallProgressBar(value: overall)),
@@ -479,6 +551,27 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
+  /// Opens the class-assignment dialog for one student and persists the
+  /// result. Saving an empty name clears the assignment.
+  Future<void> _editClass(Account a) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _ClassNameDialog(initial: a.className),
+    );
+    if (result == null) return;
+    try {
+      await ref
+          .read(accountServiceProvider.notifier)
+          .setClassName(uid: a.uid, className: result);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.accounts_class_saveFailed(e.toString()))),
+      );
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context, Account a) async {
     final messenger = ScaffoldMessenger.of(context);
     final l = AppLocalizations.of(context);
@@ -557,6 +650,94 @@ class _PageHeader extends StatelessWidget {
         Text(
           l.accounts_page_subtitle,
           style: TextStyle(color: AppColors.fgFaint, fontSize: 13, height: 1.4),
+        ),
+      ],
+    );
+  }
+}
+
+/// Class tag shown in the students table: a small pill when assigned,
+/// a faint dash when not.
+class _ClassBadge extends StatelessWidget {
+  const _ClassBadge({super.key, required this.className});
+
+  final String className;
+
+  @override
+  Widget build(BuildContext context) {
+    if (className.isEmpty) {
+      return Text('—', style: TextStyle(color: AppColors.fgFaint));
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.ink2,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        className,
+        style: TextStyle(
+          color: AppColors.fg,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// Modal editor for one student's class name. Owns its text controller so
+/// disposal happens with the dialog's own lifecycle, not mid-animation.
+class _ClassNameDialog extends StatefulWidget {
+  const _ClassNameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_ClassNameDialog> createState() => _ClassNameDialogState();
+}
+
+class _ClassNameDialogState extends State<_ClassNameDialog> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l.accounts_class_dialog_title),
+      content: SizedBox(
+        width: 320,
+        child: TextField(
+          controller: _ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: l.accounts_class_dialog_hint,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.accounts_class_dialog_cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text),
+          child: Text(l.accounts_class_dialog_save),
         ),
       ],
     );

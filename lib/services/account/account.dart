@@ -27,6 +27,11 @@ class Account {
   /// for de-duplicating same-day increments.
   final DateTime? streakLastAt;
 
+  /// Class/group tag assigned by the teacher on the Students page (#86).
+  /// Free text; empty means "no class". Drives the class filter above the
+  /// students table.
+  final String className;
+
   const Account({
     required this.uid,
     required this.email,
@@ -41,6 +46,7 @@ class Account {
     ),
     this.streakDays = 0,
     this.streakLastAt,
+    this.className = '',
   });
 
   String get displayFirstName => firstName;
@@ -66,6 +72,7 @@ class Account {
     'streakDays': streakDays,
     if (streakLastAt != null)
       'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
+    'className': className,
   };
 
   factory Account.fromMap(Map<String, dynamic> data) {
@@ -89,6 +96,7 @@ class Account {
       streakLastAt: data['streakLastAt'] is String
           ? DateTime.tryParse(data['streakLastAt'] as String)
           : null,
+      className: data['className'] as String? ?? '',
     );
   }
 }
