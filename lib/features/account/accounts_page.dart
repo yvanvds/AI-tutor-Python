@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.da
 import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
 import 'package:ai_tutor_python/features/account/students_sort_prefs.dart';
+import 'package:ai_tutor_python/features/account/students_view_prefs.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -61,6 +62,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   void initState() {
     super.initState();
     _restoreSortChoice();
+    _restoreViewPrefs();
     _accountsStream = ref
         .read(accountServiceProvider.notifier)
         .streamAllAccounts();
@@ -295,6 +297,24 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     });
   }
 
+  /// Applies the rows-per-page and class filter stored on this device
+  /// (#95), if any. Runs once from `initState`, like [_restoreSortChoice];
+  /// until the prefs read completes the page shows the defaults, same as a
+  /// device with no stored choice. A stored class that no longer exists is
+  /// restored as-is here and normalized back to "All" by `_buildContent`'s
+  /// in-build fallback — the same path that handles a class emptied out
+  /// mid-session. Only the in-memory value falls back; the stored one is
+  /// left alone until the teacher picks a filter again.
+  Future<void> _restoreViewPrefs() async {
+    final rowsPerPage = await loadStudentsRowsPerPage();
+    final classFilter = await loadStudentsClassFilter();
+    if (!mounted || (rowsPerPage == null && classFilter == null)) return;
+    setState(() {
+      if (rowsPerPage != null) _rowsPerPage = rowsPerPage;
+      if (classFilter != null) _classFilter = classFilter;
+    });
+  }
+
   void _handleSort(int columnIndex, bool ascending) {
     setState(() {
       _sortColumnIndex = columnIndex;
@@ -356,6 +376,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               _classFilter = v;
               _pageIndex = 0;
             });
+            // Remember the choice per device (#95). Fire-and-forget, same
+            // as the sort (#92): the UI state is already applied.
+            unawaited(saveStudentsClassFilter(v));
           },
           items: [
             DropdownMenuItem(
@@ -371,6 +394,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         ),
         const SizedBox(width: 12),
         DropdownButton<int>(
+          key: const Key('rows-per-page'),
           value: _rowsPerPage,
           onChanged: (v) {
             if (v == null) return;
@@ -378,8 +402,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               _rowsPerPage = v;
               _pageIndex = 0;
             });
+            // Remember the choice per device (#95). Fire-and-forget, same
+            // as the sort (#92): the UI state is already applied.
+            unawaited(saveStudentsRowsPerPage(v));
           },
-          items: const [10, 25, 50, 100]
+          items: kStudentsRowsPerPageOptions
               .map(
                 (v) => DropdownMenuItem(
                   value: v,
