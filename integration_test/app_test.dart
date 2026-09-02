@@ -34,6 +34,7 @@ import 'flows/students_class_filter.dart' as students_class_filter;
 import 'flows/students_current_goal.dart' as students_current_goal;
 import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
+import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
@@ -59,6 +60,7 @@ void main() {
   students_current_goal.main();
   students_progress_column.main();
   students_sort.main();
+  students_sort_persist.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

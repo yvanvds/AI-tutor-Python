@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
+import 'package:ai_tutor_python/features/account/students_sort_prefs.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -57,6 +60,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   @override
   void initState() {
     super.initState();
+    _restoreSortChoice();
     _accountsStream = ref
         .read(accountServiceProvider.notifier)
         .streamAllAccounts();
@@ -254,20 +258,41 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     }).toList();
   }
 
-  /// Maps a `DataColumn` index onto its sort key (#87). The leading select
-  /// column (#91), Streak, Key and Actions are not sortable; Status doubles
-  /// as the last-active sort (the severity buckets are tie-broken by the
-  /// last-active timestamp).
+  /// `DataColumn` index per sort key (#87), the one place the table layout
+  /// and the sort model meet. The leading select column (#91), Streak, Key
+  /// and Actions are not sortable; Status doubles as the last-active sort
+  /// (the severity buckets are tie-broken by the last-active timestamp).
+  /// The persisted sort (#92) stores the key's *name* and re-derives the
+  /// column index through this map, so reordering columns — as #91 did —
+  /// can never point a stored choice at the wrong column.
+  static const Map<StudentsSortKey, int> _columnBySortKey = {
+    StudentsSortKey.email: 1,
+    StudentsSortKey.name: 2,
+    StudentsSortKey.className: 3,
+    StudentsSortKey.currentGoal: 5,
+    StudentsSortKey.progress: 6,
+    StudentsSortKey.status: 7,
+  };
+
+  /// Maps a `DataColumn` index back onto its sort key; null for the
+  /// non-sortable columns and for "no sort".
   StudentsSortKey? _sortKeyForColumn(int? columnIndex) {
-    return switch (columnIndex) {
-      1 => StudentsSortKey.email,
-      2 => StudentsSortKey.name,
-      3 => StudentsSortKey.className,
-      5 => StudentsSortKey.currentGoal,
-      6 => StudentsSortKey.progress,
-      7 => StudentsSortKey.status,
-      _ => null,
-    };
+    for (final entry in _columnBySortKey.entries) {
+      if (entry.value == columnIndex) return entry.key;
+    }
+    return null;
+  }
+
+  /// Applies the sort stored on this device (#92), if any. Runs once from
+  /// `initState`; until the prefs read completes the table shows storage
+  /// order, same as a device with no stored choice.
+  Future<void> _restoreSortChoice() async {
+    final choice = await loadStudentsSortChoice();
+    if (choice == null || !mounted) return;
+    setState(() {
+      _sortColumnIndex = _columnBySortKey[choice.key];
+      _sortAscending = choice.ascending;
+    });
   }
 
   void _handleSort(int columnIndex, bool ascending) {
@@ -278,6 +303,13 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       // the result deterministic instead of showing a mid-list page.
       _pageIndex = 0;
     });
+    // Remember the choice per device (#92). Fire-and-forget: the UI state
+    // above is already applied, and a failed prefs write should not block
+    // or break the sort itself.
+    final key = _sortKeyForColumn(columnIndex);
+    if (key != null) {
+      unawaited(saveStudentsSortChoice((key: key, ascending: ascending)));
+    }
   }
 
   _PageView _paginate(List<StudentRowData> filtered) {
