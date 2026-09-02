@@ -691,9 +691,9 @@ class Conductor {
     // ---- Belief updates --------------------------------------------------
     // For follow-up grading: cap strength at `weak` and treat the
     // difficulty multiplier as `medium` regardless of the original probe's
-    // difficulty (CONDUCTOR_POLICY §6.2). The notch-drop counter and the
-    // `lastPositiveAtCalibratedAt` ratchet are skipped because a follow-up
-    // wasn't a calibrated probe.
+    // difficulty (CONDUCTOR_POLICY §6.2). The notch-drop counter and both
+    // ratchets (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty`)
+    // are skipped because a follow-up wasn't a calibrated probe.
     final appliedSignals = <TurnAppliedSignal>[];
     final touchedLoIds = <String>{};
     for (final sig in answer.signals) {
@@ -750,6 +750,16 @@ class Conductor {
       // probe); skip both the timestamp set and the notch-drop counter.
       final newPositiveAtCalibrated =
           (!answer.isFollowUp && hasPositive && atOrAbove) ? now : null;
+      // #103 three-level ratchet: absolute, not calibration-relative — the
+      // difficulty actually asked (a notch-dropped probe at easy counts as
+      // easy). Follow-ups skip it for the same reason as above.
+      final nextHighestPositiveDifficulty = answer.isFollowUp
+          ? existing?.highestPositiveDifficulty
+          : ratchetHighestPositiveDifficulty(
+              current: existing?.highestPositiveDifficulty,
+              kind: sig.kind,
+              difficulty: plan.difficulty,
+            );
 
       // §2.3 counter: bump on a strong-negative at calibration, reset on
       // any positive (any difficulty / any strength), unchanged otherwise.
@@ -777,6 +787,7 @@ class Conductor {
             : existing?.lastQuestionType,
         lastPositiveAtCalibratedAt:
             newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt,
+        highestPositiveDifficulty: nextHighestPositiveDifficulty,
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
       );
       await _deps.upsertLoBelief(updated);

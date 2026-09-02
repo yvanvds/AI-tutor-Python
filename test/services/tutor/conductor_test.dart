@@ -518,6 +518,225 @@ void main() {
     });
   });
 
+  // ---- #103 three-level difficulty ratchet ---------------------------------
+  group('#103 highestPositiveDifficulty ratchet', () {
+    Future<({Conductor c, _Fakes f})> setupSingleLo({
+      QuestionDifficulty calibration = QuestionDifficulty.medium,
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 0,
+        objectives: const [
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+        ],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = StudentCalibration(difficulty: calibration);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    Future<void> grade(
+      Conductor c, {
+      required QuestionDifficulty difficulty,
+      required LoSignalKind kind,
+      LoSignalStrength strength = LoSignalStrength.strong,
+      bool isFollowUp = false,
+    }) async {
+      final plan = QuestionPlan(
+        type: ChatRequestType.completeCodeQuestion,
+        difficulty: difficulty,
+        targetLOs: const [
+          LearningObjective(id: 'lo1', statement: 'one', kind: LoKind.apply),
+        ],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      final overall = switch (kind) {
+        LoSignalKind.positive => AnswerQuality.correct,
+        LoSignalKind.negative => AnswerQuality.wrong,
+        LoSignalKind.neutral => AnswerQuality.partial,
+      };
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: overall,
+          signals: [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'lo1',
+              kind: kind,
+              strength: strength,
+            ),
+          ],
+          isFollowUp: isFollowUp,
+          chainDepth: isFollowUp ? 1 : 0,
+        ),
+      );
+    }
+
+    QuestionDifficulty? highest(_Fakes f) =>
+        f.beliefs.values.single.highestPositiveDifficulty;
+
+    test(
+      'a positive records the difficulty asked, one level at a time',
+      () async {
+        final s = await setupSingleLo();
+        await grade(
+          s.c,
+          difficulty: QuestionDifficulty.easy,
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.weak,
+        );
+        expect(highest(s.f), QuestionDifficulty.easy);
+        await grade(
+          s.c,
+          difficulty: QuestionDifficulty.medium,
+          kind: LoSignalKind.positive,
+        );
+        expect(highest(s.f), QuestionDifficulty.medium);
+        await grade(
+          s.c,
+          difficulty: QuestionDifficulty.hard,
+          kind: LoSignalKind.positive,
+        );
+        expect(highest(s.f), QuestionDifficulty.hard);
+      },
+    );
+
+    test('one-way: a later positive at easy keeps hard', () async {
+      final s = await setupSingleLo(calibration: QuestionDifficulty.hard);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.positive,
+      );
+      expect(highest(s.f), QuestionDifficulty.hard);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.easy,
+        kind: LoSignalKind.positive,
+      );
+      expect(highest(s.f), QuestionDifficulty.hard);
+    });
+
+    test('absolute, not calibration-relative: a positive below calibration '
+        'still records its own level, and one at calibration does not '
+        'inherit the calibration', () async {
+      // Calibrated at hard, asked at easy (as a notch-dropped probe would
+      // be): the old ratchet stays unset, the level records easy.
+      final s = await setupSingleLo(calibration: QuestionDifficulty.hard);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.easy,
+        kind: LoSignalKind.positive,
+      );
+      final b = s.f.beliefs.values.single;
+      expect(b.lastPositiveAtCalibratedAt, isNull);
+      expect(b.highestPositiveDifficulty, QuestionDifficulty.easy);
+    });
+
+    test('negatives and neutrals never move it', () async {
+      final s = await setupSingleLo();
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.negative,
+      );
+      expect(highest(s.f), isNull);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.medium,
+        kind: LoSignalKind.positive,
+      );
+      expect(highest(s.f), QuestionDifficulty.medium);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.neutral,
+      );
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.negative,
+      );
+      expect(highest(s.f), QuestionDifficulty.medium);
+    });
+
+    test('follow-up grading is not a calibrated probe and leaves it '
+        'unchanged', () async {
+      final s = await setupSingleLo(calibration: QuestionDifficulty.hard);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.positive,
+        isFollowUp: true,
+      );
+      expect(highest(s.f), isNull);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.medium,
+        kind: LoSignalKind.positive,
+      );
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.positive,
+        isFollowUp: true,
+      );
+      expect(highest(s.f), QuestionDifficulty.medium);
+    });
+
+    test(
+      'a level read from an older doc is kept and only ever raised',
+      () async {
+        // A pre-#103 doc with the old ratchet reads as medium; a positive at
+        // easy keeps medium, a positive at hard lifts it. Seeded below the
+        // mastery mean so the single-LO subgoal does not advance between
+        // the two answers (an advanced subgoal is no longer the grading
+        // target).
+        final s = await setupSingleLo();
+        s.f.beliefs[s.f._key('s', 'lo1')] = LoBelief.fromCosmos({
+          'subgoalId': 's',
+          'loId': 'lo1',
+          'alpha': 1.0,
+          'beta': 2.0,
+          'lastUpdatedAt': DateTime.now().toUtc().toIso8601String(),
+          'lastPositiveAtCalibratedAt': DateTime.now()
+              .toUtc()
+              .toIso8601String(),
+        });
+        expect(highest(s.f), QuestionDifficulty.medium);
+        await grade(
+          s.c,
+          difficulty: QuestionDifficulty.easy,
+          kind: LoSignalKind.positive,
+        );
+        expect(highest(s.f), QuestionDifficulty.medium);
+        await grade(
+          s.c,
+          difficulty: QuestionDifficulty.hard,
+          kind: LoSignalKind.positive,
+        );
+        expect(highest(s.f), QuestionDifficulty.hard);
+      },
+    );
+  });
+
   // ---- §6 follow-up grading semantics --------------------------------------
   group('§6 follow-up grading', () {
     Future<({Conductor c, _Fakes f, QuestionPlan plan})> setup() async {

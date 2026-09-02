@@ -19,6 +19,7 @@
 import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
+import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
@@ -53,6 +54,7 @@ void main() {
   editor_comment_space.main();
   practice_complete_code.main();
   evidence_provenance.main();
+  difficulty_ratchet.main();
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();

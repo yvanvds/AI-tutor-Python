@@ -1,6 +1,8 @@
 // One row of the `lo_beliefs` Cosmos container. Per `docs/STUDENT_MODEL.md`
 // "Schema sketch", partition `/uid`, doc id `${uid}_${subgoalId}_${loId}`.
 
+import 'package:ai_tutor_python/core/question_difficulty.dart';
+
 class LoBelief {
   final String subgoalId;
   final String loId;
@@ -18,6 +20,20 @@ class LoBelief {
   /// a one-way ratchet for "ever demonstrated at non-easy."
   final DateTime? lastPositiveAtCalibratedAt;
 
+  /// The highest difficulty at which a positive signal was ever earned on
+  /// this LO (#103, PUNTENFORMULE §2.5). A one-way ratchet per level: a
+  /// later positive at a lower difficulty never lowers it, and calibration
+  /// shifts never reset it. `null` until the first positive. Distinct from
+  /// [lastPositiveAtCalibratedAt], which is relative to the calibration in
+  /// force at the time; this one is absolute, which is what the grade
+  /// formula needs as its difficulty differentiator above the 50-line.
+  ///
+  /// Backwards compatibility: docs written before the field existed read
+  /// the old binary flag's documented meaning — "ever demonstrated at
+  /// non-easy" — as [QuestionDifficulty.medium] when
+  /// [lastPositiveAtCalibratedAt] is set, and `null` otherwise.
+  final QuestionDifficulty? highestPositiveDifficulty;
+
   /// Count of consecutive negative signals on this LO whose answer was at
   /// the student's calibration *at the time of the answer*. Resets to 0 on
   /// any positive signal at any difficulty (CONDUCTOR_POLICY §2.3 notch-drop
@@ -33,6 +49,7 @@ class LoBelief {
     required this.lastUpdatedAt,
     this.lastQuestionType,
     this.lastPositiveAtCalibratedAt,
+    this.highestPositiveDifficulty,
     this.recentNegativesAtCalibrated = 0,
   });
 
@@ -42,6 +59,7 @@ class LoBelief {
     DateTime? lastUpdatedAt,
     String? lastQuestionType,
     DateTime? lastPositiveAtCalibratedAt,
+    QuestionDifficulty? highestPositiveDifficulty,
     int? recentNegativesAtCalibrated,
   }) {
     return LoBelief(
@@ -53,6 +71,8 @@ class LoBelief {
       lastQuestionType: lastQuestionType ?? this.lastQuestionType,
       lastPositiveAtCalibratedAt:
           lastPositiveAtCalibratedAt ?? this.lastPositiveAtCalibratedAt,
+      highestPositiveDifficulty:
+          highestPositiveDifficulty ?? this.highestPositiveDifficulty,
       recentNegativesAtCalibrated:
           recentNegativesAtCalibrated ?? this.recentNegativesAtCalibrated,
     );
@@ -78,12 +98,25 @@ class LoBelief {
       'lastPositiveAtCalibratedAt': lastPositiveAtCalibratedAt!
           .toUtc()
           .toIso8601String(),
+    if (highestPositiveDifficulty != null)
+      'highestPositiveDifficulty': highestPositiveDifficulty!.name,
     'recentNegativesAtCalibrated': recentNegativesAtCalibrated,
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
     final updatedRaw = doc['lastUpdatedAt'];
     final positiveRaw = doc['lastPositiveAtCalibratedAt'];
+    final lastPositiveAtCalibratedAt = positiveRaw is String
+        ? DateTime.tryParse(positiveRaw)
+        : null;
+    final highestRaw = doc['highestPositiveDifficulty'];
+    // An unrecognised level is treated like a missing one.
+    final highestPositiveDifficulty =
+        QuestionDifficulty.values.cast<QuestionDifficulty?>().firstWhere(
+          (d) => d!.name == highestRaw,
+          orElse: () => null,
+        ) ??
+        _legacyHighest(lastPositiveAtCalibratedAt);
     return LoBelief(
       subgoalId: (doc['subgoalId'] as String?) ?? '',
       loId: (doc['loId'] as String?) ?? '',
@@ -93,11 +126,16 @@ class LoBelief {
           ? (DateTime.tryParse(updatedRaw) ?? DateTime.utc(1970))
           : DateTime.utc(1970),
       lastQuestionType: doc['lastQuestionType'] as String?,
-      lastPositiveAtCalibratedAt: positiveRaw is String
-          ? DateTime.tryParse(positiveRaw)
-          : null,
+      lastPositiveAtCalibratedAt: lastPositiveAtCalibratedAt,
+      highestPositiveDifficulty: highestPositiveDifficulty,
       recentNegativesAtCalibrated:
           (doc['recentNegativesAtCalibrated'] as num?)?.toInt() ?? 0,
     );
   }
 }
+
+/// What a doc without `highestPositiveDifficulty` says about the level: the
+/// old flag's documented reading ("ever demonstrated at non-easy") maps to
+/// `medium`; no flag means no positive on record.
+QuestionDifficulty? _legacyHighest(DateTime? lastPositiveAtCalibratedAt) =>
+    lastPositiveAtCalibratedAt == null ? null : QuestionDifficulty.medium;

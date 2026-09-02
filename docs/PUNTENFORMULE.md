@@ -421,6 +421,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | --- | --- | --- |
 | 1.0 | 2026-09-02 | Eerste versie: structuur vastgelegd, parameters TBD tot na de schaduwrun. |
 | 1.0.1 | 2026-09-02 | Geen structuurwijziging. §4 en bijlage A: de voorlopige codewaarde van s (1,25) vermeld en de stand van §2.7 in de code beschreven (#100). |
+| 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
 
 ---
 
@@ -451,9 +452,17 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | vastgelopen (klassiek) | α + β ≥ 8 én μ < 0,6 | telt voor doorstroming, niet als beheerst (§1.7) |
 | vastgelopen (verzadigd) | α + β ≥ 18 én μ < 0,75 | idem, bij vol bewijsplafond (§1.7) |
 
-De drietraps-moeilijkheidsratel van §2.5 en de mechanismen van §2.8 zijn
-op datum van v1.0 **specificatie, nog geen werkende code**; hun
-implementatie volgt dit document. Van §2.7 staat de weging in de code
+De drietraps-moeilijkheidsratel van §2.5 staat sinds v1.0.2 in de code:
+per leerdoel bewaart de app `highestPositiveDifficulty` (makkelijk /
+gemiddeld / moeilijk), gezet op de moeilijkheid die *werkelijk gevraagd*
+werd bij elk positief signaal, alleen omhoog, nooit aangepast door een
+kalibratiewijziging en niet door vervolgvragen (§1.2). Oudere opgeslagen
+leerdoelen zonder dit veld lezen als "gemiddeld" wanneer de ratel van §1.5
+gezet was, anders als "nog niets aangetoond" — er wordt niets met
+terugwerkende kracht ingevuld. De formule van deel 2 leest dit veld; de
+tutor zelf gebruikt het niet. De mechanismen van §2.8 zijn op datum van
+v1.0.2 **specificatie, nog geen werkende code**; hun implementatie volgt
+dit document. Van §2.7 staat de weging in de code
 (elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
 s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
 tot die er is, telt elke beurt als thuis en verandert s niets.

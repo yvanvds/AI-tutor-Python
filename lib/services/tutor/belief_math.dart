@@ -115,6 +115,25 @@ BeliefSnapshot applyEvidence({
   return BeliefSnapshot(alpha + alphaDelta, beta + betaDelta);
 }
 
+/// The three-level difficulty ratchet (#103, PUNTENFORMULE §2.5): the
+/// highest difficulty at which this LO ever earned a positive signal.
+///
+/// A positive at [difficulty] lifts [current] to `max(current, difficulty)`;
+/// anything else — negatives, neutrals — leaves it alone. Strength does not
+/// matter: a weak positive at hard is still a positive at hard, the same
+/// rule the calibration-relative ratchet (`lastPositiveAtCalibratedAt`)
+/// uses. Follow-up grading is the caller's business: it is not a calibrated
+/// probe and must not reach this function (CONDUCTOR_POLICY §6.2).
+QuestionDifficulty? ratchetHighestPositiveDifficulty({
+  required QuestionDifficulty? current,
+  required LoSignalKind kind,
+  required QuestionDifficulty difficulty,
+}) {
+  if (kind != LoSignalKind.positive) return current;
+  if (current == null || difficulty.index > current.index) return difficulty;
+  return current;
+}
+
 /// Per-LO mastery condition 1 (mean) and 2 (evidence). Condition 3
 /// (`lastPositiveAtCalibratedAt` non-null) is checked separately by the
 /// conductor since it's stored alongside the belief, not derivable from

@@ -507,10 +507,15 @@ Multiply the base weight by a difficulty factor:
 | `medium` | 1.0 |
 | `hard` | 1.4 |
 
-Applies to both positive and negative signals. A `correct` at hard is
-more diagnostic of mastery than a `correct` at easy; a `wrong` at
-hard is *less* diagnostic of lacking the LO than a `wrong` at easy
-(the question was hard).
+Applies to both positive and negative signals, with the same factor:
+a `correct` at hard is more diagnostic of mastery than a `correct`
+at easy, and a `wrong` at hard is weighted just as heavily as that
+`correct` — the multiplier says how *hard* a piece of evidence is,
+not which way it points (see "Symmetric in positive/negative" above).
+A consequence for the grade formula (PUNTENFORMULE §2.5): the
+multiplier scales how fast evidence accrues but not where the mean
+settles, so difficulty is invisible in `(α, β)`; the per-LO
+`highestPositiveDifficulty` ratchet (4.3) is what carries it.
 
 **E.1 interaction.** Lower easy-weight is one of two mechanisms that
 fix the "good student grinds easy answers to mastery" problem. The
@@ -763,6 +768,22 @@ override (section 2.3) keeps firing on a specific LO at easy gets a
 softer path through, but the override releases on positive signal.
 The next probe is at calibrated difficulty. Mastery requires
 demonstrating there.
+
+**Three-level ratchet (#103, PUNTENFORMULE §2.5).** A second field,
+`highestPositiveDifficulty: "easy" | "medium" | "hard" | absent`,
+records the highest difficulty at which this LO ever earned a
+positive signal — any strength, the difficulty *actually asked* (a
+notch-dropped probe at easy counts as easy), absolute rather than
+relative to the calibration in force. It only ever rises: a later
+positive at a lower difficulty leaves it, and calibration shifts never
+touch it. Negatives, neutrals and follow-up grading (6.2) leave it
+alone, exactly like `lastPositiveAtCalibratedAt`. The conductor does
+not read it — mastery condition 3 stays on the calibration-relative
+timestamp — it exists for the grade formula, where it is the only
+signal that can tell medium from hard. Docs written before the field
+existed read as `medium` when `lastPositiveAtCalibratedAt` is set
+(the old flag's documented "ever demonstrated at non-easy" meaning)
+and as absent otherwise; nothing is backfilled.
 
 ### 4.4 The stuck rule (advancing despite a missed LO)
 
@@ -1019,7 +1040,9 @@ generated reads the new calibration.
 retroactively re-evaluated.** They were set against the calibration
 at the time of that answer, which is the correct interpretation. A
 demoted student doesn't lose their "ever demonstrated at medium"
-flag on previously-mastered LOs.
+flag on previously-mastered LOs. The same holds for
+`highestPositiveDifficulty` (4.3), which does not reference the
+calibration at all.
 
 **Per-LO override (section 2.3) is independent of student-level
 calibration.** The notch-drop on a struggling LO doesn't appear in

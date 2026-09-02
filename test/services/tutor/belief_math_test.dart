@@ -150,6 +150,80 @@ void main() {
     });
   });
 
+  group('ratchetHighestPositiveDifficulty (#103, PUNTENFORMULE §2.5)', () {
+    test('the first positive sets the level to the difficulty asked', () {
+      for (final level in QuestionDifficulty.values) {
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: null,
+            kind: LoSignalKind.positive,
+            difficulty: level,
+          ),
+          level,
+        );
+      }
+    });
+
+    test('a positive at a higher difficulty lifts the level', () {
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.easy,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.medium,
+        ),
+        QuestionDifficulty.medium,
+      );
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.medium,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.hard,
+        ),
+        QuestionDifficulty.hard,
+      );
+    });
+
+    test('one-way: a positive at a lower difficulty never lowers it', () {
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.hard,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.easy,
+        ),
+        QuestionDifficulty.hard,
+      );
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.medium,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.medium,
+        ),
+        QuestionDifficulty.medium,
+      );
+    });
+
+    test('negatives and neutrals leave it alone, at any level', () {
+      for (final kind in [LoSignalKind.negative, LoSignalKind.neutral]) {
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: null,
+            kind: kind,
+            difficulty: QuestionDifficulty.hard,
+          ),
+          isNull,
+        );
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: QuestionDifficulty.medium,
+            kind: kind,
+            difficulty: QuestionDifficulty.hard,
+          ),
+          QuestionDifficulty.medium,
+        );
+      }
+    });
+  });
+
   group('applyEvidence', () {
     test('below cap → simple addition', () {
       final s = applyEvidence(alpha: 4, beta: 1, alphaDelta: 2, betaDelta: 0);

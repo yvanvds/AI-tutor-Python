@@ -195,6 +195,16 @@ StudentLOBelief {
                                         // a one-way ratchet for the
                                         // "ever demonstrated at non-easy"
                                         // signal.
+  highestPositiveDifficulty: "easy" | "medium" | "hard"?
+                                        // Highest difficulty at which a
+                                        // positive signal was ever earned
+                                        // (conductor policy 4.3, #103).
+                                        // One-way per level; absent until
+                                        // the first positive. Missing on
+                                        // older docs: reads as "medium"
+                                        // when lastPositiveAtCalibratedAt
+                                        // is set, absent otherwise.
+  recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
 }
 ```
 
@@ -277,6 +287,12 @@ Belief and calibration are the source of truth for decisions;
   set, the field reflects "the student demonstrated this LO at
   the calibration in force at that time," which remains a valid
   signal regardless of subsequent calibration shifts.
+- **`highestPositiveDifficulty` is a three-level one-way ratchet** (#103).
+  It records the highest difficulty a positive was ever earned at, in
+  absolute terms, and only ever rises. The conductor never reads it; it
+  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
+  because the symmetric difficulty multiplier keeps difficulty out of
+  `(α, β)`.
 
 ## What this model deliberately does not do
 
