@@ -10,6 +10,7 @@
 // not part of this step's scope (CONDUCTOR_POLICY 8.2 strong-signal events
 // land later); the active/idle state below is what remains.
 
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 
 /// Coarse activity bucket the teacher table colours each student with.
@@ -53,6 +54,86 @@ StudentStatus computeStudentStatus({
     return StudentStatus.idle;
   }
   return StudentStatus.active;
+}
+
+/// Root goal id owning the student's most-recently-active progress record,
+/// resolved by walking [parentByChild] upward (a record on a root — the
+/// derived root cache doc — resolves to that root itself). Null when the
+/// student has no progress or the active record's goal is unknown — the same
+/// cases in which the "Current goal" column shows an em-dash.
+String? activeRootId({
+  required List<Progress> progress,
+  required Map<String, String?> parentByChild,
+}) {
+  final active = mostRecentlyActive(progress);
+  if (active == null) return null;
+  if (!parentByChild.containsKey(active.goalID)) return null;
+  var current = active.goalID;
+  // Guard against a parent cycle in hand-authored goal data.
+  final seen = <String>{current};
+  var parent = parentByChild[current];
+  while (parent != null) {
+    if (!seen.add(parent)) return null;
+    current = parent;
+    parent = parentByChild[current];
+  }
+  return current;
+}
+
+/// Overall progress of the student's *active* root goal — the root that owns
+/// the most-recently-active progress record, i.e. the same root the
+/// "Current goal" column names (#89).
+///
+/// Averages over **all** non-optional subgoals defined under that root, with
+/// subgoals the student has not started counting as 0 — so finishing 1 of N
+/// shows ~1/N, not 100%. Optional subgoals stay excluded from both sides of
+/// the average. Returns 0.0 when the student has no resolvable active root
+/// or the root has no non-optional subgoals.
+double activeRootProgress({
+  required List<Progress> progress,
+  required Map<String, Goal> goalById,
+  required Map<String, String?> parentByChild,
+}) {
+  final rootId = activeRootId(progress: progress, parentByChild: parentByChild);
+  if (rootId == null) return 0.0;
+  final subgoals = goalById.values
+      .where((g) => g.parentId == rootId && !g.optional)
+      .toList();
+  if (subgoals.isEmpty) return 0.0;
+  final progressByGoal = {for (final p in progress) p.goalID: p.progress};
+  double total = 0;
+  for (final g in subgoals) {
+    total += (progressByGoal[g.id] ?? 0.0).clamp(0.0, 1.0);
+  }
+  return total / subgoals.length;
+}
+
+/// Titles for the "Current goal" cell (#88): the active root goal's title
+/// plus, when the most-recently-active goal is a subgoal, that subgoal's own
+/// title. Kept as two separate fields — never concatenated — so the table
+/// can sort on the root title alone (#87).
+///
+/// The root is resolved through [activeRootId], the same walk the Progress
+/// column uses, so the two columns always describe the same root. When the
+/// walk cannot reach a known root (orphaned parent id, cycle) the cell falls
+/// back to the active goal's own title on one line — matching the previous
+/// single-line behavior. Null when the student has no progress or the active
+/// record's goal is unknown (the em-dash cases).
+({String rootTitle, String? subgoalTitle})? activeGoalTitles({
+  required List<Progress> progress,
+  required Map<String, Goal> goalById,
+  required Map<String, String?> parentByChild,
+}) {
+  final active = mostRecentlyActive(progress);
+  if (active == null) return null;
+  final goal = goalById[active.goalID];
+  if (goal == null) return null;
+  final rootId = activeRootId(progress: progress, parentByChild: parentByChild);
+  final root = rootId == null ? null : goalById[rootId];
+  if (root == null || root.id == goal.id) {
+    return (rootTitle: goal.title, subgoalTitle: null);
+  }
+  return (rootTitle: root.title, subgoalTitle: goal.title);
 }
 
 /// Average progress across [docs], skipping any goal whose id is in

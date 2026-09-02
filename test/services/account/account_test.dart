@@ -49,6 +49,7 @@ void main() {
         mayUseGlobalKey: true,
         createdAt: dt,
         updatedAt: dt,
+        className: '5A',
       );
       final map = account.toMap();
       expect(map['id'], 'uid-2');
@@ -60,12 +61,37 @@ void main() {
       expect(map['mayUseGlobalKey'], isTrue);
       expect(map['createdAt'], isA<String>());
       expect(map['updatedAt'], isA<String>());
+      expect(map['className'], '5A');
     });
 
     test('omits timestamps when null', () {
       final map = base.toMap();
       expect(map.containsKey('createdAt'), isFalse);
       expect(map.containsKey('updatedAt'), isFalse);
+    });
+
+    test('serializes an unassigned class as an empty string', () {
+      expect(base.toMap()['className'], '');
+    });
+  });
+
+  group('Account.fromMap — className (#86)', () {
+    Map<String, dynamic> doc({String? className}) => {
+      'id': 'uid-3',
+      'uid': 'uid-3',
+      'email': 'c@d.com',
+      'firstName': 'Cas',
+      'lastName': 'Peeters',
+      'targetGoal': '',
+      if (className != null) 'className': className,
+    };
+
+    test('reads a stored class name', () {
+      expect(Account.fromMap(doc(className: '5B')).className, '5B');
+    });
+
+    test('defaults to empty for docs that predate the field', () {
+      expect(Account.fromMap(doc()).className, '');
     });
   });
 }

@@ -150,6 +150,7 @@ class AccountService extends Notifier<Account?> {
       'email': email,
       'targetGoal': existing?['targetGoal'] ?? '',
       'mayUseGlobalKey': existing?['mayUseGlobalKey'] ?? false,
+      'className': existing?['className'] ?? '',
       'createdAt': existing?['createdAt'] ?? nowIso,
       'updatedAt': nowIso,
     };
@@ -167,6 +168,15 @@ class AccountService extends Notifier<Account?> {
     required bool value,
   }) async {
     await _patch(uid, {'mayUseGlobalKey': value});
+  }
+
+  /// Assigns a student to a class/group on the Students page (#86).
+  /// An empty (or whitespace-only) [className] clears the assignment.
+  Future<void> setClassName({
+    required String uid,
+    required String className,
+  }) async {
+    await _patch(uid, {'className': className.trim()});
   }
 
   /// Persists the calibration substructure on the current user's account

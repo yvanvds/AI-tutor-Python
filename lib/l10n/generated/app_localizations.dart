@@ -1511,7 +1511,7 @@ abstract class AppLocalizations {
   /// No description provided for @goals_import_dialog_message.
   ///
   /// In en, this message translates to:
-  /// **'The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: upsert by id (keeps existing lesson content links) and remove any goals not in the file.'**
+  /// **'The file contains {rootCount} root goal(s) and {total} total node(s).\n\n• Add: append using the ids from the file. Aborts if any id already exists.\n• Replace: update the matching set(s) by id (keeps existing lesson content links) and remove only goals under those sets that are not in the file. Other sets are left untouched.\n• Replace all: remove every goal not in the file, across all sets.'**
   String goals_import_dialog_message(int rootCount, int total);
 
   /// No description provided for @goals_import_action_cancel.
@@ -1531,6 +1531,76 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Replace'**
   String get goals_import_action_replace;
+
+  /// No description provided for @goals_import_action_replaceAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace all'**
+  String get goals_import_action_replaceAll;
+
+  /// No description provided for @goals_import_action_continue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get goals_import_action_continue;
+
+  /// No description provided for @goals_import_unmatched_title.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching set'**
+  String get goals_import_unmatched_title;
+
+  /// No description provided for @goals_import_unmatched_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The set \"{rootTitle}\" in the file does not match any existing set. Choose what to do with it.'**
+  String goals_import_unmatched_message(String rootTitle);
+
+  /// No description provided for @goals_import_unmatched_addAsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add as a new set'**
+  String get goals_import_unmatched_addAsNew;
+
+  /// No description provided for @goals_import_unmatched_replaceOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace \"{rootTitle}\"'**
+  String goals_import_unmatched_replaceOption(String rootTitle);
+
+  /// No description provided for @goals_import_preview_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm replace'**
+  String get goals_import_preview_title;
+
+  /// No description provided for @goals_import_preview_replaceLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces \"{rootTitle}\" ({count} goal(s) in file, {removed} will be removed)'**
+  String goals_import_preview_replaceLine(
+    String rootTitle,
+    int count,
+    int removed,
+  );
+
+  /// No description provided for @goals_import_preview_newSetLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds new set \"{rootTitle}\"'**
+  String goals_import_preview_newSetLine(String rootTitle);
+
+  /// No description provided for @goals_import_previewAll_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace all sets'**
+  String get goals_import_previewAll_title;
+
+  /// No description provided for @goals_import_previewAll_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes every goal not in the file, across all sets: {removed} goal(s) will be removed.'**
+  String goals_import_previewAll_message(int removed);
 
   /// No description provided for @goals_import_filePicker_title.
   ///
@@ -2339,6 +2409,18 @@ abstract class AppLocalizations {
   /// **'{n} / page'**
   String accounts_pageSize_label(int n);
 
+  /// No description provided for @accounts_classFilter_all.
+  ///
+  /// In en, this message translates to:
+  /// **'All classes'**
+  String get accounts_classFilter_all;
+
+  /// No description provided for @accounts_classFilter_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No class'**
+  String get accounts_classFilter_none;
+
   /// No description provided for @accounts_column_email.
   ///
   /// In en, this message translates to:
@@ -2350,6 +2432,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'NAME'**
   String get accounts_column_name;
+
+  /// No description provided for @accounts_column_class.
+  ///
+  /// In en, this message translates to:
+  /// **'CLASS'**
+  String get accounts_column_class;
 
   /// No description provided for @accounts_column_streak.
   ///
@@ -2470,6 +2558,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete failed: {error}'**
   String accounts_delete_failed(String error);
+
+  /// No description provided for @accounts_class_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign class'**
+  String get accounts_class_dialog_title;
+
+  /// No description provided for @accounts_class_dialog_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Class name (leave empty to clear)'**
+  String get accounts_class_dialog_hint;
+
+  /// No description provided for @accounts_class_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get accounts_class_dialog_cancel;
+
+  /// No description provided for @accounts_class_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get accounts_class_dialog_save;
+
+  /// No description provided for @accounts_class_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save class: {error}'**
+  String accounts_class_saveFailed(String error);
 
   /// No description provided for @accounts_status_tooltip_active.
   ///

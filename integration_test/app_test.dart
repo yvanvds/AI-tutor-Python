@@ -19,6 +19,8 @@
 import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
+import 'flows/editor_comment_space.dart' as editor_comment_space;
+import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
@@ -26,6 +28,11 @@ import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
+import 'flows/quiz_ligatures.dart' as quiz_ligatures;
+import 'flows/students_class_filter.dart' as students_class_filter;
+import 'flows/students_current_goal.dart' as students_current_goal;
+import 'flows/students_progress_column.dart' as students_progress_column;
+import 'flows/students_sort.dart' as students_sort;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
@@ -39,10 +46,17 @@ void main() {
   lesson_flow.main();
   language_switch.main();
   playground_files.main();
+  editor_comment_space.main();
   practice_complete_code.main();
+  quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();
   bug_report_oauth.main();
+  goals_import_replace.main();
+  students_class_filter.main();
+  students_current_goal.main();
+  students_progress_column.main();
+  students_sort.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();
