@@ -169,6 +169,16 @@ TextTheme _buildTextTheme(AppPalette p) {
 class AppMono {
   AppMono._();
 
+  /// JetBrains Mono ships programming ligatures on by default (the `calt`
+  /// OpenType feature), which fuses `==` / `!=` / `>=` into single glyphs
+  /// (═, ≠, ≥) that don't exist in real Python and can't be typed (#83).
+  /// Every JetBrains Mono style — here and in `code_theme.dart` — disables
+  /// them so students see the literal ASCII characters they must type.
+  static const List<FontFeature> noLigatures = [
+    FontFeature.disable('calt'),
+    FontFeature.disable('liga'),
+  ];
+
   /// Code body — JetBrains Mono 14 / 400 / lh 1.6.
   static TextStyle code({Color? color, double size = 14}) {
     return GoogleFonts.jetBrainsMono(
@@ -176,6 +186,7 @@ class AppMono {
       fontWeight: FontWeight.w400,
       height: 1.6,
       color: color ?? AppColors.fg,
+      fontFeatures: noLigatures,
     );
   }
 
@@ -186,6 +197,7 @@ class AppMono {
       fontWeight: FontWeight.w400,
       height: 1.55,
       color: color ?? AppColors.fg,
+      fontFeatures: noLigatures,
     );
   }
 
@@ -196,6 +208,7 @@ class AppMono {
       fontWeight: FontWeight.w400,
       height: 1.4,
       color: color ?? AppColors.fgMute,
+      fontFeatures: noLigatures,
     );
   }
 
