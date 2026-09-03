@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-02.
+schaduwperiode (zie §4). Laatste wijziging: 2026-09-03.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -90,6 +90,16 @@ Antwoorden op **vervolgvragen** (de doorvraagjes na een gewoon antwoord)
 tellen ook mee, maar afgetopt op sterkte *zwak* (0,5) en gerekend als
 moeilijkheid *gemiddeld*. Ze zijn echt bewijs, maar de vraag was niet als
 gekalibreerde meting ontworpen.
+
+De grader mag een antwoord ook laten meetellen voor een leerdoel uit een
+**eerder subdoel** van hetzelfde hoofddoel — meestal wanneer een fout
+laat zien dat een voorkennisleerdoel niet zit (een `print()` die misgaat
+in een lus-oefening). Zo'n signaal telt gewoon mee voor dat oudere
+leerdoel, met de sterkte die de grader opgeeft, maar gerekend als
+moeilijkheid *gemiddeld*: de moeilijkheid van de vraag was gekozen voor
+het leerdoel dat bevraagd werd, niet voor het oudere. De ratel van §2.5
+beweegt er niet door, en de voortgangsbalkjes van het oudere subdoel
+evenmin; alleen α of β en de decay-klok (§1.3) veranderen.
 
 ### 1.3 Vergeten (decay)
 
@@ -256,7 +266,8 @@ G = (M_eind − M_start) / (100 − M_start)      begrensd op [0, 1]
 ```
 
 met M_start de beheersingsscore aan het begin van de periode (uit de
-opgeslagen historiek) en M_eind die op het rapportmoment. G meet **welk
+momentopname van de periodestart, zie verder) en M_eind die op het
+rapportmoment. G meet **welk
 deel van jouw persoonlijke kloof naar de mijlpaal je deze periode hebt
 gedicht** — wie van ver komt en veel inhaalt, scoort hier hoog, precies
 even hoog als wie van dichtbij hetzelfde relatieve deel dicht. Stond je
@@ -264,19 +275,32 @@ aan het begin al op 100, dan is G = 1 (er viel geen kloof meer te
 dichten). Achteruitgang (M_eind < M_start) telt als G = 0, niet negatief:
 de gezakte M_eind weegt al in de beheersingscomponent.
 
-**Hoe M_start uit de historiek gelezen wordt (regel sinds v1.0.5).** De
-opgeslagen historiek bewaart per subdoel de *fractie* beheerste leerdoelen
-op elk moment dat die veranderde, niet welk leerdoel precies beheerst was
-en evenmin de moeilijkheidsratel. Daarom wordt M_start zo berekend: voor
-elk subdoel van de mijlpaal neemt de formule de laatst opgeslagen fractie
-op of vóór het begin van de periode (0 als er nog niets opgeslagen was), en
-kent die fractie toe aan elk leerdoel van dat subdoel — aan de kant van de
-kern én aan de kant van de uitbreiding. Zo ontstaan k_start en u_start;
-d_start is 0 (over de ratel aan het begin van de periode is niets bekend).
-M_start volgt dan uit dezelfde formule als §2.3. Dit is een benadering,
-maar een deterministische die uit dezelfde opgeslagen gegevens volgt die
-je kunt opvragen; een exactere meting per leerdoel bij het begin van de
-periode is een open verbetering.
+**Hoe M_start bepaald wordt (regel sinds v1.0.7).** Bij het begin van
+elke rapportperiode legt de app per leerling een **momentopname** vast:
+voor elk leerdoel of het op dat moment beheerst was (de drie voorwaarden
+van §1.5, na decay) en op welke trap de moeilijkheidsratel van §2.5 stond.
+De momentopname wordt geschreven bij je eerste sessie na de periodestart,
+vóór er in die sessie iets gemeten wordt. Ze is **exact**, ook al gebeurt
+dat schrijven dagen later: een overtuiging die sinds de periodestart niet
+meer geschreven is, wordt teruggerekend naar precies dat moment (decay is
+een zuivere functie van de laatste schrijving, §1.3). Alleen een leerdoel
+dat al vóór de momentopname in de nieuwe periode gemeten werd — bv. een
+mijlpaal die de leerkracht pas later aanmaakte — wordt gelezen zoals het
+op het moment van de opname stond; het voorstel vermeldt hoeveel
+mijlpaal-leerdoelen dat betreft. M_start volgt dan uit **exact dezelfde
+formule als §2.3**, met dezelfde k, u en d — inclusief de eis dat een
+kernleerdoel op het verwachte niveau van de mijlpaal aangetoond moet zijn
+om in k_start mee te tellen. Een leerdoel waarvoor bij de periodestart nog
+geen overtuiging bestond, telt als niet beheerst. De momentopname wordt
+nooit herschreven, ook niet door een reset van je voortgang.
+
+*Overgangsregel (v1.0.5, alleen voor een periode zonder momentopname).*
+Voor een rapportperiode die al liep vóór de momentopname bestond, leest de
+formule M_start uit de opgeslagen voortgangshistoriek: per subdoel van de
+mijlpaal de laatst opgeslagen fractie beheerste leerdoelen op of vóór de
+periodestart (0 als er nog niets opgeslagen was), toegekend aan elk
+leerdoel van dat subdoel, kern én uitbreiding; d_start = 0. Het voorstel
+vermeldt dat het om die schatting gaat.
 
 ### 2.5 De rol van moeilijkheid
 
@@ -350,8 +374,10 @@ niemand oneerlijk raakt:
   werkende oplossing van een nieuwe oefening, krijgt dat oude leerdoel een
   klein positief signaal: de decay-klok wordt teruggezet én de overtuiging
   stijgt licht. Dit werkt alleen positief (een foute of half-juiste
-  oplossing telt niet tegen het oude leerdoel — en levert het ook niets
-  op), alleen voor leerdoelen die eerder door directe bevraging beheerst
+  oplossing telt langs deze weg niet tegen het oude leerdoel — en levert
+  het ook niets op; wijst de fout wél duidelijk op een gat in dat oude
+  leerdoel, dan geeft de grader daar een gewoon negatief signaal op, zie
+  §1.2), alleen voor leerdoelen die eerder door directe bevraging beheerst
   raakten (de app onthoudt per leerdoel wanneer dat voor het eerst
   gebeurde), en met klein gewicht — de Beta-wiskunde zorgt zelf voor
   afnemende meeropbrengst. De moeilijkheidsratel van §2.5 beweegt er
@@ -454,6 +480,8 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
 | 1.0.3 | 2026-09-02 | Geen structuurwijziging. §2.8 transfer-krediet staat nu in de code: alleen bij een volledig juiste oplossing, alleen voor eerder beheerste leerdoelen uit een ander subdoel, gewicht voorlopig 0,5 × s (§4, bijlage A); de ratel van §2.5 beweegt er niet door (#101). |
 | 1.0.4 | 2026-09-02 | Geen structuurwijziging. §2.8 opfrisvragen staan nu in de code: hoogstens één per sessie, bij het begin, over het langst onaangeroerde eerder beheerste leerdoel uit een ander subdoel (drempel voorlopig 30 dagen, §4); het antwoord telt als gewone meting van dat leerdoel, inclusief de ratel van §2.5, maar niet voor het kalibratieniveau (#102). |
+| 1.0.6 | 2026-09-03 | Geen structuurwijziging. §1.2: signalen van de grader op een leerdoel uit een eerder subdoel tellen nu ook echt mee in de code (voorheen liet de tutor ze vallen): met de opgegeven sterkte, gerekend als gemiddeld, zonder de ratel van §2.5 of de voortgangsbalkjes te bewegen. §2.8 verduidelijkt dat een benoemd gat in oude leerstof via zo'n signaal loopt, niet via transfer-krediet (#108). |
+| 1.0.7 | 2026-09-03 | Geen structuurwijziging. §2.4: M_start komt nu uit een exacte momentopname per leerdoel bij de periodestart (beheerst? en ratel, teruggerekend naar dat moment), geschreven door de app bij de eerste sessie na de periodestart, en volgt uit dezelfde formule als M_eind, verwacht niveau inbegrepen. De regel van v1.0.5 (fractie per subdoel uit de historiek, d_start = 0) blijft alleen als overgangsregel voor een periode zonder momentopname; het voorstel vermeldt welke van de twee gebruikt is (#110). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -493,8 +521,12 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 
 De constanten van deel 2 staan sinds v1.0.5 in
 `lib/services/grading/grade_formula.dart` (`GradingConstants`), de
-berekening zelf ook daar; het lezen van de leerlingdata, de regel voor
+berekening zelf ook daar; het lezen van de leerlingdata, de twee regels voor
 M_start (§2.4) en de opslag in `lib/services/grading/grade_proposal_service.dart`;
+de momentopname van de periodestart (sinds v1.0.7) in
+`lib/services/grading/period_start_snapshot.dart`, geschreven door de
+leerling-app bij sessiestart via `period_start_snapshot_service.dart`
+(container `period_start_snapshots`);
 de tekst van de verantwoording in `lib/services/grading/grade_justification.dart`.
 Elk opgeslagen voorstel draagt het versienummer van dit document waarmee
 het berekend werd (`formulaVersion`); een afgetekend voorstel wordt nooit
@@ -516,7 +548,11 @@ raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
 zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
 meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
 zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
-wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 staan
+wordt op het beurtrecord vermeld. Sinds v1.0.6 verwerkt de tutor ook de
+**signalen op een eerder subdoel** van §1.2 (voorheen liet hij ze
+vallen): met de sterkte van de grader, gerekend als gemiddeld en gewogen
+met s, zonder ratel, teller of voortgangsbalkje te bewegen; elk verwerkt
+signaal staat met zijn subdoel op het beurtrecord. De **opfrisvragen** van §2.8 staan
 sinds v1.0.4 in de code: bij het begin van een sessie kiest de tutor
 hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
 oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel
@@ -529,7 +565,9 @@ de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
 code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
 uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel
 in het leerlingoverzicht — μ, n en de ratel per leerdoel na decay op het
-moment van berekenen, M_start uit de historiek volgens §2.4 — vraagt de
+moment van berekenen, M_start uit de momentopname van de periodestart
+volgens §2.4 (sinds v1.0.7; uit de historiek voor een periode zonder
+momentopname, en het voorstel vermeldt welke) — vraagt de
 verantwoording aan de AI (die het getal als vaststaand feit meekrijgt,
 samen met de statusrapporten uit de periode en het verloop per subdoel),
 past aan en tekent af. Het voorstel meldt ook de eerlijke

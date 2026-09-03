@@ -215,6 +215,18 @@ StudentLOBelief {
                                         // "mastered at the last write" when
                                         // the stored α, β and ratchet meet
                                         // the mastery rule, else absent.
+  regressedAt: string?                  // ISO 8601, set when an incidental
+                                        // cross-subgoal negative (conductor
+                                        // policy 2.4, #108) leaves a
+                                        // once-mastered LO below the mastery
+                                        // rule (#112). While set, the LO is
+                                        // due for a warm-up review (1.5)
+                                        // regardless of lastUpdatedAt.
+                                        // Cleared by the next direct probe
+                                        // of the LO, or by an indirect
+                                        // write that restores mastery.
+                                        // Missing on older docs: not
+                                        // regressed.
 }
 ```
 
@@ -275,8 +287,10 @@ Belief and calibration are the source of truth for decisions;
 
 ### `milestones` and `grade_proposals` containers (#99)
 
-Teacher-side only; nothing in the student flow reads or writes them, and
-the conductor does not know they exist. They are the persistence behind
+Teacher-edited and teacher-read; the conductor does not know they exist.
+The one student-side touch is a *read* of `milestones` at session start,
+to take the period-start snapshot below (#110); nothing in the student
+flow ever opens `grade_proposals`. They are the persistence behind
 PUNTENFORMULE part 2.
 
 `milestones` is single-partition (`/type = "milestone"`), a handful of
@@ -287,7 +301,7 @@ Milestone {
   id: string
   type: "milestone"
   title: string
-  periodStart: string     // ISO 8601; M_start is read from progress_history as of here
+  periodStart: string     // ISO 8601; M_start is read as of here (period_start_snapshots, #110)
   dueAt: string           // ISO 8601; the report moment
   expectedDifficulty: "easy" | "medium" | "hard"   // level the core must be shown at
   subgoalIds: string[]    // whose LOs make up the milestone
@@ -303,7 +317,67 @@ reliability signals (`staleLoCount`, `neverProbedCount`,
 `supervisedTurns`, `homeTurns`), `formulaVersion`, `computedAt`, the
 AI-written `justification` (+ `justificationAt`), and the teacher's
 `adjustedGrade`, `adjustmentNote` and `signedOffAt`. A doc with
-`signedOffAt` is frozen — never recomputed, never rewritten.
+`signedOffAt` is frozen — never recomputed, never rewritten. Since #110 it
+also records where `mStart` came from: `mStartSource` (`"snapshot"` |
+`"history"`; a doc without the field is history-based) and
+`mStartInexactCount` (see below).
+
+### `period_start_snapshots` container (#110)
+
+Partitioned `/uid`, one doc per `(uid, milestoneId)` with id
+`{uid}_{milestoneId}`: what the grade formula reads per LO, frozen as of
+the milestone's `periodStart`, so `M_start` (PUNTENFORMULE §2.4) is the
+same §2.3 arithmetic as `M_end` instead of a per-subgoal estimate from
+`progress_history`.
+
+```
+PeriodStartSnapshot {
+  id: string              // "{uid}_{milestoneId}"
+  type: "period_start_snapshot"
+  uid: string             // partition key
+  milestoneId: string
+  periodStart: string     // the milestone's periodStart this was taken for
+  takenAt: string         // ISO 8601, the session start that wrote it
+  los: [
+    {
+      subgoalId: string
+      loId: string
+      mastered: bool      // the three §4.1 conditions, post-decay
+      highest: "easy" | "medium" | "hard"?   // the §4.3 ratchet; absent = none
+      exact: bool         // see below
+    }
+  ]
+}
+```
+
+**Written by the student app**, once, at the first tutor session start
+after `periodStart` (`TutorService.initializeSession` →
+`PeriodStartSnapshotService.ensureForCurrentUser`, before `setTarget`
+and before any belief of the session can be written). Every belief doc of
+the student goes in, not only the milestone's LOs of the moment, so a
+subgoal added to the milestone later still finds its period-start state;
+an LO without an entry had no belief doc at the period start (never
+probed, not mastered).
+
+**Why it is exact although it is written days later.** A belief is
+`(α, β, lastUpdatedAt)` with decay applied lazily on read (3.3), so its
+state at any instant after `lastUpdatedAt` is a pure function of the
+doc. A belief not written since `periodStart` is therefore read *as of
+`periodStart`* (`exact: true`). Only a belief already written inside the
+period when the snapshot is taken — a milestone the teacher defined after
+the student had worked in it — has lost its period-start state; it is
+read as of `takenAt` and flagged `exact: false`, and the proposal counts
+how many milestone LOs that concerns (`mStartInexactCount`).
+
+**Lifecycle.** Idempotent: a session that finds a doc for the milestone's
+current `periodStart` writes nothing; a milestone whose `periodStart`
+moved gets a fresh one. Best-effort: a failed write is logged and retried
+at the next session start; the session itself never waits on it failing.
+A proposal for a milestone with no snapshot (a period that predates #110)
+falls back to the `progress_history` rule and says so
+(`mStartSource: "history"`). The student's progress reset (#25) leaves
+the snapshot alone: it is a fact about the period start, and wiping it
+would let a reset re-take `M_start` at zero.
 
 ## Settled decisions
 
@@ -344,9 +418,25 @@ AI-written `justification` (+ `justificationAt`), and the teacher's
   be written by a graded turn: upward only by a transfer credit, in
   either direction by the once-per-session warm-up review, which is a
   direct probe of that LO and updates its doc like any probe (ratchets
-  and counter included). `lastUpdatedAt` doubles as the staleness clock
-  for that review: an LO not written for `warmUpStaleAfter` is due.
-  Neither mechanism recomputes the other subgoal's cached `progress`.
+  and counter included), and in either direction by an incidental
+  `loSignal` the grader places on an earlier subgoal's LO (conductor
+  policy 2.4, #108), which moves only `(α, β)` and `lastUpdatedAt` —
+  never a ratchet, the counter or `lastQuestionType` — and creates the
+  doc at the prior if there was none. `lastUpdatedAt` doubles as the
+  staleness clock for the warm-up review: an LO not written for
+  `warmUpStaleAfter` is due. None of these mechanisms recomputes the
+  other subgoal's cached `progress`.
+- **`regressedAt` is the warm-up review's "due now" marker** (#112).
+  Because an incidental negative is itself a write, the staleness clock
+  alone would make a freshly revealed regression *fresh* and defer its
+  review by `warmUpStaleAfter`. The conductor therefore stamps
+  `regressedAt` when such a negative leaves a once-mastered LO below the
+  mastery rule, and the review selection (conductor policy 1.5) treats a
+  flagged LO as due regardless of `lastUpdatedAt`. The flag is not a
+  ratchet: the next direct probe of the LO clears it whichever way the
+  answer went, and so does an indirect write (transfer credit, positive
+  incidental) that brings the stored belief back to mastery. Older docs
+  without the field simply follow the staleness clock.
 
 ## What this model deliberately does not do
 

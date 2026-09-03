@@ -1,9 +1,15 @@
-// End-to-end (#101): a working solution to a later exercise refreshes the
-// earlier LOs it correctly uses. The student mastered "Print" three weeks
-// ago and is now on "Variables"; the grader nominates `lo-print` in
-// `transferLOs`, and the app lands a small positive on the old belief doc —
-// its decayed α plus the weak weight, its decay clock reset — and names the
-// credit on the `turn_history` doc. A never-mastered LO gets nothing.
+// End-to-end (#108): a mistake in later work that points to a gap in an
+// earlier subgoal reaches that earlier LO's belief. The student mastered
+// "Print" three weeks ago and is now on "Variables"; the grader marks the
+// answer wrong with a negative on the target *and* a negative on
+// `s1/lo-print` (the contract's cross-subgoal `loSignals`), and the app
+// debits the old belief doc — decayed β plus the signal's weight as medium,
+// its clock reset, nothing else on it moved — and names both signals with
+// their subgoal on the `turn_history` doc. Because the debit leaves the
+// once-mastered LO below mastery, the doc is flagged `regressedAt` (#112)
+// so the next session's warm-up review (#102) can pick it despite the
+// clock reset. An LO never probed before gets a fresh doc at the prior
+// plus the signal, and no flag: it never regressed from anything.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → belief math → Cosmos
@@ -13,7 +19,7 @@
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
-//   flutter test integration_test/flows/transfer_credit.dart -d windows
+//   flutter test integration_test/flows/cross_subgoal_signal.dart -d windows
 
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
@@ -30,23 +36,27 @@ import '../harness/seed.dart';
 const String kExercise = 'stad = ___\nprint("Welkom in " + stad)';
 const String kNextExercise = 'leeftijd = ___\nprint(leeftijd)';
 
-/// The exercise for the active subgoal, the grade that nominates the
-/// earlier LO, and the exercise the app asks for next.
+/// The exercise for the active subgoal, a wrong grade that blames the
+/// target and the earlier `print()` LO, and the exercise the app asks for
+/// next.
 List<String> script() => [
   completeCodeReply(text: 'Vul de stad in.', code: kExercise),
   codeFeedbackReply(
-    text: 'Helemaal juist.',
-    quality: 'correct',
+    text: 'De variabele klopt niet, en print() mist zijn haakjes.',
+    quality: 'wrong',
     loSignals: const [
       {
         'subgoalId': 's2',
         'loId': 'lo-var',
-        'signal': 'positive',
+        'signal': 'negative',
         'strength': 'strong',
       },
-    ],
-    transferLOs: const [
-      {'subgoalId': 's1', 'loId': 'lo-print'},
+      {
+        'subgoalId': 's1',
+        'loId': 'lo-print',
+        'signal': 'negative',
+        'strength': 'moderate',
+      },
     ],
   ),
   completeCodeReply(text: 'Nu de leeftijd.', code: kNextExercise),
@@ -64,28 +74,31 @@ Map<String, dynamic> printDone() => {
 };
 
 /// The belief on `lo-print` as it was written three weeks ago.
-Map<String, dynamic> printBelief({
-  required double alpha,
-  required double beta,
-  required DateTime lastUpdatedAt,
-  bool calibratedPositive = true,
-  DateTime? firstMasteredAt,
-}) => {
+Map<String, dynamic> printBelief({required DateTime lastUpdatedAt}) => {
   'id': '${kStudentUid}_s1_lo-print',
   'type': 'lo_belief',
   'uid': kStudentUid,
   'subgoalId': 's1',
   'loId': 'lo-print',
-  'alpha': alpha,
-  'beta': beta,
+  'alpha': 5.0,
+  'beta': 1.0,
   'lastUpdatedAt': lastUpdatedAt.toIso8601String(),
   'lastQuestionType': 'completeCodeQuestion',
-  if (calibratedPositive)
-    'lastPositiveAtCalibratedAt': lastUpdatedAt.toIso8601String(),
-  if (calibratedPositive) 'highestPositiveDifficulty': 'medium',
+  'lastPositiveAtCalibratedAt': lastUpdatedAt.toIso8601String(),
+  'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
-  if (firstMasteredAt != null)
-    'firstMasteredAt': firstMasteredAt.toIso8601String(),
+  'firstMasteredAt': lastUpdatedAt.toIso8601String(),
+};
+
+/// The seeded account, calibrated at `hard` so the probe is asked at hard
+/// and the medium treatment of the cross-subgoal signal is observable.
+Map<String, dynamic> hardStudent() => {
+  ...accountDoc(studentIdentity),
+  'calibration': {
+    'difficulty': 'hard',
+    'recentAnswers': const [],
+    'recentQuestionTypes': const [],
+  },
 };
 
 void main() {
@@ -129,8 +142,8 @@ void main() {
   Map<String, dynamic> turn(AppHarness harness) =>
       harness.cosmos['turn_history'].docs.values.single;
 
-  Map<String, dynamic> storedPrint(AppHarness harness) =>
-      harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
+  Map<String, dynamic>? storedPrint(AppHarness harness) =>
+      harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print'];
 
   // Three weeks: old enough to have decayed visibly, recent enough that the
   // LO is not yet due for a warm-up review (#102, `warmUpStaleAfter`) —
@@ -139,44 +152,42 @@ void main() {
     PolicyConstants.warmUpStaleAfter - const Duration(days: 9),
   );
 
-  testWidgets('a correct answer on a later subgoal refreshes the mastered '
-      'LO it used: decayed α plus the weak weight, clock reset, credit '
-      'on the turn record', (tester) async {
+  testWidgets('a wrong answer on a later subgoal that blames an earlier LO '
+      'debits that LO: decayed β plus the weight as medium, clock reset, '
+      'both signals on the turn record', (tester) async {
     final harness = AppHarness(
       llm: ScriptedLlm(script()),
       extraDocs: {
+        'accounts': [hardStudent()],
         'progress': [printDone()],
-        'lo_beliefs': [
-          printBelief(
-            alpha: 5,
-            beta: 1,
-            lastUpdatedAt: weeksAgo,
-            firstMasteredAt: weeksAgo,
-          ),
-        ],
+        'lo_beliefs': [printBelief(lastUpdatedAt: weeksAgo)],
       },
     );
     await answerOnce(tester, harness);
 
     final t = turn(harness);
     expect(t['subgoalId'], 's2');
-    final credits = (t['transferCredits'] as List).cast<Map>();
-    expect(credits, hasLength(1));
-    expect(credits.single['subgoalId'], 's1');
-    expect(credits.single['loId'], 'lo-print');
-    expect(
-      credits.single['alphaDelta'],
-      closeTo(PolicyConstants.weightWeak, 1e-9),
-    );
+    expect(t['difficulty'], 'hard');
+    final applied = (t['appliedSignals'] as List).cast<Map>();
+    expect(applied, hasLength(2));
+    final onTarget = applied.singleWhere((a) => a['loId'] == 'lo-var');
+    expect(onTarget['subgoalId'], 's2');
+    // Strong negative at hard on the target.
+    expect(onTarget['betaDelta'], closeTo(2.0 * 1.4, 1e-9));
+    final onPrint = applied.singleWhere((a) => a['loId'] == 'lo-print');
+    expect(onPrint['subgoalId'], 's1');
+    // Moderate negative as medium on the earlier LO — not × 1.4.
+    expect(onPrint['betaDelta'], closeTo(PolicyConstants.weightModerate, 1e-9));
+    expect(onPrint['alphaDelta'], 0.0);
 
-    final print = storedPrint(harness);
+    final print = storedPrint(harness)!;
     final writtenAt = DateTime.parse(print['lastUpdatedAt'] as String);
     // The clock was reset to the moment of the write, just now.
     expect(
       DateTime.now().toUtc().difference(writtenAt),
       lessThan(const Duration(minutes: 1)),
     );
-    // Three weeks of decay on (5, 1), then the credit.
+    // Three weeks of decay on (5, 1), then the signal on β only.
     final decayed = applyDecay(
       alpha: 5,
       beta: 1,
@@ -184,71 +195,55 @@ void main() {
       now: writtenAt,
     );
     expect(decayed.alpha, lessThan(5));
+    expect(print['alpha'], closeTo(decayed.alpha, 1e-9));
     expect(
-      print['alpha'],
-      closeTo(decayed.alpha + PolicyConstants.weightWeak, 1e-9),
+      print['beta'],
+      closeTo(decayed.beta + PolicyConstants.weightModerate, 1e-9),
     );
-    expect(print['beta'], closeTo(decayed.beta, 1e-9));
-    // Nothing else on the old doc moved.
+    // Nothing else on the old doc moved: the hard probe was of `lo-var`.
     expect(print['highestPositiveDifficulty'], 'medium');
     expect(print['lastPositiveAtCalibratedAt'], weeksAgo.toIso8601String());
     expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
-    // A credit is good news: it never flags the LO for review (#112).
-    expect(print.containsKey('regressedAt'), isFalse);
-
-    // The target LO got its own ordinary signal.
-    final variables =
-        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
-    expect(variables['alpha'], closeTo(PolicyConstants.prior + 2.0, 1e-9));
+    expect(print['recentNegativesAtCalibrated'], 0);
+    expect(print['lastQuestionType'], 'completeCodeQuestion');
+    // (decayed 5, 2): mean ≈ 0.71, below mastery — the regression is
+    // flagged with this write's timestamp, so the warm-up review can pick
+    // the LO next session even though its clock was just reset (#112).
+    expect(print['regressedAt'], print['lastUpdatedAt']);
+    // "Print" stays done: the belief is where the regression shows.
+    expect(
+      harness.cosmos['progress'].docs['${kStudentUid}_s1']!['progress'],
+      1.0,
+    );
 
     await harness.dispose(tester);
   });
 
-  testWidgets('a belief doc written before the mastery stamp existed is '
-      'refreshed when it was mastered at its last write, and gets the stamp', (
+  testWidgets('an earlier LO the student was never probed on gets a belief '
+      'doc at the prior plus the signal, with nothing certified', (
     tester,
   ) async {
     final harness = AppHarness(
       llm: ScriptedLlm(script()),
       extraDocs: {
         'progress': [printDone()],
-        'lo_beliefs': [printBelief(alpha: 5, beta: 1, lastUpdatedAt: weeksAgo)],
       },
     );
     await answerOnce(tester, harness);
 
-    expect(turn(harness)['transferCredits'], hasLength(1));
     final print = storedPrint(harness);
-    expect(print['alpha'], greaterThan(4.0));
-    expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
-
-    await harness.dispose(tester);
-  });
-
-  testWidgets('an LO that was never mastered is not refreshed, however '
-      'confidently the grader nominates it', (tester) async {
-    final harness = AppHarness(
-      llm: ScriptedLlm(script()),
-      extraDocs: {
-        'progress': [printDone()],
-        'lo_beliefs': [
-          // One easy positive, never at calibration: (1.6, 1).
-          printBelief(
-            alpha: 1.6,
-            beta: 1,
-            lastUpdatedAt: weeksAgo,
-            calibratedPositive: false,
-          ),
-        ],
-      },
+    expect(print, isNotNull, reason: 'no belief doc was created for lo-print');
+    expect(print!['alpha'], PolicyConstants.prior);
+    expect(
+      print['beta'],
+      closeTo(PolicyConstants.prior + PolicyConstants.weightModerate, 1e-9),
     );
-    await answerOnce(tester, harness);
-
-    expect(turn(harness).containsKey('transferCredits'), isFalse);
-    final print = storedPrint(harness);
-    expect(print['alpha'], 1.6);
-    expect(print['lastUpdatedAt'], weeksAgo.toIso8601String());
+    expect(print.containsKey('lastPositiveAtCalibratedAt'), isFalse);
+    expect(print.containsKey('highestPositiveDifficulty'), isFalse);
     expect(print.containsKey('firstMasteredAt'), isFalse);
+    expect(print.containsKey('lastQuestionType'), isFalse);
+    // Never mastered, so nothing to regress from: no review flag (#112).
+    expect(print.containsKey('regressedAt'), isFalse);
 
     await harness.dispose(tester);
   });

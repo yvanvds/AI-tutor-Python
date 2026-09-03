@@ -22,7 +22,7 @@ class GradingConstants {
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
   /// a signed grade was computed under.
-  static const String formulaVersion = '1.0.5';
+  static const String formulaVersion = '1.0.7';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).

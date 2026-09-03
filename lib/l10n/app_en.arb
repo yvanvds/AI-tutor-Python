@@ -80,6 +80,12 @@
   "@drawer_grade_masteryStart": {
     "placeholders": { "value": { "type": "String" } }
   },
+  "drawer_grade_startSource_snapshot": "Period start: exact per-LO snapshot",
+  "drawer_grade_startSource_snapshotLate": "Period start: per-LO snapshot, {count} LOs already written when it was taken",
+  "@drawer_grade_startSource_snapshotLate": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "drawer_grade_startSource_history": "Period start: estimate from progress history (no snapshot for this period)",
   "drawer_grade_growth": "Growth: {value}",
   "@drawer_grade_growth": {
     "placeholders": { "value": { "type": "String" } }

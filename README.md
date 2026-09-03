@@ -102,6 +102,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `lo_beliefs`     | `/uid`        |
    | `turn_history`   | `/uid`        |
    | `grade_proposals` | `/uid`       |
+   | `period_start_snapshots` | `/uid` |
    | `goals`          | `/type`       |
    | `instructions`   | `/type`       |
    | `config`         | `/type`       |

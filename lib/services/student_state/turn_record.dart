@@ -45,17 +45,25 @@ class TurnLoSignal {
   };
 }
 
+/// One post-modulation belief update this turn. Carries the subgoal since
+/// #108: an incidental signal on an earlier subgoal's LO (CONDUCTOR_POLICY
+/// §2.4) lands on that subgoal's doc, not the active one's, and the audit
+/// trail has to say which. Docs written before the field existed have no
+/// `subgoalId` on their entries; nothing reads them back.
 class TurnAppliedSignal {
+  final String subgoalId;
   final String loId;
   final double alphaDelta;
   final double betaDelta;
   const TurnAppliedSignal({
+    required this.subgoalId,
     required this.loId,
     required this.alphaDelta,
     required this.betaDelta,
   });
 
   Map<String, dynamic> toJson() => {
+    'subgoalId': subgoalId,
     'loId': loId,
     'alphaDelta': alphaDelta,
     'betaDelta': betaDelta,

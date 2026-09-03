@@ -100,6 +100,24 @@ double baseWeight(LoSignalStrength s) {
   provenance: provenance,
 );
 
+/// Incidental signal on an LO of an *earlier* subgoal (#108, CONDUCTOR_POLICY
+/// §2.4): the grader saw the answer reveal something about an LO outside the
+/// active subgoal — typically a gap in a prerequisite. It is ordinary
+/// evidence in the grader's own [strength], but the probe's difficulty was
+/// set for the target LO, not this one, so it is treated as `medium` — the
+/// same footing as a follow-up signal (§6.2) and a transfer credit (§3.7).
+/// Provenance applies as everywhere. Sign is whatever the grader said.
+({double alphaDelta, double betaDelta}) crossSubgoalSignalDeltas({
+  required LoSignalKind kind,
+  required LoSignalStrength strength,
+  EvidenceProvenance provenance = EvidenceProvenance.home,
+}) => signalDeltas(
+  kind: kind,
+  strength: strength,
+  difficulty: QuestionDifficulty.medium,
+  provenance: provenance,
+);
+
 /// Whether an LO has ever met all three mastery conditions — the gate for
 /// transfer credit (CONDUCTOR_POLICY §3.7): an LO never mastered by direct
 /// probing cannot be brought to mastery sideways.
@@ -119,6 +137,39 @@ bool everMastered({
   if (firstMasteredAt != null) return true;
   return lastPositiveAtCalibratedAt != null &&
       meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
+}
+
+/// The warm-up "regressed" marker after a belief write (#112,
+/// CONDUCTOR_POLICY §1.5): the value of `regressedAt` to persist, given
+/// [current] and what this write was.
+///
+/// A [directProbe] of the LO (a warm-up review, or any probe while its
+/// subgoal is active — follow-up grading included) always clears it: the
+/// review has happened and the ordinary staleness clock takes over. For an
+/// indirect write — a cross-subgoal incidental (§2.4) or a transfer credit
+/// (§3.7) — the marker follows the *stored* belief the write leaves
+/// behind, [stored] (post-decay, post-evidence: what the grade formula
+/// reads until the next write):
+///
+///   - back at mastery mean and evidence → cleared (good news restored it);
+///   - below, and the write was a [negative] → set (kept if already set,
+///     so the oldest regression is reviewed first);
+///   - below, and the write was not a negative → unchanged (a transfer
+///     credit that fails to restore mastery neither flags nor clears).
+///
+/// Only an LO that [everMastered] can regress; anything else reads `null`.
+DateTime? nextRegressedAt({
+  required DateTime? current,
+  required bool directProbe,
+  required bool everMastered,
+  required bool negative,
+  required BeliefSnapshot stored,
+  required DateTime now,
+}) {
+  if (directProbe || !everMastered) return null;
+  if (meetsMasteryMeanAndEvidence(stored)) return null;
+  if (negative) return current ?? now;
+  return current;
 }
 
 /// Apply an evidence delta with the cap-then-add rule (CONDUCTOR_POLICY 3.4).

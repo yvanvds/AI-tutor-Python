@@ -134,6 +134,65 @@ void main() {
     });
   });
 
+  group('nextRegressedAt (#112)', () {
+    final now = DateTime.utc(2026, 9, 3, 10);
+    final earlier = DateTime.utc(2026, 8, 20);
+    // (5, 2): mean 0.71 — below mastery. (10, 1.5): mean 0.87 — at it.
+    const below = BeliefSnapshot(5, 2);
+    const atMastery = BeliefSnapshot(10, 1.5);
+
+    DateTime? next({
+      DateTime? current,
+      bool directProbe = false,
+      bool everMastered = true,
+      bool negative = true,
+      BeliefSnapshot stored = below,
+    }) => nextRegressedAt(
+      current: current,
+      directProbe: directProbe,
+      everMastered: everMastered,
+      negative: negative,
+      stored: stored,
+      now: now,
+    );
+
+    test('a negative that leaves a mastered LO below mastery sets it', () {
+      expect(next(), now);
+    });
+
+    test('an already set flag is kept, so the oldest regression wins', () {
+      expect(next(current: earlier), earlier);
+    });
+
+    test('a negative that leaves the LO at mastery does not set it', () {
+      expect(next(stored: atMastery), isNull);
+      expect(next(stored: atMastery, current: earlier), isNull);
+    });
+
+    test('a direct probe clears it whichever way the answer went', () {
+      expect(next(directProbe: true, current: earlier), isNull);
+      expect(
+        next(directProbe: true, current: earlier, negative: false),
+        isNull,
+      );
+    });
+
+    test('an LO never mastered cannot regress', () {
+      expect(next(everMastered: false), isNull);
+      expect(next(everMastered: false, current: earlier), isNull);
+    });
+
+    test('an indirect positive (credit, incidental) clears it only when '
+        'it restores mastery; otherwise the flag is left as it was', () {
+      expect(
+        next(negative: false, current: earlier, stored: atMastery),
+        isNull,
+      );
+      expect(next(negative: false, current: earlier), earlier);
+      expect(next(negative: false, current: null), isNull);
+    });
+  });
+
   group('signalDeltas', () {
     test('positive strong @ medium → α += 2.0', () {
       final d = signalDeltas(

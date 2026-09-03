@@ -9,6 +9,20 @@
 
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 
+/// Where `M_start` came from (#110, PUNTENFORMULE §2.4).
+enum MStartSource {
+  /// The exact per-LO `period_start_snapshots` doc for this milestone.
+  snapshot,
+
+  /// The pre-snapshot rule: the per-subgoal fraction from
+  /// `progress_history`, credited to each LO, `d_start = 0`. Only for a
+  /// period no snapshot exists for.
+  history;
+
+  static MStartSource parse(Object? raw) =>
+      raw == snapshot.name ? snapshot : history;
+}
+
 class GradeProposal {
   const GradeProposal({
     required this.uid,
@@ -32,6 +46,8 @@ class GradeProposal {
     required this.neverProbedCount,
     required this.supervisedTurns,
     required this.homeTurns,
+    this.mStartSource = MStartSource.history,
+    this.mStartInexactCount = 0,
     this.justification,
     this.justificationAt,
     this.adjustedGrade,
@@ -79,6 +95,14 @@ class GradeProposal {
   final int supervisedTurns;
   final int homeTurns;
 
+  /// How `M_start` was read (#110).
+  final MStartSource mStartSource;
+
+  /// With [mStartSource] `snapshot`: milestone LOs whose belief had already
+  /// been written inside the period when the snapshot was taken, so their
+  /// period-start state is the snapshot-moment reading, not the exact one.
+  final int mStartInexactCount;
+
   final String? justification;
   final DateTime? justificationAt;
 
@@ -121,6 +145,8 @@ class GradeProposal {
     neverProbedCount: neverProbedCount,
     supervisedTurns: supervisedTurns,
     homeTurns: homeTurns,
+    mStartSource: mStartSource,
+    mStartInexactCount: mStartInexactCount,
     justification: justification ?? this.justification,
     justificationAt: justificationAt ?? this.justificationAt,
     adjustedGrade: adjustedGrade ?? this.adjustedGrade,
@@ -152,6 +178,8 @@ class GradeProposal {
     'neverProbedCount': neverProbedCount,
     'supervisedTurns': supervisedTurns,
     'homeTurns': homeTurns,
+    'mStartSource': mStartSource.name,
+    'mStartInexactCount': mStartInexactCount,
     if (justification != null) 'justification': justification,
     if (justificationAt != null)
       'justificationAt': justificationAt!.toUtc().toIso8601String(),
@@ -188,6 +216,9 @@ class GradeProposal {
       neverProbedCount: int_('neverProbedCount'),
       supervisedTurns: int_('supervisedTurns'),
       homeTurns: int_('homeTurns'),
+      // Docs from before #110 carry no source: they were history-based.
+      mStartSource: MStartSource.parse(doc['mStartSource']),
+      mStartInexactCount: int_('mStartInexactCount'),
       justification: doc['justification'] as String?,
       justificationAt: date('justificationAt'),
       adjustedGrade: (doc['adjustedGrade'] as num?)?.toInt(),

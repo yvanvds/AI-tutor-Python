@@ -193,6 +193,19 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get drawer_grade_startSource_snapshot =>
+      'Start periode: exacte momentopname per leerdoel';
+
+  @override
+  String drawer_grade_startSource_snapshotLate(int count) {
+    return 'Start periode: momentopname per leerdoel, $count leerdoelen al geschreven toen ze genomen werd';
+  }
+
+  @override
+  String get drawer_grade_startSource_history =>
+      'Start periode: schatting uit de voortgangshistoriek (geen momentopname voor deze periode)';
+
+  @override
   String drawer_grade_growth(String value) {
     return 'Groei: $value';
   }

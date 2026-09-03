@@ -50,6 +50,17 @@ class LoBelief {
   /// and get the stamp on their next write; nothing is backfilled.
   final DateTime? firstMasteredAt;
 
+  /// Set when an incidental cross-subgoal negative (CONDUCTOR_POLICY §2.4,
+  /// #108) leaves a once-mastered LO below the mastery rule — later work
+  /// revealed a regression on it (#112). While set, the LO is due for a
+  /// warm-up review (§1.5) regardless of how recently it was written: the
+  /// negative itself bumps `lastUpdatedAt`, which would otherwise push
+  /// the review `warmUpStaleAfter` out. Cleared by the next direct probe
+  /// of the LO (the review, or a probe while its subgoal is active) and by
+  /// any write that brings the stored belief back to mastery (a transfer
+  /// credit, a positive incidental). Missing on older docs: not regressed.
+  final DateTime? regressedAt;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -61,8 +72,11 @@ class LoBelief {
     this.highestPositiveDifficulty,
     this.recentNegativesAtCalibrated = 0,
     this.firstMasteredAt,
+    this.regressedAt,
   });
 
+  /// [regressedAt] is the one field that legitimately goes back to `null`
+  /// (a review clears it), hence the explicit [clearRegressedAt].
   LoBelief copyWith({
     double? alpha,
     double? beta,
@@ -72,6 +86,8 @@ class LoBelief {
     QuestionDifficulty? highestPositiveDifficulty,
     int? recentNegativesAtCalibrated,
     DateTime? firstMasteredAt,
+    DateTime? regressedAt,
+    bool clearRegressedAt = false,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -87,6 +103,7 @@ class LoBelief {
       recentNegativesAtCalibrated:
           recentNegativesAtCalibrated ?? this.recentNegativesAtCalibrated,
       firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
+      regressedAt: clearRegressedAt ? null : (regressedAt ?? this.regressedAt),
     );
   }
 
@@ -115,6 +132,8 @@ class LoBelief {
     'recentNegativesAtCalibrated': recentNegativesAtCalibrated,
     if (firstMasteredAt != null)
       'firstMasteredAt': firstMasteredAt!.toUtc().toIso8601String(),
+    if (regressedAt != null)
+      'regressedAt': regressedAt!.toUtc().toIso8601String(),
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -146,6 +165,9 @@ class LoBelief {
           (doc['recentNegativesAtCalibrated'] as num?)?.toInt() ?? 0,
       firstMasteredAt: doc['firstMasteredAt'] is String
           ? DateTime.tryParse(doc['firstMasteredAt'] as String)
+          : null,
+      regressedAt: doc['regressedAt'] is String
+          ? DateTime.tryParse(doc['regressedAt'] as String)
           : null,
     );
   }

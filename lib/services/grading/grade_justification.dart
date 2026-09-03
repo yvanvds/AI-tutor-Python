@@ -75,6 +75,7 @@ The student's current difficulty level is context only ("works at the hard level
       'proposal': proposal.proposal,
       'masteryScoreEnd': _round(proposal.mEnd),
       'masteryScoreStart': _round(proposal.mStart),
+      'masteryScoreStartSource': proposal.mStartSource.name,
       'growth': _round(proposal.g),
       'coreMasteredAtLevel': '${proposal.coreCounted}/${proposal.coreTotal}',
       'extensionMastered':
