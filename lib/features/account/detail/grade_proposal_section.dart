@@ -250,6 +250,20 @@ class _GradeProposalSectionState extends ConsumerState<GradeProposalSection> {
             style: theme.textTheme.bodySmall,
           ),
           Text(
+            switch (p.mStartSource) {
+              MStartSource.snapshot when p.mStartInexactCount == 0 =>
+                l.drawer_grade_startSource_snapshot,
+              MStartSource.snapshot => l.drawer_grade_startSource_snapshotLate(
+                p.mStartInexactCount,
+              ),
+              MStartSource.history => l.drawer_grade_startSource_history,
+            },
+            key: const Key('grade-start-source'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
             l.drawer_grade_growth(p.g.toStringAsFixed(2)),
             style: theme.textTheme.bodySmall,
           ),

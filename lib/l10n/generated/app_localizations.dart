@@ -434,6 +434,24 @@ abstract class AppLocalizations {
   /// **'Mastery at period start: {value}'**
   String drawer_grade_masteryStart(String value);
 
+  /// No description provided for @drawer_grade_startSource_snapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start: exact per-LO snapshot'**
+  String get drawer_grade_startSource_snapshot;
+
+  /// No description provided for @drawer_grade_startSource_snapshotLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start: per-LO snapshot, {count} LOs already written when it was taken'**
+  String drawer_grade_startSource_snapshotLate(int count);
+
+  /// No description provided for @drawer_grade_startSource_history.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start: estimate from progress history (no snapshot for this period)'**
+  String get drawer_grade_startSource_history;
+
   /// No description provided for @drawer_grade_growth.
   ///
   /// In en, this message translates to:

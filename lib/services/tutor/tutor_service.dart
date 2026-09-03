@@ -20,6 +20,7 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+import 'package:ai_tutor_python/services/grading/period_start_snapshot_service.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
@@ -427,6 +428,11 @@ class TutorService extends Notifier<TutorState> {
       );
     }
 
+    // Before anything of this session can write a belief: the grading
+    // period-start snapshot (#110) reads them as of `periodStart`, which is
+    // only exact while nothing has touched them since.
+    await _freezePeriodStarts();
+
     try {
       await _initializeSessionBody();
     } catch (e, stack) {
@@ -446,6 +452,27 @@ class TutorService extends Notifier<TutorState> {
           cause: describeFailure(e),
         ),
       );
+    }
+  }
+
+  /// Writes the `period_start_snapshots` doc of every milestone whose period
+  /// has started and has none yet for this student (#110). Best-effort: a
+  /// failure is logged and the next session tries again; it never blocks
+  /// the session itself. The conductor is not involved.
+  Future<void> _freezePeriodStarts() async {
+    try {
+      final written = await ref
+          .read(periodStartSnapshotServiceProvider)
+          .ensureForCurrentUser();
+      if (written > 0) {
+        _debug.recordEvent('grading.period_start_frozen', {'count': written});
+      }
+    } catch (e, stack) {
+      debugPrint('TutorService: period-start snapshot failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {
+        'where': 'freezePeriodStarts',
+        'error': '$e',
+      });
     }
   }
 

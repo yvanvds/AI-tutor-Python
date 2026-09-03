@@ -30,6 +30,7 @@ import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
+import 'flows/period_start_snapshot.dart' as period_start_snapshot;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
@@ -75,6 +76,7 @@ void main() {
   students_sort_persist.main();
   students_view_prefs_persist.main();
   grade_proposal.main();
+  period_start_snapshot.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

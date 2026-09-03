@@ -5,7 +5,10 @@
 //      period — and it lands in `milestones`.
 //   2. In a student's detail drawer the teacher computes the proposal
 //      against a seeded milestone: the number is the formula's, from the
-//      seeded beliefs and history (PUNTENFORMULE bijlage B arithmetic);
+//      seeded beliefs and history (PUNTENFORMULE bijlage B arithmetic;
+//      M_start from the history estimate, as no period-start snapshot was
+//      taken for this student — period_start_snapshot.dart drives the
+//      exact path, #110);
 //      asks the model for the justification — the prompt carries that
 //      number as a fixed fact and only the period's status reports; adjusts
 //      the grade with a note; signs off. The `grade_proposals` doc holds
@@ -234,6 +237,13 @@ void main() {
     );
     expect(find.text('Mastery now: 90.0'), findsOneWidget);
     expect(find.text('Mastery at period start: 50.0'), findsOneWidget);
+    // No period-start snapshot was ever taken for this student: the
+    // history estimate is the fallback, and the drawer says so (#110).
+    expect(
+      tester.widget<Text>(find.byKey(const Key('grade-start-source'))).data,
+      'Period start: estimate from progress history '
+      '(no snapshot for this period)',
+    );
     expect(find.text('Growth: 0.80'), findsOneWidget);
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
@@ -275,7 +285,8 @@ void main() {
     expect(doc['adjustmentNote'], 'Ziek in week 3.');
     expect(doc['justification'], kJustification);
     expect(doc['signedOffAt'], isA<String>());
-    expect(doc['formulaVersion'], '1.0.5');
+    expect(doc['mStartSource'], 'history');
+    expect(doc['formulaVersion'], '1.0.7');
 
     await harness.dispose(tester);
   });

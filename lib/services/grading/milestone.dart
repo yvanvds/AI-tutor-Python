@@ -28,9 +28,11 @@ class Milestone {
   final String id;
   final String title;
 
-  /// Start of the grading period: the growth score (§2.4) reads M_start
-  /// from the stored history as of this instant, and the AI justification
-  /// summarises status reports written from here on.
+  /// Start of the grading period: the growth score (§2.4) reads M_start as
+  /// of this instant — from the student's `period_start_snapshots` doc
+  /// (#110), or from the stored history for a period that predates it —
+  /// and the AI justification summarises status reports written from here
+  /// on.
   final DateTime periodStart;
 
   /// The report moment ("these goals should be known by this date").

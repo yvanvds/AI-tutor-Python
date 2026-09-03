@@ -192,6 +192,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get drawer_grade_startSource_snapshot =>
+      'Period start: exact per-LO snapshot';
+
+  @override
+  String drawer_grade_startSource_snapshotLate(int count) {
+    return 'Period start: per-LO snapshot, $count LOs already written when it was taken';
+  }
+
+  @override
+  String get drawer_grade_startSource_history =>
+      'Period start: estimate from progress history (no snapshot for this period)';
+
+  @override
   String drawer_grade_growth(String value) {
     return 'Growth: $value';
   }

@@ -1925,13 +1925,18 @@ difficulty, the period), computes the proposal, asks for the AI-written
 justification, adjusts, signs off. The number is
 `lib/services/grading/grade_formula.dart` over the student's `lo_beliefs`
 read post-decay (§4.1 mastery + the `highestPositiveDifficulty` ratchet of
-§4.3) and `progress_history` for the period-start baseline; the
+§4.3) and, for the period-start baseline, the `period_start_snapshots` doc
+the student app wrote at its first session start after the period began
+(the same per-LO reading frozen as of `periodStart`, #110; `progress_history`
+only for a period that has no snapshot); the
 justification is a separate, non-streaming model call with its own
 connector, fed the status reports whose `updatedAt` falls in the period
 and the per-subgoal trajectory — the number goes in as a fixed fact. The
 result lives in `grade_proposals` (`/uid`, id `${uid}_${milestoneId}`) and
 is frozen once signed. The conductor is not involved and reads none of
-this; the student shell never routes to the page or the drawer.
+this — the period-start snapshot is written by the tutor session start,
+before `setTarget`, not by the conductor; the student shell never routes
+to the page or the drawer.
 
 #### Deferred to post-v1
 
