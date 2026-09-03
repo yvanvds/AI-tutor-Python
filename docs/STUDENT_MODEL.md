@@ -344,9 +344,14 @@ AI-written `justification` (+ `justificationAt`), and the teacher's
   be written by a graded turn: upward only by a transfer credit, in
   either direction by the once-per-session warm-up review, which is a
   direct probe of that LO and updates its doc like any probe (ratchets
-  and counter included). `lastUpdatedAt` doubles as the staleness clock
-  for that review: an LO not written for `warmUpStaleAfter` is due.
-  Neither mechanism recomputes the other subgoal's cached `progress`.
+  and counter included), and in either direction by an incidental
+  `loSignal` the grader places on an earlier subgoal's LO (conductor
+  policy 2.4, #108), which moves only `(α, β)` and `lastUpdatedAt` —
+  never a ratchet, the counter or `lastQuestionType` — and creates the
+  doc at the prior if there was none. `lastUpdatedAt` doubles as the
+  staleness clock for the warm-up review: an LO not written for
+  `warmUpStaleAfter` is due. None of these mechanisms recomputes the
+  other subgoal's cached `progress`.
 
 ## What this model deliberately does not do
 

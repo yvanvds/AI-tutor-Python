@@ -1998,4 +1998,387 @@ void main() {
       expect(next.reason.chosenReason, contains('cold start'));
     });
   });
+
+  // ---- #108 cross-subgoal incidental signals ------------------------------
+  group('#108 incidental signals on an earlier subgoal (§2.4)', () {
+    const printLo = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    const varLo = LearningObjective(
+      id: 'lo-var',
+      statement: 'variables',
+      kind: LoKind.apply,
+    );
+    const loopLo = LearningObjective(
+      id: 'lo-loop',
+      statement: 'loops',
+      kind: LoKind.apply,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 'Print',
+      parentId: 'r',
+      order: 0,
+      objectives: const [printLo],
+    );
+    final active = Goal(
+      id: 's1',
+      title: 'Variables',
+      parentId: 'r',
+      order: 1000,
+      objectives: const [varLo],
+    );
+    final later = Goal(
+      id: 's2',
+      title: 'Loops',
+      parentId: 'r',
+      order: 2000,
+      objectives: const [loopLo],
+    );
+
+    /// The student finished "Print", is on "Variables", and "Loops" is
+    /// still ahead. [printBelief] is the stored belief on the earlier LO.
+    Future<({Conductor c, _Fakes f})> setup({LoBelief? printBelief}) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [earlier, active, later];
+      f.progressById['s0'] = Progress(goalID: 's0', progress: 1.0);
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: active,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.hard,
+      );
+      if (printBelief != null) {
+        f.beliefs[f._key('s0', 'lo-print')] = printBelief;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    final aMinuteAgo = DateTime.now().toUtc().subtract(
+      const Duration(minutes: 1),
+    );
+    final stamp = DateTime.utc(2026, 4, 1, 12);
+
+    /// A mastered "Print" belief, written a minute ago (see #109 in the
+    /// transfer-credit group for why never "now").
+    LoBelief masteredPrint() => LoBelief(
+      subgoalId: 's0',
+      loId: 'lo-print',
+      alpha: 5,
+      beta: 1,
+      lastUpdatedAt: aMinuteAgo,
+      lastQuestionType: 'completeCodeQuestion',
+      lastPositiveAtCalibratedAt: stamp,
+      highestPositiveDifficulty: QuestionDifficulty.medium,
+      recentNegativesAtCalibrated: 1,
+      firstMasteredAt: stamp,
+    );
+
+    /// A hard probe of `lo-var` graded with the target's own signal plus
+    /// [extra] — the grader's incidental signals.
+    Future<TurnOutcome> grade(
+      Conductor c, {
+      required List<GradedSignal> extra,
+      AnswerQuality quality = AnswerQuality.wrong,
+      List<GradedTransfer> transferLOs = const [],
+      bool isFollowUp = false,
+      EvidenceProvenance provenance = EvidenceProvenance.home,
+    }) async {
+      final plan = QuestionPlan(
+        type: ChatRequestType.writeCodeQuestion,
+        difficulty: QuestionDifficulty.hard,
+        targetLOs: const [varLo],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      return c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: 's1',
+              loId: 'lo-var',
+              kind: quality == AnswerQuality.correct
+                  ? LoSignalKind.positive
+                  : LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+            ...extra,
+          ],
+          transferLOs: transferLOs,
+          isFollowUp: isFollowUp,
+          chainDepth: isFollowUp ? 1 : 0,
+          provenance: provenance,
+        ),
+      );
+    }
+
+    const negativeOnPrint = GradedSignal(
+      subgoalId: 's0',
+      loId: 'lo-print',
+      kind: LoSignalKind.negative,
+      strength: LoSignalStrength.moderate,
+    );
+
+    LoBelief printAfter(_Fakes f) => f.beliefs[f._key('s0', 'lo-print')]!;
+
+    test(
+      'a negative on an earlier LO debits that LO as medium — the probe\'s '
+      'difficulty was set for the target — and moves nothing else on it',
+      () async {
+        final s = await setup(printBelief: masteredPrint());
+        final before = printAfter(s.f);
+        final outcome = await grade(s.c, extra: const [negativeOnPrint]);
+
+        final after = printAfter(s.f);
+        // Moderate × medium (1.0), not × hard (1.4). 1e-3: a minute of decay.
+        expect(after.beta, closeTo(1.0 + PolicyConstants.weightModerate, 1e-3));
+        expect(after.alpha, closeTo(5.0, 1e-3));
+        expect(after.lastUpdatedAt.isAfter(before.lastUpdatedAt), isTrue);
+        // Not a probe of this LO: no ratchet, no strike, no type rotation.
+        expect(after.lastPositiveAtCalibratedAt, stamp);
+        expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
+        expect(after.recentNegativesAtCalibrated, 1);
+        expect(after.lastQuestionType, 'completeCodeQuestion');
+        expect(after.firstMasteredAt, stamp);
+        // The earlier subgoal is not re-enrolled.
+        expect(s.f.progressById['s0']!.progress, 1.0);
+
+        // The target took its own signal at the probe's difficulty, and the
+        // audit trail names both with their subgoal.
+        expect(outcome.appliedSignals, hasLength(2));
+        final onTarget = outcome.appliedSignals.firstWhere(
+          (a) => a.loId == 'lo-var',
+        );
+        expect(onTarget.subgoalId, 's1');
+        expect(onTarget.betaDelta, closeTo(2.0 * 1.4, 1e-6));
+        final onPrint = outcome.appliedSignals.firstWhere(
+          (a) => a.loId == 'lo-print',
+        );
+        expect(onPrint.subgoalId, 's0');
+        expect(
+          onPrint.betaDelta,
+          closeTo(PolicyConstants.weightModerate, 1e-6),
+        );
+        expect(onPrint.alphaDelta, 0.0);
+      },
+    );
+
+    test('a positive on an earlier LO credits it in the grader\'s strength, '
+        'without certifying it at the probe\'s difficulty', () async {
+      final s = await setup(printBelief: masteredPrint());
+      await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+      );
+      final after = printAfter(s.f);
+      expect(after.alpha, closeTo(5.0 + PolicyConstants.weightStrong, 1e-3));
+      expect(after.beta, closeTo(1.0, 1e-3));
+      expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
+      expect(after.lastPositiveAtCalibratedAt, stamp);
+      // A positive on a direct probe would reset the strike counter; an
+      // incidental one leaves it alone.
+      expect(after.recentNegativesAtCalibrated, 1);
+    });
+
+    test('an LO never probed before gets a belief doc at the prior plus '
+        'the signal (§3.5), with no ratchet and no mastery stamp', () async {
+      final s = await setup();
+      await grade(s.c, extra: const [negativeOnPrint]);
+      final after = printAfter(s.f);
+      expect(after.alpha, PolicyConstants.prior);
+      expect(
+        after.beta,
+        PolicyConstants.prior + PolicyConstants.weightModerate,
+      );
+      expect(after.lastPositiveAtCalibratedAt, isNull);
+      expect(after.highestPositiveDifficulty, isNull);
+      expect(after.firstMasteredAt, isNull);
+      expect(after.lastQuestionType, isNull);
+    });
+
+    test('a signal on a later subgoal is a forward reference and is dropped; '
+        'so is one on an LO the earlier subgoal does not have', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final outcome = await grade(
+        s.c,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's2',
+            loId: 'lo-loop',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-gone',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+      );
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+      expect(s.f.beliefs.containsKey(s.f._key('s2', 'lo-loop')), isFalse);
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-gone')), isFalse);
+      expect(printAfter(s.f).beta, 1);
+    });
+
+    test('follow-up grading caps the cross-subgoal signal at weak', () async {
+      final s = await setup(printBelief: masteredPrint());
+      await grade(
+        s.c,
+        isFollowUp: true,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+      );
+      expect(
+        printAfter(s.f).beta,
+        closeTo(1.0 + PolicyConstants.weightWeak, 1e-3),
+      );
+    });
+
+    test('is weighted by provenance (#100)', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final outcome = await grade(
+        s.c,
+        extra: const [negativeOnPrint],
+        provenance: EvidenceProvenance.supervised,
+      );
+      final onPrint = outcome.appliedSignals.firstWhere(
+        (a) => a.loId == 'lo-print',
+      );
+      expect(
+        onPrint.betaDelta,
+        closeTo(
+          PolicyConstants.weightModerate *
+              PolicyConstants.supervisedWeightFactor,
+          1e-6,
+        ),
+      );
+    });
+
+    test('a transfer nomination on an LO that took a signal this turn is '
+        'dropped — one answer never counts twice on one LO', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.weak,
+          ),
+        ],
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      expect(outcome.transferCredits, isEmpty);
+      expect(
+        printAfter(s.f).alpha,
+        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
+      );
+    });
+
+    test('a signal on another LO of the warm-up subgoal is incidental, '
+        'while the warm-up target itself is a probe', () async {
+      const inputLo = LearningObjective(
+        id: 'lo-input',
+        statement: 'input',
+        kind: LoKind.recall,
+      );
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final printGoal = Goal(
+        id: 's0',
+        title: 'Print',
+        parentId: 'r',
+        order: 0,
+        objectives: const [printLo, inputLo],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [printGoal, active];
+      f.progressById['s0'] = Progress(goalID: 's0', progress: 1.0);
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: active,
+      );
+      final stale = DateTime.now().toUtc().subtract(
+        PolicyConstants.warmUpStaleAfter + const Duration(days: 15),
+      );
+      f.beliefs[f._key('s0', 'lo-print')] = LoBelief(
+        subgoalId: 's0',
+        loId: 'lo-print',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: stale,
+        lastPositiveAtCalibratedAt: stale,
+        highestPositiveDifficulty: QuestionDifficulty.medium,
+        firstMasteredAt: stale,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final plan = await c.planNext();
+      expect(plan.isWarmUp, isTrue);
+      expect(plan.targetLOs.single.id, 'lo-print');
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: const GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: [
+            GradedSignal(
+              subgoalId: 's0',
+              loId: 'lo-print',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
+            GradedSignal(
+              subgoalId: 's0',
+              loId: 'lo-input',
+              kind: LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+        ),
+      );
+      expect(outcome.appliedSignals, hasLength(2));
+      // The target: a probe at medium, ratchet moved.
+      final print = f.beliefs[f._key('s0', 'lo-print')]!;
+      expect(print.lastPositiveAtCalibratedAt!.isAfter(stale), isTrue);
+      // The other LO: incidental — doc created, nothing certified.
+      final input = f.beliefs[f._key('s0', 'lo-input')]!;
+      expect(input.beta, PolicyConstants.prior + PolicyConstants.weightStrong);
+      expect(input.lastPositiveAtCalibratedAt, isNull);
+      expect(input.lastQuestionType, isNull);
+      // Still a warm-up turn as far as the active subgoal is concerned.
+      expect(f.progressById.containsKey('s1'), isFalse);
+    });
+  });
 }

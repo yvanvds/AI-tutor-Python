@@ -91,6 +91,16 @@ tellen ook mee, maar afgetopt op sterkte *zwak* (0,5) en gerekend als
 moeilijkheid *gemiddeld*. Ze zijn echt bewijs, maar de vraag was niet als
 gekalibreerde meting ontworpen.
 
+De grader mag een antwoord ook laten meetellen voor een leerdoel uit een
+**eerder subdoel** van hetzelfde hoofddoel — meestal wanneer een fout
+laat zien dat een voorkennisleerdoel niet zit (een `print()` die misgaat
+in een lus-oefening). Zo'n signaal telt gewoon mee voor dat oudere
+leerdoel, met de sterkte die de grader opgeeft, maar gerekend als
+moeilijkheid *gemiddeld*: de moeilijkheid van de vraag was gekozen voor
+het leerdoel dat bevraagd werd, niet voor het oudere. De ratel van §2.5
+beweegt er niet door, en de voortgangsbalkjes van het oudere subdoel
+evenmin; alleen α of β en de decay-klok (§1.3) veranderen.
+
 ### 1.3 Vergeten (decay)
 
 Kennis die je niet gebruikt, zakt weg — en de overtuigingen doen dat ook,
@@ -350,8 +360,10 @@ niemand oneerlijk raakt:
   werkende oplossing van een nieuwe oefening, krijgt dat oude leerdoel een
   klein positief signaal: de decay-klok wordt teruggezet én de overtuiging
   stijgt licht. Dit werkt alleen positief (een foute of half-juiste
-  oplossing telt niet tegen het oude leerdoel — en levert het ook niets
-  op), alleen voor leerdoelen die eerder door directe bevraging beheerst
+  oplossing telt langs deze weg niet tegen het oude leerdoel — en levert
+  het ook niets op; wijst de fout wél duidelijk op een gat in dat oude
+  leerdoel, dan geeft de grader daar een gewoon negatief signaal op, zie
+  §1.2), alleen voor leerdoelen die eerder door directe bevraging beheerst
   raakten (de app onthoudt per leerdoel wanneer dat voor het eerst
   gebeurde), en met klein gewicht — de Beta-wiskunde zorgt zelf voor
   afnemende meeropbrengst. De moeilijkheidsratel van §2.5 beweegt er
@@ -454,6 +466,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
 | 1.0.3 | 2026-09-02 | Geen structuurwijziging. §2.8 transfer-krediet staat nu in de code: alleen bij een volledig juiste oplossing, alleen voor eerder beheerste leerdoelen uit een ander subdoel, gewicht voorlopig 0,5 × s (§4, bijlage A); de ratel van §2.5 beweegt er niet door (#101). |
 | 1.0.4 | 2026-09-02 | Geen structuurwijziging. §2.8 opfrisvragen staan nu in de code: hoogstens één per sessie, bij het begin, over het langst onaangeroerde eerder beheerste leerdoel uit een ander subdoel (drempel voorlopig 30 dagen, §4); het antwoord telt als gewone meting van dat leerdoel, inclusief de ratel van §2.5, maar niet voor het kalibratieniveau (#102). |
+| 1.0.6 | 2026-09-03 | Geen structuurwijziging. §1.2: signalen van de grader op een leerdoel uit een eerder subdoel tellen nu ook echt mee in de code (voorheen liet de tutor ze vallen): met de opgegeven sterkte, gerekend als gemiddeld, zonder de ratel van §2.5 of de voortgangsbalkjes te bewegen. §2.8 verduidelijkt dat een benoemd gat in oude leerstof via zo'n signaal loopt, niet via transfer-krediet (#108). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -516,7 +529,11 @@ raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
 zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
 meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
 zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
-wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 staan
+wordt op het beurtrecord vermeld. Sinds v1.0.6 verwerkt de tutor ook de
+**signalen op een eerder subdoel** van §1.2 (voorheen liet hij ze
+vallen): met de sterkte van de grader, gerekend als gemiddeld en gewogen
+met s, zonder ratel, teller of voortgangsbalkje te bewegen; elk verwerkt
+signaal staat met zijn subdoel op het beurtrecord. De **opfrisvragen** van §2.8 staan
 sinds v1.0.4 in de code: bij het begin van een sessie kiest de tutor
 hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
 oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel

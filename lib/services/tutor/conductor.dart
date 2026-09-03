@@ -869,14 +869,29 @@ class Conductor {
     final touchedLoIds = <String>{};
     // A warm-up review (§1.5) is a direct probe of an LO in another
     // subgoal: its signal lands on that LO's doc through the same update
-    // as an active-subgoal signal. Anything else outside the active
-    // subgoal is still skipped (scope was validated upstream; incidental
-    // signals on other subgoals are not evidence the conductor takes).
+    // as an active-subgoal signal, ratchets included. Any other signal
+    // outside the active subgoal is an *incidental cross-subgoal* signal
+    // (#108, §2.4): the grader saw the answer reveal something about an LO
+    // of an earlier subgoal of the root — typically a prerequisite gap. It
+    // is ordinary evidence on that LO's doc, treated as `medium` and with
+    // nothing but `(α, β)` and the clock moving (`crossSubgoalSignalDeltas`).
+    // Forward references (a later subgoal) are dropped per the LLM
+    // contract; scope was otherwise validated upstream.
     final warmUpSubgoal = plan.warmUp?.subgoal;
     final targetSubgoalId = warmUpSubgoal?.id ?? subgoal.id;
+    // LOs outside the active subgoal written this turn, `subgoalId/loId` →
+    // why: a transfer nomination on one of them is dropped, so the same
+    // answer never counts twice on one LO (§3.7).
+    final writtenElsewhere = <String, String>{};
+    if (warmUpSubgoal != null && targetLo != null) {
+      writtenElsewhere['${warmUpSubgoal.id}/${targetLo.id}'] = 'warm-up target';
+    }
+    // The root's subgoals, read on the first cross-subgoal signal only.
+    List<Goal>? siblings;
     for (final sig in answer.signals) {
       final String signalSubgoalId;
       final LearningObjective? lo;
+      var isCrossSubgoal = false;
       if (sig.subgoalId == subgoal.id) {
         signalSubgoalId = subgoal.id;
         lo = subgoal.objectives.firstWhereOrNull((o) => o.id == sig.loId);
@@ -887,9 +902,24 @@ class Conductor {
         signalSubgoalId = warmUpSubgoal.id;
         lo = targetLo;
       } else {
+        siblings ??= await _rootSubgoals(selection);
+        final other = siblings.firstWhereOrNull((g) => g.id == sig.subgoalId);
+        if (other == null) {
+          _dropSignal(sig, 'outside the active root');
+          continue;
+        }
+        if (other.order > subgoal.order) {
+          _dropSignal(sig, 'forward reference');
+          continue;
+        }
+        signalSubgoalId = other.id;
+        lo = other.objectives.firstWhereOrNull((o) => o.id == sig.loId);
+        isCrossSubgoal = true;
+      }
+      if (lo == null) {
+        _dropSignal(sig, 'unknown LO');
         continue;
       }
-      if (lo == null) continue;
       final isTarget =
           signalSubgoalId == targetSubgoalId && sig.loId == targetLo?.id;
       final existing = await _deps.getLoBelief(
@@ -921,12 +951,18 @@ class Conductor {
       final effectiveDifficulty = answer.isFollowUp
           ? QuestionDifficulty.medium
           : plan.difficulty;
-      final deltas = signalDeltas(
-        kind: sig.kind,
-        strength: effectiveStrength,
-        difficulty: effectiveDifficulty,
-        provenance: answer.provenance,
-      );
+      final deltas = isCrossSubgoal
+          ? crossSubgoalSignalDeltas(
+              kind: sig.kind,
+              strength: effectiveStrength,
+              provenance: answer.provenance,
+            )
+          : signalDeltas(
+              kind: sig.kind,
+              strength: effectiveStrength,
+              difficulty: effectiveDifficulty,
+              provenance: answer.provenance,
+            );
       final next = applyEvidence(
         alpha: alpha,
         beta: beta,
@@ -938,20 +974,24 @@ class Conductor {
       final isStrong = effectiveStrength == LoSignalStrength.strong;
       final atOrAbove = _difficultyAtLeast(plan.difficulty, calibrationBefore);
       final exactlyAtCalibration = plan.difficulty == calibrationBefore;
-      // Follow-up grading does not satisfy the §4.3 ratchet (no calibrated
-      // probe); skip both the timestamp set and the notch-drop counter.
+      // The ratchets and the notch-drop counter move only on a calibrated
+      // probe of *this* LO: not on follow-up grading (§6.2) and not on a
+      // cross-subgoal incidental (§2.4) — the difficulty was set for the
+      // target LO, so a hard loop exercise must not certify `print()` at
+      // hard, nor strike it.
+      final isCalibratedProbeOfThisLo = !answer.isFollowUp && !isCrossSubgoal;
       final newPositiveAtCalibrated =
-          (!answer.isFollowUp && hasPositive && atOrAbove) ? now : null;
+          (isCalibratedProbeOfThisLo && hasPositive && atOrAbove) ? now : null;
       // #103 three-level ratchet: absolute, not calibration-relative — the
       // difficulty actually asked (a notch-dropped probe at easy counts as
-      // easy). Follow-ups skip it for the same reason as above.
-      final nextHighestPositiveDifficulty = answer.isFollowUp
-          ? existing?.highestPositiveDifficulty
-          : ratchetHighestPositiveDifficulty(
+      // easy).
+      final nextHighestPositiveDifficulty = isCalibratedProbeOfThisLo
+          ? ratchetHighestPositiveDifficulty(
               current: existing?.highestPositiveDifficulty,
               kind: sig.kind,
               difficulty: plan.difficulty,
-            );
+            )
+          : existing?.highestPositiveDifficulty;
 
       // §2.3 counter: bump on a strong-negative at calibration, reset on
       // any positive (any difficulty / any strength), unchanged otherwise.
@@ -960,7 +1000,7 @@ class Conductor {
       // requirement on the most-recent answer.
       var nextNegativesAtCalibrated =
           existing?.recentNegativesAtCalibrated ?? 0;
-      if (!answer.isFollowUp) {
+      if (isCalibratedProbeOfThisLo) {
         if (hasPositive) {
           nextNegativesAtCalibrated = 0;
         } else if (hasNegative && exactlyAtCalibration && isStrong) {
@@ -1012,22 +1052,30 @@ class Conductor {
       await _deps.upsertLoBelief(updated);
       appliedSignals.add(
         TurnAppliedSignal(
+          subgoalId: signalSubgoalId,
           loId: sig.loId,
           alphaDelta: next.alpha - alpha,
           betaDelta: next.beta - beta,
         ),
       );
-      if (signalSubgoalId == subgoal.id) touchedLoIds.add(sig.loId);
+      if (signalSubgoalId == subgoal.id) {
+        touchedLoIds.add(sig.loId);
+      } else {
+        writtenElsewhere.putIfAbsent(
+          '$signalSubgoalId/${sig.loId}',
+          () => 'signalled this turn',
+        );
+      }
     }
 
     // ---- Transfer credit (#101, CONDUCTOR_POLICY §3.7) --------------------
     final transferCredits = await _applyTransferCredit(
       answer: answer,
       activeSubgoalId: subgoal.id,
-      // The warm-up target already took its direct signal above; a
-      // nomination on it would count the same answer twice.
-      excludeSubgoalId: warmUpSubgoal?.id,
-      excludeLoId: warmUpSubgoal == null ? null : targetLo?.id,
+      // The warm-up target and any LO that took a cross-subgoal signal
+      // above already have this answer on record; a nomination on them
+      // would count it twice.
+      excluded: writtenElsewhere,
     );
 
     // ---- Mastery + advancement ------------------------------------------
@@ -1275,11 +1323,14 @@ class Conductor {
   /// the difficulty was set for the target LO, not this one), not the
   /// notch-drop counter, not `lastQuestionType`. The other subgoal's cached
   /// progress is not recomputed: positive-only credit cannot lower it.
+  ///
+  /// [excluded] maps `subgoalId/loId` of LOs this turn already wrote
+  /// outside the active subgoal (the warm-up target, cross-subgoal
+  /// incidental signals) to the reason; a nomination on one is dropped.
   Future<List<TurnTransferCredit>> _applyTransferCredit({
     required GradedAnswer answer,
     required String activeSubgoalId,
-    String? excludeSubgoalId,
-    String? excludeLoId,
+    Map<String, String> excluded = const {},
   }) async {
     if (answer.transferLOs.isEmpty) return const [];
     if (answer.isFollowUp ||
@@ -1303,11 +1354,12 @@ class Conductor {
         });
         continue;
       }
-      if (ref.subgoalId == excludeSubgoalId && ref.loId == excludeLoId) {
+      final excludedReason = excluded['${ref.subgoalId}/${ref.loId}'];
+      if (excludedReason != null) {
         _deps.recordDebugEvent('conductor.transfer_dropped', {
           'subgoalId': ref.subgoalId,
           'loId': ref.loId,
-          'reason': 'warm-up target',
+          'reason': excludedReason,
         });
         continue;
       }
@@ -1365,6 +1417,24 @@ class Conductor {
       );
     }
     return List.unmodifiable(credits);
+  }
+
+  /// The subgoals of the active root — the grading scope (LLM contract,
+  /// part 3) a cross-subgoal signal (§2.4) is resolved against.
+  Future<List<Goal>> _rootSubgoals(GoalSelectionState selection) async {
+    final root = selection.activeRootGoal;
+    if (root == null) return const [];
+    return _deps.getChildren(root.id);
+  }
+
+  /// A validated signal the conductor still declines (§3.5 "drop the
+  /// signal, log"): the reason goes to the debug recorder.
+  void _dropSignal(GradedSignal sig, String reason) {
+    _deps.recordDebugEvent('conductor.signal_dropped', {
+      'subgoalId': sig.subgoalId,
+      'loId': sig.loId,
+      'reason': reason,
+    });
   }
 
   bool _difficultyAtLeast(QuestionDifficulty asked, QuestionDifficulty calib) {

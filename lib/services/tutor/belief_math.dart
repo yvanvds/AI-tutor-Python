@@ -100,6 +100,24 @@ double baseWeight(LoSignalStrength s) {
   provenance: provenance,
 );
 
+/// Incidental signal on an LO of an *earlier* subgoal (#108, CONDUCTOR_POLICY
+/// §2.4): the grader saw the answer reveal something about an LO outside the
+/// active subgoal — typically a gap in a prerequisite. It is ordinary
+/// evidence in the grader's own [strength], but the probe's difficulty was
+/// set for the target LO, not this one, so it is treated as `medium` — the
+/// same footing as a follow-up signal (§6.2) and a transfer credit (§3.7).
+/// Provenance applies as everywhere. Sign is whatever the grader said.
+({double alphaDelta, double betaDelta}) crossSubgoalSignalDeltas({
+  required LoSignalKind kind,
+  required LoSignalStrength strength,
+  EvidenceProvenance provenance = EvidenceProvenance.home,
+}) => signalDeltas(
+  kind: kind,
+  strength: strength,
+  difficulty: QuestionDifficulty.medium,
+  provenance: provenance,
+);
+
 /// Whether an LO has ever met all three mastery conditions — the gate for
 /// transfer credit (CONDUCTOR_POLICY §3.7): an LO never mastered by direct
 /// probing cannot be brought to mastery sideways.

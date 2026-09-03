@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 PersistedTurnRecord _record({
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
+  List<TurnAppliedSignal> appliedSignals = const [],
   bool isWarmUp = false,
 }) => PersistedTurnRecord(
   isWarmUp: isWarmUp,
@@ -24,7 +25,7 @@ PersistedTurnRecord _record({
   overallQuality: AnswerQuality.correct,
   loSignals: const [],
   hadFallback: false,
-  appliedSignals: const [],
+  appliedSignals: appliedSignals,
   calibrationBefore: QuestionDifficulty.medium,
   calibrationAfter: QuestionDifficulty.medium,
   subgoalProgressAfter: 0.0,
@@ -46,6 +47,36 @@ void main() {
       final map = _record(isWarmUp: true).toMap(uid: 'u1');
       expect(map['isWarmUp'], isTrue);
       expect(PersistedTurnRecord.fromCosmos(map).isWarmUp, isTrue);
+    });
+  });
+
+  group('PersistedTurnRecord appliedSignals (#108)', () {
+    test('each applied signal is written with the subgoal it landed on', () {
+      final map = _record(
+        appliedSignals: const [
+          TurnAppliedSignal(
+            subgoalId: 's1',
+            loId: 'lo1',
+            alphaDelta: 2.0,
+            betaDelta: 0.0,
+          ),
+          TurnAppliedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            alphaDelta: 0.0,
+            betaDelta: 1.0,
+          ),
+        ],
+      ).toMap(uid: 'u1');
+      expect(map['appliedSignals'], [
+        {'subgoalId': 's1', 'loId': 'lo1', 'alphaDelta': 2.0, 'betaDelta': 0.0},
+        {
+          'subgoalId': 's0',
+          'loId': 'lo-print',
+          'alphaDelta': 0.0,
+          'betaDelta': 1.0,
+        },
+      ]);
     });
   });
 

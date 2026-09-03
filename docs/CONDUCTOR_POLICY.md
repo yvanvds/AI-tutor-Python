@@ -274,8 +274,9 @@ at a difficulty chosen for it, so a positive at `hard` certifies the LO
 at `hard`. The 2.3 counter and `lastQuestionType` update as usual. A
 negative debits the old belief honestly — a forgotten LO should read as
 forgotten. Incidental signals the grader emits on the *active* subgoal's
-LOs are consumed normally (2.4); signals on any third subgoal are
-dropped as always.
+LOs are consumed normally (2.4); a signal on any other LO of the root —
+another LO of the warm-up subgoal included — is a cross-subgoal
+incidental under 2.4's rules (#108).
 
 **What a warm-up does not do.**
 
@@ -507,6 +508,40 @@ what the answer revealed. Those are consumed as ordinary evidence.
 A `writeCode` question targeting `for_loop_structure` may reveal the
 student handles `indentation_defines_block`; that signal lands in the
 indentation LO's belief.
+
+**Cross-subgoal incidental signals count too (#108).** The contract's
+scope for `loSignals` is the whole root goal, and the grading
+instructions ask for a signal on an *earlier* subgoal's LO when a
+mistake points to a gap there (a `print()` slip inside a loop exercise).
+Such a signal lands on that LO's own belief doc — created at the prior
+if the student was never probed on it (3.5) — with these differences
+from an in-subgoal incidental, all following from "the probe was not
+of this LO":
+
+- **Weight:** the grader's `strength`, treated as `medium` difficulty
+  (multiplier 1.0), times provenance (3.2). The question's difficulty
+  was set for the target LO, not this one — the same reasoning that
+  keeps a transfer credit (3.7) and a follow-up signal (6.2) at
+  `medium`. Sign is whatever the grader said; a positive is possible
+  (an MCQ that shows a prerequisite is solid) but on a code answer the
+  instructions route "correctly used" to `transferLOs`, so in practice
+  the path carries negatives.
+- **Nothing certified:** neither ratchet (`lastPositiveAtCalibratedAt`,
+  `highestPositiveDifficulty`, 4.3) moves, the notch-drop counter (2.3)
+  and `lastQuestionType` are left alone. Mastery condition 3 therefore
+  still needs a direct probe: an LO cannot be brought to mastery
+  sideways, only confirmed or contradicted in `(α, β)`.
+- **No re-enrolment:** the other subgoal's cached `progress` is not
+  recomputed, as for 1.5 and 3.7. The honest belief is on `lo_beliefs`,
+  where the grade formula and the warm-up selection read it.
+- **Once per LO per answer:** a `transferLOs` nomination on an LO that
+  already took a signal this turn is dropped (3.7).
+- **Forward references are dropped and logged**, per the contract's
+  scope check: only the active subgoal and subgoals *before* it in the
+  root can receive a signal.
+
+The turn record lists every applied signal with its `subgoalId` (8.1),
+so an entry on another subgoal is visible in the audit trail.
 
 **Deliberate multi-LO targeting is structurally allowed but not yet
 triggered by any rule.** The `targetLOs` field is a list; nothing
@@ -804,10 +839,13 @@ A nominated LO earns credit only when **all** of these hold:
 
 1. **The answer is `correct`.** A working solution is unambiguous
    evidence that the constructs in it still work. A `partial` or `wrong`
-   answer gives *nothing* to older LOs — not negative evidence (blame
-   assignment across old LOs is unsolvable, so nobody outside the target
-   gets blamed) and not positive evidence either. The evidence really is
-   asymmetric.
+   answer gives *nothing* to older LOs through this path — not negative
+   evidence (a nomination is never a blame assignment; spreading a
+   failure across every old LO the code touched is unsolvable) and not
+   positive evidence either. The evidence really is asymmetric. A gap
+   the grader can actually *name* is a different thing: that is a
+   `negative` in `loSignals` on the earlier LO, consumed under 2.4's
+   cross-subgoal rule (#108).
 2. **The turn is a primary probe, not a follow-up (6.2), and not a
    fallback turn (7.2).** Dialogue is not a solution, and a response
    whose primary signals failed validation is not trusted for extras.
@@ -854,7 +892,9 @@ are the review question's business. `firstMasteredAt` is the "once
 mastered" signal both mechanisms share, and a credit's `lastUpdatedAt`
 bump is what keeps a recurring LO out of the review pool. On a warm-up
 turn a nomination on the warm-up target itself is dropped — it already
-took a direct signal; other nominations follow the rules above.
+took a direct signal; likewise a nomination on an LO that took a
+cross-subgoal incidental signal this turn (2.4, #108). Other nominations
+follow the rules above.
 
 ### 3.8 What this section deliberately does not address
 
@@ -1745,7 +1785,7 @@ TurnRecord {
   overallQuality: string            // wrong | partial | correct
   loSignals: [{subgoalId, loId, signal, strength}]
   hadFallback: bool                 // grader response was unparseable
-  appliedSignals: [{loId, alphaDelta, betaDelta}]   // post-modulation
+  appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals)
   provenance: string                // home | supervised (3.2, #100); absent on older docs = home
   transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
 
