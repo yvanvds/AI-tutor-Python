@@ -193,6 +193,8 @@ void main() {
     expect(print['highestPositiveDifficulty'], 'medium');
     expect(print['lastPositiveAtCalibratedAt'], weeksAgo.toIso8601String());
     expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
+    // A credit is good news: it never flags the LO for review (#112).
+    expect(print.containsKey('regressedAt'), isFalse);
 
     // The target LO got its own ordinary signal.
     final variables =

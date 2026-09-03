@@ -567,18 +567,25 @@ class Conductor {
     );
   }
 
-  /// Warm-up review selection (CONDUCTOR_POLICY §1.5, #102).
+  /// Warm-up review selection (CONDUCTOR_POLICY §1.5, #102, #112).
   ///
   /// Candidates are the LOs of the active root's *other* subgoals whose
   /// belief doc (a) was ever mastered by direct probing (`everMastered`)
-  /// and (b) has not been written for `warmUpStaleAfter`. (b) is also what
-  /// keeps naturally recurring LOs out: a transfer credit (§3.7) bumps
-  /// `lastUpdatedAt`, so an LO that later work keeps using is never stale.
-  /// The most stale candidate wins; ties go to the lowest decayed mean.
+  /// and (b) is due: either not written for `warmUpStaleAfter`, or flagged
+  /// `regressedAt` — an incidental cross-subgoal negative (§2.4) left it
+  /// below mastery. Staleness is what keeps naturally recurring LOs out: a
+  /// transfer credit (§3.7) bumps `lastUpdatedAt`, so an LO that later
+  /// work keeps using is never stale. The regression flag is why that
+  /// bump cannot hide bad news: the negative is a write too, and without
+  /// the flag it would make the LO *fresh* for another 30 days (#112).
+  ///
+  /// Regressed candidates come first (oldest flag wins), then stale ones
+  /// (most stale wins); ties go to the lowest decayed mean.
   ///
   /// The question is the gentlest acceptable type for the LO's kind, at the
   /// student's calibrated difficulty — a direct probe of that LO, so its
-  /// answer is graded like any other (§3), ratchets included (§4.3).
+  /// answer is graded like any other (§3), ratchets included (§4.3), and
+  /// the flag is cleared by that write.
   Future<QuestionPlan?> _planWarmUp({
     required GoalSelectionState selection,
     required Goal active,
@@ -595,16 +602,22 @@ class Conductor {
 
     final candidates =
         <
-          ({Goal subgoal, LearningObjective lo, LoBelief belief, double mean})
+          ({
+            Goal subgoal,
+            LearningObjective lo,
+            LoBelief belief,
+            double mean,
+            bool regressed,
+          })
         >[];
     for (final sub in others) {
       for (final lo in sub.objectives) {
         final b = byKey['${sub.id}/${lo.id}'];
         if (b == null) continue;
-        if (now.difference(b.lastUpdatedAt) <
-            PolicyConstants.warmUpStaleAfter) {
-          continue;
-        }
+        final regressed = b.regressedAt != null;
+        final stale =
+            now.difference(b.lastUpdatedAt) >= PolicyConstants.warmUpStaleAfter;
+        if (!regressed && !stale) continue;
         final mastered = everMastered(
           firstMasteredAt: b.firstMasteredAt,
           alpha: b.alpha,
@@ -618,13 +631,22 @@ class Conductor {
           lastUpdatedAt: b.lastUpdatedAt,
           now: now,
         );
-        candidates.add((subgoal: sub, lo: lo, belief: b, mean: snap.mean));
+        candidates.add((
+          subgoal: sub,
+          lo: lo,
+          belief: b,
+          mean: snap.mean,
+          regressed: regressed,
+        ));
       }
     }
     if (candidates.isEmpty) return null;
 
     candidates.sort((a, b) {
-      final byAge = a.belief.lastUpdatedAt.compareTo(b.belief.lastUpdatedAt);
+      if (a.regressed != b.regressed) return a.regressed ? -1 : 1;
+      final byAge = a.regressed
+          ? a.belief.regressedAt!.compareTo(b.belief.regressedAt!)
+          : a.belief.lastUpdatedAt.compareTo(b.belief.lastUpdatedAt);
       if (byAge != 0) return byAge;
       return a.mean.compareTo(b.mean);
     });
@@ -640,6 +662,9 @@ class Conductor {
       'subgoalId': pick.subgoal.id,
       'loId': pick.lo.id,
       'staleDays': now.difference(pick.belief.lastUpdatedAt).inDays,
+      'regressed': pick.regressed,
+      if (pick.regressed)
+        'regressedDays': now.difference(pick.belief.regressedAt!).inDays,
       'candidates': candidates.length,
     });
 
@@ -664,7 +689,9 @@ class Conductor {
               ),
             )
             .toList(growable: false),
-        chosenReason: 'warm-up review: most stale mastered LO',
+        chosenReason: pick.regressed
+            ? 'warm-up review: regressed mastered LO'
+            : 'warm-up review: most stale mastered LO',
         notchDropFired: false,
       ),
     );
@@ -1035,6 +1062,20 @@ class Conductor {
         }
       }
 
+      // #112 warm-up regression flag (§1.5): an incidental negative that
+      // leaves a once-mastered LO below mastery makes it due for review
+      // despite the `lastUpdatedAt` bump this write is about to make. A
+      // direct probe of the LO — this turn's target, in-subgoal
+      // incidentals, follow-ups — clears it.
+      final nextRegressed = nextRegressedAt(
+        current: existing?.regressedAt,
+        directProbe: !isCrossSubgoal,
+        everMastered: nextFirstMasteredAt != null,
+        negative: hasNegative,
+        stored: next,
+        now: now,
+      );
+
       final updated = LoBelief(
         subgoalId: signalSubgoalId,
         loId: sig.loId,
@@ -1048,6 +1089,7 @@ class Conductor {
         highestPositiveDifficulty: nextHighestPositiveDifficulty,
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
         firstMasteredAt: nextFirstMasteredAt,
+        regressedAt: nextRegressed,
       );
       await _deps.upsertLoBelief(updated);
       appliedSignals.add(
@@ -1321,8 +1363,12 @@ class Conductor {
   /// the "decay clock reset". Nothing else on the doc moves: neither
   /// ratchet (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` —
   /// the difficulty was set for the target LO, not this one), not the
-  /// notch-drop counter, not `lastQuestionType`. The other subgoal's cached
-  /// progress is not recomputed: positive-only credit cannot lower it.
+  /// notch-drop counter, not `lastQuestionType`. The one exception is the
+  /// warm-up regression flag (#112, §1.5): a credit that brings the stored
+  /// belief back to mastery clears `regressedAt` — good news restored the
+  /// LO — while one that does not leaves the flag as it was. The other
+  /// subgoal's cached progress is not recomputed: positive-only credit
+  /// cannot lower it.
   ///
   /// [excluded] maps `subgoalId/loId` of LOs this turn already wrote
   /// outside the active subgoal (the warm-up target, cross-subgoal
@@ -1397,6 +1443,14 @@ class Conductor {
         alphaDelta: deltas.alphaDelta,
         betaDelta: deltas.betaDelta,
       );
+      final nextRegressed = nextRegressedAt(
+        current: existing.regressedAt,
+        directProbe: false,
+        everMastered: true,
+        negative: false,
+        stored: next,
+        now: now,
+      );
       await _deps.upsertLoBelief(
         existing.copyWith(
           alpha: next.alpha,
@@ -1406,6 +1460,8 @@ class Conductor {
           // stamp that so the verdict survives the decayed values we are
           // about to persist.
           firstMasteredAt: existing.firstMasteredAt ?? existing.lastUpdatedAt,
+          regressedAt: nextRegressed,
+          clearRegressedAt: nextRegressed == null,
         ),
       );
       credits.add(

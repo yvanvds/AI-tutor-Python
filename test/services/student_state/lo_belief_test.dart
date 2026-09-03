@@ -190,4 +190,46 @@ void main() {
       expect(b.copyWith(firstMasteredAt: later).firstMasteredAt, later);
     });
   });
+
+  group('LoBelief.regressedAt (#112)', () {
+    final flag = DateTime.utc(2026, 9, 3, 11, 15);
+
+    LoBelief belief({DateTime? regressedAt}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 5,
+      beta: 2,
+      lastUpdatedAt: DateTime.utc(2026, 9, 3),
+      firstMasteredAt: DateTime.utc(2026, 6, 15),
+      regressedAt: regressedAt,
+    );
+
+    test('is written as ISO 8601 and read back', () {
+      final map = belief(regressedAt: flag).toMap(uid: 'u');
+      expect(map['regressedAt'], flag.toIso8601String());
+      expect(LoBelief.fromCosmos(map).regressedAt, flag);
+    });
+
+    test('is omitted from the doc while the LO is not regressed, and a '
+        'doc written before the field existed reads as not regressed', () {
+      expect(belief().toMap(uid: 'u').containsKey('regressedAt'), isFalse);
+      expect(LoBelief.fromCosmos(_doc()).regressedAt, isNull);
+    });
+
+    test('a malformed value reads as absent', () {
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'regressedAt': 42}).regressedAt,
+        isNull,
+      );
+    });
+
+    test('copyWith keeps the flag, sets it, or clears it explicitly', () {
+      final b = belief(regressedAt: flag);
+      expect(b.copyWith(alpha: 4).regressedAt, flag);
+      final later = DateTime.utc(2026, 9, 4);
+      expect(b.copyWith(regressedAt: later).regressedAt, later);
+      expect(b.copyWith(clearRegressedAt: true).regressedAt, isNull);
+      expect(belief().copyWith(alpha: 4).regressedAt, isNull);
+    });
+  });
 }

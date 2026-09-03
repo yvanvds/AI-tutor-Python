@@ -5,8 +5,11 @@
 // `s1/lo-print` (the contract's cross-subgoal `loSignals`), and the app
 // debits the old belief doc — decayed β plus the signal's weight as medium,
 // its clock reset, nothing else on it moved — and names both signals with
-// their subgoal on the `turn_history` doc. An LO never probed before gets a
-// fresh doc at the prior plus the signal.
+// their subgoal on the `turn_history` doc. Because the debit leaves the
+// once-mastered LO below mastery, the doc is flagged `regressedAt` (#112)
+// so the next session's warm-up review (#102) can pick it despite the
+// clock reset. An LO never probed before gets a fresh doc at the prior
+// plus the signal, and no flag: it never regressed from anything.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → belief math → Cosmos
@@ -203,6 +206,10 @@ void main() {
     expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
     expect(print['recentNegativesAtCalibrated'], 0);
     expect(print['lastQuestionType'], 'completeCodeQuestion');
+    // (decayed 5, 2): mean ≈ 0.71, below mastery — the regression is
+    // flagged with this write's timestamp, so the warm-up review can pick
+    // the LO next session even though its clock was just reset (#112).
+    expect(print['regressedAt'], print['lastUpdatedAt']);
     // "Print" stays done: the belief is where the regression shows.
     expect(
       harness.cosmos['progress'].docs['${kStudentUid}_s1']!['progress'],
@@ -235,6 +242,8 @@ void main() {
     expect(print.containsKey('highestPositiveDifficulty'), isFalse);
     expect(print.containsKey('firstMasteredAt'), isFalse);
     expect(print.containsKey('lastQuestionType'), isFalse);
+    // Never mastered, so nothing to regress from: no review flag (#112).
+    expect(print.containsKey('regressedAt'), isFalse);
 
     await harness.dispose(tester);
   });

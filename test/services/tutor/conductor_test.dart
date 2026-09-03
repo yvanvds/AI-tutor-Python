@@ -2381,4 +2381,332 @@ void main() {
       expect(f.progressById.containsKey('s1'), isFalse);
     });
   });
+
+  // ---- #112 regressed LOs are due for review regardless of staleness -----
+  group('#112 a regressed LO is due for warm-up regardless of staleness '
+      '(§1.5)', () {
+    const printLo = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    const inputLo = LearningObjective(
+      id: 'lo-input',
+      statement: 'input',
+      kind: LoKind.recall,
+    );
+    const varLo = LearningObjective(
+      id: 'lo-var',
+      statement: 'variables',
+      kind: LoKind.apply,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 'Print',
+      parentId: 'r',
+      order: 0,
+      objectives: const [printLo, inputLo],
+    );
+    final active = Goal(
+      id: 's1',
+      title: 'Variables',
+      parentId: 'r',
+      order: 1000,
+      objectives: const [varLo],
+    );
+    final now = DateTime.now().toUtc();
+    final aMinuteAgo = now.subtract(const Duration(minutes: 1));
+    final stale = now.subtract(
+      PolicyConstants.warmUpStaleAfter + const Duration(days: 15),
+    );
+    final stamp = DateTime.utc(2026, 4, 1, 12);
+
+    /// A once-mastered belief on an LO of "Print", written a minute ago
+    /// (fresh: nowhere near stale) unless [lastUpdatedAt] says otherwise.
+    LoBelief older(
+      String loId, {
+      double alpha = 5,
+      double beta = 1,
+      DateTime? lastUpdatedAt,
+      DateTime? regressedAt,
+    }) => LoBelief(
+      subgoalId: 's0',
+      loId: loId,
+      alpha: alpha,
+      beta: beta,
+      lastUpdatedAt: lastUpdatedAt ?? aMinuteAgo,
+      lastQuestionType: 'completeCodeQuestion',
+      lastPositiveAtCalibratedAt: stamp,
+      highestPositiveDifficulty: QuestionDifficulty.medium,
+      firstMasteredAt: stamp,
+      regressedAt: regressedAt,
+    );
+
+    /// "Print" is done and the student is on "Variables" (or, with
+    /// [onPrint], still on "Print" — for the in-subgoal probe case).
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LoBelief> beliefs, {
+      bool onPrint = false,
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [earlier, active];
+      if (!onPrint) {
+        f.progressById['s0'] = Progress(goalID: 's0', progress: 1.0);
+      }
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: onPrint ? earlier : active,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    LoBelief stored(_Fakes f, String loId) => f.beliefs[f._key('s0', loId)]!;
+
+    /// A medium probe of [target] in the active subgoal, graded with the
+    /// target's own signal plus [extra].
+    Future<TurnOutcome> grade(
+      Conductor c, {
+      LearningObjective target = varLo,
+      String targetSubgoalId = 's1',
+      AnswerQuality quality = AnswerQuality.wrong,
+      List<GradedSignal> extra = const [],
+      List<GradedTransfer> transferLOs = const [],
+    }) async {
+      final plan = QuestionPlan(
+        type: ChatRequestType.writeCodeQuestion,
+        difficulty: QuestionDifficulty.medium,
+        targetLOs: [target],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      return c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: targetSubgoalId,
+              loId: target.id,
+              kind: quality == AnswerQuality.correct
+                  ? LoSignalKind.positive
+                  : LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+            ...extra,
+          ],
+          transferLOs: transferLOs,
+        ),
+      );
+    }
+
+    GradedSignal onPrint(LoSignalKind kind, LoSignalStrength strength) =>
+        GradedSignal(
+          subgoalId: 's0',
+          loId: 'lo-print',
+          kind: kind,
+          strength: strength,
+        );
+
+    test(
+      'a cross-subgoal negative that drops a fresh, once-mastered LO below '
+      'mastery flags it, and the next session opens with its review',
+      () async {
+        final s = await setup([older('lo-print')]);
+        // Fresh: no review due on staleness.
+        expect((await s.c.planNext()).isWarmUp, isFalse);
+
+        await grade(
+          s.c,
+          extra: [onPrint(LoSignalKind.negative, LoSignalStrength.moderate)],
+        );
+        final after = stored(s.f, 'lo-print');
+        // (5, 2): mean 0.71 — flagged at the moment of the write.
+        expect(after.beta, closeTo(2.0, 1e-3));
+        expect(after.regressedAt, isNotNull);
+        expect(after.regressedAt, after.lastUpdatedAt);
+
+        // The write made the LO fresh, yet the next session reviews it.
+        await s.c.setTarget();
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isTrue);
+        expect(plan.warmUp!.subgoal.id, 's0');
+        expect(plan.targetLOs.single.id, 'lo-print');
+        expect(plan.reason.chosenReason, contains('regressed'));
+      },
+    );
+
+    test('a negative that leaves the LO at mastery does not flag it', () async {
+      final s = await setup([older('lo-print', alpha: 10)]);
+      await grade(
+        s.c,
+        extra: [onPrint(LoSignalKind.negative, LoSignalStrength.weak)],
+      );
+      // (10, 1.5): mean 0.87 — the grade formula sees the dip, no review.
+      expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+    });
+
+    test('an LO never mastered cannot regress: no flag, no review', () async {
+      final s = await setup([
+        LoBelief(
+          subgoalId: 's0',
+          loId: 'lo-print',
+          alpha: 1.6,
+          beta: 1,
+          lastUpdatedAt: aMinuteAgo,
+        ),
+      ]);
+      await grade(
+        s.c,
+        extra: [onPrint(LoSignalKind.negative, LoSignalStrength.strong)],
+      );
+      expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+    });
+
+    test('a transfer credit never flags a recurring LO, and clears the flag '
+        'only when it brings the belief back to mastery', () async {
+      // Healthy and recurring: credited, not flagged, not reviewed.
+      final healthy = await setup([older('lo-print')]);
+      await grade(
+        healthy.c,
+        quality: AnswerQuality.correct,
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      expect(stored(healthy.f, 'lo-print').regressedAt, isNull);
+      await healthy.c.setTarget();
+      expect((await healthy.c.planNext()).isWarmUp, isFalse);
+
+      // Regressed, and the credit does not restore it: still due.
+      final flagged = await setup([
+        older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+      ]);
+      await grade(
+        flagged.c,
+        quality: AnswerQuality.correct,
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      // (5.5, 2): mean 0.73.
+      expect(stored(flagged.f, 'lo-print').regressedAt, aMinuteAgo);
+      await flagged.c.setTarget();
+      expect((await flagged.c.planNext()).isWarmUp, isTrue);
+
+      // Regressed just under the line: the credit restores mastery and
+      // clears the flag.
+      final restored = await setup([
+        older('lo-print', alpha: 4.5, beta: 1.2, regressedAt: aMinuteAgo),
+      ]);
+      await grade(
+        restored.c,
+        quality: AnswerQuality.correct,
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      // (5.0, 1.2): mean 0.806.
+      expect(stored(restored.f, 'lo-print').regressedAt, isNull);
+      await restored.c.setTarget();
+      expect((await restored.c.planNext()).isWarmUp, isFalse);
+    });
+
+    test(
+      'a positive incidental that restores mastery clears the flag',
+      () async {
+        final s = await setup([
+          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+        ]);
+        await grade(
+          s.c,
+          quality: AnswerQuality.correct,
+          extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
+        );
+        // (7, 2): mean 0.78 — not yet.
+        expect(stored(s.f, 'lo-print').regressedAt, aMinuteAgo);
+        await grade(
+          s.c,
+          quality: AnswerQuality.correct,
+          extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
+        );
+        // (9, 2): mean 0.82 — restored.
+        expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      },
+    );
+
+    test(
+      'the review clears the flag whichever way it went, and a failed '
+      'review does not re-flag: the LO is back on the staleness clock',
+      () async {
+        final s = await setup([
+          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+        ]);
+        final plan = await s.c.planNext();
+        expect(plan.isWarmUp, isTrue);
+        expect(plan.targetLOs.single.id, 'lo-print');
+        s.c.notePlannedQuestion(plan);
+        await s.c.integrateAnswer(
+          plan: plan,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.wrong,
+            signals: [onPrint(LoSignalKind.negative, LoSignalStrength.strong)],
+          ),
+        );
+        final after = stored(s.f, 'lo-print');
+        expect(after.beta, greaterThan(2.0));
+        expect(after.regressedAt, isNull);
+        // Fresh and unflagged: no review next session.
+        await s.c.setTarget();
+        expect((await s.c.planNext()).isWarmUp, isFalse);
+      },
+    );
+
+    test(
+      'a probe while the LO\'s own subgoal is active clears the flag',
+      () async {
+        final s = await setup([
+          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+        ], onPrint: true);
+        await grade(
+          s.c,
+          target: printLo,
+          targetSubgoalId: 's0',
+          quality: AnswerQuality.correct,
+        );
+        expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      },
+    );
+
+    test('a regressed LO wins over a more stale one; among regressed LOs '
+        'the oldest flag wins', () async {
+      final s = await setup([
+        older('lo-print', lastUpdatedAt: stale),
+        older('lo-input', beta: 2, regressedAt: aMinuteAgo),
+      ]);
+      final plan = await s.c.planNext();
+      expect(plan.isWarmUp, isTrue);
+      expect(plan.targetLOs.single.id, 'lo-input');
+      expect(plan.reason.chosenReason, contains('regressed'));
+      expect(plan.reason.candidateLOs, hasLength(2));
+
+      final twoDaysAgo = now.subtract(const Duration(days: 2));
+      final both = await setup([
+        older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+        older('lo-input', beta: 2, regressedAt: twoDaysAgo),
+      ]);
+      expect((await both.c.planNext()).targetLOs.single.id, 'lo-input');
+    });
+  });
 }

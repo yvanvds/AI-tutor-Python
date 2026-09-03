@@ -5,7 +5,10 @@
 // on the old belief doc like any direct probe — decayed α plus the full
 // weight, decay clock reset, ratchets moved — with the turn recorded against
 // the old subgoal. The next exercise is the ordinary first probe of
-// "Variables". A student whose old LO was written recently gets no warm-up.
+// "Variables". A student whose old LO was written recently gets no warm-up
+// — unless that recent write was a cross-subgoal negative that flagged the
+// LO as regressed (#112): then the review comes despite the fresh clock,
+// and answering it clears the flag.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → instruction generator → grader payload → conductor → belief
@@ -72,20 +75,27 @@ Map<String, dynamic> printDone() => {
 };
 
 /// The belief on `lo-print` as it was last written at [lastUpdatedAt].
-Map<String, dynamic> printBelief({required DateTime lastUpdatedAt}) => {
+/// [regressedAt] is the #112 review flag a cross-subgoal negative leaves.
+Map<String, dynamic> printBelief({
+  required DateTime lastUpdatedAt,
+  double alpha = 5.0,
+  double beta = 1.0,
+  DateTime? regressedAt,
+}) => {
   'id': '${kStudentUid}_s1_lo-print',
   'type': 'lo_belief',
   'uid': kStudentUid,
   'subgoalId': 's1',
   'loId': 'lo-print',
-  'alpha': 5.0,
-  'beta': 1.0,
+  'alpha': alpha,
+  'beta': beta,
   'lastUpdatedAt': lastUpdatedAt.toIso8601String(),
   'lastQuestionType': 'writeCodeQuestion',
   'lastPositiveAtCalibratedAt': lastUpdatedAt.toIso8601String(),
   'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
   'firstMasteredAt': lastUpdatedAt.toIso8601String(),
+  if (regressedAt != null) 'regressedAt': regressedAt.toIso8601String(),
 };
 
 void main() {
@@ -226,6 +236,78 @@ void main() {
       reason: 'a warm-up was announced for a fresh LO',
     );
     expect(storedPrint(harness)['lastUpdatedAt'], recently.toIso8601String());
+    expect(harness.llm!.remaining, 0);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('an old LO written recently but flagged as regressed gets '
+      'the review anyway; answering it clears the flag', (tester) async {
+    // Five days ago a loop exercise revealed a print() slip: the
+    // cross-subgoal negative left (5, 2) — mean 0.71, below mastery — and
+    // flagged the doc. On staleness alone the LO would wait another 25
+    // days.
+    final recently = DateTime.now().toUtc().subtract(const Duration(days: 5));
+    final harness = AppHarness(
+      llm: ScriptedLlm(warmUpScript()),
+      extraDocs: {
+        'progress': [printDone()],
+        'lo_beliefs': [
+          printBelief(
+            lastUpdatedAt: recently,
+            alpha: 5.0,
+            beta: 2.0,
+            regressedAt: recently,
+          ),
+        ],
+      },
+    );
+    await openPractice(tester, harness, firstExercise: kWarmUpExercise);
+
+    expect(
+      pills(tester),
+      contains(contains('one review question on Print')),
+      reason: 'no pill announced the warm-up on the regressed LO',
+    );
+
+    await tester.tap(find.byTooltip('Send to tutor'));
+    await pumpUntil(
+      tester,
+      () => harness.cosmos['turn_history'].docs.isNotEmpty,
+      timeout: const Duration(seconds: 30),
+      reason: 'no turn was recorded after the code was sent',
+    );
+    await pumpUntil(
+      tester,
+      () => editorText(tester) == kVariablesExercise,
+      timeout: const Duration(seconds: 30),
+      reason: "the active subgoal's exercise never reached the editor",
+    );
+
+    final turn = harness.cosmos['turn_history'].docs.values.single;
+    expect(turn['isWarmUp'], isTrue);
+    expect(turn['targetLOIds'], ['lo-print']);
+    expect(
+      (turn['selectionReason'] as Map)['chosenReason'],
+      contains('regressed'),
+    );
+
+    // The review is a direct probe: it clears the flag and puts the LO
+    // back on the ordinary staleness clock, with the grade applied.
+    final print = storedPrint(harness);
+    expect(print.containsKey('regressedAt'), isFalse);
+    final writtenAt = DateTime.parse(print['lastUpdatedAt'] as String);
+    expect(
+      DateTime.now().toUtc().difference(writtenAt),
+      lessThan(const Duration(minutes: 1)),
+    );
+    final decayed = applyDecay(
+      alpha: 5,
+      beta: 2,
+      lastUpdatedAt: recently,
+      now: writtenAt,
+    );
+    expect(print['alpha'], closeTo(decayed.alpha + 2.0, 1e-9));
     expect(harness.llm!.remaining, 0);
 
     await harness.dispose(tester);

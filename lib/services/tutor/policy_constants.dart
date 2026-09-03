@@ -104,7 +104,8 @@ class PolicyConstants {
   /// `(3.8, 1)` — mean 0.79, just under the mastery threshold — so the
   /// review lands right where decay starts to read as "forgotten". Any
   /// write resets the clock, including a transfer credit (§3.7), which is
-  /// how LOs that recur in later work stay out of the warm-up pool.
+  /// how LOs that recur in later work stay out of the warm-up pool. An LO
+  /// flagged `regressedAt` (#112) is due regardless of this clock.
   static const Duration warmUpStaleAfter = Duration(days: 30);
 
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------

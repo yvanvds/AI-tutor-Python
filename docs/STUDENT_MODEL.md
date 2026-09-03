@@ -215,6 +215,18 @@ StudentLOBelief {
                                         // "mastered at the last write" when
                                         // the stored α, β and ratchet meet
                                         // the mastery rule, else absent.
+  regressedAt: string?                  // ISO 8601, set when an incidental
+                                        // cross-subgoal negative (conductor
+                                        // policy 2.4, #108) leaves a
+                                        // once-mastered LO below the mastery
+                                        // rule (#112). While set, the LO is
+                                        // due for a warm-up review (1.5)
+                                        // regardless of lastUpdatedAt.
+                                        // Cleared by the next direct probe
+                                        // of the LO, or by an indirect
+                                        // write that restores mastery.
+                                        // Missing on older docs: not
+                                        // regressed.
 }
 ```
 
@@ -414,6 +426,17 @@ would let a reset re-take `M_start` at zero.
   staleness clock for the warm-up review: an LO not written for
   `warmUpStaleAfter` is due. None of these mechanisms recomputes the
   other subgoal's cached `progress`.
+- **`regressedAt` is the warm-up review's "due now" marker** (#112).
+  Because an incidental negative is itself a write, the staleness clock
+  alone would make a freshly revealed regression *fresh* and defer its
+  review by `warmUpStaleAfter`. The conductor therefore stamps
+  `regressedAt` when such a negative leaves a once-mastered LO below the
+  mastery rule, and the review selection (conductor policy 1.5) treats a
+  flagged LO as due regardless of `lastUpdatedAt`. The flag is not a
+  ratchet: the next direct probe of the LO clears it whichever way the
+  answer went, and so does an indirect write (transfer credit, positive
+  incidental) that brings the stored belief back to mastery. Older docs
+  without the field simply follow the staleness clock.
 
 ## What this model deliberately does not do
 

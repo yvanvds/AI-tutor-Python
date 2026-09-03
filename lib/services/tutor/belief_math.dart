@@ -139,6 +139,39 @@ bool everMastered({
       meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
 }
 
+/// The warm-up "regressed" marker after a belief write (#112,
+/// CONDUCTOR_POLICY §1.5): the value of `regressedAt` to persist, given
+/// [current] and what this write was.
+///
+/// A [directProbe] of the LO (a warm-up review, or any probe while its
+/// subgoal is active — follow-up grading included) always clears it: the
+/// review has happened and the ordinary staleness clock takes over. For an
+/// indirect write — a cross-subgoal incidental (§2.4) or a transfer credit
+/// (§3.7) — the marker follows the *stored* belief the write leaves
+/// behind, [stored] (post-decay, post-evidence: what the grade formula
+/// reads until the next write):
+///
+///   - back at mastery mean and evidence → cleared (good news restored it);
+///   - below, and the write was a [negative] → set (kept if already set,
+///     so the oldest regression is reviewed first);
+///   - below, and the write was not a negative → unchanged (a transfer
+///     credit that fails to restore mastery neither flags nor clears).
+///
+/// Only an LO that [everMastered] can regress; anything else reads `null`.
+DateTime? nextRegressedAt({
+  required DateTime? current,
+  required bool directProbe,
+  required bool everMastered,
+  required bool negative,
+  required BeliefSnapshot stored,
+  required DateTime now,
+}) {
+  if (directProbe || !everMastered) return null;
+  if (meetsMasteryMeanAndEvidence(stored)) return null;
+  if (negative) return current ?? now;
+  return current;
+}
+
 /// Apply an evidence delta with the cap-then-add rule (CONDUCTOR_POLICY 3.4).
 /// When the resulting `α + β` would exceed `PolicyConstants.evidenceCap`,
 /// existing evidence-above-prior is shrunk proportionally to make room.
