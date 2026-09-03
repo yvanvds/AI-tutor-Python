@@ -1876,6 +1876,23 @@ finer-grained data the LO model provides.
 - Per-subgoal AI status reports.
 - 30-day progress-history line chart (uses `progress_history`).
 
+#### Grade proposal (#99, PUNTENFORMULE part 2)
+
+The last section of the detail drawer. The teacher picks a milestone
+(`milestones` container, edited on the teacher-only Milestones page:
+subgoals, the Angoff core/extension split per LO, the expected
+difficulty, the period), computes the proposal, asks for the AI-written
+justification, adjusts, signs off. The number is
+`lib/services/grading/grade_formula.dart` over the student's `lo_beliefs`
+read post-decay (§4.1 mastery + the `highestPositiveDifficulty` ratchet of
+§4.3) and `progress_history` for the period-start baseline; the
+justification is a separate, non-streaming model call with its own
+connector, fed the status reports whose `updatedAt` falls in the period
+and the per-subgoal trajectory — the number goes in as a fixed fact. The
+result lives in `grade_proposals` (`/uid`, id `${uid}_${milestoneId}`) and
+is frozen once signed. The conductor is not involved and reads none of
+this; the student shell never routes to the page or the drawer.
+
 #### Deferred to post-v1
 
 - **Calibration timeline.** Line chart of student's calibration

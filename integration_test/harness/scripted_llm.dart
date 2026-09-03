@@ -22,6 +22,11 @@ class ScriptedLlm extends OpenaiConnector {
   int sends = 0;
   int resends = 0;
 
+  /// The user-turn payload of every non-streaming request, in order — a
+  /// flow asserts on what the app *told* the model (#99: the grade
+  /// justification prompt carries the computed number as a fixed fact).
+  final List<String> sentInputs = <String>[];
+
   /// What is left unplayed — a flow asserts this is empty when it expected
   /// every scripted reply to be consumed.
   int get remaining => _replies.length;
@@ -69,6 +74,7 @@ class ScriptedLlm extends OpenaiConnector {
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) async {
     sends++;
+    sentInputs.add(input);
     return _reply();
   }
 

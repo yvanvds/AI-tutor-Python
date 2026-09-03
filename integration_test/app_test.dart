@@ -24,6 +24,7 @@ import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
+import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
@@ -71,6 +72,7 @@ void main() {
   students_sort.main();
   students_sort_persist.main();
   students_view_prefs_persist.main();
+  grade_proposal.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

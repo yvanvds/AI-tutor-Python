@@ -49,7 +49,216 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_students => 'Studenten';
 
   @override
+  String get sidebar_section_milestones => 'Mijlpalen';
+
+  @override
   String get sidebar_section_options => 'Opties';
+
+  @override
+  String get milestones_page_title => 'Mijlpalen';
+
+  @override
+  String get milestones_page_subtitle =>
+      'Welke doelen tegen welk rapportmoment gekend horen te zijn, en welke daarvan de 50 openen.';
+
+  @override
+  String get milestones_list_empty => 'Nog geen mijlpalen.';
+
+  @override
+  String get milestones_button_new => 'Nieuwe mijlpaal';
+
+  @override
+  String get milestones_button_save => 'Opslaan';
+
+  @override
+  String get milestones_button_delete => 'Verwijderen';
+
+  @override
+  String get milestones_placeholder =>
+      'Kies links een mijlpaal, of maak een nieuwe.';
+
+  @override
+  String get milestones_field_title => 'Titel';
+
+  @override
+  String get milestones_field_periodStart =>
+      'Start van de periode (JJJJ-MM-DD)';
+
+  @override
+  String get milestones_field_dueAt => 'Rapportdatum (JJJJ-MM-DD)';
+
+  @override
+  String get milestones_field_pickDate => 'Kies een datum';
+
+  @override
+  String get milestones_field_expectedDifficulty =>
+      'Verwacht niveau voor de kern';
+
+  @override
+  String get milestones_difficulty_easy => 'makkelijk';
+
+  @override
+  String get milestones_difficulty_medium => 'gemiddeld';
+
+  @override
+  String get milestones_difficulty_hard => 'moeilijk';
+
+  @override
+  String get milestones_goals_heading => 'Doelen in deze mijlpaal';
+
+  @override
+  String get milestones_goals_hint =>
+      'Vink een subdoel aan om zijn leerdoelen op te nemen. Duid dan per leerdoel aan of een nét geslaagde leerling het beheerst (kern) of niet (uitbreiding).';
+
+  @override
+  String get milestones_lo_core => 'kern';
+
+  @override
+  String get milestones_lo_extension => 'uitbreiding';
+
+  @override
+  String get milestones_validation_title => 'Geef de mijlpaal een titel.';
+
+  @override
+  String get milestones_validation_date => 'Gebruik de vorm JJJJ-MM-DD.';
+
+  @override
+  String get milestones_validation_order =>
+      'De rapportdatum moet na de start van de periode liggen.';
+
+  @override
+  String get milestones_validation_goals => 'Neem minstens één subdoel op.';
+
+  @override
+  String get milestones_saved => 'Mijlpaal opgeslagen.';
+
+  @override
+  String get milestones_deleted => 'Mijlpaal verwijderd.';
+
+  @override
+  String get milestones_delete_dialog_title => 'Mijlpaal verwijderen';
+
+  @override
+  String milestones_delete_dialog_message(String title) {
+    return '\"$title\" verwijderen? Puntvoorstellen die er al tegen berekend zijn, blijven staan.';
+  }
+
+  @override
+  String get milestones_delete_dialog_cancel => 'Annuleren';
+
+  @override
+  String get milestones_delete_dialog_confirm => 'Verwijderen';
+
+  @override
+  String milestones_summary(int core, int extension) {
+    return '$core kern-, $extension uitbreidingsleerdoelen';
+  }
+
+  @override
+  String get drawer_grade_title => 'Puntvoorstel';
+
+  @override
+  String get drawer_grade_noMilestones =>
+      'Nog geen mijlpalen — maak er een onder Mijlpalen.';
+
+  @override
+  String get drawer_grade_milestone_label => 'Mijlpaal';
+
+  @override
+  String get drawer_grade_button_compute => 'Voorstel berekenen';
+
+  @override
+  String get drawer_grade_button_recompute => 'Opnieuw berekenen';
+
+  @override
+  String get drawer_grade_button_justify => 'Verantwoording schrijven';
+
+  @override
+  String get drawer_grade_button_signOff => 'Aftekenen';
+
+  @override
+  String get drawer_grade_button_busy => 'Bezig…';
+
+  @override
+  String get drawer_grade_proposal_label => 'Voorstel';
+
+  @override
+  String drawer_grade_masteryEnd(String value) {
+    return 'Beheersing nu: $value';
+  }
+
+  @override
+  String drawer_grade_masteryStart(String value) {
+    return 'Beheersing bij start periode: $value';
+  }
+
+  @override
+  String drawer_grade_growth(String value) {
+    return 'Groei: $value';
+  }
+
+  @override
+  String drawer_grade_core(int counted, int total) {
+    return 'Kern op niveau: $counted / $total';
+  }
+
+  @override
+  String drawer_grade_extension(int counted, int total) {
+    return 'Uitbreiding beheerst: $counted / $total';
+  }
+
+  @override
+  String drawer_grade_hard(int counted, int total) {
+    return 'Aangetoond op moeilijk: $counted / $total beheerst';
+  }
+
+  @override
+  String drawer_grade_reliability(
+    int stale,
+    int never,
+    int supervised,
+    int home,
+  ) {
+    return 'Verouderd: $stale leerdoelen (nooit bevraagd: $never). Beurten deze periode: $supervised onder toezicht, $home thuis.';
+  }
+
+  @override
+  String drawer_grade_formulaVersion(String version, String ts) {
+    return 'Formule v$version, berekend $ts';
+  }
+
+  @override
+  String get drawer_grade_justification_title => 'Verantwoording';
+
+  @override
+  String drawer_grade_justification_failed(String error) {
+    return 'De verantwoording kon niet geschreven worden: $error';
+  }
+
+  @override
+  String get drawer_grade_adjusted_label => 'Punt voor het rapport';
+
+  @override
+  String get drawer_grade_adjusted_invalid =>
+      'Geef een geheel getal van 0 tot 100.';
+
+  @override
+  String get drawer_grade_note_label => 'Reden voor aanpassing (optioneel)';
+
+  @override
+  String drawer_grade_signed(String ts, int grade) {
+    return 'Afgetekend $ts: $grade/100';
+  }
+
+  @override
+  String drawer_grade_signed_note(String note) {
+    return 'Opmerking: $note';
+  }
+
+  @override
+  String drawer_grade_failed(String error) {
+    return 'Het voorstel kon niet berekend worden: $error';
+  }
 
   @override
   String get options_page_title => 'Opties';

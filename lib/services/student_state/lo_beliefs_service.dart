@@ -54,6 +54,21 @@ class LoBeliefsService {
     });
   }
 
+  /// Every belief doc of one student, read teacher-side (#99): the grade
+  /// formula evaluates a milestone against the student's whole belief set.
+  /// Same single-partition query as [getAllForCurrentUser], addressed by
+  /// an explicit uid.
+  Future<List<LoBelief>> getAllForUser(String uid) {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT * FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      return docs.map(LoBelief.fromCosmos).toList();
+    });
+  }
+
   Future<LoBelief?> getOne({required String subgoalId, required String loId}) {
     final uid = _uid;
     return safeCosmos(() async {

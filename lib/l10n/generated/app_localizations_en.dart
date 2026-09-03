@@ -49,7 +49,215 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_students => 'Students';
 
   @override
+  String get sidebar_section_milestones => 'Milestones';
+
+  @override
   String get sidebar_section_options => 'Options';
+
+  @override
+  String get milestones_page_title => 'Milestones';
+
+  @override
+  String get milestones_page_subtitle =>
+      'Which goals should be known by which report date, and which of them gate the pass mark.';
+
+  @override
+  String get milestones_list_empty => 'No milestones yet.';
+
+  @override
+  String get milestones_button_new => 'New milestone';
+
+  @override
+  String get milestones_button_save => 'Save';
+
+  @override
+  String get milestones_button_delete => 'Delete';
+
+  @override
+  String get milestones_placeholder =>
+      'Pick a milestone on the left, or create a new one.';
+
+  @override
+  String get milestones_field_title => 'Title';
+
+  @override
+  String get milestones_field_periodStart => 'Period start (YYYY-MM-DD)';
+
+  @override
+  String get milestones_field_dueAt => 'Report date (YYYY-MM-DD)';
+
+  @override
+  String get milestones_field_pickDate => 'Pick a date';
+
+  @override
+  String get milestones_field_expectedDifficulty =>
+      'Expected level for the core';
+
+  @override
+  String get milestones_difficulty_easy => 'easy';
+
+  @override
+  String get milestones_difficulty_medium => 'medium';
+
+  @override
+  String get milestones_difficulty_hard => 'hard';
+
+  @override
+  String get milestones_goals_heading => 'Goals in this milestone';
+
+  @override
+  String get milestones_goals_hint =>
+      'Tick a subgoal to include its learning objectives. Then mark, per objective, whether a student who just passes masters it (core) or not (extension).';
+
+  @override
+  String get milestones_lo_core => 'core';
+
+  @override
+  String get milestones_lo_extension => 'extension';
+
+  @override
+  String get milestones_validation_title => 'Give the milestone a title.';
+
+  @override
+  String get milestones_validation_date => 'Use the form YYYY-MM-DD.';
+
+  @override
+  String get milestones_validation_order =>
+      'The report date must come after the period start.';
+
+  @override
+  String get milestones_validation_goals => 'Include at least one subgoal.';
+
+  @override
+  String get milestones_saved => 'Milestone saved.';
+
+  @override
+  String get milestones_deleted => 'Milestone deleted.';
+
+  @override
+  String get milestones_delete_dialog_title => 'Delete milestone';
+
+  @override
+  String milestones_delete_dialog_message(String title) {
+    return 'Delete \"$title\"? Grade proposals already computed against it stay as they are.';
+  }
+
+  @override
+  String get milestones_delete_dialog_cancel => 'Cancel';
+
+  @override
+  String get milestones_delete_dialog_confirm => 'Delete';
+
+  @override
+  String milestones_summary(int core, int extension) {
+    return '$core core, $extension extension learning objectives';
+  }
+
+  @override
+  String get drawer_grade_title => 'Grade proposal';
+
+  @override
+  String get drawer_grade_noMilestones =>
+      'No milestones defined yet — create one under Milestones.';
+
+  @override
+  String get drawer_grade_milestone_label => 'Milestone';
+
+  @override
+  String get drawer_grade_button_compute => 'Compute proposal';
+
+  @override
+  String get drawer_grade_button_recompute => 'Recompute';
+
+  @override
+  String get drawer_grade_button_justify => 'Write justification';
+
+  @override
+  String get drawer_grade_button_signOff => 'Sign off';
+
+  @override
+  String get drawer_grade_button_busy => 'Working…';
+
+  @override
+  String get drawer_grade_proposal_label => 'Proposal';
+
+  @override
+  String drawer_grade_masteryEnd(String value) {
+    return 'Mastery now: $value';
+  }
+
+  @override
+  String drawer_grade_masteryStart(String value) {
+    return 'Mastery at period start: $value';
+  }
+
+  @override
+  String drawer_grade_growth(String value) {
+    return 'Growth: $value';
+  }
+
+  @override
+  String drawer_grade_core(int counted, int total) {
+    return 'Core at level: $counted / $total';
+  }
+
+  @override
+  String drawer_grade_extension(int counted, int total) {
+    return 'Extension mastered: $counted / $total';
+  }
+
+  @override
+  String drawer_grade_hard(int counted, int total) {
+    return 'Demonstrated at hard: $counted / $total mastered';
+  }
+
+  @override
+  String drawer_grade_reliability(
+    int stale,
+    int never,
+    int supervised,
+    int home,
+  ) {
+    return 'Stale: $stale LOs (never probed: $never). Turns this period: $supervised supervised, $home at home.';
+  }
+
+  @override
+  String drawer_grade_formulaVersion(String version, String ts) {
+    return 'Formula v$version, computed $ts';
+  }
+
+  @override
+  String get drawer_grade_justification_title => 'Justification';
+
+  @override
+  String drawer_grade_justification_failed(String error) {
+    return 'Could not write the justification: $error';
+  }
+
+  @override
+  String get drawer_grade_adjusted_label => 'Grade for the report card';
+
+  @override
+  String get drawer_grade_adjusted_invalid =>
+      'Enter a whole number from 0 to 100.';
+
+  @override
+  String get drawer_grade_note_label => 'Reason for adjustment (optional)';
+
+  @override
+  String drawer_grade_signed(String ts, int grade) {
+    return 'Signed off $ts: $grade/100';
+  }
+
+  @override
+  String drawer_grade_signed_note(String note) {
+    return 'Note: $note';
+  }
+
+  @override
+  String drawer_grade_failed(String error) {
+    return 'Could not compute the proposal: $error';
+  }
 
   @override
   String get options_page_title => 'Options';

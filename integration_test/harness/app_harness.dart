@@ -40,6 +40,7 @@ import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
+import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
@@ -285,6 +286,10 @@ class AppHarness {
               ? _OfflineTutor.new
               : () => TutorService(connectorOverride: llm!),
         ),
+        // The grade justification (#99) has its own connector; the same
+        // scripted model stands in for it, and with no script it fails
+        // loudly like every other LLM call.
+        gradeJustificationConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),

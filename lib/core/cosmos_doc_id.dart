@@ -33,6 +33,11 @@ class CosmosDocId {
   /// in an id (`/`, `\`, `?`, `#`) or a leading/trailing space.
   static String playgroundFile(String uid, String name) => '${uid}_$name';
 
+  /// Doc id for the `grade_proposals` container (#99): one proposal per
+  /// student per milestone.
+  static String gradeProposal(String uid, String milestoneId) =>
+      '${uid}_$milestoneId';
+
   /// Single global config doc.
   static const String globalConfig = 'global';
 

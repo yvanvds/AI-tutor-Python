@@ -273,6 +273,38 @@ teacher-dashboard surfaces, not by the conductor's decision logic.
 Belief and calibration are the source of truth for decisions;
 `turn_history` is the audit trail.
 
+### `milestones` and `grade_proposals` containers (#99)
+
+Teacher-side only; nothing in the student flow reads or writes them, and
+the conductor does not know they exist. They are the persistence behind
+PUNTENFORMULE part 2.
+
+`milestones` is single-partition (`/type = "milestone"`), a handful of
+docs per year:
+
+```
+Milestone {
+  id: string
+  type: "milestone"
+  title: string
+  periodStart: string     // ISO 8601; M_start is read from progress_history as of here
+  dueAt: string           // ISO 8601; the report moment
+  expectedDifficulty: "easy" | "medium" | "hard"   // level the core must be shown at
+  subgoalIds: string[]    // whose LOs make up the milestone
+  coreLoKeys: string[]    // "{subgoalId}/{loId}" of every core LO; the rest is extension
+  updatedAt: string
+}
+```
+
+`grade_proposals` is partitioned `/uid`, one doc per `(uid, milestoneId)`
+with id `{uid}_{milestoneId}`: the formula's outputs (`k`, `u`, `d`,
+`mEnd`, `mStart`, `g`, `proposal`) with the counts behind them, the
+reliability signals (`staleLoCount`, `neverProbedCount`,
+`supervisedTurns`, `homeTurns`), `formulaVersion`, `computedAt`, the
+AI-written `justification` (+ `justificationAt`), and the teacher's
+`adjustedGrade`, `adjustmentNote` and `signedOffAt`. A doc with
+`signedOffAt` is frozen — never recomputed, never rewritten.
+
 ## Settled decisions
 
 - **Belief is Beta-distributed**, parameterized by `(α, β)`. Both the
