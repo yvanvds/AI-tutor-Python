@@ -13,10 +13,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 enum SessionMode { explain, practice, playground }
 
 /// Top-level sidebar destinations. Student sees the first two; teacher
-/// additionally sees goals / lessonContent / students. `instructions` is a
-/// developer tool (tutor system-prompt editor) and is only reachable when
-/// [developerToolsProvider] is true (issue #26). `options` is the settings /
-/// maintenance panel pinned to the bottom of the sidebar (issue #25).
+/// additionally sees goals / lessonContent / students / milestones.
+/// `instructions` is a developer tool (tutor system-prompt editor) and is
+/// only reachable when [developerToolsProvider] is true (issue #26).
+/// `options` is the settings / maintenance panel pinned to the bottom of
+/// the sidebar (issue #25). `milestones` is the grading-milestone editor
+/// (#99): grade proposals are teacher-only, so it never shows to a student.
 enum Section {
   session,
   map,
@@ -24,6 +26,7 @@ enum Section {
   lessonContent,
   instructions,
   students,
+  milestones,
   options,
 }
 
@@ -198,6 +201,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_instructions;
       case Section.students:
         return l.sidebar_section_students;
+      case Section.milestones:
+        return l.sidebar_section_milestones;
       case Section.options:
         return l.sidebar_section_options;
     }
@@ -209,6 +214,7 @@ extension SectionLabel on Section {
       case Section.lessonContent:
       case Section.instructions:
       case Section.students:
+      case Section.milestones:
         return true;
       case Section.session:
       case Section.map:

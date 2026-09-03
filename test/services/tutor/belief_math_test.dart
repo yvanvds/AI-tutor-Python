@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
@@ -41,6 +42,98 @@ void main() {
     });
   });
 
+  group('transferCreditDeltas (#101)', () {
+    test('is a weak positive as medium: α += 0.5, β untouched', () {
+      final d = transferCreditDeltas();
+      expect(d.alphaDelta, closeTo(PolicyConstants.weightWeak, 1e-9));
+      expect(d.betaDelta, 0);
+    });
+
+    test('is weighted by provenance like any other signal', () {
+      final d = transferCreditDeltas(provenance: EvidenceProvenance.supervised);
+      expect(
+        d.alphaDelta,
+        closeTo(
+          PolicyConstants.weightWeak * PolicyConstants.supervisedWeightFactor,
+          1e-9,
+        ),
+      );
+      expect(d.betaDelta, 0);
+    });
+
+    test('never exceeds the weak weight at home', () {
+      expect(
+        transferCreditDeltas().alphaDelta,
+        lessThanOrEqualTo(PolicyConstants.weightWeak),
+      );
+    });
+  });
+
+  group('everMastered (#101)', () {
+    final stamp = DateTime.utc(2026, 5, 1);
+    final ratchet = DateTime.utc(2026, 4, 1);
+
+    test('the stamp alone decides, whatever the stored values say', () {
+      expect(
+        everMastered(
+          firstMasteredAt: stamp,
+          alpha: 1,
+          beta: 1,
+          lastPositiveAtCalibratedAt: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('without the stamp: mastered as of the last write counts', () {
+      // (5, 1): mean 0.83, evidence 6, ratchet set → was mastered.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 5,
+          beta: 1,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isTrue,
+      );
+    });
+
+    test('without the stamp: mean or evidence below mastery is not', () {
+      // (3, 1): mean 0.75.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 3,
+          beta: 1,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isFalse,
+      );
+      // (2.5, 0.5)... evidence 3 < 4 even though mean is 0.83.
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 2.5,
+          beta: 0.5,
+          lastPositiveAtCalibratedAt: ratchet,
+        ),
+        isFalse,
+      );
+    });
+
+    test('without the stamp: no calibrated positive is never mastered', () {
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 9,
+          beta: 1,
+          lastPositiveAtCalibratedAt: null,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('signalDeltas', () {
     test('positive strong @ medium → α += 2.0', () {
       final d = signalDeltas(
@@ -80,6 +173,146 @@ void main() {
       );
       expect(d.alphaDelta, 0);
       expect(d.betaDelta, 0);
+    });
+  });
+
+  group('signalDeltas provenance (#100, PUNTENFORMULE §2.7)', () {
+    const s = PolicyConstants.supervisedWeightFactor;
+
+    test('the supervised factor is modest and never below 1', () {
+      expect(s, greaterThanOrEqualTo(1.0));
+      expect(s, lessThanOrEqualTo(1.5));
+      expect(
+        PolicyConstants.provenanceMultiplier(EvidenceProvenance.home),
+        1.0,
+      );
+      expect(
+        PolicyConstants.provenanceMultiplier(EvidenceProvenance.supervised),
+        s,
+      );
+    });
+
+    test('home is the default and equals the unweighted delta', () {
+      final implicit = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+      );
+      final explicit = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.home,
+      );
+      expect(implicit.alphaDelta, closeTo(2.0, 1e-9));
+      expect(explicit.alphaDelta, closeTo(2.0, 1e-9));
+    });
+
+    test('supervised positive strong @ medium → α += 2.0 × s', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.supervised,
+      );
+      expect(d.alphaDelta, closeTo(2.0 * s, 1e-9));
+      expect(d.betaDelta, 0);
+    });
+
+    test('symmetric: supervised negative moderate @ hard → β += 1.4 × s', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.moderate,
+        difficulty: QuestionDifficulty.hard,
+        provenance: EvidenceProvenance.supervised,
+      );
+      expect(d.alphaDelta, 0);
+      expect(d.betaDelta, closeTo(1.4 * s, 1e-9));
+    });
+
+    test('neutral stays a no-op under supervision', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.neutral,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+        provenance: EvidenceProvenance.supervised,
+      );
+      expect(d.alphaDelta, 0);
+      expect(d.betaDelta, 0);
+    });
+  });
+
+  group('ratchetHighestPositiveDifficulty (#103, PUNTENFORMULE §2.5)', () {
+    test('the first positive sets the level to the difficulty asked', () {
+      for (final level in QuestionDifficulty.values) {
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: null,
+            kind: LoSignalKind.positive,
+            difficulty: level,
+          ),
+          level,
+        );
+      }
+    });
+
+    test('a positive at a higher difficulty lifts the level', () {
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.easy,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.medium,
+        ),
+        QuestionDifficulty.medium,
+      );
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.medium,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.hard,
+        ),
+        QuestionDifficulty.hard,
+      );
+    });
+
+    test('one-way: a positive at a lower difficulty never lowers it', () {
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.hard,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.easy,
+        ),
+        QuestionDifficulty.hard,
+      );
+      expect(
+        ratchetHighestPositiveDifficulty(
+          current: QuestionDifficulty.medium,
+          kind: LoSignalKind.positive,
+          difficulty: QuestionDifficulty.medium,
+        ),
+        QuestionDifficulty.medium,
+      );
+    });
+
+    test('negatives and neutrals leave it alone, at any level', () {
+      for (final kind in [LoSignalKind.negative, LoSignalKind.neutral]) {
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: null,
+            kind: kind,
+            difficulty: QuestionDifficulty.hard,
+          ),
+          isNull,
+        );
+        expect(
+          ratchetHighestPositiveDifficulty(
+            current: QuestionDifficulty.medium,
+            kind: kind,
+            difficulty: QuestionDifficulty.hard,
+          ),
+          QuestionDifficulty.medium,
+        );
+      }
     });
   });
 

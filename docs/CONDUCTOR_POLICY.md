@@ -106,6 +106,9 @@ suppressed" logic is dropped entirely. Decay does the re-verification
 work: LOs the student has forgotten show up as low-belief LOs and get
 probed first, naturally. The "gentle re-entry" purpose is handled by
 curriculum-ordered LO selection (below), not by easier questions.
+(The single *warm-up review question* of 1.5 is a different thing: one
+fully credited probe of an *older* subgoal's LO, not a credit-suppressed
+phase on the active one.)
 
 This is communicated to the student as a feature: practice during
 holidays or your progress fades. Programming requires frequent
@@ -183,6 +186,9 @@ Putting it all together, every subgoal entry runs the same logic:
 
 ```
 entry(subgoal, student):
+    if no warm-up fired yet this session:
+        warm_up = pickWarmUp(root, subgoal, student)   # 1.5
+        if warm_up: return warm_up
     beliefs = read lo_beliefs for (student, subgoal), apply decay
     unmastered = LOs with mean < threshold OR evidence < minimum
     if unmastered is non-empty:
@@ -204,7 +210,101 @@ only differences between them are which inputs are non-empty (no
 beliefs vs. some beliefs vs. all-mastered beliefs). The algorithm
 falls through correctly in each case.
 
-### 1.5 What this section deliberately does not address
+### 1.5 Warm-up review question (#102, PUNTENFORMULE §2.8)
+
+The conductor never returns to a mastered subgoal by itself: 1.2's
+decay-driven re-probing only reaches LOs of the subgoal the student is
+*on*. An LO mastered in September that nothing later builds on is never
+asked again, so by December its belief reads as decayed — not because
+the student forgot, but because nobody asked. Once grades are computed
+from beliefs (#99) that is a fairness bug for early finishers. Transfer
+credit (3.7) covers the LOs that recur in later work for free; this
+section covers the rest: the October topic nothing builds on.
+
+**One question, at the start of the session.** When a session opens
+(`setTarget`), the first question the conductor plans may be a review
+question on an older subgoal's LO instead of the active subgoal's probe.
+At most one per session; the slot is spent the moment the question is
+*fired* (`notePlannedQuestion`), not when it is planned — the host plans
+once at session start only to check for blocks (7.1, 1.3) and discards
+that plan. A fixed, predictable ritual — "start the engine" — rather than
+surprise checks scattered through practice; after it the session is
+ordinary practice with no further review. The chat announces it
+(`warmUpReview` notice, naming the old subgoal) so the student knows why
+the first question is off-topic. Spaced retrieval is the point; fresh
+report-time evidence is the by-product.
+
+**Selection.** Candidates are the LOs of the active root's *other*
+subgoals (the grading scope, part 3 — an older root's LOs cannot be
+graded and are out) whose belief doc:
+
+1. **was ever mastered by direct probing** — `firstMasteredAt` set, or
+   the legacy reading of 3.7 (the same `everMastered` gate as transfer
+   credit); an LO the student never had is not "review" material;
+2. **is stale** — no belief write for `warmUpStaleAfter` (30 days, half
+   the decay half-life: at that age a `(5, 1)` belief has decayed to a
+   mean of 0.79, just under mastery, so the review lands where decay
+   starts to read as forgetting).
+
+There is no separate "not naturally recurring" test: any write bumps
+`lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
+later work keeps using never *becomes* stale. (2) is what keeps the
+recurring LOs out. Orphaned belief docs (LO or subgoal deleted, 7.4) are
+skipped because they resolve to no live LO.
+
+Among candidates the **most stale wins** (oldest `lastUpdatedAt`); ties
+go to the lowest decayed mean. Staleness order, not mean order, so the
+pool is rotated through predictably: once asked, an LO's clock resets
+and it goes to the back of the queue. The active subgoal's own LOs are
+never candidates — those are 1.2's business.
+
+**The question.** The gentlest acceptable type for the LO's kind (the
+1.1 cold-start table — an MCQ for `recall`, `completeCode` for `apply`,
+…) at the student's calibrated difficulty, no notch-drop override (2.3).
+"Light" is the cadence and the type, not the difficulty: a review asked
+at `easy` would carry the 0.6 weight and could not confirm anything at
+the level the LO was mastered at.
+
+**Grading: like any probe.** The answer goes through the normal
+pipeline (3) with the plan's difficulty and the turn's provenance
+(3.2, #100); the signal lands on the *old* LO's doc — decayed first,
+then updated, `lastUpdatedAt = now`. Both ratchets move on a positive
+(4.3): unlike a transfer credit, a warm-up is a direct probe of that LO
+at a difficulty chosen for it, so a positive at `hard` certifies the LO
+at `hard`. The 2.3 counter and `lastQuestionType` update as usual. A
+negative debits the old belief honestly — a forgotten LO should read as
+forgotten. Incidental signals the grader emits on the *active* subgoal's
+LOs are consumed normally (2.4); signals on any third subgoal are
+dropped as always.
+
+**What a warm-up does not do.**
+
+- **No calibration.** The answer does not enter the section 5 window: a
+  slip on months-old material is forgetting, not miscalibration, and a
+  review must not earn a promotion either. Same treatment as a follow-up
+  (6.2).
+- **No follow-up.** One short question; the grader's `followUp` on a
+  warm-up turn is not presented (6.3, condition 5).
+- **No advancement, no cache write.** The old subgoal's cached
+  `progress` is left alone even after a wrong answer, exactly as for
+  transfer credit: a review is not a re-enrolment, and lowering the
+  cache would make the conductor's next-subgoal walk (4.5) drag the
+  student back to the old topic next session. The honest belief is on
+  `lo_beliefs`, where the grade formula and the teacher drawer read it;
+  the LO simply comes up for review again once it is stale again. The
+  active subgoal is untouched too: unless the grader landed an incidental
+  signal on one of its LOs, no cache, history or advancement check runs
+  for it on this turn.
+- **No transfer credit on itself.** A nomination on the warm-up target
+  is dropped (it already took its direct signal); nominations on other
+  once-mastered LOs still count under 3.7's rules.
+
+**Audit.** The turn record (8.1) carries `isWarmUp: true`, names the old
+subgoal in `subgoalId` and the LO in `targetLOIds`; `selectionReason`
+lists the top candidates with their decayed stats under `chosenReason:
+"warm-up review: most stale mastered LO"`.
+
+### 1.6 What this section deliberately does not address
 
 - **Picking the next question after the first.** "Which LO next, given
   belief just updated?" is section 2.1. The entry algorithm above
@@ -254,7 +354,10 @@ not now.
 candidate pool only via decay (section 1.2) or the saturation revisit
 case (section 1.3). No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
-handle"). Cross-session decay handles forgetting.
+handle"). Cross-session decay handles forgetting; mastered LOs that
+later work keeps using are refreshed without being probed, by transfer
+credit (3.7); mastered LOs of *earlier* subgoals that nothing refreshes
+get one review question at the start of a session (1.5).
 
 **Saturated LOs are filtered out of the unmastered pool.** An LO at
 `α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
@@ -507,10 +610,15 @@ Multiply the base weight by a difficulty factor:
 | `medium` | 1.0 |
 | `hard` | 1.4 |
 
-Applies to both positive and negative signals. A `correct` at hard is
-more diagnostic of mastery than a `correct` at easy; a `wrong` at
-hard is *less* diagnostic of lacking the LO than a `wrong` at easy
-(the question was hard).
+Applies to both positive and negative signals, with the same factor:
+a `correct` at hard is more diagnostic of mastery than a `correct`
+at easy, and a `wrong` at hard is weighted just as heavily as that
+`correct` — the multiplier says how *hard* a piece of evidence is,
+not which way it points (see "Symmetric in positive/negative" above).
+A consequence for the grade formula (PUNTENFORMULE §2.5): the
+multiplier scales how fast evidence accrues but not where the mean
+settles, so difficulty is invisible in `(α, β)`; the per-LO
+`highestPositiveDifficulty` ratchet (4.3) is what carries it.
 
 **E.1 interaction.** Lower easy-weight is one of two mechanisms that
 fix the "good student grinds easy answers to mastery" problem. The
@@ -518,6 +626,27 @@ multiplier alone caps how fast easy-only mastery can accrue: it takes
 more easy-correct answers to reach the same evidence count as one
 medium-correct. The second mechanism — requiring evidence at the
 calibrated difficulty for mastery — lives in section 4.
+
+**Provenance modulation (#100, PUNTENFORMULE §2.7).** A second
+multiplier on the same base weight says *where* the answer was
+produced:
+
+| Provenance | Multiplier |
+| --- | --- |
+| `home` | 1.0 |
+| `supervised` | `s` = 1.25 (`PolicyConstants.supervisedWeightFactor`) |
+
+`supervised` means the student was in an active, alert-free Anchor
+classroom session at grading time, as answered per student, per turn,
+by the `SupervisionSource` the host consults before building the
+`GradedAnswer`. There is no manual toggle. The factor is symmetric in
+positive and negative (like difficulty: it changes how *hard* the
+evidence is, not which way it points), applies to follow-up signals
+as well, and never drops below 1 — home evidence keeps full weight and
+is confirmed or contradicted by later supervised work on the same LO.
+Until Anchor is wired up every turn resolves to `home`, so the
+multiplier is inert and no backfill is needed. The value is provisional
+until the period-1 shadow run (PUNTENFORMULE §4).
 
 ### 3.3 Decay
 
@@ -652,7 +781,82 @@ The progression feels right: notch-drop fires after two strikes, easy
 answers count for less than medium, mastery doesn't lock in too fast
 or too slow.
 
-### 3.7 What this section deliberately does not address
+### 3.7 Transfer credit (#101, PUNTENFORMULE §2.8)
+
+Older LOs live on inside newer work: December's while-loop exercise
+still uses September's `print()` and variables. When a *working*
+solution to a later exercise correctly uses an LO the student mastered
+earlier, that LO's belief gets a small positive update. This counters
+the 60-day decay without re-quizzing old material, and it rewards
+transfer — using a skill in a new context is a stronger demonstration
+than answering a targeted question about it.
+
+**The grader nominates, the conductor gates.** The grading response
+carries one extra field, `transferLOs: [{subgoalId, loId}]` (LLM
+contract, part 3): the goal-scope LOs from *other* subgoals that the
+solution *correctly used in service of the task*. That phrasing is the
+guard against padding code with gratuitous constructs to farm credit;
+the small weight bounds the payoff anyway. The grader is not told which
+LOs are mastered — it reports what the code demonstrates; the conductor
+decides what counts. No hand-authored mapping, no Q-matrix.
+
+A nominated LO earns credit only when **all** of these hold:
+
+1. **The answer is `correct`.** A working solution is unambiguous
+   evidence that the constructs in it still work. A `partial` or `wrong`
+   answer gives *nothing* to older LOs — not negative evidence (blame
+   assignment across old LOs is unsolvable, so nobody outside the target
+   gets blamed) and not positive evidence either. The evidence really is
+   asymmetric.
+2. **The turn is a primary probe, not a follow-up (6.2), and not a
+   fallback turn (7.2).** Dialogue is not a solution, and a response
+   whose primary signals failed validation is not trusted for extras.
+3. **The LO is outside the active subgoal.** LOs inside it already get
+   ordinary incidental signals at full weight (2.4); a nomination there
+   is dropped.
+4. **The LO was ever mastered by direct probing.** An LO that was never
+   directly probed — or probed but never mastered — cannot be brought
+   to mastery sideways. Tracked by the one-way `firstMasteredAt` stamp on
+   `lo_beliefs` (part 2), set the first time all three mastery
+   conditions (4.1) hold after a write. Docs written before the stamp
+   existed read as "mastered as of the last direct write" when their
+   stored `(α, β)` meet conditions 1–2 and the calibrated-positive
+   ratchet is set; the stamp is then written on the next update, dated
+   to that write. Nothing is backfilled.
+
+**Refresh-and-raise, small weight.** The credit is an ordinary
+`(positive, weak)` signal treated as `medium` — the same footing as a
+follow-up signal (6.2) — so it is `0.5 × s` on α, with `s` the
+provenance multiplier (3.2). Applied to the *decayed* belief and
+persisted with `lastUpdatedAt = now`: that bump is the "decay clock
+reset", and the added α is the "raise". Chosen over merely resetting
+the clock because transfer deserves reward, and kept small because
+this mechanism counters decay, it does not establish mastery. Diminishing
+returns come free from the Beta arithmetic: the more evidence an LO
+already carries, the less each credit moves its mean.
+
+**Nothing else on the old doc moves.** Neither ratchet — not
+`lastPositiveAtCalibratedAt`, not `highestPositiveDifficulty` (4.3): the
+exercise's difficulty was set for the target LO, not for the transferred
+one, and a hard loop exercise must not certify `print()` at hard — nor
+the notch-drop counter (2.3), nor `lastQuestionType`. The other subgoal's
+cached `progress` is not recomputed: positive-only credit cannot lower
+it. Credits do not enter the calibration window (section 5).
+
+**Audit.** Every credit applied is listed on the turn record as
+`transferCredits: [{subgoalId, loId, alphaDelta}]` (8.1), next to the
+target's own `appliedSignals`; declined nominations are logged in the
+debug recorder with the reason.
+
+**Complement: warm-up review (1.5, #102).** LOs that naturally recur in
+later work are refreshed here for free; LOs that nothing later builds on
+are the review question's business. `firstMasteredAt` is the "once
+mastered" signal both mechanisms share, and a credit's `lastUpdatedAt`
+bump is what keeps a recurring LO out of the review pool. On a warm-up
+turn a nomination on the warm-up target itself is dropped — it already
+took a direct signal; other nominations follow the rules above.
+
+### 3.8 What this section deliberately does not address
 
 - **The mastery decision** (when does an LO count as mastered, given
   the belief shape we just defined). Section 4.
@@ -742,6 +946,35 @@ override (section 2.3) keeps firing on a specific LO at easy gets a
 softer path through, but the override releases on positive signal.
 The next probe is at calibrated difficulty. Mastery requires
 demonstrating there.
+
+**Three-level ratchet (#103, PUNTENFORMULE §2.5).** A second field,
+`highestPositiveDifficulty: "easy" | "medium" | "hard" | absent`,
+records the highest difficulty at which this LO ever earned a
+positive signal — any strength, the difficulty *actually asked* (a
+notch-dropped probe at easy counts as easy), absolute rather than
+relative to the calibration in force. It only ever rises: a later
+positive at a lower difficulty leaves it, and calibration shifts never
+touch it. Negatives, neutrals and follow-up grading (6.2) leave it
+alone, exactly like `lastPositiveAtCalibratedAt`. So does transfer
+credit (3.7): a credit is not a probe of the LO at any difficulty, so
+neither ratchet moves — only a direct, non-follow-up positive on the LO
+itself is ratchet-worthy. A warm-up review positive (1.5) *is* one: the
+question was generated for that LO at a difficulty chosen for it, so
+both ratchets move exactly as on an active-subgoal probe. The conductor does
+not read it — mastery condition 3 stays on the calibration-relative
+timestamp — it exists for the grade formula, where it is the only
+signal that can tell medium from hard. Docs written before the field
+existed read as `medium` when `lastPositiveAtCalibratedAt` is set
+(the old flag's documented "ever demonstrated at non-easy" meaning)
+and as absent otherwise; nothing is backfilled.
+
+**Mastery stamp (#101).** A third field, `firstMasteredAt`, records
+when the LO first met all three conditions after a belief write. One-way:
+decay and later negatives unmaster the LO (4.1, no latching) but never
+clear the stamp, which answers a different question — "was this ever
+mastered by direct probing?" — the gate for transfer credit (3.7). Set in
+the same write that first satisfies the conditions; nothing is
+backfilled (3.7 says how older docs are read).
 
 ### 4.4 The stuck rule (advancing despite a missed LO)
 
@@ -998,7 +1231,9 @@ generated reads the new calibration.
 retroactively re-evaluated.** They were set against the calibration
 at the time of that answer, which is the correct interpretation. A
 demoted student doesn't lose their "ever demonstrated at medium"
-flag on previously-mastered LOs.
+flag on previously-mastered LOs. The same holds for
+`highestPositiveDifficulty` (4.3), which does not reference the
+calibration at all.
 
 **Per-LO override (section 2.3) is independent of student-level
 calibration.** The notch-drop on a struggling LO doesn't appear in
@@ -1007,6 +1242,12 @@ the recent-answer window as a special case — the answer's
 below the student's calibration if the override fired. Those answers
 filter out of the at-calibrated set. They influence neither
 promotion nor demotion.
+
+**Warm-up review answers (1.5) do not enter the window at all**, like
+follow-up answers (6.2): the question is on months-old material from
+another subgoal, so a wrong answer says "forgotten", not "too hard", and
+a right one must not buy a promotion on the current topic. Neither the
+answer nor its question type is appended.
 
 ### 5.4 Edge cases
 
@@ -1116,6 +1357,10 @@ have a meaningful `difficulty` to file against, and they're not
 probes of the student's calibration. The section 5 promotion/demotion
 rules ignore follow-up answers entirely.
 
+**No transfer credit on follow-up answers** (3.7). A follow-up is
+dialogue, not a solution; any `transferLOs` the grader emits on one are
+dropped.
+
 ### 6.3 When follow-ups fire
 
 A follow-up presents when **all** of the following hold:
@@ -1129,6 +1374,8 @@ A follow-up presents when **all** of the following hold:
 4. **The subgoal didn't just advance.** A subgoal-mastering answer
    triggers clean advancement; the follow-up is dangled on a
    subgoal the student has already left.
+5. **The turn was not a warm-up review (1.5).** One short question on
+   old material; no dialogue is opened on it.
 
 If any condition fails, the follow-up is suppressed and the
 conductor moves directly to the next regular probe via section 2.
@@ -1476,7 +1723,8 @@ TurnRecord {
   id: string                       // ISO timestamp + suffix
   uid: string                      // partition key
   turnAt: string                   // ISO 8601
-  subgoalId: string
+  subgoalId: string                // the target LO's subgoal: the active
+                                   // one, or the older one on a warm-up
 
   // What was asked
   targetLOIds: string[]            // typically one
@@ -1484,11 +1732,12 @@ TurnRecord {
   difficulty: string               // easy/medium/hard
   isFollowUp: bool                 // section 6
   chainDepth: int                  // 0, 1, or 2
+  isWarmUp: bool                   // section 1.5, #102; omitted when false
 
   // Why these were picked (section 2 decisions)
   selectionReason: {
     candidateLOs: [{loId, mean, evidence}]   // top 3
-    chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback"
+    chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …"
     notchDropFired: bool
   }
 
@@ -1497,6 +1746,8 @@ TurnRecord {
   loSignals: [{subgoalId, loId, signal, strength}]
   hadFallback: bool                 // grader response was unparseable
   appliedSignals: [{loId, alphaDelta, betaDelta}]   // post-modulation
+  provenance: string                // home | supervised (3.2, #100); absent on older docs = home
+  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
 
   // Calibration impact
   calibrationBefore: string
@@ -1624,6 +1875,23 @@ finer-grained data the LO model provides.
 - Per-subgoal progress list (uses cached `progress`).
 - Per-subgoal AI status reports.
 - 30-day progress-history line chart (uses `progress_history`).
+
+#### Grade proposal (#99, PUNTENFORMULE part 2)
+
+The last section of the detail drawer. The teacher picks a milestone
+(`milestones` container, edited on the teacher-only Milestones page:
+subgoals, the Angoff core/extension split per LO, the expected
+difficulty, the period), computes the proposal, asks for the AI-written
+justification, adjusts, signs off. The number is
+`lib/services/grading/grade_formula.dart` over the student's `lo_beliefs`
+read post-decay (§4.1 mastery + the `highestPositiveDifficulty` ratchet of
+§4.3) and `progress_history` for the period-start baseline; the
+justification is a separate, non-streaming model call with its own
+connector, fed the status reports whose `updatedAt` falls in the period
+and the per-subgoal trajectory — the number goes in as a fixed fact. The
+result lives in `grade_proposals` (`/uid`, id `${uid}_${milestoneId}`) and
+is frozen once signed. The conductor is not involved and reads none of
+this; the student shell never routes to the page or the drawer.
 
 #### Deferred to post-v1
 

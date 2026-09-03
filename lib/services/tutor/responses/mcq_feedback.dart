@@ -8,6 +8,7 @@ class McqFeedback implements ChatResponse {
   final AnswerQuality quality;
   final String prompt;
   final List<LoSignal> loSignals;
+  final List<TransferLoRef> transferLOs;
   final FollowUp? followUp;
 
   McqFeedback({
@@ -15,6 +16,7 @@ class McqFeedback implements ChatResponse {
     required this.quality,
     required this.prompt,
     this.loSignals = const [],
+    this.transferLOs = const [],
     this.followUp,
   });
 
@@ -24,6 +26,7 @@ class McqFeedback implements ChatResponse {
       quality: _stringToQuality(map['overallQuality'] ?? map['quality']),
       prompt: map['prompt'] ?? '',
       loSignals: parseLoSignals(map['loSignals']),
+      transferLOs: parseTransferLOs(map['transferLOs']),
       followUp: FollowUp.tryParse(map['followUp']),
     );
   }
@@ -34,6 +37,8 @@ class McqFeedback implements ChatResponse {
     'overallQuality': quality.name,
     'prompt': prompt,
     'loSignals': loSignals.map((s) => s.toJson()).toList(),
+    if (transferLOs.isNotEmpty)
+      'transferLOs': transferLOs.map((t) => t.toJson()).toList(),
     if (followUp != null) 'followUp': followUp!.toJson(),
   };
 

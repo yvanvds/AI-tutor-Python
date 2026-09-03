@@ -5,6 +5,7 @@
 // the persisted audit trail stay aligned.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 
 class CandidateLoStat {
@@ -58,6 +59,27 @@ class TurnAppliedSignal {
     'loId': loId,
     'alphaDelta': alphaDelta,
     'betaDelta': betaDelta,
+  };
+}
+
+/// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
+/// previously mastered LO in *another* subgoal that the working solution
+/// correctly used. Carries the subgoal because, unlike `appliedSignals`,
+/// the LO is not one of the active subgoal's.
+class TurnTransferCredit {
+  final String subgoalId;
+  final String loId;
+  final double alphaDelta;
+  const TurnTransferCredit({
+    required this.subgoalId,
+    required this.loId,
+    required this.alphaDelta,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'subgoalId': subgoalId,
+    'loId': loId,
+    'alphaDelta': alphaDelta,
   };
 }
 
@@ -204,6 +226,12 @@ class PersistedTurnRecord {
   final bool isFollowUp;
   final int chainDepth;
 
+  /// True when the turn was the session's warm-up review question (#102,
+  /// CONDUCTOR_POLICY §1.5): `subgoalId` and `targetLOIds` then name an
+  /// older subgoal and its LO, not the active one. Omitted from the doc
+  /// when false.
+  final bool isWarmUp;
+
   // Why these were picked
   final TurnSelectionReason? selectionReason;
 
@@ -212,6 +240,17 @@ class PersistedTurnRecord {
   final List<TurnLoSignal> loSignals;
   final bool hadFallback;
   final List<TurnAppliedSignal> appliedSignals;
+
+  /// Where the answer was produced (#100): the supervision registry's
+  /// verdict for this student at `turnAt`. `appliedSignals` already carry
+  /// the resulting weight; this records *why*, so a teacher (or the
+  /// student, per PUNTENFORMULE §2.7) can tell supervised from home
+  /// evidence. Missing on docs written before the field existed → `home`.
+  final EvidenceProvenance provenance;
+
+  /// Transfer credits applied this turn (#101). Empty on most turns and on
+  /// every non-code turn; omitted from the doc when empty.
+  final List<TurnTransferCredit> transferCredits;
 
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
@@ -250,6 +289,9 @@ class PersistedTurnRecord {
     required this.subgoalAdvanced,
     this.acknowledgedAt,
     this.signalEvents = const [],
+    this.provenance = EvidenceProvenance.home,
+    this.transferCredits = const [],
+    this.isWarmUp = false,
   });
 
   bool get hasStrongEvent =>
@@ -266,11 +308,15 @@ class PersistedTurnRecord {
     if (difficulty != null) 'difficulty': difficulty!.name,
     'isFollowUp': isFollowUp,
     'chainDepth': chainDepth,
+    if (isWarmUp) 'isWarmUp': true,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
     'loSignals': loSignals.map((s) => s.toJson()).toList(),
     'hadFallback': hadFallback,
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
+    'provenance': provenance.name,
+    if (transferCredits.isNotEmpty)
+      'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     'calibrationBefore': calibrationBefore.name,
     'calibrationAfter': calibrationAfter.name,
     'subgoalProgressAfter': subgoalProgressAfter,
@@ -335,11 +381,13 @@ class PersistedTurnRecord {
       difficulty: parseDifficulty(doc['difficulty']),
       isFollowUp: (doc['isFollowUp'] as bool?) ?? false,
       chainDepth: (doc['chainDepth'] as num?)?.toInt() ?? 0,
+      isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),
       loSignals: const [],
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
       appliedSignals: const [],
+      provenance: EvidenceProvenance.parse(doc['provenance']),
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

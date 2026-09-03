@@ -14,8 +14,8 @@
 // the system locale, the system light/dark setting, SharedPreferences
 // (in-memory), the playground file directory (temp), the update check (off),
 // the LLM (any call fails loudly unless a flow passes `llm:`), the lesson
-// example runner (scripted) and the browser launcher (recorded, never opened
-// — see [browserLaunches]).
+// example runner (scripted), the browser launcher (recorded, never opened
+// — see [browserLaunches]) and the sound effects (silent — see [_NoSound]).
 //
 // The light/dark pin is not cosmetic (#32): with no stored preference the app
 // follows the operating system, so an unpinned run renders in whatever theme
@@ -33,16 +33,20 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
+import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
+import 'package:ai_tutor_python/services/sound/sound_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
@@ -91,6 +95,22 @@ class _OfflineTutor extends TutorService {
   Future<void> requestExercise() async {}
 }
 
+/// Silent stand-in for the tutor's sound effects (#100). The real one plays
+/// through the speakers of whatever machine runs the suite, and audioplayers
+/// keeps a frame callback ticking past the end of the clip — a flow that
+/// ends while the "correct answer" note is still sounding fails with "an
+/// animation is still running even after the widget tree was disposed".
+class _NoSound extends SoundService {
+  @override
+  Future<void> correctAnswer() async {}
+  @override
+  Future<void> askQuestion() async {}
+  @override
+  Future<void> playGoalReached() async {}
+  @override
+  Future<void> guidingComplete() async {}
+}
+
 /// Replaces only the *dialog* half of progress export / import (#32): the
 /// path is fixed instead of asked for, and the file is still written to and
 /// read from the real disk, so a flow exercises the same round trip a student
@@ -126,6 +146,9 @@ class AppHarness {
     this.github,
     this.githubOAuthClientId,
     this.llm,
+    this.developerTools,
+    this.supervision,
+    this.extraDocs = const {},
     Map<String, LessonRunResult> lessonResults = const {},
   }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -195,6 +218,30 @@ class AppHarness {
   /// assistant text.
   final ScriptedLlm? llm;
 
+  /// Whether developer-only surfaces (the instructions editor, the developer
+  /// card and — on its own — the AI model card in Options) are exposed.
+  ///
+  /// `null` (the default) leaves the app's own rule in place, which is
+  /// `kDebugMode` — and an integration-test binary is a debug build, so by
+  /// default every flow runs *with* developer tools. A flow about who gets
+  /// to see something that developer builds see anyway (#90) passes `false`,
+  /// so it proves the role gate rather than the debug gate.
+  final bool? developerTools;
+
+  /// The classroom-supervision registry the tutor consults when it grades an
+  /// answer (#100). `null` (the default) leaves the app's own binding in
+  /// place — no registry, every turn is home work — which is also what the
+  /// shipped app does until Anchor is wired up. A flow about the supervised
+  /// weight passes a stand-in that says "in session".
+  final SupervisionSource? supervision;
+
+  /// Cosmos docs upserted on top of the standard seed before the app boots,
+  /// keyed by container name as `CosmosPaths` names them (#101). A doc whose
+  /// id already exists in the seed replaces it, so a flow can start a
+  /// student mid-curriculum — beliefs, progress, an edited goal — instead
+  /// of on the first exercise.
+  final Map<String, List<Map<String, dynamic>>> extraDocs;
+
   /// Every URL the app asked the operating system to open (#57).
   ///
   /// The launcher is always replaced, in every flow: the production one hands
@@ -224,6 +271,11 @@ class AppHarness {
   Future<void> boot(WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
+    for (final entry in extraDocs.entries) {
+      for (final doc in entry.value) {
+        cosmos[entry.key].upsert(doc);
+      }
+    }
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
 
     _container = ProviderContainer(
@@ -234,6 +286,10 @@ class AppHarness {
               ? _OfflineTutor.new
               : () => TutorService(connectorOverride: llm!),
         ),
+        // The grade justification (#99) has its own connector; the same
+        // scripted model stands in for it, and with no script it fails
+        // loudly like every other LLM call.
+        gradeJustificationConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
@@ -249,6 +305,11 @@ class AppHarness {
         ],
         if (githubOAuthClientId != null)
           gitHubOAuthClientIdProvider.overrideWithValue(githubOAuthClientId!),
+        if (developerTools != null)
+          developerToolsProvider.overrideWithValue(developerTools!),
+        if (supervision != null)
+          supervisionSourceProvider.overrideWithValue(supervision!),
+        soundServiceProvider.overrideWithValue(_NoSound()),
         browserLauncherProvider.overrideWithValue((Uri url) async {
           browserLaunches.add(url);
           return true;

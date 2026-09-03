@@ -37,6 +37,7 @@ class InstructionGenerator {
     required Future<List<Goal>> Function() fetchRootGoals,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
+    Goal? subgoalOverride,
   }) async {
     final selectedRoot = goalSelection.selectedRoot;
     final selectedChild = goalSelection.selectedChild;
@@ -51,7 +52,12 @@ class InstructionGenerator {
     String alwaysInclude = '';
     String typeSpecific = '';
     final root = goalSelection.preferredRoot ?? selectedRoot;
-    final subgoal = goalSelection.preferredChild ?? selectedChild;
+    // A warm-up review question (#102) is about an older subgoal of the same
+    // root: `{subgoal}` and `{teachingTips}` then describe that one, so the
+    // model writes and grades the question in its proper context.
+    final subgoal =
+        subgoalOverride ?? goalSelection.preferredChild ?? selectedChild;
+    final alwaysIncludeSubgoal = subgoalOverride ?? selectedChild;
     for (final instruction in instructions) {
       if (instruction.id == typeString) {
         for (final content in instruction.sections.entries) {
@@ -69,7 +75,7 @@ class InstructionGenerator {
           final processed = _replaceTags(
             content.value,
             selectedRoot,
-            selectedChild,
+            alwaysIncludeSubgoal,
             targetLOs: targetLOs,
             goalScopeLOs: goalScopeLOs,
           );

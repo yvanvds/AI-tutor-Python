@@ -5,6 +5,7 @@
 
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
+import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/hint.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
@@ -48,6 +49,33 @@ void main() {
         '<TEXT>p</TEXT><META>```json\n{"type":"hint"}\n```</META>',
       );
       expect(r, isA<Hint>());
+    });
+
+    test('code_feedback carries transferLOs (#101); malformed entries and a '
+        'missing field read as none', () {
+      final r = AIResponseParser.parse(
+        '<TEXT>Goed.</TEXT><META>{"type":"code_feedback",'
+        '"overallQuality":"correct","loSignals":[],'
+        '"transferLOs":[{"subgoalId":"s0","loId":"lo-print"},'
+        '{"subgoalId":"s0"},{"loId":"x"},"junk",{"subgoalId":"","loId":"y"}]}'
+        '</META>',
+      );
+      expect(r, isA<CodeFeedback>());
+      final fb = r as CodeFeedback;
+      expect(fb.transferLOs, hasLength(1));
+      expect(fb.transferLOs.single.subgoalId, 's0');
+      expect(fb.transferLOs.single.loId, 'lo-print');
+      // Round-trips into the debug mirror.
+      expect(fb.toJson()['transferLOs'], [
+        {'subgoalId': 's0', 'loId': 'lo-print'},
+      ]);
+
+      final none = AIResponseParser.parse(
+        '<TEXT>Goed.</TEXT><META>{"type":"code_feedback",'
+        '"overallQuality":"correct","loSignals":[]}</META>',
+      );
+      expect((none as CodeFeedback).transferLOs, isEmpty);
+      expect(none.toJson().containsKey('transferLOs'), isFalse);
     });
   });
 

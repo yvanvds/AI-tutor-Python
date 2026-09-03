@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/account/detail/grade_proposal_section.dart';
 import 'package:ai_tutor_python/features/account/detail/progress_history_charts.dart';
 import 'package:ai_tutor_python/features/account/detail/signal_events_section.dart';
 import 'package:ai_tutor_python/features/account/detail/status_reports_section.dart';
@@ -72,6 +73,11 @@ class StudentDetailDrawer extends ConsumerWidget {
                           StatusReportsSection(uid: account.uid, goals: goals),
                           const Divider(height: 1),
                           ProgressHistoryCharts(uid: account.uid, goals: goals),
+                          const Divider(height: 1),
+                          // Teacher-only by construction (#99): this drawer
+                          // exists only on the Students page, which a
+                          // student's shell never routes to.
+                          GradeProposalSection(account: account),
                         ],
                       );
                     },

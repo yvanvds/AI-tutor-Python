@@ -8,6 +8,7 @@ class ExplainFeedback implements ChatResponse {
   final AnswerQuality quality;
   final String prompt;
   final List<LoSignal> loSignals;
+  final List<TransferLoRef> transferLOs;
   final FollowUp? followUp;
 
   ExplainFeedback({
@@ -15,6 +16,7 @@ class ExplainFeedback implements ChatResponse {
     required this.quality,
     required this.prompt,
     this.loSignals = const [],
+    this.transferLOs = const [],
     this.followUp,
   });
 
@@ -24,6 +26,7 @@ class ExplainFeedback implements ChatResponse {
       quality: _stringToQuality(map['overallQuality'] ?? map['quality']),
       prompt: map['prompt'] ?? '',
       loSignals: parseLoSignals(map['loSignals']),
+      transferLOs: parseTransferLOs(map['transferLOs']),
       followUp: FollowUp.tryParse(map['followUp']),
     );
   }
@@ -35,6 +38,8 @@ class ExplainFeedback implements ChatResponse {
       'overallQuality': quality.name,
       'prompt': prompt,
       'loSignals': loSignals.map((s) => s.toJson()).toList(),
+      if (transferLOs.isNotEmpty)
+        'transferLOs': transferLOs.map((t) => t.toJson()).toList(),
       if (followUp != null) 'followUp': followUp!.toJson(),
     };
   }

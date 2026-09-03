@@ -14,16 +14,20 @@ const String _modulesContainer = 'modules';
 const String _loBeliefsContainer = 'lo_beliefs';
 const String _turnHistoryContainer = 'turn_history';
 const String _playgroundFilesContainer = 'playground_files';
+const String _milestonesContainer = 'milestones';
+const String _gradeProposalsContainer = 'grade_proposals';
 
 /// Constant partition-key values for the single-partition containers
-/// (`goals`, `instructions`, `config`, `content`, `modules`). Each doc in
-/// those containers carries a `type` field with this exact value.
+/// (`goals`, `instructions`, `config`, `content`, `modules`, `milestones`).
+/// Each doc in those containers carries a `type` field with this exact
+/// value.
 class CosmosPartitions {
   static const String goal = 'goal';
   static const String instruction = 'instruction';
   static const String config = 'config';
   static const String content = 'content';
   static const String module = 'module';
+  static const String milestone = 'milestone';
 }
 
 class CosmosPaths {
@@ -79,4 +83,17 @@ class CosmosPaths {
   /// delete reaches the student's other machines (#31).
   static CosmosContainer playgroundFiles() =>
       _client.container(_playgroundFilesContainer);
+
+  /// `/type` partition (always `"milestone"`). One doc per grading
+  /// milestone: the LOs expected by a report date with their Angoff split
+  /// (#99, PUNTENFORMULE §2.1). Teacher-edited, a handful per year.
+  static CosmosContainer milestones() =>
+      _client.container(_milestonesContainer);
+
+  /// `/uid` partition. Doc id `${uid}_${milestoneId}`: the computed grade
+  /// proposal for one student on one milestone, its AI-written
+  /// justification and the teacher's sign-off (#99). Teacher-only; the
+  /// student app never reads it.
+  static CosmosContainer gradeProposals() =>
+      _client.container(_gradeProposalsContainer);
 }

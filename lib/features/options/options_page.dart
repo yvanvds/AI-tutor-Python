@@ -4,7 +4,8 @@
 //
 //   - language (moved from the sidebar settings popup)
 //   - appearance: light / dark / follow the system (#32)
-//   - the AI model, on own-key and developer builds (#32)
+//   - the AI model, on own-key and developer builds (#32) and for teachers
+//     (#90)
 //   - progress reset: everything, or one goal / subgoal
 //   - export / import of progress to a JSON file (#32)
 //   - the user's own OpenAI key (only when the account is not on the
@@ -22,6 +23,7 @@ import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
@@ -56,6 +58,7 @@ class OptionsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final devTools = ref.watch(developerToolsProvider);
+    final isTeacher = ref.watch(isTeacherProvider);
     final usesOwnKey = ref.watch(
       accountServiceProvider.select((a) => a != null && !a.mayUseGlobalKey),
     );
@@ -86,8 +89,11 @@ class OptionsPage extends ConsumerWidget {
               const _ThemeCard(),
               // The model is a spending decision as much as a quality one, so
               // it is offered to whoever is paying: an own-key account, or a
-              // developer build (#32).
-              if (usesOwnKey || devTools) ...[
+              // developer build (#32) — and to a teacher on the school's key,
+              // who answers for that spend and has no other way to see which
+              // model the tutor is on (#90). A student on the school's key
+              // still sees nothing.
+              if (usesOwnKey || devTools || isTeacher) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _ModelCard(),
               ],

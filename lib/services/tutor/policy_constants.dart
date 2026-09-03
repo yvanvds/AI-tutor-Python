@@ -6,6 +6,7 @@
 // named module — this is it. Where the code value differs from the doc
 // value, the code value wins; flag the discrepancy in the PR description.
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 
 class PolicyConstants {
@@ -43,6 +44,23 @@ class PolicyConstants {
     }
   }
 
+  /// Provenance multiplier `s` on the base weight (PUNTENFORMULE §2.7, #100).
+  /// Evidence produced under Anchor supervision is *more reliable*, not
+  /// certain, so the factor is modest. Provisional until the period-1 shadow
+  /// run fixes it (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never
+  /// discounted, it is confirmed or contradicted by later supervised work.
+  static const double supervisedWeightFactor = 1.25;
+
+  /// Multiplier for a signal's provenance. `home` is the unit weight.
+  static double provenanceMultiplier(EvidenceProvenance p) {
+    switch (p) {
+      case EvidenceProvenance.home:
+        return 1.0;
+      case EvidenceProvenance.supervised:
+        return supervisedWeightFactor;
+    }
+  }
+
   /// Weight applied to follow-up answer signals. Per CONDUCTOR_POLICY §6.2,
   /// follow-up signals are capped at `weak` and treated as `medium`
   /// difficulty for the multiplier step. (Follow-up chaining is out of scope
@@ -77,6 +95,17 @@ class PolicyConstants {
   /// Cap on the cascade-skip when advancing through pre-mastered subgoals.
   /// At most this many subgoals can auto-skip in a row.
   static const int cascadeSkipCap = 1;
+
+  // ---- Warm-up review (CONDUCTOR_POLICY §1.5, #102) ------------------------
+
+  /// How long a once-mastered LO in another subgoal must go without a
+  /// belief write before it is due for a warm-up review question. Half the
+  /// decay half-life: at that age a `(5, 1)` belief has decayed to
+  /// `(3.8, 1)` — mean 0.79, just under the mastery threshold — so the
+  /// review lands right where decay starts to read as "forgotten". Any
+  /// write resets the clock, including a transfer credit (§3.7), which is
+  /// how LOs that recur in later work stay out of the warm-up pool.
+  static const Duration warmUpStaleAfter = Duration(days: 30);
 
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------
 

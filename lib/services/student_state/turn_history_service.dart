@@ -118,6 +118,43 @@ class TurnHistoryService {
     });
   }
 
+  /// Graded turns of one student inside `[from, to]`, oldest first, read
+  /// teacher-side for the grade proposal's provenance count (#99,
+  /// PUNTENFORMULE §3.2). Audit-only records (no question asked) are left
+  /// out: they are not evidence.
+  Future<List<PersistedTurnRecord>> listTurnsBetween(
+    String uid, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT * FROM c WHERE c.uid = @uid '
+        'AND c.turnAt >= @from AND c.turnAt <= @to '
+        'ORDER BY c.turnAt ASC',
+        parameters: {
+          '@uid': uid,
+          '@from': from.toUtc().toIso8601String(),
+          '@to': to.toUtc().toIso8601String(),
+        },
+        partitionKey: uid,
+      );
+      final out = <PersistedTurnRecord>[];
+      for (final doc in docs) {
+        final record = PersistedTurnRecord.fromCosmos(doc);
+        if (record.questionType.isEmpty) continue;
+        // The window is re-applied client-side: a fake or a partial index
+        // that ignores the range clause must not widen the count.
+        if (record.turnAt.isBefore(from) || record.turnAt.isAfter(to)) {
+          continue;
+        }
+        out.add(record);
+      }
+      out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
   /// Count of unacknowledged strong events for one student. Drives the
   /// "needs attention" badge on the accounts page.
   Future<int> countStrongUnacknowledgedFor(String uid) async {

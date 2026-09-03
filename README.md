@@ -101,11 +101,13 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `playground_files` | `/uid`      |
    | `lo_beliefs`     | `/uid`        |
    | `turn_history`   | `/uid`        |
+   | `grade_proposals` | `/uid`       |
    | `goals`          | `/type`       |
    | `instructions`   | `/type`       |
    | `config`         | `/type`       |
    | `content`        | `/type`       |
    | `modules`        | `/type`       |
+   | `milestones`     | `/type`       |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc

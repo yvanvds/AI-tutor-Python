@@ -176,11 +176,352 @@ abstract class AppLocalizations {
   /// **'Students'**
   String get sidebar_section_students;
 
+  /// No description provided for @sidebar_section_milestones.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestones'**
+  String get sidebar_section_milestones;
+
   /// No description provided for @sidebar_section_options.
   ///
   /// In en, this message translates to:
   /// **'Options'**
   String get sidebar_section_options;
+
+  /// No description provided for @milestones_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestones'**
+  String get milestones_page_title;
+
+  /// No description provided for @milestones_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which goals should be known by which report date, and which of them gate the pass mark.'**
+  String get milestones_page_subtitle;
+
+  /// No description provided for @milestones_list_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No milestones yet.'**
+  String get milestones_list_empty;
+
+  /// No description provided for @milestones_button_new.
+  ///
+  /// In en, this message translates to:
+  /// **'New milestone'**
+  String get milestones_button_new;
+
+  /// No description provided for @milestones_button_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get milestones_button_save;
+
+  /// No description provided for @milestones_button_delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get milestones_button_delete;
+
+  /// No description provided for @milestones_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a milestone on the left, or create a new one.'**
+  String get milestones_placeholder;
+
+  /// No description provided for @milestones_field_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get milestones_field_title;
+
+  /// No description provided for @milestones_field_periodStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start (YYYY-MM-DD)'**
+  String get milestones_field_periodStart;
+
+  /// No description provided for @milestones_field_dueAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Report date (YYYY-MM-DD)'**
+  String get milestones_field_dueAt;
+
+  /// No description provided for @milestones_field_pickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a date'**
+  String get milestones_field_pickDate;
+
+  /// No description provided for @milestones_field_expectedDifficulty.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected level for the core'**
+  String get milestones_field_expectedDifficulty;
+
+  /// No description provided for @milestones_difficulty_easy.
+  ///
+  /// In en, this message translates to:
+  /// **'easy'**
+  String get milestones_difficulty_easy;
+
+  /// No description provided for @milestones_difficulty_medium.
+  ///
+  /// In en, this message translates to:
+  /// **'medium'**
+  String get milestones_difficulty_medium;
+
+  /// No description provided for @milestones_difficulty_hard.
+  ///
+  /// In en, this message translates to:
+  /// **'hard'**
+  String get milestones_difficulty_hard;
+
+  /// No description provided for @milestones_goals_heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals in this milestone'**
+  String get milestones_goals_heading;
+
+  /// No description provided for @milestones_goals_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick a subgoal to include its learning objectives. Then mark, per objective, whether a student who just passes masters it (core) or not (extension).'**
+  String get milestones_goals_hint;
+
+  /// No description provided for @milestones_lo_core.
+  ///
+  /// In en, this message translates to:
+  /// **'core'**
+  String get milestones_lo_core;
+
+  /// No description provided for @milestones_lo_extension.
+  ///
+  /// In en, this message translates to:
+  /// **'extension'**
+  String get milestones_lo_extension;
+
+  /// No description provided for @milestones_validation_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the milestone a title.'**
+  String get milestones_validation_title;
+
+  /// No description provided for @milestones_validation_date.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the form YYYY-MM-DD.'**
+  String get milestones_validation_date;
+
+  /// No description provided for @milestones_validation_order.
+  ///
+  /// In en, this message translates to:
+  /// **'The report date must come after the period start.'**
+  String get milestones_validation_order;
+
+  /// No description provided for @milestones_validation_goals.
+  ///
+  /// In en, this message translates to:
+  /// **'Include at least one subgoal.'**
+  String get milestones_validation_goals;
+
+  /// No description provided for @milestones_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestone saved.'**
+  String get milestones_saved;
+
+  /// No description provided for @milestones_deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestone deleted.'**
+  String get milestones_deleted;
+
+  /// No description provided for @milestones_delete_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete milestone'**
+  String get milestones_delete_dialog_title;
+
+  /// No description provided for @milestones_delete_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\"? Grade proposals already computed against it stay as they are.'**
+  String milestones_delete_dialog_message(String title);
+
+  /// No description provided for @milestones_delete_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get milestones_delete_dialog_cancel;
+
+  /// No description provided for @milestones_delete_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get milestones_delete_dialog_confirm;
+
+  /// No description provided for @milestones_summary.
+  ///
+  /// In en, this message translates to:
+  /// **'{core} core, {extension} extension learning objectives'**
+  String milestones_summary(int core, int extension);
+
+  /// No description provided for @drawer_grade_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade proposal'**
+  String get drawer_grade_title;
+
+  /// No description provided for @drawer_grade_noMilestones.
+  ///
+  /// In en, this message translates to:
+  /// **'No milestones defined yet — create one under Milestones.'**
+  String get drawer_grade_noMilestones;
+
+  /// No description provided for @drawer_grade_milestone_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestone'**
+  String get drawer_grade_milestone_label;
+
+  /// No description provided for @drawer_grade_button_compute.
+  ///
+  /// In en, this message translates to:
+  /// **'Compute proposal'**
+  String get drawer_grade_button_compute;
+
+  /// No description provided for @drawer_grade_button_recompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Recompute'**
+  String get drawer_grade_button_recompute;
+
+  /// No description provided for @drawer_grade_button_justify.
+  ///
+  /// In en, this message translates to:
+  /// **'Write justification'**
+  String get drawer_grade_button_justify;
+
+  /// No description provided for @drawer_grade_button_signOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign off'**
+  String get drawer_grade_button_signOff;
+
+  /// No description provided for @drawer_grade_button_busy.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get drawer_grade_button_busy;
+
+  /// No description provided for @drawer_grade_proposal_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposal'**
+  String get drawer_grade_proposal_label;
+
+  /// No description provided for @drawer_grade_masteryEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastery now: {value}'**
+  String drawer_grade_masteryEnd(String value);
+
+  /// No description provided for @drawer_grade_masteryStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastery at period start: {value}'**
+  String drawer_grade_masteryStart(String value);
+
+  /// No description provided for @drawer_grade_growth.
+  ///
+  /// In en, this message translates to:
+  /// **'Growth: {value}'**
+  String drawer_grade_growth(String value);
+
+  /// No description provided for @drawer_grade_core.
+  ///
+  /// In en, this message translates to:
+  /// **'Core at level: {counted} / {total}'**
+  String drawer_grade_core(int counted, int total);
+
+  /// No description provided for @drawer_grade_extension.
+  ///
+  /// In en, this message translates to:
+  /// **'Extension mastered: {counted} / {total}'**
+  String drawer_grade_extension(int counted, int total);
+
+  /// No description provided for @drawer_grade_hard.
+  ///
+  /// In en, this message translates to:
+  /// **'Demonstrated at hard: {counted} / {total} mastered'**
+  String drawer_grade_hard(int counted, int total);
+
+  /// No description provided for @drawer_grade_reliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.'**
+  String drawer_grade_reliability(
+    int stale,
+    int never,
+    int supervised,
+    int home,
+  );
+
+  /// No description provided for @drawer_grade_formulaVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Formula v{version}, computed {ts}'**
+  String drawer_grade_formulaVersion(String version, String ts);
+
+  /// No description provided for @drawer_grade_justification_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Justification'**
+  String get drawer_grade_justification_title;
+
+  /// No description provided for @drawer_grade_justification_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not write the justification: {error}'**
+  String drawer_grade_justification_failed(String error);
+
+  /// No description provided for @drawer_grade_adjusted_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade for the report card'**
+  String get drawer_grade_adjusted_label;
+
+  /// No description provided for @drawer_grade_adjusted_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number from 0 to 100.'**
+  String get drawer_grade_adjusted_invalid;
+
+  /// No description provided for @drawer_grade_note_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for adjustment (optional)'**
+  String get drawer_grade_note_label;
+
+  /// No description provided for @drawer_grade_signed.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed off {ts}: {grade}/100'**
+  String drawer_grade_signed(String ts, int grade);
+
+  /// No description provided for @drawer_grade_signed_note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: {note}'**
+  String drawer_grade_signed_note(String note);
+
+  /// No description provided for @drawer_grade_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not compute the proposal: {error}'**
+  String drawer_grade_failed(String error);
 
   /// No description provided for @options_page_title.
   ///
@@ -3218,6 +3559,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New goal selected: {title}'**
   String chat_notice_newGoalSelected(String title);
+
+  /// No description provided for @chat_notice_warmUpReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick warm-up first: one review question on {title}.'**
+  String chat_notice_warmUpReview(String title);
 
   /// No description provided for @chat_notice_difficultyChanged.
   ///

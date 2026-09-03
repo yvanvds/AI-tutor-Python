@@ -195,6 +195,26 @@ StudentLOBelief {
                                         // a one-way ratchet for the
                                         // "ever demonstrated at non-easy"
                                         // signal.
+  highestPositiveDifficulty: "easy" | "medium" | "hard"?
+                                        // Highest difficulty at which a
+                                        // positive signal was ever earned
+                                        // (conductor policy 4.3, #103).
+                                        // One-way per level; absent until
+                                        // the first positive. Missing on
+                                        // older docs: reads as "medium"
+                                        // when lastPositiveAtCalibratedAt
+                                        // is set, absent otherwise.
+  recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
+  firstMasteredAt: string?              // ISO 8601, set the first time all
+                                        // three mastery conditions held
+                                        // after a write (conductor policy
+                                        // 4.3, #101). One-way: decay and
+                                        // later negatives never clear it.
+                                        // Gate for transfer credit (3.7).
+                                        // Missing on older docs: read as
+                                        // "mastered at the last write" when
+                                        // the stored α, β and ratchet meet
+                                        // the mastery rule, else absent.
 }
 ```
 
@@ -253,6 +273,38 @@ teacher-dashboard surfaces, not by the conductor's decision logic.
 Belief and calibration are the source of truth for decisions;
 `turn_history` is the audit trail.
 
+### `milestones` and `grade_proposals` containers (#99)
+
+Teacher-side only; nothing in the student flow reads or writes them, and
+the conductor does not know they exist. They are the persistence behind
+PUNTENFORMULE part 2.
+
+`milestones` is single-partition (`/type = "milestone"`), a handful of
+docs per year:
+
+```
+Milestone {
+  id: string
+  type: "milestone"
+  title: string
+  periodStart: string     // ISO 8601; M_start is read from progress_history as of here
+  dueAt: string           // ISO 8601; the report moment
+  expectedDifficulty: "easy" | "medium" | "hard"   // level the core must be shown at
+  subgoalIds: string[]    // whose LOs make up the milestone
+  coreLoKeys: string[]    // "{subgoalId}/{loId}" of every core LO; the rest is extension
+  updatedAt: string
+}
+```
+
+`grade_proposals` is partitioned `/uid`, one doc per `(uid, milestoneId)`
+with id `{uid}_{milestoneId}`: the formula's outputs (`k`, `u`, `d`,
+`mEnd`, `mStart`, `g`, `proposal`) with the counts behind them, the
+reliability signals (`staleLoCount`, `neverProbedCount`,
+`supervisedTurns`, `homeTurns`), `formulaVersion`, `computedAt`, the
+AI-written `justification` (+ `justificationAt`), and the teacher's
+`adjustedGrade`, `adjustmentNote` and `signedOffAt`. A doc with
+`signedOffAt` is frozen — never recomputed, never rewritten.
+
 ## Settled decisions
 
 - **Belief is Beta-distributed**, parameterized by `(α, β)`. Both the
@@ -277,6 +329,24 @@ Belief and calibration are the source of truth for decisions;
   set, the field reflects "the student demonstrated this LO at
   the calibration in force at that time," which remains a valid
   signal regardless of subsequent calibration shifts.
+- **`highestPositiveDifficulty` is a three-level one-way ratchet** (#103).
+  It records the highest difficulty a positive was ever earned at, in
+  absolute terms, and only ever rises. The conductor never reads it; it
+  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
+  because the symmetric difficulty multiplier keeps difficulty out of
+  `(α, β)`.
+- **`firstMasteredAt` is a one-way mastery stamp** (#101). Mastery itself
+  never latches (decay can demote), but "was this LO ever mastered by
+  direct probing?" is a durable fact the model keeps, because transfer
+  credit (conductor policy 3.7) may refresh only such LOs, and the
+  warm-up review question (conductor policy 1.5, #102) picks from the
+  same set. Beliefs in *other* subgoals than the active one can therefore
+  be written by a graded turn: upward only by a transfer credit, in
+  either direction by the once-per-session warm-up review, which is a
+  direct probe of that LO and updates its doc like any probe (ratchets
+  and counter included). `lastUpdatedAt` doubles as the staleness clock
+  for that review: an LO not written for `warmUpStaleAfter` is due.
+  Neither mechanism recomputes the other subgoal's cached `progress`.
 
 ## What this model deliberately does not do
 

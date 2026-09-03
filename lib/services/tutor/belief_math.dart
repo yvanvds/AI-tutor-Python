@@ -7,6 +7,7 @@
 
 import 'dart:math' as math;
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 
@@ -57,21 +58,67 @@ double baseWeight(LoSignalStrength s) {
 }
 
 /// Compute the (αDelta, βDelta) increments for a single signal at a given
-/// difficulty. `neutral` returns (0, 0).
+/// difficulty and provenance. `neutral` returns (0, 0).
+///
+/// [provenance] applies the supervised weight factor `s`
+/// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §2.7): symmetric in positive and
+/// negative, like the difficulty multiplier, so it changes how *hard* a
+/// piece of evidence is, not which way it points.
 ({double alphaDelta, double betaDelta}) signalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,
   required QuestionDifficulty difficulty,
+  EvidenceProvenance provenance = EvidenceProvenance.home,
 }) {
   if (kind == LoSignalKind.neutral) {
     return (alphaDelta: 0.0, betaDelta: 0.0);
   }
   final weighted =
-      baseWeight(strength) * PolicyConstants.difficultyMultiplier(difficulty);
+      baseWeight(strength) *
+      PolicyConstants.difficultyMultiplier(difficulty) *
+      PolicyConstants.provenanceMultiplier(provenance);
   if (kind == LoSignalKind.positive) {
     return (alphaDelta: weighted, betaDelta: 0.0);
   }
   return (alphaDelta: 0.0, betaDelta: weighted);
+}
+
+/// Transfer credit (#101, CONDUCTOR_POLICY §3.7, PUNTENFORMULE §2.8): the
+/// small positive an already-mastered LO earns when a *working* solution
+/// to a later exercise correctly uses it. Deliberately not a parallel
+/// weight path: it is an ordinary `(positive, weak)` signal treated as
+/// `medium` — the same footing as a follow-up signal (§6.2) — so it is
+/// `weightWeak × 1.0 × s`, with `s` the provenance multiplier. Small by
+/// construction (≤ the weak weight), and the Beta arithmetic gives the
+/// diminishing returns for free.
+({double alphaDelta, double betaDelta}) transferCreditDeltas({
+  EvidenceProvenance provenance = EvidenceProvenance.home,
+}) => signalDeltas(
+  kind: LoSignalKind.positive,
+  strength: LoSignalStrength.weak,
+  difficulty: QuestionDifficulty.medium,
+  provenance: provenance,
+);
+
+/// Whether an LO has ever met all three mastery conditions — the gate for
+/// transfer credit (CONDUCTOR_POLICY §3.7): an LO never mastered by direct
+/// probing cannot be brought to mastery sideways.
+///
+/// [firstMasteredAt] is the persisted one-way stamp. Docs written before
+/// it existed fall back to "mastered as of the last direct write": the
+/// stored `(α, β)` are post-update values, so if they meet the mean and
+/// evidence conditions and the calibrated-positive ratchet is set, the LO
+/// was mastered the last time it was probed. Decay since then does not
+/// matter — that is exactly the gap transfer credit is meant to close.
+bool everMastered({
+  required DateTime? firstMasteredAt,
+  required double alpha,
+  required double beta,
+  required DateTime? lastPositiveAtCalibratedAt,
+}) {
+  if (firstMasteredAt != null) return true;
+  return lastPositiveAtCalibratedAt != null &&
+      meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
 }
 
 /// Apply an evidence delta with the cap-then-add rule (CONDUCTOR_POLICY 3.4).
@@ -104,6 +151,25 @@ BeliefSnapshot applyEvidence({
     }
   }
   return BeliefSnapshot(alpha + alphaDelta, beta + betaDelta);
+}
+
+/// The three-level difficulty ratchet (#103, PUNTENFORMULE §2.5): the
+/// highest difficulty at which this LO ever earned a positive signal.
+///
+/// A positive at [difficulty] lifts [current] to `max(current, difficulty)`;
+/// anything else — negatives, neutrals — leaves it alone. Strength does not
+/// matter: a weak positive at hard is still a positive at hard, the same
+/// rule the calibration-relative ratchet (`lastPositiveAtCalibratedAt`)
+/// uses. Follow-up grading is the caller's business: it is not a calibrated
+/// probe and must not reach this function (CONDUCTOR_POLICY §6.2).
+QuestionDifficulty? ratchetHighestPositiveDifficulty({
+  required QuestionDifficulty? current,
+  required LoSignalKind kind,
+  required QuestionDifficulty difficulty,
+}) {
+  if (kind != LoSignalKind.positive) return current;
+  if (current == null || difficulty.index > current.index) return difficulty;
+  return current;
 }
 
 /// Per-LO mastery condition 1 (mean) and 2 (evidence). Condition 3

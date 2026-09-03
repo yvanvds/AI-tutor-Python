@@ -264,6 +264,20 @@ aan het begin al op 100, dan is G = 1 (er viel geen kloof meer te
 dichten). Achteruitgang (M_eind < M_start) telt als G = 0, niet negatief:
 de gezakte M_eind weegt al in de beheersingscomponent.
 
+**Hoe M_start uit de historiek gelezen wordt (regel sinds v1.0.5).** De
+opgeslagen historiek bewaart per subdoel de *fractie* beheerste leerdoelen
+op elk moment dat die veranderde, niet welk leerdoel precies beheerst was
+en evenmin de moeilijkheidsratel. Daarom wordt M_start zo berekend: voor
+elk subdoel van de mijlpaal neemt de formule de laatst opgeslagen fractie
+op of vóór het begin van de periode (0 als er nog niets opgeslagen was), en
+kent die fractie toe aan elk leerdoel van dat subdoel — aan de kant van de
+kern én aan de kant van de uitbreiding. Zo ontstaan k_start en u_start;
+d_start is 0 (over de ratel aan het begin van de periode is niets bekend).
+M_start volgt dan uit dezelfde formule als §2.3. Dit is een benadering,
+maar een deterministische die uit dezelfde opgeslagen gegevens volgt die
+je kunt opvragen; een exactere meting per leerdoel bij het begin van de
+periode is een open verbetering.
+
 ### 2.5 De rol van moeilijkheid
 
 Moeilijkheid verdient een eigen plek in het punt — maar via het juiste
@@ -332,17 +346,32 @@ niemand oneerlijk raakt:
 - **Transfer-krediet.** Oudere leerdoelen zitten vaak impliciet in nieuw
   werk: wie in december een while-lus schrijft, gebruikt daarin nog
   steeds `print()` en variabelen. Wanneer de grader ziet dat je een
-  eerder beheerst leerdoel correct gebruikt in een nieuwe oefening, krijgt
-  dat oude leerdoel een klein positief signaal: de decay-klok wordt
-  teruggezet én de overtuiging stijgt licht. Dit werkt alleen positief
-  (een fout in nieuw werk telt niet extra tegen het oude leerdoel), alleen
-  voor leerdoelen die eerder door directe bevraging beheerst raakten, en
-  met klein gewicht — de Beta-wiskunde zorgt zelf voor afnemende
-  meeropbrengst.
+  eerder beheerst leerdoel uit een *ander* subdoel correct gebruikt in een
+  werkende oplossing van een nieuwe oefening, krijgt dat oude leerdoel een
+  klein positief signaal: de decay-klok wordt teruggezet én de overtuiging
+  stijgt licht. Dit werkt alleen positief (een foute of half-juiste
+  oplossing telt niet tegen het oude leerdoel — en levert het ook niets
+  op), alleen voor leerdoelen die eerder door directe bevraging beheerst
+  raakten (de app onthoudt per leerdoel wanneer dat voor het eerst
+  gebeurde), en met klein gewicht — de Beta-wiskunde zorgt zelf voor
+  afnemende meeropbrengst. De moeilijkheidsratel van §2.5 beweegt er
+  niet door: de moeilijkheid van de oefening was voor het nieuwe
+  leerdoel gekozen, niet voor het oude.
 - **Opfrisvragen.** Leerdoelen die *niet* vanzelf in nieuwe leerstof
   terugkeren en lang niet bevraagd zijn, krijgen af en toe een korte
   opfrisvraag in de gewone oefenflow. Dat is meteen goede didactiek
-  (ophaaloefening) én houdt de meting vers.
+  (ophaaloefening) én houdt de meting vers. Concreet: een sessie kan
+  openen met **één** opfrisvraag (de app kondigt ze aan) over een eerder
+  beheerst leerdoel uit een ander subdoel van hetzelfde hoofddoel waarvan
+  de overtuiging al **30 dagen** niet meer geschreven is — het langst
+  onaangeroerde leerdoel eerst. Omdat ook transfer-krediet een schrijving
+  is, komen leerdoelen die je in nieuw werk blijft gebruiken hier
+  vanzelf niet in terecht. Het antwoord telt als een gewone meting van
+  dat leerdoel (§1.2, op je huidige moeilijkheidsniveau, met de
+  herkomst van §2.7): een juist antwoord verhoogt de overtuiging en
+  beweegt ook de ratel van §2.5, een fout antwoord verlaagt ze. De vraag
+  telt niet mee voor je kalibratieniveau (§1.6) en verandert niets aan
+  de voortgangsbalkjes.
 
 Samen betekenen ze: wie vroeg klaar was en gewoon is blijven werken,
 staat er op het rapportmoment vers en terecht goed voor.
@@ -397,12 +426,13 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 
 | parameter | betekenis | v1-status |
 | --- | --- | --- |
-| C(k) | curve onder de 50 | voorlopig C(k) = k; vorm na schaduwrun |
-| w_u, w_d | gewicht uitbreiding vs. moeilijkheid boven de 50 | TBD (som = 1) |
-| koppeling boven-50 | lineair met k, of hardere kerndrempel | voorlopig lineair met k |
-| w_M, w_G per periode | mix beheersing/groei | TBD; vroege periodes groei-zwaarder |
-| s | gewichtsfactor bewijs onder toezicht | TBD (bescheiden, s ≥ 1) |
-| transfergewicht | grootte van het transfer-krediet (§2.8) | TBD (klein; ≤ zwak-gewicht 0,5) |
+| C(k) | curve onder de 50 | voorlopig C(k) = k in de code; vorm na schaduwrun |
+| w_u, w_d | gewicht uitbreiding vs. moeilijkheid boven de 50 | voorlopig 0,6 / 0,4 in de code (de waarden van bijlage B); definitief na schaduwrun (som = 1) |
+| koppeling boven-50 | lineair met k, of hardere kerndrempel | voorlopig lineair met k in de code |
+| w_M, w_G per periode | mix beheersing/groei | voorlopig 0,6 / 0,4 in de code voor elke periode (de waarden van bijlage B); definitief na schaduwrun, vroege periodes groei-zwaarder |
+| s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
+| transfergewicht | grootte van het transfer-krediet (§2.8) | voorlopig het zwak-gewicht 0,5 (gerekend als gemiddeld) × s in de code; definitief na schaduwrun (klein; ≤ 0,5) |
+| opfrisdrempel | hoe lang een beheerst leerdoel onaangeroerd moet zijn voor een opfrisvraag (§2.8) | voorlopig 30 dagen (de halve halveringstijd) in de code; definitief na schaduwrun |
 
 Alle overige getallen in dit document (§1) zijn de vandaag werkende
 waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
@@ -420,6 +450,11 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | versie | datum | wijziging |
 | --- | --- | --- |
 | 1.0 | 2026-09-02 | Eerste versie: structuur vastgelegd, parameters TBD tot na de schaduwrun. |
+| 1.0.1 | 2026-09-02 | Geen structuurwijziging. §4 en bijlage A: de voorlopige codewaarde van s (1,25) vermeld en de stand van §2.7 in de code beschreven (#100). |
+| 1.0.2 | 2026-09-02 | Geen structuurwijziging. Bijlage A: de drietraps-ratel van §2.5 staat nu in de code (`highestPositiveDifficulty` per leerdoel), met de oude-data-regel zoals §2.5 ze beschrijft (#103). |
+| 1.0.3 | 2026-09-02 | Geen structuurwijziging. §2.8 transfer-krediet staat nu in de code: alleen bij een volledig juiste oplossing, alleen voor eerder beheerste leerdoelen uit een ander subdoel, gewicht voorlopig 0,5 × s (§4, bijlage A); de ratel van §2.5 beweegt er niet door (#101). |
+| 1.0.4 | 2026-09-02 | Geen structuurwijziging. §2.8 opfrisvragen staan nu in de code: hoogstens één per sessie, bij het begin, over het langst onaangeroerde eerder beheerste leerdoel uit een ander subdoel (drempel voorlopig 30 dagen, §4); het antwoord telt als gewone meting van dat leerdoel, inclusief de ratel van §2.5, maar niet voor het kalibratieniveau (#102). |
+| 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
 
@@ -438,6 +473,9 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | gewicht sterk / matig / zwak | 2,0 / 1,0 / 0,5 | basisgewicht per signaal (§1.2) |
 | moeilijkheidsfactor | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk, symmetrisch (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
+| toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
+| transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
+| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt; hoogstens één per sessie (§2.8) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -448,10 +486,59 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | per-LO trapverlaging | 2 sterk-fout op niveau, zonder tussentijds positief | §1.6 |
 | vastgelopen (klassiek) | α + β ≥ 8 én μ < 0,6 | telt voor doorstroming, niet als beheerst (§1.7) |
 | vastgelopen (verzadigd) | α + β ≥ 18 én μ < 0,75 | idem, bij vol bewijsplafond (§1.7) |
+| C(k) | k | curve onder de 50 (§2.3; voorlopig, §4) |
+| w_u / w_d | 0,6 / 0,4 | uitbreiding vs. moeilijkheid boven de 50 (§2.3; voorlopig, §4) |
+| w_M / w_G | 0,6 / 0,4 | beheersing vs. groei in P (§2.6; voorlopig, §4) |
+| verouderd-drempel | 30 dagen (= opfrisdrempel) | wanneer een mijlpaal-leerdoel in het voorstel als "verouderd" gemeld wordt (§3.2) |
 
-De drietraps-moeilijkheidsratel van §2.5 en de mechanismen van §2.7–§2.8
-zijn op datum van v1.0 **specificatie, nog geen werkende code**; hun
-implementatie volgt dit document.
+De constanten van deel 2 staan sinds v1.0.5 in
+`lib/services/grading/grade_formula.dart` (`GradingConstants`), de
+berekening zelf ook daar; het lezen van de leerlingdata, de regel voor
+M_start (§2.4) en de opslag in `lib/services/grading/grade_proposal_service.dart`;
+de tekst van de verantwoording in `lib/services/grading/grade_justification.dart`.
+Elk opgeslagen voorstel draagt het versienummer van dit document waarmee
+het berekend werd (`formulaVersion`); een afgetekend voorstel wordt nooit
+herrekend (§5).
+
+De drietraps-moeilijkheidsratel van §2.5 staat sinds v1.0.2 in de code:
+per leerdoel bewaart de app `highestPositiveDifficulty` (makkelijk /
+gemiddeld / moeilijk), gezet op de moeilijkheid die *werkelijk gevraagd*
+werd bij elk positief signaal, alleen omhoog, nooit aangepast door een
+kalibratiewijziging en niet door vervolgvragen (§1.2). Oudere opgeslagen
+leerdoelen zonder dit veld lezen als "gemiddeld" wanneer de ratel van §1.5
+gezet was, anders als "nog niets aangetoond" — er wordt niets met
+terugwerkende kracht ingevuld. De formule van deel 2 leest dit veld; de
+tutor zelf gebruikt het niet. Van §2.8 staat sinds v1.0.3 het
+**transfer-krediet** in de code: de grader noemt bij een juiste oplossing
+de leerdoelen uit andere subdoelen die de code correct gebruikt
+(`transferLOs`), en de tutor kent alleen aan leerdoelen die ooit beheerst
+raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
+zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
+meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
+zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
+wordt op het beurtrecord vermeld. De **opfrisvragen** van §2.8 staan
+sinds v1.0.4 in de code: bij het begin van een sessie kiest de tutor
+hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
+oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel
+waarvan `lastUpdatedAt` minstens 30 dagen oud is — het oudste eerst — en
+stelt daarover de zachtste vraagvorm voor dat soort leerdoel op je
+huidige niveau. Het antwoord wordt verwerkt als een gewone meting van
+dat leerdoel (gewicht van §1.2, herkomst van §2.7, ratel van §2.5), telt
+niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
+de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
+code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
+uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel
+in het leerlingoverzicht — μ, n en de ratel per leerdoel na decay op het
+moment van berekenen, M_start uit de historiek volgens §2.4 — vraagt de
+verantwoording aan de AI (die het getal als vaststaand feit meekrijgt,
+samen met de statusrapporten uit de periode en het verloop per subdoel),
+past aan en tekent af. Het voorstel meldt ook de eerlijke
+onzekerheidssignalen van §3.2: hoeveel mijlpaal-leerdoelen al langer dan
+30 dagen niet meer geschreven zijn (of nooit bevraagd), en hoeveel beurten
+in de periode onder toezicht dan wel thuis gebeurden. Van §2.7 staat de weging in de code
+(elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
+s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
+tot die er is, telt elke beurt als thuis en verandert s niets.
 
 ## Bijlage B — rekenvoorbeeld
 

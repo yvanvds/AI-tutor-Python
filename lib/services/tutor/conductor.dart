@@ -13,6 +13,7 @@
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -25,6 +26,15 @@ import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
+
+/// Where a warm-up review question's target LO lives (#102, CONDUCTOR_POLICY
+/// §1.5): an older subgoal of the active root, never the active subgoal.
+/// The host needs the whole [subgoal] — its title for the chat notice, its
+/// teaching tips for the prompt, its id for grading and the turn record.
+class WarmUpReview {
+  final Goal subgoal;
+  const WarmUpReview({required this.subgoal});
+}
 
 /// Selected target for the next question, computed by [Conductor.planNext].
 /// Returned to TutorService so it can pass `targetLOs` to the question
@@ -43,6 +53,11 @@ class QuestionPlan {
   /// callers should NOT also surface a "no more goals" celebration.
   final bool blockedDegraded;
 
+  /// Set when this is the session's warm-up review question (§1.5): the
+  /// single LO in [targetLOs] belongs to [WarmUpReview.subgoal], not to the
+  /// active subgoal. `null` for every ordinary probe.
+  final WarmUpReview? warmUp;
+
   const QuestionPlan({
     required this.type,
     required this.difficulty,
@@ -51,7 +66,14 @@ class QuestionPlan {
     this.blockedEmptyObjectives = false,
     this.blockedSaturated = false,
     this.blockedDegraded = false,
+    this.warmUp,
   });
+
+  bool get isWarmUp => warmUp != null;
+
+  /// The subgoal the target LO belongs to, if this plan targets one.
+  String? targetSubgoalIdOr(String? activeSubgoalId) =>
+      warmUp?.subgoal.id ?? activeSubgoalId;
 
   static const QuestionPlan noResult = QuestionPlan(
     type: ChatRequestType.noResult,
@@ -124,6 +146,11 @@ class TurnOutcome {
   /// cascade-halt conditions tripped.
   final List<TurnSignalEvent> signalEvents;
 
+  /// Transfer credits applied to previously mastered LOs in other subgoals
+  /// (#101, CONDUCTOR_POLICY §3.7). Post-modulation deltas, like
+  /// [appliedSignals]; refs the conductor declined are not listed.
+  final List<TurnTransferCredit> transferCredits;
+
   const TurnOutcome({
     required this.overallQuality,
     required this.subgoalAdvanced,
@@ -136,6 +163,7 @@ class TurnOutcome {
     required this.calibrationAfter,
     required this.hadFallback,
     this.signalEvents = const [],
+    this.transferCredits = const [],
   });
 }
 
@@ -154,10 +182,24 @@ class GradedSignal {
   });
 }
 
+/// One LO the grader saw correctly used in service of the task (#101),
+/// scope-validated like [GradedSignal]. Whether it earns transfer credit
+/// is decided in [Conductor.integrateAnswer] (CONDUCTOR_POLICY §3.7).
+class GradedTransfer {
+  final String subgoalId;
+  final String loId;
+  const GradedTransfer({required this.subgoalId, required this.loId});
+}
+
 /// Input the conductor consumes when integrating a graded answer.
 class GradedAnswer {
   final AnswerQuality overallQuality;
   final List<GradedSignal> signals;
+
+  /// Previously mastered LOs the grader saw *correctly used in service of
+  /// the task* (#101). Only LOs outside the active subgoal can qualify —
+  /// LOs inside it already receive ordinary incidental signals (§2.4).
+  final List<GradedTransfer> transferLOs;
 
   /// True when the grader response was unparseable / every signal failed
   /// validation and a fallback signal was synthesised. Counted toward the
@@ -180,12 +222,21 @@ class GradedAnswer {
   /// for debug visibility.
   final int chainDepth;
 
+  /// Where this answer was produced (#100). Resolved by the host from the
+  /// supervision registry before the answer reaches the conductor; every
+  /// signal on the answer is weighted by it (CONDUCTOR_POLICY §3.2). Applies
+  /// to follow-up signals too — provenance is about where the student was,
+  /// not what kind of probe it was.
+  final EvidenceProvenance provenance;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
     this.hadFallback = false,
     this.isFollowUp = false,
     this.chainDepth = 0,
+    this.provenance = EvidenceProvenance.home,
+    this.transferLOs = const [],
   });
 }
 
@@ -211,6 +262,7 @@ class ConductorDeps {
     required this.setCalibration,
     required this.getLoBelief,
     required this.getLoBeliefsForSubgoal,
+    required this.getAllLoBeliefs,
     required this.upsertLoBelief,
     required this.appendTurnHistory,
   });
@@ -257,6 +309,10 @@ class ConductorDeps {
   getLoBelief;
   final Future<List<LoBelief>> Function(String subgoalId)
   getLoBeliefsForSubgoal;
+
+  /// Every belief doc of the student, across subgoals — read once per
+  /// session for the warm-up review selection (§1.5, #102).
+  final Future<List<LoBelief>> Function() getAllLoBeliefs;
   final Future<void> Function(LoBelief belief) upsertLoBelief;
 
   final Future<void> Function(PersistedTurnRecord record) appendTurnHistory;
@@ -309,6 +365,12 @@ class Conductor {
   /// rides on the same persisted turn that caused the advance.
   TurnSignalEvent? _pendingCascadeHaltEvent;
 
+  /// True once a warm-up review question (§1.5, #102) has been *fired* this
+  /// session — set by `notePlannedQuestion`, not by `planNext`, because the
+  /// host calls `planNext` once at session start only to check for blocks
+  /// and discards that plan. At most one warm-up per session.
+  bool _warmUpAskedThisSession = false;
+
   /// Called on session entry / when the active subgoal changes externally.
   /// Picks the next subgoal if needed and resets per-subgoal state.
   Future<void> setTarget() async {
@@ -326,6 +388,7 @@ class Conductor {
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
     _pendingCascadeHaltEvent = null;
+    _warmUpAskedThisSession = false;
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
   }
 
@@ -347,6 +410,13 @@ class Conductor {
         'subgoalId': subgoal.id,
       });
       return QuestionPlan.emptyObjectives();
+    }
+
+    // §1.5: the session opens with one review question on a stale,
+    // once-mastered LO from an older subgoal, when there is one.
+    if (!_warmUpAskedThisSession) {
+      final warmUp = await _planWarmUp(selection: selection, active: subgoal);
+      if (warmUp != null) return warmUp;
     }
 
     final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
@@ -497,6 +567,109 @@ class Conductor {
     );
   }
 
+  /// Warm-up review selection (CONDUCTOR_POLICY §1.5, #102).
+  ///
+  /// Candidates are the LOs of the active root's *other* subgoals whose
+  /// belief doc (a) was ever mastered by direct probing (`everMastered`)
+  /// and (b) has not been written for `warmUpStaleAfter`. (b) is also what
+  /// keeps naturally recurring LOs out: a transfer credit (§3.7) bumps
+  /// `lastUpdatedAt`, so an LO that later work keeps using is never stale.
+  /// The most stale candidate wins; ties go to the lowest decayed mean.
+  ///
+  /// The question is the gentlest acceptable type for the LO's kind, at the
+  /// student's calibrated difficulty — a direct probe of that LO, so its
+  /// answer is graded like any other (§3), ratchets included (§4.3).
+  Future<QuestionPlan?> _planWarmUp({
+    required GoalSelectionState selection,
+    required Goal active,
+  }) async {
+    final root = selection.activeRootGoal;
+    if (root == null) return null;
+    final siblings = await _deps.getChildren(root.id);
+    final others = siblings.where((g) => g.id != active.id).toList();
+    if (others.isEmpty) return null;
+
+    final beliefs = await _deps.getAllLoBeliefs();
+    final byKey = {for (final b in beliefs) '${b.subgoalId}/${b.loId}': b};
+    final now = DateTime.now().toUtc();
+
+    final candidates =
+        <
+          ({Goal subgoal, LearningObjective lo, LoBelief belief, double mean})
+        >[];
+    for (final sub in others) {
+      for (final lo in sub.objectives) {
+        final b = byKey['${sub.id}/${lo.id}'];
+        if (b == null) continue;
+        if (now.difference(b.lastUpdatedAt) <
+            PolicyConstants.warmUpStaleAfter) {
+          continue;
+        }
+        final mastered = everMastered(
+          firstMasteredAt: b.firstMasteredAt,
+          alpha: b.alpha,
+          beta: b.beta,
+          lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
+        );
+        if (!mastered) continue;
+        final snap = applyDecay(
+          alpha: b.alpha,
+          beta: b.beta,
+          lastUpdatedAt: b.lastUpdatedAt,
+          now: now,
+        );
+        candidates.add((subgoal: sub, lo: lo, belief: b, mean: snap.mean));
+      }
+    }
+    if (candidates.isEmpty) return null;
+
+    candidates.sort((a, b) {
+      final byAge = a.belief.lastUpdatedAt.compareTo(b.belief.lastUpdatedAt);
+      if (byAge != 0) return byAge;
+      return a.mean.compareTo(b.mean);
+    });
+    final pick = candidates.first;
+
+    final acceptable =
+        _acceptableTypes[pick.lo.kind] ??
+        const [ChatRequestType.socraticQuestion];
+    final def = _coldStartDefault[pick.lo.kind] ?? acceptable.first;
+    final type = acceptable.contains(def) ? def : acceptable.first;
+
+    _deps.recordDebugEvent('conductor.warm_up_planned', {
+      'subgoalId': pick.subgoal.id,
+      'loId': pick.lo.id,
+      'staleDays': now.difference(pick.belief.lastUpdatedAt).inDays,
+      'candidates': candidates.length,
+    });
+
+    return QuestionPlan(
+      type: type,
+      difficulty: _deps.getCalibration().difficulty,
+      targetLOs: [pick.lo],
+      warmUp: WarmUpReview(subgoal: pick.subgoal),
+      reason: TurnSelectionReason(
+        candidateLOs: candidates
+            .take(3)
+            .map(
+              (c) => CandidateLoStat(
+                loId: c.lo.id,
+                mean: c.mean,
+                evidence: applyDecay(
+                  alpha: c.belief.alpha,
+                  beta: c.belief.beta,
+                  lastUpdatedAt: c.belief.lastUpdatedAt,
+                  now: now,
+                ).evidence,
+              ),
+            )
+            .toList(growable: false),
+        chosenReason: 'warm-up review: most stale mastered LO',
+        notchDropFired: false,
+      ),
+    );
+  }
+
   /// Acceptable types per LO `kind` (CONDUCTOR_POLICY §2.2).
   static const Map<LoKind, List<ChatRequestType>> _acceptableTypes = {
     LoKind.recall: [
@@ -606,6 +779,13 @@ class Conductor {
   /// question. TutorService calls this immediately after deciding to fire
   /// a request so per-LO recency tracking lines up with the actual probe.
   void notePlannedQuestion(QuestionPlan plan) {
+    if (plan.isWarmUp) {
+      // The warm-up is not a probe of the active subgoal: leave its
+      // per-subgoal recency tracking alone, and spend the session's one
+      // warm-up slot.
+      _warmUpAskedThisSession = true;
+      return;
+    }
     _lastTargetLoId = plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
     _lastQuestionType = plan.type;
   }
@@ -682,17 +862,38 @@ class Conductor {
     // ---- Belief updates --------------------------------------------------
     // For follow-up grading: cap strength at `weak` and treat the
     // difficulty multiplier as `medium` regardless of the original probe's
-    // difficulty (CONDUCTOR_POLICY §6.2). The notch-drop counter and the
-    // `lastPositiveAtCalibratedAt` ratchet are skipped because a follow-up
-    // wasn't a calibrated probe.
+    // difficulty (CONDUCTOR_POLICY §6.2). The notch-drop counter and both
+    // ratchets (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty`)
+    // are skipped because a follow-up wasn't a calibrated probe.
     final appliedSignals = <TurnAppliedSignal>[];
     final touchedLoIds = <String>{};
+    // A warm-up review (§1.5) is a direct probe of an LO in another
+    // subgoal: its signal lands on that LO's doc through the same update
+    // as an active-subgoal signal. Anything else outside the active
+    // subgoal is still skipped (scope was validated upstream; incidental
+    // signals on other subgoals are not evidence the conductor takes).
+    final warmUpSubgoal = plan.warmUp?.subgoal;
+    final targetSubgoalId = warmUpSubgoal?.id ?? subgoal.id;
     for (final sig in answer.signals) {
-      if (sig.subgoalId != subgoal.id) continue; // scope already validated
-      final lo = subgoal.objectives.firstWhereOrNull((o) => o.id == sig.loId);
+      final String signalSubgoalId;
+      final LearningObjective? lo;
+      if (sig.subgoalId == subgoal.id) {
+        signalSubgoalId = subgoal.id;
+        lo = subgoal.objectives.firstWhereOrNull((o) => o.id == sig.loId);
+      } else if (warmUpSubgoal != null &&
+          sig.subgoalId == warmUpSubgoal.id &&
+          targetLo != null &&
+          sig.loId == targetLo.id) {
+        signalSubgoalId = warmUpSubgoal.id;
+        lo = targetLo;
+      } else {
+        continue;
+      }
       if (lo == null) continue;
+      final isTarget =
+          signalSubgoalId == targetSubgoalId && sig.loId == targetLo?.id;
       final existing = await _deps.getLoBelief(
-        subgoalId: subgoal.id,
+        subgoalId: signalSubgoalId,
         loId: sig.loId,
       );
       final now = DateTime.now().toUtc();
@@ -724,6 +925,7 @@ class Conductor {
         kind: sig.kind,
         strength: effectiveStrength,
         difficulty: effectiveDifficulty,
+        provenance: answer.provenance,
       );
       final next = applyEvidence(
         alpha: alpha,
@@ -740,6 +942,16 @@ class Conductor {
       // probe); skip both the timestamp set and the notch-drop counter.
       final newPositiveAtCalibrated =
           (!answer.isFollowUp && hasPositive && atOrAbove) ? now : null;
+      // #103 three-level ratchet: absolute, not calibration-relative — the
+      // difficulty actually asked (a notch-dropped probe at easy counts as
+      // easy). Follow-ups skip it for the same reason as above.
+      final nextHighestPositiveDifficulty = answer.isFollowUp
+          ? existing?.highestPositiveDifficulty
+          : ratchetHighestPositiveDifficulty(
+              current: existing?.highestPositiveDifficulty,
+              kind: sig.kind,
+              difficulty: plan.difficulty,
+            );
 
       // §2.3 counter: bump on a strong-negative at calibration, reset on
       // any positive (any difficulty / any strength), unchanged otherwise.
@@ -756,18 +968,46 @@ class Conductor {
         }
       }
 
+      final nextPositiveAtCalibrated =
+          newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt;
+      // #101 one-way mastery stamp. A doc from before the field existed
+      // that reads as "mastered at its last write" keeps that verdict
+      // durably (dated to that write) even if this turn leaves it below
+      // mastery; otherwise the stamp is set the first time all three
+      // conditions hold after this write.
+      var nextFirstMasteredAt = existing?.firstMasteredAt;
+      if (nextFirstMasteredAt == null) {
+        final legacyMastered =
+            existing != null &&
+            everMastered(
+              firstMasteredAt: null,
+              alpha: existing.alpha,
+              beta: existing.beta,
+              lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
+            );
+        final masteredAfter =
+            meetsMasteryMeanAndEvidence(next) &&
+            nextPositiveAtCalibrated != null;
+        if (legacyMastered) {
+          nextFirstMasteredAt = existing.lastUpdatedAt;
+        } else if (masteredAfter) {
+          nextFirstMasteredAt = now;
+        }
+      }
+
       final updated = LoBelief(
-        subgoalId: subgoal.id,
+        subgoalId: signalSubgoalId,
         loId: sig.loId,
         alpha: next.alpha,
         beta: next.beta,
         lastUpdatedAt: now,
-        lastQuestionType: sig.loId == targetLo?.id
+        lastQuestionType: isTarget
             ? plan.type.name
             : existing?.lastQuestionType,
-        lastPositiveAtCalibratedAt:
-            newPositiveAtCalibrated ?? existing?.lastPositiveAtCalibratedAt,
+        lastPositiveAtCalibratedAt: nextPositiveAtCalibrated,
+        highestPositiveDifficulty: nextHighestPositiveDifficulty,
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
+        firstMasteredAt: nextFirstMasteredAt,
       );
       await _deps.upsertLoBelief(updated);
       appliedSignals.add(
@@ -777,10 +1017,24 @@ class Conductor {
           betaDelta: next.beta - beta,
         ),
       );
-      touchedLoIds.add(sig.loId);
+      if (signalSubgoalId == subgoal.id) touchedLoIds.add(sig.loId);
     }
 
+    // ---- Transfer credit (#101, CONDUCTOR_POLICY §3.7) --------------------
+    final transferCredits = await _applyTransferCredit(
+      answer: answer,
+      activeSubgoalId: subgoal.id,
+      // The warm-up target already took its direct signal above; a
+      // nomination on it would count the same answer twice.
+      excludeSubgoalId: warmUpSubgoal?.id,
+      excludeLoId: warmUpSubgoal == null ? null : targetLo?.id,
+    );
+
     // ---- Mastery + advancement ------------------------------------------
+    // A warm-up turn that touched no active-subgoal LO changes nothing the
+    // active subgoal's cache, history or advancement should react to (§1.5):
+    // its status is still reported on the turn record, but not persisted.
+    final activeTouched = !plan.isWarmUp || touchedLoIds.isNotEmpty;
     final freshBeliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
     final freshById = {for (final b in freshBeliefs) b.loId: b};
     final loStatus = <TurnLoStatus>[];
@@ -842,7 +1096,9 @@ class Conductor {
         : (subgoalMastered ? 1.0 : masteredNonOptional / nonOptional.length);
 
     bool advanced = false;
-    if (subgoalMastered) {
+    if (!activeTouched) {
+      // Nothing to persist or advance; fall through to the record.
+    } else if (subgoalMastered) {
       // §8.2 stuckLoAdvance: subgoal advanced with one or more stuck LOs.
       final stuckLoIds = <String>[];
       for (var i = 0; i < masteredCount.length; i++) {
@@ -926,8 +1182,10 @@ class Conductor {
     // ---- Calibration update (CONDUCTOR_POLICY §5) ------------------------
     // §6.2 / §6.5: follow-up answers don't enter the calibration window —
     // their difficulty is dialogue (medium-treated), not a calibrated probe.
+    // §1.5: neither do warm-up answers — a slip on months-old material is
+    // forgetting, not miscalibration, and a review must not promote either.
     final cal = _deps.getCalibration();
-    final updatedCal = answer.isFollowUp
+    final updatedCal = answer.isFollowUp || plan.isWarmUp
         ? cal
         : _updateCalibration(
             current: cal,
@@ -992,7 +1250,121 @@ class Conductor {
       calibrationAfter: calibrationAfter,
       hadFallback: answer.hadFallback,
       signalEvents: List.unmodifiable(events),
+      transferCredits: transferCredits,
     );
+  }
+
+  /// Transfer credit (#101, CONDUCTOR_POLICY §3.7): a small positive on
+  /// previously mastered LOs in *other* subgoals that a working solution
+  /// correctly used. The grader nominates; the conductor gates:
+  ///
+  ///   - only a `correct` answer (a working solution is unambiguous
+  ///     evidence; a failed one blames nobody outside its target),
+  ///   - never on follow-up grading (dialogue, not a solution) or a
+  ///     fallback turn (the primary signals did not validate),
+  ///   - never inside the active subgoal (those LOs get §2.4 incidental
+  ///     signals at full weight),
+  ///   - only an LO with a belief doc that was ever mastered by direct
+  ///     probing (`everMastered`) — an LO never probed cannot be brought
+  ///     to mastery sideways.
+  ///
+  /// The credit is `transferCreditDeltas` (a weak positive as medium, times
+  /// provenance) on the decayed belief; `lastUpdatedAt` is bumped, which is
+  /// the "decay clock reset". Nothing else on the doc moves: neither
+  /// ratchet (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` —
+  /// the difficulty was set for the target LO, not this one), not the
+  /// notch-drop counter, not `lastQuestionType`. The other subgoal's cached
+  /// progress is not recomputed: positive-only credit cannot lower it.
+  Future<List<TurnTransferCredit>> _applyTransferCredit({
+    required GradedAnswer answer,
+    required String activeSubgoalId,
+    String? excludeSubgoalId,
+    String? excludeLoId,
+  }) async {
+    if (answer.transferLOs.isEmpty) return const [];
+    if (answer.isFollowUp ||
+        answer.hadFallback ||
+        answer.overallQuality != AnswerQuality.correct) {
+      _deps.recordDebugEvent('conductor.transfer_skipped', {
+        'count': answer.transferLOs.length,
+        'isFollowUp': answer.isFollowUp,
+        'hadFallback': answer.hadFallback,
+        'overallQuality': answer.overallQuality.name,
+      });
+      return const [];
+    }
+    final credits = <TurnTransferCredit>[];
+    for (final ref in answer.transferLOs) {
+      if (ref.subgoalId == activeSubgoalId) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': 'active subgoal',
+        });
+        continue;
+      }
+      if (ref.subgoalId == excludeSubgoalId && ref.loId == excludeLoId) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': 'warm-up target',
+        });
+        continue;
+      }
+      final existing = await _deps.getLoBelief(
+        subgoalId: ref.subgoalId,
+        loId: ref.loId,
+      );
+      final eligible =
+          existing != null &&
+          everMastered(
+            firstMasteredAt: existing.firstMasteredAt,
+            alpha: existing.alpha,
+            beta: existing.beta,
+            lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
+          );
+      if (!eligible) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': existing == null ? 'never probed' : 'never mastered',
+        });
+        continue;
+      }
+      final now = DateTime.now().toUtc();
+      final snap = applyDecay(
+        alpha: existing.alpha,
+        beta: existing.beta,
+        lastUpdatedAt: existing.lastUpdatedAt,
+        now: now,
+      );
+      final deltas = transferCreditDeltas(provenance: answer.provenance);
+      final next = applyEvidence(
+        alpha: snap.alpha,
+        beta: snap.beta,
+        alphaDelta: deltas.alphaDelta,
+        betaDelta: deltas.betaDelta,
+      );
+      await _deps.upsertLoBelief(
+        existing.copyWith(
+          alpha: next.alpha,
+          beta: next.beta,
+          lastUpdatedAt: now,
+          // A pre-#101 doc earned its eligibility at its last direct write;
+          // stamp that so the verdict survives the decayed values we are
+          // about to persist.
+          firstMasteredAt: existing.firstMasteredAt ?? existing.lastUpdatedAt,
+        ),
+      );
+      credits.add(
+        TurnTransferCredit(
+          subgoalId: ref.subgoalId,
+          loId: ref.loId,
+          alphaDelta: next.alpha - snap.alpha,
+        ),
+      );
+    }
+    return List.unmodifiable(credits);
   }
 
   bool _difficultyAtLeast(QuestionDifficulty asked, QuestionDifficulty calib) {

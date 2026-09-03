@@ -39,10 +39,26 @@ class LoBeliefsService {
   }
 
   /// Every belief doc of the signed-in user, across subgoals. Used by the
-  /// progress export in the Options panel (#32) — the conductor never wants
-  /// this wide a read.
+  /// progress export in the Options panel (#32) and, once per session, by
+  /// the conductor's warm-up review selection (#102, CONDUCTOR_POLICY
+  /// §1.5) — a single-partition query the size of the curriculum.
   Future<List<LoBelief>> getAllForCurrentUser() {
     final uid = _uid;
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT * FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      return docs.map(LoBelief.fromCosmos).toList();
+    });
+  }
+
+  /// Every belief doc of one student, read teacher-side (#99): the grade
+  /// formula evaluates a milestone against the student's whole belief set.
+  /// Same single-partition query as [getAllForCurrentUser], addressed by
+  /// an explicit uid.
+  Future<List<LoBelief>> getAllForUser(String uid) {
     return safeCosmos(() async {
       final docs = await _container.query(
         'SELECT * FROM c WHERE c.uid = @uid',

@@ -63,9 +63,23 @@ const _identity = AccountIdentity(
   isTeacher: false,
 );
 
+/// The same person with the teacher role from Entra (#90); the account doc
+/// is untouched, so the key situation is whatever the test seeded.
+const _teacherIdentity = AccountIdentity(
+  oid: _uid,
+  displayName: 'Sam Student',
+  email: 'sam@example.com',
+  firstName: 'Sam',
+  lastName: 'Student',
+  isTeacher: true,
+);
+
 class _SignedInAuth extends AuthService {
+  _SignedInAuth(this._who);
+  final AccountIdentity _who;
+
   @override
-  AccountIdentity? build() => _identity;
+  AccountIdentity? build() => _who;
 }
 
 /// The school-wide config doc, without a Cosmos round trip.
@@ -280,6 +294,7 @@ void main() {
 
   Widget buildApp({
     bool devTools = false,
+    bool isTeacher = false,
     UpdateServices? update,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
@@ -301,7 +316,9 @@ void main() {
         () => _FixedGlobalConfig(GlobalConfig(model: globalModel, apiKey: '')),
       ),
       progressArchiveIoProvider.overrideWithValue(archiveIo),
-      authServiceProvider.overrideWith(_SignedInAuth.new),
+      authServiceProvider.overrideWith(
+        () => _SignedInAuth(isTeacher ? _teacherIdentity : _identity),
+      ),
       accountServiceProvider.overrideWith(
         () => AccountService(container: accounts.container),
       ),
@@ -338,6 +355,7 @@ void main() {
   Future<void> mount(
     WidgetTester tester, {
     bool devTools = false,
+    bool isTeacher = false,
     UpdateServices? update,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
@@ -349,6 +367,7 @@ void main() {
     await tester.pumpWidget(
       buildApp(
         devTools: devTools,
+        isTeacher: isTeacher,
         update: update,
         globalModel: globalModel,
         oauthClientId: oauthClientId,
@@ -954,6 +973,36 @@ void main() {
       await mount(tester, devTools: true);
 
       expect(find.text('AI model'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    // #90 — a teacher on the school's key had no way to see or change the
+    // model at all: the card was gated on paying for the calls yourself.
+    testWidgets('a teacher on the bundled key sees the card, with the school '
+        'default as the starting choice, and can pick a model', (tester) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: 'gpt-4.1');
+      final container = containerOf(tester);
+
+      expect(find.text('AI model'), findsOneWidget);
+      expect(find.text('School default (gpt-4.1)'), findsOneWidget);
+      for (final model in kSelectableModels) {
+        expect(find.text(model), findsOneWidget, reason: model);
+      }
+      // Still on the school's key, so the key card stays away.
+      expect(find.text('OpenAI API key'), findsNothing);
+
+      await tester.tap(find.text('gpt-4o-mini'));
+      await tester.pumpAndSettle();
+      expect(container.read(modelPreferenceProvider), 'gpt-4o-mini');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('openai_model'), 'gpt-4o-mini');
+
+      await tester.tap(find.text('School default (gpt-4.1)'));
+      await tester.pumpAndSettle();
+      expect(container.read(modelPreferenceProvider), isNull);
+      expect(prefs.getString('openai_model'), isNull);
 
       await unmount(tester);
     });

@@ -80,6 +80,39 @@ void main() {
     expect(out, contains('RESPONSE FORMAT — STRICT.'));
   });
 
+  test('a subgoal override replaces {subgoal} and {teachingTips} in both '
+      'the always-include and the type-specific sections (#102)', () async {
+    final selection = GoalSelectionState(
+      selectedRoot: root(),
+      selectedChild: subgoal(),
+    );
+    final older = Goal(
+      id: 'sub-0',
+      title: 'Print',
+      parentId: 'root-1',
+      order: 0,
+      teachingTips: const ['Tip P'],
+    );
+    final out = await InstructionGenerator().generateInstructions(
+      ChatRequestType.completeCodeQuestion,
+      goalSelection: selection,
+      cachedInstructions: [
+        makeInstruction('alwaysInclude', {
+          'main': 'always: {goal} / {subgoal} / {teachingTips}',
+        }),
+        makeInstruction('completeCodeQuestion', {
+          'main': 'type: {subgoal} / {teachingTips}',
+        }),
+      ],
+      fetchInstructions: () async => const [],
+      fetchRootGoals: () async => const [],
+      subgoalOverride: older,
+    );
+    expect(out, contains('always: Iteration / Print / Tip P'));
+    expect(out, contains('type: Print / Tip P'));
+    expect(out, isNot(contains('Loops')));
+  });
+
   test('returns empty when no goal selection', () async {
     final out = await InstructionGenerator().generateInstructions(
       ChatRequestType.mcQuestion,

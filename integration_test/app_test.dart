@@ -19,9 +19,12 @@
 import 'package:integration_test/integration_test.dart';
 
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
+import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
+import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
+import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/lesson_flow.dart' as lesson_flow;
@@ -36,12 +39,14 @@ import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
 import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
+import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
+import 'flows/warm_up_review.dart' as warm_up_review;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +56,10 @@ void main() {
   playground_files.main();
   editor_comment_space.main();
   practice_complete_code.main();
+  evidence_provenance.main();
+  difficulty_ratchet.main();
+  transfer_credit.main();
+  warm_up_review.main();
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();
@@ -63,6 +72,7 @@ void main() {
   students_sort.main();
   students_sort_persist.main();
   students_view_prefs_persist.main();
+  grade_proposal.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

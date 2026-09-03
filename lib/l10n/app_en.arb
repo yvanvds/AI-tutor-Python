@@ -23,7 +23,112 @@
   "sidebar_section_lessonContent": "Lesson content",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
+  "sidebar_section_milestones": "Milestones",
   "sidebar_section_options": "Options",
+
+  "milestones_page_title": "Milestones",
+  "milestones_page_subtitle": "Which goals should be known by which report date, and which of them gate the pass mark.",
+  "milestones_list_empty": "No milestones yet.",
+  "milestones_button_new": "New milestone",
+  "milestones_button_save": "Save",
+  "milestones_button_delete": "Delete",
+  "milestones_placeholder": "Pick a milestone on the left, or create a new one.",
+  "milestones_field_title": "Title",
+  "milestones_field_periodStart": "Period start (YYYY-MM-DD)",
+  "milestones_field_dueAt": "Report date (YYYY-MM-DD)",
+  "milestones_field_pickDate": "Pick a date",
+  "milestones_field_expectedDifficulty": "Expected level for the core",
+  "milestones_difficulty_easy": "easy",
+  "milestones_difficulty_medium": "medium",
+  "milestones_difficulty_hard": "hard",
+  "milestones_goals_heading": "Goals in this milestone",
+  "milestones_goals_hint": "Tick a subgoal to include its learning objectives. Then mark, per objective, whether a student who just passes masters it (core) or not (extension).",
+  "milestones_lo_core": "core",
+  "milestones_lo_extension": "extension",
+  "milestones_validation_title": "Give the milestone a title.",
+  "milestones_validation_date": "Use the form YYYY-MM-DD.",
+  "milestones_validation_order": "The report date must come after the period start.",
+  "milestones_validation_goals": "Include at least one subgoal.",
+  "milestones_saved": "Milestone saved.",
+  "milestones_deleted": "Milestone deleted.",
+  "milestones_delete_dialog_title": "Delete milestone",
+  "milestones_delete_dialog_message": "Delete \"{title}\"? Grade proposals already computed against it stay as they are.",
+  "@milestones_delete_dialog_message": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "milestones_delete_dialog_cancel": "Cancel",
+  "milestones_delete_dialog_confirm": "Delete",
+  "milestones_summary": "{core} core, {extension} extension learning objectives",
+  "@milestones_summary": {
+    "placeholders": { "core": { "type": "int" }, "extension": { "type": "int" } }
+  },
+
+  "drawer_grade_title": "Grade proposal",
+  "drawer_grade_noMilestones": "No milestones defined yet — create one under Milestones.",
+  "drawer_grade_milestone_label": "Milestone",
+  "drawer_grade_button_compute": "Compute proposal",
+  "drawer_grade_button_recompute": "Recompute",
+  "drawer_grade_button_justify": "Write justification",
+  "drawer_grade_button_signOff": "Sign off",
+  "drawer_grade_button_busy": "Working…",
+  "drawer_grade_proposal_label": "Proposal",
+  "drawer_grade_masteryEnd": "Mastery now: {value}",
+  "@drawer_grade_masteryEnd": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "drawer_grade_masteryStart": "Mastery at period start: {value}",
+  "@drawer_grade_masteryStart": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "drawer_grade_growth": "Growth: {value}",
+  "@drawer_grade_growth": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "drawer_grade_core": "Core at level: {counted} / {total}",
+  "@drawer_grade_core": {
+    "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "drawer_grade_extension": "Extension mastered: {counted} / {total}",
+  "@drawer_grade_extension": {
+    "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "drawer_grade_hard": "Demonstrated at hard: {counted} / {total} mastered",
+  "@drawer_grade_hard": {
+    "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "drawer_grade_reliability": "Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.",
+  "@drawer_grade_reliability": {
+    "placeholders": {
+      "stale": { "type": "int" },
+      "never": { "type": "int" },
+      "supervised": { "type": "int" },
+      "home": { "type": "int" }
+    }
+  },
+  "drawer_grade_formulaVersion": "Formula v{version}, computed {ts}",
+  "@drawer_grade_formulaVersion": {
+    "placeholders": { "version": { "type": "String" }, "ts": { "type": "String" } }
+  },
+  "drawer_grade_justification_title": "Justification",
+  "drawer_grade_justification_failed": "Could not write the justification: {error}",
+  "@drawer_grade_justification_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "drawer_grade_adjusted_label": "Grade for the report card",
+  "drawer_grade_adjusted_invalid": "Enter a whole number from 0 to 100.",
+  "drawer_grade_note_label": "Reason for adjustment (optional)",
+  "drawer_grade_signed": "Signed off {ts}: {grade}/100",
+  "@drawer_grade_signed": {
+    "placeholders": { "ts": { "type": "String" }, "grade": { "type": "int" } }
+  },
+  "drawer_grade_signed_note": "Note: {note}",
+  "@drawer_grade_signed_note": {
+    "placeholders": { "note": { "type": "String" } }
+  },
+  "drawer_grade_failed": "Could not compute the proposal: {error}",
+  "@drawer_grade_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "options_page_title": "Options",
   "options_page_subtitle": "Settings, maintenance and bug reports.",
@@ -970,6 +1075,10 @@
   "chat_notice_feedbackDegraded": "Something is wrong with the feedback. Try again in a few minutes.",
   "chat_notice_newGoalSelected": "New goal selected: {title}",
   "@chat_notice_newGoalSelected": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "chat_notice_warmUpReview": "Quick warm-up first: one review question on {title}.",
+  "@chat_notice_warmUpReview": {
     "placeholders": { "title": { "type": "String" } }
   },
   "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",

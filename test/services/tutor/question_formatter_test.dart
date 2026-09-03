@@ -57,6 +57,38 @@ void main() {
     expect((m['goal_scope_los'] as List).last['subgoalId'], 'sub-2');
   });
 
+  test('grading payloads name the subgoal of the target LOs when told '
+      '(#102); question payloads never do', () {
+    const lo = LearningObjective(id: 't', statement: 't', kind: LoKind.apply);
+    final graded = jsonDecode(
+      QuestionFormatter.submitCode(
+        'x = 1',
+        targetLOs: const [lo],
+        targetSubgoalId: 's0',
+      ),
+    ) as Map<String, dynamic>;
+    expect((graded['target_los'] as List).single['subgoalId'], 's0');
+
+    final untold = jsonDecode(
+      QuestionFormatter.submitCode('x = 1', targetLOs: const [lo]),
+    ) as Map<String, dynamic>;
+    expect(
+      (untold['target_los'] as List).single.containsKey('subgoalId'),
+      isFalse,
+    );
+
+    final question = jsonDecode(
+      QuestionFormatter.completeCodeQuestion(
+        QuestionDifficulty.easy,
+        targetLOs: const [lo],
+      ),
+    ) as Map<String, dynamic>;
+    expect(
+      (question['target_los'] as List).single.containsKey('subgoalId'),
+      isFalse,
+    );
+  });
+
   test('writeCodeQuestion omits target_los key when none', () {
     final raw = QuestionFormatter.writeCodeQuestion(QuestionDifficulty.hard);
     final m = jsonDecode(raw) as Map<String, dynamic>;
