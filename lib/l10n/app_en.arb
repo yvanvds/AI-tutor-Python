@@ -414,6 +414,10 @@
     "description": "Fallback label for the explain-view root pill when no root goal is set; displayed uppercase"
   },
   "session_explain_prev_button": "Previous",
+  "session_explain_next_button": "Next",
+  "@session_explain_next_button": {
+    "description": "Explain-view footer button that pages forward through already-seen theory pages; only shown after the student paged back"
+  },
   "session_explain_completeXp": "+10 XP on completion",
   "session_explain_tryItYourself": "Try it yourself",
 

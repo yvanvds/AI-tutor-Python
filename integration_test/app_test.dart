@@ -23,6 +23,7 @@ import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
+import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -54,6 +55,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   lesson_flow.main();
+  explain_paging.main();
   language_switch.main();
   playground_files.main();
   editor_comment_space.main();

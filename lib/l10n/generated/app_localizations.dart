@@ -1393,6 +1393,12 @@ abstract class AppLocalizations {
   /// **'Previous'**
   String get session_explain_prev_button;
 
+  /// Explain-view footer button that pages forward through already-seen theory pages; only shown after the student paged back
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get session_explain_next_button;
+
   /// No description provided for @session_explain_completeXp.
   ///
   /// In en, this message translates to:
