@@ -791,7 +791,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_explain_next_button => 'Next';
 
   @override
-  String get session_explain_completeXp => '+10 XP on completion';
+  String session_explain_completeXp(int xp) {
+    return '+$xp XP on completion';
+  }
 
   @override
   String get session_explain_tryItYourself => 'Try it yourself';

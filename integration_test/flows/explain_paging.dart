@@ -16,6 +16,7 @@
 
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +105,9 @@ void main() {
     expect(find.text('Previous'), findsOneWidget);
     expect(find.text('Next'), findsNothing);
     expect(target(), 's2');
+    // #116: the footer names the XP the shell really awards for finishing
+    // this subgoal — it used to promise a flat, invented "+10 XP".
+    expect(find.text('+$kXpPerSubgoal XP on completion'), findsOneWidget);
 
     // Back to the theory of the subgoal already finished.
     await tester.tap(find.text('Previous'));
@@ -111,6 +115,9 @@ void main() {
     expect(find.text('1 / 2'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
     expect(target(), 's2', reason: 'paging back moved the tutor target');
+    // "Print" is already done and its 100 XP already in the pill, so the
+    // footer promises nothing here (#116).
+    expect(find.textContaining('XP on completion'), findsNothing);
 
     // Forward again: the newest page, and no Next to press.
     await tester.tap(find.text('Next'));
@@ -118,6 +125,7 @@ void main() {
     expect(find.text('2 / 2'), findsOneWidget);
     expect(find.text('Next'), findsNothing);
     expect(find.text('Try it yourself'), findsOneWidget);
+    expect(find.text('+$kXpPerSubgoal XP on completion'), findsOneWidget);
     expect(target(), 's2');
 
     await harness.dispose(tester);

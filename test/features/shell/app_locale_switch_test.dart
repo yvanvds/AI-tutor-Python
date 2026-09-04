@@ -60,7 +60,7 @@ const _teacher = Profile(
   topic: 'Python',
   level: 1,
   xp: 0,
-  xpNext: 1500,
+  xpNext: 500,
   streak: 3,
   role: Role.teacher,
 );

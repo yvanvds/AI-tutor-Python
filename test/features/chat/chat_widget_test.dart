@@ -49,7 +49,7 @@ const _testProfile = Profile(
   topic: '',
   level: 1,
   xp: 0,
-  xpNext: 1500,
+  xpNext: 500,
   streak: 0,
   role: Role.student,
 );

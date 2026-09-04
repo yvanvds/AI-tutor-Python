@@ -34,11 +34,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../harness/app_harness.dart';
 import '../harness/seed.dart';
 
-/// One completed subgoal = 100 XP (`shell_state.dart`), so the pill reads
-/// "100 / 1500" while the seeded progress is in place and "0 / 1500" once it
-/// has been wiped.
-const String _xpWithProgress = '100 / 1500';
-const String _xpWiped = '0 / 1500';
+/// One completed subgoal = 100 XP and every level is 500 XP wide
+/// (`shell_state.dart`, #116), so the pill reads "100 / 500" while the seeded
+/// progress is in place and "0 / 500" once it has been wiped.
+const String _xpWithProgress = '100 / 500';
+const String _xpWiped = '0 / 500';
 
 /// Brings a card further down the Options list into view. The panel is a real
 /// `ListView` in a real window, so anything below the fold is not built yet —

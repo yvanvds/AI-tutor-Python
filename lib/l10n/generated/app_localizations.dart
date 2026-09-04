@@ -1399,11 +1399,11 @@ abstract class AppLocalizations {
   /// **'Next'**
   String get session_explain_next_button;
 
-  /// No description provided for @session_explain_completeXp.
+  /// Explain-view footer caption naming the XP the current subgoal is worth once it is fully completed; only shown on the newest theory page
   ///
   /// In en, this message translates to:
-  /// **'+10 XP on completion'**
-  String get session_explain_completeXp;
+  /// **'+{xp} XP on completion'**
+  String session_explain_completeXp(int xp);
 
   /// No description provided for @session_explain_tryItYourself.
   ///

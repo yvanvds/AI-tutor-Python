@@ -10,6 +10,7 @@
 // in `integration_test/flows/explain_paging.dart`.
 
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -179,6 +180,43 @@ void main() {
       expect(find.text('Previous'), findsOneWidget);
       expect(enabled(tester, 'Previous'), isTrue);
       expect(find.text('Next'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    // #116: the caption used to read a hard-coded "+10 XP on completion".
+    // The shell awards `kXpPerSubgoal` for finishing a subgoal and nothing
+    // for an explain page, so the caption now names that number — and only
+    // on the page whose XP is still to be earned.
+    testWidgets('the XP caption names what the subgoal is actually worth', (
+      tester,
+    ) async {
+      await mount(tester);
+
+      expect(kXpPerSubgoal, 100);
+      expect(find.text('+100 XP on completion'), findsOneWidget);
+      expect(find.textContaining('+10 XP'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a page the student paged back to promises no XP', (
+      tester,
+    ) async {
+      await mount(tester);
+      expect(find.text('+100 XP on completion'), findsOneWidget);
+
+      await tester.tap(find.text('Previous'));
+      await settlePage(tester);
+
+      // "Print" is finished; its XP is already in the pill.
+      expect(shownLesson(), contains('lesson-one'));
+      expect(find.textContaining('XP on completion'), findsNothing);
+
+      // Back on the newest page it is there again.
+      await tester.tap(find.text('Next'));
+      await settlePage(tester);
+      expect(find.text('+100 XP on completion'), findsOneWidget);
 
       await unmount(tester);
     });

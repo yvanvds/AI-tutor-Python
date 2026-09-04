@@ -128,6 +128,10 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
                 ? null
                 : () => setState(() => _viewingId = previous.id),
             onNext: !hasNext ? null : () => setState(() => _viewingId = nextId),
+            // The XP caption is about work still ahead, so it belongs to the
+            // newest page only: a page the student paged back to is theory
+            // of a subgoal whose XP has already been earned (#116).
+            onNewestPage: at < 0,
           ),
         ],
       ),
@@ -298,7 +302,11 @@ class _ChromeHeader extends StatelessWidget {
 }
 
 class _ChromeFooter extends ConsumerWidget {
-  const _ChromeFooter({required this.onPrevious, required this.onNext});
+  const _ChromeFooter({
+    required this.onPrevious,
+    required this.onNext,
+    required this.onNewestPage,
+  });
 
   /// `null` disables the button — the student is on the oldest theory page.
   final VoidCallback? onPrevious;
@@ -306,6 +314,11 @@ class _ChromeFooter extends ConsumerWidget {
   /// `null` hides the button entirely — the student is on the newest page,
   /// where there is nothing to page forward to.
   final VoidCallback? onNext;
+
+  /// Whether the theory on screen belongs to the subgoal the tutor is
+  /// working on. Only then is there XP still to earn, so only then is the
+  /// XP caption shown.
+  final bool onNewestPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -334,15 +347,19 @@ class _ChromeFooter extends ConsumerWidget {
             ),
           ],
           const Spacer(),
-          Text(
-            l.session_explain_completeXp,
-            style: TextStyle(
-              color: AppColors.fgFaint,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+          if (onNewestPage) ...[
+            Text(
+              // The number the shell actually awards for finishing a
+              // subgoal, not a hard-coded one (#116).
+              l.session_explain_completeXp(kXpPerSubgoal),
+              style: TextStyle(
+                color: AppColors.fgFaint,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.m),
+            const SizedBox(width: AppSpacing.m),
+          ],
           _AccentButton(
             label: l.session_explain_tryItYourself,
             onTap: () =>

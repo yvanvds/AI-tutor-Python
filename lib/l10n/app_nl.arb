@@ -240,7 +240,7 @@
   "session_explain_defaultPillLabel": "Concept",
   "session_explain_prev_button": "Vorige",
   "session_explain_next_button": "Volgende",
-  "session_explain_completeXp": "+10 XP bij voltooien",
+  "session_explain_completeXp": "+{xp} XP bij voltooien",
   "session_explain_tryItYourself": "Probeer het zelf",
 
   "session_playground_pill": "playground",

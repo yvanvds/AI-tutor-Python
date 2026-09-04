@@ -418,7 +418,11 @@
   "@session_explain_next_button": {
     "description": "Explain-view footer button that pages forward through already-seen theory pages; only shown after the student paged back"
   },
-  "session_explain_completeXp": "+10 XP on completion",
+  "session_explain_completeXp": "+{xp} XP on completion",
+  "@session_explain_completeXp": {
+    "description": "Explain-view footer caption naming the XP the current subgoal is worth once it is fully completed; only shown on the newest theory page",
+    "placeholders": { "xp": { "type": "int" } }
+  },
   "session_explain_tryItYourself": "Try it yourself",
 
   "session_playground_pill": "playground",

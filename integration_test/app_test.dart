@@ -29,6 +29,7 @@ import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
+import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/period_start_snapshot.dart' as period_start_snapshot;
@@ -68,6 +69,7 @@ void main() {
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();
+  level_up_gate.main();
   bug_report_oauth.main();
   goals_import_replace.main();
   students_class_filter.main();

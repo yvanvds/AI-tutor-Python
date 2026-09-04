@@ -88,27 +88,32 @@ final ambientProgressProvider = Provider<double>((ref) {
       );
 });
 
-// XP & level derivation — issue #9, option (a).
+// XP & level derivation — issue #9, option (a); curve flattened in #116.
 //
 // XP is derived from `Progress.progress` summed over every non-optional
-// subgoal × a flat constant. Level steps are a gentle linear ramp
-// (xpNext = 1500 * level). No new collection, no migration.
+// subgoal × a flat constant. Every level is the same width, so the ramp
+// never gets steeper: one level per five completed subgoals, forever. The
+// original `1500 * level` ramp cost 15 subgoals for level 2 and widened
+// after that, which meant most students never saw a level-up at all.
+// No new collection, no migration — the whole thing is derived.
 
-const int _xpPerSubgoal = 100;
-int _xpNextFor(int level) => 1500 * level;
+/// XP a fully-completed non-optional subgoal is worth.
+const int kXpPerSubgoal = 100;
+
+/// Constant width of every level, in XP. Five subgoals per level.
+const int kXpPerLevel = 500;
 
 typedef XpState = ({int xp, int level, int xpNext});
 
-const XpState _defaultXpState = (xp: 0, level: 1, xpNext: 1500);
+const XpState _defaultXpState = (xp: 0, level: 1, xpNext: kXpPerLevel);
 
 XpState _xpBreakdown(int totalXp) {
-  var level = 1;
-  var remaining = totalXp;
-  while (remaining >= _xpNextFor(level)) {
-    remaining -= _xpNextFor(level);
-    level += 1;
-  }
-  return (xp: remaining, level: level, xpNext: _xpNextFor(level));
+  final total = totalXp < 0 ? 0 : totalXp;
+  return (
+    xp: total % kXpPerLevel,
+    level: 1 + total ~/ kXpPerLevel,
+    xpNext: kXpPerLevel,
+  );
 }
 
 final xpStateProvider = StreamProvider<XpState>((ref) async* {
@@ -134,7 +139,7 @@ final xpStateProvider = StreamProvider<XpState>((ref) async* {
     final total = subgoals
         .fold<double>(
           0.0,
-          (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * _xpPerSubgoal,
+          (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * kXpPerSubgoal,
         )
         .round();
     yield _xpBreakdown(total);
