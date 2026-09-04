@@ -56,6 +56,42 @@ StudentStatus computeStudentStatus({
   return StudentStatus.active;
 }
 
+/// Picks the most-recently-active progress doc that describes *real* work —
+/// i.e. a record on a goal with a parent. Records on a root are skipped
+/// because they are not activity: the conductor writes the subgoal's doc and
+/// then immediately recomputes the root rollup ([Progress.toMap] stamps
+/// `lastSessionAt` on every upsert), so the derived root doc is always the
+/// newest one and would otherwise win every ranking (#120).
+///
+/// Returns null when the student has no record on a known subgoal at all —
+/// callers fall back to [mostRecentlyActive] so a student whose only record
+/// *is* on a root still renders.
+Progress? mostRecentlyActiveSubgoal(
+  List<Progress> docs, {
+  required Map<String, String?> parentByChild,
+}) {
+  final subgoalDocs = docs
+      .where((p) => parentByChild[p.goalID] != null)
+      .toList();
+  if (subgoalDocs.isEmpty) return null;
+  return mostRecentlyActive(subgoalDocs);
+}
+
+/// Walks [parentByChild] upward from [goalId] to the owning root. Null when
+/// the goal is unknown or the walk hits a cycle in hand-authored goal data.
+String? _rootIdOfGoal(String goalId, Map<String, String?> parentByChild) {
+  if (!parentByChild.containsKey(goalId)) return null;
+  var current = goalId;
+  final seen = <String>{current};
+  var parent = parentByChild[current];
+  while (parent != null) {
+    if (!seen.add(parent)) return null;
+    current = parent;
+    parent = parentByChild[current];
+  }
+  return current;
+}
+
 /// Root goal id owning the student's most-recently-active progress record,
 /// resolved by walking [parentByChild] upward (a record on a root — the
 /// derived root cache doc — resolves to that root itself). Null when the
@@ -67,17 +103,7 @@ String? activeRootId({
 }) {
   final active = mostRecentlyActive(progress);
   if (active == null) return null;
-  if (!parentByChild.containsKey(active.goalID)) return null;
-  var current = active.goalID;
-  // Guard against a parent cycle in hand-authored goal data.
-  final seen = <String>{current};
-  var parent = parentByChild[current];
-  while (parent != null) {
-    if (!seen.add(parent)) return null;
-    current = parent;
-    parent = parentByChild[current];
-  }
-  return current;
+  return _rootIdOfGoal(active.goalID, parentByChild);
 }
 
 /// Overall progress of the student's *active* root goal — the root that owns
@@ -113,8 +139,14 @@ double activeRootProgress({
 /// title. Kept as two separate fields — never concatenated — so the table
 /// can sort on the root title alone (#87).
 ///
-/// The root is resolved through [activeRootId], the same walk the Progress
-/// column uses, so the two columns always describe the same root. When the
+/// The active record is chosen with [mostRecentlyActiveSubgoal] so the
+/// derived root rollup doc — written one tick *after* the subgoal it
+/// summarises, with a fresh `lastSessionAt` — cannot mask the subgoal the
+/// student is actually on (#120). Students whose only record is on a root
+/// fall back to that record and keep the single-line cell.
+///
+/// The root is the one owning that record, resolved by the same upward walk
+/// [activeRootId] uses, so the two columns describe the same root. When the
 /// walk cannot reach a known root (orphaned parent id, cycle) the cell falls
 /// back to the active goal's own title on one line — matching the previous
 /// single-line behavior. Null when the student has no progress or the active
@@ -124,11 +156,13 @@ double activeRootProgress({
   required Map<String, Goal> goalById,
   required Map<String, String?> parentByChild,
 }) {
-  final active = mostRecentlyActive(progress);
+  final active =
+      mostRecentlyActiveSubgoal(progress, parentByChild: parentByChild) ??
+      mostRecentlyActive(progress);
   if (active == null) return null;
   final goal = goalById[active.goalID];
   if (goal == null) return null;
-  final rootId = activeRootId(progress: progress, parentByChild: parentByChild);
+  final rootId = _rootIdOfGoal(active.goalID, parentByChild);
   final root = rootId == null ? null : goalById[rootId];
   if (root == null || root.id == goal.id) {
     return (rootTitle: goal.title, subgoalTitle: null);
