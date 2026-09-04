@@ -316,6 +316,23 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get options_globalModel_title => 'AI-model voor de hele school';
+
+  @override
+  String get options_globalModel_subtitle =>
+      'Welk model de tutor van elke leerling bevraagt. Alleen voor leerkrachten. Een toestel dat hierboven zelf een model koos, behoudt dat; de rest volgt binnen enkele seconden.';
+
+  @override
+  String options_globalModel_saved(String model) {
+    return 'De school gebruikt nu $model.';
+  }
+
+  @override
+  String options_globalModel_saveFailed(String error) {
+    return 'Het model voor de hele school wijzigen is mislukt: $error';
+  }
+
+  @override
   String get options_progress_title => 'Voortgang';
 
   @override

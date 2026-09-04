@@ -314,6 +314,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get options_globalModel_title => 'School-wide AI model';
+
+  @override
+  String get options_globalModel_subtitle =>
+      'Which model every student\'s tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.';
+
+  @override
+  String options_globalModel_saved(String model) {
+    return 'The school now uses $model.';
+  }
+
+  @override
+  String options_globalModel_saveFailed(String error) {
+    return 'Could not change the school-wide model: $error';
+  }
+
+  @override
   String get options_progress_title => 'Progress';
 
   @override

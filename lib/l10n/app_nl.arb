@@ -97,6 +97,11 @@
   "options_model_subtitle": "Welk OpenAI-model de tutor bevraagt. Geldt alleen voor dit toestel; een groter model is trager en duurder.",
   "options_model_followGlobal": "Standaard van de school ({model})",
 
+  "options_globalModel_title": "AI-model voor de hele school",
+  "options_globalModel_subtitle": "Welk model de tutor van elke leerling bevraagt. Alleen voor leerkrachten. Een toestel dat hierboven zelf een model koos, behoudt dat; de rest volgt binnen enkele seconden.",
+  "options_globalModel_saved": "De school gebruikt nu {model}.",
+  "options_globalModel_saveFailed": "Het model voor de hele school wijzigen is mislukt: {error}",
+
   "options_progress_title": "Voortgang",
   "options_progress_subtitle": "Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.",
   "options_progress_resetAll_button": "Alle voortgang wissen",

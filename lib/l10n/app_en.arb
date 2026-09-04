@@ -155,6 +155,17 @@
     "placeholders": { "model": { "type": "String" } }
   },
 
+  "options_globalModel_title": "School-wide AI model",
+  "options_globalModel_subtitle": "Which model every student's tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.",
+  "options_globalModel_saved": "The school now uses {model}.",
+  "@options_globalModel_saved": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_globalModel_saveFailed": "Could not change the school-wide model: {error}",
+  "@options_globalModel_saveFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
   "options_progress_title": "Progress",
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",

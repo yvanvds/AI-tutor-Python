@@ -1,20 +1,22 @@
 // Which OpenAI model the tutor talks to (#32).
 //
-// Where the name lives: the school-wide default stays where it always was —
-// `GlobalConfig.Model`, one Cosmos doc the teacher maintains, read-only from
-// inside the app. What #32 adds is a *per-device override* in
-// SharedPreferences, next to the user's own OpenAI key. That direction was
-// chosen because the app has no writer for the global config doc at all, and
-// because the one person who has a reason to pick a different model is the
-// one paying for the calls.
+// Where the name lives: the school-wide default is `GlobalConfig.Model`, one
+// Cosmos doc in the `config` container. What #32 adds is a *per-device
+// override* in SharedPreferences, next to the user's own OpenAI key, because
+// the one person who has a reason to pick a different model is the one paying
+// for the calls. (#32 also had no choice: the app had no writer for the
+// global doc at all. #118 added one — `GlobalConfigService.setModel` — but
+// this override stayed, because "what my own key runs on" and "what the class
+// runs on" are two different decisions.)
 //
 // Who may change it: the Options card is shown to accounts that bring their
 // own key (`!mayUseGlobalKey`), to developer builds, and to teachers
 // (`isTeacherProvider`, from the Entra role) whichever key they are on (#90).
 // A student on the school's bundled key cannot move the whole class onto a
 // pricier model from their own machine; they see no card and the global
-// default applies. A teacher's pick is still this per-device override, not a
-// write to the global doc.
+// default applies. Moving the *class* is a second, teacher-only card in
+// Options (`_GlobalModelCard`, #118) that writes the global doc; this one is
+// still only ever about the machine it is set on.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';

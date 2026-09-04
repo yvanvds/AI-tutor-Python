@@ -12,6 +12,10 @@
 //   - progress export / import is a round trip through a file on disk and
 //     back into Cosmos, and its effect is visible in the top bar's XP pill,
 //     which is derived three providers away from the docs that move.
+//   - the teacher's school-wide model (#118) is a *write* to the one config
+//     doc the whole app reads: the card that renames itself afterwards is a
+//     different widget from the one that was tapped, fed by the real polling
+//     service rather than a fixture.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -62,11 +66,23 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.pump(const Duration(milliseconds: 200));
 }
 
-Future<void> _tapRow(WidgetTester tester, String label) async {
-  await _scrollTo(tester, find.text(label));
-  await tester.tap(find.text(label));
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await _scrollTo(tester, finder);
+  await tester.tap(finder);
   await tester.pump();
 }
+
+Future<void> _tapRow(WidgetTester tester, String label) =>
+    _tap(tester, find.text(label));
+
+/// A model row in one of the two AI-model cards (#118): `device` for the
+/// per-device override, `global` for the teacher's school-wide pick. A
+/// teacher sees both cards at once and their rows carry the same model
+/// names, so a bare `find.text('gpt-4.1')` is ambiguous for them.
+Finder _modelRow(String card, String model) => find.descendant(
+  of: find.byKey(ValueKey('model-rows-$card')),
+  matching: find.text(model),
+);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -196,6 +212,9 @@ void main() {
     // The seeded config doc names gpt-4o as the school-wide default.
     await _scrollTo(tester, find.text('School default (gpt-4o)'));
     expect(find.text('School default (gpt-4o)'), findsOneWidget);
+    // A developer build gets the per-device card, never the school-wide one:
+    // that gate is the Entra teacher role alone (#118).
+    expect(find.text('School-wide AI model'), findsNothing);
 
     await _tapRow(tester, 'gpt-5-mini');
     await pumpUntil(
@@ -235,7 +254,7 @@ void main() {
     expect(find.text('School default (gpt-4o)'), findsOneWidget);
     expect(find.text('OpenAI API key'), findsNothing);
 
-    await _tapRow(tester, 'gpt-4.1');
+    await _tap(tester, _modelRow('device', 'gpt-4.1'));
     await pumpUntil(
       tester,
       () => harness.container.read(modelPreferenceProvider) != null,
@@ -245,6 +264,75 @@ void main() {
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('openai_model'), 'gpt-4.1');
+    // A device override, and nothing more: the class is still on gpt-4o.
+    expect(harness.cosmos['config']['global']!['Model'], 'gpt-4o');
+
+    await harness.dispose(tester);
+  });
+
+  // #118 — the picker #32 shipped wrote SharedPreferences, so a teacher who
+  // changed the model changed only the machine they were sitting at. The
+  // school-wide doc now has a writer, behind a teacher-only card.
+  //
+  // Only a real run can show this end to end: the write goes out through the
+  // real `GlobalConfigService` to the container the whole app reads, and the
+  // card *above* it — a different widget, three providers away — has to
+  // rename its "School default (…)" row off the same value.
+  testWidgets('Options: a teacher moves the whole school onto another model', (
+    tester,
+  ) async {
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      developerTools: false,
+      // A school key worth losing: `GlobalConfig.toMap()` writes ApiKey too,
+      // so a blind upsert would blank it.
+      extraDocs: {
+        'config': [
+          {
+            'id': 'global',
+            'type': 'config',
+            'Model': 'gpt-4o',
+            'ApiKey': 'sk-school',
+          },
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+
+    await _scrollTo(tester, find.text('School-wide AI model'));
+    expect(find.text('School-wide AI model'), findsOneWidget);
+
+    await _tap(tester, _modelRow('global', 'gpt-4.1'));
+    await pumpUntil(
+      tester,
+      () => harness.cosmos['config']['global']!['Model'] == 'gpt-4.1',
+      reason: "the teacher's pick never reached the config doc",
+    );
+
+    expect(
+      harness.cosmos['config']['global']!['ApiKey'],
+      'sk-school',
+      reason: 'the school-wide write blanked the stored API key',
+    );
+    expect(
+      find.text('The school now uses gpt-4.1.'),
+      findsOneWidget,
+      reason: 'the teacher was never told the write landed',
+    );
+
+    // Nothing was stored for this machine — the teacher moved the class, not
+    // their own desk.
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('openai_model'), isNull);
+    expect(harness.container.read(modelPreferenceProvider), isNull);
+
+    // …and the per-device card above now offers to follow the new default.
+    await _scrollTo(tester, find.text('School default (gpt-4.1)'));
+    expect(find.text('School default (gpt-4.1)'), findsOneWidget);
+    expect(find.text('School default (gpt-4o)'), findsNothing);
 
     await harness.dispose(tester);
   });
@@ -266,9 +354,11 @@ void main() {
     await _scrollTo(tester, find.text('Appearance'));
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('AI model'), findsNothing);
+    expect(find.text('School-wide AI model'), findsNothing);
     await _scrollTo(tester, find.text('Progress'));
     expect(find.text('Progress'), findsOneWidget);
     expect(find.text('AI model'), findsNothing);
+    expect(find.text('School-wide AI model'), findsNothing);
     expect(find.text('School default (gpt-4o)'), findsNothing);
 
     await harness.dispose(tester);
