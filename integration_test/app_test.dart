@@ -52,6 +52,7 @@ import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
 import 'flows/warm_up_review.dart' as warm_up_review;
+import 'flows/whats_new_overlay.dart' as whats_new_overlay;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -90,4 +91,5 @@ void main() {
   update_install.main();
   update_dev_build.main();
   update_manual_check.main();
+  whats_new_overlay.main();
 }

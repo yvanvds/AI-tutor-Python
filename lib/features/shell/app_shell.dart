@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/update_controller.dart';
+import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
@@ -16,6 +17,7 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
 import 'package:ai_tutor_python/widgets/update_status.dart';
+import 'package:ai_tutor_python/widgets/whats_new_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,6 +37,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     // first frame never waits on the network.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(ref.read(updateControllerProvider.notifier).start());
+      // The other end of the same flow (#119): whatever the *previous* build
+      // stashed on its way into the installer. Also fire-and-forget — it only
+      // reads a preference, and a launch never waits on it.
+      unawaited(ref.read(whatsNewControllerProvider.notifier).load());
     });
   }
 
@@ -88,6 +94,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
                 const GoalSplashOverlay(),
                 const LevelUpOverlay(),
+                // Last, so a launch that has news to tell puts it in front of
+                // anything else that happens to be up (#119).
+                const WhatsNewOverlay(),
               ],
             ),
           ),

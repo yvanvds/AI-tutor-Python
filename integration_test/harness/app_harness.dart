@@ -140,6 +140,8 @@ class AppHarness {
     this.identity = studentIdentity,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
+    this.appVersion,
+    this.prefs = const {},
     this.pyRunner,
     this.archiveFile,
     this.systemBrightness = Brightness.dark,
@@ -169,6 +171,22 @@ class AppHarness {
   /// `kReleaseMode` default in place — which is how `update_dev_build.dart`
   /// proves a debug build never reaches out at all.
   final bool forceUpdateCheck;
+
+  /// The version this build reports (#119). `null` (the default) leaves the
+  /// real `kAppVersion` from `version.dart` in place, which is what every
+  /// flow that is not about versions wants. A flow that has to look like the
+  /// build an installer just put down — the "What's new" overlay only fires
+  /// when the stashed notes name the *running* version — pins it here rather
+  /// than editing a generated file.
+  final String? appVersion;
+
+  /// SharedPreferences the app starts with (#119).
+  ///
+  /// The store is always pinned in-memory and always starts empty, so a run
+  /// leaves nothing on the machine and no flow inherits another's choices.
+  /// This seeds it instead, for a flow whose subject is what a *previous*
+  /// launch left behind.
+  final Map<String, Object> prefs;
 
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
@@ -269,7 +287,7 @@ class AppHarness {
   ProviderContainer get container => _container!;
 
   Future<void> boot(WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
     for (final entry in extraDocs.entries) {
       for (final doc in entry.value) {
@@ -314,6 +332,8 @@ class AppHarness {
           browserLaunches.add(url);
           return true;
         }),
+        if (appVersion != null)
+          appVersionProvider.overrideWithValue(appVersion!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));

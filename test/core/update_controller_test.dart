@@ -13,10 +13,11 @@ import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-UpdateInfo _release(String version) => UpdateInfo(
+UpdateInfo _release(String version, {String notes = ''}) => UpdateInfo(
   version,
   Uri.parse('https://example.com/python_teacher_install.exe'),
   'abc123',
+  notes: notes,
 );
 
 /// Records what the controller asked of the outside world, so a test can
@@ -30,6 +31,7 @@ class _Seams {
     this.feedError,
     this.verifies = true,
     this.downloadError,
+    this.stashError,
     this.progress = const [],
   });
 
@@ -40,6 +42,10 @@ class _Seams {
   final bool verifies;
   final Object? downloadError;
 
+  /// What a preferences write throws, for the "an unwritable store must not
+  /// stop an install" case (#119).
+  final Object? stashError;
+
   /// Fractions the fake downloader reports before it returns.
   final List<double> progress;
 
@@ -48,6 +54,12 @@ class _Seams {
   int verifyCalls = 0;
   final List<File> ran = <File>[];
   final List<String> logs = <String>[];
+
+  /// Every release-notes stash, in order, and how far the flow had got when
+  /// it happened — the stash has to be on disk *before* the handover, because
+  /// the real `run` never comes back (#119).
+  final List<({String version, String notes, int runsSoFar})> stashed =
+      <({String version, String notes, int runsSoFar})>[];
 
   final File installer = File('does-not-need-to-exist.exe');
 
@@ -72,6 +84,10 @@ class _Seams {
       return verifies;
     },
     run: (file) async => ran.add(file),
+    stashNotes: (version, notes) async {
+      if (stashError != null) throw stashError!;
+      stashed.add((version: version, notes: notes, runsSoFar: ran.length));
+    },
     log: logs.add,
   );
 }
@@ -261,6 +277,65 @@ void main() {
       final state = container.read(updateControllerProvider);
       expect(state.phase, UpdatePhase.failed);
       expect(state.message, contains(seams.installer.path));
+    });
+
+    // #119: the notes the feed already carried used to die with the process.
+    test(
+      'stashes the release notes before handing over the installer',
+      () async {
+        final seams = _Seams(
+          latest: _release('2.1.0+20', notes: '- Faster quizzes\n- Fewer bugs'),
+        );
+        final container = _containerFor(seams);
+        final controller = container.read(updateControllerProvider.notifier);
+
+        await controller.check();
+        await controller.apply();
+
+        expect(seams.stashed, hasLength(1));
+        expect(seams.stashed.single.version, '2.1.0+20');
+        expect(seams.stashed.single.notes, '- Faster quizzes\n- Fewer bugs');
+        // Before the handover, not after: the production `run` calls `exit(0)`
+        // and nothing after it would ever execute.
+        expect(
+          seams.stashed.single.runsSoFar,
+          0,
+          reason: 'the notes were written after the process was handed away',
+        );
+      },
+    );
+
+    test('does not stash notes for a release that never installs', () async {
+      // A checksum mismatch stops the install, so the next launch must not
+      // find notes for a version it is not going to be.
+      final seams = _Seams(
+        latest: _release('2.1.0+20', notes: 'Something'),
+        verifies: false,
+      );
+      final container = _containerFor(seams);
+      final controller = container.read(updateControllerProvider.notifier);
+
+      await controller.check();
+      await controller.apply();
+
+      expect(seams.stashed, isEmpty);
+    });
+
+    test('a stash that fails does not stop the install', () async {
+      // Not being told what changed is a smaller loss than an update that
+      // refused to run because a preference file could not be written.
+      final seams = _Seams(
+        latest: _release('2.1.0+20', notes: 'Something'),
+        stashError: StateError('prefs unavailable'),
+      );
+      final container = _containerFor(seams);
+      final controller = container.read(updateControllerProvider.notifier);
+
+      await controller.check();
+      await controller.apply();
+
+      expect(seams.ran, [seams.installer]);
+      expect(seams.logs.join('\n'), contains('not stashed'));
     });
 
     // The whole reason the seams exist: nothing but a user action reaches an
