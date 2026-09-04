@@ -95,6 +95,7 @@ class _FakeInstructionGenerator extends InstructionGenerator {
     required List<Instruction> cachedInstructions,
     required Future<List<Instruction>> Function() fetchInstructions,
     required Future<List<Goal>> Function() fetchRootGoals,
+    required String languageCode,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
@@ -113,7 +114,7 @@ const _testProfile = Profile(
   topic: '',
   level: 1,
   xp: 0,
-  xpNext: 1500,
+  xpNext: 500,
   streak: 0,
   role: Role.student,
 );

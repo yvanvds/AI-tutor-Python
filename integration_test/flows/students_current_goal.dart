@@ -63,15 +63,19 @@ void main() {
     await harness.boot(tester);
 
     // Add a long-titled root + subgoal next to the seeded r1 ("Basics",
-    // subgoals "Print" and "Variables") to exercise the truncation path.
+    // subgoals "Print" and "Variables") to exercise the truncation path,
+    // plus a second root used for the rollup regression (#120).
     final goals = harness.cosmos['goals'];
     goals.upsert(goalDoc(id: 'r-long', title: _kLongRootTitle, order: 2000));
     goals.upsert(goalDoc(id: 'u1', title: _kLongSubTitle, parentId: 'r-long'));
+    goals.upsert(goalDoc(id: 'r-loop', title: 'Loops', order: 3000));
+    goals.upsert(goalDoc(id: 'v1', title: 'While', parentId: 'r-loop'));
 
     final accounts = harness.cosmos['accounts'];
     accounts.upsert(_studentDoc('it-mira', 'Mira'));
     accounts.upsert(_studentDoc('it-omar', 'Omar'));
     accounts.upsert(_studentDoc('it-lina', 'Lina'));
+    accounts.upsert(_studentDoc('it-noa', 'Noa'));
 
     final progress = harness.cosmos['progress'];
     // Mira is on subgoal s2 ("Variables") of r1 — two-line cell.
@@ -89,6 +93,16 @@ void main() {
     // instead of blowing up the row (an overflow would fail the test).
     progress.upsert(
       _progressDoc('it-lina', 'u1', 0.5, at: '2026-05-03T10:00:00Z'),
+    );
+    // Noa has the realistic production write shape (#120): the subgoal doc,
+    // then the derived root rollup the conductor writes one tick later with
+    // a *fresher* lastSessionAt. The rollup must not swallow the subgoal
+    // line — before the fix this cell showed "Loops" alone.
+    progress.upsert(
+      _progressDoc('it-noa', 'v1', 0.5, at: '2026-05-03T12:00:00Z'),
+    );
+    progress.upsert(
+      _progressDoc('it-noa', 'r-loop', 0.5, at: '2026-05-03T12:00:01Z'),
     );
 
     await tester.tap(find.byTooltip('Students'));
@@ -117,6 +131,15 @@ void main() {
     // Lina's long titles render (ellipsized — the test would fail on a
     // layout overflow) and the tooltip still carries them in full.
     expect(find.byTooltip('$_kLongRootTitle\n$_kLongSubTitle'), findsOneWidget);
+
+    // Noa: the newer root rollup doc must not collapse the cell to one line.
+    expect(find.text('While'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('While')).style?.color,
+      AppColors.fgFaint,
+    );
+    expect(find.byTooltip('Loops\nWhile'), findsOneWidget);
+    expect(find.byTooltip('Loops'), findsNothing);
 
     await harness.dispose(tester);
   });

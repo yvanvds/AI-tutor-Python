@@ -155,6 +155,17 @@
     "placeholders": { "model": { "type": "String" } }
   },
 
+  "options_globalModel_title": "School-wide AI model",
+  "options_globalModel_subtitle": "Which model every student's tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.",
+  "options_globalModel_saved": "The school now uses {model}.",
+  "@options_globalModel_saved": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_globalModel_saveFailed": "Could not change the school-wide model: {error}",
+  "@options_globalModel_saveFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
   "options_progress_title": "Progress",
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",
@@ -414,7 +425,15 @@
     "description": "Fallback label for the explain-view root pill when no root goal is set; displayed uppercase"
   },
   "session_explain_prev_button": "Previous",
-  "session_explain_completeXp": "+10 XP on completion",
+  "session_explain_next_button": "Next",
+  "@session_explain_next_button": {
+    "description": "Explain-view footer button that pages forward through already-seen theory pages; only shown after the student paged back"
+  },
+  "session_explain_completeXp": "+{xp} XP on completion",
+  "@session_explain_completeXp": {
+    "description": "Explain-view footer caption naming the XP the current subgoal is worth once it is fully completed; only shown on the newest theory page",
+    "placeholders": { "xp": { "type": "int" } }
+  },
   "session_explain_tryItYourself": "Try it yourself",
 
   "session_playground_pill": "playground",

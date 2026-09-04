@@ -28,6 +28,39 @@ Rules:
 - If the response would be of type "error", put the error message in TEXT and {"type":"error"} in META.
 ''';
 
+/// The language a code stands for, spelled out for the model. Mirrors the
+/// mapping in `grading/grade_justification.dart` (#99) so the tutor and the
+/// grade justification never disagree about what `nl` means.
+String _languageName(String languageCode) {
+  switch (languageCode) {
+    case 'nl':
+      return 'Dutch (Nederlands)';
+    default:
+      return 'English';
+  }
+}
+
+/// The output-language directive appended to every system prompt (#117).
+///
+/// The student picks a language in Options; until now that switched only the
+/// interface, because the tutor's language was implicit in the
+/// teacher-authored instruction bodies — which happen to be written in Dutch.
+/// So this directive has to *override* the language those bodies are written
+/// in, and it is appended last, after them, saying so in as many words.
+///
+/// It is scoped to student-facing prose only: META's JSON keys and enum
+/// values, learning-objective ids and code are the machine half of the
+/// contract (see `docs/LLM_CONTRACT.md`) and translating them would break
+/// parsing and belief updates.
+String languageDirective(String languageCode) {
+  final language = _languageName(languageCode);
+  return '''
+OUTPUT LANGUAGE — STRICT. This overrides the language of every instruction above.
+Write all student-facing text in $language: the entire TEXT section and every student-facing string inside META (questions, multiple-choice options, hints, feedback, explanations, status reports). The instructions above may themselves be written in another language; that is not a licence to answer in it.
+Never translate the machine parts: META's JSON keys and enum values (including "type"), learning-objective ids, and the code, identifiers and API names in any snippet you show the student.
+''';
+}
+
 class InstructionGenerator {
   Future<String> generateInstructions(
     ChatRequestType type, {
@@ -35,6 +68,7 @@ class InstructionGenerator {
     required List<Instruction> cachedInstructions,
     required Future<List<Instruction>> Function() fetchInstructions,
     required Future<List<Goal>> Function() fetchRootGoals,
+    required String languageCode,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
@@ -84,7 +118,10 @@ class InstructionGenerator {
       }
     }
 
-    return '$envelopeContract\n$alwaysInclude$typeSpecific';
+    // The language directive goes last, after the teacher-authored bodies it
+    // has to override (#117).
+    return '$envelopeContract\n$alwaysInclude$typeSpecific'
+        '\n${languageDirective(languageCode)}';
   }
 
   String _chatRequestTypeToString(ChatRequestType type) =>

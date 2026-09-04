@@ -176,6 +176,14 @@ class TutorService extends Notifier<TutorState> {
       }
     }, fireImmediately: true);
 
+    // Feed the derived level to the level-up controller so a mastered
+    // concept can be checked against a real threshold crossing (#116).
+    ref.listen<AsyncValue<XpState>>(xpStateProvider, (_, next) {
+      final level = next.maybeWhen(data: (s) => s.level, orElse: () => null);
+      if (level == null) return;
+      ref.read(levelUpControllerProvider.notifier).observeLevel(level);
+    }, fireImmediately: true);
+
     ref.onDispose(_stopCurriculumWatch);
 
     return TutorState.idle;
@@ -341,22 +349,16 @@ class TutorService extends Notifier<TutorState> {
     ref.read(progressServiceProvider).setCurrentProgress(cached);
   }
 
-  /// Translates the conductor's "a concept goal just mastered" signal into
-  /// a throttled level-up overlay push. Reads the current derived XP/level
-  /// from [xpStateProvider]; throttle lives on [LevelUpController].
+  /// Translates the conductor's "a concept goal just mastered" signal into an
+  /// *armed* level-up moment. The overlay only follows once [xpStateProvider]
+  /// reports a level above the one in force when the concept was mastered
+  /// (#116) — the XP write the conductor just made reaches that provider on
+  /// the next progress poll, which is what the listener in [build] feeds in.
+  /// Throttle and crossing check both live on [LevelUpController].
   void _onConceptMastered(String conceptName) {
-    final xpState = ref
-        .read(xpStateProvider)
-        .maybeWhen(data: (s) => s, orElse: () => null);
     ref
         .read(levelUpControllerProvider.notifier)
-        .pushThrottled(
-          LevelUpEvent(
-            newLevel: xpState?.level ?? 1,
-            xpAwarded: 100,
-            conceptName: conceptName,
-          ),
-        );
+        .armConceptMastered(conceptName: conceptName, xpAwarded: kXpPerSubgoal);
   }
 
   ConductorDeps _buildConductorDeps() {
@@ -544,6 +546,9 @@ class TutorService extends Notifier<TutorState> {
         fetchInstructions: () =>
             ref.read(instructionsServiceProvider.notifier).getAll(),
         fetchRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
+        // The language the student picked in Options (#117). Read per turn,
+        // so switching language changes the very next question.
+        languageCode: ref.read(appLocaleProvider).languageCode,
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
         subgoalOverride: warmUpSubgoal,

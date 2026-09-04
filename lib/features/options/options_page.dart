@@ -5,7 +5,8 @@
 //   - language (moved from the sidebar settings popup)
 //   - appearance: light / dark / follow the system (#32)
 //   - the AI model, on own-key and developer builds (#32) and for teachers
-//     (#90)
+//     (#90) — and, for teachers only, the school-wide model every other
+//     machine follows (#118)
 //   - progress reset: everything, or one goal / subgoal
 //   - export / import of progress to a JSON file (#32)
 //   - the user's own OpenAI key (only when the account is not on the
@@ -97,6 +98,14 @@ class OptionsPage extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.lg),
                 const _ModelCard(),
               ],
+              // Changing what every student's tutor runs on is an
+              // administrative decision, so it is gated on the Entra teacher
+              // role alone — not on the rule above, which also lets in
+              // developer builds and anyone paying with their own key (#118).
+              if (isTeacher) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const _GlobalModelCard(),
+              ],
               const SizedBox(height: AppSpacing.lg),
               const _ProgressCard(),
               const SizedBox(height: AppSpacing.lg),
@@ -164,10 +173,12 @@ class _OptionsCard extends StatelessWidget {
 }
 
 /// Radio-style row shared by the language, appearance and model cards.
+/// A null [onTap] disables the row — the school-wide model card greys its
+/// rows out while a write is in flight.
 Widget _choiceRow({
   required String label,
   required bool selected,
-  required VoidCallback onTap,
+  required VoidCallback? onTap,
 }) {
   return ListTile(
     dense: true,
@@ -287,9 +298,79 @@ class _ModelCard extends ConsumerWidget {
       title: l.options_model_title,
       subtitle: l.options_model_subtitle,
       child: Column(
+        // Keyed so a test can tell these rows from the identically-labelled
+        // ones in the school-wide card below, which a teacher sees at the
+        // same time (#118).
+        key: const ValueKey('model-rows-device'),
         children: [
           row(l.options_model_followGlobal(fallback), null),
           for (final model in kSelectableModels) row(model, model),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// School-wide AI model (#118)
+// ---------------------------------------------------------------------------
+
+/// The one `GlobalConfig.Model` every machine falls back to, for teachers.
+///
+/// Kept separate from `_ModelCard` above rather than folded into it, because
+/// the two answer different questions: an own-key user picks what the machine
+/// they are paying from runs on, a teacher decides what the whole class runs
+/// on. #32 could only offer the first — there was no writer for the config
+/// doc at all — and #118 added the second next to it.
+///
+/// The write itself preserves the stored `ApiKey`; see
+/// `GlobalConfigService.setModel`, which also explains why this widget *is*
+/// the role gate.
+class _GlobalModelCard extends ConsumerStatefulWidget {
+  const _GlobalModelCard();
+
+  @override
+  ConsumerState<_GlobalModelCard> createState() => _GlobalModelCardState();
+}
+
+class _GlobalModelCardState extends ConsumerState<_GlobalModelCard> {
+  bool _busy = false;
+
+  Future<void> _pick(String model) async {
+    final l = AppLocalizations.of(context);
+    setState(() => _busy = true);
+    try {
+      await ref.read(globalConfigServiceProvider.notifier).setModel(model);
+      if (!mounted) return;
+      _snack(context, l.options_globalModel_saved(model));
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, l.options_globalModel_saveFailed(e.toString()));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    // No "follow the default" row: this *is* the default. A config doc whose
+    // Model has never been filled in simply has no row selected, and the
+    // tutor falls back to `OpenaiConnector.defaultModel` until it does.
+    final global = ref.watch(globalConfigServiceProvider)?.model;
+
+    return _OptionsCard(
+      title: l.options_globalModel_title,
+      subtitle: l.options_globalModel_subtitle,
+      child: Column(
+        key: const ValueKey('model-rows-global'),
+        children: [
+          for (final model in kSelectableModels)
+            _choiceRow(
+              label: model,
+              selected: global == model,
+              onTap: _busy ? null : () => _pick(model),
+            ),
         ],
       ),
     );

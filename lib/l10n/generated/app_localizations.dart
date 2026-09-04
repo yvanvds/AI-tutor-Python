@@ -613,6 +613,30 @@ abstract class AppLocalizations {
   /// **'School default ({model})'**
   String options_model_followGlobal(String model);
 
+  /// No description provided for @options_globalModel_title.
+  ///
+  /// In en, this message translates to:
+  /// **'School-wide AI model'**
+  String get options_globalModel_title;
+
+  /// No description provided for @options_globalModel_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which model every student\'s tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.'**
+  String get options_globalModel_subtitle;
+
+  /// No description provided for @options_globalModel_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'The school now uses {model}.'**
+  String options_globalModel_saved(String model);
+
+  /// No description provided for @options_globalModel_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not change the school-wide model: {error}'**
+  String options_globalModel_saveFailed(String error);
+
   /// No description provided for @options_progress_title.
   ///
   /// In en, this message translates to:
@@ -1393,11 +1417,17 @@ abstract class AppLocalizations {
   /// **'Previous'**
   String get session_explain_prev_button;
 
-  /// No description provided for @session_explain_completeXp.
+  /// Explain-view footer button that pages forward through already-seen theory pages; only shown after the student paged back
   ///
   /// In en, this message translates to:
-  /// **'+10 XP on completion'**
-  String get session_explain_completeXp;
+  /// **'Next'**
+  String get session_explain_next_button;
+
+  /// Explain-view footer caption naming the XP the current subgoal is worth once it is fully completed; only shown on the newest theory page
+  ///
+  /// In en, this message translates to:
+  /// **'+{xp} XP on completion'**
+  String session_explain_completeXp(int xp);
 
   /// No description provided for @session_explain_tryItYourself.
   ///

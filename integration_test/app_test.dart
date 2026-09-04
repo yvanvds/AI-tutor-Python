@@ -23,11 +23,13 @@ import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
+import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
+import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/period_start_snapshot.dart' as period_start_snapshot;
@@ -43,18 +45,22 @@ import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
+import 'flows/tutor_language.dart' as tutor_language;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
 import 'flows/warm_up_review.dart' as warm_up_review;
+import 'flows/whats_new_overlay.dart' as whats_new_overlay;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   lesson_flow.main();
+  explain_paging.main();
   language_switch.main();
+  tutor_language.main();
   playground_files.main();
   editor_comment_space.main();
   practice_complete_code.main();
@@ -66,6 +72,7 @@ void main() {
   quiz_ligatures.main();
   turtle_run_notice.main();
   options_panel.main();
+  level_up_gate.main();
   bug_report_oauth.main();
   goals_import_replace.main();
   students_class_filter.main();
@@ -84,4 +91,5 @@ void main() {
   update_install.main();
   update_dev_build.main();
   update_manual_check.main();
+  whats_new_overlay.main();
 }

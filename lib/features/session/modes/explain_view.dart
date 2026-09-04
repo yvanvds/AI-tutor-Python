@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
@@ -15,33 +17,122 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// `goalSelectionProvider`, loads the linked `content` doc, and renders its
 /// HTML body in a WebView styled by the shared `assets/lesson/lesson.css`.
 /// The header pill, progress counter, and footer buttons stay native.
-class ExplainView extends ConsumerWidget {
+///
+/// The footer pages back and forth through the theory the student has
+/// already seen (#115): the earlier non-optional sibling subgoals that carry
+/// a `content` doc. Which page is shown is **view-local** state — paging
+/// never touches `goalSelectionProvider`, so the tutor keeps working against
+/// the same subgoal while the student re-reads an older explanation.
+class ExplainView extends ConsumerStatefulWidget {
   const ExplainView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExplainView> createState() => _ExplainViewState();
+}
+
+class _ExplainViewState extends ConsumerState<ExplainView> {
+  /// Id of the already-seen page the student paged back to; `null` means the
+  /// newest page, i.e. the active subgoal itself.
+  String? _viewingId;
+
+  /// Siblings of the active root, kept in a subscription rather than a
+  /// `StreamBuilder` so paging (a `setState`) doesn't resubscribe the poll
+  /// and blank the footer for a frame.
+  List<Goal> _siblings = const [];
+  String? _siblingsRootId;
+  StreamSubscription<List<Goal>>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _watchSiblings(ref.read(goalSelectionProvider).activeRootGoal?.id);
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  void _watchSiblings(String? rootId) {
+    if (rootId == _siblingsRootId) return;
+    _siblingsRootId = rootId;
+    _viewingId = null;
+    _siblings = const [];
+    _sub?.cancel();
+    _sub = null;
+    if (rootId == null) return;
+    _sub = ref.read(goalsServiceProvider).streamChildren(rootId).listen((list) {
+      if (mounted) setState(() => _siblings = list);
+    });
+  }
+
+  /// The theory pages before [active] that the student has already seen:
+  /// non-optional siblings carrying a `content` doc.
+  List<Goal> _seenPages(Goal active) {
+    final activeIdx = _siblings.indexWhere((g) => g.id == active.id);
+    if (activeIdx <= 0) return const [];
+    return [
+      for (final g in _siblings.take(activeIdx))
+        if (!g.optional && (g.contentId?.isNotEmpty ?? false)) g,
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final selection = ref.watch(goalSelectionProvider);
-    final child = selection.activeChildGoal;
+    ref.listen(goalSelectionProvider, (_, next) {
+      _watchSiblings(next.activeRootGoal?.id);
+    });
+    final active = selection.activeChildGoal;
     final root = selection.activeRootGoal;
 
-    if (child == null) {
+    if (active == null) {
       return _PlaceholderScreen(
         message: AppLocalizations.of(context)
             .session_explain_placeholder_noSubgoal,
       );
     }
 
+    final seen = _seenPages(active);
+    // Where the student is: -1 is the newest page (the active subgoal). A
+    // page that has since vanished from the curriculum falls back to it.
+    final at = _viewingId == null
+        ? -1
+        : seen.indexWhere((g) => g.id == _viewingId);
+    final viewing = at < 0 ? active : seen[at];
+
+    // Previous: one page back, or the last seen page when on the newest one.
+    final Goal? previous = at < 0
+        ? (seen.isEmpty ? null : seen.last)
+        : (at > 0 ? seen[at - 1] : null);
+    // Next only exists once the student has paged back; from the last seen
+    // page it returns to the newest one (`null` id).
+    final bool hasNext = at >= 0;
+    final String? nextId = at >= 0 && at + 1 < seen.length
+        ? seen[at + 1].id
+        : null;
+
     return Container(
       color: AppColors.ink0,
       child: Column(
         children: [
-          _ChromeHeader(child: child, root: root),
+          _ChromeHeader(child: viewing, root: root, siblings: _siblings),
           Expanded(
-            child: child.contentId == null || child.contentId!.isEmpty
+            child: viewing.contentId == null || viewing.contentId!.isEmpty
                 ? const _MissingContent()
-                : _ContentWebView(contentId: child.contentId!),
+                : _ContentWebView(contentId: viewing.contentId!),
           ),
-          _ChromeFooter(),
+          _ChromeFooter(
+            onPrevious: previous == null
+                ? null
+                : () => setState(() => _viewingId = previous.id),
+            onNext: !hasNext ? null : () => setState(() => _viewingId = nextId),
+            // The XP caption is about work still ahead, so it belongs to the
+            // newest page only: a page the student paged back to is theory
+            // of a subgoal whose XP has already been earned (#116).
+            onNewestPage: at < 0,
+          ),
         ],
       ),
     );
@@ -147,74 +238,87 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-class _ChromeHeader extends ConsumerWidget {
-  const _ChromeHeader({required this.child, required this.root});
+class _ChromeHeader extends StatelessWidget {
+  const _ChromeHeader({
+    required this.child,
+    required this.root,
+    required this.siblings,
+  });
   final Goal child;
   final Goal? root;
+  final List<Goal> siblings;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final pill =
         (root?.title ??
                 AppLocalizations.of(context).session_explain_defaultPillLabel)
             .toUpperCase();
-    return StreamBuilder<List<Goal>>(
-      stream: root == null
-          ? const Stream.empty()
-          : ref.read(goalsServiceProvider).streamChildren(root!.id),
-      builder: (context, snap) {
-        final siblings = snap.data ?? const <Goal>[];
-        final idx = siblings.indexWhere((g) => g.id == child.id);
-        final total = siblings.length;
-        final showCounter = idx >= 0 && total > 0;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xxxl,
-            AppSpacing.xl,
-            AppSpacing.xxxl,
-            AppSpacing.s,
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(
-                  pill,
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                  ),
-                ),
+    final idx = siblings.indexWhere((g) => g.id == child.id);
+    final total = siblings.length;
+    final showCounter = idx >= 0 && total > 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xxxl,
+        AppSpacing.xl,
+        AppSpacing.xxxl,
+        AppSpacing.s,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s,
+              vertical: 3,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              pill,
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
               ),
-              const Spacer(),
-              if (showCounter)
-                Text(
-                  '${idx + 1} / $total',
-                  style: AppMono.tnum(
-                    size: 12,
-                    weight: FontWeight.w500,
-                    color: AppColors.fgFaint,
-                  ),
-                ),
-            ],
+            ),
           ),
-        );
-      },
+          const Spacer(),
+          if (showCounter)
+            Text(
+              '${idx + 1} / $total',
+              style: AppMono.tnum(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.fgFaint,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
 class _ChromeFooter extends ConsumerWidget {
-  const _ChromeFooter();
+  const _ChromeFooter({
+    required this.onPrevious,
+    required this.onNext,
+    required this.onNewestPage,
+  });
+
+  /// `null` disables the button — the student is on the oldest theory page.
+  final VoidCallback? onPrevious;
+
+  /// `null` hides the button entirely — the student is on the newest page,
+  /// where there is nothing to page forward to.
+  final VoidCallback? onNext;
+
+  /// Whether the theory on screen belongs to the subgoal the tutor is
+  /// working on. Only then is there XP still to earn, so only then is the
+  /// XP caption shown.
+  final bool onNewestPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -231,18 +335,31 @@ class _ChromeFooter extends ConsumerWidget {
           _GhostButton(
             label: l.session_explain_prev_button,
             icon: Icons.arrow_back,
-            onTap: () {},
+            onTap: onPrevious,
           ),
-          const Spacer(),
-          Text(
-            l.session_explain_completeXp,
-            style: TextStyle(
-              color: AppColors.fgFaint,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+          if (onNext != null) ...[
+            const SizedBox(width: AppSpacing.xs),
+            _GhostButton(
+              label: l.session_explain_next_button,
+              icon: Icons.arrow_forward,
+              iconAfterLabel: true,
+              onTap: onNext,
             ),
-          ),
-          const SizedBox(width: AppSpacing.m),
+          ],
+          const Spacer(),
+          if (onNewestPage) ...[
+            Text(
+              // The number the shell actually awards for finishing a
+              // subgoal, not a hard-coded one (#116).
+              l.session_explain_completeXp(kXpPerSubgoal),
+              style: TextStyle(
+                color: AppColors.fgFaint,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.m),
+          ],
           _AccentButton(
             label: l.session_explain_tryItYourself,
             onTap: () =>
@@ -259,10 +376,16 @@ class _GhostButton extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.iconAfterLabel = false,
   });
   final String label;
   final IconData icon;
-  final VoidCallback onTap;
+
+  /// `null` renders the button dimmed and inert — there is nowhere to go.
+  final VoidCallback? onTap;
+
+  /// Puts the icon on the trailing side, for a "forward" affordance.
+  final bool iconAfterLabel;
 
   @override
   State<_GhostButton> createState() => _GhostButtonState();
@@ -273,9 +396,20 @@ class _GhostButtonState extends State<_GhostButton> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final fg = enabled
+        ? AppColors.fgMute
+        : AppColors.fgFaint.withValues(alpha: 0.5);
+    final icon = Icon(widget.icon, size: 14, color: fg);
+    final label = Text(
+      widget.label,
+      style: TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w500),
+    );
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovering = true),
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) {
+        if (enabled) setState(() => _hovering = true);
+      },
       onExit: (_) => setState(() => _hovering = false),
       child: GestureDetector(
         onTap: widget.onTap,
@@ -287,23 +421,14 @@ class _GhostButtonState extends State<_GhostButton> {
             vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: _hovering ? AppColors.ink2 : Colors.transparent,
+            color: _hovering && enabled ? AppColors.ink2 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.inputLarge),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.icon, size: 14, color: AppColors.fgMute),
-              const SizedBox(width: 6),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: AppColors.fgMute,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+            children: widget.iconAfterLabel
+                ? [label, const SizedBox(width: 6), icon]
+                : [icon, const SizedBox(width: 6), label],
           ),
         ),
       ),

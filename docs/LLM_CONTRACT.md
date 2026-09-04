@@ -98,12 +98,33 @@ grader emits the same shape, `goalScopeLOs` is the same root-wide list,
 and the scope check (below) accepts the signal because the older subgoal
 is in scope.
 
+### Output language (#117)
+
+Both calls end with a fixed output-language directive, appended by
+`InstructionGenerator` after the teacher-authored instruction bodies
+(`languageDirective` in `lib/services/tutor/instruction_generator.dart`).
+It names the language the student picked in Options — `appLocaleProvider`,
+resolved per turn — and it is deliberately the *last* thing in the system
+prompt, because the teacher-authored bodies it has to override are
+themselves written in Dutch.
+
+It is scoped to student-facing prose: the TEXT section and every
+student-facing string in META (`feedbackText`, question text, MCQ
+options, follow-up questions, status reports). It explicitly exempts the
+machine half of this contract — META's JSON keys and enum values, LO ids,
+and the code and identifiers in any snippet — which are language-neutral
+by construction and would break parsing and belief updates if translated.
+
+Out of scope: the teacher-authored instruction documents themselves and
+the lesson/theory HTML. Those stay in the language their author wrote
+them in.
+
 ## What the grader returns
 
 ```json
 {
   "overallQuality": "wrong" | "partial" | "correct",
-  "feedbackText": "Dutch student-facing message",
+  "feedbackText": "student-facing message, in the student's language",
   "loSignals": [
     {
       "subgoalId": "use_if_else",
@@ -143,12 +164,14 @@ self-consistency check on `loSignals`: if every signal is negative,
 constraint when generating. Whether/how the UI surfaces this value is a
 downstream decision, not part of the contract.
 
-**`feedbackText`** — one Dutch message for the student. Same role as
+**`feedbackText`** — one message for the student, in the language they
+picked in Options (#117; see "Output language" below). Same role as
 the existing `prompt`/`feedback` text. Granular per-LO feedback is for
 the conductor's eyes only; the student gets one readable message.
 
 **`followUp`** — optional. When present, contains a `question` (the
-text the conductor will show the student verbatim, in Dutch) and a
+text the conductor will show the student verbatim, in the student's
+language) and a
 `rationale` (for debugging and teacher visibility, not shown to the
 student). The grader emits this when continuing the dialogue would
 deepen understanding more than a fresh probe would. Whether the
@@ -310,7 +333,7 @@ answer was just graded.
   for updating *student* difficulty, not for re-tagging the question.
 - **Does not emit per-LO numeric scores.** Categorical only, by design.
 - **Does not promise per-aspect feedback to the student.**
-  `feedbackText` is one Dutch message; signal granularity is for the
+  `feedbackText` is one message; signal granularity is for the
   conductor.
 - **Does not handle multi-turn grading as a single call.** Each call
   is one question / one answer. Follow-up exchanges produce their own

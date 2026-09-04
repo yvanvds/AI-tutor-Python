@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:ai_tutor_python/core/github_release.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/whats_new_store.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// installer, and a flow that wants to drive the check points it at a
 /// loopback server that speaks the same API.
 final updateFeedUrlProvider = Provider<Uri?>((_) => kLatestReleaseEndpoint);
+
+/// The version this build reports — `kAppVersion`, generated into
+/// `version.dart` by `tooling/build_release.ps1`.
+///
+/// A provider rather than a direct read so the two things that compare
+/// against it — the update check (`UpdateServices.localVersion`) and the
+/// "What's new" stash (#119), which only fires when the stashed version *is*
+/// the running one — can both be driven end-to-end without shipping a build.
+final appVersionProvider = Provider<String>((_) => kAppVersion);
 
 /// Whether a launch checks for an update by itself.
 ///
@@ -97,7 +107,7 @@ final updateServicesProvider = Provider<UpdateServices>((ref) {
   final feedUrl = ref.watch(updateFeedUrlProvider);
   final launch = ref.watch(installerLauncherProvider);
   return UpdateServices(
-    localVersion: kAppVersion,
+    localVersion: ref.watch(appVersionProvider),
     feed: feedUrl == null
         ? () async => null
         : () => fetchLatestRelease(feedUrl),
@@ -105,6 +115,8 @@ final updateServicesProvider = Provider<UpdateServices>((ref) {
         downloadToTemp(release.url, onProgress: onProgress),
     verify: verifyAndCleanUp,
     run: (installer) => launch(installer.path, kSilentInstallArguments),
+    stashNotes: (version, notes) =>
+        stashReleaseNotes(version: version, notes: notes),
     autoCheck: feedUrl != null && ref.watch(updateAutoCheckProvider),
   );
 });

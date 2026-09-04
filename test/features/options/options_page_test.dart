@@ -54,6 +54,11 @@ import '../../helpers/in_memory_cosmos.dart';
 
 const _uid = 'u1';
 
+/// The school's OpenAI key as it sits in the config doc. Only the teacher
+/// flows touch it, and only to prove the school-wide model write did not
+/// take it with it (#118).
+const _schoolKey = 'sk-school';
+
 const _identity = AccountIdentity(
   oid: _uid,
   displayName: 'Sam Student',
@@ -82,13 +87,19 @@ class _SignedInAuth extends AuthService {
   AccountIdentity? build() => _who;
 }
 
-/// The school-wide config doc, without a Cosmos round trip.
-class _FixedGlobalConfig extends GlobalConfigService {
-  _FixedGlobalConfig(this._config);
-  final GlobalConfig? _config;
+/// The school-wide config doc over an in-memory container (#118), so the
+/// teacher-only write lands somewhere the test can read back — with the first
+/// value already in place for the first frame instead of one poll later.
+class _SeededGlobalConfig extends GlobalConfigService {
+  _SeededGlobalConfig({required super.container, required this.initial});
+
+  final GlobalConfig initial;
 
   @override
-  GlobalConfig? build() => _config;
+  GlobalConfig? build() {
+    super.build();
+    return initial;
+  }
 }
 
 /// Stands in for the OS file dialogs behind progress export / import (#32).
@@ -190,6 +201,7 @@ void main() {
   late InMemoryCosmos beliefs;
   late InMemoryCosmos turns;
   late InMemoryCosmos accounts;
+  late InMemoryCosmos config;
   late DebugSessionRecorder recorder;
   late List<http.Request> githubRequests;
   late _FakeArchiveIo archiveIo;
@@ -218,6 +230,7 @@ void main() {
     beliefs = InMemoryCosmos([_belief('b1', 's1'), _belief('b2', 's2')]);
     turns = InMemoryCosmos([_turn('t1', 's1'), _turn('t2', 's2')]);
     accounts = InMemoryCosmos([_account(mayUseGlobalKey: false)]);
+    config = InMemoryCosmos();
 
     recorder = DebugSessionRecorder()
       ..beginTurn(
@@ -313,7 +326,10 @@ void main() {
       }),
       if (update != null) updateServicesProvider.overrideWithValue(update),
       globalConfigServiceProvider.overrideWith(
-        () => _FixedGlobalConfig(GlobalConfig(model: globalModel, apiKey: '')),
+        () => _SeededGlobalConfig(
+          container: config.container,
+          initial: GlobalConfig(model: globalModel, apiKey: _schoolKey),
+        ),
       ),
       progressArchiveIoProvider.overrideWithValue(archiveIo),
       authServiceProvider.overrideWith(
@@ -360,10 +376,17 @@ void main() {
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
   }) async {
-    // Tall viewport so every card is laid out without scrolling.
-    tester.view.physicalSize = const Size(1400, 3200);
+    // Tall viewport so every card is laid out without scrolling — including
+    // the teacher's second model card (#118).
+    tester.view.physicalSize = const Size(1400, 4200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    config.upsert({
+      'id': 'global',
+      'type': 'config',
+      'Model': globalModel,
+      'ApiKey': _schoolKey,
+    });
     await tester.pumpWidget(
       buildApp(
         devTools: devTools,
@@ -921,6 +944,15 @@ void main() {
   });
 
   group('AI model', () {
+    /// A model row in the per-device card. A teacher sees the school-wide
+    /// card at the same time and its rows carry the same model names, so a
+    /// bare `find.text('gpt-4.1')` is ambiguous for exactly the person the
+    /// teacher test below is about (#118).
+    Finder deviceRow(String model) => find.descendant(
+      of: find.byKey(const ValueKey('model-rows-device')),
+      matching: find.text(model),
+    );
+
     testWidgets('own-key accounts see the card, and the school default is the '
         'starting choice', (tester) async {
       await mount(tester, globalModel: 'gpt-4.1');
@@ -988,21 +1020,138 @@ void main() {
       expect(find.text('AI model'), findsOneWidget);
       expect(find.text('School default (gpt-4.1)'), findsOneWidget);
       for (final model in kSelectableModels) {
-        expect(find.text(model), findsOneWidget, reason: model);
+        expect(deviceRow(model), findsOneWidget, reason: model);
       }
       // Still on the school's key, so the key card stays away.
       expect(find.text('OpenAI API key'), findsNothing);
 
-      await tester.tap(find.text('gpt-4o-mini'));
+      await tester.tap(deviceRow('gpt-4o-mini'));
       await tester.pumpAndSettle();
       expect(container.read(modelPreferenceProvider), 'gpt-4o-mini');
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('openai_model'), 'gpt-4o-mini');
+      // The device override is exactly that: the school-wide doc is untouched
+      // by it (#118).
+      expect(config['global']!['Model'], 'gpt-4.1');
 
       await tester.tap(find.text('School default (gpt-4.1)'));
       await tester.pumpAndSettle();
       expect(container.read(modelPreferenceProvider), isNull);
       expect(prefs.getString('openai_model'), isNull);
+
+      await unmount(tester);
+    });
+  });
+
+  // #118 — the model picker #32 shipped was per device, so a teacher changing
+  // it moved only the machine in front of them. The school-wide doc now has a
+  // writer, and this card is its only caller.
+  group('school-wide AI model', () {
+    Finder globalRow(String model) => find.descendant(
+      of: find.byKey(const ValueKey('model-rows-global')),
+      matching: find.text(model),
+    );
+
+    testWidgets('a teacher sets the model for everyone, and the school key '
+        'survives the write', (tester) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: 'gpt-4o');
+      final container = containerOf(tester);
+
+      expect(find.text('School-wide AI model'), findsOneWidget);
+      for (final model in kSelectableModels) {
+        expect(globalRow(model), findsOneWidget, reason: model);
+      }
+
+      await tester.tap(globalRow('gpt-4.1'));
+      await tester.pumpAndSettle();
+
+      expect(config['global']!['Model'], 'gpt-4.1');
+      expect(
+        config['global']!['ApiKey'],
+        _schoolKey,
+        reason: 'the school-wide write blanked the stored API key',
+      );
+      // Published straight away, so the card and the tutor agree without
+      // waiting for the next poll.
+      expect(container.read(globalConfigServiceProvider)?.model, 'gpt-4.1');
+      expect(find.text('The school now uses gpt-4.1.'), findsOneWidget);
+      // And it left this device's own choice alone.
+      expect(container.read(modelPreferenceProvider), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('openai_model'), isNull);
+
+      await unmount(tester);
+    });
+
+    testWidgets('the new school default is what the per-device card offers to '
+        'follow', (tester) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: 'gpt-4o');
+
+      expect(find.text('School default (gpt-4o)'), findsOneWidget);
+
+      await tester.tap(globalRow('gpt-5-mini'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('School default (gpt-5-mini)'), findsOneWidget);
+      expect(find.text('School default (gpt-4o)'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    // The write is gated on the Entra role alone. A developer build and an
+    // own-key account both see the *per-device* card — neither may move the
+    // whole class.
+    testWidgets('an own-key account on a developer build does not get the '
+        'card', (tester) async {
+      await mount(tester, devTools: true);
+
+      expect(find.text('AI model'), findsOneWidget);
+      expect(find.text('School-wide AI model'), findsNothing);
+      expect(find.byKey(const ValueKey('model-rows-global')), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a student on the bundled key does not get the card', (
+      tester,
+    ) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester);
+
+      expect(find.text('School-wide AI model'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    // The doc a fresh deployment has never had a Model written into: no row
+    // is selected, and picking one fills it in rather than failing on the
+    // read.
+    testWidgets('an unset school model leaves every row unselected, and the '
+        'first pick fills it in', (tester) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: '');
+
+      final rows = tester.widgetList<ListTile>(
+        find.descendant(
+          of: find.byKey(const ValueKey('model-rows-global')),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(rows, hasLength(kSelectableModels.length));
+      expect(
+        rows.map(
+          (t) => (t.leading! as Icon).icon == Icons.radio_button_checked,
+        ),
+        everyElement(isFalse),
+      );
+
+      await tester.tap(globalRow('gpt-5'));
+      await tester.pumpAndSettle();
+
+      expect(config['global']!['Model'], 'gpt-5');
+      expect(config['global']!['ApiKey'], _schoolKey);
 
       await unmount(tester);
     });

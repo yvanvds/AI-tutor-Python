@@ -27,6 +27,11 @@ class ScriptedLlm extends OpenaiConnector {
   /// justification prompt carries the computed number as a fixed fact).
   final List<String> sentInputs = <String>[];
 
+  /// The system prompt of every request, streaming or not, in order — a flow
+  /// asserts on the contract the app put in front of the model (#117: the
+  /// output-language directive follows the language picked in Options).
+  final List<String> sentInstructions = <String>[];
+
   /// What is left unplayed — a flow asserts this is empty when it expected
   /// every scripted reply to be consumed.
   int get remaining => _replies.length;
@@ -58,6 +63,7 @@ class ScriptedLlm extends OpenaiConnector {
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) {
     sends++;
+    sentInstructions.add(instructions);
     return _play(input);
   }
 
@@ -75,6 +81,7 @@ class ScriptedLlm extends OpenaiConnector {
   }) async {
     sends++;
     sentInputs.add(input);
+    sentInstructions.add(instructions);
     return _reply();
   }
 

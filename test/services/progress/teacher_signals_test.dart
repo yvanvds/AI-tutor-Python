@@ -216,6 +216,60 @@ void main() {
       expect(titles, (rootTitle: 'Orphan', subgoalTitle: null));
     });
 
+    test(
+      'the derived root rollup doc does not mask the active subgoal (#120)',
+      () {
+        // The realistic write shape: the conductor persists the subgoal cache
+        // and then immediately recomputes the root rollup, which is stamped
+        // with a *newer* lastSessionAt. The cell must still name the subgoal.
+        final titles = activeGoalTitles(
+          progress: [
+            _p('s2', 0.5, at: '2026-05-02T10:00:00Z'),
+            _p(
+              'r1',
+              0.25,
+              at: '2026-05-02T10:00:01Z',
+            ), // rollup, one tick later
+          ],
+          goalById: titledById,
+          parentByChild: titledParents,
+        );
+        expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Variables'));
+      },
+    );
+
+    test('the rollup does not resurrect an older subgoal either (#120)', () {
+      final titles = activeGoalTitles(
+        progress: [
+          _p('s1', 1.0, at: '2026-05-01T10:00:00Z'),
+          _p('s2', 0.5, at: '2026-05-02T10:00:00Z'),
+          _p('r1', 0.75, at: '2026-05-02T10:00:01Z'),
+        ],
+        goalById: titledById,
+        parentByChild: titledParents,
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Variables'));
+    });
+
+    test('a rollup on another root does not split the two lines (#120)', () {
+      // Root B's rollup is the newest doc overall, but the student's only
+      // real subgoal work is under root A — both lines must come from A.
+      final twoRoots = <Goal>[
+        Goal(id: 'r1', title: 'Basics', parentId: null, order: 0),
+        Goal(id: 's2', title: 'Variables', parentId: 'r1', order: 0),
+        Goal(id: 'r2', title: 'Loops', parentId: null, order: 0),
+      ];
+      final titles = activeGoalTitles(
+        progress: [
+          _p('s2', 0.5, at: '2026-05-02T10:00:00Z'),
+          _p('r2', 0.0, at: '2026-05-02T10:00:01Z'),
+        ],
+        goalById: {for (final g in twoRoots) g.id: g},
+        parentByChild: {for (final g in twoRoots) g.id: g.parentId},
+      );
+      expect(titles, (rootTitle: 'Basics', subgoalTitle: 'Variables'));
+    });
+
     test('a multi-level leaf reports the top root plus its own title', () {
       final deep = <Goal>[
         Goal(id: 'r1', title: 'Basics', parentId: null, order: 0),
@@ -231,7 +285,41 @@ void main() {
     });
   });
 
+  group('mostRecentlyActiveSubgoal', () {
+    test('skips root records and picks the newest subgoal record', () {
+      final active = mostRecentlyActiveSubgoal([
+        _p('s1', 1.0, at: '2026-05-01T10:00:00Z'),
+        _p('s2', 0.5, at: '2026-05-02T10:00:00Z'),
+        _p('r1', 0.25, at: '2026-05-02T10:00:01Z'),
+      ], parentByChild: parentByChild);
+      expect(active?.goalID, 's2');
+    });
+
+    test('returns null when only root or unknown records exist', () {
+      expect(
+        mostRecentlyActiveSubgoal([
+          _p('r1', 0.25),
+          _p('deleted-goal', 1.0),
+        ], parentByChild: parentByChild),
+        isNull,
+      );
+    });
+  });
+
   group('activeRootId', () {
+    test('still anchors on the newest record, rollup included (#120)', () {
+      // The status dot and the Progress column deliberately keep counting
+      // the rollup write as activity — only the titles cell filters it out.
+      final id = activeRootId(
+        progress: [
+          _p('s1', 1.0, at: '2026-05-01T10:00:00Z'),
+          _p('r1', 0.125, at: '2026-05-02T10:00:00Z'),
+        ],
+        parentByChild: parentByChild,
+      );
+      expect(id, 'r1');
+    });
+
     test('walks multi-level parents up to the root', () {
       final deep = <Goal>[
         _goal('r1'),

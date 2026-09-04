@@ -78,6 +78,11 @@ typedef ReleaseVerifier = Future<bool> Function(
 /// handover failed — a successful one does not come back.
 typedef InstallerRunner = Future<void> Function(File installer);
 
+/// Parks a release's notes somewhere that outlives this process, so the build
+/// the installer puts in its place can show them (#119). Called once, on the
+/// way out, after the download has verified and before [InstallerRunner].
+typedef ReleaseNotesStash = Future<void> Function(String version, String notes);
+
 /// Where a diagnostic goes when nothing is shown on screen.
 typedef UpdateLog = void Function(String message);
 
@@ -91,6 +96,7 @@ class UpdateServices {
     required this.download,
     required this.verify,
     required this.run,
+    this.stashNotes,
     this.autoCheck = true,
     this.log,
   });
@@ -111,6 +117,13 @@ class UpdateServices {
 
   /// How a verified installer is launched.
   final InstallerRunner run;
+
+  /// Where a release's notes are left for the build that comes back (#119).
+  ///
+  /// Optional, and a failure here never stops an install: not being told what
+  /// changed is a smaller loss than an update that refused to run because a
+  /// preference file could not be written.
+  final ReleaseNotesStash? stashNotes;
 
   /// Whether a launch checks by itself.
   ///
@@ -368,6 +381,20 @@ class UpdateController extends Notifier<UpdateState> {
               'back as version ${release.version}.',
         ),
       );
+
+      // The last thing done before the process is handed to the installer:
+      // `run` does not come back, so anything the next build needs has to be
+      // on disk by now (#119). Guarded on its own — an unwritable preference
+      // store must not turn a working update into a failed one.
+      final stash = services.stashNotes;
+      if (stash != null) {
+        try {
+          await stash(release.version, release.notes);
+        } on Object catch (e) {
+          _log('Update: release notes for ${release.version} not stashed: $e');
+        }
+      }
+
       await services.run(installer);
 
       // Reached only when the handover failed to take the process with it.
