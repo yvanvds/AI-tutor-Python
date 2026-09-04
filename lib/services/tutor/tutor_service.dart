@@ -546,6 +546,9 @@ class TutorService extends Notifier<TutorState> {
         fetchInstructions: () =>
             ref.read(instructionsServiceProvider.notifier).getAll(),
         fetchRootGoals: () => ref.read(goalsServiceProvider).getRootGoalsOnce(),
+        // The language the student picked in Options (#117). Read per turn,
+        // so switching language changes the very next question.
+        languageCode: ref.read(appLocaleProvider).languageCode,
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
         subgoalOverride: warmUpSubgoal,

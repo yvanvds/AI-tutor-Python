@@ -95,6 +95,7 @@ class _FakeInstructionGenerator extends InstructionGenerator {
     required List<Instruction> cachedInstructions,
     required Future<List<Instruction>> Function() fetchInstructions,
     required Future<List<Goal>> Function() fetchRootGoals,
+    required String languageCode,
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,

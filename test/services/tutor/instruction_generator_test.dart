@@ -51,6 +51,7 @@ void main() {
       ],
       fetchInstructions: () async => const [],
       fetchRootGoals: () async => const [],
+      languageCode: 'nl',
       targetLOs: const [
         LearningObjective(
           id: 'iter_fixed_count',
@@ -106,6 +107,7 @@ void main() {
       ],
       fetchInstructions: () async => const [],
       fetchRootGoals: () async => const [],
+      languageCode: 'nl',
       subgoalOverride: older,
     );
     expect(out, contains('always: Iteration / Print / Tip P'));
@@ -120,7 +122,72 @@ void main() {
       cachedInstructions: const [],
       fetchInstructions: () async => const [],
       fetchRootGoals: () async => const [],
+      languageCode: 'nl',
     );
     expect(out, isEmpty);
+  });
+
+  group('output-language directive (#117)', () {
+    Future<String> generate(String languageCode) =>
+        InstructionGenerator().generateInstructions(
+          ChatRequestType.mcQuestion,
+          goalSelection: GoalSelectionState(
+            selectedRoot: root(),
+            selectedChild: subgoal(),
+          ),
+          cachedInstructions: [
+            // A teacher-authored body in Dutch, as the real ones are.
+            makeInstruction('alwaysInclude', {
+              'main': 'Stel een vraag over {subgoal}.',
+            }),
+            makeInstruction('mcQuestion', {'main': 'Geef vier opties.'}),
+          ],
+          fetchInstructions: () async => const [],
+          fetchRootGoals: () async => const [],
+          languageCode: languageCode,
+        );
+
+    test('names English for an English student', () async {
+      final out = await generate('en');
+      expect(out, contains('OUTPUT LANGUAGE — STRICT.'));
+      expect(out, contains('Write all student-facing text in English'));
+      expect(out, isNot(contains('Dutch (Nederlands)')));
+    });
+
+    test('names Dutch for a Dutch student', () async {
+      final out = await generate('nl');
+      expect(
+        out,
+        contains('Write all student-facing text in Dutch (Nederlands)'),
+      );
+    });
+
+    test(
+      'falls back to English for a language the app has no name for',
+      () async {
+        expect(
+          await generate('fr'),
+          contains('Write all student-facing text in English'),
+        );
+      },
+    );
+
+    test('comes after the teacher-authored bodies it must override', () async {
+      final out = await generate('en');
+      expect(
+        out.indexOf('OUTPUT LANGUAGE'),
+        greaterThan(out.indexOf('Geef vier opties.')),
+        reason: 'the directive must be the last word in the system prompt',
+      );
+      expect(out.trimRight(), endsWith('you show the student.'));
+    });
+
+    test('exempts the machine half of the contract from translation', () async {
+      final out = await generate('en');
+      expect(out, contains('Never translate the machine parts'));
+      expect(out, contains('learning-objective ids'));
+      // The envelope contract itself is still intact above it.
+      expect(out, contains('RESPONSE FORMAT — STRICT.'));
+    });
   });
 }

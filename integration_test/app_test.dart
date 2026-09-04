@@ -45,6 +45,7 @@ import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
+import 'flows/tutor_language.dart' as tutor_language;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
@@ -58,6 +59,7 @@ void main() {
   lesson_flow.main();
   explain_paging.main();
   language_switch.main();
+  tutor_language.main();
   playground_files.main();
   editor_comment_space.main();
   practice_complete_code.main();
