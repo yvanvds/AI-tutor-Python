@@ -38,6 +38,20 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
   static const _cssAssetKey = 'assets/lesson/lesson.css';
 
   late final WebViewController _controller;
+
+  /// The one `WebViewWidget` this state ever hands to the tree (#128).
+  ///
+  /// Built once, in [initState], and returned as the *same instance* from
+  /// every [build]. `Element.updateChild` short-circuits on an identical
+  /// widget, so the platform widget's `build` never re-runs when a parent
+  /// rebuilds with an unchanged fragment. That matters on Windows, where
+  /// `webview_all_windows` wraps the texture in a `FutureBuilder` whose
+  /// future is a fresh `async` result on every build: a rebuild put the
+  /// snapshot back to `waiting`, drew one blank frame and re-mounted the
+  /// texture — the lesson "blinked" on every 5 s poll that rebuilt a host.
+  /// The controller is reused across fragments too, so a changed fragment
+  /// navigates in place ([didUpdateWidget] → [_load]) instead of re-mounting.
+  late final Widget _webview;
   late final Future<void> _channelReady;
   LessonRunnerLabels? _labels;
   bool _ready = false;
@@ -58,6 +72,7 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
       kLessonRunnerChannel,
       onMessageReceived: _onRunRequested,
     );
+    _webview = WebViewWidget(controller: _controller);
   }
 
   @override
@@ -132,7 +147,7 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
       color: AppColors.ink0,
       child: Stack(
         children: [
-          WebViewWidget(controller: _controller),
+          _webview,
           if (!_ready)
             Positioned.fill(child: ColoredBox(color: AppColors.ink0)),
         ],

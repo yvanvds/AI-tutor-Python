@@ -25,6 +25,7 @@ import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/explain_paging.dart' as explain_paging;
+import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -64,6 +65,7 @@ void main() {
 
   lesson_flow.main();
   explain_paging.main();
+  explain_poll_steady.main();
   language_switch.main();
   tutor_language.main();
   playground_files.main();
