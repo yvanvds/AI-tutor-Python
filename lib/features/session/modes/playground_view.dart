@@ -88,7 +88,9 @@ class PlaygroundView extends ConsumerWidget {
               ],
             ),
           ),
-          const Expanded(child: PracticeView(showObjective: false)),
+          const Expanded(
+            child: PracticeView(showObjective: false, showQuiz: false),
+          ),
         ],
       ),
     );

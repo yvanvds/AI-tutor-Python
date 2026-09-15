@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-03.
+schaduwperiode (zie §4). Laatste wijziging: 2026-09-11.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -392,7 +392,17 @@ niemand oneerlijk raakt:
   de overtuiging al **30 dagen** niet meer geschreven is — het langst
   onaangeroerde leerdoel eerst. Omdat ook transfer-krediet een schrijving
   is, komen leerdoelen die je in nieuw werk blijft gebruiken hier
-  vanzelf niet in terecht. Het antwoord telt als een gewone meting van
+  vanzelf niet in terecht. Eén uitzondering op de 30 dagen: bleek uit
+  een latere oefening een gat in zo'n eerder beheerst leerdoel (een
+  negatief signaal op een eerder subdoel, §1.2, dat de overtuiging onder
+  de drempels van §1.5 duwt), dan wordt het bij de eerstvolgende
+  sessiestart opgefrist, ook al is het pas geschreven — de app onthoudt
+  dat gat tot het leerdoel opnieuw rechtstreeks bevraagd is, of tot
+  transfer-krediet of een positief signaal het weer boven die drempels
+  brengt. Zulke leerdoelen gaan voor op de gewoon-verouderde; de
+  opfrisvraag zelf (goed of fout beantwoord) zet het leerdoel daarna
+  terug op de gewone klok van 30 dagen. Het antwoord telt als een gewone
+  meting van
   dat leerdoel (§1.2, op je huidige moeilijkheidsniveau, met de
   herkomst van §2.7): een juist antwoord verhoogt de overtuiging en
   beweegt ook de ratel van §2.5, een fout antwoord verlaagt ze. De vraag
@@ -482,6 +492,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.4 | 2026-09-02 | Geen structuurwijziging. §2.8 opfrisvragen staan nu in de code: hoogstens één per sessie, bij het begin, over het langst onaangeroerde eerder beheerste leerdoel uit een ander subdoel (drempel voorlopig 30 dagen, §4); het antwoord telt als gewone meting van dat leerdoel, inclusief de ratel van §2.5, maar niet voor het kalibratieniveau (#102). |
 | 1.0.6 | 2026-09-03 | Geen structuurwijziging. §1.2: signalen van de grader op een leerdoel uit een eerder subdoel tellen nu ook echt mee in de code (voorheen liet de tutor ze vallen): met de opgegeven sterkte, gerekend als gemiddeld, zonder de ratel van §2.5 of de voortgangsbalkjes te bewegen. §2.8 verduidelijkt dat een benoemd gat in oude leerstof via zo'n signaal loopt, niet via transfer-krediet (#108). |
 | 1.0.7 | 2026-09-03 | Geen structuurwijziging. §2.4: M_start komt nu uit een exacte momentopname per leerdoel bij de periodestart (beheerst? en ratel, teruggerekend naar dat moment), geschreven door de app bij de eerste sessie na de periodestart, en volgt uit dezelfde formule als M_eind, verwacht niveau inbegrepen. De regel van v1.0.5 (fractie per subdoel uit de historiek, d_start = 0) blijft alleen als overgangsregel voor een periode zonder momentopname; het voorstel vermeldt welke van de twee gebruikt is (#110). |
+| 1.0.8 | 2026-09-11 | Geen structuurwijziging. §2.8 en bijlage A: een opfrisvraag wacht niet langer altijd 30 dagen — een eerder beheerst leerdoel waarin een later signaal op een eerder subdoel (§1.2) een gat blootlegt, wordt bij de eerstvolgende sessiestart opgefrist (markering `regressedAt`, gewist door de eerstvolgende rechtstreekse meting of door een onrechtstreekse schrijving die de beheersing herstelt) en gaat voor op de gewoon-verouderde leerdoelen. Beschrijft gedrag dat sinds #112 in de code staat; de formule van deel 2 verandert niet (#113). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -503,7 +514,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
 | toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
 | transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
-| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt; hoogstens één per sessie (§2.8) |
+| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt — een leerdoel met een gemarkeerd gat (`regressedAt`, zie onder) komt eerder aan de beurt; hoogstens één per sessie (§2.8) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -558,7 +569,20 @@ hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
 oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel
 waarvan `lastUpdatedAt` minstens 30 dagen oud is — het oudste eerst — en
 stelt daarover de zachtste vraagvorm voor dat soort leerdoel op je
-huidige niveau. Het antwoord wordt verwerkt als een gewone meting van
+huidige niveau. Sinds v1.0.8 telt daarnaast een leerdoel met de markering
+`regressedAt` als aan de beurt, ongeacht `lastUpdatedAt`: de tutor zet
+die markering wanneer een negatief signaal op een eerder subdoel (§1.2)
+een ooit beheerst leerdoel onder de voorwaarden 1 en 2 van §1.5 laat
+zakken (een reeds gezette markering blijft staan, zodat het oudste gat
+eerst komt), en wist ze bij elke rechtstreekse meting van dat leerdoel
+(de opfrisvraag zelf, goed of fout, of een gewone vraag zodra het subdoel
+weer actief is) en bij transfer-krediet of een positief signaal dat de
+opgeslagen overtuiging weer aan die voorwaarden laat voldoen; een
+onrechtstreekse schrijving die het leerdoel onder de drempels laat,
+verandert niets aan de markering. Gemarkeerde leerdoelen gaan voor op
+verouderde (oudste markering eerst), daarna het oudste `lastUpdatedAt`,
+bij gelijke stand de laagste μ; het beurtrecord vermeldt welke van de
+twee regels het leerdoel koos. Het antwoord wordt verwerkt als een gewone meting van
 dat leerdoel (gewicht van §1.2, herkomst van §2.7, ratel van §2.5), telt
 niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
 de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
