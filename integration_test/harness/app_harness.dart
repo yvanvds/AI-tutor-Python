@@ -12,7 +12,8 @@
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the system locale, the system light/dark setting, SharedPreferences
-// (in-memory), the playground file directory (temp), the update check (off),
+// (in-memory), the playground file directory (temp), the update check (off)
+// and its native fallback transport (none — see [AppHarness.nativeGet]),
 // the LLM (any call fails loudly unless a flow passes `llm:`), the lesson
 // example runner (scripted), the browser launcher (recorded, never opened
 // — see [browserLaunches]) and the sound effects (silent — see [_NoSound]).
@@ -32,6 +33,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
+import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
@@ -59,6 +61,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../test/helpers/fake_lesson_code_runner.dart';
 import '../../test/helpers/in_memory_cosmos.dart';
 import 'fake_github_server.dart';
+import 'fake_release_server.dart';
 import 'scripted_llm.dart';
 import 'seed.dart';
 
@@ -140,6 +143,7 @@ class AppHarness {
     this.identity = studentIdentity,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
+    this.nativeGet,
     this.appVersion,
     this.prefs = const {},
     this.pyRunner,
@@ -171,6 +175,15 @@ class AppHarness {
   /// `kReleaseMode` default in place — which is how `update_dev_build.dart`
   /// proves a debug build never reaches out at all.
   final bool forceUpdateCheck;
+
+  /// The transport the updater falls back to when Dart cannot complete a
+  /// TLS handshake (#124). `null` (the default) means none — a test boot
+  /// never spawns the `curl.exe` the production wiring would, and a flow
+  /// that serves its release over a certificate Dart refuses sees the app
+  /// fail the way it fails on a machine with no fallback. The TLS flow
+  /// passes [TrustingLoopbackGet], which trusts that one certificate the way
+  /// Schannel trusts a school filter's CA.
+  final NativeGet? nativeGet;
 
   /// The version this build reports (#119). `null` (the default) leaves the
   /// real `kAppVersion` from `version.dart` in place, which is what every
@@ -335,6 +348,7 @@ class AppHarness {
         if (appVersion != null)
           appVersionProvider.overrideWithValue(appVersion!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
+        nativeGetProvider.overrideWithValue(nativeGet),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
           // The real launcher never returns — it exits the process. Hanging

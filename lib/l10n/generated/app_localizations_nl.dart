@@ -782,6 +782,13 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get update_notice_checkFailed =>
+      'Controleren op updates is mislukt — zie Opties → Over.';
+
+  @override
+  String get update_notice_dismiss => 'Sluiten';
+
+  @override
   String get update_action_apply => 'Bijwerken';
 
   @override

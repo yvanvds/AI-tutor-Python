@@ -216,19 +216,32 @@ String? parseSha256Document(String body) {
 /// payload that is not JSON, or a release that publishes an installer with no
 /// checksum beside it. That distinction is #46's and is what keeps a broken
 /// check from reading as "you are up to date".
+///
+/// A TLS handshake Dart cannot complete — and only that (#124) — is retried
+/// through [nativeGet] when one is given, and once that was needed the
+/// checksum goes the same way rather than failing the same handshake again.
+/// The release that comes back says so ([UpdateInfo.viaNativeTransport]) so
+/// the download can too. A 404, a timeout, a dead socket are not the
+/// certificate problem and are never retried natively.
 Future<UpdateInfo?> fetchLatestRelease(
   Uri endpoint, {
   http.Client? client,
   Duration timeout = kUpdateRequestTimeout,
+  NativeGet? nativeGet,
+  TransportLog? log,
 }) async {
   final bool owned = client == null;
   final http.Client c = client ?? http.Client();
+  final _Transport transport = _Transport(
+    c,
+    timeout: timeout,
+    nativeGet: nativeGet,
+    log: log,
+  );
   try {
-    final http.Response res = await _get(
-      c,
+    final http.Response res = await transport.get(
       endpoint,
       headers: kGitHubApiHeaders,
-      timeout: timeout,
     );
 
     // Nothing published yet — a normal outcome, not a failure.
@@ -267,8 +280,9 @@ Future<UpdateInfo?> fetchLatestRelease(
     return UpdateInfo(
       release.version,
       release.installerUrl,
-      await _fetchChecksum(c, checksumUrl, timeout),
+      await _fetchChecksum(transport, checksumUrl),
       notes: release.notes,
+      viaNativeTransport: transport.nativeEngaged,
     );
   } finally {
     // Closing an owned client also aborts a request still in flight after a
@@ -278,12 +292,8 @@ Future<UpdateInfo?> fetchLatestRelease(
 }
 
 /// Downloads the `.sha256` asset and reads the hash out of it.
-Future<String> _fetchChecksum(
-  http.Client client,
-  Uri url,
-  Duration timeout,
-) async {
-  final http.Response res = await _get(client, url, timeout: timeout);
+Future<String> _fetchChecksum(_Transport transport, Uri url) async {
+  final http.Response res = await transport.get(url);
   if (res.statusCode != HttpStatus.ok) {
     throw UpdateCheckException(
       'checksum download from $url returned HTTP ${res.statusCode}',
@@ -300,23 +310,80 @@ Future<String> _fetchChecksum(
   return sha;
 }
 
-/// A bounded GET that reports its failures as [UpdateCheckException].
-Future<http.Response> _get(
-  http.Client client,
-  Uri url, {
-  Map<String, String> headers = const <String, String>{},
-  required Duration timeout,
-}) async {
-  try {
-    return await client.get(url, headers: headers).timeout(timeout);
-  } on TimeoutException {
-    throw UpdateCheckException(
-      'request to $url timed out after ${timeout.inSeconds}s',
-    );
-  } on UpdateCheckException {
-    rethrow;
-  } on Object catch (e) {
-    throw UpdateCheckException('request to $url failed: $e');
+/// The bounded GETs one check makes, reporting their failures as
+/// [UpdateCheckException] — and, from the first handshake Dart cannot
+/// complete onwards, making them through [nativeGet] instead (#124).
+class _Transport {
+  _Transport(
+    this.client, {
+    required this.timeout,
+    required this.nativeGet,
+    required this.log,
+  });
+
+  final http.Client client;
+  final Duration timeout;
+  final NativeGet? nativeGet;
+  final TransportLog? log;
+
+  /// Whether a request of this check has gone through [nativeGet]. Sticky:
+  /// the checksum asset sits behind the same inspection as the API, so once
+  /// Dart has failed the handshake there is nothing to learn from failing it
+  /// again.
+  bool nativeEngaged = false;
+
+  Future<http.Response> get(
+    Uri url, {
+    Map<String, String> headers = const <String, String>{},
+  }) async {
+    if (nativeEngaged) return _native(url, headers);
+    try {
+      return await client.get(url, headers: headers).timeout(timeout);
+    } on TimeoutException {
+      throw UpdateCheckException(
+        'request to $url timed out after ${timeout.inSeconds}s',
+      );
+    } on HandshakeException catch (e) {
+      // One clause above the catch-all on purpose: `package:http` wraps only
+      // `SocketException` and `HttpException`, so this arrives as itself.
+      // Nothing else is retried natively — a 404, a timeout, a dead socket
+      // are not the certificate problem, and the fallback would only mask
+      // them.
+      final NativeGet? native = nativeGet;
+      if (native == null) {
+        throw UpdateCheckException('request to $url failed: $e');
+      }
+      log?.call(
+        'Update: Dart could not complete the TLS handshake to $url ($e); '
+        'retrying through the Windows-native transport.',
+      );
+      nativeEngaged = true;
+      try {
+        return await _native(url, headers);
+      } on UpdateCheckException catch (nativeFailure) {
+        // The handshake reason stays in front: it is the one that explains
+        // the network, and the one About should still be telling the truth
+        // about.
+        throw UpdateCheckException(
+          'request to $url failed: $e; the Windows-native fallback failed '
+          'too: ${nativeFailure.message}',
+        );
+      }
+    } on UpdateCheckException {
+      rethrow;
+    } on Object catch (e) {
+      throw UpdateCheckException('request to $url failed: $e');
+    }
+  }
+
+  Future<http.Response> _native(Uri url, Map<String, String> headers) async {
+    try {
+      return await nativeGet!(url, headers: headers, timeout: timeout);
+    } on UpdateCheckException {
+      rethrow;
+    } on Object catch (e) {
+      throw UpdateCheckException('request to $url failed: $e');
+    }
   }
 }
 

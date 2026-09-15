@@ -12,7 +12,13 @@
 // #50 adds the third one: a release that publishes an installer but no
 // `.sha256` beside it. That is a broken release rather than "nothing
 // published", so the check fails loudly into the log and the state — and
-// still must not put anything on screen or install anything.
+// still must not offer or install anything.
+//
+// Since #124 a failed *launch* check is not silent on screen either: the
+// shell puts up a small dismissible notice pointing at About. The flows say
+// which of them is a failure in that sense — a payload that is not a release
+// is "nothing published", not a broken check, and must not nag — and
+// `update_check_failed_notice.dart` drives the notice itself.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -28,11 +34,14 @@ import '../harness/app_harness.dart';
 import '../harness/fake_release_server.dart';
 
 /// Boots the app against [server], waits for the check to land, and asserts
-/// the app survived it without an update dialog.
+/// the app survived it without an update dialog. [announced] says whether
+/// the outcome is a failed check the shell tells the student about (#124),
+/// as opposed to a quiet "nothing to offer".
 Future<void> _expectSurvivesCheck(
   WidgetTester tester,
-  FakeReleaseServer server,
-) async {
+  FakeReleaseServer server, {
+  required bool announced,
+}) async {
   final harness = AppHarness(updateFeedUrl: server.feedUrl);
   await harness.boot(tester);
 
@@ -49,9 +58,14 @@ Future<void> _expectSurvivesCheck(
 
   // Nothing pushed at the student, in either shape: the modal #48 removed or
   // the offer bar that replaced it. A check that failed has no release to
-  // offer, so its reason waits in About instead (#48).
+  // offer, so its reason waits in About (#48) — and the shell says so with a
+  // notice rather than nothing at all (#124).
   expect(find.byType(AlertDialog), findsNothing);
   expect(find.byKey(const ValueKey('update-offer')), findsNothing);
+  expect(
+    find.byKey(const ValueKey('update-check-failed')),
+    announced ? findsOneWidget : findsNothing,
+  );
   expect(find.byType(AppShell), findsOneWidget);
 
   await harness.dispose(tester);
@@ -65,10 +79,11 @@ void main() {
     tester,
   ) async {
     // No `tag_name`, no `assets`: every field the parser reads is missing.
+    // That is "nothing to offer", not a failed check — nothing to announce.
     final server = await FakeReleaseServer.start(
       rawBody: '{"message":"Not Found"}',
     );
-    await _expectSurvivesCheck(tester, server);
+    await _expectSurvivesCheck(tester, server, announced: false);
   });
 
   testWidgets('a server error does not crash the app', (tester) async {
@@ -76,13 +91,13 @@ void main() {
       status: 500,
       rawBody: 'upstream is having a day',
     );
-    await _expectSurvivesCheck(tester, server);
+    await _expectSurvivesCheck(tester, server, announced: true);
   });
 
   testWidgets('a release with no checksum asset does not crash the app', (
     tester,
   ) async {
     final server = await FakeReleaseServer.start(withChecksumAsset: false);
-    await _expectSurvivesCheck(tester, server);
+    await _expectSurvivesCheck(tester, server, announced: true);
   });
 }

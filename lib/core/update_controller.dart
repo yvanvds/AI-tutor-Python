@@ -15,7 +15,10 @@
 /// - **Invisible.** A failed check left nothing behind for the UI to show.
 ///   [UpdateState.phase] and [UpdateState.message] now carry the reason, and
 ///   the About panel renders it beside its **Check for updates** button
-///   (#48).
+///   (#48). A failed *launch* check additionally announces itself with a
+///   dismissible notice in the shell ([UpdateState.checkFailed], #124) —
+///   About is a panel nobody opens, and a student whose check has failed on
+///   every launch since 2.1.0 was two releases behind without knowing it.
 ///
 /// The layering mirrors AccountManager's (`lib/src/update/`): this file holds
 /// decision logic and no IO, `update_bootstrap.dart` holds the IO and is the
@@ -148,6 +151,8 @@ class UpdateState {
     this.message = '',
     this.progress = 0,
     this.dismissed = false,
+    this.automatic = false,
+    this.noticeDismissed = false,
   });
 
   final UpdatePhase phase;
@@ -172,6 +177,20 @@ class UpdateState {
   /// produces.
   final bool dismissed;
 
+  /// Whether the check this state came out of was the launch's own
+  /// ([UpdateController.start]) rather than one the student asked for from
+  /// About (#124). The difference decides where a failure is shown: a manual
+  /// check fails in front of the person who pressed the button; an automatic
+  /// one fails with nobody looking, and has to say so.
+  final bool automatic;
+
+  /// Whether the student has closed the "check failed" notice (#124).
+  ///
+  /// Sticky for the session, unlike [dismissed]: the launch checks once, so
+  /// there is exactly one automatic failure to announce, and a notice that
+  /// came back would be nagging.
+  final bool noticeDismissed;
+
   /// Whether the shell should be showing the offer bar.
   ///
   /// Covers the whole accepted run, not just the moment before it: the bar is
@@ -186,6 +205,20 @@ class UpdateState {
           phase == UpdatePhase.applying ||
           phase == UpdatePhase.failed);
 
+  /// Whether the shell should be showing the "check failed" notice (#124).
+  ///
+  /// Only for a check the app ran by itself, and only for a *check*: a failed
+  /// apply keeps its release and is reported on the offer bar it started
+  /// from ([isOffering]); a failed manual check is rendered inline by the
+  /// About panel the student is already looking at. Kept apart from
+  /// [isOffering] rather than folded into it, so the offer bar's own rules
+  /// do not move.
+  bool get checkFailed =>
+      !noticeDismissed &&
+      automatic &&
+      phase == UpdatePhase.failed &&
+      release == null;
+
   /// Whether an operation is in flight, so a button can disable itself.
   bool get busy =>
       phase == UpdatePhase.checking ||
@@ -199,12 +232,16 @@ class UpdateState {
     String? message,
     double? progress,
     bool? dismissed,
+    bool? automatic,
+    bool? noticeDismissed,
   }) => UpdateState(
     phase: phase ?? this.phase,
     release: clearRelease ? null : (release ?? this.release),
     message: message ?? this.message,
     progress: progress ?? this.progress,
     dismissed: dismissed ?? this.dismissed,
+    automatic: automatic ?? this.automatic,
+    noticeDismissed: noticeDismissed ?? this.noticeDismissed,
   );
 }
 
@@ -236,9 +273,12 @@ class UpdateController extends Notifier<UpdateState> {
 
   /// What the shell fires from its first frame. Checks only on a build that
   /// checks by itself; never throws, never blocks anything on screen.
+  ///
+  /// The one check whose failure is announced ([UpdateState.checkFailed]):
+  /// nobody pressed anything, so nobody is looking at About for the answer.
   Future<void> start() async {
     if (!_services.autoCheck) return;
-    await check();
+    await _check(automatic: true);
   }
 
   /// Asks the feed whether a newer release is published.
@@ -248,7 +288,9 @@ class UpdateController extends Notifier<UpdateState> {
   ///
   /// This never installs anything. Reaching [apply] takes a separate call
   /// that only a user action makes.
-  Future<void> check() async {
+  Future<void> check() => _check(automatic: false);
+
+  Future<void> _check({required bool automatic}) async {
     if (state.busy) return;
     final services = _services;
 
@@ -261,6 +303,7 @@ class UpdateController extends Notifier<UpdateState> {
         // Asking again is asking to be told: a check the student started
         // themselves must be allowed to put the bar back.
         dismissed: false,
+        automatic: automatic,
       ),
     );
     try {
@@ -431,6 +474,12 @@ class UpdateController extends Notifier<UpdateState> {
     if (state.busy) return;
     _set(state.copyWith(dismissed: true));
   }
+
+  /// Closes the "check failed" notice for the rest of this session (#124).
+  ///
+  /// The state underneath is untouched — the reason stays on
+  /// [UpdateState.message] for About, exactly as the notice said it would.
+  void dismissNotice() => _set(state.copyWith(noticeDismissed: true));
 }
 
 final updateControllerProvider =

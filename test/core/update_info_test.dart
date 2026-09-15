@@ -157,6 +157,192 @@ void main() {
     });
   });
 
+  // #124: the installer sits behind the same TLS inspection as the API, so
+  // the download has the same fallback — and the same rule that nothing but
+  // a handshake failure reaches it.
+  group('downloadToTemp — native transport fallback', () {
+    final url = Uri.parse('https://example.com/installer.exe');
+    const handshake = HandshakeException(
+      'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED)',
+    );
+    final expectedPath =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'python_teacher_install.exe';
+
+    /// A seam that writes [bytes] where it is told to and records the call.
+    ({NativeGet get, List<({Uri url, File? to})> calls}) recordingNative({
+      List<int> bytes = const [1, 2, 3],
+      int status = 200,
+      Object? failWith,
+    }) {
+      final calls = <({Uri url, File? to})>[];
+      Future<http.Response> get(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async {
+        calls.add((url: url, to: to));
+        if (failWith != null) throw failWith;
+        if (to != null && status == 200) to.writeAsBytesSync(bytes);
+        return http.Response('', status);
+      }
+
+      return (get: get, calls: calls);
+    }
+
+    setUp(() {
+      final leftover = File(expectedPath);
+      if (leftover.existsSync()) leftover.deleteSync();
+    });
+
+    test('a handshake failure is retried through the seam into the temp '
+        'file', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(bytes: const [9, 8, 7]);
+      final logs = <String>[];
+
+      final file = await downloadToTemp(
+        url,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+
+      expect(file.path, expectedPath);
+      expect(native.calls, hasLength(1));
+      expect(native.calls.single.url, url);
+      expect(native.calls.single.to?.path, expectedPath);
+      expect(file.readAsBytesSync(), [9, 8, 7]);
+      expect(logs.join('\n'), contains('TLS handshake'));
+    });
+
+    // A check that only got through natively is not going to fare better on
+    // the installer: go straight there.
+    test('preferNative skips Dart entirely', () async {
+      var dartRequests = 0;
+      final dart = MockClient((_) async {
+        dartRequests++;
+        return http.Response('never', 200);
+      });
+      final native = recordingNative();
+
+      final file = await downloadToTemp(
+        url,
+        client: dart,
+        nativeGet: native.get,
+        preferNative: true,
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+
+      expect(dartRequests, 0);
+      expect(native.calls, hasLength(1));
+    });
+
+    test('preferNative without a seam still uses Dart', () async {
+      final dart = MockClient((_) async => http.Response('', 404));
+      await expectLater(
+        downloadToTemp(url, client: dart, preferNative: true),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('HTTP 404'),
+          ),
+        ),
+      );
+    });
+
+    test('a non-200 through the seam fails and leaves no file', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(status: 403);
+      await expectLater(
+        downloadToTemp(url, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('HTTP 403'),
+          ),
+        ),
+      );
+      expect(File(expectedPath).existsSync(), isFalse);
+    });
+
+    test('without a seam the handshake reason is reported as before', () async {
+      final dart = MockClient((_) async => throw handshake);
+      await expectLater(
+        downloadToTemp(url, client: dart),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('CERTIFICATE_VERIFY_FAILED'),
+          ),
+        ),
+      );
+    });
+
+    test('when the seam fails too, both reasons are kept', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(
+        failWith: UpdateCheckException('curl.exe exited with 60'),
+      );
+      await expectLater(
+        downloadToTemp(url, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('CERTIFICATE_VERIFY_FAILED'),
+              contains('curl.exe exited with 60'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('a dead socket, a 404 or a stall never reach the seam', () async {
+      final native = recordingNative();
+
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient(
+            (_) async => throw const SocketException('no route to host'),
+          ),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient((_) async => http.Response('', 404)),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient((_) => Completer<http.Response>().future),
+          nativeGet: native.get,
+          responseTimeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+
+      expect(native.calls, isEmpty);
+    });
+  });
+
   group('verifySha256', () {
     late Directory tmp;
 

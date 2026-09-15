@@ -234,6 +234,8 @@
   "update_status_downloading": "Versie {version} wordt gedownload…",
   "update_status_applying": "Het installatieprogramma start. De app sluit zichzelf en komt terug als versie {version}.",
   "update_status_failed": "De update is niet gelukt: {reason}",
+  "update_notice_checkFailed": "Controleren op updates is mislukt — zie Opties → Over.",
+  "update_notice_dismiss": "Sluiten",
   "update_action_apply": "Bijwerken",
   "update_action_applyVersion": "Bijwerken naar {version}",
   "update_action_later": "Later",

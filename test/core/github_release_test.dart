@@ -2,6 +2,11 @@
 // asks GitHub's `/releases/latest`. These pin the two halves that can go
 // wrong on their own — reading a release payload, and reading the checksum
 // asset that replaces the manifest's `sha256` field.
+//
+// #124 adds the third: what happens when Dart cannot complete the TLS
+// handshake at all, which is what a school's TLS-inspecting filter does to
+// it. The check has to retry through the Windows-native seam — for exactly
+// that failure and no other.
 
 import 'dart:async';
 import 'dart:convert';
@@ -420,6 +425,184 @@ void main() {
             contains('timed out'),
           ),
         ),
+      );
+    });
+  });
+
+  // #124: behind a TLS-inspecting filter Dart's BoringSSL cannot chain the
+  // re-signed certificate and throws `HandshakeException` — which
+  // `package:http` does not wrap, so it arrives as itself. The seam exists
+  // for that failure only.
+  group('fetchLatestRelease — native transport fallback', () {
+    final endpoint = Uri.parse(
+      'https://api.github.com/repos/yvanvds/AI-tutor-Python/releases/latest',
+    );
+    const handshake = HandshakeException(
+      'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: '
+      'unable to get local issuer certificate)',
+    );
+
+    /// Records every call the seam gets and answers like GitHub would.
+    ({NativeGet get, List<({Uri url, Map<String, String> headers})> calls})
+    recordingNative({Object? failWith}) {
+      final calls = <({Uri url, Map<String, String> headers})>[];
+      Future<http.Response> get(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async {
+        calls.add((url: url, headers: headers));
+        if (failWith != null) throw failWith;
+        if (url.path.endsWith('.sha256')) {
+          return http.Response.bytes(
+            utf8.encode('$_hash  $kInstallerAssetName\n'),
+            200,
+          );
+        }
+        return http.Response.bytes(
+          utf8.encode(jsonEncode(_releaseJson())),
+          200,
+        );
+      }
+
+      return (get: get, calls: calls);
+    }
+
+    test('a handshake failure is retried through the seam, with the same '
+        'URL and headers, and the checksum follows it', () async {
+      var dartRequests = 0;
+      final dart = MockClient((_) async {
+        dartRequests++;
+        throw handshake;
+      });
+      final native = recordingNative();
+      final logs = <String>[];
+
+      final info = await fetchLatestRelease(
+        endpoint,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+
+      expect(info, isNotNull);
+      expect(info!.version, '2.0.0+18');
+      expect(info.sha256, _hash);
+      expect(info.viaNativeTransport, isTrue);
+
+      expect(native.calls, hasLength(2));
+      expect(native.calls[0].url, endpoint);
+      expect(native.calls[0].headers['Accept'], 'application/vnd.github+json');
+      expect(native.calls[0].headers['X-GitHub-Api-Version'], '2022-11-28');
+      expect(native.calls[1].url, Uri.parse(_checksumUrl));
+      // Once Dart has failed the handshake to this host there is nothing to
+      // learn from failing it again for the checksum.
+      expect(dartRequests, 1, reason: 'the checksum was tried on Dart again');
+      expect(logs.join('\n'), contains('TLS handshake'));
+    });
+
+    test('a check that never needed the seam does not say it did', () async {
+      final native = recordingNative();
+      final info = await fetchLatestRelease(
+        endpoint,
+        client: _githubClient(release: _releaseJson()),
+        nativeGet: native.get,
+      );
+      expect(info?.viaNativeTransport, isFalse);
+      expect(native.calls, isEmpty);
+    });
+
+    test('without a seam the handshake reason is reported as before', () async {
+      final dart = MockClient((_) async => throw handshake);
+      await expectLater(
+        fetchLatestRelease(endpoint, client: dart),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('CERTIFICATE_VERIFY_FAILED'),
+          ),
+        ),
+      );
+    });
+
+    // About has to keep telling the truth about the network: the handshake
+    // is what went wrong first, the fallback is what went wrong after.
+    test('when the seam fails too, both reasons are kept', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(
+        failWith: UpdateCheckException('curl.exe exited with 60'),
+      );
+      await expectLater(
+        fetchLatestRelease(endpoint, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('CERTIFICATE_VERIFY_FAILED'),
+              contains('curl.exe exited with 60'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('a non-200 through the seam is an ordinary non-200', () async {
+      final dart = MockClient((_) async => throw handshake);
+      Future<http.Response> native(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async => http.Response('', 404);
+      // 404 still means "nothing published", whichever transport said so.
+      expect(
+        await fetchLatestRelease(endpoint, client: dart, nativeGet: native),
+        isNull,
+      );
+    });
+
+    // The fallback masks whatever it is used for, so it must only be used
+    // for the certificate problem.
+    test('a dead socket, a 404 or a timeout never reach the seam', () async {
+      final native = recordingNative();
+
+      await expectLater(
+        fetchLatestRelease(
+          endpoint,
+          client: MockClient(
+            (_) async => throw const SocketException('no route to host'),
+          ),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(
+        await fetchLatestRelease(
+          endpoint,
+          client: MockClient((_) async => http.Response('', 404)),
+          nativeGet: native.get,
+        ),
+        isNull,
+      );
+      await expectLater(
+        fetchLatestRelease(
+          endpoint,
+          client: MockClient((_) => Completer<http.Response>().future),
+          nativeGet: native.get,
+          timeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+
+      expect(
+        native.calls,
+        isEmpty,
+        reason:
+            'the seam was used for a failure '
+            'that is not the certificate problem',
       );
     });
   });

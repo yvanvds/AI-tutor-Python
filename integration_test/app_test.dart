@@ -47,11 +47,13 @@ import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/tutor_language.dart' as tutor_language;
+import 'flows/update_check_failed_notice.dart' as update_check_failed_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
+import 'flows/update_tls_fallback.dart' as update_tls_fallback;
 import 'flows/warm_up_review.dart' as warm_up_review;
 import 'flows/whats_new_overlay.dart' as whats_new_overlay;
 
@@ -93,5 +95,7 @@ void main() {
   update_install.main();
   update_dev_build.main();
   update_manual_check.main();
+  update_check_failed_notice.main();
+  update_tls_fallback.main();
   whats_new_overlay.main();
 }

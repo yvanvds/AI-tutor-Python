@@ -53,6 +53,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     final offering = ref.watch(
       updateControllerProvider.select((s) => s.isOffering),
     );
+    // The same strip, for a launch check that did not complete (#124). The
+    // two never hold at once — a failed check has no release to offer — but
+    // the offer wins on paper so a release is never hidden behind a notice.
+    final checkFailed = ref.watch(
+      updateControllerProvider.select((s) => s.checkFailed),
+    );
 
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
@@ -75,7 +81,10 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           // Above the sidebar as well as the content: this is the app telling
           // the student something, not one page's business.
-          if (offering) const UpdateOfferBar(),
+          if (offering)
+            const UpdateOfferBar()
+          else if (checkFailed)
+            const UpdateCheckFailedNotice(),
           Expanded(
             child: Stack(
               children: [

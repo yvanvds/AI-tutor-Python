@@ -1363,6 +1363,18 @@ abstract class AppLocalizations {
   /// **'The update did not succeed: {reason}'**
   String update_status_failed(String reason);
 
+  /// Dismissible shell notice after the launch's own update check failed (#124); the reason itself is in Options → About
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates did not succeed — see Options → About.'**
+  String get update_notice_checkFailed;
+
+  /// No description provided for @update_notice_dismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get update_notice_dismiss;
+
   /// No description provided for @update_action_apply.
   ///
   /// In en, this message translates to:

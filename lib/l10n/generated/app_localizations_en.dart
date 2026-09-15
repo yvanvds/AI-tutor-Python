@@ -774,6 +774,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get update_notice_checkFailed =>
+      'Checking for updates did not succeed — see Options → About.';
+
+  @override
+  String get update_notice_dismiss => 'Close';
+
+  @override
   String get update_action_apply => 'Update';
 
   @override

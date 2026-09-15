@@ -407,6 +407,11 @@
       "reason": { "type": "String" }
     }
   },
+  "update_notice_checkFailed": "Checking for updates did not succeed — see Options → About.",
+  "@update_notice_checkFailed": {
+    "description": "Dismissible shell notice after the launch's own update check failed (#124); the reason itself is in Options → About"
+  },
+  "update_notice_dismiss": "Close",
   "update_action_apply": "Update",
   "update_action_applyVersion": "Update to {version}",
   "@update_action_applyVersion": {
