@@ -12,9 +12,18 @@ import 'package:multi_split_view/multi_split_view.dart';
 
 /// Oefenen — objective + run controls + editor (resizable) + output (resizable).
 class PracticeView extends ConsumerStatefulWidget {
-  const PracticeView({super.key, this.showObjective = true});
+  const PracticeView({
+    super.key,
+    this.showObjective = true,
+    this.showQuiz = true,
+  });
 
   final bool showObjective;
+
+  /// Whether a pending MCQ (`activeMcqProvider != null`) replaces the editor
+  /// with [QuizView]. Playground hosts this view too and must keep showing
+  /// the editor while a quiz is parked in Practice (#122).
+  final bool showQuiz;
 
   @override
   ConsumerState<PracticeView> createState() => _PracticeViewState();
@@ -42,7 +51,7 @@ class _PracticeViewState extends ConsumerState<PracticeView> {
 
   @override
   Widget build(BuildContext context) {
-    final mcqActive = ref.watch(activeMcqProvider) != null;
+    final mcqActive = widget.showQuiz && ref.watch(activeMcqProvider) != null;
 
     return Container(
       color: AppColors.ink0,
