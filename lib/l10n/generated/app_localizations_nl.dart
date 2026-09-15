@@ -333,6 +333,49 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get options_model_override => 'Een ander model op dit toestel';
+
+  @override
+  String options_model_saved(String model) {
+    return 'Dit toestel gebruikt nu $model.';
+  }
+
+  @override
+  String get options_modelField_label => 'Model-id';
+
+  @override
+  String get options_modelField_hint => 'bv. gpt-5-mini';
+
+  @override
+  String get options_modelField_helper =>
+      'De exacte id van platform.openai.com/docs/models, hoofdlettergevoelig. Test het voor je opslaat.';
+
+  @override
+  String get options_modelField_invalid =>
+      'Geef één model-id op, zonder spaties.';
+
+  @override
+  String get options_modelField_test_button => 'Testen';
+
+  @override
+  String get options_modelField_save_button => 'Opslaan';
+
+  @override
+  String options_modelField_testing(String model) {
+    return '$model wordt getest…';
+  }
+
+  @override
+  String options_modelField_testPassed(String model, String seconds) {
+    return '$model antwoordde in $seconds s.';
+  }
+
+  @override
+  String options_modelField_testFailed(String reason) {
+    return 'Test mislukt: $reason';
+  }
+
+  @override
   String get options_progress_title => 'Voortgang';
 
   @override

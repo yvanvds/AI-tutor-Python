@@ -16,6 +16,11 @@
 //     doc the whole app reads: the card that renames itself afterwards is a
 //     different widget from the one that was tapped, fed by the real polling
 //     service rather than a fixture.
+//   - both model cards are a typed id behind a Test button (#125): the probe
+//     goes out through the connector provider the real page reads, which the
+//     harness points at the scripted model, and Save only unlocks once it
+//     has answered — a typo in the school-wide field must never reach the
+//     config doc.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -29,6 +34,7 @@ import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive.dart';
+import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +42,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../harness/app_harness.dart';
+import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
 
 /// One completed subgoal = 100 XP and every level is 500 XP wide
@@ -75,14 +82,39 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 Future<void> _tapRow(WidgetTester tester, String label) =>
     _tap(tester, find.text(label));
 
-/// A model row in one of the two AI-model cards (#118): `device` for the
-/// per-device override, `global` for the teacher's school-wide pick. A
-/// teacher sees both cards at once and their rows carry the same model
-/// names, so a bare `find.text('gpt-4.1')` is ambiguous for them.
-Finder _modelRow(String card, String model) => find.descendant(
-  of: find.byKey(ValueKey('model-rows-$card')),
-  matching: find.text(model),
-);
+/// The model field and its buttons in one of the two AI-model cards (#125):
+/// `device` for the per-device override, `global` for the teacher's
+/// school-wide pick. A teacher sees both cards at once, so everything is
+/// keyed by card.
+Finder _modelField(String card) => find.byKey(ValueKey('model-field-$card'));
+Finder _testButton(String card) => find.byKey(ValueKey('model-test-$card'));
+Finder _saveButton(String card) => find.byKey(ValueKey('model-save-$card'));
+
+bool _enabled(WidgetTester tester, Finder button) =>
+    tester.widget<ButtonStyleButton>(button).onPressed != null;
+
+/// Clicks into a card's field, types [id], presses Test and waits for the
+/// probe to report back on screen. The click is what a person does before
+/// typing, and it is load-bearing here: once a click elsewhere (the Test
+/// button) has taken focus off the field, `enterText`'s own programmatic
+/// refocus does not get the typed text into the field on a real window —
+/// the text is silently dropped. A real click puts the caret back first.
+Future<void> _typeAndTest(
+  WidgetTester tester,
+  String card,
+  String id, {
+  required String expectStatus,
+}) async {
+  await _tap(tester, _modelField(card));
+  await tester.enterText(_modelField(card), id);
+  await tester.pump();
+  await _tap(tester, _testButton(card));
+  await pumpUntilFound(tester, find.text(expectStatus));
+}
+
+/// The scripted model's answer to the Test button for [model] (#125).
+ModelProbeOk _answers(String model) =>
+    ModelProbeOk(model, const Duration(milliseconds: 1200));
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -200,32 +232,62 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('Options: the AI model choice is stored for this device', (
-    tester,
-  ) async {
-    final harness = AppHarness();
+  testWidgets('Options: a model typed and tested for this device is stored '
+      'on Save', (tester) async {
+    final llm = ScriptedLlm(
+      const [],
+      probeResults: {'gpt-5-mini': _answers('gpt-5-mini')},
+    );
+    final harness = AppHarness(llm: llm);
     await harness.boot(tester);
 
     await tester.tap(find.byTooltip('Options'));
     await pumpUntilFound(tester, find.byType(OptionsPage));
 
-    // The seeded config doc names gpt-4o as the school-wide default.
+    // The seeded config doc names gpt-4o as the school-wide default, and the
+    // field is closed until this device is told to go its own way.
     await _scrollTo(tester, find.text('School default (gpt-4o)'));
     expect(find.text('School default (gpt-4o)'), findsOneWidget);
+    expect(_modelField('device'), findsNothing);
     // A developer build gets the per-device card, never the school-wide one:
     // that gate is the Entra teacher role alone (#118).
     expect(find.text('School-wide AI model'), findsNothing);
 
-    await _tapRow(tester, 'gpt-5-mini');
+    await _tapRow(tester, 'Another model on this device');
+    await pumpUntilFound(tester, _modelField('device'));
+    expect(_enabled(tester, _saveButton('device')), isFalse);
+
+    await _typeAndTest(
+      tester,
+      'device',
+      'gpt-5-mini',
+      expectStatus: 'gpt-5-mini answered in 1.2 s.',
+    );
+    expect(llm.probed, ['gpt-5-mini']);
+    // Tested is not stored.
+    expect(harness.container.read(modelPreferenceProvider), isNull);
+
+    await _tap(tester, _saveButton('device'));
     await pumpUntil(
       tester,
       () => harness.container.read(modelPreferenceProvider) != null,
       reason: 'the model choice never reached the app state',
     );
     expect(harness.container.read(modelPreferenceProvider), 'gpt-5-mini');
+    await pumpUntilFound(tester, find.text('This device now uses gpt-5-mini.'));
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('openai_model'), 'gpt-5-mini');
+
+    // Back to the school default: the override goes and the field closes.
+    await _tapRow(tester, 'School default (gpt-4o)');
+    await pumpUntil(
+      tester,
+      () => harness.container.read(modelPreferenceProvider) == null,
+      reason: 'the override was never cleared',
+    );
+    expect(prefs.getString('openai_model'), isNull);
+    expect(_modelField('device'), findsNothing);
 
     await harness.dispose(tester);
   });
@@ -237,10 +299,15 @@ void main() {
   // with the debug gate open the card is there for everyone — which is why
   // the flow above never had to say who it was signed in as.
   testWidgets('Options: a teacher on the school key sees the AI model card '
-      'and can pick a model for this device', (tester) async {
+      'and can name a model for this device', (tester) async {
+    final llm = ScriptedLlm(
+      const [],
+      probeResults: {'gpt-4.1': _answers('gpt-4.1')},
+    );
     final harness = AppHarness(
       identity: teacherIdentity,
       developerTools: false,
+      llm: llm,
     );
     await harness.boot(tester);
 
@@ -254,7 +321,15 @@ void main() {
     expect(find.text('School default (gpt-4o)'), findsOneWidget);
     expect(find.text('OpenAI API key'), findsNothing);
 
-    await _tap(tester, _modelRow('device', 'gpt-4.1'));
+    await _tapRow(tester, 'Another model on this device');
+    await pumpUntilFound(tester, _modelField('device'));
+    await _typeAndTest(
+      tester,
+      'device',
+      'gpt-4.1',
+      expectStatus: 'gpt-4.1 answered in 1.2 s.',
+    );
+    await _tap(tester, _saveButton('device'));
     await pumpUntil(
       tester,
       () => harness.container.read(modelPreferenceProvider) != null,
@@ -278,12 +353,18 @@ void main() {
   // real `GlobalConfigService` to the container the whole app reads, and the
   // card *above* it — a different widget, three providers away — has to
   // rename its "School default (…)" row off the same value.
-  testWidgets('Options: a teacher moves the whole school onto another model', (
-    tester,
-  ) async {
+  testWidgets('Options: a teacher moves the whole school onto another model, '
+      'and only after the model has answered', (tester) async {
+    // The typo is not scripted, so the probe fails the way an unknown id
+    // fails at OpenAI; the real id answers.
+    final llm = ScriptedLlm(
+      const [],
+      probeResults: {'gpt-4.1': _answers('gpt-4.1')},
+    );
     final harness = AppHarness(
       identity: teacherIdentity,
       developerTools: false,
+      llm: llm,
       // A school key worth losing: `GlobalConfig.toMap()` writes ApiKey too,
       // so a blind upsert would blank it.
       extraDocs: {
@@ -304,8 +385,41 @@ void main() {
 
     await _scrollTo(tester, find.text('School-wide AI model'));
     expect(find.text('School-wide AI model'), findsOneWidget);
+    // The field opens on what the whole app reads — the real polling
+    // service delivered the seeded doc, not a fixture.
+    await pumpUntil(
+      tester,
+      () =>
+          tester.widget<TextField>(_modelField('global')).controller!.text ==
+          'gpt-4o',
+      reason: 'the school-wide field never showed the stored model',
+    );
+    expect(_enabled(tester, _saveButton('global')), isFalse);
 
-    await _tap(tester, _modelRow('global', 'gpt-4.1'));
+    // A typo: the test fails, says why, and Save stays locked — the class
+    // is still on gpt-4o.
+    await _typeAndTest(
+      tester,
+      'global',
+      'gpt-4.1-typo',
+      expectStatus:
+          'Test failed: The model `gpt-4.1-typo` does not exist or you do '
+          'not have access to it.',
+    );
+    expect(_enabled(tester, _saveButton('global')), isFalse);
+    expect(harness.cosmos['config']['global']!['Model'], 'gpt-4o');
+
+    // The right id answers, and only then can it be saved.
+    await _typeAndTest(
+      tester,
+      'global',
+      'gpt-4.1',
+      expectStatus: 'gpt-4.1 answered in 1.2 s.',
+    );
+    expect(llm.probed, ['gpt-4.1-typo', 'gpt-4.1']);
+    expect(harness.cosmos['config']['global']!['Model'], 'gpt-4o');
+
+    await _tap(tester, _saveButton('global'));
     await pumpUntil(
       tester,
       () => harness.cosmos['config']['global']!['Model'] == 'gpt-4.1',
@@ -360,6 +474,8 @@ void main() {
     expect(find.text('AI model'), findsNothing);
     expect(find.text('School-wide AI model'), findsNothing);
     expect(find.text('School default (gpt-4o)'), findsNothing);
+    expect(_modelField('device'), findsNothing);
+    expect(_modelField('global'), findsNothing);
 
     await harness.dispose(tester);
   });

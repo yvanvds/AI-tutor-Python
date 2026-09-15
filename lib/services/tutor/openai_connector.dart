@@ -11,6 +11,7 @@ import 'package:ai_tutor_python/services/tutor/responses/envelope_assembler.dart
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 enum PreviousInputs { includeAll, includeSession, newSession }
 
@@ -61,12 +62,39 @@ class StreamFailed extends StreamChunk {
   const StreamFailed(this.error, this.stack, this.notice);
 }
 
+/// Outcome of [OpenaiConnector.probe] — the Test button in Options (#125).
+sealed class ModelProbe {
+  const ModelProbe();
+}
+
+/// The model answered a chat completion on this key.
+class ModelProbeOk extends ModelProbe {
+  final String model;
+
+  /// Wall-clock time of the round trip, shown to the teacher as a hint of
+  /// what a student will wait for.
+  final Duration latency;
+  const ModelProbeOk(this.model, this.latency);
+}
+
+/// The call did not come back with an answer. [reason] is what the teacher
+/// is shown: OpenAI's own message for a request the API refused (an unknown
+/// id, a parameter the model does not take, a key or quota problem), the
+/// localized transport line for a timeout or a dead connection.
+class ModelProbeFailed extends ModelProbe {
+  final Object error;
+  final StackTrace stack;
+  final ChatNotice reason;
+  const ModelProbeFailed(this.error, this.stack, this.reason);
+}
+
 class OpenaiConnector {
   OpenaiConnector({
     this._onRecordRawOutput,
     this._onRecordStreamFailure,
     this._getConfig,
     this._getModelOverride,
+    this._client,
   });
 
   final void Function(String)? _onRecordRawOutput;
@@ -76,6 +104,12 @@ class OpenaiConnector {
   /// This device's model choice from the Options panel (#32), or `null` to
   /// follow the school-wide `GlobalConfig.Model`.
   final String? Function()? _getModelOverride;
+
+  /// The HTTP transport every call goes out on. `null` (production) lets
+  /// `dart_openai` open its own connections with `OpenAI.requestsTimeOut`
+  /// applied; a test passes a scripted client so a request can be inspected
+  /// and answered without a socket (#125).
+  final http.Client? _client;
 
   final String _apiKey = Env.apiKey;
 
@@ -127,6 +161,7 @@ class OpenaiConnector {
         model: model,
         messages: messages,
         extraParams: _extraParams(model),
+        client: _client,
       );
       _recordUserTurn(input, inputs);
       final text = _extractText(response);
@@ -166,6 +201,7 @@ class OpenaiConnector {
         model: model,
         messages: messages,
         extraParams: _extraParams(model),
+        client: _client,
       );
       await for (final event in stream) {
         if (event.choices.isEmpty) continue;
@@ -258,6 +294,62 @@ class OpenaiConnector {
       return const ChatNotice(ChatNoticeKind.tutorUnreachable);
     }
     return ChatNotice.raw(e.toString());
+  }
+
+  /// The one user message the Test button sends (#125). Tiny on purpose: the
+  /// point is the round trip, not the answer.
+  static const String probePrompt = 'Reply with the single word OK.';
+
+  /// Asks [model] for one chat completion on the tutor's key and reports
+  /// whether it answered — the Test button in Options (#125).
+  ///
+  /// A real, minimal version of the call the tutor makes, not a
+  /// `GET /v1/models/{id}`: that only says the id exists for this key, and
+  /// `whisper-1` or an embedding model pass it while breaking the tutor.
+  /// The same [_extraParams] the real calls add go out too, so a parameter
+  /// the model rejects (`reasoning_effort` on a model that does not take it)
+  /// surfaces here and not in a student's first question. No system prompt,
+  /// no history, no envelope, and nothing is recorded: a probe is not a
+  /// turn. No `max_tokens` either — the gpt-5 / o-series reject it in favour
+  /// of `max_completion_tokens`.
+  ///
+  /// Never throws: every failure comes back as a [ModelProbeFailed] carrying
+  /// what the teacher should read.
+  Future<ModelProbe> probe(String model) async {
+    OpenAI.apiKey = _apiKey;
+    OpenAI.requestsTimeOut = const Duration(seconds: 60);
+    final clock = Stopwatch()..start();
+    try {
+      await OpenAI.instance.chat.create(
+        model: model,
+        messages: [
+          OpenAIChatCompletionChoiceMessageModel(
+            role: OpenAIChatMessageRole.user,
+            content: [
+              OpenAIChatCompletionChoiceMessageContentItemModel.text(
+                probePrompt,
+              ),
+            ],
+          ),
+        ],
+        extraParams: _extraParams(model),
+        client: _client,
+      );
+      return ModelProbeOk(model, clock.elapsed);
+    } catch (e, stack) {
+      debugPrint('OpenaiConnector.probe($model) failed: $e');
+      return ModelProbeFailed(e, stack, _describeProbeError(e));
+    }
+  }
+
+  /// What the Test button shows for a failed probe. A request the API
+  /// refused carries OpenAI's own explanation ("The model … does not
+  /// exist", "Unsupported parameter: …", "Incorrect API key …"), which is
+  /// exactly what the teacher needs to read; anything else is a transport
+  /// problem and gets the same line the chat shows for it.
+  static ChatNotice _describeProbeError(Object e) {
+    if (e is RequestFailedException) return ChatNotice.raw(e.message);
+    return describeTransportError(e);
   }
 
   Future<ConnectorResult> resendRequest() async {

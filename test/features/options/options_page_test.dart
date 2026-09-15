@@ -9,12 +9,15 @@
 // every flow is exercised from the button through the dialogs to the writes.
 //
 // Extended for #32: appearance (light / dark), the per-device AI model, and
-// export / import of progress.
+// export / import of progress. #125 turned both model cards' fixed lists into
+// a text field whose Save unlocks only after a Test — a real chat completion
+// on the typed id — has passed; the probe here is scripted.
 //
 // The end-to-end half of the panel — the theme switch repainting the whole
 // shell, and the progress round trip through a real file — lives in
 // `integration_test/flows/options_panel.dart`, which boots the real app.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -26,6 +29,7 @@ import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
@@ -40,6 +44,7 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
 import 'package:flutter/material.dart';
@@ -101,6 +106,31 @@ class _SeededGlobalConfig extends GlobalConfigService {
     return initial;
   }
 }
+
+/// The connector behind the Test button (#125), answering from a script
+/// instead of OpenAI. [answer] is consulted per probe; [probed] lists every
+/// id the page asked about, so a test can prove an invalid id never left the
+/// field.
+class _FakeProbe extends OpenaiConnector {
+  Future<ModelProbe> Function(String model) answer = (model) async =>
+      ModelProbeOk(model, const Duration(milliseconds: 1234));
+  final List<String> probed = <String>[];
+
+  @override
+  Future<ModelProbe> probe(String model) {
+    probed.add(model);
+    return answer(model);
+  }
+}
+
+/// What OpenAI says about an id it does not know.
+ModelProbeFailed _unknownModel(String model) => ModelProbeFailed(
+  StateError('404'),
+  StackTrace.current,
+  ChatNotice.raw(
+    'The model `$model` does not exist or you do not have access to it.',
+  ),
+);
 
 /// Stands in for the OS file dialogs behind progress export / import (#32).
 class _FakeArchiveIo implements ProgressArchiveIo {
@@ -205,6 +235,7 @@ void main() {
   late DebugSessionRecorder recorder;
   late List<http.Request> githubRequests;
   late _FakeArchiveIo archiveIo;
+  late _FakeProbe probe;
 
   // #57 — the device flow's two moving parts, as a test can steer them:
   // whether the student has approved the code yet, and whether GitHub is
@@ -253,6 +284,7 @@ void main() {
 
     githubRequests = [];
     archiveIo = _FakeArchiveIo();
+    probe = _FakeProbe();
     githubApproved = false;
     githubPollError = null;
     browserLaunches = [];
@@ -332,6 +364,7 @@ void main() {
         ),
       ),
       progressArchiveIoProvider.overrideWithValue(archiveIo),
+      modelProbeConnectorProvider.overrideWithValue(probe),
       authServiceProvider.overrideWith(
         () => _SignedInAuth(isTeacher ? _teacherIdentity : _identity),
       ),
@@ -416,6 +449,25 @@ void main() {
 
   ProviderContainer containerOf(WidgetTester tester) =>
       ProviderScope.containerOf(tester.element(find.byType(OptionsPage)));
+
+  // #125 — the model field and its two buttons, in the `device` or `global`
+  // card. A teacher sees both cards at once, so everything is keyed by card.
+  Finder modelField(String scope) => find.byKey(ValueKey('model-field-$scope'));
+  Finder testButton(String scope) => find.byKey(ValueKey('model-test-$scope'));
+  Finder saveButton(String scope) => find.byKey(ValueKey('model-save-$scope'));
+  Finder modelStatus(String scope) =>
+      find.byKey(ValueKey('model-status-$scope'));
+
+  bool enabled(WidgetTester tester, Finder button) =>
+      tester.widget<ButtonStyleButton>(button).onPressed != null;
+
+  /// Types [id] into the card's field, runs the Test and waits for it.
+  Future<void> typeAndTest(WidgetTester tester, String scope, String id) async {
+    await tester.enterText(modelField(scope), id);
+    await tester.pump();
+    await tester.tap(testButton(scope));
+    await tester.pumpAndSettle();
+  }
 
   group('progress', () {
     testWidgets('reset all wipes every per-user doc and resets calibration', (
@@ -944,45 +996,249 @@ void main() {
   });
 
   group('AI model', () {
-    /// A model row in the per-device card. A teacher sees the school-wide
-    /// card at the same time and its rows carry the same model names, so a
-    /// bare `find.text('gpt-4.1')` is ambiguous for exactly the person the
-    /// teacher test below is about (#118).
-    Finder deviceRow(String model) => find.descendant(
-      of: find.byKey(const ValueKey('model-rows-device')),
-      matching: find.text(model),
-    );
+    const followDefault = 'School default (gpt-4o)';
+    const override = 'Another model on this device';
 
-    testWidgets('own-key accounts see the card, and the school default is the '
-        'starting choice', (tester) async {
+    testWidgets('own-key accounts see the card, on the school default, with '
+        'no field open', (tester) async {
       await mount(tester, globalModel: 'gpt-4.1');
 
       expect(find.text('AI model'), findsOneWidget);
       expect(find.text('School default (gpt-4.1)'), findsOneWidget);
-      for (final model in kSelectableModels) {
-        expect(find.text(model), findsOneWidget, reason: model);
-      }
+      expect(find.text(override), findsOneWidget);
+      expect(modelField('device'), findsNothing);
+      // The school-wide card is a teacher's; an own-key student has one card.
+      expect(modelField('global'), findsNothing);
 
       await unmount(tester);
     });
 
-    testWidgets('picking a model stores a per-device override', (tester) async {
+    testWidgets('naming a model for this device: Test, then Save, stores the '
+        'override; the school default clears it', (tester) async {
       await mount(tester);
       final container = containerOf(tester);
       expect(container.read(modelPreferenceProvider), isNull);
 
-      await tester.tap(find.text('gpt-5-mini'));
+      await tester.tap(find.text(override));
       await tester.pumpAndSettle();
+      expect(modelField('device'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(modelField('device')).controller!.text,
+        isEmpty,
+      );
+      // Nothing typed: nothing to test, nothing to save.
+      expect(enabled(tester, testButton('device')), isFalse);
+      expect(enabled(tester, saveButton('device')), isFalse);
 
+      await tester.enterText(modelField('device'), 'gpt-5-mini');
+      await tester.pump();
+      expect(enabled(tester, testButton('device')), isTrue);
+      expect(
+        enabled(tester, saveButton('device')),
+        isFalse,
+        reason: 'Save unlocked before the id was tested',
+      );
+      expect(container.read(modelPreferenceProvider), isNull);
+
+      await tester.tap(testButton('device'));
+      await tester.pumpAndSettle();
+      expect(probe.probed, ['gpt-5-mini']);
+      expect(find.text('gpt-5-mini answered in 1.2 s.'), findsOneWidget);
+      expect(enabled(tester, saveButton('device')), isTrue);
+      // Tested is not saved.
+      expect(container.read(modelPreferenceProvider), isNull);
+
+      await tester.tap(saveButton('device'));
+      await tester.pumpAndSettle();
       expect(container.read(modelPreferenceProvider), 'gpt-5-mini');
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('openai_model'), 'gpt-5-mini');
+      expect(find.text('This device now uses gpt-5-mini.'), findsOneWidget);
+      // The field stays open on the stored id.
+      expect(modelField('device'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(modelField('device')).controller!.text,
+        'gpt-5-mini',
+      );
 
-      // Back to the school default.
-      await tester.tap(find.text('School default (gpt-4o)'));
+      // Back to the school default: the override goes, and so does the field.
+      await tester.tap(find.text(followDefault));
       await tester.pumpAndSettle();
       expect(container.read(modelPreferenceProvider), isNull);
       expect(prefs.getString('openai_model'), isNull);
+      expect(modelField('device'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a failed test says why, and Save stays locked', (
+      tester,
+    ) async {
+      probe.answer = (model) async => _unknownModel(model);
+      await mount(tester);
+      final container = containerOf(tester);
+
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await typeAndTest(tester, 'device', 'gpt-6-ultra');
+
+      expect(probe.probed, ['gpt-6-ultra']);
+      expect(
+        find.text(
+          'Test failed: The model `gpt-6-ultra` does not exist or you do '
+          'not have access to it.',
+        ),
+        findsOneWidget,
+      );
+      expect(enabled(tester, saveButton('device')), isFalse);
+      expect(container.read(modelPreferenceProvider), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('openai_model'), isNull);
+
+      await unmount(tester);
+    });
+
+    testWidgets('editing after a passed test puts the field back to untested', (
+      tester,
+    ) async {
+      await mount(tester);
+
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await typeAndTest(tester, 'device', 'gpt-5-mini');
+      expect(enabled(tester, saveButton('device')), isTrue);
+
+      await tester.enterText(modelField('device'), 'gpt-5-min');
+      await tester.pump();
+      expect(
+        enabled(tester, saveButton('device')),
+        isFalse,
+        reason: 'Save stayed unlocked for an id the test never saw',
+      );
+      expect(modelStatus('device'), findsNothing);
+      expect(probe.probed, hasLength(1), reason: 'an edit is not a test');
+
+      // Typing the tested id back brings its result back, no round trip.
+      await tester.enterText(modelField('device'), 'gpt-5-mini');
+      await tester.pump();
+      expect(enabled(tester, saveButton('device')), isTrue);
+      expect(find.text('gpt-5-mini answered in 1.2 s.'), findsOneWidget);
+      expect(probe.probed, hasLength(1));
+
+      await unmount(tester);
+    });
+
+    testWidgets('an id with a space in it is refused before any call; '
+        'surrounding whitespace is trimmed', (tester) async {
+      await mount(tester);
+
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await tester.enterText(modelField('device'), 'gpt 5 mini');
+      await tester.pump();
+
+      expect(find.text('Enter one model id, without spaces.'), findsOneWidget);
+      expect(enabled(tester, testButton('device')), isFalse);
+      expect(enabled(tester, saveButton('device')), isFalse);
+      expect(probe.probed, isEmpty);
+
+      await typeAndTest(tester, 'device', '  gpt-5-mini  ');
+      expect(probe.probed, ['gpt-5-mini']);
+      expect(find.text('Enter one model id, without spaces.'), findsNothing);
+      await tester.tap(saveButton('device'));
+      await tester.pumpAndSettle();
+      expect(containerOf(tester).read(modelPreferenceProvider), 'gpt-5-mini');
+
+      await unmount(tester);
+    });
+
+    testWidgets('while a test runs, the field and both buttons wait', (
+      tester,
+    ) async {
+      final pending = Completer<ModelProbe>();
+      probe.answer = (_) => pending.future;
+      await mount(tester);
+
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await tester.enterText(modelField('device'), 'gpt-5');
+      await tester.pump();
+      await tester.tap(testButton('device'));
+      await tester.pump();
+
+      expect(find.text('Testing gpt-5…'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: modelStatus('device'),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(enabled(tester, testButton('device')), isFalse);
+      expect(enabled(tester, saveButton('device')), isFalse);
+
+      pending.complete(
+        const ModelProbeOk('gpt-5', Duration(milliseconds: 2900)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('gpt-5 answered in 2.9 s.'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(enabled(tester, testButton('device')), isTrue);
+      expect(enabled(tester, saveButton('device')), isTrue);
+
+      await unmount(tester);
+    });
+
+    // The field stays editable while a probe runs — the cursor must not be
+    // taken away after every Test — so a result can land for an id that is
+    // no longer in the field. It is bound to the id it ran on, not shown.
+    testWidgets('an edit while a test runs leaves its result unshown and '
+        'Save locked', (tester) async {
+      final pending = Completer<ModelProbe>();
+      probe.answer = (_) => pending.future;
+      await mount(tester);
+
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await tester.enterText(modelField('device'), 'gpt-5');
+      await tester.pump();
+      await tester.tap(testButton('device'));
+      await tester.pump();
+
+      await tester.enterText(modelField('device'), 'gpt-5-mini');
+      await tester.pump();
+      pending.complete(
+        const ModelProbeOk('gpt-5', Duration(milliseconds: 800)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('gpt-5 answered in 0.8 s.'), findsNothing);
+      expect(modelStatus('device'), findsNothing);
+      expect(enabled(tester, saveButton('device')), isFalse);
+      expect(enabled(tester, testButton('device')), isTrue);
+      expect(probe.probed, ['gpt-5']);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a stored override opens the card on the field, prefilled', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'local_api_key': 'sk-old',
+        'openai_model': 'gpt-4.1',
+      });
+      await mount(tester);
+
+      expect(modelField('device'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(modelField('device')).controller!.text,
+        'gpt-4.1',
+      );
+      // Prefilled is not tested: a Save would be a no-op anyway, and the
+      // rule is one rule.
+      expect(enabled(tester, saveButton('device')), isFalse);
+      expect(enabled(tester, testButton('device')), isTrue);
 
       await unmount(tester);
     });
@@ -994,6 +1250,7 @@ void main() {
       await mount(tester);
 
       expect(find.text('AI model'), findsNothing);
+      expect(modelField('device'), findsNothing);
 
       await unmount(tester);
     });
@@ -1012,20 +1269,20 @@ void main() {
     // #90 — a teacher on the school's key had no way to see or change the
     // model at all: the card was gated on paying for the calls yourself.
     testWidgets('a teacher on the bundled key sees the card, with the school '
-        'default as the starting choice, and can pick a model', (tester) async {
+        'default as the starting choice, and can name a model', (tester) async {
       accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
       await mount(tester, isTeacher: true, globalModel: 'gpt-4.1');
       final container = containerOf(tester);
 
       expect(find.text('AI model'), findsOneWidget);
       expect(find.text('School default (gpt-4.1)'), findsOneWidget);
-      for (final model in kSelectableModels) {
-        expect(deviceRow(model), findsOneWidget, reason: model);
-      }
       // Still on the school's key, so the key card stays away.
       expect(find.text('OpenAI API key'), findsNothing);
 
-      await tester.tap(deviceRow('gpt-4o-mini'));
+      await tester.tap(find.text(override));
+      await tester.pumpAndSettle();
+      await typeAndTest(tester, 'device', 'gpt-4o-mini');
+      await tester.tap(saveButton('device'));
       await tester.pumpAndSettle();
       expect(container.read(modelPreferenceProvider), 'gpt-4o-mini');
       final prefs = await SharedPreferences.getInstance();
@@ -1045,25 +1302,38 @@ void main() {
 
   // #118 — the model picker #32 shipped was per device, so a teacher changing
   // it moved only the machine in front of them. The school-wide doc now has a
-  // writer, and this card is its only caller.
+  // writer, and this card is its only caller. #125 put a tested text field
+  // in front of the write.
   group('school-wide AI model', () {
-    Finder globalRow(String model) => find.descendant(
-      of: find.byKey(const ValueKey('model-rows-global')),
-      matching: find.text(model),
-    );
+    String globalText(WidgetTester tester) =>
+        tester.widget<TextField>(modelField('global')).controller!.text;
 
-    testWidgets('a teacher sets the model for everyone, and the school key '
-        'survives the write', (tester) async {
+    testWidgets('a teacher sets the model for everyone after a passing test, '
+        'and the school key survives the write', (tester) async {
       accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
       await mount(tester, isTeacher: true, globalModel: 'gpt-4o');
       final container = containerOf(tester);
 
       expect(find.text('School-wide AI model'), findsOneWidget);
-      for (final model in kSelectableModels) {
-        expect(globalRow(model), findsOneWidget, reason: model);
-      }
+      expect(globalText(tester), 'gpt-4o');
+      expect(enabled(tester, saveButton('global')), isFalse);
 
-      await tester.tap(globalRow('gpt-4.1'));
+      await tester.enterText(modelField('global'), 'gpt-4.1');
+      await tester.pump();
+      expect(
+        enabled(tester, saveButton('global')),
+        isFalse,
+        reason: 'an untested id must never reach every student',
+      );
+      expect(config['global']!['Model'], 'gpt-4o');
+
+      await tester.tap(testButton('global'));
+      await tester.pumpAndSettle();
+      expect(probe.probed, ['gpt-4.1']);
+      expect(find.text('gpt-4.1 answered in 1.2 s.'), findsOneWidget);
+      expect(config['global']!['Model'], 'gpt-4o', reason: 'tested, not saved');
+
+      await tester.tap(saveButton('global'));
       await tester.pumpAndSettle();
 
       expect(config['global']!['Model'], 'gpt-4.1');
@@ -1091,11 +1361,58 @@ void main() {
 
       expect(find.text('School default (gpt-4o)'), findsOneWidget);
 
-      await tester.tap(globalRow('gpt-5-mini'));
+      await typeAndTest(tester, 'global', 'gpt-5-mini');
+      await tester.tap(saveButton('global'));
       await tester.pumpAndSettle();
 
       expect(find.text('School default (gpt-5-mini)'), findsOneWidget);
       expect(find.text('School default (gpt-4o)'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a failing test blocks the write and says why', (tester) async {
+      probe.answer = (model) async => _unknownModel(model);
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: 'gpt-4o');
+
+      await typeAndTest(tester, 'global', 'gpt-4.1-turbo');
+
+      expect(
+        find.text(
+          'Test failed: The model `gpt-4.1-turbo` does not exist or you do '
+          'not have access to it.',
+        ),
+        findsOneWidget,
+      );
+      expect(enabled(tester, saveButton('global')), isFalse);
+      expect(config['global']!['Model'], 'gpt-4o');
+      expect(find.textContaining('The school now uses'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    // A teacher's card is one of several: another teacher's write, or the
+    // poll delivering the doc after the first frame, must show up in the
+    // field — but not on top of an id this teacher is halfway through typing.
+    testWidgets('the field follows the stored value until the teacher types', (
+      tester,
+    ) async {
+      accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
+      await mount(tester, isTeacher: true, globalModel: 'gpt-4o');
+      final service = containerOf(tester)
+          .read(globalConfigServiceProvider.notifier);
+
+      await service.setModel('gpt-4.1');
+      await tester.pumpAndSettle();
+      expect(globalText(tester), 'gpt-4.1');
+
+      await tester.enterText(modelField('global'), 'gpt-5');
+      await tester.pump();
+      await service.setModel('gpt-4o-mini');
+      await tester.pumpAndSettle();
+      expect(globalText(tester), 'gpt-5', reason: 'typed text was overwritten');
+      expect(find.text('School default (gpt-4o-mini)'), findsOneWidget);
 
       await unmount(tester);
     });
@@ -1109,7 +1426,7 @@ void main() {
 
       expect(find.text('AI model'), findsOneWidget);
       expect(find.text('School-wide AI model'), findsNothing);
-      expect(find.byKey(const ValueKey('model-rows-global')), findsNothing);
+      expect(modelField('global'), findsNothing);
 
       await unmount(tester);
     });
@@ -1121,33 +1438,25 @@ void main() {
       await mount(tester);
 
       expect(find.text('School-wide AI model'), findsNothing);
+      expect(modelField('global'), findsNothing);
 
       await unmount(tester);
     });
 
-    // The doc a fresh deployment has never had a Model written into: no row
-    // is selected, and picking one fills it in rather than failing on the
-    // read.
-    testWidgets('an unset school model leaves every row unselected, and the '
-        'first pick fills it in', (tester) async {
+    // The doc a fresh deployment has never had a Model written into: the
+    // field starts empty, and the first save fills it in rather than failing
+    // on the read.
+    testWidgets('an unset school model starts the field empty, and the first '
+        'save fills it in', (tester) async {
       accounts = InMemoryCosmos([_account(mayUseGlobalKey: true)]);
       await mount(tester, isTeacher: true, globalModel: '');
 
-      final rows = tester.widgetList<ListTile>(
-        find.descendant(
-          of: find.byKey(const ValueKey('model-rows-global')),
-          matching: find.byType(ListTile),
-        ),
-      );
-      expect(rows, hasLength(kSelectableModels.length));
-      expect(
-        rows.map(
-          (t) => (t.leading! as Icon).icon == Icons.radio_button_checked,
-        ),
-        everyElement(isFalse),
-      );
+      expect(globalText(tester), isEmpty);
+      expect(enabled(tester, testButton('global')), isFalse);
+      expect(enabled(tester, saveButton('global')), isFalse);
 
-      await tester.tap(globalRow('gpt-5'));
+      await typeAndTest(tester, 'global', 'gpt-5');
+      await tester.tap(saveButton('global'));
       await tester.pumpAndSettle();
 
       expect(config['global']!['Model'], 'gpt-5');

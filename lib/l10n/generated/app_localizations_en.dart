@@ -331,6 +331,49 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get options_model_override => 'Another model on this device';
+
+  @override
+  String options_model_saved(String model) {
+    return 'This device now uses $model.';
+  }
+
+  @override
+  String get options_modelField_label => 'Model id';
+
+  @override
+  String get options_modelField_hint => 'e.g. gpt-5-mini';
+
+  @override
+  String get options_modelField_helper =>
+      'The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.';
+
+  @override
+  String get options_modelField_invalid =>
+      'Enter one model id, without spaces.';
+
+  @override
+  String get options_modelField_test_button => 'Test';
+
+  @override
+  String get options_modelField_save_button => 'Save';
+
+  @override
+  String options_modelField_testing(String model) {
+    return 'Testing $model…';
+  }
+
+  @override
+  String options_modelField_testPassed(String model, String seconds) {
+    return '$model answered in $seconds s.';
+  }
+
+  @override
+  String options_modelField_testFailed(String reason) {
+    return 'Test failed: $reason';
+  }
+
+  @override
   String get options_progress_title => 'Progress';
 
   @override

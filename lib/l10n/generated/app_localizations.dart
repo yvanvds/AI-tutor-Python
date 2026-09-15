@@ -637,6 +637,72 @@ abstract class AppLocalizations {
   /// **'Could not change the school-wide model: {error}'**
   String options_globalModel_saveFailed(String error);
 
+  /// No description provided for @options_model_override.
+  ///
+  /// In en, this message translates to:
+  /// **'Another model on this device'**
+  String get options_model_override;
+
+  /// No description provided for @options_model_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'This device now uses {model}.'**
+  String options_model_saved(String model);
+
+  /// No description provided for @options_modelField_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Model id'**
+  String get options_modelField_label;
+
+  /// No description provided for @options_modelField_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. gpt-5-mini'**
+  String get options_modelField_hint;
+
+  /// No description provided for @options_modelField_helper.
+  ///
+  /// In en, this message translates to:
+  /// **'The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.'**
+  String get options_modelField_helper;
+
+  /// No description provided for @options_modelField_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter one model id, without spaces.'**
+  String get options_modelField_invalid;
+
+  /// No description provided for @options_modelField_test_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get options_modelField_test_button;
+
+  /// No description provided for @options_modelField_save_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get options_modelField_save_button;
+
+  /// No description provided for @options_modelField_testing.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing {model}…'**
+  String options_modelField_testing(String model);
+
+  /// No description provided for @options_modelField_testPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} answered in {seconds} s.'**
+  String options_modelField_testPassed(String model, String seconds);
+
+  /// No description provided for @options_modelField_testFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Test failed: {reason}'**
+  String options_modelField_testFailed(String reason);
+
   /// No description provided for @options_progress_title.
   ///
   /// In en, this message translates to:

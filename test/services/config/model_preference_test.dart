@@ -49,14 +49,6 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(container.read(modelPreferenceProvider), 'gpt-4o-mini');
     });
-
-    test('every offered model is a distinct, non-empty name', () {
-      expect(kSelectableModels, isNotEmpty);
-      expect(kSelectableModels.toSet(), hasLength(kSelectableModels.length));
-      for (final m in kSelectableModels) {
-        expect(m.trim(), isNotEmpty);
-      }
-    });
   });
 
   group('OpenaiConnector.resolveModel', () {

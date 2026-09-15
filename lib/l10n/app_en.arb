@@ -166,6 +166,30 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "options_model_override": "Another model on this device",
+  "options_model_saved": "This device now uses {model}.",
+  "@options_model_saved": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_modelField_label": "Model id",
+  "options_modelField_hint": "e.g. gpt-5-mini",
+  "options_modelField_helper": "The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.",
+  "options_modelField_invalid": "Enter one model id, without spaces.",
+  "options_modelField_test_button": "Test",
+  "options_modelField_save_button": "Save",
+  "options_modelField_testing": "Testing {model}…",
+  "@options_modelField_testing": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_modelField_testPassed": "{model} answered in {seconds} s.",
+  "@options_modelField_testPassed": {
+    "placeholders": { "model": { "type": "String" }, "seconds": { "type": "String" } }
+  },
+  "options_modelField_testFailed": "Test failed: {reason}",
+  "@options_modelField_testFailed": {
+    "placeholders": { "reason": { "type": "String" } }
+  },
+
   "options_progress_title": "Progress",
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",

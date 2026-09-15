@@ -34,6 +34,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
@@ -321,6 +322,9 @@ class AppHarness {
         // scripted model stands in for it, and with no script it fails
         // loudly like every other LLM call.
         gradeJustificationConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
+        // So does the Test button behind the model fields in Options (#125):
+        // `ScriptedLlm.probeResults` says what each id answers.
+        modelProbeConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),

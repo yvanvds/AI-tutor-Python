@@ -22,9 +22,11 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
@@ -270,41 +272,296 @@ class _ThemeCard extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// AI model (#32)
+// AI model (#32, #125)
 // ---------------------------------------------------------------------------
+
+/// The connector behind the Test button in both model cards (#125).
+///
+/// Its own instance rather than the tutor's: `probe()` names the model
+/// explicitly and records nothing, so it needs neither the config nor the
+/// device override — and the tutor's connector carries a student's
+/// conversation, which a teacher-side check has no business touching. The
+/// integration harness overrides this with its scripted model.
+final modelProbeConnectorProvider = Provider<OpenaiConnector>(
+  (ref) => OpenaiConnector(),
+);
+
+/// Whether [text] can be sent to OpenAI as a model id. Trimmed by the caller;
+/// ids never contain whitespace, and case is left alone because they are
+/// case-sensitive.
+bool _isValidModelId(String text) =>
+    text.isNotEmpty && !RegExp(r'\s').hasMatch(text);
+
+/// A model id typed in, tested, then saved — the input both model cards share
+/// (#125).
+///
+/// The list this replaces went stale within weeks of every release. A free
+/// field never does, but it also lets a typo through, so **Save only unlocks
+/// after Test has passed for the text as it stands**: a probe is bound to the
+/// trimmed id it ran on, and any edit puts the field back to untested. That
+/// matters most for the school-wide card, where a saved id moves every
+/// student within `kCosmosPollInterval`.
+///
+/// [initialValue] is what the field starts on and what it follows while the
+/// user has not typed: the school-wide card's value arrives one poll after
+/// the first frame, and another teacher's write should show up too.
+class _ModelField extends ConsumerStatefulWidget {
+  const _ModelField({
+    required this.scope,
+    required this.initialValue,
+    required this.onSave,
+  });
+
+  /// `device` / `global` — keys the field, its buttons and its status line so
+  /// a test can tell the two cards apart when a teacher sees both.
+  final String scope;
+  final String initialValue;
+
+  /// Stores the tested id. Throws to report a failed write; the caller owns
+  /// the confirmation and the error message.
+  final Future<void> Function(String model) onSave;
+
+  @override
+  ConsumerState<_ModelField> createState() => _ModelFieldState();
+}
+
+class _ModelFieldState extends ConsumerState<_ModelField> {
+  late final TextEditingController _controller;
+  bool _busy = false;
+
+  /// The trimmed id the last probe ran on, and its outcome. Both are only
+  /// meaningful while the field still reads [_testedModel]; an edit leaves
+  /// them in place but hides them, so undoing the edit brings the result
+  /// back without another round trip.
+  String? _testedModel;
+  ModelProbe? _result;
+
+  /// Set while a probe is in flight, for the status line.
+  String? _testing;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue)
+      ..addListener(() => setState(() {}));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ModelField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Follow the stored value until the user has typed something of their
+    // own — a poll delivering the school-wide model after the first frame
+    // must fill the field, a teacher's half-typed id must not be overwritten
+    // by it.
+    if (widget.initialValue != oldWidget.initialValue &&
+        _controller.text == oldWidget.initialValue) {
+      _controller.text = widget.initialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _text => _controller.text.trim();
+
+  Future<void> _test() async {
+    final model = _text;
+    setState(() {
+      _busy = true;
+      _testing = model;
+    });
+    ModelProbe result;
+    try {
+      result = await ref.read(modelProbeConnectorProvider).probe(model);
+    } catch (e, stack) {
+      // `probe` never throws; a stand-in might, and a probe that never
+      // reports back would leave both buttons dead.
+      result = ModelProbeFailed(e, stack, ChatNotice.raw(e.toString()));
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _testing = null;
+      _testedModel = model;
+      _result = result;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSave(_text);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final text = _text;
+    final valid = _isValidModelId(text);
+    final tested = text == _testedModel ? _result : null;
+    final canSave = !_busy && valid && tested is ModelProbeOk;
+
+    Widget? status;
+    final testing = _testing;
+    if (testing != null) {
+      status = Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.s),
+          Text(l.options_modelField_testing(testing)),
+        ],
+      );
+    } else if (tested is ModelProbeOk) {
+      status = Text(
+        l.options_modelField_testPassed(
+          tested.model,
+          (tested.latency.inMilliseconds / 1000).toStringAsFixed(1),
+        ),
+        style: TextStyle(color: AppColors.accent),
+      );
+    } else if (tested is ModelProbeFailed) {
+      status = Text(
+        l.options_modelField_testFailed(l.chatNotice(tested.reason)),
+        style: TextStyle(color: AppColors.danger),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Editable while a probe runs: the result is bound to the id it ran
+        // on, so an edit in the meantime simply lands as untested — and
+        // disabling the field would take the cursor away after every Test.
+        TextField(
+          key: ValueKey('model-field-${widget.scope}'),
+          controller: _controller,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: InputDecoration(
+            labelText: l.options_modelField_label,
+            hintText: l.options_modelField_hint,
+            helperText: l.options_modelField_helper,
+            helperMaxLines: 2,
+            // Empty is the untouched state, not a mistake; a space inside
+            // the id is.
+            errorText: text.isEmpty || valid
+                ? null
+                : l.options_modelField_invalid,
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (_) {
+            if (!_busy && valid) _test();
+          },
+        ),
+        if (status != null) ...[
+          const SizedBox(height: AppSpacing.s),
+          KeyedSubtree(
+            key: ValueKey('model-status-${widget.scope}'),
+            child: status,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.m),
+        Wrap(
+          spacing: AppSpacing.s,
+          runSpacing: AppSpacing.s,
+          children: [
+            OutlinedButton.icon(
+              key: ValueKey('model-test-${widget.scope}'),
+              onPressed: _busy || !valid ? null : _test,
+              icon: const Icon(Icons.network_check, size: 18),
+              label: Text(l.options_modelField_test_button),
+            ),
+            FilledButton.tonalIcon(
+              key: ValueKey('model-save-${widget.scope}'),
+              onPressed: canSave ? _save : null,
+              icon: const Icon(Icons.save_outlined, size: 18),
+              label: Text(l.options_modelField_save_button),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 /// Per-device model override on top of the school-wide `GlobalConfig.Model`.
 /// See `services/config/model_preference.dart` for why it is per device and
 /// who gets to see this card.
-class _ModelCard extends ConsumerWidget {
+///
+/// Two choices: follow the school default, or name a model for this machine.
+/// The second opens a [_ModelField]; nothing is stored until its Save, so
+/// picking it and walking away leaves the device on the default.
+class _ModelCard extends ConsumerStatefulWidget {
   const _ModelCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ModelCard> createState() => _ModelCardState();
+}
+
+class _ModelCardState extends ConsumerState<_ModelCard> {
+  /// The user opened the field but has not saved an id yet. Once one is
+  /// stored the override itself says the field is open.
+  bool _editing = false;
+
+  Future<void> _save(String model) async {
+    final l = AppLocalizations.of(context);
+    await ref.read(modelPreferenceProvider.notifier).setModel(model);
+    if (!mounted) return;
+    _snack(context, l.options_model_saved(model));
+  }
+
+  Future<void> _followGlobal() async {
+    setState(() => _editing = false);
+    await ref.read(modelPreferenceProvider.notifier).setModel(null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final current = ref.watch(modelPreferenceProvider);
     final global = ref.watch(globalConfigServiceProvider)?.model;
     final fallback = (global == null || global.isEmpty)
         ? OpenaiConnector.defaultModel
         : global;
-
-    Widget row(String label, String? value) => _choiceRow(
-      label: label,
-      selected: current == value,
-      onTap: () => ref.read(modelPreferenceProvider.notifier).setModel(value),
-    );
+    final overriding = current != null || _editing;
 
     return _OptionsCard(
       title: l.options_model_title,
       subtitle: l.options_model_subtitle,
       child: Column(
-        // Keyed so a test can tell these rows from the identically-labelled
-        // ones in the school-wide card below, which a teacher sees at the
-        // same time (#118).
+        // Keyed so a test can tell these rows from the school-wide card
+        // below, which a teacher sees at the same time (#118).
         key: const ValueKey('model-rows-device'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          row(l.options_model_followGlobal(fallback), null),
-          for (final model in kSelectableModels) row(model, model),
+          _choiceRow(
+            label: l.options_model_followGlobal(fallback),
+            selected: !overriding,
+            onTap: _followGlobal,
+          ),
+          _choiceRow(
+            label: l.options_model_override,
+            selected: overriding,
+            onTap: () => setState(() => _editing = true),
+          ),
+          if (overriding) ...[
+            const SizedBox(height: AppSpacing.s),
+            _ModelField(
+              scope: 'device',
+              initialValue: current ?? '',
+              onSave: _save,
+            ),
+          ],
         ],
       ),
     );
@@ -325,53 +582,38 @@ class _ModelCard extends ConsumerWidget {
 ///
 /// The write itself preserves the stored `ApiKey`; see
 /// `GlobalConfigService.setModel`, which also explains why this widget *is*
-/// the role gate.
-class _GlobalModelCard extends ConsumerStatefulWidget {
+/// the role gate. The field it holds will not save an id the Test button has
+/// not seen answer (#125): a typo here reaches every student.
+class _GlobalModelCard extends ConsumerWidget {
   const _GlobalModelCard();
 
-  @override
-  ConsumerState<_GlobalModelCard> createState() => _GlobalModelCardState();
-}
-
-class _GlobalModelCardState extends ConsumerState<_GlobalModelCard> {
-  bool _busy = false;
-
-  Future<void> _pick(String model) async {
+  Future<void> _save(BuildContext context, WidgetRef ref, String model) async {
     final l = AppLocalizations.of(context);
-    setState(() => _busy = true);
     try {
       await ref.read(globalConfigServiceProvider.notifier).setModel(model);
-      if (!mounted) return;
+      if (!context.mounted) return;
       _snack(context, l.options_globalModel_saved(model));
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       _snack(context, l.options_globalModel_saveFailed(e.toString()));
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    // No "follow the default" row: this *is* the default. A config doc whose
-    // Model has never been filled in simply has no row selected, and the
-    // tutor falls back to `OpenaiConnector.defaultModel` until it does.
-    final global = ref.watch(globalConfigServiceProvider)?.model;
+    // No "follow the default" choice: this *is* the default. A config doc
+    // whose Model has never been filled in starts the field empty, and the
+    // tutor falls back to `OpenaiConnector.defaultModel` until it is.
+    final global = ref.watch(globalConfigServiceProvider)?.model ?? '';
 
     return _OptionsCard(
       title: l.options_globalModel_title,
       subtitle: l.options_globalModel_subtitle,
-      child: Column(
-        key: const ValueKey('model-rows-global'),
-        children: [
-          for (final model in kSelectableModels)
-            _choiceRow(
-              label: model,
-              selected: global == model,
-              onTap: _busy ? null : () => _pick(model),
-            ),
-        ],
+      child: _ModelField(
+        scope: 'global',
+        initialValue: global,
+        onSave: (model) => _save(context, ref, model),
       ),
     );
   }

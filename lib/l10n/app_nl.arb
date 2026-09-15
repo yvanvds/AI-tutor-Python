@@ -102,6 +102,18 @@
   "options_globalModel_saved": "De school gebruikt nu {model}.",
   "options_globalModel_saveFailed": "Het model voor de hele school wijzigen is mislukt: {error}",
 
+  "options_model_override": "Een ander model op dit toestel",
+  "options_model_saved": "Dit toestel gebruikt nu {model}.",
+  "options_modelField_label": "Model-id",
+  "options_modelField_hint": "bv. gpt-5-mini",
+  "options_modelField_helper": "De exacte id van platform.openai.com/docs/models, hoofdlettergevoelig. Test het voor je opslaat.",
+  "options_modelField_invalid": "Geef één model-id op, zonder spaties.",
+  "options_modelField_test_button": "Testen",
+  "options_modelField_save_button": "Opslaan",
+  "options_modelField_testing": "{model} wordt getest…",
+  "options_modelField_testPassed": "{model} antwoordde in {seconds} s.",
+  "options_modelField_testFailed": "Test mislukt: {reason}",
+
   "options_progress_title": "Voortgang",
   "options_progress_subtitle": "Voortgang wissen wist ook wat de tutor over je kennis weet. Dit kan niet ongedaan gemaakt worden.",
   "options_progress_resetAll_button": "Alle voortgang wissen",
