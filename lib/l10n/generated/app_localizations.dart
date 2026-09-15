@@ -976,7 +976,7 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.'**
+  /// **'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.'**
   String get options_bugReport_subtitle;
 
   /// No description provided for @options_bugReport_github_notConnected.
@@ -1006,7 +1006,7 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_github_notConfigured.
   ///
   /// In en, this message translates to:
-  /// **'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.'**
+  /// **'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.'**
   String get options_bugReport_github_notConfigured;
 
   /// No description provided for @options_bugReport_github_device_explainer.
@@ -1126,8 +1126,14 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_dialog_submit.
   ///
   /// In en, this message translates to:
-  /// **'Post issue'**
+  /// **'Post on GitHub'**
   String get options_bugReport_dialog_submit;
+
+  /// No description provided for @options_bugReport_dialog_saveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as file'**
+  String get options_bugReport_dialog_saveFile;
 
   /// No description provided for @options_bugReport_posted.
   ///
@@ -1140,6 +1146,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Posting failed: {error}'**
   String options_bugReport_postFailed(String error);
+
+  /// No description provided for @options_bugReport_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved as {path}. Send this file to your teacher.'**
+  String options_bugReport_saved(String path);
+
+  /// No description provided for @options_bugReport_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving failed: {error}'**
+  String options_bugReport_saveFailed(String error);
 
   /// No description provided for @options_developer_title.
   ///

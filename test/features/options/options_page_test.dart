@@ -11,7 +11,10 @@
 // Extended for #32: appearance (light / dark), the per-device AI model, and
 // export / import of progress. #125 turned both model cards' fixed lists into
 // a text field whose Save unlocks only after a Test — a real chat completion
-// on the typed id — has passed; the probe here is scripted.
+// on the typed id — has passed; the probe here is scripted. #127 made the
+// bug report a file first: the dialog is reachable with no GitHub account at
+// all, and `Save as file` writes the same redacted report through the
+// archive seam the progress export uses.
 //
 // The end-to-end half of the panel — the theme switch repainting the whole
 // shell, and the progress round trip through a real file — lives in
@@ -132,11 +135,14 @@ ModelProbeFailed _unknownModel(String model) => ModelProbeFailed(
   ),
 );
 
-/// Stands in for the OS file dialogs behind progress export / import (#32).
+/// Stands in for the OS file dialogs behind progress export / import (#32)
+/// and the bug report's `Save as file` (#127).
 class _FakeArchiveIo implements ProgressArchiveIo {
   String? savedName;
   String? savedContents;
+  List<String>? savedExtensions;
   bool cancelSave = false;
+  Object? saveError;
   ArchiveFile? toOpen;
   Object? openError;
 
@@ -144,9 +150,12 @@ class _FakeArchiveIo implements ProgressArchiveIo {
   Future<String?> save({
     required String suggestedName,
     required String contents,
+    List<String> allowedExtensions = const ['json'],
   }) async {
+    if (saveError != null) throw saveError!;
     savedName = suggestedName;
     savedContents = contents;
+    savedExtensions = allowedExtensions;
     return cancelSave ? null : 'C:\\Users\\sam\\$suggestedName';
   }
 
@@ -644,7 +653,8 @@ void main() {
         'latest turn attached', (tester) async {
       await mount(tester);
       expect(find.text('Not connected to GitHub.'), findsOneWidget);
-      expect(find.text('Report a bug…'), findsNothing);
+      // Reporting no longer waits for the sign-in (#127); posting does.
+      expect(find.text('Report a bug…'), findsOneWidget);
 
       await startDeviceFlow(tester);
 
@@ -705,9 +715,15 @@ void main() {
       expect(find.text('Report a bug'), findsOneWidget);
       // Latest turn is preselected.
       expect(find.text('#1 submitCode'), findsOneWidget);
+      // Connected: both ways out are on offer (#127).
+      expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Post on GitHub'),
+        findsOneWidget,
+      );
 
       // Title is required.
-      await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
       await tester.pumpAndSettle();
       expect(find.text('Please enter a title.'), findsOneWidget);
 
@@ -719,7 +735,7 @@ void main() {
         find.widgetWithText(TextField, 'What went wrong?'),
         'It stopped after my answer.',
       );
-      await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
       await tester.pumpAndSettle();
 
       final post = githubRequests.singleWhere(
@@ -738,6 +754,8 @@ void main() {
         find.text('Issue posted: https://github.com/$kBugReportRepo/issues/42'),
         findsOneWidget,
       );
+      // Posted, not saved.
+      expect(archiveIo.savedName, isNull);
 
       await unmount(tester);
     });
@@ -885,9 +903,14 @@ void main() {
       );
       expect(find.text('Connect GitHub'), findsNothing);
       expect(find.text('Not connected to GitHub.'), findsNothing);
-      // The card itself is still there — the feature is unavailable, not
-      // invisible.
+      // The card itself is still there — the sign-in is unavailable, not
+      // the reporting (#127).
       expect(find.text('Bug reports'), findsOneWidget);
+      expect(find.text('Report a bug…'), findsOneWidget);
+      expect(
+        enabled(tester, find.byKey(const ValueKey('bug-report-button'))),
+        isTrue,
+      );
       expect(githubRequests, isEmpty);
 
       await unmount(tester);
@@ -922,6 +945,193 @@ void main() {
       expect(find.text('Not connected to GitHub.'), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.containsKey('github_token'), isFalse);
+
+      await unmount(tester);
+    });
+
+    // #127 — the path with no account at all. The report is the same one
+    // the issue would have carried, so the assertions on its contents are
+    // the same ones the GitHub test makes, plus the redaction of a path the
+    // student typed: the teacher may paste this file into a public issue.
+    testWidgets('without a GitHub account the report is saved as a text '
+        'file, redacted, and the path is confirmed', (tester) async {
+      // A second turn whose input carries the student's Windows profile.
+      recorder
+        ..beginTurn(
+          requestType: 'submitCode',
+          currentExerciseTypeAtStart: '',
+          tutorStateAtStart: 'working',
+          selectedRootGoalId: 'r1',
+          selectedChildGoalId: 's1',
+          preferredRootGoalId: null,
+          preferredChildGoalId: null,
+          streamable: true,
+          previousInputsMode: 'includeSession',
+        )
+        ..recordRequestPayload(
+          userInput: r'open(r"C:\Users\sam.student\Desktop\data.txt")',
+          instructions: 'SYSTEM PROMPT — must not be saved',
+          instructionsDocId: 'submitCode',
+        )
+        ..endTurn();
+      await mount(tester);
+      expect(find.text('Not connected to GitHub.'), findsOneWidget);
+      expect(
+        enabled(tester, find.byKey(const ValueKey('bug-report-button'))),
+        isTrue,
+      );
+
+      await tester.tap(find.text('Report a bug…'));
+      await tester.pumpAndSettle();
+      expect(find.text('Report a bug'), findsOneWidget);
+      // Not connected: no posting, but the file is right there.
+      expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
+      expect(find.text('Post on GitHub'), findsNothing);
+      // The newest turn — the one with the path — is preselected.
+      expect(find.text('#2 submitCode'), findsOneWidget);
+
+      // Title is required here too.
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter a title.'), findsOneWidget);
+      expect(archiveIo.savedName, isNull);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Title'),
+        'Tutor crashed',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'What went wrong?'),
+        'It stopped after my answer.',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+
+      // A `.txt` named for the day and the title, offered as such.
+      expect(
+        archiveIo.savedName,
+        matches(
+          RegExp(r'^ai-tutor-bugreport-\d{4}-\d{2}-\d{2}-tutor-crashed\.txt$'),
+        ),
+      );
+      expect(archiveIo.savedExtensions, ['txt']);
+
+      final text = archiveIo.savedContents!;
+      // A heading that says what the file is on its own…
+      expect(text, startsWith('# Tutor crashed\n'));
+      expect(
+        text,
+        contains(
+          RegExp(
+            r'^Reported: \d{4}-\d{2}-\d{2} \d{2}:\d{2}  ·  App version '
+            '${RegExp.escape(kAppVersion)}\$',
+            multiLine: true,
+          ),
+        ),
+      );
+      // …over the very body a GitHub issue gets.
+      expect(text, contains('It stopped after my answer.'));
+      expect(text, contains('App version: `$kAppVersion`'));
+      expect(text, contains('Python runner state'));
+      expect(text, contains('Turn debug payload'));
+      expect(text, contains('"turnId": 2'));
+      expect(text, isNot(contains('SYSTEM PROMPT')));
+      // The student's name is not in it; the path otherwise is.
+      expect(text, isNot(contains('sam.student')));
+      expect(text, contains(r'C:\\Users\\<user>\\Desktop\\data.txt'));
+
+      expect(
+        find.text(
+          'Report saved as C:\\Users\\sam\\${archiveIo.savedName}. '
+          'Send this file to your teacher.',
+        ),
+        findsOneWidget,
+      );
+      // Nothing went to GitHub, and the button is back.
+      expect(githubRequests, isEmpty);
+      expect(
+        enabled(tester, find.byKey(const ValueKey('bug-report-button'))),
+        isTrue,
+      );
+
+      await unmount(tester);
+    });
+
+    // A fork with no OAuth app cannot sign in — which used to mean it could
+    // not report. The file needs neither.
+    testWidgets('a build with no OAuth client id still saves a report', (
+      tester,
+    ) async {
+      await mount(tester, oauthClientId: '');
+      expect(
+        find.byKey(const ValueKey('github-not-configured')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Report a bug…'));
+      await tester.pumpAndSettle();
+      expect(find.text('Post on GitHub'), findsNothing);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Title'),
+        'Nothing happens',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+
+      expect(archiveIo.savedName, endsWith('-nothing-happens.txt'));
+      expect(archiveIo.savedContents, startsWith('# Nothing happens\n'));
+      expect(find.textContaining('Report saved as'), findsOneWidget);
+      expect(githubRequests, isEmpty);
+
+      await unmount(tester);
+    });
+
+    testWidgets('cancelling the save dialog reports nothing', (tester) async {
+      archiveIo.cancelSave = true;
+      await mount(tester);
+
+      await tester.tap(find.text('Report a bug…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Title'),
+        'Tutor crashed',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+
+      // The dialog was reached (the report was built), and then nothing.
+      expect(archiveIo.savedName, endsWith('.txt'));
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        enabled(tester, find.byKey(const ValueKey('bug-report-button'))),
+        isTrue,
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('a save that fails says why', (tester) async {
+      archiveIo.saveError = const FileSystemException(
+        'Cannot write',
+        r'D:\report.txt',
+      );
+      await mount(tester);
+
+      await tester.tap(find.text('Report a bug…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Title'),
+        'Tutor crashed',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saving failed: '), findsOneWidget);
+      expect(find.textContaining('Cannot write'), findsOneWidget);
+      expect(
+        enabled(tester, find.byKey(const ValueKey('bug-report-button'))),
+        isTrue,
+      );
 
       await unmount(tester);
     });
@@ -1475,6 +1685,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(archiveIo.savedName, endsWith('.json'));
+      // The seam grew an extension parameter for #127; the export still
+      // asks for its own.
+      expect(archiveIo.savedExtensions, ['json']);
       final written = jsonDecode(archiveIo.savedContents!) as Map;
       expect(written['kind'], ProgressArchive.kind);
       expect(written['progress'], hasLength(3));

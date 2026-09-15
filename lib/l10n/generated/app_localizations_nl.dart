@@ -543,7 +543,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Maak rechtstreeks vanuit de app een issue aan op GitHub, met de debuggegevens van een recente tutorbeurt erbij.';
+      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -563,7 +563,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_github_notConfigured =>
-      'Deze build kan niet aanmelden bij GitHub: ze is gebouwd zonder GitHub OAuth-client-id, dus bugmeldingen kunnen enkel met de hand op github.com.';
+      'Deze build kan niet aanmelden bij GitHub: ze is gebouwd zonder GitHub OAuth-client-id. Een melding als bestand bewaren kan wel.';
 
   @override
   String options_bugReport_github_device_explainer(String repo) {
@@ -637,7 +637,10 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
-  String get options_bugReport_dialog_submit => 'Issue plaatsen';
+  String get options_bugReport_dialog_submit => 'Op GitHub plaatsen';
+
+  @override
+  String get options_bugReport_dialog_saveFile => 'Als bestand bewaren';
 
   @override
   String options_bugReport_posted(String url) {
@@ -647,6 +650,16 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String options_bugReport_postFailed(String error) {
     return 'Plaatsen mislukt: $error';
+  }
+
+  @override
+  String options_bugReport_saved(String path) {
+    return 'Melding bewaard als $path. Stuur dit bestand naar je leerkracht.';
+  }
+
+  @override
+  String options_bugReport_saveFailed(String error) {
+    return 'Bewaren mislukt: $error';
   }
 
   @override

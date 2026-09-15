@@ -122,7 +122,9 @@ void main() {
     await _openOptions(tester);
 
     await _scrollTo(tester, find.text('Not connected to GitHub.'));
-    expect(find.text('Report a bug…'), findsNothing);
+    // Reporting no longer waits for the sign-in (#127) — the file path is
+    // `bug_report_file.dart`'s flow; this one is about the token.
+    expect(find.text('Report a bug…'), findsOneWidget);
 
     await _tap(tester, find.text('Connect GitHub'));
     await pumpUntilFound(
@@ -187,11 +189,14 @@ void main() {
     await _clearSnacks(tester);
     await _tap(tester, find.text('Report a bug…'));
     await pumpUntilFound(tester, find.text('Report a bug'));
+    // Signed in, so the dialog offers both ways out (#127).
+    expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Post on GitHub'), findsOneWidget);
     await tester.enterText(
       find.widgetWithText(TextField, 'Title'),
       'The Run button did nothing',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
     await pumpUntil(
       tester,
       () => github.issues.isNotEmpty,
@@ -242,7 +247,7 @@ void main() {
       find.widgetWithText(TextField, 'Title'),
       'the python script did not run',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
     await pumpUntil(
       tester,
       () => github.issues.isNotEmpty,
@@ -338,7 +343,7 @@ void main() {
       find.widgetWithText(TextField, 'Title'),
       'the exercise looks wrong',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Post issue'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
     await pumpUntil(
       tester,
       () => github.issues.isNotEmpty,
@@ -405,6 +410,8 @@ void main() {
     );
     expect(find.text('Connect GitHub'), findsNothing);
     expect(find.text('Not connected to GitHub.'), findsNothing);
+    // …but reporting is still there: the file needs no sign-in (#127).
+    expect(find.text('Report a bug…'), findsOneWidget);
     expect(github.polls, 0);
     expect(harness.browserLaunches, isEmpty);
 

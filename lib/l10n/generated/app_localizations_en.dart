@@ -538,7 +538,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.';
+      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -557,7 +557,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_github_notConfigured =>
-      'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.';
+      'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.';
 
   @override
   String options_bugReport_github_device_explainer(String repo) {
@@ -631,7 +631,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get options_bugReport_dialog_submit => 'Post issue';
+  String get options_bugReport_dialog_submit => 'Post on GitHub';
+
+  @override
+  String get options_bugReport_dialog_saveFile => 'Save as file';
 
   @override
   String options_bugReport_posted(String url) {
@@ -641,6 +644,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String options_bugReport_postFailed(String error) {
     return 'Posting failed: $error';
+  }
+
+  @override
+  String options_bugReport_saved(String path) {
+    return 'Report saved as $path. Send this file to your teacher.';
+  }
+
+  @override
+  String options_bugReport_saveFailed(String error) {
+    return 'Saving failed: $error';
   }
 
   @override

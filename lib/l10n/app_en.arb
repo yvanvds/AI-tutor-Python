@@ -269,7 +269,7 @@
   "options_apiKey_removed": "API key removed.",
 
   "options_bugReport_title": "Bug reports",
-  "options_bugReport_subtitle": "Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.",
+  "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.",
   "options_bugReport_github_notConnected": "Not connected to GitHub.",
   "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
   "@options_bugReport_github_connectedAs": {
@@ -277,7 +277,7 @@
   },
   "options_bugReport_github_connect_button": "Connect GitHub",
   "options_bugReport_github_disconnect_button": "Disconnect",
-  "options_bugReport_github_notConfigured": "This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.",
+  "options_bugReport_github_notConfigured": "This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.",
   "options_bugReport_github_device_explainer": "Type this code on GitHub to let the app create issues on {repo}. Nothing is stored until you approve it.",
   "@options_bugReport_github_device_explainer": {
     "placeholders": { "repo": { "type": "String" } }
@@ -312,13 +312,22 @@
   "@options_bugReport_dialog_turnLabel": {
     "placeholders": { "id": { "type": "int" }, "type": { "type": "String" } }
   },
-  "options_bugReport_dialog_submit": "Post issue",
+  "options_bugReport_dialog_submit": "Post on GitHub",
+  "options_bugReport_dialog_saveFile": "Save as file",
   "options_bugReport_posted": "Issue posted: {url}",
   "@options_bugReport_posted": {
     "placeholders": { "url": { "type": "String" } }
   },
   "options_bugReport_postFailed": "Posting failed: {error}",
   "@options_bugReport_postFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_bugReport_saved": "Report saved as {path}. Send this file to your teacher.",
+  "@options_bugReport_saved": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "options_bugReport_saveFailed": "Saving failed: {error}",
+  "@options_bugReport_saveFailed": {
     "placeholders": { "error": { "type": "String" } }
   },
 

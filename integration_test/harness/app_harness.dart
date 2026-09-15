@@ -124,19 +124,27 @@ class _NoSound extends SoundService {
   Future<void> guidingComplete() async {}
 }
 
-/// Replaces only the *dialog* half of progress export / import (#32): the
-/// path is fixed instead of asked for, and the file is still written to and
-/// read from the real disk, so a flow exercises the same round trip a student
-/// does.
+/// What the app asked the save dialog for (#127): the name it suggested and
+/// the extension filter it set — the two things the fixed path below takes
+/// out of a flow's sight.
+typedef FileSaveRequest = ({String suggestedName, List<String> extensions});
+
+/// Replaces only the *dialog* half of progress export / import (#32) and of
+/// the bug report's `Save as file` (#127): the path is fixed instead of
+/// asked for, and the file is still written to and read from the real disk,
+/// so a flow exercises the same round trip a student does.
 class _FixedPathArchiveIo implements ProgressArchiveIo {
-  _FixedPathArchiveIo(this.file);
+  _FixedPathArchiveIo(this.file, {required this.onSave});
   final File file;
+  final void Function(FileSaveRequest request) onSave;
 
   @override
   Future<String?> save({
     required String suggestedName,
     required String contents,
+    List<String> allowedExtensions = const ['json'],
   }) async {
+    onSave((suggestedName: suggestedName, extensions: allowedExtensions));
     await file.writeAsString(contents);
     return file.path;
   }
@@ -235,10 +243,16 @@ class AppHarness {
   /// is what made the theme flow pass on a dark desktop and fail on CI.
   final Brightness systemBrightness;
 
-  /// Where "Export progress…" writes and "Import progress…" reads (#32).
-  /// `null` (the default) leaves the real OS file dialogs in place, which no
-  /// test can click; pass a path in a temp directory to drive the round trip.
+  /// Where "Export progress…" writes and "Import progress…" reads (#32), and
+  /// where the bug report's "Save as file" lands (#127). `null` (the
+  /// default) leaves the real OS file dialogs in place, which no test can
+  /// click; pass a path in a temp directory to drive the round trip.
   final File? archiveFile;
+
+  /// Every save dialog the app would have opened over [archiveFile], in
+  /// order: the file name it suggested and the extension filter it asked
+  /// for (#127). The fixed path hides both from the file on disk.
+  final List<FileSaveRequest> fileSaves = <FileSaveRequest>[];
 
   /// GitHub, as the bug reporter talks to it (#57). `null` (the default)
   /// leaves the production hosts in place, which costs nothing: no flow
@@ -376,7 +390,7 @@ class AppHarness {
         if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
         if (archiveFile != null)
           progressArchiveIoProvider.overrideWithValue(
-            _FixedPathArchiveIo(archiveFile!),
+            _FixedPathArchiveIo(archiveFile!, onSave: fileSaves.add),
           ),
         if (github != null) ...[
           gitHubOAuthBaseProvider.overrideWithValue(github!.base),

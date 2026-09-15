@@ -11,7 +11,8 @@
 //   - export / import of progress to a JSON file (#32)
 //   - the user's own OpenAI key (only when the account is not on the
 //     bundled key)
-//   - bug reports to GitHub, with a recent tutor turn's debug payload
+//   - bug reports, saved as a file for the teacher or posted to GitHub,
+//     with a recent tutor turn's debug payload (#127)
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
 //   - about / version, with the manual update check (#48)
 
@@ -31,6 +32,7 @@ import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
+import 'package:ai_tutor_python/services/debug/bug_report_file.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
@@ -1145,8 +1147,16 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
 // Bug reports
 // ---------------------------------------------------------------------------
 
-/// Filing a GitHub issue from inside the app, and the GitHub sign-in that
-/// makes it possible.
+/// Filing a bug report from inside the app: the same report either **saved
+/// as a text file** the student sends to the teacher over chat (#127), or
+/// **posted as a GitHub issue** for whoever has an account — and the GitHub
+/// sign-in that makes the second possible.
+///
+/// The file is the primary path. Reporting used to require the sign-in
+/// first, and for most students creating a GitHub account is a bigger step
+/// than the bug is worth — so the reports did not come in. `Report a bug…`
+/// is therefore always on offer; connecting GitHub is the optional extra
+/// below it, not the prerequisite.
 ///
 /// Sign-in is the OAuth **device flow** (#57): a dialog shows a short code,
 /// the student approves it in a browser, and the app polls until GitHub hands
@@ -1164,8 +1174,9 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
 ///
 /// A build compiled without an OAuth client id cannot run the flow at all.
 /// That is a legitimate state (a fork that has not registered an OAuth app),
-/// so the card says so plainly and hides the button, rather than offering a
-/// sign-in that could only fail.
+/// so the card says so plainly and hides the sign-in button, rather than
+/// offering a sign-in that could only fail. Saving a file needs no account
+/// and no client id, so that path stays open on such a build.
 class _BugReportCard extends ConsumerStatefulWidget {
   const _BugReportCard();
 
@@ -1302,15 +1313,19 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
     });
   }
 
-  Future<void> _report(String token) async {
+  /// One dialog, two outcomes (#127). [token] is the stored GitHub token,
+  /// or null — which only takes the `Post on GitHub` button off the dialog;
+  /// the report itself, and saving it as a file, need no account.
+  Future<void> _report(String? token) async {
     final l = AppLocalizations.of(context);
     final turns = ref.read(debugServiceProvider).buffer;
     // Read before the dialog, so the async gaps below never touch `ref`.
     final pyRunner = ref.read(pyRunnerProvider);
     final issues = ref.read(githubIssueServiceProvider);
+    final io = ref.read(progressArchiveIoProvider);
     final draft = await showDialog<_BugReportDraft>(
       context: context,
-      builder: (_) => _BugReportDialog(turns: turns),
+      builder: (_) => _BugReportDialog(turns: turns, canPost: token != null),
     );
     if (draft == null || !mounted) return;
 
@@ -1319,21 +1334,55 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
       // Always attached, with no dropdown: the turn payload describes the
       // tutor, and "it didn't run" is a question about the runner (#74).
       final runner = await RunnerDiagnostics.collect(pyRunner);
-      final url = await issues.createIssue(
-        token: token,
-        title: draft.title,
-        body: buildBugReportBody(
-          description: draft.description,
-          appVersion: kAppVersion,
-          runner: runner,
-          turn: draft.turn?.toJson(),
-        ),
+      // The same body whichever way it leaves — same runner section, same
+      // turn payload, same redaction. The teacher may paste the file into a
+      // public issue, so it must be as clean as the issue would have been.
+      final body = buildBugReportBody(
+        description: draft.description,
+        appVersion: kAppVersion,
+        runner: runner,
+        turn: draft.turn?.toJson(),
       );
-      if (!mounted) return;
-      _snack(context, l.options_bugReport_posted(url.toString()));
+      switch (draft.destination) {
+        case _BugReportDestination.github:
+          // The dialog only offers this with a token; a disconnect cannot
+          // happen while the modal is up.
+          final url = await issues.createIssue(
+            token: token!,
+            title: draft.title,
+            body: body,
+          );
+          if (!mounted) return;
+          _snack(context, l.options_bugReport_posted(url.toString()));
+        case _BugReportDestination.file:
+          final now = DateTime.now();
+          final path = await io.save(
+            suggestedName: bugReportFileName(
+              title: draft.title,
+              reportedAt: now,
+            ),
+            contents: buildBugReportFile(
+              title: draft.title,
+              reportedAt: now,
+              appVersion: kAppVersion,
+              body: body,
+            ),
+            allowedExtensions: const ['txt'],
+          );
+          // Cancelled in the save dialog: the student knows.
+          if (!mounted || path == null) return;
+          _snack(context, l.options_bugReport_saved(path));
+      }
     } catch (e) {
       if (!mounted) return;
-      _snack(context, l.options_bugReport_postFailed(e.toString()));
+      _snack(context, switch (draft.destination) {
+        _BugReportDestination.github => l.options_bugReport_postFailed(
+          e.toString(),
+        ),
+        _BugReportDestination.file => l.options_bugReport_saveFailed(
+          e.toString(),
+        ),
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1375,33 +1424,32 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          status,
-          const SizedBox(height: AppSpacing.m),
-          Wrap(
-            spacing: AppSpacing.s,
-            runSpacing: AppSpacing.s,
-            children: [
-              if (token == null) ...[
-                if (configured)
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _connect,
-                    icon: const Icon(Icons.link, size: 18),
-                    label: Text(l.options_bugReport_github_connect_button),
-                  ),
-              ] else ...[
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : () => _report(token),
-                  icon: const Icon(Icons.bug_report_outlined, size: 18),
-                  label: Text(l.options_bugReport_report_button),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _disconnect,
-                  icon: const Icon(Icons.link_off, size: 18),
-                  label: Text(l.options_bugReport_github_disconnect_button),
-                ),
-              ],
-            ],
+          // Always, token or not (#127): the dialog decides what it can do
+          // with the report, and saving it needs nothing from GitHub.
+          FilledButton.tonalIcon(
+            key: const ValueKey('bug-report-button'),
+            onPressed: _busy ? null : () => _report(token),
+            icon: const Icon(Icons.bug_report_outlined, size: 18),
+            label: Text(l.options_bugReport_report_button),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          // The optional extra, below the primary action.
+          status,
+          if (token != null || configured) ...[
+            const SizedBox(height: AppSpacing.m),
+            if (token == null)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _connect,
+                icon: const Icon(Icons.link, size: 18),
+                label: Text(l.options_bugReport_github_connect_button),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _disconnect,
+                icon: const Icon(Icons.link_off, size: 18),
+                label: Text(l.options_bugReport_github_disconnect_button),
+              ),
+          ],
         ],
       ),
     );
@@ -1530,21 +1578,31 @@ class _DeviceCodeDialogState extends State<_DeviceCodeDialog> {
   }
 }
 
+/// Where a finished report goes (#127): a `.txt` for the teacher, or an
+/// issue on GitHub.
+enum _BugReportDestination { file, github }
+
 class _BugReportDraft {
   const _BugReportDraft({
     required this.title,
     required this.description,
+    required this.destination,
     this.turn,
   });
   final String title;
   final String description;
+  final _BugReportDestination destination;
   final TurnRecord? turn;
 }
 
+/// Title, description and an optional turn — the same form for both
+/// outcomes. `Save as file` is always there and is the primary action;
+/// `Post on GitHub` only appears with [canPost], i.e. a stored token.
 class _BugReportDialog extends StatefulWidget {
-  const _BugReportDialog({required this.turns});
+  const _BugReportDialog({required this.turns, required this.canPost});
 
   final List<TurnRecord> turns;
+  final bool canPost;
 
   @override
   State<_BugReportDialog> createState() => _BugReportDialogState();
@@ -1569,7 +1627,7 @@ class _BugReportDialogState extends State<_BugReportDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit(_BugReportDestination destination) {
     final title = _title.text.trim();
     if (title.isEmpty) {
       setState(() => _titleMissing = true);
@@ -1579,6 +1637,7 @@ class _BugReportDialogState extends State<_BugReportDialog> {
       _BugReportDraft(
         title: title,
         description: _description.text,
+        destination: destination,
         turn: _turn,
       ),
     );
@@ -1649,15 +1708,24 @@ class _BugReportDialogState extends State<_BugReportDialog> {
           ],
         ),
       ),
+      // Cancel · Save as file · Post on GitHub (when connected). The file is
+      // the default, so it takes the filled style; posting is tonal.
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l.options_dialog_cancel),
         ),
         FilledButton(
-          onPressed: _submit,
-          child: Text(l.options_bugReport_dialog_submit),
+          key: const ValueKey('bug-report-save-file'),
+          onPressed: () => _submit(_BugReportDestination.file),
+          child: Text(l.options_bugReport_dialog_saveFile),
         ),
+        if (widget.canPost)
+          FilledButton.tonal(
+            key: const ValueKey('bug-report-post-github'),
+            onPressed: () => _submit(_BugReportDestination.github),
+            child: Text(l.options_bugReport_dialog_submit),
+          ),
       ],
     );
   }

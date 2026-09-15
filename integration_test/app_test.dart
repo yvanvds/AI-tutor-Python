@@ -18,6 +18,7 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
@@ -80,6 +81,7 @@ void main() {
   own_key.main();
   level_up_gate.main();
   bug_report_oauth.main();
+  bug_report_file.main();
   goals_import_replace.main();
   students_class_filter.main();
   students_bulk_class.main();
