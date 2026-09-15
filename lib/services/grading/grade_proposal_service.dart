@@ -25,6 +25,7 @@ import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -429,6 +430,8 @@ final gradeJustificationConnectorProvider = Provider<OpenaiConnector>(
   (ref) => OpenaiConnector(
     getConfig: () => ref.read(globalConfigServiceProvider),
     getModelOverride: () => ref.read(modelPreferenceProvider),
+    getApiKey: () => ref.read(tutorApiKeyProvider),
+    client: ref.watch(openaiClientProvider),
   ),
 );
 

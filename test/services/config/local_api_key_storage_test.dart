@@ -1,3 +1,8 @@
+// The user's own OpenAI key on this device. Since #126 the notifier's state
+// is the key itself (`String?`), not a presence flag: the connector reads it
+// synchronously on every call, so it is hydrated once from
+// shared_preferences and published by save / clear from then on.
+
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,55 +14,61 @@ void main() {
   });
 
   group('LocalApiKeyStorage', () {
-    test('hasKey returns false when no key stored', () async {
+    test('the state is null while no key is stored', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      expect(container.read(localApiKeyStorageProvider), isNull);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(localApiKeyStorageProvider), isNull);
+    });
+
+    test('saveKey persists the key and publishes its value', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container
+          .read(localApiKeyStorageProvider.notifier)
+          .saveKey('sk-test-123');
+      expect(container.read(localApiKeyStorageProvider), 'sk-test-123');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('local_api_key'), 'sk-test-123');
+    });
+
+    test('saving again replaces the published value', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final storage = container.read(localApiKeyStorageProvider.notifier);
-      expect(await storage.hasKey(), isFalse);
+      await storage.saveKey('sk-first');
+      await storage.saveKey('sk-second');
+      expect(container.read(localApiKeyStorageProvider), 'sk-second');
     });
 
-    test('loadKey returns null when no key stored', () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final storage = container.read(localApiKeyStorageProvider.notifier);
-      expect(await storage.loadKey(), isNull);
-    });
-
-    test('saveKey stores the key and sets isKeyPresent to true', () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final storage = container.read(localApiKeyStorageProvider.notifier);
-      await storage.saveKey('sk-test-123');
-      expect(await storage.hasKey(), isTrue);
-      expect(await storage.loadKey(), 'sk-test-123');
-      expect(container.read(localApiKeyStorageProvider), isTrue);
-    });
-
-    test('clearKey removes the key and sets isKeyPresent to false', () async {
+    test('clearKey removes the key and publishes null', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final storage = container.read(localApiKeyStorageProvider.notifier);
       await storage.saveKey('sk-test-456');
       await storage.clearKey();
-      expect(await storage.hasKey(), isFalse);
-      expect(await storage.loadKey(), isNull);
-      expect(container.read(localApiKeyStorageProvider), isFalse);
+      expect(container.read(localApiKeyStorageProvider), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('local_api_key'), isFalse);
     });
 
-    test(
-      'isKeyPresent updates asynchronously on construction when key exists',
-      () async {
-        SharedPreferences.setMockInitialValues({
-          'local_api_key': 'existing-key',
-        });
-        final container = ProviderContainer();
-        addTearDown(container.dispose);
-        // Trigger build by reading.
-        container.read(localApiKeyStorageProvider);
-        // Let the constructor's async init complete
-        await Future.delayed(Duration.zero);
-        expect(container.read(localApiKeyStorageProvider), isTrue);
-      },
-    );
+    test('hydrates the stored key on first read', () async {
+      SharedPreferences.setMockInitialValues({'local_api_key': 'existing-key'});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(localApiKeyStorageProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(localApiKeyStorageProvider), 'existing-key');
+    });
+
+    test('an empty stored value counts as no key', () async {
+      SharedPreferences.setMockInitialValues({'local_api_key': ''});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(localApiKeyStorageProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(localApiKeyStorageProvider), isNull);
+    });
   });
 }

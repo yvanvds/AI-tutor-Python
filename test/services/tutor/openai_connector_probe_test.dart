@@ -170,18 +170,42 @@ void main() {
     expect((result as ModelProbeFailed).reason, ChatNotice.raw(message));
   });
 
-  test('a key or quota problem is reported in the same way', () async {
+  test('a quota problem is reported in the same way', () async {
     const message =
-        'Incorrect API key provided: sk-abc***. You can find '
-        'your API key at https://platform.openai.com/account/api-keys.';
+        'You exceeded your current quota, please check your plan and '
+        'billing details.';
     final c = connector(
-      (_) =>
-          http.Response(_apiError(message, type: 'invalid_request_error'), 401),
+      (_) => http.Response(_apiError(message, type: 'insufficient_quota'), 429),
     );
 
     final result = await c.probe('gpt-4.1');
 
     expect((result as ModelProbeFailed).reason, ChatNotice.raw(message));
+  });
+
+  test('a refused key is reported against whoever owns it, not with the '
+      "API's line (#126)", () async {
+    const message =
+        'Incorrect API key provided: sk-abc***. You can find '
+        'your API key at https://platform.openai.com/account/api-keys.';
+    http.Response refuse(http.Request _) =>
+        http.Response(_apiError(message, type: 'invalid_request_error'), 401);
+
+    // Without a key seam the probe runs on the school's build-time key.
+    final school = await connector(refuse).probe('gpt-4.1');
+    expect(
+      (school as ModelProbeFailed).reason,
+      const ChatNotice(ChatNoticeKind.schoolKeyInvalid),
+    );
+
+    final own = await OpenaiConnector(
+      getApiKey: () => const OwnKey('sk-own'),
+      client: MockClient((req) async => refuse(req)),
+    ).probe('gpt-4.1');
+    expect(
+      (own as ModelProbeFailed).reason,
+      const ChatNotice(ChatNoticeKind.ownKeyRejected),
+    );
   });
 
   test('a dead connection is the localized transport notice, and a timeout '

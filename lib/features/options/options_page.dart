@@ -43,6 +43,7 @@ import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
@@ -280,10 +281,15 @@ class _ThemeCard extends ConsumerWidget {
 /// Its own instance rather than the tutor's: `probe()` names the model
 /// explicitly and records nothing, so it needs neither the config nor the
 /// device override — and the tutor's connector carries a student's
-/// conversation, which a teacher-side check has no business touching. The
+/// conversation, which a teacher-side check has no business touching. It
+/// does run on the same key as the tutor (#126), so on an own-key account
+/// the Test button validates the stored key as well as the model id. The
 /// integration harness overrides this with its scripted model.
 final modelProbeConnectorProvider = Provider<OpenaiConnector>(
-  (ref) => OpenaiConnector(),
+  (ref) => OpenaiConnector(
+    getApiKey: () => ref.read(tutorApiKeyProvider),
+    client: ref.watch(openaiClientProvider),
+  ),
 );
 
 /// Whether [text] can be sent to OpenAI as a model id. Trimmed by the caller;
@@ -1004,7 +1010,9 @@ class _ApiKeyCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final hasKey = ref.watch(localApiKeyStorageProvider);
+    final hasKey = ref.watch(
+      localApiKeyStorageProvider.select((key) => key != null),
+    );
     return _OptionsCard(
       title: l.options_apiKey_title,
       subtitle: l.options_apiKey_subtitle,

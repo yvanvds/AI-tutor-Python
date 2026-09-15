@@ -2104,6 +2104,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_notice_replyTruncated => 'The tutor\'s reply was cut off.';
 
   @override
+  String get chat_notice_ownKeyMissing =>
+      'No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.';
+
+  @override
+  String get chat_notice_ownKeyRejected =>
+      'OpenAI rejected your API key. Check it under Options → OpenAI API key.';
+
+  @override
+  String get chat_notice_schoolKeyInvalid =>
+      'The school\'s OpenAI API key is not working. Let your teacher know.';
+
+  @override
   String get chat_notice_noPreviousRequest => 'No previous request to retry.';
 
   @override

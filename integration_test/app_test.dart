@@ -32,6 +32,7 @@ import 'flows/language_switch.dart' as language_switch;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
+import 'flows/own_key.dart' as own_key;
 import 'flows/period_start_snapshot.dart' as period_start_snapshot;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
@@ -76,6 +77,7 @@ void main() {
   playground_during_mcq.main();
   turtle_run_notice.main();
   options_panel.main();
+  own_key.main();
   level_up_gate.main();
   bug_report_oauth.main();
   goals_import_replace.main();

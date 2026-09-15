@@ -3608,6 +3608,24 @@ abstract class AppLocalizations {
   /// **'The tutor\'s reply was cut off.'**
   String get chat_notice_replyTruncated;
 
+  /// An account without the school key has no key stored, so the tutor made no call (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.'**
+  String get chat_notice_ownKeyMissing;
+
+  /// OpenAI answered 401 on the key the user stored on this device (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI rejected your API key. Check it under Options → OpenAI API key.'**
+  String get chat_notice_ownKeyRejected;
+
+  /// OpenAI answered 401 on the school's bundled key, or the build has none; nothing the student can fix (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'The school\'s OpenAI API key is not working. Let your teacher know.'**
+  String get chat_notice_schoolKeyInvalid;
+
   /// No description provided for @chat_notice_noPreviousRequest.
   ///
   /// In en, this message translates to:

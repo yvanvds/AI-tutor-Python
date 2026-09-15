@@ -40,6 +40,7 @@ import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -154,6 +155,8 @@ class TutorService extends Notifier<TutorState> {
           onRecordStreamFailure: _debug.recordStreamFailure,
           getConfig: () => ref.read(globalConfigServiceProvider),
           getModelOverride: () => ref.read(modelPreferenceProvider),
+          getApiKey: () => ref.read(tutorApiKeyProvider),
+          client: ref.read(openaiClientProvider),
         );
     _conductor = _conductorOverride ?? Conductor(deps: _buildConductorDeps());
 

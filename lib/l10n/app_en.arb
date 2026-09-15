@@ -1109,6 +1109,18 @@
   "chat_notice_tutorTimeout": "The tutor did not respond in time.",
   "chat_notice_tutorUnreachable": "No connection to the tutor.",
   "chat_notice_replyTruncated": "The tutor's reply was cut off.",
+  "chat_notice_ownKeyMissing": "No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.",
+  "@chat_notice_ownKeyMissing": {
+    "description": "An account without the school key has no key stored, so the tutor made no call (#126)"
+  },
+  "chat_notice_ownKeyRejected": "OpenAI rejected your API key. Check it under Options → OpenAI API key.",
+  "@chat_notice_ownKeyRejected": {
+    "description": "OpenAI answered 401 on the key the user stored on this device (#126)"
+  },
+  "chat_notice_schoolKeyInvalid": "The school's OpenAI API key is not working. Let your teacher know.",
+  "@chat_notice_schoolKeyInvalid": {
+    "description": "OpenAI answered 401 on the school's bundled key, or the build has none; nothing the student can fix (#126)"
+  },
   "chat_notice_noPreviousRequest": "No previous request to retry.",
   "chat_notice_emptyResponse": "Empty response from the tutor.",
   "chat_notice_unparseableResponse": "Could not process the response: {raw}",

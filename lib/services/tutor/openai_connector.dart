@@ -79,7 +79,8 @@ class ModelProbeOk extends ModelProbe {
 
 /// The call did not come back with an answer. [reason] is what the teacher
 /// is shown: OpenAI's own message for a request the API refused (an unknown
-/// id, a parameter the model does not take, a key or quota problem), the
+/// id, a parameter the model does not take, a quota problem), the localized
+/// line naming whose key it is for a refused or missing key (#126), the
 /// localized transport line for a timeout or a dead connection.
 class ModelProbeFailed extends ModelProbe {
   final Object error;
@@ -88,12 +89,79 @@ class ModelProbeFailed extends ModelProbe {
   const ModelProbeFailed(this.error, this.stack, this.reason);
 }
 
+/// Whose OpenAI key an account's calls go out on (#126).
+///
+/// Decided per account by `tutorApiKeyProvider` and handed to the connector
+/// through its `getApiKey` seam. The connector keeps the *source* and not
+/// just the string because a rejected key has to be reported to the right
+/// person: the student who typed their own, or the teacher who owns the
+/// school's.
+sealed class ApiKeySource {
+  const ApiKeySource();
+
+  /// The key itself; `null` or empty when the source has none to offer.
+  String? get key;
+}
+
+/// The school's key, bundled into the build: the account has
+/// `mayUseGlobalKey`. A key the user may also have stored on the device is
+/// ignored, consistent with the Options page hiding the own-key card for
+/// such an account.
+final class SchoolKey extends ApiKeySource {
+  const SchoolKey(this.key);
+
+  @override
+  final String key;
+
+  @override
+  bool operator ==(Object other) => other is SchoolKey && other.key == key;
+
+  @override
+  int get hashCode => Object.hash(SchoolKey, key);
+
+  @override
+  String toString() => 'SchoolKey(${key.isEmpty ? 'empty' : 'set'})';
+}
+
+/// The key the user stored on this device (`LocalApiKeyStorage`): the
+/// account does not have `mayUseGlobalKey`. `null` while there is none —
+/// the local-key gate makes that unreachable in practice, but a call must
+/// still fail rather than silently fall back on the school's key.
+final class OwnKey extends ApiKeySource {
+  const OwnKey(this.key);
+
+  @override
+  final String? key;
+
+  @override
+  bool operator ==(Object other) => other is OwnKey && other.key == key;
+
+  @override
+  int get hashCode => Object.hash(OwnKey, key);
+
+  @override
+  String toString() =>
+      'OwnKey(${key == null || key!.isEmpty ? 'none' : 'set'})';
+}
+
+/// Thrown by [OpenaiConnector.resolveApiKey] when [source] has no key to
+/// call with. Nothing is sent to OpenAI; the notice says whose key is
+/// missing.
+class NoApiKeyException implements Exception {
+  const NoApiKeyException(this.source);
+  final ApiKeySource source;
+
+  @override
+  String toString() => 'NoApiKeyException($source)';
+}
+
 class OpenaiConnector {
   OpenaiConnector({
     this._onRecordRawOutput,
     this._onRecordStreamFailure,
     this._getConfig,
     this._getModelOverride,
+    this._getApiKey,
     this._client,
   });
 
@@ -105,13 +173,19 @@ class OpenaiConnector {
   /// follow the school-wide `GlobalConfig.Model`.
   final String? Function()? _getModelOverride;
 
+  /// Whose key the next call goes out on (#126): the school's for an
+  /// account with `mayUseGlobalKey`, the user's own otherwise — see
+  /// `tutorApiKeyProvider`, which every production connector reads through
+  /// this seam. `null` falls back on the school's build-time key, which is
+  /// what the connector did unconditionally before #126; only tests and
+  /// scripted stand-ins leave it unset.
+  final ApiKeySource Function()? _getApiKey;
+
   /// The HTTP transport every call goes out on. `null` (production) lets
   /// `dart_openai` open its own connections with `OpenAI.requestsTimeOut`
   /// applied; a test passes a scripted client so a request can be inspected
   /// and answered without a socket (#125).
   final http.Client? _client;
-
-  final String _apiKey = Env.apiKey;
 
   /// Reasoning effort for gpt-5 / o-series models.
   /// One of: 'minimal' | 'low' | 'medium' | 'high', or null to omit the
@@ -146,7 +220,6 @@ class OpenaiConnector {
   }) async {
     debugPrint('system prompt: ${instructions.length} chars');
     _rememberForResend(instructions, input, inputs);
-    OpenAI.apiKey = _apiKey;
     OpenAI.requestsTimeOut = const Duration(seconds: 60);
 
     if (inputs == PreviousInputs.newSession) {
@@ -156,6 +229,9 @@ class OpenaiConnector {
     final messages = _buildMessages(instructions, _historyFor(inputs), input);
 
     try {
+      // Inside the try on purpose: an account with no key to call with
+      // fails the turn the same way a refused request does (#126).
+      OpenAI.apiKey = resolveApiKey();
       final model = resolveModel();
       final response = await OpenAI.instance.chat.create(
         model: model,
@@ -169,7 +245,7 @@ class OpenaiConnector {
       return ConnectorOk(text);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequest failed: $e');
-      return ConnectorFailure(e, stack, describeTransportError(e));
+      return ConnectorFailure(e, stack, _describeCallError(e));
     }
   }
 
@@ -183,7 +259,6 @@ class OpenaiConnector {
   }) {
     debugPrint('system prompt: ${instructions.length} chars');
     _rememberForResend(instructions, input, inputs);
-    OpenAI.apiKey = _apiKey;
     OpenAI.requestsTimeOut = const Duration(seconds: 60);
 
     if (inputs == PreviousInputs.newSession) {
@@ -193,9 +268,11 @@ class OpenaiConnector {
     final messages = _buildMessages(instructions, _historyFor(inputs), input);
 
     // Opening the stream is deferred into the generator so a synchronous
-    // throw from `createStream` (bad key, bad model) lands in the same
-    // StreamFailed path as a mid-stream transport error.
+    // throw from `createStream` (bad key, bad model) — and an account with
+    // no key at all (#126) — lands in the same StreamFailed path as a
+    // mid-stream transport error.
     Stream<String> deltas() async* {
+      OpenAI.apiKey = resolveApiKey();
       final model = resolveModel();
       final stream = OpenAI.instance.chat.createStream(
         model: model,
@@ -279,7 +356,7 @@ class OpenaiConnector {
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequestStream failed: $e');
       _onRecordStreamFailure?.call(e.toString());
-      yield StreamFailed(e, stack, describeTransportError(e));
+      yield StreamFailed(e, stack, _describeCallError(e));
     }
   }
 
@@ -287,6 +364,7 @@ class OpenaiConnector {
   /// (`SocketException: Failed host lookup ...`) stays in the debug log;
   /// unknown errors are passed through verbatim.
   static ChatNotice describeTransportError(Object e) {
+    if (e is NoApiKeyException) return _keyNotice(e.source, missing: true);
     if (e is TimeoutException) {
       return const ChatNotice(ChatNoticeKind.tutorTimeout);
     }
@@ -295,6 +373,32 @@ class OpenaiConnector {
     }
     return ChatNotice.raw(e.toString());
   }
+
+  /// What a failed call of *this* connector reads as. On top of
+  /// [describeTransportError]: a request OpenAI refused for its key (HTTP
+  /// 401) is reported against whoever owns that key (#126) — the student's
+  /// own, to be fixed under Options, or the school's, to be taken to the
+  /// teacher — instead of the API's "Incorrect API key provided: sk-***"
+  /// line, which points a student at a key that is not theirs to change.
+  ChatNotice _describeCallError(Object e) {
+    if (e is RequestFailedException &&
+        e.statusCode == HttpStatus.unauthorized) {
+      return _keyNotice(_apiKeySource(), missing: false);
+    }
+    return describeTransportError(e);
+  }
+
+  static ChatNotice _keyNotice(ApiKeySource source, {required bool missing}) =>
+      switch (source) {
+        OwnKey() => ChatNotice(
+          missing
+              ? ChatNoticeKind.ownKeyMissing
+              : ChatNoticeKind.ownKeyRejected,
+        ),
+        // The school's key is nobody's to type in here: absent and refused
+        // come to the same advice.
+        SchoolKey() => const ChatNotice(ChatNoticeKind.schoolKeyInvalid),
+      };
 
   /// The one user message the Test button sends (#125). Tiny on purpose: the
   /// point is the round trip, not the answer.
@@ -316,10 +420,12 @@ class OpenaiConnector {
   /// Never throws: every failure comes back as a [ModelProbeFailed] carrying
   /// what the teacher should read.
   Future<ModelProbe> probe(String model) async {
-    OpenAI.apiKey = _apiKey;
     OpenAI.requestsTimeOut = const Duration(seconds: 60);
     final clock = Stopwatch()..start();
     try {
+      // The same key the tutor's calls go out on (#126), so on an own-key
+      // account the Test button also validates the stored key.
+      OpenAI.apiKey = resolveApiKey();
       await OpenAI.instance.chat.create(
         model: model,
         messages: [
@@ -344,12 +450,15 @@ class OpenaiConnector {
 
   /// What the Test button shows for a failed probe. A request the API
   /// refused carries OpenAI's own explanation ("The model … does not
-  /// exist", "Unsupported parameter: …", "Incorrect API key …"), which is
-  /// exactly what the teacher needs to read; anything else is a transport
-  /// problem and gets the same line the chat shows for it.
-  static ChatNotice _describeProbeError(Object e) {
-    if (e is RequestFailedException) return ChatNotice.raw(e.message);
-    return describeTransportError(e);
+  /// exist", "Unsupported parameter: …"), which is exactly what the teacher
+  /// needs to read; a key problem — refused or missing — gets the same line
+  /// the chat shows for it (#126), and so does a transport failure.
+  ChatNotice _describeProbeError(Object e) {
+    if (e is RequestFailedException &&
+        e.statusCode != HttpStatus.unauthorized) {
+      return ChatNotice.raw(e.message);
+    }
+    return _describeCallError(e);
   }
 
   Future<ConnectorResult> resendRequest() async {
@@ -425,6 +534,21 @@ class OpenaiConnector {
     }
     return params.isEmpty ? null : params;
   }
+
+  /// Key the next call goes out on (#126): whatever the `getApiKey` seam
+  /// says — the school's key for an account with `mayUseGlobalKey`, the
+  /// user's own otherwise. Throws [NoApiKeyException] when that source has
+  /// nothing to offer, so a call never quietly runs on a key the account is
+  /// not entitled to. Without a seam, the school's build-time key.
+  @visibleForTesting
+  String resolveApiKey() {
+    final source = _apiKeySource();
+    final key = source.key;
+    if (key == null || key.isEmpty) throw NoApiKeyException(source);
+    return key;
+  }
+
+  ApiKeySource _apiKeySource() => _getApiKey?.call() ?? SchoolKey(Env.apiKey);
 
   /// Model the next call goes to: this device's override (#32) when the user
   /// picked one, else the school-wide `GlobalConfig.Model`, else the

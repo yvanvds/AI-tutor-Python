@@ -14,9 +14,11 @@
 // the system locale, the system light/dark setting, SharedPreferences
 // (in-memory), the playground file directory (temp), the update check (off)
 // and its native fallback transport (none — see [AppHarness.nativeGet]),
-// the LLM (any call fails loudly unless a flow passes `llm:`), the lesson
-// example runner (scripted), the browser launcher (recorded, never opened
-// — see [browserLaunches]) and the sound effects (silent — see [_NoSound]).
+// the LLM (any call fails loudly unless a flow passes `llm:` or
+// `openaiClient:`), the school's OpenAI key (a fixed string — see
+// [kSchoolApiKey]), the lesson example runner (scripted), the browser
+// launcher (recorded, never opened — see [browserLaunches]) and the sound
+// effects (silent — see [_NoSound]).
 //
 // The light/dark pin is not cosmetic (#32): with no stored preference the app
 // follows the operating system, so an unpinned run renders in whatever theme
@@ -51,10 +53,12 @@ import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,6 +69,11 @@ import 'fake_github_server.dart';
 import 'fake_release_server.dart';
 import 'scripted_llm.dart';
 import 'seed.dart';
+
+/// The school's OpenAI key as every flow sees it (#126). Pinned in place of
+/// the build's real `Env.apiKey` so a flow can assert on the key a request
+/// carried without the developer's own key ever appearing in a test.
+const String kSchoolApiKey = 'sk-school-key';
 
 /// Signed in from the first frame; `tryAcquireTokenSilent` / `signIn` are
 /// never reached. `signOut` still works so a sign-out flow can be driven.
@@ -153,11 +162,16 @@ class AppHarness {
     this.github,
     this.githubOAuthClientId,
     this.llm,
+    this.openaiClient,
     this.developerTools,
     this.supervision,
     this.extraDocs = const {},
     Map<String, LessonRunResult> lessonResults = const {},
-  }) : lessonRunner = FakeLessonCodeRunner(results: lessonResults);
+  }) : assert(
+         llm == null || openaiClient == null,
+         'llm: replaces the connectors, openaiClient: keeps them; pick one',
+       ),
+       lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
   final AccountIdentity identity;
 
@@ -250,6 +264,20 @@ class AppHarness {
   /// assistant text.
   final ScriptedLlm? llm;
 
+  /// OpenAI as an HTTP endpoint, for a flow about what the app puts *on the
+  /// wire* (#126).
+  ///
+  /// Where [llm] swaps the connectors for a scripted stand-in, this leaves
+  /// the production wiring in place — the tutor's connector, the grade
+  /// justification's and the Test button's, each built the way `lib/`
+  /// builds it, resolving its key through `tutorApiKeyProvider` — and only
+  /// replaces the socket underneath, through `openaiClientProvider`. Pass a
+  /// `FakeOpenAi().client` (test/helpers) to read back every request the
+  /// real app made, header and body, and to answer it. Mounting the practice
+  /// editor then really asks the model for an exercise, so the client has to
+  /// be ready to answer one.
+  final http.Client? openaiClient;
+
   /// Whether developer-only surfaces (the instructions editor, the developer
   /// card and — on its own — the AI model card in Options) are exposed.
   ///
@@ -300,7 +328,11 @@ class AppHarness {
   /// widgets do (e.g. `harness.container.read(codeServiceProvider(mode))`).
   ProviderContainer get container => _container!;
 
-  Future<void> boot(WidgetTester tester) async {
+  /// Boots the app and, by default, waits for the shell — the screen every
+  /// flow on a seeded account lands on. A flow about the screens *before*
+  /// the shell (the local-key gate, #126) passes `waitForShell: false` and
+  /// waits for what it expects itself.
+  Future<void> boot(WidgetTester tester, {bool waitForShell = true}) async {
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
     for (final entry in extraDocs.entries) {
@@ -310,21 +342,33 @@ class AppHarness {
     }
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
 
+    final openaiClient = this.openaiClient;
     _container = ProviderContainer(
       overrides: [
         authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
-        tutorServiceProvider.overrideWith(
-          llm == null
-              ? _OfflineTutor.new
-              : () => TutorService(connectorOverride: llm!),
-        ),
-        // The grade justification (#99) has its own connector; the same
-        // scripted model stands in for it, and with no script it fails
-        // loudly like every other LLM call.
-        gradeJustificationConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
-        // So does the Test button behind the model fields in Options (#125):
-        // `ScriptedLlm.probeResults` says what each id answers.
-        modelProbeConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
+        // Never the build's real key (#126): the school-key account's calls
+        // are asserted against this string, and a developer's own key must
+        // not leak into a test.
+        schoolApiKeyProvider.overrideWithValue(kSchoolApiKey),
+        if (openaiClient != null)
+          // The production connectors, over a scripted socket.
+          openaiClientProvider.overrideWithValue(openaiClient)
+        else ...[
+          tutorServiceProvider.overrideWith(
+            llm == null
+                ? _OfflineTutor.new
+                : () => TutorService(connectorOverride: llm!),
+          ),
+          // The grade justification (#99) has its own connector; the same
+          // scripted model stands in for it, and with no script it fails
+          // loudly like every other LLM call.
+          gradeJustificationConnectorProvider.overrideWithValue(
+            llm ?? _NoLlm(),
+          ),
+          // So does the Test button behind the model fields in Options
+          // (#125): `ScriptedLlm.probeResults` says what each id answers.
+          modelProbeConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
+        ],
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
@@ -371,7 +415,12 @@ class AppHarness {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const GoalsApp()),
     );
-    await pumpUntil(tester, () => find.byType(AppShell).evaluate().isNotEmpty);
+    if (waitForShell) {
+      await pumpUntil(
+        tester,
+        () => find.byType(AppShell).evaluate().isNotEmpty,
+      );
+    }
   }
 
   /// Unmounts the app and tears down services, timers and temp files.
