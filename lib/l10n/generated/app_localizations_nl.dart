@@ -37,6 +37,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_map => 'Leerpad';
 
   @override
+  String get sidebar_section_puntenformule => 'Puntenformule';
+
+  @override
   String get sidebar_section_goals => 'Doelen';
 
   @override
@@ -53,6 +56,18 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get sidebar_section_options => 'Opties';
+
+  @override
+  String get puntenformule_header_note =>
+      'Hoe je rapportcijfer tot stand komt. Het document is openbaar en geversioneerd; dit is de versie die deze build van de app meebrengt.';
+
+  @override
+  String get puntenformule_loading => 'Puntenformule laden…';
+
+  @override
+  String puntenformule_loadError(String error) {
+    return 'De puntenformule kon niet geladen worden: $error';
+  }
 
   @override
   String get milestones_page_title => 'Mijlpalen';

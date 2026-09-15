@@ -37,6 +37,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_map => 'Learning path';
 
   @override
+  String get sidebar_section_puntenformule => 'Grade formula';
+
+  @override
   String get sidebar_section_goals => 'Goals';
 
   @override
@@ -53,6 +56,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebar_section_options => 'Options';
+
+  @override
+  String get puntenformule_header_note =>
+      'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.';
+
+  @override
+  String get puntenformule_loading => 'Loading the grade formula…';
+
+  @override
+  String puntenformule_loadError(String error) {
+    return 'The grade formula could not be loaded: $error';
+  }
 
   @override
   String get milestones_page_title => 'Milestones';

@@ -10,7 +10,13 @@ const double sidebarWidth = 72;
 class Sidebar extends ConsumerWidget {
   const Sidebar({super.key});
 
-  static const _studentSections = [Section.session, Section.map];
+  // Everyone gets the grade formula (#129): it is written for students,
+  // and a teacher reads the same document the students do.
+  static const _studentSections = [
+    Section.session,
+    Section.map,
+    Section.puntenformule,
+  ];
 
   static const _teacherSections = [
     Section.goals,
@@ -88,6 +94,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.terminal_outlined;
       case Section.map:
         return Icons.insights_outlined;
+      case Section.puntenformule:
+        return Icons.calculate_outlined;
       case Section.goals:
         return Icons.flag_outlined;
       case Section.lessonContent:

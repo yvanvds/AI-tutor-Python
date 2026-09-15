@@ -19,12 +19,20 @@
 
   "sidebar_section_session": "Session",
   "sidebar_section_map": "Learning path",
+  "sidebar_section_puntenformule": "Grade formula",
   "sidebar_section_goals": "Goals",
   "sidebar_section_lessonContent": "Lesson content",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
   "sidebar_section_milestones": "Milestones",
   "sidebar_section_options": "Options",
+
+  "puntenformule_header_note": "How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.",
+  "puntenformule_loading": "Loading the grade formula…",
+  "puntenformule_loadError": "The grade formula could not be loaded: {error}",
+  "@puntenformule_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "milestones_page_title": "Milestones",
   "milestones_page_subtitle": "Which goals should be known by which report date, and which of them gate the pass mark.",

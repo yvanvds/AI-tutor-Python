@@ -39,6 +39,7 @@ import 'flows/period_start_snapshot.dart' as period_start_snapshot;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
+import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
@@ -79,6 +80,7 @@ void main() {
   quiz_ligatures.main();
   playground_during_mcq.main();
   turtle_run_notice.main();
+  puntenformule_tab.main();
   options_panel.main();
   own_key.main();
   level_up_gate.main();

@@ -13,10 +13,15 @@
 
   "sidebar_section_session": "Sessie",
   "sidebar_section_map": "Leerpad",
+  "sidebar_section_puntenformule": "Puntenformule",
   "sidebar_section_goals": "Doelen",
   "sidebar_section_lessonContent": "Lesinhoud",
   "sidebar_section_instructions": "Instructies",
   "sidebar_section_milestones": "Mijlpalen",
+
+  "puntenformule_header_note": "Hoe je rapportcijfer tot stand komt. Het document is openbaar en geversioneerd; dit is de versie die deze build van de app meebrengt.",
+  "puntenformule_loading": "Puntenformule laden…",
+  "puntenformule_loadError": "De puntenformule kon niet geladen worden: {error}",
 
   "milestones_page_title": "Mijlpalen",
   "milestones_page_subtitle": "Welke doelen tegen welk rapportmoment gekend horen te zijn, en welke daarvan de 50 openen.",

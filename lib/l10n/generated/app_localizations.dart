@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Learning path'**
   String get sidebar_section_map;
 
+  /// No description provided for @sidebar_section_puntenformule.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade formula'**
+  String get sidebar_section_puntenformule;
+
   /// No description provided for @sidebar_section_goals.
   ///
   /// In en, this message translates to:
@@ -187,6 +193,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Options'**
   String get sidebar_section_options;
+
+  /// No description provided for @puntenformule_header_note.
+  ///
+  /// In en, this message translates to:
+  /// **'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.'**
+  String get puntenformule_header_note;
+
+  /// No description provided for @puntenformule_loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the grade formula…'**
+  String get puntenformule_loading;
+
+  /// No description provided for @puntenformule_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade formula could not be loaded: {error}'**
+  String puntenformule_loadError(String error);
 
   /// No description provided for @milestones_page_title.
   ///
