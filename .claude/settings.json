@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(gh pr merge *)",
       "Bash(gh pr merge:*)",
@@ -7,7 +8,26 @@
       "Skill(projcect-overview-bootstrap)",
       "Skill(projcect-overview-bootstrap:*)",
       "Read(//c/Users/yvan/AppData/Local/Pub/Cache/**)",
-      "Read(//c/tools/flutter/packages/flutter/lib/src/**)"
+      "Read(//c/tools/flutter/packages/flutter/lib/src/**)",
+      "Bash(gh run watch *)",
+      "Bash(flutter analyze *)",
+      "PowerShell(git status *)",
+      "PowerShell(git log *)",
+      "PowerShell(git fetch *)",
+      "PowerShell(git tag --list *)",
+      "PowerShell(gh auth status)",
+      "PowerShell(gh release view *)",
+      "PowerShell(flutter --version)",
+      "PowerShell(winget list *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Select-Object *)",
+      "PowerShell(Where-Object *)",
+      "PowerShell(ForEach-Object *)",
+      "PowerShell(Write-Host *)"
     ]
   }
 }
