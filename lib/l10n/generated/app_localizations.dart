@@ -1915,6 +1915,12 @@ abstract class AppLocalizations {
   /// **'Type your question or answer…'**
   String get chat_composer_idle_hint;
 
+  /// Hint in the chat input while a theory page is on screen: a question typed now is answered about that page (#132)
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a question about this explanation…'**
+  String get chat_composer_idle_pageHint;
+
   /// No description provided for @chat_composer_idle_kbd_send.
   ///
   /// In en, this message translates to:

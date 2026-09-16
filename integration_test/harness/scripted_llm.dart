@@ -32,9 +32,10 @@ class ScriptedLlm extends OpenaiConnector {
   int sends = 0;
   int resends = 0;
 
-  /// The user-turn payload of every non-streaming request, in order — a
+  /// The user-turn payload of every request, streaming or not, in order — a
   /// flow asserts on what the app *told* the model (#99: the grade
-  /// justification prompt carries the computed number as a fixed fact).
+  /// justification prompt carries the computed number as a fixed fact;
+  /// #132: a question typed on a theory page carries the page).
   final List<String> sentInputs = <String>[];
 
   /// The system prompt of every request, streaming or not, in order — a flow
@@ -73,6 +74,7 @@ class ScriptedLlm extends OpenaiConnector {
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) {
     sends++;
+    sentInputs.add(input);
     sentInstructions.add(instructions);
     return _play(input);
   }

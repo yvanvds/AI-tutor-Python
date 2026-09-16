@@ -335,6 +335,7 @@
   "chat_header_collapse_tooltip": "Verberg chat",
   "chat_panel_expand_tooltip": "Toon chat",
   "chat_composer_idle_hint": "Typ je vraag of antwoord…",
+  "chat_composer_idle_pageHint": "Stel een vraag over deze uitleg…",
   "chat_composer_idle_kbd_send": "verstuur",
   "chat_composer_idle_kbd_newline": "nieuwe regel",
   "chat_composer_idle_tip_prefix": "tip: typ ",

@@ -611,6 +611,10 @@
     "description": "Tooltip of the one button on the folded chat strip, which brings the full chat panel back"
   },
   "chat_composer_idle_hint": "Type your question or answer…",
+  "chat_composer_idle_pageHint": "Ask a question about this explanation…",
+  "@chat_composer_idle_pageHint": {
+    "description": "Hint in the chat input while a theory page is on screen: a question typed now is answered about that page (#132)"
+  },
   "chat_composer_idle_kbd_send": "send",
   "chat_composer_idle_kbd_newline": "new line",
   "chat_composer_idle_tip_prefix": "tip: type ",

@@ -95,4 +95,25 @@ void main() {
     expect(m.containsKey('target_los'), isFalse);
     expect(m['difficulty'], 'hard');
   });
+
+  test('contentQuestion carries the question and the page as text, and '
+      'nothing a grader would read (#132)', () {
+    const page = 'Zo toon je iets op het scherm.\n\n```\nprint(1, 2)\n```';
+    final raw = QuestionFormatter.contentQuestion(
+      'Waarom staat er een komma?',
+      contentTitle: 'Print',
+      contentText: page,
+    );
+    final m = jsonDecode(raw) as Map<String, dynamic>;
+    expect(m, {
+      'request_type': 'content_question',
+      'question': 'Waarom staat er een komma?',
+      'content_title': 'Print',
+      'content': page,
+    });
+    expect(m.containsKey('target_los'), isFalse);
+    expect(m.containsKey('goal_scope_los'), isFalse);
+    expect(m.containsKey('difficulty'), isFalse);
+    expect(m.containsKey('code'), isFalse);
+  });
 }

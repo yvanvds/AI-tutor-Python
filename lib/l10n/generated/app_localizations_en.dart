@@ -1108,6 +1108,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_composer_idle_hint => 'Type your question or answer…';
 
   @override
+  String get chat_composer_idle_pageHint =>
+      'Ask a question about this explanation…';
+
+  @override
   String get chat_composer_idle_kbd_send => 'send';
 
   @override

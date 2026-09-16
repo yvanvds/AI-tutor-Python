@@ -61,6 +61,38 @@ Never translate the machine parts: META's JSON keys and enum values (including "
 ''';
 }
 
+/// What the model is told on a `contentQuestion` turn (#132) until the
+/// teacher authors an instruction doc with that id — the seed text, and the
+/// one request type that ships with a default. The other types have always
+/// had a teacher-authored doc; this one is new, and a question about the
+/// page must land as a plain `answer` from the first launch, not as an
+/// exercise or a grade because the model was told nothing.
+///
+/// Rendered through the same tag replacement as a teacher doc, so
+/// `{goal}`, `{subgoal}` and `{teachingTips}` name the page's subgoal.
+const String defaultContentQuestionInstruction = '''
+### CONTENT QUESTION
+
+The student is reading the lesson page given in `content` (its title in `content_title`) and asks a question about it. The page belongs to the subgoal "{subgoal}" of the goal "{goal}".
+Answer from the page, quoting it where that helps. If the page does not answer the question, say so and answer briefly anyway.
+Do not start an exercise, do not grade, do not ask a follow-up question.
+
+### TEXT section
+
+The answer, in markdown. Keep it short.
+
+### META section (JSON)
+
+{"type": "answer"}
+''';
+
+/// Type-specific instruction bodies that ship with the app, keyed by the
+/// instruction doc id a teacher would author to replace them. Only consulted
+/// when no doc with that id exists.
+const Map<String, String> builtInInstructions = {
+  'contentQuestion': defaultContentQuestionInstruction,
+};
+
 class InstructionGenerator {
   Future<String> generateInstructions(
     ChatRequestType type, {
@@ -116,6 +148,20 @@ class InstructionGenerator {
           alwaysInclude += '$processed\n';
         }
       }
+    }
+
+    // A type the teacher has not written a doc for yet falls back to the
+    // body that ships with the app, if there is one (#132).
+    final builtIn = builtInInstructions[typeString];
+    if (typeSpecific.isEmpty && builtIn != null) {
+      final processed = _replaceTags(
+        builtIn,
+        root,
+        subgoal,
+        targetLOs: targetLOs,
+        goalScopeLOs: goalScopeLOs,
+      );
+      typeSpecific = '$processed\n';
     }
 
     // The language directive goes last, after the teacher-authored bodies it

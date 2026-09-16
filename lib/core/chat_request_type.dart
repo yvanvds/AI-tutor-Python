@@ -8,6 +8,12 @@ enum ChatRequestType {
   mcqAnswer,
   requestHint,
   studentQuestion,
+
+  /// A question typed while a theory page is on screen (#132). The page's
+  /// text goes along with the question (LLM_CONTRACT "Content question"),
+  /// the reply is a plain `answer`, and nothing is graded: the exercise in
+  /// flight, if any, stays pending.
+  contentQuestion,
   explainAnswer,
   socraticFeedback,
 

@@ -1119,6 +1119,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get chat_composer_idle_hint => 'Typ je vraag of antwoord…';
 
   @override
+  String get chat_composer_idle_pageHint => 'Stel een vraag over deze uitleg…';
+
+  @override
   String get chat_composer_idle_kbd_send => 'verstuur';
 
   @override
