@@ -63,6 +63,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
+import 'package:path/path.dart' as p;
 import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -510,9 +511,63 @@ class AppHarness {
     await tester.pumpWidget(const SizedBox.shrink());
     _container?.dispose();
     _container = null;
-    if (playgroundDir.existsSync()) {
-      playgroundDir.deleteSync(recursive: true);
+    await _deletePlaygroundDir();
+  }
+
+  /// How long [_deletePlaygroundDir] waits for a write that is still
+  /// closing. Far above the `flush` and `close` it waits out — hundreds of
+  /// milliseconds on the hosted runner at worst — and a handle that is
+  /// genuinely leaked never closes, so this is also how long a leak takes
+  /// to fail.
+  static const Duration _deleteTimeout = Duration(seconds: 5);
+
+  /// Deletes [playgroundDir], waiting out the app's last write to it.
+  ///
+  /// That write can outlive a flow (#143). A save goes to disk, then to the
+  /// account, and only then does the sync layer record the stamp it agreed
+  /// with in its sidecar (`_sync.json`: `PlaygroundSyncService.push` →
+  /// `PlaygroundFileStore.writeSyncMeta`) — after the account write a flow
+  /// waits on, with nothing left for the flow to observe. On Windows a file
+  /// whose handle is still open — in that write's `flush` or `close`, which
+  /// the runner's disk and its scan-on-close stretch to hundreds of
+  /// milliseconds — cannot be deleted (a sharing violation, errno 32), and
+  /// neither can its directory, which is how a single `deleteSync` here
+  /// failed the sweep. So the delete is retried until [_deleteTimeout], and
+  /// when it still fails the failure names the files that are held — the
+  /// recursive delete only ever names the directory, after it has already
+  /// removed every sibling that was free.
+  Future<void> _deletePlaygroundDir() async {
+    if (!playgroundDir.existsSync()) return;
+    final deadline = DateTime.now().add(_deleteTimeout);
+    while (true) {
+      try {
+        playgroundDir.deleteSync(recursive: true);
+        return;
+      } on FileSystemException catch (e) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail(
+            '${playgroundDir.path} still held after $_deleteTimeout — '
+            '${_heldFiles().join(', ')}: $e',
+          );
+        }
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+  }
+
+  /// The files in [playgroundDir] that refuse to be deleted, by name. Only
+  /// asked once the wait has been given up on: whatever it can delete on
+  /// the way, it does.
+  List<String> _heldFiles() {
+    final held = <String>[];
+    for (final file in playgroundDir.listSync().whereType<File>()) {
+      try {
+        file.deleteSync();
+      } on FileSystemException {
+        held.add(p.basename(file.path));
+      }
+    }
+    return held;
   }
 }
 

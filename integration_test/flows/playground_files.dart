@@ -16,6 +16,7 @@ import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
 import 'package:ai_tutor_python/services/playground/playground_files_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,6 +182,20 @@ void main() {
       );
       expect(saved.code, _code);
       expect(saved.deleted, isFalse);
+      // The account write is not the app's last write for this save: the
+      // sync layer then records the stamp it agreed with in its sidecar,
+      // on disk next to the file (#31). Waited for, so the flow ends after
+      // that write and not in the middle of it (#143) — its `close` can
+      // still be in flight, which `dispose` waits out.
+      final index = File(
+        p.join(harness.playgroundDir.path, PlaygroundFileStore.syncMetaFile),
+      );
+      await pumpUntil(
+        tester,
+        () =>
+            index.existsSync() && index.readAsStringSync().contains('"loops"'),
+        reason: 'the save was not recorded in the sync index',
+      );
       await pumpUntilGone(tester, find.byType(AlertDialog));
 
       await harness.dispose(tester);
