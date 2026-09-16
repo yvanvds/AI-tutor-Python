@@ -834,7 +834,7 @@ class TutorService extends Notifier<TutorState> {
     if (failed != null) {
       _chat.failStream();
       _chat.addSystemNotice(_tutorFailed(failed.notice));
-      await _maybeRetryStream();
+      if (_worthRetrying(failed.notice)) await _maybeRetryStream();
       return;
     }
 
@@ -1196,8 +1196,20 @@ class TutorService extends Notifier<TutorState> {
         await _handleResponse(output);
       case ConnectorFailure(:final notice):
         _chat.addSystemNotice(_tutorFailed(notice));
-        await _maybeRetry();
+        if (_worthRetrying(notice)) await _maybeRetry();
     }
+  }
+
+  /// Whether the automatic retry can help the turn that just failed with
+  /// [notice] (#134). A timeout or a dropped socket may well go through the
+  /// second time. A key problem (#126) cannot: the same key — or none at
+  /// all — would go out again and the same refusal come back, so re-sending
+  /// only shows the student the same pill twice and costs a round trip.
+  /// The skip is on the debug log, next to where a retry would have been.
+  bool _worthRetrying(ChatNotice notice) {
+    if (!OpenaiConnector.isKeyFailure(notice)) return true;
+    _debug.recordEvent('tutor.retry_skipped', {'notice': notice.kind.name});
+    return false;
   }
 
   Future<void> _maybeRetry() async {

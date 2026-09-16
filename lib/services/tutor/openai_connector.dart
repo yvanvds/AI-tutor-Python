@@ -400,6 +400,19 @@ class OpenaiConnector {
         SchoolKey() => const ChatNotice(ChatNoticeKind.schoolKeyInvalid),
       };
 
+  /// Whether [notice] is one of the key problems [_keyNotice] reports: the
+  /// account has no key to call with, or OpenAI refused the one it has.
+  /// Re-sending such a turn as it is cannot help — the same key, or none,
+  /// goes out again and the same refusal comes back — which is why the
+  /// tutor's automatic retry skips it (#134); a timeout or a dropped socket
+  /// may well go through the second time and is retried as before.
+  static bool isKeyFailure(ChatNotice notice) => switch (notice.kind) {
+    ChatNoticeKind.ownKeyMissing ||
+    ChatNoticeKind.ownKeyRejected ||
+    ChatNoticeKind.schoolKeyInvalid => true,
+    _ => false,
+  };
+
   /// The one user message the Test button sends (#125). Tiny on purpose: the
   /// point is the round trip, not the answer.
   static const String probePrompt = 'Reply with the single word OK.';

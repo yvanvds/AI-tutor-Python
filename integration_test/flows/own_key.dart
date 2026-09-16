@@ -14,7 +14,9 @@
 //     school's key is on the wire, the stray one ignored;
 //   - own-key account whose key OpenAI refuses: the chat says so and points
 //     at Options, and the Test button in Options says the same — the
-//     student's key, not the school's, is what is wrong.
+//     student's key, not the school's, is what is wrong. Once, on one
+//     request: the tutor does not re-send a turn a key problem failed
+//     (#134).
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -28,6 +30,7 @@ import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -213,9 +216,19 @@ void main() {
     );
     // Not the API's own line, which names a key the student cannot change.
     expect(_pills(tester).any((p) => p.contains('Incorrect API key')), isFalse);
-    // Every attempt (the first and the app's one retry) went out on the
-    // student's key.
-    expect(openai.bearers, everyElement('Bearer $_ownKey'));
+    // The turn is over once the tutor is idle again — which is when the
+    // automatic retry, had there been one, would have gone out too.
+    await pumpUntil(
+      tester,
+      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+      timeout: const Duration(seconds: 30),
+      reason: 'the tutor never went idle after the refused request',
+    );
+    // Exactly one request, on the student's key, and one pill for it: the
+    // tutor's automatic retry is skipped for a key OpenAI refused (#134),
+    // since the same key would only be refused again.
+    expect(openai.bearers, ['Bearer $_ownKey']);
+    expect(_pills(tester).where((p) => p == expected).length, 1);
 
     // The Test button behind the model field runs on the same key and says
     // the same thing.
