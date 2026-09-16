@@ -149,10 +149,14 @@ class FakeReleaseServer {
   /// links name instead of the server's own — for a flow that puts a proxy
   /// between the app and this server (#133), it is the address only the
   /// proxy has a route to.
+  /// [notes] is the release body — what GitHub returns as `body`, Markdown
+  /// by origin. A flow that shows the notes (#119, #130, #137) publishes a
+  /// body with some Markdown in it; the default is one plain sentence.
   static Future<FakeReleaseServer> start({
     int status = HttpStatus.ok,
     String? rawBody,
     String version = '99.0.0+1',
+    String? notes,
     bool withInstallerAsset = true,
     bool withChecksumAsset = true,
     bool checksumBom = false,
@@ -198,7 +202,7 @@ class FakeReleaseServer {
         rawBody ??
         jsonEncode(<String, Object?>{
           'tag_name': 'v$version',
-          'body': 'What changed in $version.',
+          'body': notes ?? 'What changed in $version.',
           'html_url': '$base/releases/tag/v$version',
           'assets': assets,
         });

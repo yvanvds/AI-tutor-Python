@@ -25,6 +25,11 @@
 // by tag on the same server the update check uses. A fourth pins the 404: a
 // version nobody released — every dev build — gets a snack, not a card.
 //
+// The body the server publishes has Markdown in it — a `-` list, a `**bold**`
+// word — the way real release bodies do, and every card is checked to have
+// rendered it as such (#137): the words, no markers, real bullets, real
+// weight. What goes to disk between the two legs is still the raw body.
+//
 // The installer launcher is replaced by the harness in every flow (it spawns
 // a real setup and calls `exit(0)`), and the second leg stands in for the
 // restart by booting a fresh app pinned to the version the installer would
@@ -41,9 +46,11 @@ import 'dart:typed_data';
 
 import 'package:ai_tutor_python/core/whats_new_store.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
+import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gpt_markdown/custom_widgets/unordered_ordered_list.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,8 +59,12 @@ import '../harness/fake_release_server.dart';
 
 const String _installedVersion = '99.0.0+1';
 
-/// What `FakeReleaseServer` publishes as the release body for that version.
-const String _publishedNotes = 'What changed in $_installedVersion.';
+/// What `FakeReleaseServer` publishes as the release body for that version:
+/// Markdown, as a GitHub release body is (#137).
+const String _publishedNotes =
+    'What changed in $_installedVersion.\n\n'
+    '- **Faster** quizzes\n'
+    '- Clearer hints';
 
 final _applyButton = find.byKey(const ValueKey('update-offer-apply'));
 final _overlay = find.byKey(const ValueKey('whats-new-overlay'));
@@ -61,6 +72,57 @@ final _title = find.byKey(const ValueKey('whats-new-title'));
 final _notes = find.byKey(const ValueKey('whats-new-notes'));
 final _dismiss = find.byKey(const ValueKey('whats-new-dismiss'));
 final _whatsNewButton = find.byKey(const ValueKey('about-whats-new'));
+
+/// Text under the notes key. Rendered Markdown is `RichText`, which a plain
+/// `find.text` never sees.
+Finder _inNotes(String text) => find.descendant(
+  of: _notes,
+  matching: find.textContaining(text, findRichText: true),
+);
+
+/// The card is up with the published notes, rendered as Markdown (#137):
+/// the words are on screen without the syntax around them, each `-` line
+/// is a bullet, and the `**bold**` word is painted bold.
+void _expectNotesShown(WidgetTester tester) {
+  expect(tester.widget<Text>(_title).data, "What's new in $_installedVersion");
+  expect(_inNotes('What changed in $_installedVersion.'), findsOneWidget);
+  expect(_inNotes('Faster quizzes'), findsOneWidget);
+  expect(_inNotes('Clearer hints'), findsOneWidget);
+  expect(_inNotes('**'), findsNothing);
+  expect(_inNotes('- '), findsNothing);
+  expect(tester.widget<TutorMarkdown>(_notes).text, _publishedNotes);
+  expect(
+    find.descendant(of: _notes, matching: find.byType(UnorderedListView)),
+    findsNWidgets(2),
+  );
+  expect(_boldRuns(tester), ['Faster']);
+}
+
+/// The runs of text under the notes key that are painted bold — the span
+/// tree's styles merged down to each leaf, the way the paragraph paints it.
+List<String> _boldRuns(WidgetTester tester) {
+  final bold = <String>[];
+  void walk(InlineSpan span, TextStyle inherited) {
+    final style = inherited.merge(span.style);
+    if (span is! TextSpan) return;
+    final text = span.text;
+    if (text != null &&
+        text.isNotEmpty &&
+        style.fontWeight == FontWeight.bold) {
+      bold.add(text);
+    }
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      walk(child, style);
+    }
+  }
+
+  for (final rich in tester.widgetList<RichText>(
+    find.descendant(of: _notes, matching: find.byType(RichText)),
+  )) {
+    walk(rich.text, const TextStyle());
+  }
+  return bold;
+}
 
 /// The stash as it stands on disk, in the shape `AppHarness.prefs` seeds a
 /// launch from — so a leg can hand the next boot literally what the previous
@@ -110,6 +172,7 @@ void main() {
     );
     final server = await FakeReleaseServer.start(
       version: _installedVersion,
+      notes: _publishedNotes,
       installerBytes: installerBytes,
       installerSha256: sha256.convert(installerBytes).toString(),
     );
@@ -150,7 +213,10 @@ void main() {
     // The server is there to prove a negative: the button must not ask it
     // for notes the updater already left on disk. The launch check stays
     // off (`forceUpdateCheck: false`) so the boot does not reach it either.
-    final server = await FakeReleaseServer.start(version: _installedVersion);
+    final server = await FakeReleaseServer.start(
+      version: _installedVersion,
+      notes: _publishedNotes,
+    );
 
     // The restart, stood in for: a fresh app that reports the version the
     // installer put down, starting from exactly the stash the previous leg
@@ -167,11 +233,7 @@ void main() {
     await harness.boot(tester);
 
     await pumpUntilFound(tester, _overlay);
-    expect(
-      tester.widget<Text>(_title).data,
-      "What's new in $_installedVersion",
-    );
-    expect(tester.widget<Text>(_notes).data, _publishedNotes);
+    _expectNotesShown(tester);
 
     // Clicking it away marks the stash seen — and keeps it (#130).
     await tester.tap(_dismiss);
@@ -186,11 +248,7 @@ void main() {
     // one request to the release server.
     await _openFromAbout(tester);
     await pumpUntilFound(tester, _overlay);
-    expect(
-      tester.widget<Text>(_title).data,
-      "What's new in $_installedVersion",
-    );
-    expect(tester.widget<Text>(_notes).data, _publishedNotes);
+    _expectNotesShown(tester);
     expect(
       server.tagRequests,
       0,
@@ -225,7 +283,10 @@ void main() {
     // A build installed by hand, or a cleared preference file: the updater
     // left nothing, so the button has to ask the release server — the same
     // one the update check uses — for the release under this version's tag.
-    final server = await FakeReleaseServer.start(version: _installedVersion);
+    final server = await FakeReleaseServer.start(
+      version: _installedVersion,
+      notes: _publishedNotes,
+    );
     final harness = AppHarness(
       appVersion: _installedVersion,
       updateFeedUrl: server.feedUrl,
@@ -244,11 +305,7 @@ void main() {
       reason: 'the button never looked the running version up',
     );
     await pumpUntilFound(tester, _overlay);
-    expect(
-      tester.widget<Text>(_title).data,
-      "What's new in $_installedVersion",
-    );
-    expect(tester.widget<Text>(_notes).data, _publishedNotes);
+    _expectNotesShown(tester);
     expect(server.tagRequests, 1);
     expect(
       server.releaseRequests,
@@ -268,7 +325,10 @@ void main() {
   ) async {
     // Every dev build: `kAppVersion` is ahead of the newest tag, so the
     // lookup is a 404 and About has to say so instead of showing nothing.
-    final server = await FakeReleaseServer.start(version: _installedVersion);
+    final server = await FakeReleaseServer.start(
+      version: _installedVersion,
+      notes: _publishedNotes,
+    );
     final harness = AppHarness(
       appVersion: '99.1.0+2',
       updateFeedUrl: server.feedUrl,

@@ -55,8 +55,8 @@ class ReleaseNotes {
   /// The version the app came back as — `99.0.0+1`, no leading `v`.
   final String version;
 
-  /// The body of the GitHub release, verbatim. Markdown by origin; rendered
-  /// as plain text by the overlay (see `whats_new_overlay.dart`).
+  /// The body of the GitHub release, verbatim. Markdown by origin, and
+  /// rendered as Markdown by the overlay (see `whats_new_overlay.dart`).
   final String notes;
 }
 
