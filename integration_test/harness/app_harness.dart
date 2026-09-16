@@ -12,10 +12,11 @@
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the system locale, the system light/dark setting, SharedPreferences
-// (in-memory), the playground file directory (temp), the update check (off)
-// and its native fallback transport (none — see [AppHarness.nativeGet]),
-// the LLM (any call fails loudly unless a flow passes `llm:` or
-// `openaiClient:`), the school's OpenAI key (a fixed string — see
+// (in-memory), the playground file directory (temp), the update check (off),
+// its native fallback transport (none — see [AppHarness.nativeGet]) and the
+// proxy it would go through (none — see [AppHarness.proxy]), the LLM (any
+// call fails loudly unless a flow passes `llm:` or `openaiClient:`), the
+// school's OpenAI key (a fixed string — see
 // [kSchoolApiKey]), the lesson example runner (scripted), the browser
 // launcher (recorded, never opened — see [browserLaunches]) and the sound
 // effects (silent — see [_NoSound]).
@@ -36,6 +37,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -162,6 +164,7 @@ class AppHarness {
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
+    this.proxy,
     this.appVersion,
     this.prefs = const {},
     this.pyRunner,
@@ -207,6 +210,13 @@ class AppHarness {
   /// passes [TrustingLoopbackGet], which trusts that one certificate the way
   /// Schannel trusts a school filter's CA.
   final NativeGet? nativeGet;
+
+  /// The proxy the updater's requests go through (#133). `null` (the
+  /// default) pins it to none, so a test boot never depends on the machine
+  /// it runs on having a proxy set — the production wiring would read the
+  /// environment and Internet Options. The proxy flow passes a loopback
+  /// `LoopbackProxy`, the one route to its release server.
+  final UpdateProxy? proxy;
 
   /// The version this build reports (#119). `null` (the default) leaves the
   /// real `kAppVersion` from `version.dart` in place, which is what every
@@ -411,6 +421,7 @@ class AppHarness {
           appVersionProvider.overrideWithValue(appVersion!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         nativeGetProvider.overrideWithValue(nativeGet),
+        updateProxyProvider.overrideWithValue(proxy),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
           // The real launcher never returns — it exits the process. Hanging
@@ -470,6 +481,12 @@ Future<void> pumpUntil(
 }
 
 /// Pumps until [finder] matches at least one widget.
+///
+/// The reason names the finder itself (`describeSelf`), not its last result:
+/// a plain `$finder` prints what the finder *found last time*, and a finder
+/// shared across the tests of one flow still holds the previous test's
+/// elements — unmounted with that test's app, and a null-check crash to
+/// describe (#133).
 Future<void> pumpUntilFound(
   WidgetTester tester,
   Finder finder, {
@@ -478,7 +495,7 @@ Future<void> pumpUntilFound(
   tester,
   () => finder.evaluate().isNotEmpty,
   timeout: timeout,
-  reason: 'nothing matched $finder',
+  reason: 'nothing matched ${finder.toString(describeSelf: true)}',
 );
 
 /// Pumps until [finder] matches nothing — e.g. a dialog route that is still
@@ -491,5 +508,5 @@ Future<void> pumpUntilGone(
   tester,
   () => finder.evaluate().isEmpty,
   timeout: timeout,
-  reason: 'still matched $finder',
+  reason: 'still matched ${finder.toString(describeSelf: true)}',
 );

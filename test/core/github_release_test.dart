@@ -7,6 +7,9 @@
 // handshake at all, which is what a school's TLS-inspecting filter does to
 // it. The check has to retry through the Windows-native seam — for exactly
 // that failure and no other.
+//
+// #133 the fourth: the client the check builds for itself has to go through
+// the machine's proxy, which `package:http`'s default one never does.
 
 import 'dart:async';
 import 'dart:convert';
@@ -14,9 +17,13 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/github_release.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import '../helpers/loopback_proxy.dart';
+import '../helpers/loopback_tls.dart';
 
 const String _installerUrl =
     'https://github.com/yvanvds/AI-tutor-Python/releases/download/'
@@ -604,6 +611,122 @@ void main() {
             'the seam was used for a failure '
             'that is not the certificate problem',
       );
+    });
+  });
+
+  // #133: on a network where only the proxy has a route out, the client the
+  // check builds for itself must go through it. The endpoint names a black
+  // hole — a direct dial connects and hears nothing, the production symptom
+  // — and the proxy routes that address to a loopback TLS server answering
+  // like GitHub. Dart trusts that server's certificate only inside
+  // `TrustLoopbackCertificate`, the test-side stand-in for a CA in the
+  // Windows root store; nothing in `lib/` is touched by it.
+  group('fetchLatestRelease — through the machine proxy', () {
+    late BlackHole hole;
+    late HttpServer github;
+    late LoopbackProxy proxy;
+    late Uri endpoint;
+
+    setUp(() async {
+      hole = await BlackHole.start();
+      github = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        SecurityContext()
+          ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+          ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+      );
+      github.listen((HttpRequest req) {
+        req.response.headers.contentType = ContentType.binary;
+        if (req.uri.path.endsWith('.sha256')) {
+          req.response.write('$_hash  $kInstallerAssetName\n');
+        } else {
+          req.response.write(
+            jsonEncode(
+              _releaseJson(
+                assets: [
+                  _asset(
+                    kInstallerAssetName,
+                    'https://${hole.authority}/$kInstallerAssetName',
+                  ),
+                  _asset(
+                    kChecksumAssetName,
+                    'https://${hole.authority}/$kChecksumAssetName',
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        req.response.close();
+      });
+      proxy = await LoopbackProxy.start(
+        routes: {hole.authority: '${github.address.address}:${github.port}'},
+      );
+      endpoint = Uri.parse('https://${hole.authority}/releases/latest');
+    });
+
+    tearDown(() async {
+      await proxy.close();
+      await github.close(force: true);
+      await hole.close();
+    });
+
+    test('the release and its checksum both arrive through it', () async {
+      final info = await HttpOverrides.runWithHttpOverrides(
+        () => fetchLatestRelease(endpoint, proxy: proxy.updateProxy),
+        TrustLoopbackCertificate(),
+      );
+      expect(info?.version, '2.0.0+18');
+      expect(info?.sha256, _hash);
+      expect(info?.viaNativeTransport, isFalse, reason: 'Dart got through');
+      expect(proxy.connects, everyElement(hole.authority));
+      expect(
+        proxy.connects.length,
+        greaterThanOrEqualTo(1),
+        reason: 'the check never went through the proxy',
+      );
+      expect(hole.connections, 0, reason: 'the check dialled out directly');
+    });
+
+    // The premise, and the symptom the issue was filed on: the same
+    // endpoint with no proxy is a ten-second silence.
+    test('without the proxy the same check times out', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => fetchLatestRelease(
+            endpoint,
+            timeout: const Duration(milliseconds: 300),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('timed out'),
+          ),
+        ),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
+    });
+
+    // A host on the bypass list goes direct — here, into the hole.
+    test('a bypassed host is dialled directly', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => fetchLatestRelease(
+            endpoint,
+            timeout: const Duration(milliseconds: 300),
+            proxy: UpdateProxy(proxy.updateProxy.url, bypass: const ['*']),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
     });
   });
 

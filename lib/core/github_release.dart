@@ -22,6 +22,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:http/http.dart' as http;
 import 'package:pub_semver/pub_semver.dart';
 
@@ -223,15 +224,22 @@ String? parseSha256Document(String body) {
 /// The release that comes back says so ([UpdateInfo.viaNativeTransport]) so
 /// the download can too. A 404, a timeout, a dead socket are not the
 /// certificate problem and are never retried natively.
+///
+/// [proxy] is the machine's proxy setting (#133), honoured when no [client]
+/// is given; [nativeGet] was built with the same one.
 Future<UpdateInfo?> fetchLatestRelease(
   Uri endpoint, {
   http.Client? client,
   Duration timeout = kUpdateRequestTimeout,
   NativeGet? nativeGet,
+  UpdateProxy? proxy,
   TransportLog? log,
 }) async {
   final bool owned = client == null;
-  final http.Client c = client ?? http.Client();
+  final http.Client c = client ?? httpClientVia(proxy);
+  if (owned && proxy != null) {
+    log?.call('Update: requests go through the proxy at ${proxy.redactedUrl}.');
+  }
   final _Transport transport = _Transport(
     c,
     timeout: timeout,
@@ -348,7 +356,10 @@ class _Transport {
       // `SocketException` and `HttpException`, so this arrives as itself.
       // Nothing else is retried natively — a 404, a timeout, a dead socket
       // are not the certificate problem, and the fallback would only mask
-      // them.
+      // them. That holds on a proxied network too (#133): both transports
+      // are handed the same proxy, so a request that times out through it
+      // here has nothing to gain from curl beyond a second wait of the same
+      // length, and a dead network would read as a slow one.
       final NativeGet? native = nativeGet;
       if (native == null) {
         throw UpdateCheckException('request to $url failed: $e');

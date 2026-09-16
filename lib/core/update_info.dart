@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:pub_semver/pub_semver.dart'; // add to pubspec
 import 'package:path/path.dart' as p;
 
@@ -68,6 +70,18 @@ typedef NativeGet = Future<http.Response> Function(
 
 /// Where a transport diagnostic goes when nothing is shown on screen.
 typedef TransportLog = void Function(String message);
+
+/// The client the updater's own requests are made with: Dart's `HttpClient`,
+/// told about [proxy] when there is one (#133).
+///
+/// `package:http`'s default client ignores every proxy setting a machine has;
+/// `IOClient` over a configured `HttpClient` is the documented way to give it
+/// one, and `UpdateProxy.findProxy` answers per URL so a bypassed host still
+/// goes direct. Without a proxy this is the plain client it always was.
+http.Client httpClientVia(UpdateProxy? proxy) {
+  if (proxy == null) return http.Client();
+  return IOClient(HttpClient()..findProxy = proxy.findProxy);
+}
 
 /// A release the app can offer: which version, which installer, and the
 /// hash the download has to match.
@@ -141,6 +155,9 @@ bool isNewer(String remote, String local) {
 /// for a download with no declared length. A 404, a timeout, a dead socket
 /// are not the certificate problem and are never retried natively — that
 /// would only hide what actually went wrong.
+///
+/// [proxy] is the machine's proxy setting (#133), honoured when no [client]
+/// is given; the native transport was built with the same one.
 Future<File> downloadToTemp(
   Uri url, {
   void Function(double fraction)? onProgress,
@@ -149,6 +166,7 @@ Future<File> downloadToTemp(
   Duration stallTimeout = kDownloadStallTimeout,
   NativeGet? nativeGet,
   bool preferNative = false,
+  UpdateProxy? proxy,
   TransportLog? log,
 }) async {
   final tmp = File(
@@ -159,7 +177,7 @@ Future<File> downloadToTemp(
   }
 
   final owned = client == null;
-  final c = client ?? http.Client();
+  final c = client ?? httpClientVia(proxy);
   try {
     final res = await c.send(http.Request('GET', url)).timeout(responseTimeout);
     if (res.statusCode != HttpStatus.ok) {

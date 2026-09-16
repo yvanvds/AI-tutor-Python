@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -7,6 +8,9 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import '../helpers/loopback_proxy.dart';
+import '../helpers/loopback_tls.dart';
 
 void main() {
   group('isNewer', () {
@@ -340,6 +344,83 @@ void main() {
       );
 
       expect(native.calls, isEmpty);
+    });
+  });
+
+  // #133: the installer comes down through the machine's proxy too — the
+  // download builds a client of its own, so it is a second place the setting
+  // has to reach. Same shape as the check's test in github_release_test.dart:
+  // the URL names a black hole, the proxy routes it to a loopback TLS server,
+  // and Dart trusts that certificate only inside `TrustLoopbackCertificate`.
+  group('downloadToTemp — through the machine proxy', () {
+    final installer = Uint8List.fromList(
+      List<int>.generate(16 * 1024, (i) => (i * 7) % 256),
+    );
+    late BlackHole hole;
+    late HttpServer server;
+    late LoopbackProxy proxy;
+    late Uri url;
+
+    setUp(() async {
+      hole = await BlackHole.start();
+      server = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        SecurityContext()
+          ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+          ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+      );
+      server.listen((HttpRequest req) {
+        req.response.headers.contentType = ContentType.binary;
+        req.response.contentLength = installer.length;
+        req.response.add(installer);
+        req.response.close();
+      });
+      proxy = await LoopbackProxy.start(
+        routes: {hole.authority: '${server.address.address}:${server.port}'},
+      );
+      url = Uri.parse('https://${hole.authority}/python_teacher_install.exe');
+    });
+
+    tearDown(() async {
+      await proxy.close();
+      await server.close(force: true);
+      await hole.close();
+    });
+
+    test('the installer arrives through it, with progress', () async {
+      final progress = <double>[];
+      final file = await HttpOverrides.runWithHttpOverrides(
+        () => downloadToTemp(
+          url,
+          proxy: proxy.updateProxy,
+          onProgress: progress.add,
+        ),
+        TrustLoopbackCertificate(),
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+      expect(file.readAsBytesSync(), installer);
+      expect(progress, isNotEmpty);
+      expect(progress.last, 1.0);
+      expect(proxy.connects, [hole.authority]);
+      expect(hole.connections, 0, reason: 'the download dialled out directly');
+    });
+
+    test('without the proxy the same download times out', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => downloadToTemp(
+            url,
+            responseTimeout: const Duration(milliseconds: 300),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
     });
   });
 

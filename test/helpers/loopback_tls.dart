@@ -10,11 +10,45 @@
 //
 // Embedded as source rather than read from disk because an integration test
 // runs inside the desktop app, whose working directory is not the checkout.
+// Under test/helpers rather than the integration harness (#133) because the
+// unit tests of the proxy wiring serve it too, and the harness already
+// sources its shared fakes from here.
 //
 // Generated once with
 //   openssl req -x509 -newkey rsa:2048 -nodes -days 36500 -subj /CN=localhost
 //     -addext subjectAltName=DNS:localhost,IP:127.0.0.1
 // and valid for a hundred years, so it does not have to be regenerated.
+
+import 'dart:io';
+
+/// Does [certificate] carry the loopback test certificate, and nothing else?
+///
+/// Compared on the DER bytes, not on the subject: "trust anything that calls
+/// itself localhost" would be the `badCertificateCallback => true` the app
+/// must never ship, only narrower.
+bool isLoopbackCertificate(X509Certificate certificate) {
+  final String pem = certificate.pem.replaceAll('\r\n', '\n').trim();
+  return pem == kLoopbackCertificatePem.trim();
+}
+
+/// Makes every `HttpClient` the app creates trust the loopback certificate —
+/// that one certificate, on the loopback address, and nothing else — for
+/// the duration of a test: `HttpOverrides.global` in an end-to-end flow,
+/// `HttpOverrides.runZoned` in a unit test.
+///
+/// This is the test-side stand-in for a CA that *is* in the Windows root
+/// store, which Dart would honour on its own. The proxy flows (#133) use it
+/// to drive Dart's own transport through a loopback proxy to a TLS server,
+/// the way it goes through a school proxy to GitHub on a network that does
+/// not inspect TLS. Nothing in `lib/` knows this exists.
+class TrustLoopbackCertificate extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(context)
+        ..badCertificateCallback = (cert, host, port) =>
+            host == InternetAddress.loopbackIPv4.address &&
+            isLoopbackCertificate(cert);
+}
 
 /// The certificate, PEM-encoded.
 const String kLoopbackCertificatePem = '''

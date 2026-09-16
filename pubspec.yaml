@@ -48,6 +48,11 @@ dependencies:
   fl_chart: ^0.69.0
   webview_all: ^1.0.3
   markdown: ^7.3.1
+  # The Windows proxy setting the update check honours (#133) is read from
+  # the registry through `RegGetValue`; both were already in the tree as
+  # file_picker's dependencies.
+  win32: ^5.15.0
+  ffi: ^2.1.4
 
 dev_dependencies:
   flutter_test:

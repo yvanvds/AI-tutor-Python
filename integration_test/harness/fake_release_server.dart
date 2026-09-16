@@ -33,9 +33,10 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:http/http.dart' as http;
 
-import 'loopback_tls.dart';
+import '../../test/helpers/loopback_tls.dart';
 
 /// A well-formed hash that no download will ever match.
 ///
@@ -45,22 +46,20 @@ import 'loopback_tls.dart';
 const String kFakeInstallerSha256 =
     '0000000000000000000000000000000000000000000000000000000000000000';
 
-/// Does [certificate] carry the loopback test certificate, and nothing else?
-///
-/// Compared on the DER bytes, not on the subject: "trust anything that calls
-/// itself localhost" would be the `badCertificateCallback => true` the app
-/// must never ship, only narrower.
-bool isLoopbackCertificate(X509Certificate certificate) {
-  final String pem = certificate.pem.replaceAll('\r\n', '\n').trim();
-  return pem == kLoopbackCertificatePem.trim();
-}
-
 /// A [NativeGet] that trusts the loopback certificate — and only that one —
 /// standing in for the Windows-native `curl.exe` transport in a flow that
 /// drives the fallback end-to-end (#124). Records every request it makes on
 /// [calls], so a flow can prove the fallback carried the check, the checksum
 /// and the installer rather than any of them getting through on Dart.
+///
+/// Built with the machine's [proxy], as the real one is (#133): the
+/// production wiring hands `curlNativeGet` the same `UpdateProxy` it hands
+/// Dart's client, and this stand-in honours it the same way.
 class TrustingLoopbackGet {
+  TrustingLoopbackGet({this.proxy});
+
+  final UpdateProxy? proxy;
+
   final List<({Uri url, Map<String, String> headers, File? to})> calls = [];
 
   Future<http.Response> call(
@@ -74,6 +73,8 @@ class TrustingLoopbackGet {
       ..badCertificateCallback = (cert, host, port) =>
           host == InternetAddress.loopbackIPv4.address &&
           isLoopbackCertificate(cert);
+    final UpdateProxy? via = proxy;
+    if (via != null) client.findProxy = via.findProxy;
     try {
       final HttpClientRequest request = await client.getUrl(url);
       headers.forEach(request.headers.set);
@@ -106,6 +107,11 @@ class FakeReleaseServer {
   /// What the harness's `updateFeedUrl` is pointed at.
   final Uri feedUrl;
 
+  /// Where the server actually listens, as `host:port` — the same as the
+  /// feed URL's authority unless [start] was given an `advertisedAuthority`,
+  /// in which case this is what a proxy's route has to point at (#133).
+  String get authority => '${_server.address.address}:${_server.port}';
+
   /// How often the app asked for the release / the checksum asset / the
   /// installer. A flow that has to prove the app did *not* act — nothing
   /// fetched on a debug build, nothing downloaded after **Later** — asserts
@@ -133,6 +139,10 @@ class FakeReleaseServer {
   /// the installer is a 404, as it was before (#50).
   /// [tls] serves everything over HTTPS with the self-signed loopback
   /// certificate, which Dart cannot verify (#124) — see the file comment.
+  /// [advertisedAuthority] is the `host:port` the feed URL and the asset
+  /// links name instead of the server's own — for a flow that puts a proxy
+  /// between the app and this server (#133), it is the address only the
+  /// proxy has a route to.
   static Future<FakeReleaseServer> start({
     int status = HttpStatus.ok,
     String? rawBody,
@@ -145,6 +155,7 @@ class FakeReleaseServer {
     int installerChunks = 5,
     Duration chunkDelay = const Duration(milliseconds: 120),
     bool tls = false,
+    String? advertisedAuthority,
   }) async {
     final HttpServer server;
     if (tls) {
@@ -160,7 +171,9 @@ class FakeReleaseServer {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     }
     final scheme = tls ? 'https' : 'http';
-    final base = '$scheme://${server.address.address}:${server.port}';
+    final authority =
+        advertisedAuthority ?? '${server.address.address}:${server.port}';
+    final base = '$scheme://$authority';
     final fake = FakeReleaseServer._(server, Uri.parse('$base$_feedPath'));
 
     final assets = <Map<String, Object?>>[

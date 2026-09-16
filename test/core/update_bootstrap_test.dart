@@ -11,15 +11,26 @@
 // complete a TLS handshake. Pinned the same way: the command line it is
 // handed, against a fake runner; and, where the machine has the real binary,
 // one round trip through it against a loopback server.
+//
+// #133: the proxy both transports are handed. The command line grows a
+// `--proxy` when the machine states one; the setting is resolved from the
+// environment first and Internet Options second, with the registry read
+// behind a seam; and the production provider is driven with the real
+// `curl.exe` through a loopback proxy, which is the only way to see that the
+// binary Windows ships accepts what it is given.
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+
+import '../helpers/loopback_proxy.dart';
+import '../helpers/loopback_tls.dart';
 
 /// What the fake `curl.exe` was told, and what it will pretend happened.
 class _FakeCurl {
@@ -138,8 +149,39 @@ void main() {
       // Never `-k`: the fallback trusts what Windows trusts, not everything.
       expect(args, isNot(contains('-k')));
       expect(args, isNot(contains('--insecure')));
+      // No proxy was stated, so none is passed — curl's own reading of the
+      // environment is left alone.
+      expect(args, isNot(contains('--proxy')));
       // The scratch file a small response was read from is gone again.
       expect(File(fake.argAfter('-o')!).existsSync(), isFalse);
+    });
+
+    // #133: curl.exe reads https_proxy from the environment by itself but
+    // never Internet Options, so the proxy the app resolved is passed
+    // explicitly — the same one Dart's client is configured with.
+    test('passes the machine proxy as --proxy', () async {
+      final fake = _FakeCurl();
+      final NativeGet get = curlNativeGet(
+        curlPath: curl.path,
+        run: fake.run,
+        proxy: UpdateProxy(Uri.parse('http://proxy.school.be:8080')),
+      )!;
+      await get(Uri.parse('https://api.github.com/x'));
+      expect(fake.argAfter('--proxy'), 'http://proxy.school.be:8080');
+    });
+
+    test('leaves --proxy off for a host on the bypass list', () async {
+      final fake = _FakeCurl();
+      final NativeGet get = curlNativeGet(
+        curlPath: curl.path,
+        run: fake.run,
+        proxy: UpdateProxy(
+          Uri.parse('http://proxy.school.be:8080'),
+          bypass: const <String>['*.github.com'],
+        ),
+      )!;
+      await get(Uri.parse('https://api.github.com/x'));
+      expect(fake.calls.single.arguments, isNot(contains('--proxy')));
     });
 
     test(
@@ -256,9 +298,85 @@ void main() {
     );
   });
 
+  // #133: where the proxy comes from. The two parsers have their own tests
+  // (update_proxy_test.dart); these pin the order and the seam.
+  group('systemUpdateProxy', () {
+    const InternetSettingsProxy schoolProxy = (
+      enabled: true,
+      server: 'proxy.school.be:8080',
+      override: '<local>',
+    );
+
+    test('the environment wins, and the registry is not even read', () {
+      var reads = 0;
+      final proxy = systemUpdateProxy(
+        environment: const {'https_proxy': 'http://env-proxy:3128'},
+        internetSettings: () {
+          reads++;
+          return schoolProxy;
+        },
+        windows: true,
+      );
+      expect(proxy?.url, Uri.parse('http://env-proxy:3128'));
+      expect(reads, 0);
+    });
+
+    test('with nothing in the environment, Internet Options decide', () {
+      final proxy = systemUpdateProxy(
+        environment: const {},
+        internetSettings: () => schoolProxy,
+        windows: true,
+      );
+      expect(proxy?.url, Uri.parse('http://proxy.school.be:8080'));
+      expect(proxy?.bypass, <String>['<local>']);
+    });
+
+    test('off Windows there are no Internet Options to read', () {
+      var reads = 0;
+      expect(
+        systemUpdateProxy(
+          environment: const {},
+          internetSettings: () {
+            reads++;
+            return schoolProxy;
+          },
+          windows: false,
+        ),
+        isNull,
+      );
+      expect(reads, 0);
+    });
+
+    // The update check must not die over its own diagnostics.
+    test('a registry read that throws counts as no proxy', () {
+      expect(
+        systemUpdateProxy(
+          environment: const {},
+          internetSettings: () => throw StateError('registry unavailable'),
+          windows: true,
+        ),
+        isNull,
+      );
+    });
+
+    // The real read, against whatever this machine has: it must come back
+    // with a well-formed record rather than throw, whether or not a proxy
+    // is set here. What the record means is pinned above and in
+    // update_proxy_test.dart.
+    test('the registry read answers on this machine', () {
+      final InternetSettingsProxy settings = readInternetSettingsProxy();
+      expect(settings.enabled, isA<bool>());
+      if (settings.server != null) {
+        expect(settings.server, isNotEmpty);
+      }
+    }, skip: Platform.isWindows ? false : 'Internet Options are Windows-only');
+  });
+
   group('the production wiring of the native transport', () {
     test('the shipped fallback is curl.exe on Windows', () {
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [updateProxyProvider.overrideWithValue(null)],
+      );
       addTearDown(container.dispose);
       final NativeGet? native = container.read(nativeGetProvider);
       expect(
@@ -269,6 +387,64 @@ void main() {
       );
     });
 
+    // #133, with the real binary: the shipped fallback, built by the
+    // production provider from the proxy the app resolved, reaches a server
+    // that is only there through the proxy. The URL names a black hole — a
+    // direct dial connects and then hears nothing, which is what a
+    // firewalled route looks like — and the proxy routes that same address
+    // to a loopback TLS server. Schannel then refuses the loopback
+    // certificate, as it must (it is in no store); that refusal is the
+    // proof: the handshake happened with the routed server, not the hole.
+    // Without `--proxy` curl waits on the hole until `--max-time` and reports
+    // a timeout instead, and the proxy sees no CONNECT.
+    test(
+      'the shipped fallback goes through the machine proxy',
+      () async {
+        final BlackHole hole = await BlackHole.start();
+        addTearDown(hole.close);
+        final HttpServer server = await HttpServer.bindSecure(
+          InternetAddress.loopbackIPv4,
+          0,
+          SecurityContext()
+            ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+            ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+        );
+        addTearDown(() => server.close(force: true));
+        server.listen((HttpRequest req) => req.response.close());
+        final LoopbackProxy proxy = await LoopbackProxy.start(
+          routes: <String, String>{
+            hole.authority: '${server.address.address}:${server.port}',
+          },
+        );
+        addTearDown(proxy.close);
+
+        final container = ProviderContainer(
+          overrides: [updateProxyProvider.overrideWithValue(proxy.updateProxy)],
+        );
+        addTearDown(container.dispose);
+        final NativeGet native = container.read(nativeGetProvider)!;
+
+        await expectLater(
+          native(
+            Uri.parse('https://${hole.authority}/releases/latest'),
+            timeout: const Duration(seconds: 5),
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains('exited with 60'), isNot(contains('timed out'))),
+            ),
+          ),
+        );
+        expect(proxy.connects, <String>[hole.authority]);
+        expect(hole.connections, 0, reason: 'curl dialled the hole directly');
+      },
+      skip: Platform.isWindows && File(windowsCurlPath()).existsSync()
+          ? false
+          : 'no ${windowsCurlPath()} on this machine',
+    );
+
     // A check that only got through natively hands its release to a download
     // that must not try Dart first: the flag on the release is what carries
     // that across the two seams.
@@ -277,6 +453,8 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           updateFeedUrlProvider.overrideWithValue(null),
+          // Not this machine's setting: the download must be deterministic.
+          updateProxyProvider.overrideWithValue(null),
           nativeGetProvider.overrideWithValue((
             Uri url, {
             Map<String, String> headers = const {},
@@ -320,6 +498,7 @@ void main() {
           // No feed: this test is about the handover, and an unoverridden feed
           // URL would point the services at the real GitHub API.
           updateFeedUrlProvider.overrideWithValue(null),
+          updateProxyProvider.overrideWithValue(null),
           installerLauncherProvider.overrideWithValue((
             executable,
             arguments,
