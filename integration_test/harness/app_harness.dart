@@ -165,6 +165,7 @@ class AppHarness {
     this.forceUpdateCheck = true,
     this.nativeGet,
     this.proxy,
+    this.pacUrl,
     this.appVersion,
     this.prefs = const {},
     this.pyRunner,
@@ -181,6 +182,11 @@ class AppHarness {
   }) : assert(
          llm == null || openaiClient == null,
          'llm: replaces the connectors, openaiClient: keeps them; pick one',
+       ),
+       assert(
+         proxy == null || pacUrl == null,
+         'proxy: hands the app the resolved setting, pacUrl: makes it resolve '
+         'one; pick one',
        ),
        lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -214,9 +220,19 @@ class AppHarness {
   /// The proxy the updater's requests go through (#133). `null` (the
   /// default) pins it to none, so a test boot never depends on the machine
   /// it runs on having a proxy set — the production wiring would read the
-  /// environment and Internet Options. The proxy flow passes a loopback
-  /// `LoopbackProxy`, the one route to its release server.
+  /// environment, Internet Options and its PAC script. The proxy flow passes
+  /// a loopback `LoopbackProxy`, the one route to its release server.
   final UpdateProxy? proxy;
+
+  /// A proxy auto-configuration script for the app to resolve (#135), the
+  /// way Internet Options would name one under "Use automatic configuration
+  /// script". Unlike [proxy], this hands the app nothing resolved: the
+  /// production `systemUpdateProxy` runs, with the environment and the
+  /// explicit Internet Options pinned to none and the auto-configuration
+  /// pinned to this URL, and the real WinHTTP fetches and evaluates the
+  /// script. The PAC flow serves one from a loopback server that names its
+  /// `LoopbackProxy`.
+  final Uri? pacUrl;
 
   /// The version this build reports (#119). `null` (the default) leaves the
   /// real `kAppVersion` from `version.dart` in place, which is what every
@@ -421,7 +437,22 @@ class AppHarness {
           appVersionProvider.overrideWithValue(appVersion!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         nativeGetProvider.overrideWithValue(nativeGet),
-        updateProxyProvider.overrideWithValue(proxy),
+        if (pacUrl == null)
+          updateProxyProvider.overrideWithValue(fixedUpdateProxy(proxy))
+        else
+          updateProxyProvider.overrideWithValue(
+            updateProxyResolvedOnce(
+              () => systemUpdateProxy(
+                updateFeedUrl!,
+                environment: const <String, String>{},
+                internetSettings: () =>
+                    (enabled: false, server: null, override: null),
+                autoProxyConfig: () =>
+                    (autoDetect: false, configUrl: pacUrl.toString()),
+                windows: true,
+              ),
+            ),
+          ),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
           // The real launcher never returns — it exits the process. Hanging

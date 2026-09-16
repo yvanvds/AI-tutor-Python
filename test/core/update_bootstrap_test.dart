@@ -18,7 +18,14 @@
 // behind a seam; and the production provider is driven with the real
 // `curl.exe` through a loopback proxy, which is the only way to see that the
 // binary Windows ships accepts what it is given.
+//
+// #135: the third source, a PAC script or WPAD, resolved through WinHTTP.
+// The ordering and the cap on a slow script are pinned with fake seams and
+// strings; the bindings themselves — the one part a fake cannot vouch for —
+// are driven for real against a loopback PAC server, the way the e2e flow
+// drives the whole app.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -164,7 +171,7 @@ void main() {
       final NativeGet get = curlNativeGet(
         curlPath: curl.path,
         run: fake.run,
-        proxy: UpdateProxy(Uri.parse('http://proxy.school.be:8080')),
+        proxy: () => UpdateProxy(Uri.parse('http://proxy.school.be:8080')),
       )!;
       await get(Uri.parse('https://api.github.com/x'));
       expect(fake.argAfter('--proxy'), 'http://proxy.school.be:8080');
@@ -175,7 +182,7 @@ void main() {
       final NativeGet get = curlNativeGet(
         curlPath: curl.path,
         run: fake.run,
-        proxy: UpdateProxy(
+        proxy: () => UpdateProxy(
           Uri.parse('http://proxy.school.be:8080'),
           bypass: const <String>['*.github.com'],
         ),
@@ -298,70 +305,255 @@ void main() {
     );
   });
 
-  // #133: where the proxy comes from. The two parsers have their own tests
-  // (update_proxy_test.dart); these pin the order and the seam.
+  // #133, #135: where the proxy comes from. The parsers have their own tests
+  // (update_proxy_test.dart); these pin the order and the seams.
   group('systemUpdateProxy', () {
+    final Uri target = Uri.parse(
+      'https://api.github.com/repos/yvanvds/AI-tutor-Python/releases/latest',
+    );
     const InternetSettingsProxy schoolProxy = (
       enabled: true,
       server: 'proxy.school.be:8080',
       override: '<local>',
     );
+    const InternetSettingsProxy noExplicitProxy = (
+      enabled: false,
+      server: null,
+      override: null,
+    );
+    const AutoProxyConfig noAutoProxy = (autoDetect: false, configUrl: null);
+    const AutoProxyConfig schoolPac = (
+      autoDetect: false,
+      configUrl: 'http://proxy.school.be/proxy.pac',
+    );
 
-    test('the environment wins, and the registry is not even read', () {
+    /// A WinHTTP that records what it was asked and answers with [result].
+    ({AutoProxyResolver resolve, List<(Uri, AutoProxyConfig)> asked})
+    fakeWinHttp(FutureOr<AutoProxyResult> Function() result) {
+      final List<(Uri, AutoProxyConfig)> asked = [];
+      return (
+        resolve: (Uri url, AutoProxyConfig config) async {
+          asked.add((url, config));
+          return result();
+        },
+        asked: asked,
+      );
+    }
+
+    test('the environment wins, and nothing else is even read', () async {
       var reads = 0;
-      final proxy = systemUpdateProxy(
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      final proxy = await systemUpdateProxy(
+        target,
         environment: const {'https_proxy': 'http://env-proxy:3128'},
         internetSettings: () {
           reads++;
           return schoolProxy;
         },
+        autoProxyConfig: () {
+          reads++;
+          return schoolPac;
+        },
+        autoProxy: winHttp.resolve,
         windows: true,
       );
       expect(proxy?.url, Uri.parse('http://env-proxy:3128'));
       expect(reads, 0);
+      expect(winHttp.asked, isEmpty);
     });
 
-    test('with nothing in the environment, Internet Options decide', () {
-      final proxy = systemUpdateProxy(
+    test('with nothing in the environment, an explicit Internet Options proxy '
+        'decides, and the script is not asked', () async {
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      final proxy = await systemUpdateProxy(
+        target,
         environment: const {},
         internetSettings: () => schoolProxy,
+        autoProxyConfig: () => schoolPac,
+        autoProxy: winHttp.resolve,
         windows: true,
       );
       expect(proxy?.url, Uri.parse('http://proxy.school.be:8080'));
       expect(proxy?.bypass, <String>['<local>']);
+      expect(winHttp.asked, isEmpty);
     });
 
-    test('off Windows there are no Internet Options to read', () {
-      var reads = 0;
-      expect(
-        systemUpdateProxy(
+    // #135: the case the issue is about — a school that publishes its proxy
+    // only as a script. WinHTTP is asked for the endpoint, with the script
+    // Internet Options name, and its answer is read like ProxyServer.
+    test(
+      'with no explicit proxy, the PAC script names one for the endpoint',
+      () async {
+        final winHttp = fakeWinHttp(
+          () => (proxy: 'filter.school.be:3128', bypass: '<local>;*.school.be'),
+        );
+        final proxy = await systemUpdateProxy(
+          target,
           environment: const {},
-          internetSettings: () {
-            reads++;
-            return schoolProxy;
-          },
-          windows: false,
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => schoolPac,
+          autoProxy: winHttp.resolve,
+          windows: true,
+        );
+        expect(proxy?.url, Uri.parse('http://filter.school.be:3128'));
+        expect(proxy?.bypass, <String>['<local>', '*.school.be']);
+        expect(winHttp.asked, [(target, schoolPac)]);
+      },
+    );
+
+    test('WPAD alone is enough to ask', () async {
+      const AutoProxyConfig wpad = (autoDetect: true, configUrl: null);
+      final winHttp = fakeWinHttp(
+        () => (proxy: 'wpad-proxy:8080', bypass: null),
+      );
+      final proxy = await systemUpdateProxy(
+        target,
+        environment: const {},
+        internetSettings: () => noExplicitProxy,
+        autoProxyConfig: () => wpad,
+        autoProxy: winHttp.resolve,
+        windows: true,
+      );
+      expect(proxy?.url, Uri.parse('http://wpad-proxy:8080'));
+      expect(winHttp.asked, [(target, wpad)]);
+    });
+
+    // The Windows default — neither box ticked — costs no WinHTTP session.
+    test('with neither box ticked, WinHTTP is not asked', () async {
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => noAutoProxy,
+          autoProxy: winHttp.resolve,
+          windows: true,
         ),
         isNull,
       );
-      expect(reads, 0);
+      expect(winHttp.asked, isEmpty);
     });
 
-    // The update check must not die over its own diagnostics.
-    test('a registry read that throws counts as no proxy', () {
+    test('a script that says DIRECT is no proxy', () async {
+      final winHttp = fakeWinHttp(() => (proxy: null, bypass: null));
       expect(
-        systemUpdateProxy(
+        await systemUpdateProxy(
+          target,
           environment: const {},
-          internetSettings: () => throw StateError('registry unavailable'),
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => schoolPac,
+          autoProxy: winHttp.resolve,
           windows: true,
         ),
         isNull,
       );
     });
 
-    // The real read, against whatever this machine has: it must come back
-    // with a well-formed record rather than throw, whether or not a proxy
-    // is set here. What the record means is pinned above and in
+    // A script WinHTTP could not fetch or run — the URL is stale, the server
+    // is down, WPAD found nothing — is the network as it was before #135:
+    // the check goes direct, and does not die over it.
+    test('a script WinHTTP cannot resolve counts as no proxy', () async {
+      final winHttp = fakeWinHttp(
+        () => throw StateError(
+          'WinHttpGetProxyForUrl failed: error 12167 '
+          '(ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT)',
+        ),
+      );
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => schoolPac,
+          autoProxy: winHttp.resolve,
+          windows: true,
+        ),
+        isNull,
+      );
+      expect(winHttp.asked, hasLength(1));
+    });
+
+    // The one the issue insists on: a script server that accepts and never
+    // answers must not hold the check. The cap is applied to whatever the
+    // seam returns, so a never-completing fake pins it.
+    test('a script that does not answer in time counts as no proxy', () async {
+      final winHttp = fakeWinHttp(() => Completer<AutoProxyResult>().future);
+      final Stopwatch clock = Stopwatch()..start();
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => schoolPac,
+          autoProxy: winHttp.resolve,
+          autoProxyTimeout: const Duration(milliseconds: 200),
+          windows: true,
+        ),
+        isNull,
+      );
+      expect(clock.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('off Windows there are no Internet Options to read', () async {
+      var reads = 0;
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () {
+            reads++;
+            return schoolProxy;
+          },
+          autoProxyConfig: () {
+            reads++;
+            return schoolPac;
+          },
+          autoProxy: winHttp.resolve,
+          windows: false,
+        ),
+        isNull,
+      );
+      expect(reads, 0);
+      expect(winHttp.asked, isEmpty);
+    });
+
+    // The update check must not die over its own diagnostics.
+    test('a registry read that throws counts as no explicit proxy', () async {
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () => throw StateError('registry unavailable'),
+          autoProxyConfig: () => noAutoProxy,
+          autoProxy: winHttp.resolve,
+          windows: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('an auto-proxy setting that cannot be read counts as none', () async {
+      final winHttp = fakeWinHttp(() => (proxy: 'pac-proxy:1', bypass: null));
+      expect(
+        await systemUpdateProxy(
+          target,
+          environment: const {},
+          internetSettings: () => noExplicitProxy,
+          autoProxyConfig: () => throw StateError('WinHTTP unavailable'),
+          autoProxy: winHttp.resolve,
+          windows: true,
+        ),
+        isNull,
+      );
+      expect(winHttp.asked, isEmpty);
+    });
+
+    // The real reads, against whatever this machine has: they must come
+    // back with a well-formed record rather than throw, whether or not a
+    // proxy is set here. What the records mean is pinned above and in
     // update_proxy_test.dart.
     test('the registry read answers on this machine', () {
       final InternetSettingsProxy settings = readInternetSettingsProxy();
@@ -370,12 +562,116 @@ void main() {
         expect(settings.server, isNotEmpty);
       }
     }, skip: Platform.isWindows ? false : 'Internet Options are Windows-only');
+
+    test('the WinHTTP configuration read answers on this machine', () {
+      final AutoProxyConfig config = readAutoProxyConfig();
+      expect(config.autoDetect, isA<bool>());
+      if (config.configUrl != null) {
+        expect(config.configUrl, isNotEmpty);
+      }
+    }, skip: Platform.isWindows ? false : 'WinHTTP is Windows-only');
+
+    // The bindings for real: the WinHTTP Windows ships fetches a script
+    // from a loopback server, evaluates it for two URLs, and hands back the
+    // proxy for one and DIRECT for the other. Not a network test — the
+    // point is that the structs, flags and strings crossing the FFI
+    // boundary are the ones WinHTTP expects, which no fake can vouch for.
+    test(
+      'the real WinHTTP evaluates a loopback script through this shape',
+      () async {
+        final LoopbackPacServer pac = await LoopbackPacServer.start(
+          script: pacScript(
+            proxy: '127.0.0.1:8080',
+            direct: const <String>['direct.school.be'],
+          ),
+        );
+        addTearDown(pac.close);
+        final AutoProxyConfig config = (
+          autoDetect: false,
+          configUrl: pac.url.toString(),
+        );
+
+        final AutoProxyResult proxied = await resolveAutoProxy(
+          Uri.parse('https://api.github.com/repos/x/y/releases/latest'),
+          config,
+        );
+        expect(proxied.proxy, '127.0.0.1:8080');
+        expect(pac.fetches, greaterThanOrEqualTo(1));
+
+        final AutoProxyResult direct = await resolveAutoProxy(
+          Uri.parse('https://direct.school.be/'),
+          config,
+        );
+        expect(direct.proxy, isNull);
+      },
+      skip: Platform.isWindows ? false : 'WinHTTP is Windows-only',
+    );
+
+    // A script URL nobody serves: WinHTTP must say so, not hang, and must
+    // say so as an error the resolver surfaces rather than a proxy of none.
+    test('the real WinHTTP reports a script it cannot download', () async {
+      // A port that was listening a moment ago and is not any more.
+      final ServerSocket gone = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final int port = gone.port;
+      await gone.close();
+      await expectLater(
+        resolveAutoProxy(Uri.parse('https://api.github.com/'), (
+          autoDetect: false,
+          configUrl: 'http://127.0.0.1:$port/proxy.pac',
+        )),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('WinHttpGetProxyForUrl'),
+          ),
+        ),
+      );
+    }, skip: Platform.isWindows ? false : 'WinHTTP is Windows-only');
+  });
+
+  group('the production proxy provider', () {
+    // With the feed off there is nothing to reach: no registry, no WinHTTP,
+    // no wait — which is also what keeps every test boot off the machine's
+    // setting without an override.
+    test('resolves to no proxy without touching anything when the feed is '
+        'off', () async {
+      final container = ProviderContainer(
+        overrides: [updateFeedUrlProvider.overrideWithValue(null)],
+      );
+      addTearDown(container.dispose);
+      expect(await container.read(updateProxyProvider)(), isNull);
+    });
+
+    // Reading the wiring is not a request: nothing is resolved until one
+    // asks, and then once — so a debug launch that never checks never
+    // probes WinHTTP, and the release, the checksum and the installer share
+    // one answer rather than three lookups.
+    test('resolves lazily, and once', () async {
+      final container = ProviderContainer(
+        overrides: [
+          updateFeedUrlProvider.overrideWithValue(
+            Uri.parse('https://example.com/releases/latest'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final UpdateProxyLookup lookup = container.read(updateProxyProvider);
+      // Two calls, one future: the memo is the whole guarantee, and it is
+      // observable without knowing what this machine would resolve to.
+      expect(identical(lookup(), lookup()), isTrue);
+    });
   });
 
   group('the production wiring of the native transport', () {
     test('the shipped fallback is curl.exe on Windows', () {
       final container = ProviderContainer(
-        overrides: [updateProxyProvider.overrideWithValue(null)],
+        overrides: [
+          updateProxyProvider.overrideWithValue(fixedUpdateProxy(null)),
+        ],
       );
       addTearDown(container.dispose);
       final NativeGet? native = container.read(nativeGetProvider);
@@ -419,7 +715,11 @@ void main() {
         addTearDown(proxy.close);
 
         final container = ProviderContainer(
-          overrides: [updateProxyProvider.overrideWithValue(proxy.updateProxy)],
+          overrides: [
+            updateProxyProvider.overrideWithValue(
+              fixedUpdateProxy(proxy.updateProxy),
+            ),
+          ],
         );
         addTearDown(container.dispose);
         final NativeGet native = container.read(nativeGetProvider)!;
@@ -454,7 +754,7 @@ void main() {
         overrides: [
           updateFeedUrlProvider.overrideWithValue(null),
           // Not this machine's setting: the download must be deterministic.
-          updateProxyProvider.overrideWithValue(null),
+          updateProxyProvider.overrideWithValue(fixedUpdateProxy(null)),
           nativeGetProvider.overrideWithValue((
             Uri url, {
             Map<String, String> headers = const {},
@@ -498,7 +798,7 @@ void main() {
           // No feed: this test is about the handover, and an unoverridden feed
           // URL would point the services at the real GitHub API.
           updateFeedUrlProvider.overrideWithValue(null),
-          updateProxyProvider.overrideWithValue(null),
+          updateProxyProvider.overrideWithValue(fixedUpdateProxy(null)),
           installerLauncherProvider.overrideWithValue((
             executable,
             arguments,

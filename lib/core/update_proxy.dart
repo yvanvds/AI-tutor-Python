@@ -1,5 +1,5 @@
 /// The forward proxy the updater's requests go through (#133), and how it
-/// is read out of the two places a machine states one.
+/// is read out of the three places a machine states one.
 ///
 /// Dart's `HttpClient` knows nothing of the proxy Windows is configured with:
 /// it dials `api.github.com` directly, and on a school network where only
@@ -11,7 +11,7 @@
 /// `update_bootstrap.dart`: `HttpClient.findProxy` for Dart, `--proxy` for
 /// curl.
 ///
-/// Two sources, in this order, the way Python's `urllib` and most tools
+/// Three sources, in this order, the way Python's `urllib` and most tools
 /// resolve it:
 ///
 /// - the environment (`https_proxy` / `all_proxy`, with `no_proxy`), which is
@@ -19,11 +19,14 @@
 /// - on Windows, Internet Options — `ProxyEnable`, `ProxyServer` and
 ///   `ProxyOverride` under `HKCU\…\Internet Settings` — which is what Edge,
 ///   Chrome, .NET and `WinHttpGetIEProxyConfigForCurrentUser` honour, and
-///   what a school's group policy writes.
-///
-/// A PAC script (`AutoConfigURL`) or WPAD auto-detection is not resolved:
-/// that needs WinHTTP to fetch and evaluate the script, and a network that
-/// only publishes a PAC keeps today's behaviour.
+///   what a school's group policy writes;
+/// - on Windows, when Internet Options name no explicit server, the proxy a
+///   PAC script (`AutoConfigURL`) or WPAD auto-detection yields for the
+///   endpoint (#135) — the way a managed filter most often states its proxy.
+///   That needs WinHTTP to fetch and evaluate the script, which
+///   `update_bootstrap.dart` does through `WinHttpGetProxyForUrl`; what comes
+///   back (`lpszProxy` / `lpszProxyBypass`) is the same shape Internet
+///   Options keep, and [proxyFromAutoProxy] parses it the same way.
 ///
 /// This file parses and decides; it reads nothing. `update_bootstrap.dart`
 /// does the reading, so everything here is drivable from a test with a
@@ -105,6 +108,38 @@ typedef InternetSettingsProxy = ({
   String? override,
 });
 
+/// What Internet Options say about *automatic* configuration (#135), as
+/// `WinHttpGetIEProxyConfigForCurrentUser` reports it: whether "Automatically
+/// detect settings" (WPAD) is ticked, and the "Use automatic configuration
+/// script" URL when one is set. Read by `update_bootstrap.dart`; whether it
+/// is worth asking WinHTTP about is [AutoProxyConfigX.isConfigured].
+typedef AutoProxyConfig = ({bool autoDetect, String? configUrl});
+
+/// What WinHTTP hands back once it has evaluated the script for a URL
+/// (`WINHTTP_PROXY_INFO`): `lpszProxy` — one or more
+/// `[protocol=]host[:port]` entries, `;`- or space-separated, exactly the
+/// `ProxyServer` shape — and `lpszProxyBypass` in the `ProxyOverride` shape.
+/// A `null` [AutoProxyResult.proxy] is the script's `DIRECT`.
+typedef AutoProxyResult = ({String? proxy, String? bypass});
+
+extension AutoProxyConfigX on AutoProxyConfig {
+  /// Whether there is anything to evaluate at all. A machine with neither
+  /// box ticked is not asked, which spares it a WinHTTP session per launch.
+  bool get isConfigured {
+    final String? url = configUrl;
+    return autoDetect || (url != null && url.trim().isNotEmpty);
+  }
+
+  /// For a log line: where the answer would have come from.
+  String get describe {
+    final String? url = configUrl;
+    final bool hasUrl = url != null && url.trim().isNotEmpty;
+    if (autoDetect && hasUrl) return 'WPAD and the script at ${url.trim()}';
+    if (hasUrl) return 'the script at ${url.trim()}';
+    return 'WPAD';
+  }
+}
+
 /// The proxy the environment states, or `null` when it states none.
 ///
 /// `https_proxy` first — every request the updater makes is HTTPS — then
@@ -158,13 +193,41 @@ UpdateProxy? proxyFromInternetSettings(InternetSettingsProxy settings) {
   );
 }
 
+/// The proxy a PAC script or WPAD yielded for the endpoint (#135), or `null`
+/// when the script said `DIRECT` or named no proxy usable for HTTPS.
+///
+/// `lpszProxy` is parsed exactly as `ProxyServer` is: a per-protocol list
+/// applies only through its `https=` entry, and a plain list — a script's
+/// `PROXY a:8080; PROXY b:8080` comes back as `a:8080;b:8080` — through its
+/// first, which is the one WinINET would try first too. Neither transport
+/// fails over to a second proxy, so the rest is not kept. `lpszProxyBypass`
+/// becomes the bypass list, as `ProxyOverride` does.
+UpdateProxy? proxyFromAutoProxy(AutoProxyResult result) {
+  final String? proxy = result.proxy;
+  if (proxy == null || proxy.trim().isEmpty) return null;
+  final Uri? url = _httpsProxyIn(proxy);
+  if (url == null) return null;
+  final String? bypass = result.bypass;
+  return UpdateProxy(
+    url,
+    bypass: bypass == null ? const <String>[] : bypass.split(_listSeparator),
+  );
+}
+
+/// What separates the entries of a `ProxyServer`-shaped list: `;` in the
+/// registry, `;` or whitespace from WinHTTP.
+final RegExp _listSeparator = RegExp(r'[;\s]+');
+
+/// The proxy for HTTPS in a `ProxyServer`-shaped list, or `null`.
+///
+/// Entries are `[protocol=]address`; a `protocol=` entry counts only when it
+/// is `https=`, a plain entry always does, and the first that counts wins.
+/// `DIRECT`, which a PAC result may carry, is skipped.
 Uri? _httpsProxyIn(String proxyServer) {
-  if (!proxyServer.contains('=')) {
-    return _proxyUrl(proxyServer, defaultPort: 80);
-  }
-  for (final String entry in proxyServer.split(';')) {
+  for (final String entry in proxyServer.split(_listSeparator)) {
+    if (entry.isEmpty || entry.toLowerCase() == 'direct') continue;
     final int eq = entry.indexOf('=');
-    if (eq < 0) continue;
+    if (eq < 0) return _proxyUrl(entry, defaultPort: 80);
     if (entry.substring(0, eq).trim().toLowerCase() == 'https') {
       return _proxyUrl(entry.substring(eq + 1), defaultPort: 80);
     }
