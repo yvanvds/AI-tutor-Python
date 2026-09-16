@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Learning path'**
   String get sidebar_section_map;
 
+  /// No description provided for @sidebar_section_puntenformule.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade formula'**
+  String get sidebar_section_puntenformule;
+
   /// No description provided for @sidebar_section_goals.
   ///
   /// In en, this message translates to:
@@ -187,6 +193,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Options'**
   String get sidebar_section_options;
+
+  /// No description provided for @puntenformule_header_note.
+  ///
+  /// In en, this message translates to:
+  /// **'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.'**
+  String get puntenformule_header_note;
+
+  /// No description provided for @puntenformule_loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the grade formula…'**
+  String get puntenformule_loading;
+
+  /// No description provided for @puntenformule_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade formula could not be loaded: {error}'**
+  String puntenformule_loadError(String error);
 
   /// No description provided for @milestones_page_title.
   ///
@@ -637,6 +661,72 @@ abstract class AppLocalizations {
   /// **'Could not change the school-wide model: {error}'**
   String options_globalModel_saveFailed(String error);
 
+  /// No description provided for @options_model_override.
+  ///
+  /// In en, this message translates to:
+  /// **'Another model on this device'**
+  String get options_model_override;
+
+  /// No description provided for @options_model_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'This device now uses {model}.'**
+  String options_model_saved(String model);
+
+  /// No description provided for @options_modelField_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Model id'**
+  String get options_modelField_label;
+
+  /// No description provided for @options_modelField_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. gpt-5-mini'**
+  String get options_modelField_hint;
+
+  /// No description provided for @options_modelField_helper.
+  ///
+  /// In en, this message translates to:
+  /// **'The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.'**
+  String get options_modelField_helper;
+
+  /// No description provided for @options_modelField_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter one model id, without spaces.'**
+  String get options_modelField_invalid;
+
+  /// No description provided for @options_modelField_test_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get options_modelField_test_button;
+
+  /// No description provided for @options_modelField_save_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get options_modelField_save_button;
+
+  /// No description provided for @options_modelField_testing.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing {model}…'**
+  String options_modelField_testing(String model);
+
+  /// No description provided for @options_modelField_testPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} answered in {seconds} s.'**
+  String options_modelField_testPassed(String model, String seconds);
+
+  /// No description provided for @options_modelField_testFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Test failed: {reason}'**
+  String options_modelField_testFailed(String reason);
+
   /// No description provided for @options_progress_title.
   ///
   /// In en, this message translates to:
@@ -910,7 +1000,7 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.'**
+  /// **'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.'**
   String get options_bugReport_subtitle;
 
   /// No description provided for @options_bugReport_github_notConnected.
@@ -940,7 +1030,7 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_github_notConfigured.
   ///
   /// In en, this message translates to:
-  /// **'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.'**
+  /// **'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.'**
   String get options_bugReport_github_notConfigured;
 
   /// No description provided for @options_bugReport_github_device_explainer.
@@ -1060,8 +1150,14 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_dialog_submit.
   ///
   /// In en, this message translates to:
-  /// **'Post issue'**
+  /// **'Post on GitHub'**
   String get options_bugReport_dialog_submit;
+
+  /// No description provided for @options_bugReport_dialog_saveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as file'**
+  String get options_bugReport_dialog_saveFile;
 
   /// No description provided for @options_bugReport_posted.
   ///
@@ -1074,6 +1170,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Posting failed: {error}'**
   String options_bugReport_postFailed(String error);
+
+  /// No description provided for @options_bugReport_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved as {path}. Send this file to your teacher.'**
+  String options_bugReport_saved(String path);
+
+  /// No description provided for @options_bugReport_saveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving failed: {error}'**
+  String options_bugReport_saveFailed(String error);
 
   /// No description provided for @options_developer_title.
   ///
@@ -1362,6 +1470,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The update did not succeed: {reason}'**
   String update_status_failed(String reason);
+
+  /// Dismissible shell notice after the launch's own update check failed (#124); the reason itself is in Options → About
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates did not succeed — see Options → About.'**
+  String get update_notice_checkFailed;
+
+  /// No description provided for @update_notice_dismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get update_notice_dismiss;
 
   /// No description provided for @update_action_apply.
   ///
@@ -3529,6 +3649,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The tutor\'s reply was cut off.'**
   String get chat_notice_replyTruncated;
+
+  /// An account without the school key has no key stored, so the tutor made no call (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.'**
+  String get chat_notice_ownKeyMissing;
+
+  /// OpenAI answered 401 on the key the user stored on this device (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI rejected your API key. Check it under Options → OpenAI API key.'**
+  String get chat_notice_ownKeyRejected;
+
+  /// OpenAI answered 401 on the school's bundled key, or the build has none; nothing the student can fix (#126)
+  ///
+  /// In en, this message translates to:
+  /// **'The school\'s OpenAI API key is not working. Let your teacher know.'**
+  String get chat_notice_schoolKeyInvalid;
 
   /// No description provided for @chat_notice_noPreviousRequest.
   ///

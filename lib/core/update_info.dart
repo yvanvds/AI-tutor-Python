@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:pub_semver/pub_semver.dart'; // add to pubspec
 import 'package:path/path.dart' as p;
 
@@ -34,13 +36,66 @@ const kUpdateRequestTimeout = Duration(seconds: 10);
 /// is legitimate — but a stalled socket is not.
 const kDownloadStallTimeout = Duration(seconds: 60);
 
+/// A GET made by something other than Dart's own TLS stack (#124).
+///
+/// On a school network that inspects TLS — a web filter or endpoint software
+/// re-signing every certificate with its own CA — Dart's `HttpClient` fails
+/// the handshake to GitHub with `CERTIFICATE_VERIFY_FAILED`: BoringSSL takes
+/// a snapshot of the Windows *root* store at startup, never fetches a missing
+/// intermediate, and so cannot chain what the filter hands it. Edge, `.NET`
+/// and `curl.exe` on the same laptop all succeed, because Schannel trusts what
+/// the machine trusts. This is the seam through which the updater borrows
+/// that trust: `update_bootstrap.dart` wires it to the `curl.exe` Windows
+/// ships, tests wire a fake, and everything above it keeps parsing the same
+/// [http.Response].
+///
+/// Fetches [url] with [headers]. [timeout] bounds the whole request; `null`
+/// means no deadline beyond a stall (the installer on a slow line is
+/// legitimate). With [to] the body is streamed into that file and the
+/// returned response has an empty body; without it the body comes back in
+/// the response. Throws [UpdateCheckException] when the request itself did
+/// not complete; an HTTP error status is returned, not thrown, so the caller
+/// applies the same rules it applies to Dart's own answer.
+///
+/// `badCertificateCallback => true` is explicitly *not* what this is: the
+/// updater executes what it downloads, and a middlebox that can replace the
+/// installer can replace the `.sha256` beside it too. The fallback trusts
+/// what the operating system trusts, and `verifySha256` still runs after it.
+typedef NativeGet = Future<http.Response> Function(
+  Uri url, {
+  Map<String, String> headers,
+  Duration? timeout,
+  File? to,
+});
+
+/// Where a transport diagnostic goes when nothing is shown on screen.
+typedef TransportLog = void Function(String message);
+
+/// The client the updater's own requests are made with: Dart's `HttpClient`,
+/// told about [proxy] when there is one (#133).
+///
+/// `package:http`'s default client ignores every proxy setting a machine has;
+/// `IOClient` over a configured `HttpClient` is the documented way to give it
+/// one, and `UpdateProxy.findProxy` answers per URL so a bypassed host still
+/// goes direct. Without a proxy this is the plain client it always was.
+http.Client httpClientVia(UpdateProxy? proxy) {
+  if (proxy == null) return http.Client();
+  return IOClient(HttpClient()..findProxy = proxy.findProxy);
+}
+
 /// A release the app can offer: which version, which installer, and the
 /// hash the download has to match.
 ///
 /// Built from the GitHub Releases API by `github_release.dart` (#50); it used
 /// to come from a hand-published `version.json`.
 class UpdateInfo {
-  UpdateInfo(this.version, this.url, this.sha256, {this.notes = ''});
+  UpdateInfo(
+    this.version,
+    this.url,
+    this.sha256, {
+    this.notes = '',
+    this.viaNativeTransport = false,
+  });
 
   final String version;
   final Uri url;
@@ -49,6 +104,14 @@ class UpdateInfo {
   /// The release notes, as written on the GitHub release. Empty when the
   /// release has none. The manifest could not carry these at all.
   final String notes;
+
+  /// Whether the check that found this release only got through on the
+  /// [NativeGet] fallback (#124).
+  ///
+  /// Carried on the release so the download that follows goes straight to
+  /// the transport that worked, instead of failing the same handshake again
+  /// first. The installer asset sits behind the same inspection as the API.
+  final bool viaNativeTransport;
 }
 
 bool isNewer(String remote, String local) {
@@ -84,18 +147,37 @@ bool isNewer(String remote, String local) {
 /// transport error, a request that never gets a response, or a stream that
 /// stalls for [stallTimeout]. It used to return `null` for a bad status and
 /// hang forever on a dead socket (#46). A partial file is removed.
+///
+/// A TLS handshake Dart cannot complete — and only that (#124) — is retried
+/// through [nativeGet] when one is given, and [preferNative] skips straight
+/// to it for a release whose check already needed it. The fallback reports
+/// no progress: the bar stays indeterminate, which the UI already renders
+/// for a download with no declared length. A 404, a timeout, a dead socket
+/// are not the certificate problem and are never retried natively — that
+/// would only hide what actually went wrong.
+///
+/// [proxy] is the machine's proxy setting (#133), honoured when no [client]
+/// is given; the native transport was built with the same one.
 Future<File> downloadToTemp(
   Uri url, {
   void Function(double fraction)? onProgress,
   http.Client? client,
   Duration responseTimeout = kUpdateRequestTimeout,
   Duration stallTimeout = kDownloadStallTimeout,
+  NativeGet? nativeGet,
+  bool preferNative = false,
+  UpdateProxy? proxy,
+  TransportLog? log,
 }) async {
-  final owned = client == null;
-  final c = client ?? http.Client();
   final tmp = File(
     p.join(Directory.systemTemp.path, 'python_teacher_install.exe'),
   );
+  if (preferNative && nativeGet != null) {
+    return _downloadNatively(nativeGet, url, tmp);
+  }
+
+  final owned = client == null;
+  final c = client ?? httpClientVia(proxy);
   try {
     final res = await c.send(http.Request('GET', url)).timeout(responseTimeout);
     if (res.statusCode != HttpStatus.ok) {
@@ -133,12 +215,55 @@ Future<File> downloadToTemp(
   } on TimeoutException {
     await _deleteQuietly(tmp);
     throw UpdateCheckException('installer download from $url stalled');
+  } on HandshakeException catch (e) {
+    // One clause above the catch-all on purpose: `package:http` wraps only
+    // `SocketException` and `HttpException`, so this arrives as itself.
+    await _deleteQuietly(tmp);
+    if (nativeGet == null) {
+      throw UpdateCheckException('installer download from $url failed: $e');
+    }
+    log?.call(
+      'Update: Dart could not complete the TLS handshake for the installer '
+      '($e); retrying through the Windows-native transport.',
+    );
+    try {
+      return await _downloadNatively(nativeGet, url, tmp);
+    } on UpdateCheckException catch (native) {
+      // The handshake reason stays in front: it is the one that explains the
+      // network, and the one About should still be telling the truth about.
+      throw UpdateCheckException(
+        'installer download from $url failed: $e; the Windows-native '
+        'fallback failed too: ${native.message}',
+      );
+    }
   } on Object catch (e) {
     await _deleteQuietly(tmp);
     throw UpdateCheckException('installer download from $url failed: $e');
   } finally {
     if (owned) c.close();
   }
+}
+
+/// The installer through [nativeGet], into [tmp]. No progress: the bar stays
+/// indeterminate for the length of the download.
+Future<File> _downloadNatively(NativeGet nativeGet, Uri url, File tmp) async {
+  final http.Response res;
+  try {
+    res = await nativeGet(url, to: tmp);
+  } on UpdateCheckException {
+    await _deleteQuietly(tmp);
+    rethrow;
+  } on Object catch (e) {
+    await _deleteQuietly(tmp);
+    throw UpdateCheckException('installer download from $url failed: $e');
+  }
+  if (res.statusCode != HttpStatus.ok) {
+    await _deleteQuietly(tmp);
+    throw UpdateCheckException(
+      'installer download from $url returned HTTP ${res.statusCode}',
+    );
+  }
+  return tmp;
 }
 
 Future<void> _deleteQuietly(File file) async {

@@ -63,8 +63,30 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
     _sub = null;
     if (rootId == null) return;
     _sub = ref.read(goalsServiceProvider).streamChildren(rootId).listen((list) {
-      if (mounted) setState(() => _siblings = list);
+      // The poll emits every 5 s whether or not anything changed; only a
+      // real change is worth a rebuild of the whole view (#128).
+      if (mounted && !_sameSiblings(_siblings, list)) {
+        setState(() => _siblings = list);
+      }
     });
+  }
+
+  /// Whether two sibling lists agree on everything this view reads from
+  /// them: the ids and their order (the header counter, [_seenPages]),
+  /// `optional` and `contentId` (which pages count as seen theory). `Goal`
+  /// has no value equality, so a fresh poll always hands back new
+  /// instances; comparing the projection is what tells "same curriculum"
+  /// from "the teacher changed something".
+  static bool _sameSiblings(List<Goal> a, List<Goal> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id ||
+          a[i].optional != b[i].optional ||
+          a[i].contentId != b[i].contentId) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// The theory pages before [active] that the student has already seen:
@@ -145,9 +167,11 @@ class _ContentWebView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Scope the watch to this content's body so 5s polls that don't change
-    // the body don't rebuild the WebView host (which visibly flickers on
-    // Windows even when the fragment string is unchanged).
+    // Scope the watch to this content's body so 5 s content polls that
+    // don't change the body don't rebuild the WebView host. This only stops
+    // rebuilds that originate here; the "flicker on an unchanged fragment"
+    // it was added for came from `LessonHtmlView` re-creating its
+    // `WebViewWidget` on *any* rebuild, which is fixed at the source (#128).
     final body = ref.watch(
       contentServiceProvider.select((list) {
         for (final c in list) {

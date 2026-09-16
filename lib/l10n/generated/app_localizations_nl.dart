@@ -37,6 +37,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_map => 'Leerpad';
 
   @override
+  String get sidebar_section_puntenformule => 'Puntenformule';
+
+  @override
   String get sidebar_section_goals => 'Doelen';
 
   @override
@@ -53,6 +56,18 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get sidebar_section_options => 'Opties';
+
+  @override
+  String get puntenformule_header_note =>
+      'Hoe je rapportcijfer tot stand komt. Het document is openbaar en geversioneerd; dit is de versie die deze build van de app meebrengt.';
+
+  @override
+  String get puntenformule_loading => 'Puntenformule laden…';
+
+  @override
+  String puntenformule_loadError(String error) {
+    return 'De puntenformule kon niet geladen worden: $error';
+  }
 
   @override
   String get milestones_page_title => 'Mijlpalen';
@@ -333,6 +348,49 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get options_model_override => 'Een ander model op dit toestel';
+
+  @override
+  String options_model_saved(String model) {
+    return 'Dit toestel gebruikt nu $model.';
+  }
+
+  @override
+  String get options_modelField_label => 'Model-id';
+
+  @override
+  String get options_modelField_hint => 'bv. gpt-5-mini';
+
+  @override
+  String get options_modelField_helper =>
+      'De exacte id van platform.openai.com/docs/models, hoofdlettergevoelig. Test het voor je opslaat.';
+
+  @override
+  String get options_modelField_invalid =>
+      'Geef één model-id op, zonder spaties.';
+
+  @override
+  String get options_modelField_test_button => 'Testen';
+
+  @override
+  String get options_modelField_save_button => 'Opslaan';
+
+  @override
+  String options_modelField_testing(String model) {
+    return '$model wordt getest…';
+  }
+
+  @override
+  String options_modelField_testPassed(String model, String seconds) {
+    return '$model antwoordde in $seconds s.';
+  }
+
+  @override
+  String options_modelField_testFailed(String reason) {
+    return 'Test mislukt: $reason';
+  }
+
+  @override
   String get options_progress_title => 'Voortgang';
 
   @override
@@ -500,7 +558,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Maak rechtstreeks vanuit de app een issue aan op GitHub, met de debuggegevens van een recente tutorbeurt erbij.';
+      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -520,7 +578,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_github_notConfigured =>
-      'Deze build kan niet aanmelden bij GitHub: ze is gebouwd zonder GitHub OAuth-client-id, dus bugmeldingen kunnen enkel met de hand op github.com.';
+      'Deze build kan niet aanmelden bij GitHub: ze is gebouwd zonder GitHub OAuth-client-id. Een melding als bestand bewaren kan wel.';
 
   @override
   String options_bugReport_github_device_explainer(String repo) {
@@ -594,7 +652,10 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
-  String get options_bugReport_dialog_submit => 'Issue plaatsen';
+  String get options_bugReport_dialog_submit => 'Op GitHub plaatsen';
+
+  @override
+  String get options_bugReport_dialog_saveFile => 'Als bestand bewaren';
 
   @override
   String options_bugReport_posted(String url) {
@@ -604,6 +665,16 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String options_bugReport_postFailed(String error) {
     return 'Plaatsen mislukt: $error';
+  }
+
+  @override
+  String options_bugReport_saved(String path) {
+    return 'Melding bewaard als $path. Stuur dit bestand naar je leerkracht.';
+  }
+
+  @override
+  String options_bugReport_saveFailed(String error) {
+    return 'Bewaren mislukt: $error';
   }
 
   @override
@@ -780,6 +851,13 @@ class AppLocalizationsNl extends AppLocalizations {
   String update_status_failed(String reason) {
     return 'De update is niet gelukt: $reason';
   }
+
+  @override
+  String get update_notice_checkFailed =>
+      'Controleren op updates is mislukt — zie Opties → Over.';
+
+  @override
+  String get update_notice_dismiss => 'Sluiten';
 
   @override
   String get update_action_apply => 'Bijwerken';
@@ -2079,6 +2157,18 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get chat_notice_replyTruncated =>
       'Het antwoord van de tutor werd afgebroken.';
+
+  @override
+  String get chat_notice_ownKeyMissing =>
+      'Er is geen OpenAI API-sleutel opgeslagen op dit toestel. Voeg de jouwe toe via Opties → OpenAI API-sleutel.';
+
+  @override
+  String get chat_notice_ownKeyRejected =>
+      'OpenAI heeft je API-sleutel geweigerd. Controleer ze via Opties → OpenAI API-sleutel.';
+
+  @override
+  String get chat_notice_schoolKeyInvalid =>
+      'De OpenAI API-sleutel van de school werkt niet. Laat het je leerkracht weten.';
 
   @override
   String get chat_notice_noPreviousRequest =>

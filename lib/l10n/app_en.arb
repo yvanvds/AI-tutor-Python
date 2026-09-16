@@ -19,12 +19,20 @@
 
   "sidebar_section_session": "Session",
   "sidebar_section_map": "Learning path",
+  "sidebar_section_puntenformule": "Grade formula",
   "sidebar_section_goals": "Goals",
   "sidebar_section_lessonContent": "Lesson content",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
   "sidebar_section_milestones": "Milestones",
   "sidebar_section_options": "Options",
+
+  "puntenformule_header_note": "How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.",
+  "puntenformule_loading": "Loading the grade formula…",
+  "puntenformule_loadError": "The grade formula could not be loaded: {error}",
+  "@puntenformule_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "milestones_page_title": "Milestones",
   "milestones_page_subtitle": "Which goals should be known by which report date, and which of them gate the pass mark.",
@@ -166,6 +174,30 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "options_model_override": "Another model on this device",
+  "options_model_saved": "This device now uses {model}.",
+  "@options_model_saved": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_modelField_label": "Model id",
+  "options_modelField_hint": "e.g. gpt-5-mini",
+  "options_modelField_helper": "The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.",
+  "options_modelField_invalid": "Enter one model id, without spaces.",
+  "options_modelField_test_button": "Test",
+  "options_modelField_save_button": "Save",
+  "options_modelField_testing": "Testing {model}…",
+  "@options_modelField_testing": {
+    "placeholders": { "model": { "type": "String" } }
+  },
+  "options_modelField_testPassed": "{model} answered in {seconds} s.",
+  "@options_modelField_testPassed": {
+    "placeholders": { "model": { "type": "String" }, "seconds": { "type": "String" } }
+  },
+  "options_modelField_testFailed": "Test failed: {reason}",
+  "@options_modelField_testFailed": {
+    "placeholders": { "reason": { "type": "String" } }
+  },
+
   "options_progress_title": "Progress",
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",
@@ -245,7 +277,7 @@
   "options_apiKey_removed": "API key removed.",
 
   "options_bugReport_title": "Bug reports",
-  "options_bugReport_subtitle": "Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.",
+  "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.",
   "options_bugReport_github_notConnected": "Not connected to GitHub.",
   "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
   "@options_bugReport_github_connectedAs": {
@@ -253,7 +285,7 @@
   },
   "options_bugReport_github_connect_button": "Connect GitHub",
   "options_bugReport_github_disconnect_button": "Disconnect",
-  "options_bugReport_github_notConfigured": "This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.",
+  "options_bugReport_github_notConfigured": "This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.",
   "options_bugReport_github_device_explainer": "Type this code on GitHub to let the app create issues on {repo}. Nothing is stored until you approve it.",
   "@options_bugReport_github_device_explainer": {
     "placeholders": { "repo": { "type": "String" } }
@@ -288,13 +320,22 @@
   "@options_bugReport_dialog_turnLabel": {
     "placeholders": { "id": { "type": "int" }, "type": { "type": "String" } }
   },
-  "options_bugReport_dialog_submit": "Post issue",
+  "options_bugReport_dialog_submit": "Post on GitHub",
+  "options_bugReport_dialog_saveFile": "Save as file",
   "options_bugReport_posted": "Issue posted: {url}",
   "@options_bugReport_posted": {
     "placeholders": { "url": { "type": "String" } }
   },
   "options_bugReport_postFailed": "Posting failed: {error}",
   "@options_bugReport_postFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_bugReport_saved": "Report saved as {path}. Send this file to your teacher.",
+  "@options_bugReport_saved": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "options_bugReport_saveFailed": "Saving failed: {error}",
+  "@options_bugReport_saveFailed": {
     "placeholders": { "error": { "type": "String" } }
   },
 
@@ -407,6 +448,11 @@
       "reason": { "type": "String" }
     }
   },
+  "update_notice_checkFailed": "Checking for updates did not succeed — see Options → About.",
+  "@update_notice_checkFailed": {
+    "description": "Dismissible shell notice after the launch's own update check failed (#124); the reason itself is in Options → About"
+  },
+  "update_notice_dismiss": "Close",
   "update_action_apply": "Update",
   "update_action_applyVersion": "Update to {version}",
   "@update_action_applyVersion": {
@@ -1080,6 +1126,18 @@
   "chat_notice_tutorTimeout": "The tutor did not respond in time.",
   "chat_notice_tutorUnreachable": "No connection to the tutor.",
   "chat_notice_replyTruncated": "The tutor's reply was cut off.",
+  "chat_notice_ownKeyMissing": "No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.",
+  "@chat_notice_ownKeyMissing": {
+    "description": "An account without the school key has no key stored, so the tutor made no call (#126)"
+  },
+  "chat_notice_ownKeyRejected": "OpenAI rejected your API key. Check it under Options → OpenAI API key.",
+  "@chat_notice_ownKeyRejected": {
+    "description": "OpenAI answered 401 on the key the user stored on this device (#126)"
+  },
+  "chat_notice_schoolKeyInvalid": "The school's OpenAI API key is not working. Let your teacher know.",
+  "@chat_notice_schoolKeyInvalid": {
+    "description": "OpenAI answered 401 on the school's bundled key, or the build has none; nothing the student can fix (#126)"
+  },
   "chat_notice_noPreviousRequest": "No previous request to retry.",
   "chat_notice_emptyResponse": "Empty response from the tutor.",
   "chat_notice_unparseableResponse": "Could not process the response: {raw}",

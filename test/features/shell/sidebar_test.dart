@@ -7,6 +7,9 @@
 // icon buttons are gone: language moved into the Options page and the debug
 // tools live in its developer-gated section.
 //
+// Issue #129 — the grade formula document is a section of its own, in the
+// student group, so every signed-in user (a teacher included) can open it.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
 // what a signed-in user actually sees in the navigation rail.
@@ -134,6 +137,42 @@ void main() {
     await tester.tap(find.byTooltip('Session'));
     await tester.pump();
     expect(container.read(sectionProvider), Section.session);
+  });
+
+  testWidgets('student sees the grade formula entry and tapping it routes '
+      'to the section', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+    final container = containerOf(tester);
+
+    expect(find.byTooltip('Grade formula'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Grade formula'));
+    await tester.pump();
+
+    expect(container.read(sectionProvider), Section.puntenformule);
+    final icons = tester
+        .widgetList<Icon>(find.byType(Icon))
+        .where((i) => i.icon == Icons.calculate_outlined)
+        .toList();
+    expect(icons, hasLength(1));
+    expect(icons.single.color, isNot(equals(Colors.transparent)));
+  });
+
+  testWidgets('teacher gets the grade formula entry in the student group, '
+      'above the teacher header', (tester) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    final entry = find.byTooltip('Grade formula');
+    expect(entry, findsOneWidget);
+    expect(
+      tester.getTopLeft(entry).dy,
+      lessThan(tester.getTopLeft(find.text('TEACHER')).dy),
+    );
+  });
+
+  test('Section.puntenformule is reachable by students', () {
+    expect(Section.puntenformule.isTeacherOnly, isFalse);
+    expect(Section.puntenformule.isDeveloperOnly, isFalse);
   });
 
   test('Section.instructions is the only developer-only section', () {

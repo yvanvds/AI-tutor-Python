@@ -13,9 +13,19 @@ import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 
 class ScriptedLlm extends OpenaiConnector {
-  ScriptedLlm(Iterable<String> replies) : _replies = [...replies];
+  ScriptedLlm(Iterable<String> replies, {this.probeResults = const {}})
+    : _replies = [...replies];
 
   final List<String> _replies;
+
+  /// What the Test button in Options gets back, per model id (#125). An id
+  /// not listed fails the way an unknown id fails at OpenAI, so a flow that
+  /// forgot to script a probe sees the failure on screen rather than a
+  /// passing test it never asked for.
+  final Map<String, ModelProbe> probeResults;
+
+  /// Every model id the Test button asked about, in order (#125).
+  final List<String> probed = <String>[];
 
   /// Requests the app opened, and how many of those were retries of a reply
   /// the app refused to use.
@@ -89,6 +99,20 @@ class ScriptedLlm extends OpenaiConnector {
   Future<ConnectorResult> resendRequest() async {
     resends++;
     return _reply();
+  }
+
+  @override
+  Future<ModelProbe> probe(String model) async {
+    probed.add(model);
+    return probeResults[model] ??
+        ModelProbeFailed(
+          StateError('ScriptedLlm: no probe scripted for $model'),
+          StackTrace.current,
+          ChatNotice.raw(
+            'The model `$model` does not exist or you do not have access '
+            'to it.',
+          ),
+        );
   }
 
   ConnectorResult _reply() {

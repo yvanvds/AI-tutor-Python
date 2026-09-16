@@ -18,12 +18,14 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/explain_paging.dart' as explain_paging;
+import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -32,10 +34,12 @@ import 'flows/language_switch.dart' as language_switch;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/options_panel.dart' as options_panel;
+import 'flows/own_key.dart' as own_key;
 import 'flows/period_start_snapshot.dart' as period_start_snapshot;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
+import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
@@ -47,11 +51,14 @@ import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/tutor_language.dart' as tutor_language;
+import 'flows/update_check_failed_notice.dart' as update_check_failed_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
 import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
+import 'flows/update_proxy.dart' as update_proxy;
+import 'flows/update_tls_fallback.dart' as update_tls_fallback;
 import 'flows/warm_up_review.dart' as warm_up_review;
 import 'flows/whats_new_overlay.dart' as whats_new_overlay;
 
@@ -60,6 +67,7 @@ void main() {
 
   lesson_flow.main();
   explain_paging.main();
+  explain_poll_steady.main();
   language_switch.main();
   tutor_language.main();
   playground_files.main();
@@ -73,9 +81,12 @@ void main() {
   quiz_ligatures.main();
   playground_during_mcq.main();
   turtle_run_notice.main();
+  puntenformule_tab.main();
   options_panel.main();
+  own_key.main();
   level_up_gate.main();
   bug_report_oauth.main();
+  bug_report_file.main();
   goals_import_replace.main();
   students_class_filter.main();
   students_bulk_class.main();
@@ -93,5 +104,8 @@ void main() {
   update_install.main();
   update_dev_build.main();
   update_manual_check.main();
+  update_check_failed_notice.main();
+  update_tls_fallback.main();
+  update_proxy.main();
   whats_new_overlay.main();
 }

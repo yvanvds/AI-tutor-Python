@@ -4,12 +4,25 @@
 // and lets a test play the page's side of the bridge by posting a message
 // on a channel — exactly what the real page does through
 // `window.<channel>.postMessage(...)`.
+//
+// Also counts how often the platform *widget* is created and built (#128):
+// every `WebViewWidget(...)` constructs one and every `WebViewWidget.build`
+// builds it, and on Windows each such build re-mounts the native texture —
+// so a host that keeps the lesson from blinking must keep both at one.
 
 import 'package:flutter/widgets.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 class FakeWebViewPlatform extends WebViewPlatform {
   final List<FakeWebViewController> controllers = [];
+
+  /// How many platform widgets were created — one per `WebViewWidget(...)`
+  /// constructor call.
+  int widgetsCreated = 0;
+
+  /// How many times any platform widget's `build` ran — one per
+  /// `WebViewWidget.build`, i.e. per rebuild that reached the WebView.
+  int widgetBuilds = 0;
 
   /// Installs a fresh fake as the global platform and returns it.
   static FakeWebViewPlatform install() {
@@ -30,7 +43,10 @@ class FakeWebViewPlatform extends WebViewPlatform {
   @override
   PlatformWebViewWidget createPlatformWebViewWidget(
     PlatformWebViewWidgetCreationParams params,
-  ) => FakeWebViewWidget(params);
+  ) {
+    widgetsCreated++;
+    return FakeWebViewWidget(params, onBuild: () => widgetBuilds++);
+  }
 
   @override
   PlatformNavigationDelegate createPlatformNavigationDelegate(
@@ -95,10 +111,16 @@ class FakeWebViewController extends PlatformWebViewController {
 }
 
 class FakeWebViewWidget extends PlatformWebViewWidget {
-  FakeWebViewWidget(super.params) : super.implementation();
+  FakeWebViewWidget(super.params, {required this.onBuild})
+    : super.implementation();
+
+  final VoidCallback onBuild;
 
   @override
-  Widget build(BuildContext context) => const SizedBox.expand();
+  Widget build(BuildContext context) {
+    onBuild();
+    return const SizedBox.expand();
+  }
 }
 
 class FakeNavigationDelegate extends PlatformNavigationDelegate {

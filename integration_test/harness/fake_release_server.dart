@@ -16,11 +16,27 @@
 //     binary either way: the harness always replaces the installer launcher
 //     (#49), because a test run must never start a real setup on the machine
 //     it is running on.
+//
+// With `tls: true` (#124) it serves all of that over HTTPS with a self-signed
+// certificate (`loopback_tls.dart`), which Dart's own TLS stack refuses with
+// `CERTIFICATE_VERIFY_FAILED` — the production symptom on a school network
+// that inspects TLS. [TrustingLoopbackGet] is the stand-in for the `curl.exe`
+// the app falls back to on such a network: it trusts exactly this
+// certificate, the way Schannel trusts the filter's CA from the Windows
+// store. The real binary cannot be used here — it would refuse the loopback
+// certificate for the same reason Dart does, and putting a test CA in the
+// machine's store is not something a test may do.
 
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+
+import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
+import 'package:http/http.dart' as http;
+
+import '../../test/helpers/loopback_tls.dart';
 
 /// A well-formed hash that no download will ever match.
 ///
@@ -30,6 +46,59 @@ import 'dart:typed_data';
 const String kFakeInstallerSha256 =
     '0000000000000000000000000000000000000000000000000000000000000000';
 
+/// A [NativeGet] that trusts the loopback certificate — and only that one —
+/// standing in for the Windows-native `curl.exe` transport in a flow that
+/// drives the fallback end-to-end (#124). Records every request it makes on
+/// [calls], so a flow can prove the fallback carried the check, the checksum
+/// and the installer rather than any of them getting through on Dart.
+///
+/// Built with the machine's [proxy], as the real one is (#133): the
+/// production wiring hands `curlNativeGet` the same `UpdateProxy` it hands
+/// Dart's client, and this stand-in honours it the same way.
+class TrustingLoopbackGet {
+  TrustingLoopbackGet({this.proxy});
+
+  final UpdateProxy? proxy;
+
+  final List<({Uri url, Map<String, String> headers, File? to})> calls = [];
+
+  Future<http.Response> call(
+    Uri url, {
+    Map<String, String> headers = const <String, String>{},
+    Duration? timeout,
+    File? to,
+  }) async {
+    calls.add((url: url, headers: headers, to: to));
+    final HttpClient client = HttpClient()
+      ..badCertificateCallback = (cert, host, port) =>
+          host == InternetAddress.loopbackIPv4.address &&
+          isLoopbackCertificate(cert);
+    final UpdateProxy? via = proxy;
+    if (via != null) client.findProxy = via.findProxy;
+    try {
+      final HttpClientRequest request = await client.getUrl(url);
+      headers.forEach(request.headers.set);
+      final HttpClientResponse response = await request.close();
+      if (to != null) {
+        final IOSink sink = to.openWrite();
+        await response.pipe(sink);
+        return http.Response.bytes(Uint8List(0), response.statusCode);
+      }
+      final BytesBuilder body = BytesBuilder(copy: false);
+      await for (final List<int> chunk in response) {
+        body.add(chunk);
+      }
+      return http.Response.bytes(body.takeBytes(), response.statusCode);
+    } on HandshakeException catch (e) {
+      // The stand-in refused something: not this flow's certificate, so not
+      // this flow's server. Say so rather than look like a network error.
+      throw UpdateCheckException('loopback stand-in refused $url: $e');
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
 class FakeReleaseServer {
   FakeReleaseServer._(this._server, this.feedUrl);
 
@@ -37,6 +106,11 @@ class FakeReleaseServer {
 
   /// What the harness's `updateFeedUrl` is pointed at.
   final Uri feedUrl;
+
+  /// Where the server actually listens, as `host:port` — the same as the
+  /// feed URL's authority unless [start] was given an `advertisedAuthority`,
+  /// in which case this is what a proxy's route has to point at (#133).
+  String get authority => '${_server.address.address}:${_server.port}';
 
   /// How often the app asked for the release / the checksum asset / the
   /// installer. A flow that has to prove the app did *not* act — nothing
@@ -63,6 +137,12 @@ class FakeReleaseServer {
   /// app to get past verification — the install handover (#49) — passes
   /// [installerSha256] as the real hash of the bytes it serves. Left `null`
   /// the installer is a 404, as it was before (#50).
+  /// [tls] serves everything over HTTPS with the self-signed loopback
+  /// certificate, which Dart cannot verify (#124) — see the file comment.
+  /// [advertisedAuthority] is the `host:port` the feed URL and the asset
+  /// links name instead of the server's own — for a flow that puts a proxy
+  /// between the app and this server (#133), it is the address only the
+  /// proxy has a route to.
   static Future<FakeReleaseServer> start({
     int status = HttpStatus.ok,
     String? rawBody,
@@ -74,9 +154,26 @@ class FakeReleaseServer {
     String installerSha256 = kFakeInstallerSha256,
     int installerChunks = 5,
     Duration chunkDelay = const Duration(milliseconds: 120),
+    bool tls = false,
+    String? advertisedAuthority,
   }) async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final base = 'http://${server.address.address}:${server.port}';
+    final HttpServer server;
+    if (tls) {
+      final context = SecurityContext()
+        ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+        ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem));
+      server = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        context,
+      );
+    } else {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    }
+    final scheme = tls ? 'https' : 'http';
+    final authority =
+        advertisedAuthority ?? '${server.address.address}:${server.port}';
+    final base = '$scheme://$authority';
     final fake = FakeReleaseServer._(server, Uri.parse('$base$_feedPath'));
 
     final assets = <Map<String, Object?>>[

@@ -47,6 +47,12 @@ dependencies:
   url_launcher: ^6.3.0
   fl_chart: ^0.69.0
   webview_all: ^1.0.3
+  markdown: ^7.3.1
+  # The Windows proxy setting the update check honours (#133) is read from
+  # the registry through `RegGetValue`; both were already in the tree as
+  # file_picker's dependencies.
+  win32: ^5.15.0
+  ffi: ^2.1.4
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +85,11 @@ flutter:
     - assets/sounds/question.mp3
     - assets/sounds/chime.mp3
     - assets/lesson/lesson.css
+    # The grade formula students read inside the app (#129). The repository
+    # document is bundled as-is — declared here rather than copied under
+    # assets/ — so there is one file to edit and the build ships whatever
+    # version the tree carries.
+    - docs/PUNTENFORMULE.md
 
 
   # An image asset can refer to one or more resolution-specific "variants", see

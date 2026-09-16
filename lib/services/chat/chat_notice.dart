@@ -27,6 +27,18 @@ enum ChatNoticeKind {
   /// Stream ended before the envelope closed.
   replyTruncated,
 
+  /// An account on its own key has none stored, so the call was not made
+  /// (#126). Points at Options → OpenAI API key.
+  ownKeyMissing,
+
+  /// OpenAI refused the key the user stored on this device (HTTP 401,
+  /// #126). Points at Options → OpenAI API key.
+  ownKeyRejected,
+
+  /// OpenAI refused the school's bundled key, or the build has none (#126).
+  /// Nothing the student can fix: points at the teacher.
+  schoolKeyInvalid,
+
   /// Retry requested with nothing to retry.
   noPreviousRequest,
 

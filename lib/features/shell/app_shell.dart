@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
+import 'package:ai_tutor_python/features/puntenformule/puntenformule_page.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
@@ -53,6 +54,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     final offering = ref.watch(
       updateControllerProvider.select((s) => s.isOffering),
     );
+    // The same strip, for a launch check that did not complete (#124). The
+    // two never hold at once — a failed check has no release to offer — but
+    // the offer wins on paper so a release is never hidden behind a notice.
+    final checkFailed = ref.watch(
+      updateControllerProvider.select((s) => s.checkFailed),
+    );
 
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
@@ -75,7 +82,10 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           // Above the sidebar as well as the content: this is the app telling
           // the student something, not one page's business.
-          if (offering) const UpdateOfferBar(),
+          if (offering)
+            const UpdateOfferBar()
+          else if (checkFailed)
+            const UpdateCheckFailedNotice(),
           Expanded(
             child: Stack(
               children: [
@@ -111,6 +121,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const SessionView();
       case Section.map:
         return const LeerpadPage();
+      case Section.puntenformule:
+        return const PuntenformulePage();
       case Section.goals:
         return const GoalsPage();
       case Section.lessonContent:

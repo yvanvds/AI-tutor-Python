@@ -548,6 +548,144 @@ void main() {
     });
   });
 
+  // #124: a launch check that fails used to be a `debugPrint` and a line in
+  // About, which nobody opens — students behind a TLS-inspecting filter sat
+  // two releases behind with no hint. The state now says when the shell
+  // should announce it, and only then.
+  group('checkFailed', () {
+    final offline = UpdateCheckException(
+      'request failed: HandshakeException: CERTIFICATE_VERIFY_FAILED',
+    );
+
+    test('a failed automatic check asks to be announced', () async {
+      final seams = _Seams(feedError: offline);
+      final container = _containerFor(seams);
+
+      await container.read(updateControllerProvider.notifier).start();
+
+      final state = container.read(updateControllerProvider);
+      expect(state.phase, UpdatePhase.failed);
+      expect(state.automatic, isTrue);
+      expect(state.checkFailed, isTrue);
+      expect(state.isOffering, isFalse, reason: 'nothing to offer');
+      // The notice points at About, so About has to have the reason.
+      expect(state.message, contains('CERTIFICATE_VERIFY_FAILED'));
+    });
+
+    // The person who pressed the button is looking at the answer already.
+    test('a failed manual check is not announced', () async {
+      final seams = _Seams(feedError: offline);
+      final container = _containerFor(seams);
+
+      await container.read(updateControllerProvider.notifier).check();
+
+      final state = container.read(updateControllerProvider);
+      expect(state.phase, UpdatePhase.failed);
+      expect(state.automatic, isFalse);
+      expect(state.checkFailed, isFalse);
+    });
+
+    test('a successful automatic check is not announced', () async {
+      for (final latest in [_release('2.1.0+20'), _release('1.0.0'), null]) {
+        final seams = _Seams(latest: latest);
+        final container = _containerFor(seams);
+        await container.read(updateControllerProvider.notifier).start();
+        expect(container.read(updateControllerProvider).checkFailed, isFalse);
+      }
+    });
+
+    // A failed *apply* keeps its release and is reported on the bar it
+    // started from; the notice is for a check that left nothing to show.
+    test(
+      'a failed apply after an automatic check is the bar\'s news',
+      () async {
+        final seams = _Seams(latest: _release('2.1.0+20'), verifies: false);
+        final container = _containerFor(seams);
+        final controller = container.read(updateControllerProvider.notifier);
+
+        await controller.start();
+        await controller.apply();
+
+        final state = container.read(updateControllerProvider);
+        expect(state.phase, UpdatePhase.failed);
+        expect(state.isOffering, isTrue);
+        expect(state.checkFailed, isFalse);
+      },
+    );
+
+    test('closing the notice keeps the reason for About', () async {
+      final seams = _Seams(feedError: offline);
+      final container = _containerFor(seams);
+      final controller = container.read(updateControllerProvider.notifier);
+
+      await controller.start();
+      controller.dismissNotice();
+
+      final state = container.read(updateControllerProvider);
+      expect(state.checkFailed, isFalse);
+      expect(state.noticeDismissed, isTrue);
+      expect(state.phase, UpdatePhase.failed);
+      expect(state.message, contains('CERTIFICATE_VERIFY_FAILED'));
+    });
+
+    // At most once per session: a manual retry from About that fails again
+    // renders inline there and does not bring the strip back.
+    test('a closed notice stays closed through a later failed check', () async {
+      final seams = _Seams(feedError: offline);
+      final container = _containerFor(seams);
+      final controller = container.read(updateControllerProvider.notifier);
+
+      await controller.start();
+      controller.dismissNotice();
+      await controller.check();
+
+      expect(container.read(updateControllerProvider).checkFailed, isFalse);
+    });
+
+    // The two strips never contend: a manual check that finds a release
+    // after a failed launch check puts the offer up, not the notice.
+    test('a later manual check that succeeds clears the notice', () async {
+      var attempts = 0;
+      final container = ProviderContainer(
+        overrides: [
+          updateServicesProvider.overrideWithValue(
+            UpdateServices(
+              localVersion: '2.0.0+17',
+              feed: () async {
+                if (attempts++ == 0) throw offline;
+                return _release('2.1.0+20');
+              },
+              download: (_, _) async => throw StateError('not reached'),
+              verify: (_, _) async => true,
+              run: (_) async => throw StateError('not reached'),
+              log: (_) {},
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(updateControllerProvider.notifier);
+
+      await controller.start();
+      expect(container.read(updateControllerProvider).checkFailed, isTrue);
+
+      await controller.check();
+      final state = container.read(updateControllerProvider);
+      expect(state.checkFailed, isFalse);
+      expect(state.isOffering, isTrue);
+    });
+
+    test('nothing is announced on a build that does not check', () async {
+      final seams = _Seams(autoCheck: false, feedError: offline);
+      final container = _containerFor(seams);
+
+      await container.read(updateControllerProvider.notifier).start();
+
+      expect(container.read(updateControllerProvider).checkFailed, isFalse);
+      expect(seams.feedCalls, 0);
+    });
+  });
+
   group('production wiring', () {
     test('a null feed URL means no feed and no auto check', () async {
       final container = ProviderContainer(

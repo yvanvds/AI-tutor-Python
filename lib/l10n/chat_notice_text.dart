@@ -20,6 +20,12 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_tutorUnreachable;
       case ChatNoticeKind.replyTruncated:
         return chat_notice_replyTruncated;
+      case ChatNoticeKind.ownKeyMissing:
+        return chat_notice_ownKeyMissing;
+      case ChatNoticeKind.ownKeyRejected:
+        return chat_notice_ownKeyRejected;
+      case ChatNoticeKind.schoolKeyInvalid:
+        return chat_notice_schoolKeyInvalid;
       case ChatNoticeKind.noPreviousRequest:
         return chat_notice_noPreviousRequest;
       case ChatNoticeKind.emptyResponse:

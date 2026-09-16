@@ -9,6 +9,7 @@
 // replaced by the in-memory fake. The end-to-end version of this flow lives
 // in `integration_test/flows/explain_paging.dart`.
 
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -18,6 +19,7 @@ import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -317,6 +319,83 @@ void main() {
       await tester.tap(find.text('Previous'));
       await settlePage(tester);
       expect(shownLesson(), contains('lesson-one'));
+
+      await unmount(tester);
+    });
+  });
+
+  // #128: the sibling poll emits every 5 s whether or not the curriculum
+  // changed, and the view used to `setState` on every emission — a full
+  // rebuild down to the WebView, which on Windows blinked. Now an unchanged
+  // poll is dropped, a changed one still lands, and neither reaches the
+  // platform widget.
+  group('sibling polls', () {
+    Future<void> poll(WidgetTester tester) async {
+      await tester.pump(kCosmosPollInterval);
+      await tester.pump();
+    }
+
+    LessonHtmlView lesson(WidgetTester tester) =>
+        tester.widget<LessonHtmlView>(find.byType(LessonHtmlView));
+
+    testWidgets('an unchanged poll does not rebuild the view', (tester) async {
+      await mount(tester);
+      final before = lesson(tester);
+      expect(webviews.widgetBuilds, 1);
+
+      await poll(tester);
+      await poll(tester);
+
+      expect(
+        lesson(tester),
+        same(before),
+        reason: 'a poll with the same siblings rebuilt the explain view',
+      );
+      expect(find.text('3 / 4'), findsOneWidget);
+      expect(webviews.widgetsCreated, 1);
+      expect(webviews.widgetBuilds, 1);
+      expect(shownLesson(), contains('lesson-three'));
+
+      await unmount(tester);
+    });
+
+    testWidgets('a changed poll still lands, without touching the platform '
+        'widget', (tester) async {
+      await mount(tester);
+      final before = lesson(tester);
+
+      // The teacher adds a subgoal after the active one.
+      goals.docs['s5'] = _goalDoc(
+        id: 's5',
+        title: 'Functions',
+        parentId: 'r1',
+        order: 5000,
+        contentId: 'c5',
+      );
+      await poll(tester);
+
+      expect(lesson(tester), isNot(same(before)));
+      expect(find.text('3 / 5'), findsOneWidget);
+      expect(webviews.widgetsCreated, 1);
+      expect(webviews.widgetBuilds, 1);
+      // Same page, same document: nothing was reloaded.
+      expect(webviews.controllers.single.loadedHtml, hasLength(1));
+
+      await unmount(tester);
+    });
+
+    testWidgets('a sibling turning optional changes what Previous reaches', (
+      tester,
+    ) async {
+      await mount(tester);
+      expect(enabled(tester, 'Previous'), isTrue);
+
+      // The only seen page, "Print", becomes a side quest.
+      goals.docs['s1']!['optional'] = true;
+      await poll(tester);
+
+      expect(enabled(tester, 'Previous'), isFalse);
+      expect(webviews.widgetBuilds, 1);
 
       await unmount(tester);
     });

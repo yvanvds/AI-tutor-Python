@@ -37,6 +37,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_map => 'Learning path';
 
   @override
+  String get sidebar_section_puntenformule => 'Grade formula';
+
+  @override
   String get sidebar_section_goals => 'Goals';
 
   @override
@@ -53,6 +56,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebar_section_options => 'Options';
+
+  @override
+  String get puntenformule_header_note =>
+      'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.';
+
+  @override
+  String get puntenformule_loading => 'Loading the grade formula…';
+
+  @override
+  String puntenformule_loadError(String error) {
+    return 'The grade formula could not be loaded: $error';
+  }
 
   @override
   String get milestones_page_title => 'Milestones';
@@ -331,6 +346,49 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get options_model_override => 'Another model on this device';
+
+  @override
+  String options_model_saved(String model) {
+    return 'This device now uses $model.';
+  }
+
+  @override
+  String get options_modelField_label => 'Model id';
+
+  @override
+  String get options_modelField_hint => 'e.g. gpt-5-mini';
+
+  @override
+  String get options_modelField_helper =>
+      'The exact id from platform.openai.com/docs/models, case-sensitive. Test it before saving.';
+
+  @override
+  String get options_modelField_invalid =>
+      'Enter one model id, without spaces.';
+
+  @override
+  String get options_modelField_test_button => 'Test';
+
+  @override
+  String get options_modelField_save_button => 'Save';
+
+  @override
+  String options_modelField_testing(String model) {
+    return 'Testing $model…';
+  }
+
+  @override
+  String options_modelField_testPassed(String model, String seconds) {
+    return '$model answered in $seconds s.';
+  }
+
+  @override
+  String options_modelField_testFailed(String reason) {
+    return 'Test failed: $reason';
+  }
+
+  @override
   String get options_progress_title => 'Progress';
 
   @override
@@ -495,7 +553,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Post an issue on GitHub straight from the app, with the debug data of a recent tutor turn attached.';
+      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -514,7 +572,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_github_notConfigured =>
-      'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id, so bug reports can only be filed on github.com by hand.';
+      'This build cannot sign in to GitHub: it was compiled without a GitHub OAuth client id. Reports can still be saved as a file.';
 
   @override
   String options_bugReport_github_device_explainer(String repo) {
@@ -588,7 +646,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get options_bugReport_dialog_submit => 'Post issue';
+  String get options_bugReport_dialog_submit => 'Post on GitHub';
+
+  @override
+  String get options_bugReport_dialog_saveFile => 'Save as file';
 
   @override
   String options_bugReport_posted(String url) {
@@ -598,6 +659,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String options_bugReport_postFailed(String error) {
     return 'Posting failed: $error';
+  }
+
+  @override
+  String options_bugReport_saved(String path) {
+    return 'Report saved as $path. Send this file to your teacher.';
+  }
+
+  @override
+  String options_bugReport_saveFailed(String error) {
+    return 'Saving failed: $error';
   }
 
   @override
@@ -772,6 +843,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String update_status_failed(String reason) {
     return 'The update did not succeed: $reason';
   }
+
+  @override
+  String get update_notice_checkFailed =>
+      'Checking for updates did not succeed — see Options → About.';
+
+  @override
+  String get update_notice_dismiss => 'Close';
 
   @override
   String get update_action_apply => 'Update';
@@ -2052,6 +2130,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chat_notice_replyTruncated => 'The tutor\'s reply was cut off.';
+
+  @override
+  String get chat_notice_ownKeyMissing =>
+      'No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.';
+
+  @override
+  String get chat_notice_ownKeyRejected =>
+      'OpenAI rejected your API key. Check it under Options → OpenAI API key.';
+
+  @override
+  String get chat_notice_schoolKeyInvalid =>
+      'The school\'s OpenAI API key is not working. Let your teacher know.';
 
   @override
   String get chat_notice_noPreviousRequest => 'No previous request to retry.';

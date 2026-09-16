@@ -2,6 +2,14 @@
 // asks GitHub's `/releases/latest`. These pin the two halves that can go
 // wrong on their own — reading a release payload, and reading the checksum
 // asset that replaces the manifest's `sha256` field.
+//
+// #124 adds the third: what happens when Dart cannot complete the TLS
+// handshake at all, which is what a school's TLS-inspecting filter does to
+// it. The check has to retry through the Windows-native seam — for exactly
+// that failure and no other.
+//
+// #133 the fourth: the client the check builds for itself has to go through
+// the machine's proxy, which `package:http`'s default one never does.
 
 import 'dart:async';
 import 'dart:convert';
@@ -9,9 +17,13 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/github_release.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import '../helpers/loopback_proxy.dart';
+import '../helpers/loopback_tls.dart';
 
 const String _installerUrl =
     'https://github.com/yvanvds/AI-tutor-Python/releases/download/'
@@ -421,6 +433,300 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  // #124: behind a TLS-inspecting filter Dart's BoringSSL cannot chain the
+  // re-signed certificate and throws `HandshakeException` — which
+  // `package:http` does not wrap, so it arrives as itself. The seam exists
+  // for that failure only.
+  group('fetchLatestRelease — native transport fallback', () {
+    final endpoint = Uri.parse(
+      'https://api.github.com/repos/yvanvds/AI-tutor-Python/releases/latest',
+    );
+    const handshake = HandshakeException(
+      'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: '
+      'unable to get local issuer certificate)',
+    );
+
+    /// Records every call the seam gets and answers like GitHub would.
+    ({NativeGet get, List<({Uri url, Map<String, String> headers})> calls})
+    recordingNative({Object? failWith}) {
+      final calls = <({Uri url, Map<String, String> headers})>[];
+      Future<http.Response> get(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async {
+        calls.add((url: url, headers: headers));
+        if (failWith != null) throw failWith;
+        if (url.path.endsWith('.sha256')) {
+          return http.Response.bytes(
+            utf8.encode('$_hash  $kInstallerAssetName\n'),
+            200,
+          );
+        }
+        return http.Response.bytes(
+          utf8.encode(jsonEncode(_releaseJson())),
+          200,
+        );
+      }
+
+      return (get: get, calls: calls);
+    }
+
+    test('a handshake failure is retried through the seam, with the same '
+        'URL and headers, and the checksum follows it', () async {
+      var dartRequests = 0;
+      final dart = MockClient((_) async {
+        dartRequests++;
+        throw handshake;
+      });
+      final native = recordingNative();
+      final logs = <String>[];
+
+      final info = await fetchLatestRelease(
+        endpoint,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+
+      expect(info, isNotNull);
+      expect(info!.version, '2.0.0+18');
+      expect(info.sha256, _hash);
+      expect(info.viaNativeTransport, isTrue);
+
+      expect(native.calls, hasLength(2));
+      expect(native.calls[0].url, endpoint);
+      expect(native.calls[0].headers['Accept'], 'application/vnd.github+json');
+      expect(native.calls[0].headers['X-GitHub-Api-Version'], '2022-11-28');
+      expect(native.calls[1].url, Uri.parse(_checksumUrl));
+      // Once Dart has failed the handshake to this host there is nothing to
+      // learn from failing it again for the checksum.
+      expect(dartRequests, 1, reason: 'the checksum was tried on Dart again');
+      expect(logs.join('\n'), contains('TLS handshake'));
+    });
+
+    test('a check that never needed the seam does not say it did', () async {
+      final native = recordingNative();
+      final info = await fetchLatestRelease(
+        endpoint,
+        client: _githubClient(release: _releaseJson()),
+        nativeGet: native.get,
+      );
+      expect(info?.viaNativeTransport, isFalse);
+      expect(native.calls, isEmpty);
+    });
+
+    test('without a seam the handshake reason is reported as before', () async {
+      final dart = MockClient((_) async => throw handshake);
+      await expectLater(
+        fetchLatestRelease(endpoint, client: dart),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('CERTIFICATE_VERIFY_FAILED'),
+          ),
+        ),
+      );
+    });
+
+    // About has to keep telling the truth about the network: the handshake
+    // is what went wrong first, the fallback is what went wrong after.
+    test('when the seam fails too, both reasons are kept', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(
+        failWith: UpdateCheckException('curl.exe exited with 60'),
+      );
+      await expectLater(
+        fetchLatestRelease(endpoint, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('CERTIFICATE_VERIFY_FAILED'),
+              contains('curl.exe exited with 60'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('a non-200 through the seam is an ordinary non-200', () async {
+      final dart = MockClient((_) async => throw handshake);
+      Future<http.Response> native(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async => http.Response('', 404);
+      // 404 still means "nothing published", whichever transport said so.
+      expect(
+        await fetchLatestRelease(endpoint, client: dart, nativeGet: native),
+        isNull,
+      );
+    });
+
+    // The fallback masks whatever it is used for, so it must only be used
+    // for the certificate problem.
+    test('a dead socket, a 404 or a timeout never reach the seam', () async {
+      final native = recordingNative();
+
+      await expectLater(
+        fetchLatestRelease(
+          endpoint,
+          client: MockClient(
+            (_) async => throw const SocketException('no route to host'),
+          ),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(
+        await fetchLatestRelease(
+          endpoint,
+          client: MockClient((_) async => http.Response('', 404)),
+          nativeGet: native.get,
+        ),
+        isNull,
+      );
+      await expectLater(
+        fetchLatestRelease(
+          endpoint,
+          client: MockClient((_) => Completer<http.Response>().future),
+          nativeGet: native.get,
+          timeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+
+      expect(
+        native.calls,
+        isEmpty,
+        reason:
+            'the seam was used for a failure '
+            'that is not the certificate problem',
+      );
+    });
+  });
+
+  // #133: on a network where only the proxy has a route out, the client the
+  // check builds for itself must go through it. The endpoint names a black
+  // hole — a direct dial connects and hears nothing, the production symptom
+  // — and the proxy routes that address to a loopback TLS server answering
+  // like GitHub. Dart trusts that server's certificate only inside
+  // `TrustLoopbackCertificate`, the test-side stand-in for a CA in the
+  // Windows root store; nothing in `lib/` is touched by it.
+  group('fetchLatestRelease — through the machine proxy', () {
+    late BlackHole hole;
+    late HttpServer github;
+    late LoopbackProxy proxy;
+    late Uri endpoint;
+
+    setUp(() async {
+      hole = await BlackHole.start();
+      github = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        SecurityContext()
+          ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+          ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+      );
+      github.listen((HttpRequest req) {
+        req.response.headers.contentType = ContentType.binary;
+        if (req.uri.path.endsWith('.sha256')) {
+          req.response.write('$_hash  $kInstallerAssetName\n');
+        } else {
+          req.response.write(
+            jsonEncode(
+              _releaseJson(
+                assets: [
+                  _asset(
+                    kInstallerAssetName,
+                    'https://${hole.authority}/$kInstallerAssetName',
+                  ),
+                  _asset(
+                    kChecksumAssetName,
+                    'https://${hole.authority}/$kChecksumAssetName',
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        req.response.close();
+      });
+      proxy = await LoopbackProxy.start(
+        routes: {hole.authority: '${github.address.address}:${github.port}'},
+      );
+      endpoint = Uri.parse('https://${hole.authority}/releases/latest');
+    });
+
+    tearDown(() async {
+      await proxy.close();
+      await github.close(force: true);
+      await hole.close();
+    });
+
+    test('the release and its checksum both arrive through it', () async {
+      final info = await HttpOverrides.runWithHttpOverrides(
+        () => fetchLatestRelease(endpoint, proxy: proxy.updateProxy),
+        TrustLoopbackCertificate(),
+      );
+      expect(info?.version, '2.0.0+18');
+      expect(info?.sha256, _hash);
+      expect(info?.viaNativeTransport, isFalse, reason: 'Dart got through');
+      expect(proxy.connects, everyElement(hole.authority));
+      expect(
+        proxy.connects.length,
+        greaterThanOrEqualTo(1),
+        reason: 'the check never went through the proxy',
+      );
+      expect(hole.connections, 0, reason: 'the check dialled out directly');
+    });
+
+    // The premise, and the symptom the issue was filed on: the same
+    // endpoint with no proxy is a ten-second silence.
+    test('without the proxy the same check times out', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => fetchLatestRelease(
+            endpoint,
+            timeout: const Duration(milliseconds: 300),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('timed out'),
+          ),
+        ),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
+    });
+
+    // A host on the bypass list goes direct — here, into the hole.
+    test('a bypassed host is dialled directly', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => fetchLatestRelease(
+            endpoint,
+            timeout: const Duration(milliseconds: 300),
+            proxy: UpdateProxy(proxy.updateProxy.url, bypass: const ['*']),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
     });
   });
 

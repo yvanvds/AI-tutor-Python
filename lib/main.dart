@@ -50,7 +50,9 @@ class GoalsApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final identity = ref.watch(authServiceProvider);
     final currentAccount = ref.watch(accountServiceProvider);
-    final hasLocalKey = ref.watch(localApiKeyStorageProvider);
+    final hasLocalKey = ref.watch(
+      localApiKeyStorageProvider.select((key) => key != null),
+    );
     // User override, else the system locale when translated, else English
     // (#23). Resolved once in `appLocaleProvider` so services that need a
     // locale (see `appLocalizationsProvider`) agree with the widget tree.

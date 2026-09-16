@@ -11,7 +11,8 @@
 //   - export / import of progress to a JSON file (#32)
 //   - the user's own OpenAI key (only when the account is not on the
 //     bundled key)
-//   - bug reports to GitHub, with a recent tutor turn's debug payload
+//   - bug reports, saved as a file for the teacher or posted to GitHub,
+//     with a recent tutor turn's debug payload (#127)
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
 //   - about / version, with the manual update check (#48)
 
@@ -22,13 +23,16 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/locale_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
+import 'package:ai_tutor_python/services/debug/bug_report_file.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/debug/runner_diagnostics.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
@@ -41,6 +45,7 @@ import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
@@ -270,41 +275,301 @@ class _ThemeCard extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// AI model (#32)
+// AI model (#32, #125)
 // ---------------------------------------------------------------------------
+
+/// The connector behind the Test button in both model cards (#125).
+///
+/// Its own instance rather than the tutor's: `probe()` names the model
+/// explicitly and records nothing, so it needs neither the config nor the
+/// device override — and the tutor's connector carries a student's
+/// conversation, which a teacher-side check has no business touching. It
+/// does run on the same key as the tutor (#126), so on an own-key account
+/// the Test button validates the stored key as well as the model id. The
+/// integration harness overrides this with its scripted model.
+final modelProbeConnectorProvider = Provider<OpenaiConnector>(
+  (ref) => OpenaiConnector(
+    getApiKey: () => ref.read(tutorApiKeyProvider),
+    client: ref.watch(openaiClientProvider),
+  ),
+);
+
+/// Whether [text] can be sent to OpenAI as a model id. Trimmed by the caller;
+/// ids never contain whitespace, and case is left alone because they are
+/// case-sensitive.
+bool _isValidModelId(String text) =>
+    text.isNotEmpty && !RegExp(r'\s').hasMatch(text);
+
+/// A model id typed in, tested, then saved — the input both model cards share
+/// (#125).
+///
+/// The list this replaces went stale within weeks of every release. A free
+/// field never does, but it also lets a typo through, so **Save only unlocks
+/// after Test has passed for the text as it stands**: a probe is bound to the
+/// trimmed id it ran on, and any edit puts the field back to untested. That
+/// matters most for the school-wide card, where a saved id moves every
+/// student within `kCosmosPollInterval`.
+///
+/// [initialValue] is what the field starts on and what it follows while the
+/// user has not typed: the school-wide card's value arrives one poll after
+/// the first frame, and another teacher's write should show up too.
+class _ModelField extends ConsumerStatefulWidget {
+  const _ModelField({
+    required this.scope,
+    required this.initialValue,
+    required this.onSave,
+  });
+
+  /// `device` / `global` — keys the field, its buttons and its status line so
+  /// a test can tell the two cards apart when a teacher sees both.
+  final String scope;
+  final String initialValue;
+
+  /// Stores the tested id. Throws to report a failed write; the caller owns
+  /// the confirmation and the error message.
+  final Future<void> Function(String model) onSave;
+
+  @override
+  ConsumerState<_ModelField> createState() => _ModelFieldState();
+}
+
+class _ModelFieldState extends ConsumerState<_ModelField> {
+  late final TextEditingController _controller;
+  bool _busy = false;
+
+  /// The trimmed id the last probe ran on, and its outcome. Both are only
+  /// meaningful while the field still reads [_testedModel]; an edit leaves
+  /// them in place but hides them, so undoing the edit brings the result
+  /// back without another round trip.
+  String? _testedModel;
+  ModelProbe? _result;
+
+  /// Set while a probe is in flight, for the status line.
+  String? _testing;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue)
+      ..addListener(() => setState(() {}));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ModelField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Follow the stored value until the user has typed something of their
+    // own — a poll delivering the school-wide model after the first frame
+    // must fill the field, a teacher's half-typed id must not be overwritten
+    // by it.
+    if (widget.initialValue != oldWidget.initialValue &&
+        _controller.text == oldWidget.initialValue) {
+      _controller.text = widget.initialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _text => _controller.text.trim();
+
+  Future<void> _test() async {
+    final model = _text;
+    setState(() {
+      _busy = true;
+      _testing = model;
+    });
+    ModelProbe result;
+    try {
+      result = await ref.read(modelProbeConnectorProvider).probe(model);
+    } catch (e, stack) {
+      // `probe` never throws; a stand-in might, and a probe that never
+      // reports back would leave both buttons dead.
+      result = ModelProbeFailed(e, stack, ChatNotice.raw(e.toString()));
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _testing = null;
+      _testedModel = model;
+      _result = result;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSave(_text);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final text = _text;
+    final valid = _isValidModelId(text);
+    final tested = text == _testedModel ? _result : null;
+    final canSave = !_busy && valid && tested is ModelProbeOk;
+
+    Widget? status;
+    final testing = _testing;
+    if (testing != null) {
+      status = Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.s),
+          Text(l.options_modelField_testing(testing)),
+        ],
+      );
+    } else if (tested is ModelProbeOk) {
+      status = Text(
+        l.options_modelField_testPassed(
+          tested.model,
+          (tested.latency.inMilliseconds / 1000).toStringAsFixed(1),
+        ),
+        style: TextStyle(color: AppColors.accent),
+      );
+    } else if (tested is ModelProbeFailed) {
+      status = Text(
+        l.options_modelField_testFailed(l.chatNotice(tested.reason)),
+        style: TextStyle(color: AppColors.danger),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Editable while a probe runs: the result is bound to the id it ran
+        // on, so an edit in the meantime simply lands as untested — and
+        // disabling the field would take the cursor away after every Test.
+        TextField(
+          key: ValueKey('model-field-${widget.scope}'),
+          controller: _controller,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: InputDecoration(
+            labelText: l.options_modelField_label,
+            hintText: l.options_modelField_hint,
+            helperText: l.options_modelField_helper,
+            helperMaxLines: 2,
+            // Empty is the untouched state, not a mistake; a space inside
+            // the id is.
+            errorText: text.isEmpty || valid
+                ? null
+                : l.options_modelField_invalid,
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (_) {
+            if (!_busy && valid) _test();
+          },
+        ),
+        if (status != null) ...[
+          const SizedBox(height: AppSpacing.s),
+          KeyedSubtree(
+            key: ValueKey('model-status-${widget.scope}'),
+            child: status,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.m),
+        Wrap(
+          spacing: AppSpacing.s,
+          runSpacing: AppSpacing.s,
+          children: [
+            OutlinedButton.icon(
+              key: ValueKey('model-test-${widget.scope}'),
+              onPressed: _busy || !valid ? null : _test,
+              icon: const Icon(Icons.network_check, size: 18),
+              label: Text(l.options_modelField_test_button),
+            ),
+            FilledButton.tonalIcon(
+              key: ValueKey('model-save-${widget.scope}'),
+              onPressed: canSave ? _save : null,
+              icon: const Icon(Icons.save_outlined, size: 18),
+              label: Text(l.options_modelField_save_button),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 /// Per-device model override on top of the school-wide `GlobalConfig.Model`.
 /// See `services/config/model_preference.dart` for why it is per device and
 /// who gets to see this card.
-class _ModelCard extends ConsumerWidget {
+///
+/// Two choices: follow the school default, or name a model for this machine.
+/// The second opens a [_ModelField]; nothing is stored until its Save, so
+/// picking it and walking away leaves the device on the default.
+class _ModelCard extends ConsumerStatefulWidget {
   const _ModelCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ModelCard> createState() => _ModelCardState();
+}
+
+class _ModelCardState extends ConsumerState<_ModelCard> {
+  /// The user opened the field but has not saved an id yet. Once one is
+  /// stored the override itself says the field is open.
+  bool _editing = false;
+
+  Future<void> _save(String model) async {
+    final l = AppLocalizations.of(context);
+    await ref.read(modelPreferenceProvider.notifier).setModel(model);
+    if (!mounted) return;
+    _snack(context, l.options_model_saved(model));
+  }
+
+  Future<void> _followGlobal() async {
+    setState(() => _editing = false);
+    await ref.read(modelPreferenceProvider.notifier).setModel(null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final current = ref.watch(modelPreferenceProvider);
     final global = ref.watch(globalConfigServiceProvider)?.model;
     final fallback = (global == null || global.isEmpty)
         ? OpenaiConnector.defaultModel
         : global;
-
-    Widget row(String label, String? value) => _choiceRow(
-      label: label,
-      selected: current == value,
-      onTap: () => ref.read(modelPreferenceProvider.notifier).setModel(value),
-    );
+    final overriding = current != null || _editing;
 
     return _OptionsCard(
       title: l.options_model_title,
       subtitle: l.options_model_subtitle,
       child: Column(
-        // Keyed so a test can tell these rows from the identically-labelled
-        // ones in the school-wide card below, which a teacher sees at the
-        // same time (#118).
+        // Keyed so a test can tell these rows from the school-wide card
+        // below, which a teacher sees at the same time (#118).
         key: const ValueKey('model-rows-device'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          row(l.options_model_followGlobal(fallback), null),
-          for (final model in kSelectableModels) row(model, model),
+          _choiceRow(
+            label: l.options_model_followGlobal(fallback),
+            selected: !overriding,
+            onTap: _followGlobal,
+          ),
+          _choiceRow(
+            label: l.options_model_override,
+            selected: overriding,
+            onTap: () => setState(() => _editing = true),
+          ),
+          if (overriding) ...[
+            const SizedBox(height: AppSpacing.s),
+            _ModelField(
+              scope: 'device',
+              initialValue: current ?? '',
+              onSave: _save,
+            ),
+          ],
         ],
       ),
     );
@@ -325,53 +590,38 @@ class _ModelCard extends ConsumerWidget {
 ///
 /// The write itself preserves the stored `ApiKey`; see
 /// `GlobalConfigService.setModel`, which also explains why this widget *is*
-/// the role gate.
-class _GlobalModelCard extends ConsumerStatefulWidget {
+/// the role gate. The field it holds will not save an id the Test button has
+/// not seen answer (#125): a typo here reaches every student.
+class _GlobalModelCard extends ConsumerWidget {
   const _GlobalModelCard();
 
-  @override
-  ConsumerState<_GlobalModelCard> createState() => _GlobalModelCardState();
-}
-
-class _GlobalModelCardState extends ConsumerState<_GlobalModelCard> {
-  bool _busy = false;
-
-  Future<void> _pick(String model) async {
+  Future<void> _save(BuildContext context, WidgetRef ref, String model) async {
     final l = AppLocalizations.of(context);
-    setState(() => _busy = true);
     try {
       await ref.read(globalConfigServiceProvider.notifier).setModel(model);
-      if (!mounted) return;
+      if (!context.mounted) return;
       _snack(context, l.options_globalModel_saved(model));
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       _snack(context, l.options_globalModel_saveFailed(e.toString()));
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    // No "follow the default" row: this *is* the default. A config doc whose
-    // Model has never been filled in simply has no row selected, and the
-    // tutor falls back to `OpenaiConnector.defaultModel` until it does.
-    final global = ref.watch(globalConfigServiceProvider)?.model;
+    // No "follow the default" choice: this *is* the default. A config doc
+    // whose Model has never been filled in starts the field empty, and the
+    // tutor falls back to `OpenaiConnector.defaultModel` until it is.
+    final global = ref.watch(globalConfigServiceProvider)?.model ?? '';
 
     return _OptionsCard(
       title: l.options_globalModel_title,
       subtitle: l.options_globalModel_subtitle,
-      child: Column(
-        key: const ValueKey('model-rows-global'),
-        children: [
-          for (final model in kSelectableModels)
-            _choiceRow(
-              label: model,
-              selected: global == model,
-              onTap: _busy ? null : () => _pick(model),
-            ),
-        ],
+      child: _ModelField(
+        scope: 'global',
+        initialValue: global,
+        onSave: (model) => _save(context, ref, model),
       ),
     );
   }
@@ -762,7 +1012,9 @@ class _ApiKeyCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final hasKey = ref.watch(localApiKeyStorageProvider);
+    final hasKey = ref.watch(
+      localApiKeyStorageProvider.select((key) => key != null),
+    );
     return _OptionsCard(
       title: l.options_apiKey_title,
       subtitle: l.options_apiKey_subtitle,
@@ -895,8 +1147,16 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
 // Bug reports
 // ---------------------------------------------------------------------------
 
-/// Filing a GitHub issue from inside the app, and the GitHub sign-in that
-/// makes it possible.
+/// Filing a bug report from inside the app: the same report either **saved
+/// as a text file** the student sends to the teacher over chat (#127), or
+/// **posted as a GitHub issue** for whoever has an account — and the GitHub
+/// sign-in that makes the second possible.
+///
+/// The file is the primary path. Reporting used to require the sign-in
+/// first, and for most students creating a GitHub account is a bigger step
+/// than the bug is worth — so the reports did not come in. `Report a bug…`
+/// is therefore always on offer; connecting GitHub is the optional extra
+/// below it, not the prerequisite.
 ///
 /// Sign-in is the OAuth **device flow** (#57): a dialog shows a short code,
 /// the student approves it in a browser, and the app polls until GitHub hands
@@ -914,8 +1174,9 @@ class _SecretInputDialogState extends State<_SecretInputDialog> {
 ///
 /// A build compiled without an OAuth client id cannot run the flow at all.
 /// That is a legitimate state (a fork that has not registered an OAuth app),
-/// so the card says so plainly and hides the button, rather than offering a
-/// sign-in that could only fail.
+/// so the card says so plainly and hides the sign-in button, rather than
+/// offering a sign-in that could only fail. Saving a file needs no account
+/// and no client id, so that path stays open on such a build.
 class _BugReportCard extends ConsumerStatefulWidget {
   const _BugReportCard();
 
@@ -1052,15 +1313,19 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
     });
   }
 
-  Future<void> _report(String token) async {
+  /// One dialog, two outcomes (#127). [token] is the stored GitHub token,
+  /// or null — which only takes the `Post on GitHub` button off the dialog;
+  /// the report itself, and saving it as a file, need no account.
+  Future<void> _report(String? token) async {
     final l = AppLocalizations.of(context);
     final turns = ref.read(debugServiceProvider).buffer;
     // Read before the dialog, so the async gaps below never touch `ref`.
     final pyRunner = ref.read(pyRunnerProvider);
     final issues = ref.read(githubIssueServiceProvider);
+    final io = ref.read(progressArchiveIoProvider);
     final draft = await showDialog<_BugReportDraft>(
       context: context,
-      builder: (_) => _BugReportDialog(turns: turns),
+      builder: (_) => _BugReportDialog(turns: turns, canPost: token != null),
     );
     if (draft == null || !mounted) return;
 
@@ -1069,21 +1334,55 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
       // Always attached, with no dropdown: the turn payload describes the
       // tutor, and "it didn't run" is a question about the runner (#74).
       final runner = await RunnerDiagnostics.collect(pyRunner);
-      final url = await issues.createIssue(
-        token: token,
-        title: draft.title,
-        body: buildBugReportBody(
-          description: draft.description,
-          appVersion: kAppVersion,
-          runner: runner,
-          turn: draft.turn?.toJson(),
-        ),
+      // The same body whichever way it leaves — same runner section, same
+      // turn payload, same redaction. The teacher may paste the file into a
+      // public issue, so it must be as clean as the issue would have been.
+      final body = buildBugReportBody(
+        description: draft.description,
+        appVersion: kAppVersion,
+        runner: runner,
+        turn: draft.turn?.toJson(),
       );
-      if (!mounted) return;
-      _snack(context, l.options_bugReport_posted(url.toString()));
+      switch (draft.destination) {
+        case _BugReportDestination.github:
+          // The dialog only offers this with a token; a disconnect cannot
+          // happen while the modal is up.
+          final url = await issues.createIssue(
+            token: token!,
+            title: draft.title,
+            body: body,
+          );
+          if (!mounted) return;
+          _snack(context, l.options_bugReport_posted(url.toString()));
+        case _BugReportDestination.file:
+          final now = DateTime.now();
+          final path = await io.save(
+            suggestedName: bugReportFileName(
+              title: draft.title,
+              reportedAt: now,
+            ),
+            contents: buildBugReportFile(
+              title: draft.title,
+              reportedAt: now,
+              appVersion: kAppVersion,
+              body: body,
+            ),
+            allowedExtensions: const ['txt'],
+          );
+          // Cancelled in the save dialog: the student knows.
+          if (!mounted || path == null) return;
+          _snack(context, l.options_bugReport_saved(path));
+      }
     } catch (e) {
       if (!mounted) return;
-      _snack(context, l.options_bugReport_postFailed(e.toString()));
+      _snack(context, switch (draft.destination) {
+        _BugReportDestination.github => l.options_bugReport_postFailed(
+          e.toString(),
+        ),
+        _BugReportDestination.file => l.options_bugReport_saveFailed(
+          e.toString(),
+        ),
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1125,33 +1424,32 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          status,
-          const SizedBox(height: AppSpacing.m),
-          Wrap(
-            spacing: AppSpacing.s,
-            runSpacing: AppSpacing.s,
-            children: [
-              if (token == null) ...[
-                if (configured)
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _connect,
-                    icon: const Icon(Icons.link, size: 18),
-                    label: Text(l.options_bugReport_github_connect_button),
-                  ),
-              ] else ...[
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : () => _report(token),
-                  icon: const Icon(Icons.bug_report_outlined, size: 18),
-                  label: Text(l.options_bugReport_report_button),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _disconnect,
-                  icon: const Icon(Icons.link_off, size: 18),
-                  label: Text(l.options_bugReport_github_disconnect_button),
-                ),
-              ],
-            ],
+          // Always, token or not (#127): the dialog decides what it can do
+          // with the report, and saving it needs nothing from GitHub.
+          FilledButton.tonalIcon(
+            key: const ValueKey('bug-report-button'),
+            onPressed: _busy ? null : () => _report(token),
+            icon: const Icon(Icons.bug_report_outlined, size: 18),
+            label: Text(l.options_bugReport_report_button),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          // The optional extra, below the primary action.
+          status,
+          if (token != null || configured) ...[
+            const SizedBox(height: AppSpacing.m),
+            if (token == null)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _connect,
+                icon: const Icon(Icons.link, size: 18),
+                label: Text(l.options_bugReport_github_connect_button),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _disconnect,
+                icon: const Icon(Icons.link_off, size: 18),
+                label: Text(l.options_bugReport_github_disconnect_button),
+              ),
+          ],
         ],
       ),
     );
@@ -1280,21 +1578,31 @@ class _DeviceCodeDialogState extends State<_DeviceCodeDialog> {
   }
 }
 
+/// Where a finished report goes (#127): a `.txt` for the teacher, or an
+/// issue on GitHub.
+enum _BugReportDestination { file, github }
+
 class _BugReportDraft {
   const _BugReportDraft({
     required this.title,
     required this.description,
+    required this.destination,
     this.turn,
   });
   final String title;
   final String description;
+  final _BugReportDestination destination;
   final TurnRecord? turn;
 }
 
+/// Title, description and an optional turn — the same form for both
+/// outcomes. `Save as file` is always there and is the primary action;
+/// `Post on GitHub` only appears with [canPost], i.e. a stored token.
 class _BugReportDialog extends StatefulWidget {
-  const _BugReportDialog({required this.turns});
+  const _BugReportDialog({required this.turns, required this.canPost});
 
   final List<TurnRecord> turns;
+  final bool canPost;
 
   @override
   State<_BugReportDialog> createState() => _BugReportDialogState();
@@ -1319,7 +1627,7 @@ class _BugReportDialogState extends State<_BugReportDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit(_BugReportDestination destination) {
     final title = _title.text.trim();
     if (title.isEmpty) {
       setState(() => _titleMissing = true);
@@ -1329,6 +1637,7 @@ class _BugReportDialogState extends State<_BugReportDialog> {
       _BugReportDraft(
         title: title,
         description: _description.text,
+        destination: destination,
         turn: _turn,
       ),
     );
@@ -1399,15 +1708,24 @@ class _BugReportDialogState extends State<_BugReportDialog> {
           ],
         ),
       ),
+      // Cancel · Save as file · Post on GitHub (when connected). The file is
+      // the default, so it takes the filled style; posting is tonal.
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l.options_dialog_cancel),
         ),
         FilledButton(
-          onPressed: _submit,
-          child: Text(l.options_bugReport_dialog_submit),
+          key: const ValueKey('bug-report-save-file'),
+          onPressed: () => _submit(_BugReportDestination.file),
+          child: Text(l.options_bugReport_dialog_saveFile),
         ),
+        if (widget.canPost)
+          FilledButton.tonal(
+            key: const ValueKey('bug-report-post-github'),
+            onPressed: () => _submit(_BugReportDestination.github),
+            child: Text(l.options_bugReport_dialog_submit),
+          ),
       ],
     );
   }

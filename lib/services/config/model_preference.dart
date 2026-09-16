@@ -17,24 +17,16 @@
 // default applies. Moving the *class* is a second, teacher-only card in
 // Options (`_GlobalModelCard`, #118) that writes the global doc; this one is
 // still only ever about the machine it is set on.
+//
+// What it may be: any model id (#125). The Options card used to offer a
+// curated list, which went stale within weeks of every release; it is now a
+// free field whose Test button asks the model for a real chat completion
+// before Save unlocks, so the app holds no list of model names at all. The
+// one piece of model knowledge left is `OpenaiConnector._extraParams`, which
+// adds `reasoning_effort` for the gpt-5 / o-series families.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-/// Models offered in the Options panel, cheapest-first within each family.
-///
-/// A short curated list rather than a live catalogue: `/v1/models` returns
-/// every embedding and audio model too, and the tutor only works with chat
-/// completions. `OpenaiConnector` sends `reasoning_effort` to the gpt-5 and
-/// o-series entries automatically.
-const List<String> kSelectableModels = <String>[
-  'gpt-4o-mini',
-  'gpt-4o',
-  'gpt-4.1-mini',
-  'gpt-4.1',
-  'gpt-5-mini',
-  'gpt-5',
-];
 
 /// Per-device model override, or `null` to follow the school-wide default
 /// from `GlobalConfig`.

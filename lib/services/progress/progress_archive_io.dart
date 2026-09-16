@@ -1,6 +1,11 @@
 // The "choose a file" half of progress export / import (#32), kept behind a
 // provider so the flow can be driven without an OS file dialog — a modal the
 // Windows shell owns, which no widget or integration test can click.
+//
+// The bug-report card saves through the same seam (#127): a report a student
+// sends to the teacher by chat is a `.txt` written with the same "ask where,
+// then write" dialog, so [ProgressArchiveIo.save] takes the extension filter
+// as a parameter rather than hard-coding the archive's.
 
 import 'dart:io';
 
@@ -13,10 +18,12 @@ typedef ArchiveFile = ({String name, String contents});
 
 abstract class ProgressArchiveIo {
   /// Asks where to write, writes [contents], and returns the path — or null
-  /// when the user cancelled.
+  /// when the user cancelled. [allowedExtensions] is the dialog's filter,
+  /// without the dot; it defaults to the progress archive's.
   Future<String?> save({
     required String suggestedName,
     required String contents,
+    List<String> allowedExtensions = const ['json'],
   });
 
   /// Asks which file to read and returns it, or null when cancelled.
@@ -30,12 +37,13 @@ class FilePickerArchiveIo implements ProgressArchiveIo {
   Future<String?> save({
     required String suggestedName,
     required String contents,
+    List<String> allowedExtensions = const ['json'],
   }) async {
     // `saveFile` only returns the chosen path on desktop; writing is ours.
     final path = await FilePicker.platform.saveFile(
       fileName: suggestedName,
       type: FileType.custom,
-      allowedExtensions: const ['json'],
+      allowedExtensions: allowedExtensions,
     );
     if (path == null) return null;
     await File(path).writeAsString(contents);

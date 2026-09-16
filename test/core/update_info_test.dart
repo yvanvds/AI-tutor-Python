@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -7,6 +8,9 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import '../helpers/loopback_proxy.dart';
+import '../helpers/loopback_tls.dart';
 
 void main() {
   group('isNewer', () {
@@ -154,6 +158,269 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  // #124: the installer sits behind the same TLS inspection as the API, so
+  // the download has the same fallback — and the same rule that nothing but
+  // a handshake failure reaches it.
+  group('downloadToTemp — native transport fallback', () {
+    final url = Uri.parse('https://example.com/installer.exe');
+    const handshake = HandshakeException(
+      'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED)',
+    );
+    final expectedPath =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'python_teacher_install.exe';
+
+    /// A seam that writes [bytes] where it is told to and records the call.
+    ({NativeGet get, List<({Uri url, File? to})> calls}) recordingNative({
+      List<int> bytes = const [1, 2, 3],
+      int status = 200,
+      Object? failWith,
+    }) {
+      final calls = <({Uri url, File? to})>[];
+      Future<http.Response> get(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async {
+        calls.add((url: url, to: to));
+        if (failWith != null) throw failWith;
+        if (to != null && status == 200) to.writeAsBytesSync(bytes);
+        return http.Response('', status);
+      }
+
+      return (get: get, calls: calls);
+    }
+
+    setUp(() {
+      final leftover = File(expectedPath);
+      if (leftover.existsSync()) leftover.deleteSync();
+    });
+
+    test('a handshake failure is retried through the seam into the temp '
+        'file', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(bytes: const [9, 8, 7]);
+      final logs = <String>[];
+
+      final file = await downloadToTemp(
+        url,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+
+      expect(file.path, expectedPath);
+      expect(native.calls, hasLength(1));
+      expect(native.calls.single.url, url);
+      expect(native.calls.single.to?.path, expectedPath);
+      expect(file.readAsBytesSync(), [9, 8, 7]);
+      expect(logs.join('\n'), contains('TLS handshake'));
+    });
+
+    // A check that only got through natively is not going to fare better on
+    // the installer: go straight there.
+    test('preferNative skips Dart entirely', () async {
+      var dartRequests = 0;
+      final dart = MockClient((_) async {
+        dartRequests++;
+        return http.Response('never', 200);
+      });
+      final native = recordingNative();
+
+      final file = await downloadToTemp(
+        url,
+        client: dart,
+        nativeGet: native.get,
+        preferNative: true,
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+
+      expect(dartRequests, 0);
+      expect(native.calls, hasLength(1));
+    });
+
+    test('preferNative without a seam still uses Dart', () async {
+      final dart = MockClient((_) async => http.Response('', 404));
+      await expectLater(
+        downloadToTemp(url, client: dart, preferNative: true),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('HTTP 404'),
+          ),
+        ),
+      );
+    });
+
+    test('a non-200 through the seam fails and leaves no file', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(status: 403);
+      await expectLater(
+        downloadToTemp(url, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('HTTP 403'),
+          ),
+        ),
+      );
+      expect(File(expectedPath).existsSync(), isFalse);
+    });
+
+    test('without a seam the handshake reason is reported as before', () async {
+      final dart = MockClient((_) async => throw handshake);
+      await expectLater(
+        downloadToTemp(url, client: dart),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('CERTIFICATE_VERIFY_FAILED'),
+          ),
+        ),
+      );
+    });
+
+    test('when the seam fails too, both reasons are kept', () async {
+      final dart = MockClient((_) async => throw handshake);
+      final native = recordingNative(
+        failWith: UpdateCheckException('curl.exe exited with 60'),
+      );
+      await expectLater(
+        downloadToTemp(url, client: dart, nativeGet: native.get),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('CERTIFICATE_VERIFY_FAILED'),
+              contains('curl.exe exited with 60'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('a dead socket, a 404 or a stall never reach the seam', () async {
+      final native = recordingNative();
+
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient(
+            (_) async => throw const SocketException('no route to host'),
+          ),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient((_) async => http.Response('', 404)),
+          nativeGet: native.get,
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      await expectLater(
+        downloadToTemp(
+          url,
+          client: MockClient((_) => Completer<http.Response>().future),
+          nativeGet: native.get,
+          responseTimeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+
+      expect(native.calls, isEmpty);
+    });
+  });
+
+  // #133: the installer comes down through the machine's proxy too — the
+  // download builds a client of its own, so it is a second place the setting
+  // has to reach. Same shape as the check's test in github_release_test.dart:
+  // the URL names a black hole, the proxy routes it to a loopback TLS server,
+  // and Dart trusts that certificate only inside `TrustLoopbackCertificate`.
+  group('downloadToTemp — through the machine proxy', () {
+    final installer = Uint8List.fromList(
+      List<int>.generate(16 * 1024, (i) => (i * 7) % 256),
+    );
+    late BlackHole hole;
+    late HttpServer server;
+    late LoopbackProxy proxy;
+    late Uri url;
+
+    setUp(() async {
+      hole = await BlackHole.start();
+      server = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        SecurityContext()
+          ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+          ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+      );
+      server.listen((HttpRequest req) {
+        req.response.headers.contentType = ContentType.binary;
+        req.response.contentLength = installer.length;
+        req.response.add(installer);
+        req.response.close();
+      });
+      proxy = await LoopbackProxy.start(
+        routes: {hole.authority: '${server.address.address}:${server.port}'},
+      );
+      url = Uri.parse('https://${hole.authority}/python_teacher_install.exe');
+    });
+
+    tearDown(() async {
+      await proxy.close();
+      await server.close(force: true);
+      await hole.close();
+    });
+
+    test('the installer arrives through it, with progress', () async {
+      final progress = <double>[];
+      final file = await HttpOverrides.runWithHttpOverrides(
+        () => downloadToTemp(
+          url,
+          proxy: proxy.updateProxy,
+          onProgress: progress.add,
+        ),
+        TrustLoopbackCertificate(),
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+      expect(file.readAsBytesSync(), installer);
+      expect(progress, isNotEmpty);
+      expect(progress.last, 1.0);
+      expect(proxy.connects, [hole.authority]);
+      expect(hole.connections, 0, reason: 'the download dialled out directly');
+    });
+
+    test('without the proxy the same download times out', () async {
+      await expectLater(
+        HttpOverrides.runWithHttpOverrides(
+          () => downloadToTemp(
+            url,
+            responseTimeout: const Duration(milliseconds: 300),
+          ),
+          TrustLoopbackCertificate(),
+        ),
+        throwsA(isA<UpdateCheckException>()),
+      );
+      expect(proxy.connects, isEmpty);
+      expect(hole.connections, 1);
     });
   });
 
