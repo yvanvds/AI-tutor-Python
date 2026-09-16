@@ -1099,6 +1099,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_header_restart_tooltip => 'Restart session';
 
   @override
+  String get chat_header_collapse_tooltip => 'Hide chat';
+
+  @override
+  String get chat_panel_expand_tooltip => 'Show chat';
+
+  @override
   String get chat_composer_idle_hint => 'Type your question or answer…';
 
   @override

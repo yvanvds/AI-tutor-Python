@@ -1110,6 +1110,12 @@ class AppLocalizationsNl extends AppLocalizations {
   String get chat_header_restart_tooltip => 'Sessie herstarten';
 
   @override
+  String get chat_header_collapse_tooltip => 'Verberg chat';
+
+  @override
+  String get chat_panel_expand_tooltip => 'Toon chat';
+
+  @override
   String get chat_composer_idle_hint => 'Typ je vraag of antwoord…';
 
   @override

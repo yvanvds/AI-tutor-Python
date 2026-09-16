@@ -332,6 +332,8 @@
   "chat_header_presence_online": "online",
   "chat_header_presence_helpsWith": " · helpt je met ",
   "chat_header_restart_tooltip": "Sessie herstarten",
+  "chat_header_collapse_tooltip": "Verberg chat",
+  "chat_panel_expand_tooltip": "Toon chat",
   "chat_composer_idle_hint": "Typ je vraag of antwoord…",
   "chat_composer_idle_kbd_send": "verstuur",
   "chat_composer_idle_kbd_newline": "nieuwe regel",

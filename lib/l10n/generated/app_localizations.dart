@@ -1897,6 +1897,18 @@ abstract class AppLocalizations {
   /// **'Restart session'**
   String get chat_header_restart_tooltip;
 
+  /// Tooltip of the chat header button that folds the chat panel to an edge strip; only offered in the theory (explain) view
+  ///
+  /// In en, this message translates to:
+  /// **'Hide chat'**
+  String get chat_header_collapse_tooltip;
+
+  /// Tooltip of the one button on the folded chat strip, which brings the full chat panel back
+  ///
+  /// In en, this message translates to:
+  /// **'Show chat'**
+  String get chat_panel_expand_tooltip;
+
   /// No description provided for @chat_composer_idle_hint.
   ///
   /// In en, this message translates to:

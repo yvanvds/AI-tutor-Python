@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
@@ -9,6 +10,14 @@ class ChatService {
   final ChatController controller = InMemoryChatController();
   final void Function(StreamState)? _onStreamStateChanged;
   final void Function(bool)? _onMcqPendingChanged;
+
+  /// How many tutor messages are in the chat: every [addTutorMessage] and
+  /// every stream that [completeStream] turned into a real message; back to
+  /// zero on [clear]. A listener sees "one more arrived" or "all gone", which
+  /// is all the folded chat strip's unread dot needs (#131). Notices, MCQ
+  /// blocks and in-flight stream placeholders are not counted: they are not
+  /// something the tutor said that the student has yet to read.
+  final ValueNotifier<int> tutorMessageCount = ValueNotifier<int>(0);
 
   int _id = 0;
   TextStreamMessage? _activeStream;
@@ -25,6 +34,7 @@ class ChatService {
     controller.insertMessage(
       TextMessage(id: _id.toString(), text: text, authorId: 'Teacher'),
     );
+    tutorMessageCount.value++;
   }
 
   /// Insert a system pill. The text is not chosen here: the notice travels
@@ -104,6 +114,7 @@ class ChatService {
         createdAt: placeholder.createdAt,
       ),
     );
+    tutorMessageCount.value++;
   }
 
   /// Tear down the active stream after a transport error.
@@ -119,12 +130,16 @@ class ChatService {
   void clear() {
     _id = 0;
     _activeStream = null;
+    tutorMessageCount.value = 0;
     _onStreamStateChanged?.call(const StreamStateLoading());
     _onMcqPendingChanged?.call(false);
     controller.setMessages([]);
   }
 
-  void dispose() => controller.dispose();
+  void dispose() {
+    tutorMessageCount.dispose();
+    controller.dispose();
+  }
 }
 
 final streamStateProvider = StateProvider<StreamState>(

@@ -602,6 +602,14 @@
     "description": "Connective fragment between 'online' and the topic name; leading dot and bullet are part of the string"
   },
   "chat_header_restart_tooltip": "Restart session",
+  "chat_header_collapse_tooltip": "Hide chat",
+  "@chat_header_collapse_tooltip": {
+    "description": "Tooltip of the chat header button that folds the chat panel to an edge strip; only offered in the theory (explain) view"
+  },
+  "chat_panel_expand_tooltip": "Show chat",
+  "@chat_panel_expand_tooltip": {
+    "description": "Tooltip of the one button on the folded chat strip, which brings the full chat panel back"
+  },
   "chat_composer_idle_hint": "Type your question or answer…",
   "chat_composer_idle_kbd_send": "send",
   "chat_composer_idle_kbd_newline": "new line",
