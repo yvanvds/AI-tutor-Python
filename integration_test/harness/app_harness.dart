@@ -221,7 +221,9 @@ class AppHarness {
   /// that serves its release over a certificate Dart refuses sees the app
   /// fail the way it fails on a machine with no fallback. The TLS flow
   /// passes [TrustingLoopbackGet], which trusts that one certificate the way
-  /// Schannel trusts a school filter's CA.
+  /// Schannel trusts a school filter's CA; the proxy-login flow (#140) passes
+  /// one that also answers a proxy's challenge, the way SSPI answers a
+  /// school proxy's with the Windows login.
   final NativeGet? nativeGet;
 
   /// The proxy the updater's requests go through (#133). `null` (the

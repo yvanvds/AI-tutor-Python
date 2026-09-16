@@ -71,6 +71,42 @@ typedef NativeGet = Future<http.Response> Function(
 /// Where a transport diagnostic goes when nothing is shown on screen.
 typedef TransportLog = void Function(String message);
 
+/// Whether [error] is Dart's `HttpClient` reporting that the proxy refused
+/// to open the `CONNECT` tunnel for want of a login (#140): the
+/// `HttpException("Proxy failed to establish tunnel (407 …)")` it throws
+/// when the proxy answers the tunnel request with `407 Proxy Authentication
+/// Required`, as `package:http` hands it on — a `ClientException` carrying
+/// the same message.
+///
+/// That is what an authenticating school proxy (NTLM / Kerberos, the usual
+/// with an AD-joined filter) does to every request the updater makes, and
+/// it is the second and last reason the [NativeGet] fallback is engaged:
+/// Dart can only answer such a challenge with a login it is given, and the
+/// app has none — the student is logged in to Windows, not to the app —
+/// while the `curl.exe` Windows ships answers it through SSPI with that
+/// Windows login and no stored secret. Recognised by that message and that
+/// status, and by nothing wider: a tunnel refused for another reason (a 502
+/// from a proxy with no route, a 403 from one that blocks the host), a 404,
+/// a timeout or a dead socket are not the login problem, and the fallback
+/// would only mask them. The wording is `dart:io`'s own, matched as a
+/// prefix so the proxy's reason phrase after the status does not matter.
+bool isProxyLoginChallenge(Object error) {
+  final String message = switch (error) {
+    http.ClientException e => e.message,
+    HttpException e => e.message,
+    _ => '',
+  };
+  return message.startsWith('Proxy failed to establish tunnel (407');
+}
+
+/// What About says for a proxy that asks for a login (#140), in front of
+/// whatever the transports said: "407 Proxy Authentication Required" is the
+/// network's wording and not something a student can act on; this is what
+/// they can tell whoever runs the network.
+const String kProxyLoginReason =
+    "the network's proxy asks for a login "
+    '(HTTP 407 Proxy Authentication Required)';
+
 /// The client the updater's own requests are made with: Dart's `HttpClient`,
 /// told about [proxy] when there is one (#133).
 ///
@@ -106,11 +142,12 @@ class UpdateInfo {
   final String notes;
 
   /// Whether the check that found this release only got through on the
-  /// [NativeGet] fallback (#124).
+  /// [NativeGet] fallback (#124, #140).
   ///
   /// Carried on the release so the download that follows goes straight to
-  /// the transport that worked, instead of failing the same handshake again
-  /// first. The installer asset sits behind the same inspection as the API.
+  /// the transport that worked, instead of failing the same handshake — or
+  /// the same proxy login challenge — again first. The installer asset sits
+  /// behind the same inspection, and the same proxy, as the API.
   final bool viaNativeTransport;
 }
 
@@ -148,13 +185,15 @@ bool isNewer(String remote, String local) {
 /// stalls for [stallTimeout]. It used to return `null` for a bad status and
 /// hang forever on a dead socket (#46). A partial file is removed.
 ///
-/// A TLS handshake Dart cannot complete — and only that (#124) — is retried
-/// through [nativeGet] when one is given, and [preferNative] skips straight
-/// to it for a release whose check already needed it. The fallback reports
-/// no progress: the bar stays indeterminate, which the UI already renders
-/// for a download with no declared length. A 404, a timeout, a dead socket
-/// are not the certificate problem and are never retried natively — that
-/// would only hide what actually went wrong.
+/// A TLS handshake Dart cannot complete (#124), or a proxy that refuses the
+/// tunnel for want of a login (#140, [isProxyLoginChallenge]) — and only
+/// those — are retried through [nativeGet] when one is given, and
+/// [preferNative] skips straight to it for a release whose check already
+/// needed it. The fallback reports no progress: the bar stays indeterminate,
+/// which the UI already renders for a download with no declared length. A
+/// 404, a timeout, a dead socket are neither the certificate problem nor
+/// the login problem and are never retried natively — that would only hide
+/// what actually went wrong.
 ///
 /// [proxy] is the machine's proxy setting (#133), honoured when no [client]
 /// is given; the native transport was built with the same one.
@@ -219,28 +258,65 @@ Future<File> downloadToTemp(
     // One clause above the catch-all on purpose: `package:http` wraps only
     // `SocketException` and `HttpException`, so this arrives as itself.
     await _deleteQuietly(tmp);
-    if (nativeGet == null) {
+    return _retryDownloadNatively(
+      nativeGet,
+      url,
+      tmp,
+      reason: '$e',
+      why: 'Dart could not complete the TLS handshake for the installer ($e)',
+      log: log,
+    );
+  } on http.ClientException catch (e) {
+    // The proxy's 407 on the tunnel arrives wrapped in this (#140); every
+    // other `ClientException` is an ordinary failure and reported as one.
+    await _deleteQuietly(tmp);
+    if (!isProxyLoginChallenge(e)) {
       throw UpdateCheckException('installer download from $url failed: $e');
     }
-    log?.call(
-      'Update: Dart could not complete the TLS handshake for the installer '
-      '($e); retrying through the Windows-native transport.',
+    return _retryDownloadNatively(
+      nativeGet,
+      url,
+      tmp,
+      reason: kProxyLoginReason,
+      why:
+          'the proxy asks for a login to open the tunnel for the installer '
+          '($e)',
+      log: log,
     );
-    try {
-      return await _downloadNatively(nativeGet, url, tmp);
-    } on UpdateCheckException catch (native) {
-      // The handshake reason stays in front: it is the one that explains the
-      // network, and the one About should still be telling the truth about.
-      throw UpdateCheckException(
-        'installer download from $url failed: $e; the Windows-native '
-        'fallback failed too: ${native.message}',
-      );
-    }
   } on Object catch (e) {
     await _deleteQuietly(tmp);
     throw UpdateCheckException('installer download from $url failed: $e');
   } finally {
     if (owned) c.close();
+  }
+}
+
+/// The installer through [nativeGet] after Dart's own attempt failed for
+/// [reason] — or, with no [nativeGet] to retry on, that reason as the
+/// failure. [why] is the log line's account of it.
+///
+/// When the fallback fails too, [reason] stays in front: it is the one that
+/// explains the network, and the one About should still be telling the
+/// truth about.
+Future<File> _retryDownloadNatively(
+  NativeGet? nativeGet,
+  Uri url,
+  File tmp, {
+  required String reason,
+  required String why,
+  TransportLog? log,
+}) async {
+  if (nativeGet == null) {
+    throw UpdateCheckException('installer download from $url failed: $reason');
+  }
+  log?.call('Update: $why; retrying through the Windows-native transport.');
+  try {
+    return await _downloadNatively(nativeGet, url, tmp);
+  } on UpdateCheckException catch (native) {
+    throw UpdateCheckException(
+      'installer download from $url failed: $reason; the Windows-native '
+      'fallback failed too: ${native.message}',
+    );
   }
 }
 

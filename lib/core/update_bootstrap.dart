@@ -123,6 +123,19 @@ String windowsCurlPath() => p.join(
   'curl.exe',
 );
 
+/// How `curl.exe` is told to answer a proxy's login challenge with the
+/// logged-in Windows user (#140): `--proxy-anyauth` lets it pick whatever
+/// the proxy offers (Negotiate over NTLM over the rest), and `--proxy-user :`
+/// — a bare colon — is the documented spelling of "take the user name and
+/// password from the environment", which on an SSPI build is the current
+/// Windows session. Passed only beside a `--proxy` that names no login of
+/// its own.
+const List<String> kCurlProxyWindowsLogin = <String>[
+  '--proxy-anyauth',
+  '--proxy-user',
+  ':',
+];
+
 /// The Windows-native transport behind [NativeGet]: `curl.exe` at
 /// [curlPath], or `null` when there is no such file — in which case the
 /// updater keeps today's behaviour and today's error text.
@@ -150,6 +163,16 @@ String windowsCurlPath() => p.join(
 ///   handed, bypass list included. [proxy] is looked up per request, not
 ///   taken at construction: the setting is resolved once per launch and,
 ///   when it comes from a PAC script (#135), not before a request needs it.
+/// - `--proxy-anyauth --proxy-user :` beside it (#140), unless the proxy
+///   URL carries a login of its own: a proxy that authenticates answers the
+///   `CONNECT` with a 407, and this is curl's documented way of answering a
+///   Negotiate / NTLM challenge through SSPI as the logged-in Windows user —
+///   the empty login is what tells it to. No credential is stored, passed
+///   or logged. A proxy that only offers Basic is not answered at all —
+///   curl ignores Basic for an empty login, rightly — and the request fails
+///   exactly as it failed before. With a login in the URL
+///   (`https_proxy=http://user:pass@…`) curl is left to send that, as
+///   Dart's client does.
 ///
 /// Nothing here weakens verification: the fallback trusts what the operating
 /// system trusts, and `verifyAndCleanUp` still hashes what arrives.
@@ -170,7 +193,8 @@ NativeGet? curlNativeGet({
         : null;
     final File out = to ?? File(p.join(scratch!.path, 'body'));
     try {
-      final String? via = (await proxy?.call())?.curlProxyFor(url);
+      final UpdateProxy? through = await proxy?.call();
+      final String? via = through?.curlProxyFor(url);
       final List<String> arguments = <String>[
         '-sS',
         '-L',
@@ -181,7 +205,11 @@ NativeGet? curlNativeGet({
         '1',
         '--speed-time',
         '${kDownloadStallTimeout.inSeconds}',
-        if (via != null) ...<String>['--proxy', via],
+        if (via != null) ...<String>[
+          '--proxy',
+          via,
+          if (!through!.hasLogin) ...kCurlProxyWindowsLogin,
+        ],
         for (final MapEntry<String, String> h in headers.entries) ...<String>[
           '-H',
           '${h.key}: ${h.value}',
@@ -683,10 +711,12 @@ final updateProxyProvider = Provider<UpdateProxyLookup>((ref) {
 });
 
 /// The transport the updater falls back to when Dart cannot complete a TLS
-/// handshake (#124): `curl.exe` on Windows, nothing anywhere else. The
-/// integration harness overrides it — with `null` to keep a test boot from
-/// ever spawning a process, or with a stand-in that trusts a loopback
-/// certificate the way Schannel would trust the school's.
+/// handshake (#124) or answer a proxy's login challenge (#140): `curl.exe`
+/// on Windows, nothing anywhere else. The integration harness overrides it
+/// — with `null` to keep a test boot from ever spawning a process, or with a
+/// stand-in that trusts a loopback certificate the way Schannel would trust
+/// the school's, and answers a loopback proxy's challenge the way SSPI would
+/// answer the school's.
 final nativeGetProvider = Provider<NativeGet?>(
   (ref) => Platform.isWindows
       ? curlNativeGet(

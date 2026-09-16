@@ -33,12 +33,24 @@
 // loopback target before it consults any script (the same built-in bypass
 // Edge has), and a name only the proxy knows the way to is what a school's
 // filter looks like anyway — Dart never resolves it, since through a proxy
-// it only ever sends `CONNECT host:port`.
+// it only ever sends `CONNECT host:port`. The fifth and sixth (#140) make
+// the proxy *authenticate*, as an AD-joined filter does: it refuses every
+// CONNECT that carries no `Proxy-Authorization` with a 407. Dart's client
+// has no login to give — the student is logged in to Windows, not to the
+// app — so the fifth shows the check failing on it and About saying, in
+// plain words, that the proxy asks for a login; the sixth hands the app a
+// fallback that answers the challenge, the way the shipped `curl.exe`
+// answers a school proxy's through SSPI with the Windows login, and drives
+// the whole update through it: the 407 engages the fallback, the checksum
+// and the installer follow it without being challenged again, and the
+// offer bar appears where it always does.
 //
-// Dart trusts the loopback certificate in the second test only through
-// `TrustLoopbackCertificate`, the test-side stand-in for a CA that sits in
-// the Windows root store, which Dart honours on its own. Nothing in `lib/`
-// is touched by it, and it is cleared again when the test ends.
+// Dart trusts the loopback certificate in the second, fifth and sixth tests
+// only through `TrustLoopbackCertificate`, the test-side stand-in for a CA
+// that sits in the Windows root store, which Dart honours on its own.
+// Nothing in `lib/` is touched by it, and it is cleared again when the test
+// ends. In the fifth and sixth it is what makes the login the *only* thing
+// in Dart's way.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -67,14 +79,21 @@ final _notice = find.byKey(const ValueKey('update-check-failed'));
 /// network, on a port that stays visible in the URL and the CONNECT alike.
 const String _schoolAuthority = 'updates.school.test:8443';
 
+/// What the fallback stand-in answers the proxy's challenge with (#140):
+/// the Windows login, as far as this flow is concerned. The proxy accepts
+/// any login and verifies none; what it records is that one was given.
+const String _windowsLogin = 'student:hunter2';
+
 /// The network: a hole the app is pointed at, a release server it cannot
 /// reach, and a proxy that can. The server is advertised at the hole unless
 /// [advertisedAuthority] says otherwise; either way the proxy alone routes
-/// that authority to the server.
+/// that authority to the server. With [requireLogin] the proxy refuses a
+/// CONNECT that carries no login (#140).
 Future<({BlackHole hole, FakeReleaseServer server, LoopbackProxy proxy})>
 _proxiedNetwork({
   Uint8List? installerBytes,
   String? advertisedAuthority,
+  bool requireLogin = false,
 }) async {
   final hole = await BlackHole.start();
   final String authority = advertisedAuthority ?? hole.authority;
@@ -89,6 +108,7 @@ _proxiedNetwork({
   );
   final proxy = await LoopbackProxy.start(
     routes: {authority: server.authority},
+    requireLogin: requireLogin,
   );
   return (hole: hole, server: server, proxy: proxy);
 }
@@ -325,6 +345,155 @@ void main() {
 
       await harness.dispose(tester);
       await pac.close();
+      await net.proxy.close();
+      await net.server.close();
+      await net.hole.close();
+      final downloaded = File(launch.executable);
+      if (downloaded.existsSync()) downloaded.deleteSync();
+    },
+  );
+
+  testWidgets(
+    'behind a proxy that asks for a login, Dart\'s own transport cannot '
+    'answer and About says so in plain words',
+    (tester) async {
+      final net = await _proxiedNetwork(requireLogin: true);
+      // The certificate is trusted, so the login is the only thing in the
+      // way — and it is enough.
+      HttpOverrides.global = TrustLoopbackCertificate();
+      addTearDown(() => HttpOverrides.global = null);
+
+      // The proxy setting as the app resolved it, and no fallback: a
+      // machine with nothing that can answer the challenge.
+      final harness = AppHarness(
+        updateFeedUrl: net.server.feedUrl,
+        proxy: net.proxy.updateProxy,
+      );
+      await harness.boot(tester);
+
+      await pumpUntil(
+        tester,
+        () =>
+            harness.container.read(updateControllerProvider).phase ==
+            UpdatePhase.failed,
+        timeout: const Duration(seconds: 25),
+        reason: 'the check did not fail against a proxy that wants a login',
+      );
+      // Not "ClientException: Proxy failed to establish tunnel (407 …)":
+      // the reason About shows is one a student can pass on.
+      expect(
+        harness.container.read(updateControllerProvider).message,
+        allOf(
+          contains("the network's proxy asks for a login"),
+          isNot(contains('ClientException')),
+        ),
+      );
+      // The proxy was asked, refused, and never given a login; the server
+      // never heard from the app, and nothing dialled out directly.
+      expect(net.proxy.challenges, greaterThanOrEqualTo(1));
+      expect(net.proxy.logins, isEmpty, reason: 'the app has no login');
+      expect(net.server.releaseRequests, 0);
+      expect(net.hole.connections, 0);
+      expect(_offerBar, findsNothing);
+      // ...and, per #124, the failure is announced rather than buried.
+      await pumpUntilFound(tester, _notice);
+
+      await harness.dispose(tester);
+      await net.proxy.close();
+      await net.server.close();
+      await net.hole.close();
+    },
+  );
+
+  testWidgets(
+    'behind a proxy that asks for a login, the fallback answers it and '
+    'carries the update through',
+    (tester) async {
+      final installerBytes = Uint8List.fromList(
+        List<int>.generate(48 * 1024, (i) => (i * 13) % 256),
+      );
+      final net = await _proxiedNetwork(
+        installerBytes: installerBytes,
+        requireLogin: true,
+      );
+      // Same trust as above: what pushes the check to the fallback here is
+      // the login alone, not a handshake.
+      HttpOverrides.global = TrustLoopbackCertificate();
+      addTearDown(() => HttpOverrides.global = null);
+      // The stand-in for curl.exe: the same proxy, and a login to answer
+      // its challenge with — what SSPI gives the real one.
+      final trusting = TrustingLoopbackGet(
+        proxy: net.proxy.updateProxy,
+        proxyLogin: _windowsLogin,
+      );
+
+      final harness = AppHarness(
+        updateFeedUrl: net.server.feedUrl,
+        proxy: net.proxy.updateProxy,
+        nativeGet: trusting.call,
+      );
+      await harness.boot(tester);
+
+      // The offer arrives where it always does, and nothing announces a
+      // failure: the 407 was a reason to fall back, not to give up.
+      await pumpUntilFound(tester, _offerBar);
+      expect(find.textContaining('99.0.0+1'), findsOneWidget);
+      expect(_notice, findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        harness.container
+            .read(updateControllerProvider)
+            .release
+            ?.viaNativeTransport,
+        isTrue,
+        reason: 'Dart got through a login challenge it cannot answer',
+      );
+
+      // Dart was challenged once, for the release, and never again: from
+      // there the fallback carried the check, answering the proxy on every
+      // CONNECT, and the checksum followed it without a second challenge.
+      expect(
+        trusting.calls.map((c) => c.url.path),
+        containsAllInOrder(<String>[
+          '/repos/yvanvds/AI-tutor-Python/releases/latest',
+          '/download/python_teacher_install.exe.sha256',
+        ]),
+      );
+      expect(net.proxy.challenges, 1);
+      expect(net.proxy.logins, hasLength(2));
+      expect(net.proxy.logins, everyElement(startsWith('Basic ')));
+      expect(net.server.releaseRequests, 1);
+      expect(net.server.checksumRequests, 1);
+      expect(net.proxy.connects, everyElement(net.hole.authority));
+      expect(net.hole.connections, 0, reason: 'something dialled out directly');
+
+      await tester.tap(_applyButton);
+      await pumpUntil(
+        tester,
+        () => harness.installerLaunches.isNotEmpty,
+        timeout: const Duration(seconds: 30),
+        reason: 'the verified installer was never handed over',
+      );
+
+      // The installer went straight to the fallback — the release remembers
+      // which transport found it — so the proxy was answered a third time
+      // and challenged no more.
+      expect(
+        trusting.calls.last.url.path,
+        '/download/python_teacher_install.exe',
+      );
+      expect(net.server.installerRequests, 1);
+      expect(net.proxy.challenges, 1);
+      expect(net.proxy.logins, hasLength(3));
+      expect(net.hole.connections, 0);
+
+      // The handover is the ordinary one (#49): the file, verified against
+      // the published hash, with the silent + relaunch switches.
+      final launch = harness.installerLaunches.single;
+      expect(File(launch.executable).readAsBytesSync(), installerBytes);
+      expect(launch.arguments, containsAll(<String>['/SILENT', '/RELAUNCH=1']));
+
+      await harness.dispose(tester);
       await net.proxy.close();
       await net.server.close();
       await net.hole.close();

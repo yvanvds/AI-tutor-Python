@@ -14,6 +14,10 @@
 // #130 the fifth: a second lookup on the same API, the release *by tag*
 // behind About's "What's new" button. It reads one field and goes through
 // the same transport, so the failures it reports are the check's failures.
+//
+// #140 the sixth: a proxy that authenticates. Dart's client cannot answer
+// its 407 on the CONNECT — the app has no login to give — so that, and only
+// that, is the second reason the native seam is engaged.
 
 import 'dart:async';
 import 'dart:convert';
@@ -616,6 +620,136 @@ void main() {
             'that is not the certificate problem',
       );
     });
+
+    // #140: an authenticating proxy answers the CONNECT with a 407. Dart's
+    // client throws `HttpException("Proxy failed to establish tunnel (407
+    // …)")`, which `package:http` wraps in a `ClientException` with the same
+    // message — and which, before this, fell into the catch-all beside a
+    // dead socket. The real client's wording is pinned in the proxy group
+    // below; these pin what the transport does with it.
+    final loginChallenge = http.ClientException(
+      'Proxy failed to establish tunnel (407 Proxy Authentication Required)',
+      endpoint,
+    );
+
+    test('a proxy login challenge is retried through the seam, and the '
+        'checksum follows it', () async {
+      var dartRequests = 0;
+      final dart = MockClient((_) async {
+        dartRequests++;
+        throw loginChallenge;
+      });
+      final native = recordingNative();
+      final logs = <String>[];
+
+      final info = await fetchLatestRelease(
+        endpoint,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+
+      expect(info?.version, '2.0.0+18');
+      expect(info?.sha256, _hash);
+      expect(info?.viaNativeTransport, isTrue);
+      expect(native.calls.map((c) => c.url), [
+        endpoint,
+        Uri.parse(_checksumUrl),
+      ]);
+      expect(native.calls[0].headers['Accept'], 'application/vnd.github+json');
+      expect(dartRequests, 1, reason: 'the checksum was tried on Dart again');
+      expect(logs.join('\n'), contains('asks for a login'));
+    });
+
+    // The student cannot act on "407 Proxy Authentication Required"; "the
+    // proxy asks for a login" is something they can tell whoever runs the
+    // network.
+    test(
+      'without a seam the login is the reason reported, in plain words',
+      () async {
+        final dart = MockClient((_) async => throw loginChallenge);
+        await expectLater(
+          fetchLatestRelease(endpoint, client: dart),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains("the network's proxy asks for a login"),
+                contains('407'),
+                isNot(contains('ClientException')),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'when the seam is refused the login too, both reasons are kept',
+      () async {
+        final dart = MockClient((_) async => throw loginChallenge);
+        final native = recordingNative(
+          failWith: UpdateCheckException(
+            'curl.exe exited with 7 for $endpoint: '
+            'curl: (7) CONNECT tunnel failed, response 407',
+          ),
+        );
+        await expectLater(
+          fetchLatestRelease(endpoint, client: dart, nativeGet: native.get),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                startsWith(
+                  "request to $endpoint failed: the network's proxy "
+                  'asks for a login',
+                ),
+                contains('curl.exe exited with 7'),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    // Only the 407, and only on the tunnel: a proxy that refuses the tunnel
+    // for another reason, or any other client error, is not the login
+    // problem and must not be masked by the fallback.
+    test('a tunnel refused with another status, or any other client error, '
+        'never reaches the seam', () async {
+      final native = recordingNative();
+      for (final String message in <String>[
+        'Proxy failed to establish tunnel (502 Bad Gateway)',
+        'Proxy failed to establish tunnel (403 Forbidden)',
+        'Connection closed before full header was received',
+        '407 Proxy Authentication Required',
+      ]) {
+        await expectLater(
+          fetchLatestRelease(
+            endpoint,
+            client: MockClient(
+              (_) async => throw http.ClientException(message, endpoint),
+            ),
+            nativeGet: native.get,
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains(message), isNot(contains('asks for a login'))),
+            ),
+          ),
+          reason: message,
+        );
+      }
+      expect(
+        native.calls,
+        isEmpty,
+        reason: 'the seam was used for a failure that is not the login problem',
+      );
+    });
   });
 
   // #133: on a network where only the proxy has a route out, the client the
@@ -731,6 +865,79 @@ void main() {
       );
       expect(proxy.connects, isEmpty);
       expect(hole.connections, 1);
+    });
+
+    // #140, with the real client: the same proxy, now demanding a login on
+    // the CONNECT. This is the one place the `dart:io` wording the transport
+    // recognises is produced rather than quoted — with the certificate
+    // trusted, the login is the only thing in the way, and it is enough.
+    group('when the proxy asks for a login', () {
+      late LoopbackProxy asking;
+
+      setUp(() async {
+        asking = await LoopbackProxy.start(
+          routes: {hole.authority: '${github.address.address}:${github.port}'},
+          requireLogin: true,
+        );
+      });
+
+      tearDown(() => asking.close());
+
+      test('Dart\'s own client cannot answer, and says so', () async {
+        await expectLater(
+          HttpOverrides.runWithHttpOverrides(
+            () => fetchLatestRelease(endpoint, proxy: asking.updateProxy),
+            TrustLoopbackCertificate(),
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              contains("the network's proxy asks for a login"),
+            ),
+          ),
+        );
+        expect(asking.challenges, 1);
+        expect(asking.logins, isEmpty, reason: 'Dart has no login to send');
+        expect(asking.connects, [hole.authority]);
+        expect(hole.connections, 0);
+      });
+
+      test('the seam is engaged, and the checksum follows it', () async {
+        final calls = <Uri>[];
+        Future<http.Response> native(
+          Uri url, {
+          Map<String, String> headers = const {},
+          Duration? timeout,
+          File? to,
+        }) async {
+          calls.add(url);
+          return http.Response.bytes(
+            utf8.encode(
+              url.path.endsWith('.sha256')
+                  ? '$_hash  $kInstallerAssetName\n'
+                  : jsonEncode(_releaseJson()),
+            ),
+            200,
+          );
+        }
+
+        final info = await HttpOverrides.runWithHttpOverrides(
+          () => fetchLatestRelease(
+            endpoint,
+            proxy: asking.updateProxy,
+            nativeGet: native,
+          ),
+          TrustLoopbackCertificate(),
+        );
+        expect(info?.version, '2.0.0+18');
+        expect(info?.viaNativeTransport, isTrue);
+        expect(calls, [endpoint, Uri.parse(_checksumUrl)]);
+        // One challenge — the release request — and not a second for the
+        // checksum: once the proxy has asked, the seam carries the rest.
+        expect(asking.challenges, 1);
+        expect(hole.connections, 0);
+      });
     });
   });
 

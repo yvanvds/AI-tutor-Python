@@ -24,6 +24,12 @@
 // strings; the bindings themselves — the one part a fake cannot vouch for —
 // are driven for real against a loopback PAC server, the way the e2e flow
 // drives the whole app.
+//
+// #140: a proxy that authenticates. The command line grows
+// `--proxy-anyauth --proxy-user :` beside `--proxy` — curl's spelling of
+// "answer the challenge as the logged-in Windows user" — and the real binary
+// is driven through a loopback proxy that demands a login, which is the only
+// way to see that it answers one at all.
 
 import 'dart:async';
 import 'dart:convert';
@@ -157,8 +163,10 @@ void main() {
       expect(args, isNot(contains('-k')));
       expect(args, isNot(contains('--insecure')));
       // No proxy was stated, so none is passed — curl's own reading of the
-      // environment is left alone.
+      // environment is left alone — and no proxy login either (#140).
       expect(args, isNot(contains('--proxy')));
+      expect(args, isNot(contains('--proxy-anyauth')));
+      expect(args, isNot(contains('--proxy-user')));
       // The scratch file a small response was read from is gone again.
       expect(File(fake.argAfter('-o')!).existsSync(), isFalse);
     });
@@ -189,6 +197,55 @@ void main() {
       )!;
       await get(Uri.parse('https://api.github.com/x'));
       expect(fake.calls.single.arguments, isNot(contains('--proxy')));
+      expect(fake.calls.single.arguments, isNot(contains('--proxy-user')));
+    });
+
+    // #140: a proxy that authenticates answers the CONNECT with a 407.
+    // `--proxy-anyauth` lets curl pick what the proxy offers (Negotiate,
+    // NTLM); `--proxy-user :` — a bare colon — is the documented way to have
+    // an SSPI build answer as the logged-in Windows user. Nothing is stored
+    // or passed: the colon is the whole credential.
+    test('answers a proxy login challenge as the Windows user', () async {
+      final fake = _FakeCurl();
+      final NativeGet get = curlNativeGet(
+        curlPath: curl.path,
+        run: fake.run,
+        proxy: () => UpdateProxy(Uri.parse('http://proxy.school.be:8080')),
+      )!;
+      await get(Uri.parse('https://api.github.com/x'));
+      expect(
+        fake.calls.single.arguments,
+        containsAllInOrder(<String>[
+          '--proxy',
+          'http://proxy.school.be:8080',
+          '--proxy-anyauth',
+          '--proxy-user',
+          ':',
+        ]),
+      );
+      expect(fake.argAfter('--proxy-user'), ':');
+    });
+
+    // A login stated in the proxy URL (`https_proxy=http://user:pw@…`) is
+    // the one curl is left to send, as Dart's client sends it: a
+    // `--proxy-user` would replace it with the empty one.
+    test('keeps a login the proxy URL states, and adds none', () async {
+      final fake = _FakeCurl();
+      final NativeGet get = curlNativeGet(
+        curlPath: curl.path,
+        run: fake.run,
+        proxy: () => UpdateProxy(
+          Uri.parse('http://student:secret@proxy.school.be:8080'),
+        ),
+      )!;
+      await get(Uri.parse('https://api.github.com/x'));
+      final List<String> args = fake.calls.single.arguments;
+      expect(
+        fake.argAfter('--proxy'),
+        'http://student:secret@proxy.school.be:8080',
+      );
+      expect(args, isNot(contains('--proxy-anyauth')));
+      expect(args, isNot(contains('--proxy-user')));
     });
 
     test(
@@ -738,6 +795,82 @@ void main() {
           ),
         );
         expect(proxy.connects, <String>[hole.authority]);
+        expect(hole.connections, 0, reason: 'curl dialled the hole directly');
+      },
+      skip: Platform.isWindows && File(windowsCurlPath()).existsSync()
+          ? false
+          : 'no ${windowsCurlPath()} on this machine',
+    );
+
+    // #140, with the real binary: the same proxy, now demanding a login on
+    // the CONNECT with a `Negotiate` challenge, as a school's AD-joined
+    // filter does. The shipped fallback, built by the production provider
+    // with a proxy that names no login, has to answer by itself —
+    // `--proxy-anyauth --proxy-user :` makes SSPI answer as the logged-in
+    // Windows user — and the proof is the same as above: Schannel's refusal
+    // of the loopback certificate means the authenticated CONNECT was
+    // tunnelled to the routed server. Without those switches curl gives up
+    // on the 407 with exit 7 ("CONNECT tunnel failed, response 407") and
+    // never meets a certificate at all. What SSPI produces on a machine
+    // outside any domain is NTLM's first message for the local account —
+    // enough to see the challenge answered with the Windows session, which
+    // is all a test without a domain can see; the proxy accepts that first
+    // leg without verifying it.
+    test(
+      'the shipped fallback answers the machine proxy\'s login challenge',
+      () async {
+        final BlackHole hole = await BlackHole.start();
+        addTearDown(hole.close);
+        final HttpServer server = await HttpServer.bindSecure(
+          InternetAddress.loopbackIPv4,
+          0,
+          SecurityContext()
+            ..useCertificateChainBytes(utf8.encode(kLoopbackCertificatePem))
+            ..usePrivateKeyBytes(utf8.encode(kLoopbackPrivateKeyPem)),
+        );
+        addTearDown(() => server.close(force: true));
+        server.listen((HttpRequest req) => req.response.close());
+        final LoopbackProxy proxy = await LoopbackProxy.start(
+          routes: <String, String>{
+            hole.authority: '${server.address.address}:${server.port}',
+          },
+          requireLogin: true,
+        );
+        addTearDown(proxy.close);
+
+        final container = ProviderContainer(
+          overrides: [
+            updateProxyProvider.overrideWithValue(
+              fixedUpdateProxy(proxy.updateProxy),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final NativeGet native = container.read(nativeGetProvider)!;
+
+        await expectLater(
+          native(
+            Uri.parse('https://${hole.authority}/releases/latest'),
+            timeout: const Duration(seconds: 5),
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('exited with 60'),
+                isNot(contains('407')),
+                isNot(contains('timed out')),
+              ),
+            ),
+          ),
+        );
+        // Challenged once, answered once — both CONNECTs for the same target
+        // — and answered with an SSPI token, not with any stored login.
+        expect(proxy.challenges, 1);
+        expect(proxy.logins, hasLength(1));
+        expect(proxy.logins.single, startsWith('Negotiate '));
+        expect(proxy.connects, <String>[hole.authority, hole.authority]);
         expect(hole.connections, 0, reason: 'curl dialled the hole directly');
       },
       skip: Platform.isWindows && File(windowsCurlPath()).existsSync()
