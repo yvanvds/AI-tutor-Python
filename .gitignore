@@ -125,3 +125,5 @@ app.*.symbols
 
 # docs
 PROJECT_OVERVIEW.md
+# Claude Code per-machine permissions (the shared rules live in .claude/settings.json)
+.claude/settings.local.json
