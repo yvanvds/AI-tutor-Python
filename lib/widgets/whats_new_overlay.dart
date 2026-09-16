@@ -1,5 +1,7 @@
 /// The "What's new" card the app shows once, on the first launch after it
-/// updated itself (#119).
+/// updated itself (#119) — and again whenever Options → About asks for it
+/// (#130). Both put the same `ReleaseNotes` on the controller; this renders
+/// whatever is there.
 ///
 /// Built on `LevelUpOverlay`'s shape — same blurred scrim, same pop-in, same
 /// "tap outside or press the button" dismissal — because it is stacked in the

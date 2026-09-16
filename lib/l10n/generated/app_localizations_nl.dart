@@ -725,6 +725,22 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get options_about_whatsNew => 'Wat is er nieuw';
+
+  @override
+  String get options_about_whatsNew_loading => 'Laden…';
+
+  @override
+  String options_about_whatsNew_failed(String error) {
+    return 'De releasenotes konden niet geladen worden: $error';
+  }
+
+  @override
+  String options_about_whatsNew_none(String version) {
+    return 'Geen releasenotes voor versie $version.';
+  }
+
+  @override
   String get session_mode_explain => 'Uitleg';
 
   @override

@@ -213,6 +213,10 @@
 
   "options_about_title": "Over",
   "options_about_version": "Versie {version}",
+  "options_about_whatsNew": "Wat is er nieuw",
+  "options_about_whatsNew_loading": "Laden…",
+  "options_about_whatsNew_failed": "De releasenotes konden niet geladen worden: {error}",
+  "options_about_whatsNew_none": "Geen releasenotes voor versie {version}.",
 
   "session_mode_explain": "Uitleg",
   "session_mode_practice": "Oefenen",

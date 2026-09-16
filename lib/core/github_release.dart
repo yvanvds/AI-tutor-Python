@@ -51,6 +51,18 @@ final Uri kLatestReleaseEndpoint = Uri.https(
   '/repos/$kReleaseOwner/$kReleaseRepo/releases/latest',
 );
 
+/// GitHub's release for one tag — `/releases/tags/v{version}`, the sibling
+/// of `/releases/latest` (#130).
+///
+/// Derived from [latest] rather than spelled out, so wherever the feed is
+/// pointed — `api.github.com`, or the loopback stand-in an integration flow
+/// serves the same API from — this lookup goes to the same server. The `v`
+/// is the tag convention `tooling/build_release.ps1` follows; [version] is
+/// the bare `2.3.0+20`, as `kAppVersion` reports it. A `+` is a legal path
+/// character and GitHub reads it literally; nothing here encodes it.
+Uri releaseByTagEndpoint(Uri latest, String version) =>
+    latest.resolve('tags/v$version');
+
 /// What the API wants to be asked with: the documented media type, and a
 /// pinned API version so a future default cannot reshape the payload under a
 /// build that has already shipped.
@@ -247,30 +259,9 @@ Future<UpdateInfo?> fetchLatestRelease(
     log: log,
   );
   try {
-    final http.Response res = await transport.get(
-      endpoint,
-      headers: kGitHubApiHeaders,
-    );
-
+    final Object? decoded = await _fetchReleaseJson(transport, endpoint);
     // Nothing published yet — a normal outcome, not a failure.
-    if (res.statusCode == HttpStatus.notFound) return null;
-    if (res.statusCode != HttpStatus.ok) {
-      throw UpdateCheckException(
-        'release lookup at $endpoint returned HTTP ${res.statusCode}'
-        '${_rateLimitHint(res)}',
-      );
-    }
-
-    final Object? decoded;
-    try {
-      // Decode the bytes as UTF-8 rather than reading `res.body`: that getter
-      // honours the response charset and falls back to latin1 for a type like
-      // `application/octet-stream`, which is exactly what a release *asset*
-      // is served as (#45). JSON is UTF-8 (RFC 8259).
-      decoded = jsonDecode(utf8.decode(res.bodyBytes, allowMalformed: true));
-    } on FormatException {
-      throw UpdateCheckException('$endpoint did not answer with JSON');
-    }
+    if (decoded == null) return null;
 
     final PublishedRelease? release = releaseFromJson(decoded);
     // No installer, or a tag nobody can compare: nothing to offer, and
@@ -296,6 +287,74 @@ Future<UpdateInfo?> fetchLatestRelease(
     // Closing an owned client also aborts a request still in flight after a
     // timeout fired.
     if (owned) c.close();
+  }
+}
+
+/// Fetches the release notes of the release tagged for [version] — the body
+/// GitHub shows on the release page — for About's **What's new** button
+/// (#130), which needs them for a build the app did not install itself.
+///
+/// [endpoint] is [releaseByTagEndpoint]'s. Returns `null` when no release
+/// carries that tag (HTTP 404): a dev build whose version was never
+/// published, which About reports as "no notes for this version". The body
+/// comes back verbatim — blank when the release was published with none;
+/// the caller decides what that means. Throws an [UpdateCheckException] for
+/// everything else, exactly as [fetchLatestRelease] does and through the
+/// same transport, so the timeout, the rate-limit hint, the proxy (#133) and
+/// the TLS fallback (#124) all apply here too.
+Future<String?> fetchReleaseNotesByTag(
+  Uri endpoint, {
+  http.Client? client,
+  Duration timeout = kUpdateRequestTimeout,
+  NativeGet? nativeGet,
+  UpdateProxy? proxy,
+  TransportLog? log,
+}) async {
+  final bool owned = client == null;
+  final http.Client c = client ?? httpClientVia(proxy);
+  final _Transport transport = _Transport(
+    c,
+    timeout: timeout,
+    nativeGet: nativeGet,
+    log: log,
+  );
+  try {
+    final Object? decoded = await _fetchReleaseJson(transport, endpoint);
+    if (decoded == null) return null;
+    if (decoded is! Map) {
+      throw UpdateCheckException('$endpoint did not answer with a release');
+    }
+    final Object? body = decoded['body'];
+    return body is String ? body : '';
+  } finally {
+    if (owned) c.close();
+  }
+}
+
+/// One GET against the Releases API, decoded: the payload, or `null` for a
+/// 404 — which both callers read as "no such release" rather than as a
+/// failure. Any other non-200, or a body that is not JSON, is an
+/// [UpdateCheckException] with the rate limit named when that is the cause.
+Future<Object?> _fetchReleaseJson(_Transport transport, Uri endpoint) async {
+  final http.Response res = await transport.get(
+    endpoint,
+    headers: kGitHubApiHeaders,
+  );
+  if (res.statusCode == HttpStatus.notFound) return null;
+  if (res.statusCode != HttpStatus.ok) {
+    throw UpdateCheckException(
+      'release lookup at $endpoint returned HTTP ${res.statusCode}'
+      '${_rateLimitHint(res)}',
+    );
+  }
+  try {
+    // Decode the bytes as UTF-8 rather than reading `res.body`: that getter
+    // honours the response charset and falls back to latin1 for a type like
+    // `application/octet-stream`, which is exactly what a release *asset*
+    // is served as (#45). JSON is UTF-8 (RFC 8259).
+    return jsonDecode(utf8.decode(res.bodyBytes, allowMalformed: true));
+  } on FormatException {
+    throw UpdateCheckException('$endpoint did not answer with JSON');
   }
 }
 

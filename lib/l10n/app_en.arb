@@ -362,6 +362,23 @@
   "@options_about_version": {
     "placeholders": { "version": { "type": "String" } }
   },
+  "options_about_whatsNew": "What's new",
+  "@options_about_whatsNew": {
+    "description": "About button that shows the running version's release notes in the What's new overlay (#130)"
+  },
+  "options_about_whatsNew_loading": "Loading…",
+  "@options_about_whatsNew_loading": {
+    "description": "Label of the What's new button while the release notes are being looked up"
+  },
+  "options_about_whatsNew_failed": "Could not load the release notes: {error}",
+  "@options_about_whatsNew_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_about_whatsNew_none": "No release notes for version {version}.",
+  "@options_about_whatsNew_none": {
+    "description": "Snack when no published release carries the running version's tag — a dev build, typically",
+    "placeholders": { "version": { "type": "String" } }
+  },
 
   "session_mode_explain": "Explain",
   "session_mode_practice": "Practice",

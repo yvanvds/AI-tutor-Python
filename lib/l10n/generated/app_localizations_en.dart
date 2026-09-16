@@ -717,6 +717,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get options_about_whatsNew => 'What\'s new';
+
+  @override
+  String get options_about_whatsNew_loading => 'Loading…';
+
+  @override
+  String options_about_whatsNew_failed(String error) {
+    return 'Could not load the release notes: $error';
+  }
+
+  @override
+  String options_about_whatsNew_none(String version) {
+    return 'No release notes for version $version.';
+  }
+
+  @override
   String get session_mode_explain => 'Explain';
 
   @override

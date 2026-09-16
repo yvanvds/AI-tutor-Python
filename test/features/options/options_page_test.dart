@@ -14,7 +14,8 @@
 // on the typed id — has passed; the probe here is scripted. #127 made the
 // bug report a file first: the dialog is reachable with no GitHub account at
 // all, and `Save as file` writes the same redacted report through the
-// archive seam the progress export uses.
+// archive seam the progress export uses. #130 put a "What's new" button in
+// About that brings the post-update release notes back on demand.
 //
 // The end-to-end half of the panel — the theme switch repainting the whole
 // shell, and the progress round trip through a real file — lives in
@@ -27,6 +28,8 @@ import 'dart:io';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/core/whats_new_controller.dart';
+import 'package:ai_tutor_python/core/whats_new_store.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -350,10 +353,18 @@ void main() {
     bool devTools = false,
     bool isTeacher = false,
     UpdateServices? update,
+    ReleaseNotesFetcher? notes,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
   }) => ProviderScope(
     overrides: [
+      // The by-tag lookup behind "What's new" (#130): never the production
+      // one, which would reach api.github.com from a test.
+      releaseNotesFetcherProvider.overrideWithValue(
+        notes ??
+            (version) async =>
+                throw StateError('no release notes fetcher in this test'),
+      ),
       gitHubDeviceFlowProvider.overrideWithValue(
         GitHubDeviceFlow(
           clientId: oauthClientId,
@@ -415,6 +426,7 @@ void main() {
     bool devTools = false,
     bool isTeacher = false,
     UpdateServices? update,
+    ReleaseNotesFetcher? notes,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
   }) async {
@@ -434,6 +446,7 @@ void main() {
         devTools: devTools,
         isTeacher: isTeacher,
         update: update,
+        notes: notes,
         globalModel: globalModel,
         oauthClientId: oauthClientId,
       ),
@@ -1875,6 +1888,121 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(statusText(tester), 'You have the newest version.');
+
+      await unmount(tester);
+    });
+  });
+
+  // #130 — the post-update "What's new" card had no way back once clicked
+  // away, and no way in at all on a build the app did not install itself.
+  // The button shows the running version's notes: from the stash the
+  // updater left (no network), else from the release published under this
+  // version's tag. The overlay lives in the shell; here the card's state is
+  // read off the controller, and the end-to-end showing is in
+  // `integration_test/flows/whats_new_overlay.dart`.
+  group("about — what's new", () {
+    final button = find.byKey(const ValueKey('about-whats-new'));
+
+    ReleaseNotes? shown(WidgetTester tester) =>
+        containerOf(tester).read(whatsNewControllerProvider);
+
+    testWidgets('sits beside Check for updates and shows the kept notes '
+        'without a lookup', (tester) async {
+      // The stash the updater left for this build, already dismissed once.
+      SharedPreferences.setMockInitialValues({
+        kWhatsNewVersionPref: kAppVersion,
+        kWhatsNewNotesPref: '- Faster quizzes',
+        kWhatsNewSeenPref: true,
+      });
+      final lookups = <String>[];
+      await mount(
+        tester,
+        notes: (version) async {
+          lookups.add(version);
+          return null;
+        },
+      );
+
+      expect(button, findsOneWidget);
+      expect(find.text("What's new"), findsOneWidget);
+      expect(find.byKey(const ValueKey('about-update-check')), findsOneWidget);
+      expect(shown(tester), isNull);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      expect(shown(tester)?.version, kAppVersion);
+      expect(shown(tester)?.notes, '- Faster quizzes');
+      expect(lookups, isEmpty, reason: 'kept notes were fetched anyway');
+      expect(find.byType(SnackBar), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('with nothing kept, looks the running version up and '
+        'shows what it finds', (tester) async {
+      final lookups = <String>[];
+      await mount(
+        tester,
+        notes: (version) async {
+          lookups.add(version);
+          return 'For students\n\n- Something new';
+        },
+      );
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      expect(lookups, [kAppVersion]);
+      expect(shown(tester)?.version, kAppVersion);
+      expect(shown(tester)?.notes, 'For students\n\n- Something new');
+
+      await unmount(tester);
+    });
+
+    testWidgets('is disabled while the lookup is in flight, and a failure '
+        'is a snack', (tester) async {
+      final pending = Completer<String?>();
+      await mount(tester, notes: (_) => pending.future);
+
+      expect(enabled(tester, button), isTrue);
+
+      await tester.tap(button);
+      await tester.pump();
+
+      expect(enabled(tester, button), isFalse, reason: 'a second lookup');
+      expect(find.text('Loading…'), findsOneWidget);
+      expect(find.text("What's new"), findsNothing);
+
+      pending.completeError(
+        UpdateCheckException('release lookup returned HTTP 500'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(shown(tester), isNull);
+      expect(enabled(tester, button), isTrue);
+      expect(find.text("What's new"), findsOneWidget);
+      expect(
+        find.textContaining('Could not load the release notes'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('HTTP 500'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a version with no release says so', (tester) async {
+      await mount(tester, notes: (_) async => null);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      expect(shown(tester), isNull);
+      expect(
+        find.text('No release notes for version $kAppVersion.'),
+        findsOneWidget,
+      );
+      expect(enabled(tester, button), isTrue);
 
       await unmount(tester);
     });

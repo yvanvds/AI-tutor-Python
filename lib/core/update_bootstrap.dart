@@ -346,6 +346,29 @@ final nativeGetProvider = Provider<NativeGet?>(
       : null,
 );
 
+/// Looks up the release notes published for [version] — the running build's,
+/// when About's **What's new** button has nothing kept locally (#130).
+/// Returns `null` when no release carries that tag; throws
+/// [UpdateCheckException] when the lookup itself did not complete.
+typedef ReleaseNotesFetcher = Future<String?> Function(String version);
+
+/// The by-tag lookup behind **What's new** (#130), on the same feed, proxy
+/// and native fallback as the update check — or `null` when the feed is off
+/// (`updateFeedUrlProvider` overridden with `null`), in which case there is
+/// nowhere to ask and the button says so instead of reaching out.
+final releaseNotesFetcherProvider = Provider<ReleaseNotesFetcher?>((ref) {
+  final feedUrl = ref.watch(updateFeedUrlProvider);
+  if (feedUrl == null) return null;
+  final nativeGet = ref.watch(nativeGetProvider);
+  final proxy = ref.watch(updateProxyProvider);
+  return (version) => fetchReleaseNotesByTag(
+    releaseByTagEndpoint(feedUrl, version),
+    nativeGet: nativeGet,
+    proxy: proxy,
+    log: debugPrint,
+  );
+});
+
 /// Verifies the download against the hash published beside it, and removes
 /// it when it does not match: a corrupted or substituted installer is not
 /// something to leave lying in `%TEMP%` for a later run to trip over.
