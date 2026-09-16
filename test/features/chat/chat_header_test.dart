@@ -106,7 +106,7 @@ void main() {
   ) async {
     pc.read(modeProvider.notifier).state = SessionMode.explain;
     await mount(tester);
-    expect(pc.read(chatCollapsedProvider), isFalse);
+    expect(pc.read(chatCollapsedProvider), isNull, reason: 'no choice yet');
 
     await tester.tap(find.byTooltip('Hide chat'));
     await tester.pump();

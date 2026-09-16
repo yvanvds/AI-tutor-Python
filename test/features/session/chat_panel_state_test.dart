@@ -2,30 +2,46 @@
 // choice round-trips through SharedPreferences, the layout derived from it
 // applies to `explain` only, and the unread flag follows the tutor-message
 // count while the full panel is off screen.
+//
+// Issue #138 — until the student has chosen, the layout follows the window:
+// folded under 1200 px, open above, live across a resize; a stored choice
+// wins on any window, and a stored `false` means open on a small screen.
 
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _mcq = ActiveMcq(prompt: 'q', code: '', options: ['a', 'b']);
 
+/// A wide and a narrow window, either side of [kChatFoldWindowWidth].
+const double _wide = 1400;
+const double _narrow = 1000;
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  /// The window width the container reports, changeable mid-test the way a
+  /// resize would change it.
+  final windowWidth = StateProvider<double>((_) => _wide);
+
   ProviderContainer container({
     SessionMode mode = SessionMode.explain,
     ChatService? chat,
+    double width = _wide,
   }) {
     final c = ProviderContainer(
       overrides: [
         modeProvider.overrideWith((_) => mode),
+        windowWidth.overrideWith((_) => width),
+        windowWidthProvider.overrideWith((ref) => ref.watch(windowWidth)),
         if (chat != null) chatServiceProvider.overrideWithValue(chat),
       ],
     );
@@ -34,8 +50,34 @@ void main() {
   }
 
   group('chatCollapsedProvider', () {
-    test('defaults to open', () {
-      expect(container().read(chatCollapsedProvider), isFalse);
+    test('starts unset: no choice until a button is pressed', () async {
+      final c = container();
+      expect(c.read(chatCollapsedProvider), isNull);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatCollapsedProvider), isNull, reason: 'after hydration');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(kChatCollapsedPrefsKey), isFalse);
+    });
+
+    test('hydrates a stored false as a choice, not as unset', () async {
+      SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: false});
+      final c = container();
+      c.read(chatCollapsedProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatCollapsedProvider), isFalse);
+    });
+
+    test('a button pressed before the store answered wins', () async {
+      SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: true});
+      final c = container();
+      c.read(chatCollapsedProvider);
+      final done = c.read(chatCollapsedProvider.notifier).expand();
+      expect(c.read(chatCollapsedProvider), isFalse);
+      await done;
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatCollapsedProvider), isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(kChatCollapsedPrefsKey), isFalse);
     });
 
     test('collapse() applies at once and stores the choice', () async {
@@ -88,6 +130,89 @@ void main() {
       expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
     });
 
+    test('with no choice stored, a narrow window starts folded and stores '
+        'nothing', () async {
+      final c = container(width: _narrow);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+      expect(c.read(chatCollapsedProvider), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(kChatCollapsedPrefsKey), isFalse);
+    });
+
+    test('the fold line is 1200 px: just under folds, at it opens', () {
+      expect(
+        container(width: kChatFoldWindowWidth - 1)
+            .read(chatPanelLayoutProvider),
+        ChatPanelLayout.collapsed,
+      );
+      expect(
+        container(width: kChatFoldWindowWidth).read(chatPanelLayoutProvider),
+        ChatPanelLayout.full,
+      );
+    });
+
+    test('until the student chooses, the panel follows a resize', () {
+      final c = container();
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+
+      c.read(windowWidth.notifier).state = _narrow;
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+
+      c.read(windowWidth.notifier).state = _wide;
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+    });
+
+    test('a stored false keeps the panel open on a narrow window', () async {
+      SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: false});
+      final c = container(width: _narrow);
+      c.read(chatCollapsedProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+    });
+
+    test('a stored true keeps the panel folded on a wide window', () async {
+      SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: true});
+      final c = container(width: _wide);
+      c.read(chatCollapsedProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+    });
+
+    test('once the student chooses, the window no longer matters', () async {
+      final c = container(width: _narrow);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+
+      await c.read(chatCollapsedProvider.notifier).expand();
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+      c.read(windowWidth.notifier).state = _wide;
+      c.read(windowWidth.notifier).state = _narrow;
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+
+      await c.read(chatCollapsedProvider.notifier).collapse();
+      c.read(windowWidth.notifier).state = _wide;
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+    });
+
+    test('the window fallback is a theory-view thing: practice stays full, '
+        'playground stays hidden', () {
+      expect(
+        container(
+          mode: SessionMode.practice,
+          width: _narrow,
+        ).read(chatPanelLayoutProvider),
+        ChatPanelLayout.full,
+      );
+      expect(
+        container(
+          mode: SessionMode.playground,
+          width: _narrow,
+        ).read(chatPanelLayoutProvider),
+        ChatPanelLayout.hidden,
+      );
+    });
+
     test('practice ignores the flag: the panel is always full', () async {
       final c = container(mode: SessionMode.practice);
       await c.read(chatCollapsedProvider.notifier).collapse();
@@ -126,11 +251,60 @@ void main() {
     );
   });
 
+  group('windowWidthProvider', () {
+    testWidgets('reads the window in logical pixels and follows a resize', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(2000, 1400);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+
+      expect(c.read(windowWidthProvider), 1000);
+
+      tester.view.physicalSize = const Size(2800, 1400);
+      await tester.pump(Duration.zero);
+      expect(c.read(windowWidthProvider), 1400);
+    });
+
+    testWidgets('a narrow window folds an undecided theory view through the '
+        'real provider', (tester) async {
+      tester.view.physicalSize = const Size(_narrow, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = ProviderContainer(
+        overrides: [modeProvider.overrideWith((_) => SessionMode.explain)],
+      );
+      addTearDown(c.dispose);
+
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+
+      tester.view.physicalSize = const Size(_wide, 700);
+      await tester.pump(Duration.zero);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+    });
+  });
+
   group('chatUnreadProvider', () {
     late ChatService chat;
 
     setUp(() => chat = ChatService());
     tearDown(() => chat.dispose());
+
+    test('a message that lands behind the window fold is unread too', () {
+      final c = container(chat: chat, width: _narrow);
+      c.read(chatUnreadProvider);
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+
+      chat.addTutorMessage('hello');
+      expect(c.read(chatUnreadProvider), isTrue);
+
+      // Widening the window unfolds the undecided panel: read.
+      c.read(windowWidth.notifier).state = _wide;
+      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+      expect(c.read(chatUnreadProvider), isFalse);
+    });
 
     test(
       'a tutor message while folded raises the flag; unfolding clears it',

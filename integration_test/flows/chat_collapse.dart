@@ -13,6 +13,13 @@
 // a frame — the same guarantee #128 makes for the 5 s polls, now for a
 // layout change the student triggers.
 //
+// Since #138 the student on a small laptop does not have to find the button
+// first: with no choice stored, a window under 1200 px starts the lesson
+// with the chat folded, the panel follows the window across that line until
+// either button is pressed, and a stored "open" is open on a small screen.
+// The window is sized through the test view (see `AppHarness.windowSize`),
+// and resized mid-flow the way a student drags the window edge.
+//
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
@@ -36,6 +43,10 @@ import 'package:webview_all/webview_all.dart';
 import '../harness/app_harness.dart';
 import '../harness/seed.dart';
 
+/// Either side of the 1200 px fold line (#138), in logical pixels.
+const double _wideWindow = 1400;
+const double _narrowWindow = 1000;
+
 /// Fresh finders per call: a reused instance caches elements that a mode
 /// swap has since unmounted (#133).
 Finder _panel() => find.byKey(const Key('chat-panel'));
@@ -50,6 +61,13 @@ Finder _surface() => find.descendant(
 double _panelWidth(WidgetTester tester) => tester.getSize(_panel()).width;
 double _lessonWidth(WidgetTester tester) =>
     tester.getSize(find.byType(ExplainView)).width;
+
+/// Resizes the app window to [width] logical pixels, keeping the harness's
+/// height and the machine's pixel ratio.
+void _resize(WidgetTester tester, double width) {
+  tester.view.physicalSize =
+      Size(width, kRunnerWindowSize.height) * tester.view.devicePixelRatio;
+}
 
 /// Pumps until the chat panel has slid to [width], watching every frame for
 /// the lesson surface, and returns how many frames it was missing from.
@@ -196,6 +214,104 @@ void main() {
     expect(_showChat(), findsNothing);
     expect(_hideChat(), findsOneWidget);
     expect(prefs.getBool(kChatCollapsedPrefsKey), isFalse);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('with no choice stored, a narrow window starts the lesson with '
+      'the chat folded; the panel follows the window until Show chat makes '
+      'open the decision, which then holds on any window', (tester) async {
+    final harness = AppHarness(
+      windowSize: const Size(_narrowWindow, 720),
+      lessonResults: {
+        kLessonExampleCode: const LessonRunResult(stdout: 'Hallo Mira'),
+      },
+    );
+    await harness.boot(tester);
+    await _openLesson(tester, harness);
+
+    // Folded from the first frame of the lesson, and nothing was decided
+    // for the student: no choice in the notifier, nothing in the store.
+    expect(_panelWidth(tester), chatCollapsedWidth);
+    expect(_showChat(), findsOneWidget);
+    expect(_unreadDot(), findsNothing);
+    expect(harness.container.read(chatCollapsedProvider), isNull);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(kChatCollapsedPrefsKey), isFalse);
+    final lessonFolded = _lessonWidth(tester);
+    final webviewBefore = tester.element(find.byType(WebViewWidget));
+    final surfaceBefore = tester.element(_surface());
+    final runsBefore = harness.lessonRunner.ran.length;
+
+    // Wider than the line: still no choice, so the panel unfolds — without
+    // touching the lesson surface.
+    _resize(tester, _wideWindow);
+    final blankOnUnfold = await _slideTo(tester, chatPanelWidth);
+    expect(
+      blankOnUnfold,
+      0,
+      reason: 'the lesson surface was missing from $blankOnUnfold frame(s)',
+    );
+    expect(_showChat(), findsNothing);
+    expect(harness.container.read(chatCollapsedProvider), isNull);
+    expect(
+      _lessonWidth(tester),
+      lessonFolded +
+          (_wideWindow - _narrowWindow) -
+          (chatPanelWidth - chatCollapsedWidth),
+      reason: 'the lesson grew with the window, less what the chat took back',
+    );
+    expect(
+      tester.element(find.byType(WebViewWidget)),
+      same(webviewBefore),
+      reason: 'the window fold re-mounted the WebViewWidget',
+    );
+    expect(tester.element(_surface()), same(surfaceBefore));
+    expect(harness.lessonRunner.ran, hasLength(runsBefore));
+
+    // Back under the line: folds again.
+    _resize(tester, _narrowWindow);
+    final blankOnFold = await _slideTo(tester, chatCollapsedWidth);
+    expect(blankOnFold, 0);
+    expect(_showChat(), findsOneWidget);
+    expect(tester.element(_surface()), same(surfaceBefore));
+
+    // Show chat on the narrow window: open is the decision now.
+    await tester.tap(_showChat());
+    await _slideTo(tester, chatPanelWidth);
+    expect(harness.container.read(chatCollapsedProvider), isFalse);
+    expect(prefs.getBool(kChatCollapsedPrefsKey), isFalse);
+
+    // And the window no longer has a say: across the line and back, the
+    // panel never leaves full width.
+    _resize(tester, _wideWindow);
+    await tester.pump(const Duration(milliseconds: 100));
+    _resize(tester, _narrowWindow);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_panelWidth(tester), chatPanelWidth);
+    }
+    expect(_showChat(), findsNothing);
+    expect(_hideChat(), findsOneWidget);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a stored "open" is in place on a narrow window from the first '
+      'frame of the lesson: open, even on a small screen', (tester) async {
+    final harness = AppHarness(
+      windowSize: const Size(_narrowWindow, 720),
+      prefs: {kChatCollapsedPrefsKey: false},
+      lessonResults: {
+        kLessonExampleCode: const LessonRunResult(stdout: 'Hallo Mira'),
+      },
+    );
+    await harness.boot(tester);
+    await _openLesson(tester, harness);
+
+    expect(_panelWidth(tester), chatPanelWidth);
+    expect(_showChat(), findsNothing);
+    expect(_hideChat(), findsOneWidget);
 
     await harness.dispose(tester);
   });

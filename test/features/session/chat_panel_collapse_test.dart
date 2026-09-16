@@ -5,13 +5,19 @@
 // the theory view: practice always shows the full panel, playground still
 // hides it, and the lesson on the left is the only thing that changes size.
 //
+// Issue #138 — until the student has pressed either button, the theory view
+// follows the window: a window narrower than 1200 px starts with the panel
+// folded, a wider one open, and a resize across the line re-folds or unfolds
+// it. A stored choice wins on any window; a stored "open" stays open on a
+// small screen.
+//
 // This mounts the real `ModeSwitcher` over the real `SessionView` (all three
 // mode views plus the chat panel), drives the fold through the real header
-// and strip buttons and the mode through the real top-bar pills, and
-// measures the rendered widths. The lesson view must survive a fold as the
-// same element: the WebView it hosts must not be re-created by a chat-width
-// change (#128). The end-to-end version, over the real WebView, lives in
-// `integration_test/flows/chat_collapse.dart`.
+// and strip buttons and the mode through the real top-bar pills, sizes the
+// window through the test view, and measures the rendered widths. The lesson
+// view must survive a fold as the same element: the WebView it hosts must
+// not be re-created by a chat-width change (#128). The end-to-end version,
+// over the real WebView, lives in `integration_test/flows/chat_collapse.dart`.
 
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
@@ -51,7 +57,9 @@ const _profile = Profile(
   role: Role.student,
 );
 
+/// A wide window and a narrow one, either side of [kChatFoldWindowWidth].
 const double _window = 1400;
+const double _narrow = 1000;
 
 final _panel = find.byKey(const Key('chat-panel'));
 final _showChat = find.byTooltip('Show chat');
@@ -113,8 +121,12 @@ void main() {
     }
   }
 
-  Future<void> mount(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(_window, 900);
+  void resize(WidgetTester tester, double width) {
+    tester.view.physicalSize = Size(width, 900);
+  }
+
+  Future<void> mount(WidgetTester tester, {double width = _window}) async {
+    resize(tester, width);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(buildApp());
@@ -198,6 +210,98 @@ void main() {
     await settle(tester);
     expect(panelWidth(tester), chatCollapsedWidth);
     expect(_showChat, findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('with no choice stored, a narrow window starts with the panel '
+      'folded from the first frame, the lesson has the room, and nothing is '
+      'stored', (tester) async {
+    resize(tester, _narrow);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(buildApp());
+    // The first frame, before the store has answered.
+    expect(panelWidth(tester), chatCollapsedWidth);
+    final lessonFirst = tester.element(find.byType(ExplainView));
+
+    await settle(tester);
+    expect(panelWidth(tester), chatCollapsedWidth);
+    expect(lessonWidth(tester), _narrow - chatCollapsedWidth);
+    expect(_showChat, findsOneWidget);
+    expect(
+      tester.element(find.byType(ExplainView)),
+      same(lessonFirst),
+      reason: 'the window default must not re-create the lesson view',
+    );
+    expect(pc.read(chatCollapsedProvider), isNull, reason: 'no choice made');
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(kChatCollapsedPrefsKey), isFalse);
+
+    await unmount(tester);
+  });
+
+  testWidgets('a stored "open" keeps the full panel on a narrow window', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: false});
+    await mount(tester, width: _narrow);
+
+    expect(panelWidth(tester), chatPanelWidth);
+    expect(lessonWidth(tester), _narrow - chatPanelWidth);
+    expect(_hideChat, findsOneWidget);
+    expect(_showChat, findsNothing);
+
+    await unmount(tester);
+  });
+
+  testWidgets('until the student chooses, the panel follows a resize across '
+      '1200 px; a choice ends that on any window', (tester) async {
+    await mount(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+    final lessonBefore = tester.element(find.byType(ExplainView));
+
+    resize(tester, _narrow);
+    await settle(tester);
+    expect(panelWidth(tester), chatCollapsedWidth);
+    expect(lessonWidth(tester), _narrow - chatCollapsedWidth);
+    expect(_showChat, findsOneWidget);
+    expect(tester.element(find.byType(ExplainView)), same(lessonBefore));
+
+    resize(tester, _window);
+    await settle(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+    expect(_showChat, findsNothing);
+    expect(pc.read(chatCollapsedProvider), isNull, reason: 'still no choice');
+
+    // Show chat on the narrow window: open is now the decision.
+    resize(tester, _narrow);
+    await settle(tester);
+    expect(panelWidth(tester), chatCollapsedWidth);
+    await tester.tap(_showChat);
+    await settle(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+    expect(pc.read(chatCollapsedProvider), isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(kChatCollapsedPrefsKey), isFalse);
+
+    resize(tester, _window);
+    await settle(tester);
+    resize(tester, _narrow);
+    await settle(tester);
+    expect(
+      panelWidth(tester),
+      chatPanelWidth,
+      reason: 'a stored open choice is open on a narrow window too',
+    );
+
+    // And a fold is a fold on a wide window.
+    await tester.tap(_hideChat);
+    await settle(tester);
+    resize(tester, _window);
+    await settle(tester);
+    expect(panelWidth(tester), chatCollapsedWidth);
+    expect(prefs.getBool(kChatCollapsedPrefsKey), isTrue);
 
     await unmount(tester);
   });

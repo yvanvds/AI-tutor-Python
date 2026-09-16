@@ -21,7 +21,8 @@ const double chatCollapsedWidth = 32;
 /// depending on [chatPanelLayoutProvider]: Free hides the chat, an MCQ being
 /// rendered inside `PracticeView` hides it so the student can focus on the
 /// question, and in the theory view the student can fold it to a strip
-/// (#131). Whatever the width, `ChatWidget` stays laid out at full width
+/// (#131) — which a window under 1200 px starts with until they choose
+/// (#138). Whatever the width, `ChatWidget` stays laid out at full width
 /// under an `OverflowBox`, so nothing inside the chat reflows and the mode
 /// view on the left is the only thing that changes size.
 class SessionView extends ConsumerWidget {
