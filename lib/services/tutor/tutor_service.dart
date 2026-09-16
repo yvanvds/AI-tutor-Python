@@ -1212,13 +1212,18 @@ class TutorService extends Notifier<TutorState> {
     return false;
   }
 
+  // The one automatic re-send of a failed request, streamed and not. Both
+  // run inside the turn that failed — `queryTutor` holds `working` until
+  // its `finally` — so neither waits for `idle` before re-sending: the
+  // non-streamed one used to (#139), and since the turn was still `working`
+  // it never re-sent anything, so a status report that failed on a timeout
+  // or a dropped socket was simply lost.
   Future<void> _maybeRetry() async {
     _debug.recordEvent('tutor.maybe_retry', {'retriesLeft': _retriesLeft});
     if (_retriesLeft <= 0) return;
     _retriesLeft--;
-    final result = await _resendLastRequest();
-    if (result == null) return;
-    await _processNonStreamingResult(result);
+    if (state != TutorState.working) state = TutorState.working;
+    await _processNonStreamingResult(await _connector.resendRequest());
   }
 
   Future<void> _maybeRetryStream() async {
@@ -1376,16 +1381,6 @@ class TutorService extends Notifier<TutorState> {
     if (!dispatched) {
       _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
       await _maybeRetry();
-    }
-  }
-
-  Future<ConnectorResult?> _resendLastRequest() async {
-    if (state != TutorState.idle) return null;
-    state = TutorState.working;
-    try {
-      return await _connector.resendRequest();
-    } finally {
-      state = TutorState.idle;
     }
   }
 

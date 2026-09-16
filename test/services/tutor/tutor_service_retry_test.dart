@@ -1,18 +1,27 @@
-// #134 — which failed turns the tutor re-sends on its own.
+// #134, #139 — which failed turns the tutor re-sends on its own, and that
+// it actually does.
 //
 // `TutorService` retries a failed request once, which is the right thing
 // for a timeout or a dropped socket. A turn that failed on the account's
 // key (#126) — none stored, or one OpenAI refused with a 401 — fails the
 // same way when re-sent: the same key, or none, goes out again. Before
-// this issue the retry ran anyway, so the student saw the same pill twice
-// and the app spent a round trip on a foregone conclusion. Now such a
-// turn is reported once and left alone; every other failure keeps the
-// one-retry policy.
+// #134 the retry ran anyway, so the student saw the same pill twice and
+// the app spent a round trip on a foregone conclusion. Now such a turn is
+// reported once and left alone; every other failure keeps the one-retry
+// policy.
+//
+// On the non-streamed path (the status report) that policy was dead code
+// until #139: the re-send waited for the tutor to be `idle`, and the turn
+// that had just failed still held `working`, so a status report that
+// failed on a dropped socket was lost every time. The non-streamed cases
+// below assert on the re-send itself — and on what it brought back landing
+// where it belongs — not only on the debug log saying a retry was reached.
 //
 // The real `TutorService` over a scripted connector (canned stream chunks
 // for the streamed question turns, canned results for the non-streamed
-// status turn) and a mocked conductor. What is asserted is what went out
-// (sends, resends), what the chat holds, and what the debug log says.
+// status turn), a mocked conductor and a report service over an in-memory
+// container. What is asserted is what went out (sends, resends), what the
+// chat holds, what was written, and what the debug log says.
 
 import 'dart:io';
 
@@ -29,6 +38,7 @@ import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
+import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
@@ -42,6 +52,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/mocks.dart';
 
 /// Replays one canned outcome per request, in order, and counts what the
@@ -195,6 +206,21 @@ List<StreamChunk> _streamFailed(_Failure f) => [
 ConnectorResult _callFailed(_Failure f) =>
     ConnectorFailure(f.error, StackTrace.current, f.notice);
 
+/// The status report a non-streamed turn asks for, in the envelope the
+/// instructions demand: the report itself is the TEXT section.
+const String _report = 'Werkt vlot met print().';
+ConnectorResult _statusSummary() => ConnectorOk(
+  '<TEXT>$_report</TEXT>'
+  '<META>{"type":"status_summary","stats":{"hints_used":0,'
+  '"common_issues":[],"last_exercise_type":"complete_code"}}</META>',
+);
+
+/// A reply the model itself flags as an error — the other way a
+/// non-streamed turn reaches the retry, through the response handlers.
+ConnectorResult _errorReply() => const ConnectorOk(
+  '<TEXT>Ik kon geen rapport maken.</TEXT><META>{"type":"error"}</META>',
+);
+
 void main() {
   // The locale the prompt is asked for comes from SharedPreferences.
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -202,6 +228,7 @@ void main() {
   late _ScriptedConnector connector;
   late MockConductor conductor;
   late ChatService chat;
+  late InMemoryCosmos reports;
   late ProviderContainer pc;
 
   setUpAll(() {
@@ -228,6 +255,9 @@ void main() {
     when(() => sound.askQuestion()).thenAnswer((_) async {});
 
     chat = ChatService();
+    // Where a status report the tutor brings back is written: the real
+    // service over an in-memory container, against a fixed subgoal.
+    reports = InMemoryCosmos();
     pc = ProviderContainer(
       overrides: [
         tutorServiceProvider.overrideWith(
@@ -241,6 +271,13 @@ void main() {
         instructionsServiceProvider.overrideWith(_NoInstructions.new),
         goalsServiceProvider.overrideWithValue(MockGoalsService()),
         soundServiceProvider.overrideWithValue(sound),
+        reportServiceProvider.overrideWithValue(
+          ReportService(
+            container: reports.container,
+            getUid: () => 'u1',
+            getCurrentChildGoalId: () => 's1',
+          ),
+        ),
       ],
     );
   });
@@ -331,22 +368,53 @@ void main() {
       );
     }
 
-    test(
-      'that failed on ${_socketReset.name} still reaches the retry',
-      () async {
-        connector.results.add(_callFailed(_socketReset));
+    test('that failed on ${_socketReset.name} is re-sent once, and the '
+        'report the re-send brings back is written (#139)', () async {
+      connector.results.addAll([_callFailed(_socketReset), _statusSummary()]);
 
-        await tutor().queryTutor(type: ChatRequestType.status);
+      await tutor().queryTutor(type: ChatRequestType.status);
 
-        expect(connector.sends, 1);
-        expect(failurePills(), [ChatNoticeKind.tutorUnreachable]);
-        expect(tutor().state, TutorState.idle);
-        // The retry is reached, not made: `_resendLastRequest` bails while
-        // the turn holds `working`, so no non-streamed turn is ever re-sent
-        // (#139). Only the debug log tells the two policies apart here.
-        expect(turnEvents(), contains('tutor.maybe_retry'));
-        expect(turnEvents(), isNot(contains('tutor.retry_skipped')));
-      },
-    );
+      expect(connector.sends, 1);
+      expect(connector.resends, 1, reason: 'the retry never went out');
+      expect(failurePills(), [ChatNoticeKind.tutorUnreachable]);
+      expect(reports['u1_s1']?['statusReport'], _report);
+      expect(tutor().state, TutorState.idle);
+      expect(turnEvents(), contains('tutor.maybe_retry'));
+      expect(turnEvents(), isNot(contains('tutor.retry_skipped')));
+    });
+
+    test('that came back as an error reply is re-sent once, and the report '
+        'the re-send brings back is written (#139)', () async {
+      connector.results.addAll([_errorReply(), _statusSummary()]);
+
+      await tutor().queryTutor(type: ChatRequestType.status);
+
+      expect(connector.sends, 1);
+      expect(connector.resends, 1, reason: 'the retry never went out');
+      expect(reports['u1_s1']?['statusReport'], _report);
+      expect(tutor().state, TutorState.idle);
+      expect(turnEvents(), contains('tutor.maybe_retry'));
+    });
+
+    test('is re-sent once at most: a second failure is reported and left '
+        'alone', () async {
+      connector.results.addAll([
+        _callFailed(_socketReset),
+        _callFailed(_socketReset),
+        // Never reached.
+        _statusSummary(),
+      ]);
+
+      await tutor().queryTutor(type: ChatRequestType.status);
+
+      expect(connector.sends, 1);
+      expect(connector.resends, 1);
+      expect(failurePills(), [
+        ChatNoticeKind.tutorUnreachable,
+        ChatNoticeKind.tutorUnreachable,
+      ]);
+      expect(reports.docs, isEmpty);
+      expect(tutor().state, TutorState.idle);
+    });
   });
 }

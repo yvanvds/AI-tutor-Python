@@ -230,12 +230,14 @@ String? parseSha256Document(String body) {
 /// checksum beside it. That distinction is #46's and is what keeps a broken
 /// check from reading as "you are up to date".
 ///
-/// A TLS handshake Dart cannot complete — and only that (#124) — is retried
-/// through [nativeGet] when one is given, and once that was needed the
-/// checksum goes the same way rather than failing the same handshake again.
-/// The release that comes back says so ([UpdateInfo.viaNativeTransport]) so
-/// the download can too. A 404, a timeout, a dead socket are not the
-/// certificate problem and are never retried natively.
+/// A TLS handshake Dart cannot complete (#124), or a proxy that refuses the
+/// tunnel for want of a login (#140, [isProxyLoginChallenge]) — and only
+/// those — are retried through [nativeGet] when one is given, and once that
+/// was needed the checksum goes the same way rather than failing the same
+/// handshake or challenge again. The release that comes back says so
+/// ([UpdateInfo.viaNativeTransport]) so the download can too. A 404, a
+/// timeout, a dead socket are neither the certificate problem nor the login
+/// problem and are never retried natively.
 ///
 /// [proxy] is the machine's proxy setting (#133), honoured when no [client]
 /// is given; [nativeGet] was built with the same one.
@@ -379,7 +381,8 @@ Future<String> _fetchChecksum(_Transport transport, Uri url) async {
 
 /// The bounded GETs one check makes, reporting their failures as
 /// [UpdateCheckException] — and, from the first handshake Dart cannot
-/// complete onwards, making them through [nativeGet] instead (#124).
+/// complete (#124) or the first proxy login challenge it cannot answer
+/// (#140) onwards, making them through [nativeGet] instead.
 class _Transport {
   _Transport(
     this.client, {
@@ -394,9 +397,9 @@ class _Transport {
   final TransportLog? log;
 
   /// Whether a request of this check has gone through [nativeGet]. Sticky:
-  /// the checksum asset sits behind the same inspection as the API, so once
-  /// Dart has failed the handshake there is nothing to learn from failing it
-  /// again.
+  /// the checksum asset sits behind the same inspection, and the same
+  /// proxy, as the API, so once Dart has failed the handshake or the login
+  /// challenge there is nothing to learn from failing it again.
   bool nativeEngaged = false;
 
   Future<http.Response> get(
@@ -419,30 +422,61 @@ class _Transport {
       // are handed the same proxy, so a request that times out through it
       // here has nothing to gain from curl beyond a second wait of the same
       // length, and a dead network would read as a slow one.
-      final NativeGet? native = nativeGet;
-      if (native == null) {
+      return _retryNatively(
+        url,
+        headers,
+        reason: '$e',
+        why: 'Dart could not complete the TLS handshake to $url ($e)',
+      );
+    } on http.ClientException catch (e) {
+      // The one other reason (#140): the proxy answered the CONNECT with a
+      // 407, which Dart reports as an `HttpException` this wraps. The app
+      // has no login to answer it with; the Windows-native transport has
+      // the Windows login. Every other `ClientException` — a connection
+      // closed mid-header, a tunnel refused with some other status — is an
+      // ordinary failure and reported as one.
+      if (!isProxyLoginChallenge(e)) {
         throw UpdateCheckException('request to $url failed: $e');
       }
-      log?.call(
-        'Update: Dart could not complete the TLS handshake to $url ($e); '
-        'retrying through the Windows-native transport.',
+      return _retryNatively(
+        url,
+        headers,
+        reason: kProxyLoginReason,
+        why: 'the proxy asks for a login to open the tunnel to $url ($e)',
       );
-      nativeEngaged = true;
-      try {
-        return await _native(url, headers);
-      } on UpdateCheckException catch (nativeFailure) {
-        // The handshake reason stays in front: it is the one that explains
-        // the network, and the one About should still be telling the truth
-        // about.
-        throw UpdateCheckException(
-          'request to $url failed: $e; the Windows-native fallback failed '
-          'too: ${nativeFailure.message}',
-        );
-      }
     } on UpdateCheckException {
       rethrow;
     } on Object catch (e) {
       throw UpdateCheckException('request to $url failed: $e');
+    }
+  }
+
+  /// The request through [nativeGet] after Dart's own attempt failed for
+  /// [reason] — or, with no [nativeGet] to retry on, that reason as the
+  /// failure. [why] is the log line's account of it. From here on every
+  /// request of this check goes natively ([nativeEngaged]).
+  ///
+  /// When the fallback fails too, [reason] stays in front: it is the one
+  /// that explains the network, and the one About should still be telling
+  /// the truth about.
+  Future<http.Response> _retryNatively(
+    Uri url,
+    Map<String, String> headers, {
+    required String reason,
+    required String why,
+  }) async {
+    if (nativeGet == null) {
+      throw UpdateCheckException('request to $url failed: $reason');
+    }
+    log?.call('Update: $why; retrying through the Windows-native transport.');
+    nativeEngaged = true;
+    try {
+      return await _native(url, headers);
+    } on UpdateCheckException catch (nativeFailure) {
+      throw UpdateCheckException(
+        'request to $url failed: $reason; the Windows-native fallback failed '
+        'too: ${nativeFailure.message}',
+      );
     }
   }
 

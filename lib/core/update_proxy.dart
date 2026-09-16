@@ -90,6 +90,12 @@ class UpdateProxy {
   /// host — in which case the flag is left off.
   String? curlProxyFor(Uri target) => bypasses(target) ? null : url.toString();
 
+  /// Whether [url] carries a login of its own — `http://user:pass@host:port`,
+  /// as an environment variable can state one. Both transports send it as
+  /// Basic; without one, the `curl.exe` fallback answers a challenge with the
+  /// Windows login instead (#140), and Dart's client cannot answer at all.
+  bool get hasLogin => url.userInfo.isNotEmpty;
+
   /// [url] without its credentials: what a log line or an error message may
   /// say about the proxy. Only the two transports are handed the password.
   String get redactedUrl => url.replace(userInfo: '').toString();

@@ -308,6 +308,21 @@ void main() {
       expect(withCredentials.curlProxyFor(github), contains('student:secret@'));
     });
 
+    // #140: whether curl is left to send the URL's login, or told to answer
+    // a challenge with the Windows one instead.
+    test('knows whether it carries a login', () {
+      expect(proxy.hasLogin, isFalse);
+      expect(
+        UpdateProxy(Uri.parse('http://student:secret@proxy.school.be:8080'))
+            .hasLogin,
+        isTrue,
+      );
+      expect(
+        UpdateProxy(Uri.parse('http://student@proxy.school.be:8080')).hasLogin,
+        isTrue,
+      );
+    });
+
     group('bypasses', () {
       UpdateProxy withBypass(List<String> bypass) =>
           UpdateProxy(proxy.url, bypass: bypass);

@@ -27,9 +27,10 @@
 // that inspects TLS. [TrustingLoopbackGet] is the stand-in for the `curl.exe`
 // the app falls back to on such a network: it trusts exactly this
 // certificate, the way Schannel trusts the filter's CA from the Windows
-// store. The real binary cannot be used here — it would refuse the loopback
-// certificate for the same reason Dart does, and putting a test CA in the
-// machine's store is not something a test may do.
+// store, and (#140) answers a loopback proxy's login challenge the way SSPI
+// answers the school's. The real binary cannot be used here — it would
+// refuse the loopback certificate for the same reason Dart does, and putting
+// a test CA in the machine's store is not something a test may do.
 
 import 'dart:convert';
 import 'dart:io';
@@ -58,11 +59,20 @@ const String kFakeInstallerSha256 =
 ///
 /// Built with the machine's [proxy], as the real one is (#133): the
 /// production wiring hands `curlNativeGet` the same `UpdateProxy` it hands
-/// Dart's client, and this stand-in honours it the same way.
+/// Dart's client, and this stand-in honours it the same way. With a
+/// [proxyLogin] it also answers that proxy's login challenge (#140), the
+/// way the real `curl.exe` answers a school proxy's through SSPI with the
+/// Windows login: `user:pass`, sent as a Basic `Proxy-Authorization` on the
+/// CONNECT. The app's own client is never given one — it has none — which
+/// is the whole difference the flow drives.
 class TrustingLoopbackGet {
-  TrustingLoopbackGet({this.proxy});
+  TrustingLoopbackGet({this.proxy, this.proxyLogin});
 
   final UpdateProxy? proxy;
+
+  /// The login the stand-in answers [proxy]'s challenge with, or `null` to
+  /// answer none — in which case it fails on a 407 exactly as Dart does.
+  final String? proxyLogin;
 
   final List<({Uri url, Map<String, String> headers, File? to})> calls = [];
 
@@ -78,7 +88,15 @@ class TrustingLoopbackGet {
           host == InternetAddress.loopbackIPv4.address &&
           isLoopbackCertificate(cert);
     final UpdateProxy? via = proxy;
-    if (via != null) client.findProxy = via.findProxy;
+    final String? login = proxyLogin;
+    if (via != null) {
+      client.findProxy = login == null
+          ? via.findProxy
+          : UpdateProxy(
+              via.url.replace(userInfo: login),
+              bypass: via.bypass,
+            ).findProxy;
+    }
     try {
       final HttpClientRequest request = await client.getUrl(url);
       headers.forEach(request.headers.set);

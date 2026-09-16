@@ -345,6 +345,108 @@ void main() {
 
       expect(native.calls, isEmpty);
     });
+
+    // #140: the installer sits behind the same proxy as the API, and an
+    // authenticating one refuses the download's CONNECT with a 407 exactly
+    // as it refuses the check's. Same second trigger, same narrowness.
+    final loginChallenge = http.ClientException(
+      'Proxy failed to establish tunnel (407 Proxy Authentication Required)',
+      url,
+    );
+
+    test('a proxy login challenge is retried through the seam into the temp '
+        'file', () async {
+      final dart = MockClient((_) async => throw loginChallenge);
+      final native = recordingNative(bytes: const [5, 6, 7]);
+      final logs = <String>[];
+
+      final file = await downloadToTemp(
+        url,
+        client: dart,
+        nativeGet: native.get,
+        log: logs.add,
+      );
+      addTearDown(() {
+        if (file.existsSync()) file.deleteSync();
+      });
+
+      expect(native.calls, hasLength(1));
+      expect(native.calls.single.to?.path, expectedPath);
+      expect(file.readAsBytesSync(), [5, 6, 7]);
+      expect(logs.join('\n'), contains('asks for a login'));
+    });
+
+    test(
+      'without a seam the login is the reason reported, in plain words',
+      () async {
+        final dart = MockClient((_) async => throw loginChallenge);
+        await expectLater(
+          downloadToTemp(url, client: dart),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains("the network's proxy asks for a login"),
+                isNot(contains('ClientException')),
+              ),
+            ),
+          ),
+        );
+        expect(File(expectedPath).existsSync(), isFalse);
+      },
+    );
+
+    test(
+      'when the seam is refused the login too, both reasons are kept',
+      () async {
+        final dart = MockClient((_) async => throw loginChallenge);
+        final native = recordingNative(
+          failWith: UpdateCheckException('curl.exe exited with 7'),
+        );
+        await expectLater(
+          downloadToTemp(url, client: dart, nativeGet: native.get),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('asks for a login'),
+                contains('curl.exe exited with 7'),
+              ),
+            ),
+          ),
+        );
+        expect(File(expectedPath).existsSync(), isFalse);
+      },
+    );
+
+    test(
+      'a tunnel refused with another status never reaches the seam',
+      () async {
+        final native = recordingNative();
+        await expectLater(
+          downloadToTemp(
+            url,
+            client: MockClient(
+              (_) async => throw http.ClientException(
+                'Proxy failed to establish tunnel (502 Bad Gateway)',
+                url,
+              ),
+            ),
+            nativeGet: native.get,
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains('502'), isNot(contains('asks for a login'))),
+            ),
+          ),
+        );
+        expect(native.calls, isEmpty);
+      },
+    );
   });
 
   // #133: the installer comes down through the machine's proxy too — the
@@ -422,6 +524,44 @@ void main() {
       expect(proxy.connects, isEmpty);
       expect(hole.connections, 1);
     });
+
+    // #140, with the real client: the proxy demands a login on the CONNECT,
+    // Dart's download cannot give one, and the seam carries the installer.
+    test(
+      'when the proxy asks for a login, the seam carries the installer',
+      () async {
+        final LoopbackProxy asking = await LoopbackProxy.start(
+          routes: {hole.authority: '${server.address.address}:${server.port}'},
+          requireLogin: true,
+        );
+        addTearDown(asking.close);
+        final List<Uri> calls = <Uri>[];
+        Future<http.Response> native(
+          Uri url, {
+          Map<String, String> headers = const {},
+          Duration? timeout,
+          File? to,
+        }) async {
+          calls.add(url);
+          to!.writeAsBytesSync(installer);
+          return http.Response('', 200);
+        }
+
+        final file = await HttpOverrides.runWithHttpOverrides(
+          () =>
+              downloadToTemp(url, proxy: asking.updateProxy, nativeGet: native),
+          TrustLoopbackCertificate(),
+        );
+        addTearDown(() {
+          if (file.existsSync()) file.deleteSync();
+        });
+        expect(file.readAsBytesSync(), installer);
+        expect(calls, [url]);
+        expect(asking.challenges, 1);
+        expect(asking.logins, isEmpty, reason: 'Dart has no login to send');
+        expect(hole.connections, 0);
+      },
+    );
   });
 
   group('verifySha256', () {
