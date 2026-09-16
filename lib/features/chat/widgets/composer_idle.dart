@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/features/chat/widgets/composer_chrome.dart';
+import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
@@ -12,7 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Idle composer: multi-line TextField, accent send button when populated,
 /// `Cmd/Ctrl + Enter` to send, plain `Enter` inserts a newline. Sending a
-/// solo `?` is shorthand for "give me a hint".
+/// solo `?` is shorthand for "give me a hint". While a theory page is on
+/// screen the field's hint says a question is about that page (#132).
 class ComposerIdle extends ConsumerStatefulWidget {
   const ComposerIdle({super.key});
 
@@ -69,6 +71,10 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final hint = ref.watch(askAboutPageProvider)
+        ? l.chat_composer_idle_pageHint
+        : l.chat_composer_idle_hint;
     return ComposerChrome(
       child: CallbackShortcuts(
         bindings: {
@@ -83,6 +89,7 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
               controller: _controller,
               focusNode: _focus,
               hasText: _hasText,
+              hint: hint,
               onSend: _send,
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -99,12 +106,14 @@ class _Field extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.hasText,
+    required this.hint,
     required this.onSend,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool hasText;
+  final String hint;
   final VoidCallback onSend;
 
   @override
@@ -142,8 +151,7 @@ class _Field extends StatelessWidget {
                 decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
-                  hintText: AppLocalizations.of(context)
-                      .chat_composer_idle_hint,
+                  hintText: hint,
                   hintStyle: TextStyle(
                     color: AppColors.fgFaint,
                     fontSize: 14,

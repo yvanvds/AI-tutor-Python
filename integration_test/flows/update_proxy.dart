@@ -23,7 +23,17 @@
 // third is the combination a managed school network actually presents —
 // an explicit proxy *and* TLS inspection — where Dart fails the handshake
 // inside the tunnel and the fallback, built with the same proxy, carries
-// the check.
+// the check. The fourth (#135) states the proxy the other way a school
+// does — not in Internet Options' proxy box but as a PAC script the
+// machine is told to fetch — and hands the app nothing resolved: the real
+// WinHTTP fetches the script from a loopback `LoopbackPacServer`, evaluates
+// it for the feed URL, and the proxy it names is the one the whole update
+// then goes through. That test advertises the release server under a
+// school hostname rather than at the hole: WinHTTP answers DIRECT for a
+// loopback target before it consults any script (the same built-in bypass
+// Edge has), and a name only the proxy knows the way to is what a school's
+// filter looks like anyway — Dart never resolves it, since through a proxy
+// it only ever sends `CONNECT host:port`.
 //
 // Dart trusts the loopback certificate in the second test only through
 // `TrustLoopbackCertificate`, the test-side stand-in for a CA that sits in
@@ -53,11 +63,21 @@ final _offerBar = find.byKey(const ValueKey('update-offer'));
 final _applyButton = find.byKey(const ValueKey('update-offer-apply'));
 final _notice = find.byKey(const ValueKey('update-check-failed'));
 
+/// Where the PAC flow says the release server is: a name on the school
+/// network, on a port that stays visible in the URL and the CONNECT alike.
+const String _schoolAuthority = 'updates.school.test:8443';
+
 /// The network: a hole the app is pointed at, a release server it cannot
-/// reach, and a proxy that can.
+/// reach, and a proxy that can. The server is advertised at the hole unless
+/// [advertisedAuthority] says otherwise; either way the proxy alone routes
+/// that authority to the server.
 Future<({BlackHole hole, FakeReleaseServer server, LoopbackProxy proxy})>
-_proxiedNetwork({Uint8List? installerBytes}) async {
+_proxiedNetwork({
+  Uint8List? installerBytes,
+  String? advertisedAuthority,
+}) async {
   final hole = await BlackHole.start();
+  final String authority = advertisedAuthority ?? hole.authority;
   final server = await FakeReleaseServer.start(
     version: '99.0.0+1',
     installerBytes: installerBytes,
@@ -65,10 +85,10 @@ _proxiedNetwork({Uint8List? installerBytes}) async {
         ? kFakeInstallerSha256
         : sha256.convert(installerBytes).toString(),
     tls: true,
-    advertisedAuthority: hole.authority,
+    advertisedAuthority: authority,
   );
   final proxy = await LoopbackProxy.start(
-    routes: {hole.authority: server.authority},
+    routes: {authority: server.authority},
   );
   return (hole: hole, server: server, proxy: proxy);
 }
@@ -232,6 +252,84 @@ void main() {
       await net.proxy.close();
       await net.server.close();
       await net.hole.close();
+    },
+  );
+
+  testWidgets(
+    'with only a PAC script naming the proxy, the update is found, verified '
+    'and installed through the proxy WinHTTP resolves from it',
+    (tester) async {
+      final installerBytes = Uint8List.fromList(
+        List<int>.generate(48 * 1024, (i) => (i * 7) % 256),
+      );
+      final net = await _proxiedNetwork(
+        installerBytes: installerBytes,
+        advertisedAuthority: _schoolAuthority,
+      );
+      // What the school publishes at its AutoConfigURL: every URL through
+      // the proxy — the one route to the release server.
+      final pac = await LoopbackPacServer.start(
+        script: pacScript(proxy: '127.0.0.1:${net.proxy.port}'),
+      );
+
+      HttpOverrides.global = TrustLoopbackCertificate(
+        hosts: <String>[Uri.parse('https://$_schoolAuthority').host],
+      );
+      addTearDown(() => HttpOverrides.global = null);
+
+      // No `proxy`: the app is told where the script is, as Internet
+      // Options would tell it, and resolves the rest itself.
+      final harness = AppHarness(
+        updateFeedUrl: net.server.feedUrl,
+        pacUrl: pac.url,
+      );
+      await harness.boot(tester);
+
+      await pumpUntilFound(tester, _offerBar);
+      expect(find.textContaining('99.0.0+1'), findsOneWidget);
+      expect(_notice, findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // WinHTTP came for the script, and what it evaluated is what the
+      // check went through: both requests tunnelled through the proxy to
+      // the school name, which nothing else could have reached.
+      expect(pac.fetches, greaterThanOrEqualTo(1));
+      expect(net.server.releaseRequests, 1);
+      expect(net.server.checksumRequests, 1);
+      expect(net.proxy.connects, isNotEmpty);
+      expect(net.proxy.connects, everyElement(_schoolAuthority));
+      expect(
+        harness.container
+            .read(updateControllerProvider)
+            .release
+            ?.viaNativeTransport,
+        isFalse,
+        reason: 'the fallback was engaged on a network that did not need it',
+      );
+
+      await tester.tap(_applyButton);
+      await pumpUntil(
+        tester,
+        () => harness.installerLaunches.isNotEmpty,
+        timeout: const Duration(seconds: 30),
+        reason: 'the verified installer was never handed over',
+      );
+
+      // The installer came the same way: the download awaited the same
+      // resolution, and it too went through the proxy the script named.
+      expect(net.server.installerRequests, 1);
+      expect(net.proxy.connects, everyElement(_schoolAuthority));
+      final launch = harness.installerLaunches.single;
+      expect(File(launch.executable).readAsBytesSync(), installerBytes);
+      expect(launch.arguments, containsAll(<String>['/SILENT', '/RELAUNCH=1']));
+
+      await harness.dispose(tester);
+      await pac.close();
+      await net.proxy.close();
+      await net.server.close();
+      await net.hole.close();
+      final downloaded = File(launch.executable);
+      if (downloaded.existsSync()) downloaded.deleteSync();
     },
   );
 }

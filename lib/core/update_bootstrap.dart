@@ -4,12 +4,14 @@
 ///
 /// Held apart from `update_controller.dart` on purpose — this is the only
 /// file in the update layer that touches the real network, the real
-/// filesystem, a real process and the registry, so everything above it stays
-/// drivable from a test with no network and no `%TEMP%` write.
+/// filesystem, a real process, the registry and WinHTTP, so everything above
+/// it stays drivable from a test with no network and no `%TEMP%` write.
 library;
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ai_tutor_python/core/github_release.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
@@ -25,6 +27,8 @@ import 'package:path/path.dart' as p;
 import 'package:win32/win32.dart'
     show
         ERROR_SUCCESS,
+        GetLastError,
+        GlobalFree,
         HKEY_CURRENT_USER,
         HKEY_LOCAL_MACHINE,
         RRF_RT_REG_DWORD,
@@ -143,14 +147,16 @@ String windowsCurlPath() => p.join(
 /// - `--proxy` when the machine has one ([proxy], #133): `curl.exe` reads
 ///   `https_proxy` from the environment by itself but never Internet
 ///   Options, so it is told explicitly — the same decision Dart's client was
-///   handed, bypass list included.
+///   handed, bypass list included. [proxy] is looked up per request, not
+///   taken at construction: the setting is resolved once per launch and,
+///   when it comes from a PAC script (#135), not before a request needs it.
 ///
 /// Nothing here weakens verification: the fallback trusts what the operating
 /// system trusts, and `verifyAndCleanUp` still hashes what arrives.
 NativeGet? curlNativeGet({
   required String curlPath,
   ProcessRunner run = _runProcess,
-  UpdateProxy? proxy,
+  FutureOr<UpdateProxy?> Function()? proxy,
 }) {
   if (!File(curlPath).existsSync()) return null;
   return (
@@ -164,7 +170,7 @@ NativeGet? curlNativeGet({
         : null;
     final File out = to ?? File(p.join(scratch!.path, 'body'));
     try {
-      final String? via = proxy?.curlProxyFor(url);
+      final String? via = (await proxy?.call())?.curlProxyFor(url);
       final List<String> arguments = <String>[
         '-sS',
         '-L',
@@ -300,37 +306,381 @@ InternetSettingsProxy readInternetSettingsProxy() {
   );
 }
 
-/// The proxy this machine states for the updater's requests (#133), or
-/// `null` for a direct connection: the environment first (`https_proxy`,
-/// `all_proxy`), then — on Windows — Internet Options. Both seams default to
-/// the real thing and exist so a test can hand in a string instead.
+// --- PAC / WPAD through WinHTTP (#135) -------------------------------------
+//
+// The `win32` package binds WinHTTP's COM `WinHttpRequest` but not its C
+// API, so the five entry points the auto-proxy read needs are looked up here
+// directly. Only `WinHttpGetIEProxyConfigForCurrentUser` and
+// `WinHttpGetProxyForUrl` do any work; the rest is session housekeeping.
+
+const int _winHttpAccessTypeNoProxy = 1;
+const int _winHttpAutoProxyAutoDetect = 0x00000001;
+const int _winHttpAutoProxyConfigUrl = 0x00000002;
+const int _winHttpAutoDetectTypeDhcp = 0x00000001;
+const int _winHttpAutoDetectTypeDnsA = 0x00000002;
+const int _errorWinHttpLoginFailure = 12015;
+
+/// WinHTTP's own names for the failures a PAC/WPAD lookup most often ends
+/// in; anything else is reported by number.
+const Map<int, String> _winHttpErrorNames = <int, String>{
+  12002: 'ERROR_WINHTTP_TIMEOUT',
+  12007: 'ERROR_WINHTTP_NAME_NOT_RESOLVED',
+  12015: 'ERROR_WINHTTP_LOGIN_FAILURE',
+  12029: 'ERROR_WINHTTP_CANNOT_CONNECT',
+  12166: 'ERROR_WINHTTP_BAD_AUTO_PROXY_SCRIPT',
+  12167: 'ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT',
+  12180: 'ERROR_WINHTTP_AUTODETECTION_FAILED',
+};
+
+/// `WINHTTP_CURRENT_USER_IE_PROXY_CONFIG`.
+final class _IeProxyConfig extends Struct {
+  @Int32()
+  external int fAutoDetect;
+  external Pointer<Utf16> lpszAutoConfigUrl;
+  external Pointer<Utf16> lpszProxy;
+  external Pointer<Utf16> lpszProxyBypass;
+}
+
+/// `WINHTTP_AUTOPROXY_OPTIONS`.
+final class _AutoProxyOptions extends Struct {
+  @Uint32()
+  external int dwFlags;
+  @Uint32()
+  external int dwAutoDetectFlags;
+  external Pointer<Utf16> lpszAutoConfigUrl;
+  external Pointer<Void> lpvReserved;
+  @Uint32()
+  external int dwReserved;
+  @Int32()
+  external int fAutoLogonIfChallenged;
+}
+
+/// `WINHTTP_PROXY_INFO`.
+final class _ProxyInfo extends Struct {
+  @Uint32()
+  external int dwAccessType;
+  external Pointer<Utf16> lpszProxy;
+  external Pointer<Utf16> lpszProxyBypass;
+}
+
+typedef _WinHttpOpenC = Pointer<Void> Function(
+  Pointer<Utf16> agent,
+  Uint32 accessType,
+  Pointer<Utf16> proxy,
+  Pointer<Utf16> proxyBypass,
+  Uint32 flags,
+);
+typedef _WinHttpOpenDart = Pointer<Void> Function(
+  Pointer<Utf16> agent,
+  int accessType,
+  Pointer<Utf16> proxy,
+  Pointer<Utf16> proxyBypass,
+  int flags,
+);
+typedef _WinHttpCloseHandleC = Int32 Function(Pointer<Void> handle);
+typedef _WinHttpCloseHandleDart = int Function(Pointer<Void> handle);
+typedef _WinHttpSetTimeoutsC = Int32 Function(
+  Pointer<Void> handle,
+  Int32 resolve,
+  Int32 connect,
+  Int32 send,
+  Int32 receive,
+);
+typedef _WinHttpSetTimeoutsDart = int Function(
+  Pointer<Void> handle,
+  int resolve,
+  int connect,
+  int send,
+  int receive,
+);
+typedef _WinHttpGetIEProxyConfigC = Int32 Function(
+  Pointer<_IeProxyConfig> config,
+);
+typedef _WinHttpGetIEProxyConfigDart = int Function(
+  Pointer<_IeProxyConfig> config,
+);
+typedef _WinHttpGetProxyForUrlC = Int32 Function(
+  Pointer<Void> session,
+  Pointer<Utf16> url,
+  Pointer<_AutoProxyOptions> options,
+  Pointer<_ProxyInfo> info,
+);
+typedef _WinHttpGetProxyForUrlDart = int Function(
+  Pointer<Void> session,
+  Pointer<Utf16> url,
+  Pointer<_AutoProxyOptions> options,
+  Pointer<_ProxyInfo> info,
+);
+
+/// `winhttp.dll`, opened on first use — per isolate, since the lookup runs
+/// off the main one — and only ever on Windows.
+class _WinHttp {
+  _WinHttp() : _library = DynamicLibrary.open('winhttp.dll');
+
+  final DynamicLibrary _library;
+
+  late final _WinHttpOpenDart open = _library
+      .lookupFunction<_WinHttpOpenC, _WinHttpOpenDart>('WinHttpOpen');
+  late final _WinHttpCloseHandleDart closeHandle = _library
+      .lookupFunction<_WinHttpCloseHandleC, _WinHttpCloseHandleDart>(
+        'WinHttpCloseHandle',
+      );
+  late final _WinHttpSetTimeoutsDart setTimeouts = _library
+      .lookupFunction<_WinHttpSetTimeoutsC, _WinHttpSetTimeoutsDart>(
+        'WinHttpSetTimeouts',
+      );
+  late final _WinHttpGetIEProxyConfigDart getIEProxyConfigForCurrentUser =
+      _library.lookupFunction<
+        _WinHttpGetIEProxyConfigC,
+        _WinHttpGetIEProxyConfigDart
+      >('WinHttpGetIEProxyConfigForCurrentUser');
+  late final _WinHttpGetProxyForUrlDart getProxyForUrl = _library
+      .lookupFunction<_WinHttpGetProxyForUrlC, _WinHttpGetProxyForUrlDart>(
+        'WinHttpGetProxyForUrl',
+      );
+}
+
+/// A string WinHTTP allocated for the caller, read and given back.
+String? _takeWinHttpString(Pointer<Utf16> value) {
+  if (value == nullptr) return null;
+  try {
+    return value.toDartString();
+  } finally {
+    GlobalFree(value.cast());
+  }
+}
+
+String _winHttpError(String call, int code) {
+  final String? name = _winHttpErrorNames[code];
+  return '$call failed: error $code${name == null ? '' : ' ($name)'}';
+}
+
+/// The automatic-configuration half of Internet Options (#135): whether
+/// "Automatically detect settings" is ticked and which script URL is set, as
+/// `WinHttpGetIEProxyConfigForCurrentUser` reports them. Windows only.
 ///
-/// A registry read that fails outright is logged and counts as "no proxy":
-/// the update check must not die over its own diagnostics.
-UpdateProxy? systemUpdateProxy({
+/// The explicit half — `lpszProxy` / `lpszProxyBypass`, which the same call
+/// also returns — is deliberately still read from the registry by
+/// [readInternetSettingsProxy], where the per-machine policy is honoured
+/// (#133); this reads only what the registry does not keep in the clear
+/// (WPAD sits in a binary blob under `Connections`).
+AutoProxyConfig readAutoProxyConfig() => using((Arena arena) {
+  final _WinHttp api = _WinHttp();
+  final Pointer<_IeProxyConfig> config = arena<_IeProxyConfig>();
+  if (api.getIEProxyConfigForCurrentUser(config) == 0) {
+    throw StateError(
+      _winHttpError('WinHttpGetIEProxyConfigForCurrentUser', GetLastError()),
+    );
+  }
+  _takeWinHttpString(config.ref.lpszProxy);
+  _takeWinHttpString(config.ref.lpszProxyBypass);
+  return (
+    autoDetect: config.ref.fAutoDetect != 0,
+    configUrl: _takeWinHttpString(config.ref.lpszAutoConfigUrl),
+  );
+});
+
+/// How long the PAC/WPAD lookup may take before the check goes ahead without
+/// it (#135). A script on a school LAN answers well inside a second; WPAD
+/// on a network that has none — a student's home, with "Automatically
+/// detect settings" at its Windows default of on — fails in a few, and
+/// WinHTTP's auto-proxy service remembers that between launches. The cap is
+/// what keeps a script server that accepts and never answers from holding
+/// the check for WinHTTP's own thirty-second deadline.
+const Duration kAutoProxyTimeout = Duration(seconds: 5);
+
+/// The WinHTTP side of the PAC/WPAD lookup, in whatever isolate it is
+/// called on: one session, one `WinHttpGetProxyForUrl`, and the strings it
+/// hands back. Throws a [StateError] naming WinHTTP's error when the lookup
+/// does not complete.
+AutoProxyResult _winHttpProxyForUrl(
+  String url, {
+  required bool autoDetect,
+  required String? configUrl,
+}) => using((Arena arena) {
+  final _WinHttp api = _WinHttp();
+  final Pointer<Void> session = api.open(
+    'AI-tutor-Python'.toNativeUtf16(allocator: arena),
+    _winHttpAccessTypeNoProxy,
+    nullptr,
+    nullptr,
+    0,
+  );
+  if (session == nullptr) {
+    throw StateError(_winHttpError('WinHttpOpen', GetLastError()));
+  }
+  try {
+    // The session's own deadlines, for the in-process script download;
+    // the out-of-process auto-proxy service keeps its own, which is why
+    // the caller's [kAutoProxyTimeout] is the one that is guaranteed.
+    final int ms = kAutoProxyTimeout.inMilliseconds;
+    api.setTimeouts(session, ms, ms, ms, ms);
+    final Pointer<_AutoProxyOptions> options = arena<_AutoProxyOptions>();
+    options.ref.dwFlags =
+        (autoDetect ? _winHttpAutoProxyAutoDetect : 0) |
+        (configUrl == null ? 0 : _winHttpAutoProxyConfigUrl);
+    options.ref.dwAutoDetectFlags = autoDetect
+        ? _winHttpAutoDetectTypeDhcp | _winHttpAutoDetectTypeDnsA
+        : 0;
+    options.ref.lpszAutoConfigUrl = configUrl == null
+        ? nullptr
+        : configUrl.toNativeUtf16(allocator: arena);
+    // As the documentation recommends: without automatic logon first, and
+    // again with it only when the script server asked for credentials.
+    options.ref.fAutoLogonIfChallenged = 0;
+    final Pointer<Utf16> target = url.toNativeUtf16(allocator: arena);
+    final Pointer<_ProxyInfo> info = arena<_ProxyInfo>();
+    if (api.getProxyForUrl(session, target, options, info) == 0) {
+      int error = GetLastError();
+      if (error == _errorWinHttpLoginFailure) {
+        options.ref.fAutoLogonIfChallenged = 1;
+        if (api.getProxyForUrl(session, target, options, info) == 0) {
+          error = GetLastError();
+          throw StateError(_winHttpError('WinHttpGetProxyForUrl', error));
+        }
+      } else {
+        throw StateError(_winHttpError('WinHttpGetProxyForUrl', error));
+      }
+    }
+    final String? proxy = _takeWinHttpString(info.ref.lpszProxy);
+    final String? bypass = _takeWinHttpString(info.ref.lpszProxyBypass);
+    // `DIRECT` comes back as `WINHTTP_ACCESS_TYPE_NO_PROXY` and no string.
+    return (
+      proxy: info.ref.dwAccessType == _winHttpAccessTypeNoProxy ? null : proxy,
+      bypass: bypass,
+    );
+  } finally {
+    api.closeHandle(session);
+  }
+});
+
+/// Asks WinHTTP which proxy [config]'s script or WPAD names for [target]:
+/// the seam behind [systemUpdateProxy]'s third source (#135).
+typedef AutoProxyResolver = Future<AutoProxyResult> Function(
+  Uri target,
+  AutoProxyConfig config,
+);
+
+/// The production [AutoProxyResolver]: `WinHttpGetProxyForUrl` with
+/// `WINHTTP_AUTOPROXY_AUTO_DETECT` and/or `WINHTTP_AUTOPROXY_CONFIG_URL`,
+/// which fetches and evaluates the script. Windows only.
+///
+/// Off the main isolate, because the call blocks for as long as the
+/// download and the WPAD probes take, and the UI must not. The future is
+/// not bounded here — [systemUpdateProxy] applies [kAutoProxyTimeout] to
+/// whatever resolver it was given, so the cap is pinned with a fake — and
+/// completes with an error, not a value, when WinHTTP could not say.
+Future<AutoProxyResult> resolveAutoProxy(Uri target, AutoProxyConfig config) {
+  final String url = target.toString();
+  final bool autoDetect = config.autoDetect;
+  final String? configUrl = config.configUrl?.trim();
+  return Isolate.run(
+    () => _winHttpProxyForUrl(
+      url,
+      autoDetect: autoDetect,
+      configUrl: configUrl == null || configUrl.isEmpty ? null : configUrl,
+    ),
+    debugName: 'update-auto-proxy',
+  );
+}
+
+/// The proxy this machine states for the updater's requests to [target]
+/// (#133, #135), or `null` for a direct connection: the environment first
+/// (`https_proxy`, `all_proxy`), then — on Windows — Internet Options'
+/// explicit server, then the one its PAC script or WPAD yields for
+/// [target]. Each seam defaults to the real thing and exists so a test can
+/// hand in a string instead; the order is what `update_bootstrap_test.dart`
+/// pins.
+///
+/// Nothing here may fail the check over its own diagnostics: a registry or
+/// WinHTTP read that throws is logged and counts as "no proxy" for that
+/// source, and a script lookup that has not answered within
+/// [autoProxyTimeout] is abandoned the same way — the check goes ahead
+/// directly rather than wait on it.
+Future<UpdateProxy?> systemUpdateProxy(
+  Uri target, {
   Map<String, String>? environment,
   InternetSettingsProxy Function() internetSettings = readInternetSettingsProxy,
+  AutoProxyConfig Function() autoProxyConfig = readAutoProxyConfig,
+  AutoProxyResolver autoProxy = resolveAutoProxy,
+  Duration autoProxyTimeout = kAutoProxyTimeout,
   bool? windows,
-}) {
+}) async {
   final UpdateProxy? fromEnvironment = proxyFromEnvironment(
     environment ?? Platform.environment,
   );
   if (fromEnvironment != null) return fromEnvironment;
   if (!(windows ?? Platform.isWindows)) return null;
   try {
-    return proxyFromInternetSettings(internetSettings());
+    final UpdateProxy? explicit = proxyFromInternetSettings(internetSettings());
+    if (explicit != null) return explicit;
   } on Object catch (e) {
     debugPrint('Update: could not read the Windows proxy setting: $e');
+  }
+  final AutoProxyConfig config;
+  try {
+    config = autoProxyConfig();
+  } on Object catch (e) {
+    debugPrint('Update: could not read the Windows auto-proxy setting: $e');
+    return null;
+  }
+  if (!config.isConfigured) return null;
+  try {
+    final AutoProxyResult result = await autoProxy(
+      target,
+      config,
+    ).timeout(autoProxyTimeout);
+    return proxyFromAutoProxy(result);
+  } on TimeoutException {
+    debugPrint(
+      'Update: ${config.describe} did not name a proxy within '
+      '${autoProxyTimeout.inSeconds}s; connecting directly.',
+    );
+    return null;
+  } on Object catch (e) {
+    debugPrint(
+      'Update: ${config.describe} could not name a proxy for $target ($e); '
+      'connecting directly.',
+    );
     return null;
   }
 }
 
+/// The proxy setting as the transports receive it: a look-up that resolves
+/// it at most once per launch, and not before a request needs it.
+///
+/// A look-up rather than the value because a PAC script (#135) takes a
+/// moment to answer, and rather than an eager future because building the
+/// update services must not touch WinHTTP — a debug launch never checks,
+/// and a test that only reads the wiring must not probe the machine.
+typedef UpdateProxyLookup = Future<UpdateProxy?> Function();
+
+/// A look-up that always answers [proxy]: what the integration harness and
+/// the tests hand in for a setting they already know.
+UpdateProxyLookup fixedUpdateProxy(UpdateProxy? proxy) =>
+    () => Future<UpdateProxy?>.value(proxy);
+
+/// A look-up that runs [resolve] on its first call and answers every later
+/// one — the checksum's, the installer's — with that same future.
+UpdateProxyLookup updateProxyResolvedOnce(
+  Future<UpdateProxy?> Function() resolve,
+) {
+  Future<UpdateProxy?>? pending;
+  return () => pending ??= resolve();
+}
+
 /// The proxy every request of the updater goes through (#133) — Dart's own
-/// and the `curl.exe` fallback alike — resolved once per launch. The
-/// integration harness overrides it: with `null` so a test boot never
-/// depends on the machine's setting, or with a loopback proxy a flow put
-/// between the app and its release server.
-final updateProxyProvider = Provider<UpdateProxy?>((_) => systemUpdateProxy());
+/// and the `curl.exe` fallback alike — resolved for the feed's endpoint by
+/// the first request that asks and shared by every later one. With the feed
+/// off there is nothing to reach and nothing is ever asked. The integration
+/// harness overrides it: with `null` so a test boot never depends on the
+/// machine's setting, or with a loopback proxy a flow put between the app
+/// and its release server.
+final updateProxyProvider = Provider<UpdateProxyLookup>((ref) {
+  final Uri? feedUrl = ref.watch(updateFeedUrlProvider);
+  if (feedUrl == null) return fixedUpdateProxy(null);
+  return updateProxyResolvedOnce(() => systemUpdateProxy(feedUrl));
+});
 
 /// The transport the updater falls back to when Dart cannot complete a TLS
 /// handshake (#124): `curl.exe` on Windows, nothing anywhere else. The
@@ -345,6 +695,29 @@ final nativeGetProvider = Provider<NativeGet?>(
         )
       : null,
 );
+
+/// Looks up the release notes published for [version] — the running build's,
+/// when About's **What's new** button has nothing kept locally (#130).
+/// Returns `null` when no release carries that tag; throws
+/// [UpdateCheckException] when the lookup itself did not complete.
+typedef ReleaseNotesFetcher = Future<String?> Function(String version);
+
+/// The by-tag lookup behind **What's new** (#130), on the same feed, proxy
+/// and native fallback as the update check — or `null` when the feed is off
+/// (`updateFeedUrlProvider` overridden with `null`), in which case there is
+/// nowhere to ask and the button says so instead of reaching out.
+final releaseNotesFetcherProvider = Provider<ReleaseNotesFetcher?>((ref) {
+  final feedUrl = ref.watch(updateFeedUrlProvider);
+  if (feedUrl == null) return null;
+  final nativeGet = ref.watch(nativeGetProvider);
+  final UpdateProxyLookup proxy = ref.watch(updateProxyProvider);
+  return (version) async => fetchReleaseNotesByTag(
+    releaseByTagEndpoint(feedUrl, version),
+    nativeGet: nativeGet,
+    proxy: await proxy(),
+    log: debugPrint,
+  );
+});
 
 /// Verifies the download against the hash published beside it, and removes
 /// it when it does not match: a corrupted or substituted installer is not
@@ -369,25 +742,25 @@ final updateServicesProvider = Provider<UpdateServices>((ref) {
   final feedUrl = ref.watch(updateFeedUrlProvider);
   final launch = ref.watch(installerLauncherProvider);
   final nativeGet = ref.watch(nativeGetProvider);
-  final proxy = ref.watch(updateProxyProvider);
+  final UpdateProxyLookup proxy = ref.watch(updateProxyProvider);
   return UpdateServices(
     localVersion: ref.watch(appVersionProvider),
     feed: feedUrl == null
         ? () async => null
-        : () => fetchLatestRelease(
+        : () async => fetchLatestRelease(
             feedUrl,
             nativeGet: nativeGet,
-            proxy: proxy,
+            proxy: await proxy(),
             log: debugPrint,
           ),
-    download: (release, onProgress) => downloadToTemp(
+    download: (release, onProgress) async => downloadToTemp(
       release.url,
       onProgress: onProgress,
       nativeGet: nativeGet,
       // A check that only got through natively is not going to fare better
       // on the installer, which sits behind the same inspection.
       preferNative: release.viaNativeTransport,
-      proxy: proxy,
+      proxy: await proxy(),
       log: debugPrint,
     ),
     verify: verifyAndCleanUp,

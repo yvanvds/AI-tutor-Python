@@ -32,22 +32,30 @@ bool isLoopbackCertificate(X509Certificate certificate) {
 }
 
 /// Makes every `HttpClient` the app creates trust the loopback certificate —
-/// that one certificate, on the loopback address, and nothing else — for
-/// the duration of a test: `HttpOverrides.global` in an end-to-end flow,
+/// that one certificate, on the loopback address (or on the stand-in
+/// [hosts] a flow advertises the server under), and nothing else — for the
+/// duration of a test: `HttpOverrides.global` in an end-to-end flow,
 /// `HttpOverrides.runZoned` in a unit test.
 ///
 /// This is the test-side stand-in for a CA that *is* in the Windows root
 /// store, which Dart would honour on its own. The proxy flows (#133) use it
 /// to drive Dart's own transport through a loopback proxy to a TLS server,
 /// the way it goes through a school proxy to GitHub on a network that does
-/// not inspect TLS. Nothing in `lib/` knows this exists.
+/// not inspect TLS; the PAC flow (#135) reaches that server under a school
+/// hostname only the proxy knows, and names it here. Nothing in `lib/`
+/// knows this exists.
 class TrustLoopbackCertificate extends HttpOverrides {
+  TrustLoopbackCertificate({this.hosts = const <String>['127.0.0.1']});
+
+  /// The hosts the certificate is accepted for; the DER comparison in
+  /// [isLoopbackCertificate] still applies to each.
+  final List<String> hosts;
+
   @override
   HttpClient createHttpClient(SecurityContext? context) =>
       super.createHttpClient(context)
         ..badCertificateCallback = (cert, host, port) =>
-            host == InternetAddress.loopbackIPv4.address &&
-            isLoopbackCertificate(cert);
+            hosts.contains(host) && isLoopbackCertificate(cert);
 }
 
 /// The certificate, PEM-encoded.

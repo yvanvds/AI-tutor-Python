@@ -35,7 +35,9 @@ it (evidence weights, when to ask follow-ups, etc.).
 
 ## What we send to the LLM
 
-Two distinct calls: question generation and answer grading.
+Two distinct calls: question generation and answer grading. A third,
+lighter one — a question about the theory page on screen — sends no LOs
+and grades nothing (see "Content question").
 
 ### Question generation
 
@@ -97,6 +99,40 @@ LO with its `subgoalId`. Nothing else in the contract changes: the
 grader emits the same shape, `goalScopeLOs` is the same root-wide list,
 and the scope check (below) accepts the signal because the older subgoal
 is in scope.
+
+### Content question (#132)
+
+The student is reading a theory page (`SessionMode.explain`, a `content`
+doc in the WebView) and types a question in the chat. The question is
+about the page they are looking at — which, after paging back (#115), is
+not always the active subgoal's — so the page goes along with it.
+
+Inputs (`request_type: content_question`, built by
+`QuestionFormatter.contentQuestion`):
+
+- `question` — what the student typed.
+- `content_title` — the page's `Content.title`.
+- `content` — the page's `Content.body` as plain text
+  (`lessonHtmlToText`): headings and list items on their own lines,
+  `<pre>` blocks as fenced code, tags gone, entities decoded, capped at
+  12 000 characters.
+- The system prompt is the `contentQuestion` instruction doc when the
+  teacher has authored one, else the built-in default
+  (`defaultContentQuestionInstruction`), plus `alwaysInclude`; `{goal}`,
+  `{subgoal}` and `{teachingTips}` describe the subgoal whose page is on
+  screen, as they describe the older subgoal of a warm-up review.
+
+Output: the plain `answer` envelope — TEXT is the answer, META is
+`{"type": "answer"}`. No `overallQuality`, no `loSignals`, no
+`followUp`: a content question is not evidence, so nothing on the
+conductor side moves — no `turn_history` record, no belief or XP change,
+and the exercise in flight (if any) is still pending afterwards. The
+debug turn is recorded like every other request, so Recent turns and a
+bug report show what was sent.
+
+Out of scope: questions about a *practice* question's code (still
+`student_question` with `code`) and multi-page context — only the page on
+screen is sent.
 
 ### Output language (#117)
 

@@ -11,6 +11,7 @@
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
@@ -124,23 +125,27 @@ void main() {
     ]);
   });
 
-  Widget app(Goal child) => ProviderScope(
-    overrides: [
-      goalSelectionProvider.overrideWith(() => _PresetSelection(root, child)),
-      goalsServiceProvider.overrideWithValue(
-        GoalsService(container: goals.container),
-      ),
-      contentServiceProvider.overrideWith(
-        () => ContentService(container: content.container),
-      ),
-      lessonCodeRunnerProvider.overrideWithValue(FakeLessonCodeRunner()),
-    ],
-    child: MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: const Scaffold(body: ExplainView()),
+  List<Override> overrides(Goal child) => [
+    goalSelectionProvider.overrideWith(() => _PresetSelection(root, child)),
+    goalsServiceProvider.overrideWithValue(
+      GoalsService(container: goals.container),
     ),
+    contentServiceProvider.overrideWith(
+      () => ContentService(container: content.container),
+    ),
+    lessonCodeRunnerProvider.overrideWithValue(FakeLessonCodeRunner()),
+  ];
+
+  Widget materialApp(Widget home) => MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(body: home),
+  );
+
+  Widget app(Goal child) => ProviderScope(
+    overrides: overrides(child),
+    child: materialApp(const ExplainView()),
   );
 
   Future<void> mount(WidgetTester tester, {Goal? child}) async {
@@ -396,6 +401,76 @@ void main() {
 
       expect(enabled(tester, 'Previous'), isFalse);
       expect(webviews.widgetBuilds, 1);
+
+      await unmount(tester);
+    });
+  });
+
+  // #132: the view publishes the page it shows, so a question typed in the
+  // chat can be about it — the page paged back to, not the active
+  // subgoal's, and nothing once the view is gone.
+  group('the page on screen', () {
+    ProviderContainer containerOf(WidgetTester tester) =>
+        ProviderScope.containerOf(tester.element(find.byType(ExplainView)));
+
+    testWidgets('is the lesson of the active subgoal, then the one paged '
+        'back to, then the newest again; nothing once the view is gone', (
+      tester,
+    ) async {
+      // A container of the test's own, so it outlives the view.
+      final container = ProviderContainer(overrides: overrides(active));
+      String? viewed() => container.read(viewedContentIdProvider);
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: materialApp(const ExplainView()),
+        ),
+      );
+      for (var i = 0; i < 6; i++) {
+        await tester.pump();
+      }
+
+      expect(viewed(), 'c3');
+      expect(webviews.widgetBuilds, 1);
+
+      await tester.tap(find.text('Previous'));
+      await settlePage(tester);
+      expect(shownLesson(), contains('lesson-one'));
+      expect(viewed(), 'c1');
+
+      await tester.tap(find.text('Next'));
+      await settlePage(tester);
+      expect(viewed(), 'c3');
+      // Publishing is not a rebuild of the WebView.
+      expect(webviews.widgetsCreated, 1);
+      expect(webviews.widgetBuilds, 1);
+
+      // The view leaves the screen, the scope stays.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: materialApp(const SizedBox()),
+        ),
+      );
+      await tester.pump();
+      expect(viewed(), isNull, reason: 'the view left the screen');
+
+      await unmount(tester);
+      // Before the framework checks for pending timers: the content poll.
+      container.dispose();
+    });
+
+    testWidgets('is nothing for a subgoal without a lesson', (tester) async {
+      final bare = Goal(id: 's4', title: 'Loops', parentId: 'r1', order: 4000);
+      goals.docs['s4']!['contentId'] = null;
+      await mount(tester, child: bare);
+      final container = containerOf(tester);
+
+      expect(find.byType(LessonHtmlView), findsNothing);
+      expect(container.read(viewedContentIdProvider), isNull);
 
       await unmount(tester);
     });

@@ -115,6 +115,106 @@ void main() {
     expect(out, isNot(contains('Loops')));
   });
 
+  group('content question (#132)', () {
+    Future<String> generate(List<Instruction> docs, {Goal? override}) =>
+        InstructionGenerator().generateInstructions(
+          ChatRequestType.contentQuestion,
+          goalSelection: GoalSelectionState(
+            selectedRoot: root(),
+            selectedChild: subgoal(),
+          ),
+          cachedInstructions: docs,
+          fetchInstructions: () async => const [],
+          fetchRootGoals: () async => const [],
+          languageCode: 'nl',
+          subgoalOverride: override,
+        );
+
+    test('a teacher-authored contentQuestion doc is the body, with its tags '
+        'filled in', () async {
+      final out = await generate([
+        makeInstruction('alwaysInclude', {'main': 'always {goal}'}),
+        makeInstruction('contentQuestion', {
+          'main': 'Answer about the page of {subgoal}; tips: {teachingTips}',
+        }),
+        makeInstruction('studentQuestion', {'main': 'the other doc'}),
+      ]);
+      expect(out, contains('always Iteration'));
+      expect(out, contains('Answer about the page of Loops; tips: Tip A'));
+      expect(out, isNot(contains('the other doc')));
+      expect(out, isNot(contains(defaultContentQuestionInstruction)));
+      expect(out, isNot(contains('CONTENT QUESTION')));
+    });
+
+    test('without one the prompt still assembles, around the built-in body '
+        'with its tags filled in', () async {
+      final out = await generate([
+        makeInstruction('alwaysInclude', {'main': 'always {goal}'}),
+        makeInstruction('studentQuestion', {'main': 'the other doc'}),
+      ]);
+      expect(out, contains('RESPONSE FORMAT — STRICT.'));
+      expect(out, contains('always Iteration'));
+      expect(out, contains('### CONTENT QUESTION'));
+      expect(
+        out,
+        contains('belongs to the subgoal "Loops" of the goal "Iteration"'),
+      );
+      expect(out, contains('Do not start an exercise, do not grade'));
+      expect(out, contains('{"type": "answer"}'));
+      expect(out, isNot(contains('the other doc')));
+      expect(out, isNot(contains('{subgoal}')));
+      // The language directive still comes last.
+      expect(
+        out.indexOf('OUTPUT LANGUAGE'),
+        greaterThan(out.indexOf('### CONTENT QUESTION')),
+      );
+    });
+
+    test('with no docs at all the built-in body is the whole middle', () async {
+      final out = await generate(const []);
+      expect(out, contains('### CONTENT QUESTION'));
+      expect(out, contains('Write all student-facing text in Dutch'));
+    });
+
+    test('the page of an older subgoal: the override names it, in the '
+        'built-in body as in a teacher doc', () async {
+      final older = Goal(
+        id: 'sub-0',
+        title: 'Print',
+        parentId: 'root-1',
+        order: 0,
+        teachingTips: const ['Tip P'],
+      );
+      final builtIn = await generate(const [], override: older);
+      expect(builtIn, contains('belongs to the subgoal "Print"'));
+      expect(builtIn, isNot(contains('Loops')));
+
+      final authored = await generate([
+        makeInstruction('contentQuestion', {
+          'main': 'page of {subgoal}; tips: {teachingTips}',
+        }),
+      ], override: older);
+      expect(authored, contains('page of Print; tips: Tip P'));
+      expect(authored, isNot(contains('Loops')));
+    });
+
+    test('no other request type picks up a built-in body', () async {
+      final out = await InstructionGenerator().generateInstructions(
+        ChatRequestType.studentQuestion,
+        goalSelection: GoalSelectionState(
+          selectedRoot: root(),
+          selectedChild: subgoal(),
+        ),
+        cachedInstructions: const [],
+        fetchInstructions: () async => const [],
+        fetchRootGoals: () async => const [],
+        languageCode: 'nl',
+      );
+      expect(out, isNot(contains('CONTENT QUESTION')));
+      expect(builtInInstructions.keys, ['contentQuestion']);
+    });
+  });
+
   test('returns empty when no goal selection', () async {
     final out = await InstructionGenerator().generateInstructions(
       ChatRequestType.mcQuestion,

@@ -14,14 +14,17 @@
 //   - bug reports, saved as a file for the teacher or posted to GitHub,
 //     with a recent tutor turn's debug payload (#127)
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
-//   - about / version, with the manual update check (#48)
+//   - about / version, with the manual update check (#48) and the
+//     "What's new" button that brings the release notes back (#130)
 
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
+import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -2001,6 +2004,9 @@ class _RecentTurnsList extends StatelessWidget {
 /// for the student. It also has to work on a build that never checks by
 /// itself: `autoCheck` is `kReleaseMode` (#47), so on a `flutter run`
 /// checkout this button is the *only* way the feature runs at all.
+///
+/// Beside it, **What's new** (#130) brings back the release notes the shell
+/// shows once after an update — see [_WhatsNewButton].
 class _AboutCard extends ConsumerWidget {
   const _AboutCard();
 
@@ -2038,6 +2044,7 @@ class _AboutCard extends ConsumerWidget {
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(l.update_action_check),
               ),
+              const _WhatsNewButton(),
               // Offered only when there is genuinely something to apply. With
               // the shell's Update button this is the whole consent gate: no
               // other code path reaches `apply()`.
@@ -2058,6 +2065,64 @@ class _AboutCard extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Shows the running version's release notes in the shell's "What's new"
+/// overlay — the card a launch puts up by itself after an update (#119), on
+/// demand and as often as wanted (#130).
+///
+/// Two reasons it exists. A student who clicked the card away has no other
+/// way back to it, and neither has anyone who wants to read what changed.
+/// And the automatic path — stash, installer, relaunch — first fires on the
+/// update *from* the release that introduced it, so until that release goes
+/// out this button is the one way to see the card at all.
+///
+/// The notes come from the stash the updater left (no network) or, for a
+/// build installed by hand, from the release published under this version's
+/// tag. Both live in `WhatsNewController.openForRunningVersion`; what is here
+/// is the button's own busy state and the two snacks — no notes for this
+/// version, or a lookup that did not complete — rendered like the other
+/// outcomes on this page.
+class _WhatsNewButton extends ConsumerStatefulWidget {
+  const _WhatsNewButton();
+
+  @override
+  ConsumerState<_WhatsNewButton> createState() => _WhatsNewButtonState();
+}
+
+class _WhatsNewButtonState extends ConsumerState<_WhatsNewButton> {
+  bool _busy = false;
+
+  Future<void> _open() async {
+    final l = AppLocalizations.of(context);
+    final version = ref.read(appVersionProvider);
+    setState(() => _busy = true);
+    try {
+      final shown = await ref
+          .read(whatsNewControllerProvider.notifier)
+          .openForRunningVersion();
+      if (!shown && mounted) {
+        _snack(context, l.options_about_whatsNew_none(version));
+      }
+    } on Object catch (e) {
+      if (mounted) _snack(context, l.options_about_whatsNew_failed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return OutlinedButton.icon(
+      key: const ValueKey('about-whats-new'),
+      onPressed: _busy ? null : _open,
+      icon: const Icon(Icons.new_releases_outlined, size: 18),
+      label: Text(
+        _busy ? l.options_about_whatsNew_loading : l.options_about_whatsNew,
       ),
     );
   }

@@ -1,7 +1,9 @@
 // A loopback forward proxy and a loopback black hole (#133): together they
 // reproduce a network where the app's own sockets go nowhere and only the
 // proxy has a route out — which is what an explicit school proxy looks like
-// from a laptop whose direct egress is firewalled.
+// from a laptop whose direct egress is firewalled. A loopback PAC server
+// (#135) adds the other way a school states that proxy: as a script the
+// machine is told to fetch and evaluate.
 //
 // [LoopbackProxy] speaks the one half of HTTP proxying the updater relies on:
 // `CONNECT host:port`, the tunnel both Dart's `HttpClient` and `curl.exe`
@@ -187,4 +189,61 @@ class BlackHole {
     }
     await _server.close();
   }
+}
+
+/// A loopback HTTP server serving one proxy auto-configuration script
+/// (#135): what a school publishes at its `AutoConfigURL`, and what WinHTTP
+/// fetches and evaluates when the app asks it which proxy a URL takes. A
+/// flow points the app's auto-configuration at [url] and the script at a
+/// [LoopbackProxy]; the app then reaches its release only if it resolved
+/// the script, which is the whole difference #135 makes.
+class LoopbackPacServer {
+  LoopbackPacServer._(this._server, this.script);
+
+  final HttpServer _server;
+
+  /// The JavaScript served, verbatim.
+  final String script;
+
+  /// How many times the script was fetched: the proof WinHTTP came for it.
+  int fetches = 0;
+
+  /// Where Internet Options would point: `http://127.0.0.1:<port>/proxy.pac`.
+  Uri get url =>
+      Uri.parse('http://${_server.address.address}:${_server.port}/proxy.pac');
+
+  static Future<LoopbackPacServer> start({required String script}) async {
+    final HttpServer server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    final LoopbackPacServer pac = LoopbackPacServer._(server, script);
+    server.listen((HttpRequest req) async {
+      pac.fetches++;
+      req.response.headers.contentType = ContentType(
+        'application',
+        'x-ns-proxy-autoconfig',
+      );
+      req.response.write(script);
+      await req.response.close();
+    });
+    return pac;
+  }
+
+  Future<void> close() => _server.close(force: true);
+}
+
+/// A PAC script that sends every URL through [proxy] (`host:port`), except
+/// the hosts in [direct], which it answers `DIRECT` for — the two answers a
+/// school's script gives, in the shape WinHTTP hands back for each.
+String pacScript({required String proxy, List<String> direct = const []}) {
+  final String directHosts = direct
+      .map((String host) => 'host == "$host"')
+      .join(' || ');
+  return '''
+function FindProxyForURL(url, host) {
+  ${directHosts.isEmpty ? '' : 'if ($directHosts) return "DIRECT";'}
+  return "PROXY $proxy";
+}
+''';
 }

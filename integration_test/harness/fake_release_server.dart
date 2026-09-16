@@ -1,11 +1,15 @@
 // A loopback stand-in for GitHub's Releases API (#50), so an end-to-end flow
 // can drive the real update check without reaching github.com.
 //
-// It answers the three requests the app makes, in the shapes GitHub actually
+// It answers the four requests the app makes, in the shapes GitHub actually
 // uses — which is the part that matters:
 //
 //   - `/repos/<owner>/<repo>/releases/latest` with the release JSON,
 //     `application/json; charset=utf-8`;
+//   - `/repos/<owner>/<repo>/releases/tags/v<version>` — the by-tag lookup
+//     behind About's **What's new** button (#130) — with the same JSON for
+//     the one version it publishes and a 404 for any other tag, as GitHub
+//     answers a tag that was never released;
 //   - the `.sha256` asset as `application/octet-stream`, the content type a
 //     release asset really carries, optionally with the UTF-8 BOM that
 //     `build_release.ps1` has put in front of a generated file before (#45);
@@ -113,16 +117,18 @@ class FakeReleaseServer {
   String get authority => '${_server.address.address}:${_server.port}';
 
   /// How often the app asked for the release / the checksum asset / the
-  /// installer. A flow that has to prove the app did *not* act — nothing
-  /// fetched on a debug build, nothing downloaded after **Later** — asserts
-  /// on these.
+  /// installer / a release by its tag (#130). A flow that has to prove the
+  /// app did *not* act — nothing fetched on a debug build, nothing
+  /// downloaded after **Later**, notes shown from the stash without a
+  /// lookup — asserts on these.
   int releaseRequests = 0;
   int checksumRequests = 0;
   int installerRequests = 0;
+  int tagRequests = 0;
 
   static const String _installerName = 'python_teacher_install.exe';
-  static const String _feedPath =
-      '/repos/yvanvds/AI-tutor-Python/releases/latest';
+  static const String _releasesPath = '/repos/yvanvds/AI-tutor-Python/releases';
+  static const String _feedPath = '$_releasesPath/latest';
 
   /// Binds a server on the loopback interface and starts answering.
   ///
@@ -143,10 +149,14 @@ class FakeReleaseServer {
   /// links name instead of the server's own — for a flow that puts a proxy
   /// between the app and this server (#133), it is the address only the
   /// proxy has a route to.
+  /// [notes] is the release body — what GitHub returns as `body`, Markdown
+  /// by origin. A flow that shows the notes (#119, #130, #137) publishes a
+  /// body with some Markdown in it; the default is one plain sentence.
   static Future<FakeReleaseServer> start({
     int status = HttpStatus.ok,
     String? rawBody,
     String version = '99.0.0+1',
+    String? notes,
     bool withInstallerAsset = true,
     bool withChecksumAsset = true,
     bool checksumBom = false,
@@ -192,7 +202,7 @@ class FakeReleaseServer {
         rawBody ??
         jsonEncode(<String, Object?>{
           'tag_name': 'v$version',
-          'body': 'What changed in $version.',
+          'body': notes ?? 'What changed in $version.',
           'html_url': '$base/releases/tag/v$version',
           'assets': assets,
         });
@@ -208,6 +218,20 @@ class FakeReleaseServer {
           charset: 'utf-8',
         );
         request.response.add(utf8.encode(body));
+      } else if (path.startsWith('$_releasesPath/tags/')) {
+        fake.tagRequests++;
+        if (path == '$_releasesPath/tags/v$version') {
+          request.response.statusCode = status;
+          request.response.headers.contentType = ContentType(
+            'application',
+            'json',
+            charset: 'utf-8',
+          );
+          request.response.add(utf8.encode(body));
+        } else {
+          // No release under that tag — what a dev build's version gets.
+          request.response.statusCode = HttpStatus.notFound;
+        }
       } else if (path.endsWith('.sha256')) {
         fake.checksumRequests++;
         // No charset: `package:http` falls back to latin1 for this type, so

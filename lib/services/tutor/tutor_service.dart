@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
+import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -15,6 +16,9 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
+import 'package:ai_tutor_python/services/content/content.dart';
+import 'package:ai_tutor_python/services/content/content_service.dart';
+import 'package:ai_tutor_python/services/content/lesson_html_to_text.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -540,8 +544,11 @@ class TutorService extends Notifier<TutorState> {
       // A warm-up review (#102) is about an older subgoal: the question,
       // its grading and any hint on it are prompted in that subgoal's
       // context. Grading and hint calls carry no `plan`; the in-flight one
-      // is the warm-up then.
-      final warmUpSubgoal = (plan ?? _inFlightPlan)?.warmUp?.subgoal;
+      // is the warm-up then. A content question (#132) is about the page on
+      // screen, which is an older subgoal's when the student paged back.
+      final subgoalOverride = type == ChatRequestType.contentQuestion
+          ? await _pageSubgoal(selection)
+          : (plan ?? _inFlightPlan)?.warmUp?.subgoal;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
         goalSelection: selection,
@@ -554,7 +561,7 @@ class TutorService extends Notifier<TutorState> {
         languageCode: ref.read(appLocaleProvider).languageCode,
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
-        subgoalOverride: warmUpSubgoal,
+        subgoalOverride: subgoalOverride,
       );
 
       final request = await _buildRequestInput(
@@ -707,6 +714,18 @@ class TutorService extends Notifier<TutorState> {
         if (prompt == null) return null;
         return _RequestInput(QuestionFormatter.studentQuestion(prompt, code));
 
+      case ChatRequestType.contentQuestion:
+        if (prompt == null) return null;
+        final page = _pageOnScreen();
+        if (page == null) return null;
+        return _RequestInput(
+          QuestionFormatter.contentQuestion(
+            prompt,
+            contentTitle: page.title,
+            contentText: lessonHtmlToText(page.body),
+          ),
+        );
+
       case ChatRequestType.explainAnswer:
         if (prompt == null) return null;
         return _RequestInput(
@@ -815,7 +834,7 @@ class TutorService extends Notifier<TutorState> {
     if (failed != null) {
       _chat.failStream();
       _chat.addSystemNotice(_tutorFailed(failed.notice));
-      await _maybeRetryStream();
+      if (_worthRetrying(failed.notice)) await _maybeRetryStream();
       return;
     }
 
@@ -1177,8 +1196,20 @@ class TutorService extends Notifier<TutorState> {
         await _handleResponse(output);
       case ConnectorFailure(:final notice):
         _chat.addSystemNotice(_tutorFailed(notice));
-        await _maybeRetry();
+        if (_worthRetrying(notice)) await _maybeRetry();
     }
+  }
+
+  /// Whether the automatic retry can help the turn that just failed with
+  /// [notice] (#134). A timeout or a dropped socket may well go through the
+  /// second time. A key problem (#126) cannot: the same key — or none at
+  /// all — would go out again and the same refusal come back, so re-sending
+  /// only shows the student the same pill twice and costs a round trip.
+  /// The skip is on the debug log, next to where a retry would have been.
+  bool _worthRetrying(ChatNotice notice) {
+    if (!OpenaiConnector.isKeyFailure(notice)) return true;
+    _debug.recordEvent('tutor.retry_skipped', {'notice': notice.kind.name});
+    return false;
   }
 
   Future<void> _maybeRetry() async {
@@ -1198,7 +1229,39 @@ class TutorService extends Notifier<TutorState> {
     await _runStream(() => _connector.resendRequestStream());
   }
 
+  /// The lesson the student is reading, when a question typed now is about
+  /// it (#132): the theory view is the active mode and shows a page, and
+  /// that page's doc is in the content cache — where the view itself reads
+  /// it from. `null` otherwise, and the message is routed as before.
+  Content? _pageOnScreen() {
+    if (!ref.read(askAboutPageProvider)) return null;
+    final id = ref.read(viewedContentIdProvider);
+    return ref.read(contentServiceProvider).firstWhereOrNull((c) => c.id == id);
+  }
+
+  /// The subgoal whose lesson is on screen when that is not the active one
+  /// (#132): the student paged back (#115), so `{subgoal}` and
+  /// `{teachingTips}` in the prompt should describe the page they are
+  /// asking about — as they describe the older subgoal of a warm-up review
+  /// (#102). `null` when the page is the active subgoal's own.
+  Future<Goal?> _pageSubgoal(GoalSelectionState selection) async {
+    final id = ref.read(viewedContentIdProvider);
+    final root = selection.activeRootGoal;
+    if (id == null || root == null) return null;
+    if (selection.activeChildGoal?.contentId == id) return null;
+    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
+    return subs.firstWhereOrNull((g) => g.contentId == id);
+  }
+
   Future<void> handleStudentMessage(String message) async {
+    // A question typed while a theory page is on screen is about that page
+    // (#132). It goes out with the page and comes back as a plain answer;
+    // nothing else moves — the follow-up, plan and exercise type in flight
+    // are still there when the student returns to practice and answers.
+    if (_pageOnScreen() != null) {
+      await queryTutor(type: ChatRequestType.contentQuestion, prompt: message);
+      return;
+    }
     // A pending follow-up takes precedence: the next student utterance is
     // the answer to the chained follow-up question, regardless of the
     // exercise type that produced the original probe.

@@ -1261,6 +1261,30 @@ abstract class AppLocalizations {
   /// **'Version {version}'**
   String options_about_version(String version);
 
+  /// About button that shows the running version's release notes in the What's new overlay (#130)
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get options_about_whatsNew;
+
+  /// Label of the What's new button while the release notes are being looked up
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get options_about_whatsNew_loading;
+
+  /// No description provided for @options_about_whatsNew_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the release notes: {error}'**
+  String options_about_whatsNew_failed(String error);
+
+  /// Snack when no published release carries the running version's tag — a dev build, typically
+  ///
+  /// In en, this message translates to:
+  /// **'No release notes for version {version}.'**
+  String options_about_whatsNew_none(String version);
+
   /// No description provided for @session_mode_explain.
   ///
   /// In en, this message translates to:
@@ -1873,11 +1897,29 @@ abstract class AppLocalizations {
   /// **'Restart session'**
   String get chat_header_restart_tooltip;
 
+  /// Tooltip of the chat header button that folds the chat panel to an edge strip; only offered in the theory (explain) view
+  ///
+  /// In en, this message translates to:
+  /// **'Hide chat'**
+  String get chat_header_collapse_tooltip;
+
+  /// Tooltip of the one button on the folded chat strip, which brings the full chat panel back
+  ///
+  /// In en, this message translates to:
+  /// **'Show chat'**
+  String get chat_panel_expand_tooltip;
+
   /// No description provided for @chat_composer_idle_hint.
   ///
   /// In en, this message translates to:
   /// **'Type your question or answer…'**
   String get chat_composer_idle_hint;
+
+  /// Hint in the chat input while a theory page is on screen: a question typed now is answered about that page (#132)
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a question about this explanation…'**
+  String get chat_composer_idle_pageHint;
 
   /// No description provided for @chat_composer_idle_kbd_send.
   ///

@@ -2,6 +2,10 @@
 // or from Internet Options — and what it hands each transport. These pin the
 // parsing of the two on-disk shapes, the bypass rules, and the two spellings
 // (`HttpClient.findProxy`'s and `curl --proxy`'s) that have to agree.
+//
+// #135: the third shape, what WinHTTP hands back after evaluating a PAC
+// script or WPAD for the endpoint, and when the auto-configuration setting
+// is worth asking WinHTTP about at all.
 
 import 'package:ai_tutor_python/core/update_proxy.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,6 +106,106 @@ void main() {
         override: '*.school.be;10.*;<local>',
       ));
       expect(proxy?.bypass, <String>['*.school.be', '10.*', '<local>']);
+    });
+  });
+
+  // #135: `WINHTTP_PROXY_INFO` as `WinHttpGetProxyForUrl` fills it in —
+  // the `ProxyServer` shape again, plus what a script's own answers add: a
+  // list of proxies, `DIRECT`, and whitespace as a separator.
+  group('proxyFromAutoProxy', () {
+    test('one proxy, the way a script most often answers', () {
+      final proxy = proxyFromAutoProxy((
+        proxy: 'filter.school.be:3128',
+        bypass: null,
+      ));
+      expect(proxy?.url, Uri.parse('http://filter.school.be:3128'));
+      expect(proxy?.bypass, isEmpty);
+    });
+
+    // `PROXY a:8080; PROXY b:8080` comes back as `a:8080;b:8080`. Neither
+    // transport fails over, so the first — the one WinINET would try first
+    // — is the one.
+    test('a list of proxies uses the first', () {
+      expect(
+        proxyFromAutoProxy((
+          proxy: 'first.school.be:8080;second.school.be:8080',
+          bypass: null,
+        ))?.url,
+        Uri.parse('http://first.school.be:8080'),
+      );
+      expect(
+        proxyFromAutoProxy((
+          proxy: 'first.school.be:8080 second.school.be:8080',
+          bypass: null,
+        ))?.url,
+        Uri.parse('http://first.school.be:8080'),
+      );
+    });
+
+    test('DIRECT is no proxy, alone or in front', () {
+      expect(proxyFromAutoProxy((proxy: null, bypass: null)), isNull);
+      expect(proxyFromAutoProxy((proxy: 'DIRECT', bypass: null)), isNull);
+      expect(
+        proxyFromAutoProxy((proxy: 'DIRECT;proxy.school.be:8080', bypass: null))
+            ?.url,
+        Uri.parse('http://proxy.school.be:8080'),
+      );
+    });
+
+    test('a per-protocol list applies through its https= entry', () {
+      expect(
+        proxyFromAutoProxy((
+          proxy: 'http=plain.school.be:8080;https=secure.school.be:8443',
+          bypass: null,
+        ))?.url,
+        Uri.parse('http://secure.school.be:8443'),
+      );
+      expect(
+        proxyFromAutoProxy((proxy: 'http=plain.school.be:8080', bypass: null)),
+        isNull,
+      );
+    });
+
+    test('is none for a blank answer', () {
+      expect(proxyFromAutoProxy((proxy: '', bypass: null)), isNull);
+      expect(proxyFromAutoProxy((proxy: '  ', bypass: '<local>')), isNull);
+    });
+
+    test('the bypass list splits on ; or whitespace', () {
+      final proxy = proxyFromAutoProxy((
+        proxy: 'proxy.school.be:8080',
+        bypass: '<local>;*.school.be 10.*',
+      ));
+      expect(proxy?.bypass, <String>['<local>', '*.school.be', '10.*']);
+      expect(proxy?.bypasses(Uri.parse('https://portal.school.be/')), isTrue);
+      expect(proxy?.bypasses(github), isFalse);
+    });
+  });
+
+  group('AutoProxyConfig', () {
+    test('is configured by either box', () {
+      expect((autoDetect: false, configUrl: null).isConfigured, isFalse);
+      expect((autoDetect: false, configUrl: '  ').isConfigured, isFalse);
+      expect((autoDetect: true, configUrl: null).isConfigured, isTrue);
+      expect(
+        (
+          autoDetect: false,
+          configUrl: 'http://school.be/proxy.pac',
+        ).isConfigured,
+        isTrue,
+      );
+    });
+
+    test('describes where an answer would come from', () {
+      expect((autoDetect: true, configUrl: null).describe, 'WPAD');
+      expect(
+        (autoDetect: false, configUrl: 'http://school.be/proxy.pac').describe,
+        'the script at http://school.be/proxy.pac',
+      );
+      expect(
+        (autoDetect: true, configUrl: 'http://school.be/proxy.pac').describe,
+        'WPAD and the script at http://school.be/proxy.pac',
+      );
     });
   });
 

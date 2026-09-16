@@ -6,7 +6,8 @@ import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 /// Markdown renderer for tutor-authored copy: chat bubbles, MCQ prompt and
-/// MCQ feedback. Plain prose stays visually identical to the previous
+/// MCQ feedback — and, since #137, the release notes on the "What's new"
+/// card. Plain prose stays visually identical to the previous
 /// `Text`/`SelectableText` rendering — `**bold**`, `*italic*`, lists,
 /// links, inline `` `code` `` and fenced code blocks add structure when the
 /// model uses them.

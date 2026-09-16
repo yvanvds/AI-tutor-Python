@@ -43,6 +43,7 @@ tutor.exercise_type_set {from, to}
 tutor.follow_up_set {hasMessage, hasCode}
 tutor.request_exercise.entered / tutor.request_exercise.next {type, difficulty}
 tutor.maybe_retry {retriesLeft}
+tutor.retry_skipped {notice}   # a key problem (#126) is not re-sent (#134)
 dispatch.unhandled {type}
 stream.failed {message}
 conductor.subgoal_set {goalId, persistedProgress, warmupRemaining}

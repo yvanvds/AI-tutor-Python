@@ -11,8 +11,9 @@
 //     `flutter build windows` — there is no flag in `lib/` to flip.
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
-// the system locale, the system light/dark setting, SharedPreferences
-// (in-memory), the playground file directory (temp), the update check (off),
+// the window size (see [AppHarness.windowSize]), the system locale, the
+// system light/dark setting, SharedPreferences (in-memory), the playground
+// file directory (temp), the update check (off),
 // its native fallback transport (none — see [AppHarness.nativeGet]) and the
 // proxy it would go through (none — see [AppHarness.proxy]), the LLM (any
 // call fails loudly unless a flow passes `llm:` or `openaiClient:`), the
@@ -76,6 +77,11 @@ import 'seed.dart';
 /// the build's real `Env.apiKey` so a flow can assert on the key a request
 /// carried without the developer's own key ever appearing in a test.
 const String kSchoolApiKey = 'sk-school-key';
+
+/// The window the Windows runner creates the app in, in logical pixels
+/// (`windows/runner/main.cpp`), and the size every flow lays out at unless
+/// it says otherwise — see [AppHarness.windowSize].
+const Size kRunnerWindowSize = Size(1280, 720);
 
 /// Signed in from the first frame; `tryAcquireTokenSilent` / `signIn` are
 /// never reached. `signOut` still works so a sign-out flow can be driven.
@@ -165,8 +171,10 @@ class AppHarness {
     this.forceUpdateCheck = true,
     this.nativeGet,
     this.proxy,
+    this.pacUrl,
     this.appVersion,
     this.prefs = const {},
+    this.windowSize = kRunnerWindowSize,
     this.pyRunner,
     this.archiveFile,
     this.systemBrightness = Brightness.dark,
@@ -181,6 +189,11 @@ class AppHarness {
   }) : assert(
          llm == null || openaiClient == null,
          'llm: replaces the connectors, openaiClient: keeps them; pick one',
+       ),
+       assert(
+         proxy == null || pacUrl == null,
+         'proxy: hands the app the resolved setting, pacUrl: makes it resolve '
+         'one; pick one',
        ),
        lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
@@ -214,9 +227,19 @@ class AppHarness {
   /// The proxy the updater's requests go through (#133). `null` (the
   /// default) pins it to none, so a test boot never depends on the machine
   /// it runs on having a proxy set — the production wiring would read the
-  /// environment and Internet Options. The proxy flow passes a loopback
-  /// `LoopbackProxy`, the one route to its release server.
+  /// environment, Internet Options and its PAC script. The proxy flow passes
+  /// a loopback `LoopbackProxy`, the one route to its release server.
   final UpdateProxy? proxy;
+
+  /// A proxy auto-configuration script for the app to resolve (#135), the
+  /// way Internet Options would name one under "Use automatic configuration
+  /// script". Unlike [proxy], this hands the app nothing resolved: the
+  /// production `systemUpdateProxy` runs, with the environment and the
+  /// explicit Internet Options pinned to none and the auto-configuration
+  /// pinned to this URL, and the real WinHTTP fetches and evaluates the
+  /// script. The PAC flow serves one from a loopback server that names its
+  /// `LoopbackProxy`.
+  final Uri? pacUrl;
 
   /// The version this build reports (#119). `null` (the default) leaves the
   /// real `kAppVersion` from `version.dart` in place, which is what every
@@ -233,6 +256,17 @@ class AppHarness {
   /// This seeds it instead, for a flow whose subject is what a *previous*
   /// launch left behind.
   final Map<String, Object> prefs;
+
+  /// The size, in logical pixels, the app lays out at (#138).
+  ///
+  /// Defaults to [kRunnerWindowSize], the window the Windows runner creates.
+  /// Pinned through the test view rather than left to the real window: on a
+  /// display too small for that window the app would get less, and the
+  /// theory view starts with the chat folded under 1200 px — every flow that
+  /// types into the chat from the theory page would then meet a strip. A
+  /// flow about the window width passes its own size, and can resize
+  /// mid-flow through `tester.view.physicalSize` the way this does.
+  final Size windowSize;
 
   /// Scripted stand-in for the bundled Python behind lesson examples.
   /// `lessonRunner.ran` lists every `<pre class="run">` the page asked for.
@@ -357,6 +391,12 @@ class AppHarness {
   /// the shell (the local-key gate, #126) passes `waitForShell: false` and
   /// waits for what it expects itself.
   Future<void> boot(WidgetTester tester, {bool waitForShell = true}) async {
+    // Logical size times the machine's ratio: the layout is the same on a
+    // 100 % desktop and a 150 % laptop. Reset in a tear-down, not in
+    // [dispose], so a failed flow cannot hand its size to the next one in
+    // the same process (app_test.dart).
+    tester.view.physicalSize = windowSize * tester.view.devicePixelRatio;
+    addTearDown(tester.view.resetPhysicalSize);
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
     for (final entry in extraDocs.entries) {
@@ -421,7 +461,22 @@ class AppHarness {
           appVersionProvider.overrideWithValue(appVersion!),
         updateFeedUrlProvider.overrideWithValue(updateFeedUrl),
         nativeGetProvider.overrideWithValue(nativeGet),
-        updateProxyProvider.overrideWithValue(proxy),
+        if (pacUrl == null)
+          updateProxyProvider.overrideWithValue(fixedUpdateProxy(proxy))
+        else
+          updateProxyProvider.overrideWithValue(
+            updateProxyResolvedOnce(
+              () => systemUpdateProxy(
+                updateFeedUrl!,
+                environment: const <String, String>{},
+                internetSettings: () =>
+                    (enabled: false, server: null, override: null),
+                autoProxyConfig: () =>
+                    (autoDetect: false, configUrl: pacUrl.toString()),
+                windows: true,
+              ),
+            ),
+          ),
         installerLauncherProvider.overrideWithValue((executable, arguments) {
           installerLaunches.add((executable: executable, arguments: arguments));
           // The real launcher never returns — it exits the process. Hanging

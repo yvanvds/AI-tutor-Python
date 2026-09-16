@@ -1,5 +1,7 @@
 /// The "What's new" card the app shows once, on the first launch after it
-/// updated itself (#119).
+/// updated itself (#119) — and again whenever Options → About asks for it
+/// (#130). Both put the same `ReleaseNotes` on the controller; this renders
+/// whatever is there.
 ///
 /// Built on `LevelUpOverlay`'s shape — same blurred scrim, same pop-in, same
 /// "tap outside or press the button" dismissal — because it is stacked in the
@@ -14,9 +16,9 @@
 /// read as half-localized. Nothing here goes through `AppLocalizations`.
 ///
 /// The notes are Markdown by origin (a GitHub release body) and are rendered
-/// as plain text, so what a release is written as is what a student reads.
-/// Keep release bodies plain — short lines, `-` bullets — when cutting a
-/// release with `tooling/build_release.ps1`.
+/// as such, through `TutorMarkdown` (#137): `-` bullets, `**bold**` and
+/// headers come out as structure, and plain prose keeps the plain-text look
+/// it had, so a body written as short lines still reads as short lines.
 library;
 
 import 'dart:ui';
@@ -24,6 +26,7 @@ import 'dart:ui';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_store.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -145,7 +148,9 @@ class _WhatsNewCard extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 320),
             child: SingleChildScrollView(
-              child: Text(
+              // The style is the one the plain `Text` had, so a body without
+              // any Markdown in it looks exactly as it did before #137.
+              child: TutorMarkdown(
                 notes.notes.trim(),
                 key: const ValueKey('whats-new-notes'),
                 style: TextStyle(

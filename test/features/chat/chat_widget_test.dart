@@ -22,6 +22,7 @@ import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_continue.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
+import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
@@ -152,5 +153,80 @@ void main() {
     expect(fakeTutor.initializeSessionCalls, 1);
 
     await unmount(tester);
+  });
+
+  // #132: while a theory page is on screen the field says a question is
+  // about that page; anywhere else it is the usual hint.
+  group('the composer hint', () {
+    String hint(WidgetTester tester) => tester
+        .widget<TextField>(
+          find.descendant(
+            of: find.byType(ComposerIdle),
+            matching: find.byType(TextField),
+          ),
+        )
+        .decoration!
+        .hintText!;
+
+    testWidgets('names the page in the theory view with a page on screen, '
+        'and nothing else', (tester) async {
+      await tester.pumpWidget(buildApp());
+      await tester.pump();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ChatWidget)),
+      );
+      final view = Object();
+
+      // Explain is the mode the app starts in; no page yet.
+      expect(container.read(modeProvider), SessionMode.explain);
+      expect(hint(tester), 'Type your question or answer…');
+
+      container.read(viewedContentIdProvider.notifier).show(view, 's1');
+      await tester.pump();
+      expect(hint(tester), 'Ask a question about this explanation…');
+
+      container.read(modeProvider.notifier).state = SessionMode.practice;
+      await tester.pump();
+      expect(hint(tester), 'Type your question or answer…');
+
+      container.read(modeProvider.notifier).state = SessionMode.explain;
+      await tester.pump();
+      expect(hint(tester), 'Ask a question about this explanation…');
+
+      container.read(viewedContentIdProvider.notifier).hide(view);
+      await tester.pump();
+      expect(hint(tester), 'Type your question or answer…');
+
+      await unmount(tester);
+    });
+
+    testWidgets('is translated', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tutorServiceProvider.overrideWith(() => fakeTutor),
+            chatServiceProvider.overrideWithValue(chat),
+            profileProvider.overrideWithValue(_testProfile),
+          ],
+          child: MaterialApp(
+            locale: const Locale('nl'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: ChatWidget()),
+          ),
+        ),
+      );
+      await tester.pump();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ChatWidget)),
+      );
+      expect(hint(tester), 'Typ je vraag of antwoord…');
+
+      container.read(viewedContentIdProvider.notifier).show(Object(), 's1');
+      await tester.pump();
+      expect(hint(tester), 'Stel een vraag over deze uitleg…');
+
+      await unmount(tester);
+    });
   });
 }

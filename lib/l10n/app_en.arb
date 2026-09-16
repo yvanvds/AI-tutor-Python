@@ -362,6 +362,23 @@
   "@options_about_version": {
     "placeholders": { "version": { "type": "String" } }
   },
+  "options_about_whatsNew": "What's new",
+  "@options_about_whatsNew": {
+    "description": "About button that shows the running version's release notes in the What's new overlay (#130)"
+  },
+  "options_about_whatsNew_loading": "Loading…",
+  "@options_about_whatsNew_loading": {
+    "description": "Label of the What's new button while the release notes are being looked up"
+  },
+  "options_about_whatsNew_failed": "Could not load the release notes: {error}",
+  "@options_about_whatsNew_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "options_about_whatsNew_none": "No release notes for version {version}.",
+  "@options_about_whatsNew_none": {
+    "description": "Snack when no published release carries the running version's tag — a dev build, typically",
+    "placeholders": { "version": { "type": "String" } }
+  },
 
   "session_mode_explain": "Explain",
   "session_mode_practice": "Practice",
@@ -585,7 +602,19 @@
     "description": "Connective fragment between 'online' and the topic name; leading dot and bullet are part of the string"
   },
   "chat_header_restart_tooltip": "Restart session",
+  "chat_header_collapse_tooltip": "Hide chat",
+  "@chat_header_collapse_tooltip": {
+    "description": "Tooltip of the chat header button that folds the chat panel to an edge strip; only offered in the theory (explain) view"
+  },
+  "chat_panel_expand_tooltip": "Show chat",
+  "@chat_panel_expand_tooltip": {
+    "description": "Tooltip of the one button on the folded chat strip, which brings the full chat panel back"
+  },
   "chat_composer_idle_hint": "Type your question or answer…",
+  "chat_composer_idle_pageHint": "Ask a question about this explanation…",
+  "@chat_composer_idle_pageHint": {
+    "description": "Hint in the chat input while a theory page is on screen: a question typed now is answered about that page (#132)"
+  },
   "chat_composer_idle_kbd_send": "send",
   "chat_composer_idle_kbd_newline": "new line",
   "chat_composer_idle_tip_prefix": "tip: type ",

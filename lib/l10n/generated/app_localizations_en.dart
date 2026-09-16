@@ -717,6 +717,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get options_about_whatsNew => 'What\'s new';
+
+  @override
+  String get options_about_whatsNew_loading => 'Loading…';
+
+  @override
+  String options_about_whatsNew_failed(String error) {
+    return 'Could not load the release notes: $error';
+  }
+
+  @override
+  String options_about_whatsNew_none(String version) {
+    return 'No release notes for version $version.';
+  }
+
+  @override
   String get session_mode_explain => 'Explain';
 
   @override
@@ -1083,7 +1099,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_header_restart_tooltip => 'Restart session';
 
   @override
+  String get chat_header_collapse_tooltip => 'Hide chat';
+
+  @override
+  String get chat_panel_expand_tooltip => 'Show chat';
+
+  @override
   String get chat_composer_idle_hint => 'Type your question or answer…';
+
+  @override
+  String get chat_composer_idle_pageHint =>
+      'Ask a question about this explanation…';
 
   @override
   String get chat_composer_idle_kbd_send => 'send';

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
@@ -23,6 +24,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// a `content` doc. Which page is shown is **view-local** state — paging
 /// never touches `goalSelectionProvider`, so the tutor keeps working against
 /// the same subgoal while the student re-reads an older explanation.
+///
+/// What the view shows is published to `viewedContentIdProvider` (#132), so
+/// a question typed in the chat can be about the page on screen — the one
+/// paged back to, not necessarily the active subgoal's.
 class ExplainView extends ConsumerStatefulWidget {
   const ExplainView({super.key});
 
@@ -42,16 +47,41 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
   String? _siblingsRootId;
   StreamSubscription<List<Goal>>? _sub;
 
+  /// Where the page on screen is published (#132). Held from `initState`
+  /// because `ref` is gone by the time `dispose` runs.
+  late final ViewedContentNotifier _viewed;
+
+  /// The id last handed to [_viewed], so a rebuild that shows the same page
+  /// publishes nothing.
+  String? _publishedContentId;
+  bool _publishedOnce = false;
+
   @override
   void initState() {
     super.initState();
+    _viewed = ref.read(viewedContentIdProvider.notifier);
     _watchSiblings(ref.read(goalSelectionProvider).activeRootGoal?.id);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    // Not during unmount: the tree is locked, and a provider write would
+    // mark the scope dirty. The owner check in `hide` covers the arriving
+    // view that may already have published by the time this runs.
+    scheduleMicrotask(() => _viewed.hide(this));
     super.dispose();
+  }
+
+  /// Publishes the page this build draws, once it is on screen. `null` is
+  /// a placeholder: no subgoal, or one without a lesson.
+  void _publishViewed(String? contentId) {
+    if (_publishedOnce && contentId == _publishedContentId) return;
+    _publishedOnce = true;
+    _publishedContentId = contentId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _viewed.show(this, contentId);
+    });
   }
 
   void _watchSiblings(String? rootId) {
@@ -110,6 +140,7 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
     final root = selection.activeRootGoal;
 
     if (active == null) {
+      _publishViewed(null);
       return _PlaceholderScreen(
         message: AppLocalizations.of(context)
             .session_explain_placeholder_noSubgoal,
@@ -135,15 +166,18 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
         ? seen[at + 1].id
         : null;
 
+    final hasPage = viewing.contentId != null && viewing.contentId!.isNotEmpty;
+    _publishViewed(hasPage ? viewing.contentId : null);
+
     return Container(
       color: AppColors.ink0,
       child: Column(
         children: [
           _ChromeHeader(child: viewing, root: root, siblings: _siblings),
           Expanded(
-            child: viewing.contentId == null || viewing.contentId!.isEmpty
-                ? const _MissingContent()
-                : _ContentWebView(contentId: viewing.contentId!),
+            child: hasPage
+                ? _ContentWebView(contentId: viewing.contentId!)
+                : const _MissingContent(),
           ),
           _ChromeFooter(
             onPrevious: previous == null

@@ -105,6 +105,23 @@ class QuestionFormatter {
         additionalFields: {"question": question, "code": code ?? ""},
       );
 
+  /// A question about the theory page on screen (#132, LLM_CONTRACT
+  /// "Content question"): the question plus the page itself — its title and
+  /// its body as plain text (`lessonHtmlToText`), so the model answers from
+  /// what the student is looking at.
+  static String contentQuestion(
+    String question, {
+    required String contentTitle,
+    required String contentText,
+  }) => _encodeRequest(
+    "content_question",
+    additionalFields: {
+      "question": question,
+      "content_title": contentTitle,
+      "content": contentText,
+    },
+  );
+
   static String explainAnswer(
     String answer, {
     List<LearningObjective> targetLOs = const [],

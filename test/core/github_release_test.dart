@@ -10,6 +10,10 @@
 //
 // #133 the fourth: the client the check builds for itself has to go through
 // the machine's proxy, which `package:http`'s default one never does.
+//
+// #130 the fifth: a second lookup on the same API, the release *by tag*
+// behind About's "What's new" button. It reads one field and goes through
+// the same transport, so the failures it reports are the check's failures.
 
 import 'dart:async';
 import 'dart:convert';
@@ -738,6 +742,259 @@ void main() {
         '/repos/$kReleaseOwner/$kReleaseRepo/releases/latest',
       );
       expect(kLatestReleaseEndpoint.scheme, 'https');
+    });
+  });
+
+  // #130 — the by-tag lookup sits beside `/releases/latest` on the same
+  // server, wherever that server is.
+  group('releaseByTagEndpoint', () {
+    test('is /releases/tags/v{version} next to the feed', () {
+      expect(
+        releaseByTagEndpoint(kLatestReleaseEndpoint, '2.3.0+20').toString(),
+        'https://api.github.com/repos/$kReleaseOwner/$kReleaseRepo/'
+        'releases/tags/v2.3.0+20',
+      );
+    });
+
+    test('follows the feed to wherever it is pointed', () {
+      // The integration harness serves the API from a loopback server; the
+      // lookup has to land there too, or a flow would reach github.com.
+      final feed = Uri.parse(
+        'http://127.0.0.1:4321/repos/$kReleaseOwner/$kReleaseRepo/'
+        'releases/latest',
+      );
+      expect(
+        releaseByTagEndpoint(feed, '99.0.0+1').toString(),
+        'http://127.0.0.1:4321/repos/$kReleaseOwner/$kReleaseRepo/'
+        'releases/tags/v99.0.0+1',
+      );
+    });
+
+    test('keeps the + of a build number as GitHub reads it', () {
+      // `+` is a legal path character; percent-encoding it would ask for a
+      // tag that does not exist.
+      expect(
+        releaseByTagEndpoint(kLatestReleaseEndpoint, '2.3.0+20').path,
+        endsWith('/tags/v2.3.0+20'),
+      );
+    });
+  });
+
+  group('fetchReleaseNotesByTag', () {
+    final endpoint = releaseByTagEndpoint(kLatestReleaseEndpoint, '2.0.0+18');
+
+    MockClient answering(
+      Object? json, {
+      int status = 200,
+      Map<String, String> headers = const {
+        'content-type': 'application/json; charset=utf-8',
+      },
+    }) => MockClient(
+      (_) async => http.Response.bytes(
+        utf8.encode(json is String ? json : jsonEncode(json)),
+        status,
+        headers: headers,
+      ),
+    );
+
+    test('returns the release body', () async {
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: answering(_releaseJson(body: 'For students\n\n- Faster')),
+        ),
+        'For students\n\n- Faster',
+      );
+    });
+
+    test('asks the API the documented way, at the tag URL', () async {
+      Uri? asked;
+      final seen = <String, String>{};
+      final client = MockClient((request) async {
+        asked = request.url;
+        seen.addAll(request.headers);
+        return http.Response.bytes(
+          utf8.encode(jsonEncode(_releaseJson())),
+          200,
+        );
+      });
+      await fetchReleaseNotesByTag(endpoint, client: client);
+      expect(asked, endpoint);
+      expect(seen['Accept'], 'application/vnd.github+json');
+      expect(seen['X-GitHub-Api-Version'], '2022-11-28');
+    });
+
+    test('does not need an installer asset — notes are notes', () async {
+      // Unlike the update check, a release with nothing to install still has
+      // something to say.
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: answering(_releaseJson(assets: [], body: 'Notes only')),
+        ),
+        'Notes only',
+      );
+    });
+
+    test('returns an empty string for a release published with no '
+        'body', () async {
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: answering({'tag_name': 'v2.0.0+18', 'body': null}),
+        ),
+        '',
+      );
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: answering({'tag_name': 'v2.0.0+18'}),
+        ),
+        '',
+      );
+    });
+
+    test('returns null on 404 — no release under that tag', () async {
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: answering('{"message":"Not Found"}', status: 404),
+        ),
+        isNull,
+      );
+    });
+
+    test('throws on any other non-200', () async {
+      for (final status in [400, 403, 429, 500, 503]) {
+        await expectLater(
+          fetchReleaseNotesByTag(
+            endpoint,
+            client: answering('', status: status),
+          ),
+          throwsA(
+            isA<UpdateCheckException>().having(
+              (e) => e.message,
+              'message',
+              contains('HTTP $status'),
+            ),
+          ),
+          reason: 'HTTP $status',
+        );
+      }
+    });
+
+    test('names the rate limit when GitHub has had enough', () async {
+      await expectLater(
+        fetchReleaseNotesByTag(
+          endpoint,
+          client: answering(
+            '',
+            status: 403,
+            headers: const {'x-ratelimit-remaining': '0'},
+          ),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('rate limit'),
+          ),
+        ),
+      );
+    });
+
+    test('throws when the endpoint does not answer with JSON', () async {
+      await expectLater(
+        fetchReleaseNotesByTag(
+          endpoint,
+          client: answering(
+            '<html>maintenance</html>',
+            headers: const {'content-type': 'text/html'},
+          ),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('JSON'),
+          ),
+        ),
+      );
+    });
+
+    test('throws when the JSON is not a release object', () async {
+      await expectLater(
+        fetchReleaseNotesByTag(endpoint, client: answering(['not', 'it'])),
+        throwsA(isA<UpdateCheckException>()),
+      );
+    });
+
+    test('throws on a transport error', () async {
+      await expectLater(
+        fetchReleaseNotesByTag(
+          endpoint,
+          client: MockClient(
+            (_) async => throw const SocketException('no route to host'),
+          ),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('no route to host'),
+          ),
+        ),
+      );
+    });
+
+    test('throws instead of hanging when the server never answers', () async {
+      await expectLater(
+        fetchReleaseNotesByTag(
+          endpoint,
+          client: MockClient((_) => Completer<http.Response>().future),
+          timeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(
+          isA<UpdateCheckException>().having(
+            (e) => e.message,
+            'message',
+            contains('timed out'),
+          ),
+        ),
+      );
+    });
+
+    // The same transport as the check (#124): a handshake Dart cannot
+    // complete is retried through the native seam, with the same URL and
+    // headers.
+    test('a handshake failure is retried through the native seam', () async {
+      const handshake = HandshakeException(
+        'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED)',
+      );
+      final calls = <({Uri url, Map<String, String> headers})>[];
+      Future<http.Response> native(
+        Uri url, {
+        Map<String, String> headers = const {},
+        Duration? timeout,
+        File? to,
+      }) async {
+        calls.add((url: url, headers: headers));
+        return http.Response.bytes(
+          utf8.encode(jsonEncode(_releaseJson(body: 'Via curl'))),
+          200,
+        );
+      }
+
+      expect(
+        await fetchReleaseNotesByTag(
+          endpoint,
+          client: MockClient((_) async => throw handshake),
+          nativeGet: native,
+        ),
+        'Via curl',
+      );
+      expect(calls.single.url, endpoint);
+      expect(calls.single.headers['Accept'], 'application/vnd.github+json');
     });
   });
 }
