@@ -43,6 +43,7 @@ import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
 import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
+import 'flows/status_report_retry.dart' as status_report_retry;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
 import 'flows/students_current_goal.dart' as students_current_goal;
@@ -88,6 +89,7 @@ void main() {
   puntenformule_tab.main();
   options_panel.main();
   own_key.main();
+  status_report_retry.main();
   level_up_gate.main();
   bug_report_oauth.main();
   bug_report_file.main();
