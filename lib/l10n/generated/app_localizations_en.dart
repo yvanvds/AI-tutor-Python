@@ -2158,6 +2158,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_notice_replyTruncated => 'The tutor\'s reply was cut off.';
 
   @override
+  String get chat_notice_replyGarbled =>
+      'The tutor\'s reply came back garbled.';
+
+  @override
   String get chat_notice_ownKeyMissing =>
       'No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.';
 

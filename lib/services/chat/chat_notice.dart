@@ -27,6 +27,11 @@ enum ChatNoticeKind {
   /// Stream ended before the envelope closed.
   replyTruncated,
 
+  /// The reply's prose carried a run of characters from an alphabet the
+  /// tutor does not write in — a stray token out of a small model (#147).
+  /// See `services/tutor/responses/script_guard.dart`.
+  replyGarbled,
+
   /// An account on its own key has none stored, so the call was not made
   /// (#126). Points at Options → OpenAI API key.
   ownKeyMissing,

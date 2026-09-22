@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/envelope_assembler.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
+import 'package:ai_tutor_python/services/tutor/responses/script_guard.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -239,9 +240,22 @@ class OpenaiConnector {
         extraParams: _extraParams(model),
         client: _client,
       );
-      _recordUserTurn(input, inputs);
       final text = _extractText(response);
       _onRecordRawOutput?.call(text);
+
+      // Refused before the user turn is on record, so the re-send goes out
+      // against the same history the refused call saw (#147).
+      final garbled = offScriptRunInReply(text);
+      if (garbled != null) {
+        debugPrint('OpenaiConnector: reply carries off-script run "$garbled"');
+        return ConnectorFailure(
+          StateError('reply carries an off-script run: $garbled'),
+          StackTrace.current,
+          const ChatNotice(ChatNoticeKind.replyGarbled),
+        );
+      }
+
+      _recordUserTurn(input, inputs);
       return ConnectorOk(text);
     } catch (e, stack) {
       debugPrint('OpenaiConnector.sendRequest failed: $e');
@@ -338,6 +352,25 @@ class OpenaiConnector {
           StateError('stream ended before </META>'),
           StackTrace.current,
           const ChatNotice(ChatNoticeKind.replyTruncated),
+        );
+        return;
+      }
+
+      // The prose came back with a run of characters from an alphabet the
+      // tutor does not write in — a stray token out of a small model (#147).
+      // Refused for the same reason a truncated reply is: it is not
+      // something to leave in front of a student, and the caller's one
+      // re-send normally comes back clean. The placeholder the deltas were
+      // streaming into is dropped by `ChatService.failStream`, so the
+      // garbled text does not survive the turn.
+      final garbled = offScriptRunInReply(raw.toString());
+      if (garbled != null) {
+        debugPrint('OpenaiConnector: reply carries off-script run "$garbled"');
+        _onRecordStreamFailure?.call('off-script run: $garbled');
+        yield StreamFailed(
+          StateError('reply carries an off-script run: $garbled'),
+          StackTrace.current,
+          const ChatNotice(ChatNoticeKind.replyGarbled),
         );
         return;
       }

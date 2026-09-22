@@ -155,6 +155,26 @@ Out of scope: the teacher-authored instruction documents themselves and
 the lesson/theory HTML. Those stay in the language their author wrote
 them in.
 
+#### Client-side script guard (#147)
+
+The directive is a request, and a small model can ignore it by accident:
+#147 is a Dutch reply with one word replaced by a run of non-Latin
+lookalikes, out of a nano-class model. Since the model's output is not
+something the app can correct, the app refuses it instead — the same
+treatment a reply truncated in transit gets (#7). `offScriptRunInReply`
+(`lib/services/tutor/responses/script_guard.dart`) reads the TEXT
+section of every completion, streamed and not; a run of adjacent
+characters from a non-Latin script in an otherwise Latin reply comes
+back as `ChatNoticeKind.replyGarbled`, the half-streamed message is
+withdrawn, and `TutorService`'s one automatic re-send asks again.
+
+Deliberately narrow, and the rule lives in that file's header: code
+spans and fenced blocks are exempt (a Python string may hold any
+script), a single off-script character is not a run, and a reply
+genuinely written in another script is not touched — nothing a re-send
+would fix. META's own student-facing strings are not scanned, because
+META also carries code.
+
 ## What the grader returns
 
 ```json

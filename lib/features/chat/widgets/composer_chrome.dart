@@ -5,6 +5,15 @@ import 'package:provider/provider.dart';
 
 /// Bottom-anchored shell shared by every composer state. Reports its measured
 /// height to [ComposerHeightNotifier] so the message list pads itself.
+///
+/// `flutter_chat_ui` draws the composer *over* the list (a `Positioned` in a
+/// `Stack`) and pads the list by whatever the notifier last reported, so a
+/// height that goes stale hides the bottom of the newest message behind the
+/// composer. `initState` / `didUpdateWidget` alone are not enough (#146): the
+/// idle composer's `TextField` has `maxLines: null`, so wrapping onto another
+/// row is a *relayout of the child*, not a new `ComposerChrome` widget, and
+/// neither hook fires. A [SizeChangedLayoutNotifier] catches that case — and
+/// every other composer state's growth — by watching the rendered size.
 class ComposerChrome extends StatefulWidget {
   const ComposerChrome({
     super.key,
@@ -53,19 +62,30 @@ class _ComposerChromeState extends State<ComposerChrome> {
       left: 0,
       right: 0,
       bottom: 0,
-      child: Container(
-        key: _key,
-        decoration: BoxDecoration(
-          color: widget.background ?? AppColors.ink1,
-          border: Border(
-            top: BorderSide(
-              color: widget.topBorder ?? AppColors.ink2,
-              width: 1,
+      // The notification is dispatched from `performLayout`, so the re-measure
+      // waits for the end of the frame: `setHeight` notifies listeners, and
+      // rebuilding the list's padding mid-layout is not allowed.
+      child: NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+          return true;
+        },
+        child: SizeChangedLayoutNotifier(
+          child: Container(
+            key: _key,
+            decoration: BoxDecoration(
+              color: widget.background ?? AppColors.ink1,
+              border: Border(
+                top: BorderSide(
+                  color: widget.topBorder ?? AppColors.ink2,
+                  width: 1,
+                ),
+              ),
             ),
+            padding: widget.padding,
+            child: widget.child,
           ),
         ),
-        padding: widget.padding,
-        child: widget.child,
       ),
     );
   }

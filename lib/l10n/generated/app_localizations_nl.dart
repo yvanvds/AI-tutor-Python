@@ -2184,6 +2184,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Het antwoord van de tutor werd afgebroken.';
 
   @override
+  String get chat_notice_replyGarbled =>
+      'Het antwoord van de tutor kwam verminkt terug.';
+
+  @override
   String get chat_notice_ownKeyMissing =>
       'Er is geen OpenAI API-sleutel opgeslagen op dit toestel. Voeg de jouwe toe via Opties → OpenAI API-sleutel.';
 

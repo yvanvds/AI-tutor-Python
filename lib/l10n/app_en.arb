@@ -1155,6 +1155,10 @@
   "chat_notice_tutorTimeout": "The tutor did not respond in time.",
   "chat_notice_tutorUnreachable": "No connection to the tutor.",
   "chat_notice_replyTruncated": "The tutor's reply was cut off.",
+  "chat_notice_replyGarbled": "The tutor's reply came back garbled.",
+  "@chat_notice_replyGarbled": {
+    "description": "The reply's prose carried a run of characters from another alphabet — a stray token out of a small model (#147)"
+  },
   "chat_notice_ownKeyMissing": "No OpenAI API key is stored on this device. Add yours under Options → OpenAI API key.",
   "@chat_notice_ownKeyMissing": {
     "description": "An account without the school key has no key stored, so the tutor made no call (#126)"

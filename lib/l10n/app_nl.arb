@@ -664,6 +664,7 @@
   "chat_notice_tutorTimeout": "De tutor reageerde niet op tijd.",
   "chat_notice_tutorUnreachable": "Geen verbinding met de tutor.",
   "chat_notice_replyTruncated": "Het antwoord van de tutor werd afgebroken.",
+  "chat_notice_replyGarbled": "Het antwoord van de tutor kwam verminkt terug.",
   "chat_notice_ownKeyMissing": "Er is geen OpenAI API-sleutel opgeslagen op dit toestel. Voeg de jouwe toe via Opties → OpenAI API-sleutel.",
   "chat_notice_ownKeyRejected": "OpenAI heeft je API-sleutel geweigerd. Controleer ze via Opties → OpenAI API-sleutel.",
   "chat_notice_schoolKeyInvalid": "De OpenAI API-sleutel van de school werkt niet. Laat het je leerkracht weten.",

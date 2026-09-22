@@ -3692,6 +3692,12 @@ abstract class AppLocalizations {
   /// **'The tutor\'s reply was cut off.'**
   String get chat_notice_replyTruncated;
 
+  /// The reply's prose carried a run of characters from another alphabet — a stray token out of a small model (#147)
+  ///
+  /// In en, this message translates to:
+  /// **'The tutor\'s reply came back garbled.'**
+  String get chat_notice_replyGarbled;
+
   /// An account without the school key has no key stored, so the tutor made no call (#126)
   ///
   /// In en, this message translates to:
