@@ -120,6 +120,39 @@ class GradeProposalService {
     ),
   );
 
+  /// Every stored proposal for one milestone, across students (#148).
+  ///
+  /// Cross-partition by necessity — the container is partitioned by `/uid`
+  /// and the Reports page asks the other question ("this milestone, every
+  /// student"). A handful of docs per milestone, read once when the teacher
+  /// picks one.
+  Future<List<GradeProposal>> getForMilestone(String milestoneId) =>
+      safeCosmos(() async {
+        final docs = await _container.query(
+          'SELECT * FROM c WHERE c.milestoneId = @milestoneId',
+          parameters: {'@milestoneId': milestoneId},
+          crossPartition: true,
+        );
+        return docs.map(GradeProposal.fromCosmos).toList();
+      });
+
+  /// Milestone ids that already have at least one stored proposal (#148).
+  /// The Milestones page flags an overdue milestone that has none — the
+  /// silent pass that prompted the issue.
+  Future<Set<String>> milestoneIdsWithProposals() => safeCosmos(() async {
+    final docs = await _container.query(
+      'SELECT c.milestoneId FROM c',
+      crossPartition: true,
+    );
+    return {
+      for (final doc in docs)
+        if (doc['milestoneId'] is String) doc['milestoneId'] as String,
+    };
+  });
+
+  Stream<Set<String>> watchMilestoneIdsWithProposals() =>
+      safeCosmosStream(pollingStream(milestoneIdsWithProposals));
+
   Future<void> _save(GradeProposal p) =>
       safeCosmos(() => _container.upsert(p.toMap(), partitionKey: p.uid));
 

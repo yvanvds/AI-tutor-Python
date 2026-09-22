@@ -25,6 +25,7 @@
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
   "sidebar_section_milestones": "Milestones",
+  "sidebar_section_reports": "Reports",
   "sidebar_section_options": "Options",
 
   "puntenformule_header_note": "How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.",
@@ -66,52 +67,75 @@
   },
   "milestones_delete_dialog_cancel": "Cancel",
   "milestones_delete_dialog_confirm": "Delete",
+  "milestones_overdue_noReports": "Report date passed — no reports generated yet.",
   "milestones_summary": "{core} core, {extension} extension learning objectives",
   "@milestones_summary": {
     "placeholders": { "core": { "type": "int" }, "extension": { "type": "int" } }
   },
 
-  "drawer_grade_title": "Grade proposal",
-  "drawer_grade_noMilestones": "No milestones defined yet — create one under Milestones.",
-  "drawer_grade_milestone_label": "Milestone",
-  "drawer_grade_button_compute": "Compute proposal",
-  "drawer_grade_button_recompute": "Recompute",
-  "drawer_grade_button_justify": "Write justification",
-  "drawer_grade_button_signOff": "Sign off",
-  "drawer_grade_button_busy": "Working…",
-  "drawer_grade_proposal_label": "Proposal",
-  "drawer_grade_masteryEnd": "Mastery now: {value}",
-  "@drawer_grade_masteryEnd": {
+  "reports_page_title": "Reports",
+  "reports_page_subtitle": "Generate and review the milestone reports of a whole class.",
+  "reports_class_label": "Class",
+  "reports_generate": "Generate reports",
+  "reports_generating": "Generating… {done} / {total}",
+  "@reports_generating": {
+    "placeholders": { "done": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "reports_noStudents": "No students in this class.",
+  "reports_placeholder": "Pick a student on the left.",
+  "reports_status_noData": "no data",
+  "reports_status_computed": "computed",
+  "reports_status_justified": "justification",
+  "reports_status_signedOff": "signed off",
+  "reports_rowError": "Failed: {error}",
+  "@reports_rowError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "reports_retry": "Retry",
+  "reports_previous": "Previous student",
+  "reports_next": "Next student",
+
+  "reports_grade_title": "Grade proposal",
+  "reports_grade_noMilestones": "No milestones defined yet — create one under Milestones.",
+  "reports_grade_milestone_label": "Milestone",
+  "reports_grade_button_compute": "Compute proposal",
+  "reports_grade_button_recompute": "Recompute",
+  "reports_grade_button_justify": "Write justification",
+  "reports_grade_button_signOff": "Sign off",
+  "reports_grade_button_busy": "Working…",
+  "reports_grade_proposal_label": "Proposal",
+  "reports_grade_masteryEnd": "Mastery now: {value}",
+  "@reports_grade_masteryEnd": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "drawer_grade_masteryStart": "Mastery at period start: {value}",
-  "@drawer_grade_masteryStart": {
+  "reports_grade_masteryStart": "Mastery at period start: {value}",
+  "@reports_grade_masteryStart": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "drawer_grade_startSource_snapshot": "Period start: exact per-LO snapshot",
-  "drawer_grade_startSource_snapshotLate": "Period start: per-LO snapshot, {count} LOs already written when it was taken",
-  "@drawer_grade_startSource_snapshotLate": {
+  "reports_grade_startSource_snapshot": "Period start: exact per-LO snapshot",
+  "reports_grade_startSource_snapshotLate": "Period start: per-LO snapshot, {count} LOs already written when it was taken",
+  "@reports_grade_startSource_snapshotLate": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "drawer_grade_startSource_history": "Period start: estimate from progress history (no snapshot for this period)",
-  "drawer_grade_growth": "Growth: {value}",
-  "@drawer_grade_growth": {
+  "reports_grade_startSource_history": "Period start: estimate from progress history (no snapshot for this period)",
+  "reports_grade_growth": "Growth: {value}",
+  "@reports_grade_growth": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "drawer_grade_core": "Core at level: {counted} / {total}",
-  "@drawer_grade_core": {
+  "reports_grade_core": "Core at level: {counted} / {total}",
+  "@reports_grade_core": {
     "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
   },
-  "drawer_grade_extension": "Extension mastered: {counted} / {total}",
-  "@drawer_grade_extension": {
+  "reports_grade_extension": "Extension mastered: {counted} / {total}",
+  "@reports_grade_extension": {
     "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
   },
-  "drawer_grade_hard": "Demonstrated at hard: {counted} / {total} mastered",
-  "@drawer_grade_hard": {
+  "reports_grade_hard": "Demonstrated at hard: {counted} / {total} mastered",
+  "@reports_grade_hard": {
     "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
   },
-  "drawer_grade_reliability": "Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.",
-  "@drawer_grade_reliability": {
+  "reports_grade_reliability": "Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.",
+  "@reports_grade_reliability": {
     "placeholders": {
       "stale": { "type": "int" },
       "never": { "type": "int" },
@@ -119,28 +143,28 @@
       "home": { "type": "int" }
     }
   },
-  "drawer_grade_formulaVersion": "Formula v{version}, computed {ts}",
-  "@drawer_grade_formulaVersion": {
+  "reports_grade_formulaVersion": "Formula v{version}, computed {ts}",
+  "@reports_grade_formulaVersion": {
     "placeholders": { "version": { "type": "String" }, "ts": { "type": "String" } }
   },
-  "drawer_grade_justification_title": "Justification",
-  "drawer_grade_justification_failed": "Could not write the justification: {error}",
-  "@drawer_grade_justification_failed": {
+  "reports_grade_justification_title": "Justification",
+  "reports_grade_justification_failed": "Could not write the justification: {error}",
+  "@reports_grade_justification_failed": {
     "placeholders": { "error": { "type": "String" } }
   },
-  "drawer_grade_adjusted_label": "Grade for the report card",
-  "drawer_grade_adjusted_invalid": "Enter a whole number from 0 to 100.",
-  "drawer_grade_note_label": "Reason for adjustment (optional)",
-  "drawer_grade_signed": "Signed off {ts}: {grade}/100",
-  "@drawer_grade_signed": {
+  "reports_grade_adjusted_label": "Grade for the report card",
+  "reports_grade_adjusted_invalid": "Enter a whole number from 0 to 100.",
+  "reports_grade_note_label": "Reason for adjustment (optional)",
+  "reports_grade_signed": "Signed off {ts}: {grade}/100",
+  "@reports_grade_signed": {
     "placeholders": { "ts": { "type": "String" }, "grade": { "type": "int" } }
   },
-  "drawer_grade_signed_note": "Note: {note}",
-  "@drawer_grade_signed_note": {
+  "reports_grade_signed_note": "Note: {note}",
+  "@reports_grade_signed_note": {
     "placeholders": { "note": { "type": "String" } }
   },
-  "drawer_grade_failed": "Could not compute the proposal: {error}",
-  "@drawer_grade_failed": {
+  "reports_grade_failed": "Could not compute the proposal: {error}",
+  "@reports_grade_failed": {
     "placeholders": { "error": { "type": "String" } }
   },
 

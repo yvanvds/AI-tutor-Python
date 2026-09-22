@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Milestones'**
   String get sidebar_section_milestones;
 
+  /// No description provided for @sidebar_section_reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get sidebar_section_reports;
+
   /// No description provided for @sidebar_section_options.
   ///
   /// In en, this message translates to:
@@ -386,184 +392,280 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get milestones_delete_dialog_confirm;
 
+  /// No description provided for @milestones_overdue_noReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Report date passed — no reports generated yet.'**
+  String get milestones_overdue_noReports;
+
   /// No description provided for @milestones_summary.
   ///
   /// In en, this message translates to:
   /// **'{core} core, {extension} extension learning objectives'**
   String milestones_summary(int core, int extension);
 
-  /// No description provided for @drawer_grade_title.
+  /// No description provided for @reports_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get reports_page_title;
+
+  /// No description provided for @reports_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate and review the milestone reports of a whole class.'**
+  String get reports_page_subtitle;
+
+  /// No description provided for @reports_class_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Class'**
+  String get reports_class_label;
+
+  /// No description provided for @reports_generate.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate reports'**
+  String get reports_generate;
+
+  /// No description provided for @reports_generating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating… {done} / {total}'**
+  String reports_generating(int done, int total);
+
+  /// No description provided for @reports_noStudents.
+  ///
+  /// In en, this message translates to:
+  /// **'No students in this class.'**
+  String get reports_noStudents;
+
+  /// No description provided for @reports_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a student on the left.'**
+  String get reports_placeholder;
+
+  /// No description provided for @reports_status_noData.
+  ///
+  /// In en, this message translates to:
+  /// **'no data'**
+  String get reports_status_noData;
+
+  /// No description provided for @reports_status_computed.
+  ///
+  /// In en, this message translates to:
+  /// **'computed'**
+  String get reports_status_computed;
+
+  /// No description provided for @reports_status_justified.
+  ///
+  /// In en, this message translates to:
+  /// **'justification'**
+  String get reports_status_justified;
+
+  /// No description provided for @reports_status_signedOff.
+  ///
+  /// In en, this message translates to:
+  /// **'signed off'**
+  String get reports_status_signedOff;
+
+  /// No description provided for @reports_rowError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: {error}'**
+  String reports_rowError(String error);
+
+  /// No description provided for @reports_retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get reports_retry;
+
+  /// No description provided for @reports_previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous student'**
+  String get reports_previous;
+
+  /// No description provided for @reports_next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next student'**
+  String get reports_next;
+
+  /// No description provided for @reports_grade_title.
   ///
   /// In en, this message translates to:
   /// **'Grade proposal'**
-  String get drawer_grade_title;
+  String get reports_grade_title;
 
-  /// No description provided for @drawer_grade_noMilestones.
+  /// No description provided for @reports_grade_noMilestones.
   ///
   /// In en, this message translates to:
   /// **'No milestones defined yet — create one under Milestones.'**
-  String get drawer_grade_noMilestones;
+  String get reports_grade_noMilestones;
 
-  /// No description provided for @drawer_grade_milestone_label.
+  /// No description provided for @reports_grade_milestone_label.
   ///
   /// In en, this message translates to:
   /// **'Milestone'**
-  String get drawer_grade_milestone_label;
+  String get reports_grade_milestone_label;
 
-  /// No description provided for @drawer_grade_button_compute.
+  /// No description provided for @reports_grade_button_compute.
   ///
   /// In en, this message translates to:
   /// **'Compute proposal'**
-  String get drawer_grade_button_compute;
+  String get reports_grade_button_compute;
 
-  /// No description provided for @drawer_grade_button_recompute.
+  /// No description provided for @reports_grade_button_recompute.
   ///
   /// In en, this message translates to:
   /// **'Recompute'**
-  String get drawer_grade_button_recompute;
+  String get reports_grade_button_recompute;
 
-  /// No description provided for @drawer_grade_button_justify.
+  /// No description provided for @reports_grade_button_justify.
   ///
   /// In en, this message translates to:
   /// **'Write justification'**
-  String get drawer_grade_button_justify;
+  String get reports_grade_button_justify;
 
-  /// No description provided for @drawer_grade_button_signOff.
+  /// No description provided for @reports_grade_button_signOff.
   ///
   /// In en, this message translates to:
   /// **'Sign off'**
-  String get drawer_grade_button_signOff;
+  String get reports_grade_button_signOff;
 
-  /// No description provided for @drawer_grade_button_busy.
+  /// No description provided for @reports_grade_button_busy.
   ///
   /// In en, this message translates to:
   /// **'Working…'**
-  String get drawer_grade_button_busy;
+  String get reports_grade_button_busy;
 
-  /// No description provided for @drawer_grade_proposal_label.
+  /// No description provided for @reports_grade_proposal_label.
   ///
   /// In en, this message translates to:
   /// **'Proposal'**
-  String get drawer_grade_proposal_label;
+  String get reports_grade_proposal_label;
 
-  /// No description provided for @drawer_grade_masteryEnd.
+  /// No description provided for @reports_grade_masteryEnd.
   ///
   /// In en, this message translates to:
   /// **'Mastery now: {value}'**
-  String drawer_grade_masteryEnd(String value);
+  String reports_grade_masteryEnd(String value);
 
-  /// No description provided for @drawer_grade_masteryStart.
+  /// No description provided for @reports_grade_masteryStart.
   ///
   /// In en, this message translates to:
   /// **'Mastery at period start: {value}'**
-  String drawer_grade_masteryStart(String value);
+  String reports_grade_masteryStart(String value);
 
-  /// No description provided for @drawer_grade_startSource_snapshot.
+  /// No description provided for @reports_grade_startSource_snapshot.
   ///
   /// In en, this message translates to:
   /// **'Period start: exact per-LO snapshot'**
-  String get drawer_grade_startSource_snapshot;
+  String get reports_grade_startSource_snapshot;
 
-  /// No description provided for @drawer_grade_startSource_snapshotLate.
+  /// No description provided for @reports_grade_startSource_snapshotLate.
   ///
   /// In en, this message translates to:
   /// **'Period start: per-LO snapshot, {count} LOs already written when it was taken'**
-  String drawer_grade_startSource_snapshotLate(int count);
+  String reports_grade_startSource_snapshotLate(int count);
 
-  /// No description provided for @drawer_grade_startSource_history.
+  /// No description provided for @reports_grade_startSource_history.
   ///
   /// In en, this message translates to:
   /// **'Period start: estimate from progress history (no snapshot for this period)'**
-  String get drawer_grade_startSource_history;
+  String get reports_grade_startSource_history;
 
-  /// No description provided for @drawer_grade_growth.
+  /// No description provided for @reports_grade_growth.
   ///
   /// In en, this message translates to:
   /// **'Growth: {value}'**
-  String drawer_grade_growth(String value);
+  String reports_grade_growth(String value);
 
-  /// No description provided for @drawer_grade_core.
+  /// No description provided for @reports_grade_core.
   ///
   /// In en, this message translates to:
   /// **'Core at level: {counted} / {total}'**
-  String drawer_grade_core(int counted, int total);
+  String reports_grade_core(int counted, int total);
 
-  /// No description provided for @drawer_grade_extension.
+  /// No description provided for @reports_grade_extension.
   ///
   /// In en, this message translates to:
   /// **'Extension mastered: {counted} / {total}'**
-  String drawer_grade_extension(int counted, int total);
+  String reports_grade_extension(int counted, int total);
 
-  /// No description provided for @drawer_grade_hard.
+  /// No description provided for @reports_grade_hard.
   ///
   /// In en, this message translates to:
   /// **'Demonstrated at hard: {counted} / {total} mastered'**
-  String drawer_grade_hard(int counted, int total);
+  String reports_grade_hard(int counted, int total);
 
-  /// No description provided for @drawer_grade_reliability.
+  /// No description provided for @reports_grade_reliability.
   ///
   /// In en, this message translates to:
   /// **'Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.'**
-  String drawer_grade_reliability(
+  String reports_grade_reliability(
     int stale,
     int never,
     int supervised,
     int home,
   );
 
-  /// No description provided for @drawer_grade_formulaVersion.
+  /// No description provided for @reports_grade_formulaVersion.
   ///
   /// In en, this message translates to:
   /// **'Formula v{version}, computed {ts}'**
-  String drawer_grade_formulaVersion(String version, String ts);
+  String reports_grade_formulaVersion(String version, String ts);
 
-  /// No description provided for @drawer_grade_justification_title.
+  /// No description provided for @reports_grade_justification_title.
   ///
   /// In en, this message translates to:
   /// **'Justification'**
-  String get drawer_grade_justification_title;
+  String get reports_grade_justification_title;
 
-  /// No description provided for @drawer_grade_justification_failed.
+  /// No description provided for @reports_grade_justification_failed.
   ///
   /// In en, this message translates to:
   /// **'Could not write the justification: {error}'**
-  String drawer_grade_justification_failed(String error);
+  String reports_grade_justification_failed(String error);
 
-  /// No description provided for @drawer_grade_adjusted_label.
+  /// No description provided for @reports_grade_adjusted_label.
   ///
   /// In en, this message translates to:
   /// **'Grade for the report card'**
-  String get drawer_grade_adjusted_label;
+  String get reports_grade_adjusted_label;
 
-  /// No description provided for @drawer_grade_adjusted_invalid.
+  /// No description provided for @reports_grade_adjusted_invalid.
   ///
   /// In en, this message translates to:
   /// **'Enter a whole number from 0 to 100.'**
-  String get drawer_grade_adjusted_invalid;
+  String get reports_grade_adjusted_invalid;
 
-  /// No description provided for @drawer_grade_note_label.
+  /// No description provided for @reports_grade_note_label.
   ///
   /// In en, this message translates to:
   /// **'Reason for adjustment (optional)'**
-  String get drawer_grade_note_label;
+  String get reports_grade_note_label;
 
-  /// No description provided for @drawer_grade_signed.
+  /// No description provided for @reports_grade_signed.
   ///
   /// In en, this message translates to:
   /// **'Signed off {ts}: {grade}/100'**
-  String drawer_grade_signed(String ts, int grade);
+  String reports_grade_signed(String ts, int grade);
 
-  /// No description provided for @drawer_grade_signed_note.
+  /// No description provided for @reports_grade_signed_note.
   ///
   /// In en, this message translates to:
   /// **'Note: {note}'**
-  String drawer_grade_signed_note(String note);
+  String reports_grade_signed_note(String note);
 
-  /// No description provided for @drawer_grade_failed.
+  /// No description provided for @reports_grade_failed.
   ///
   /// In en, this message translates to:
   /// **'Could not compute the proposal: {error}'**
-  String drawer_grade_failed(String error);
+  String reports_grade_failed(String error);
 
   /// No description provided for @options_page_title.
   ///

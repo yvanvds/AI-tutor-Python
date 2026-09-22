@@ -24,6 +24,7 @@ class Sidebar extends ConsumerWidget {
     Section.instructions,
     Section.students,
     Section.milestones,
+    Section.reports,
   ];
 
   @override
@@ -106,6 +107,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.people_outline;
       case Section.milestones:
         return Icons.event_available_outlined;
+      case Section.reports:
+        return Icons.assignment_outlined;
       case Section.options:
         return Icons.settings_outlined;
     }

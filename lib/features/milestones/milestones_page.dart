@@ -8,11 +8,17 @@
 // Left: the list of milestones. Right: the editor for the selected one.
 // Dates are typed as `YYYY-MM-DD` (a calendar button fills the field), so
 // the form is driveable without a picker dialog.
+//
+// A milestone whose report date has passed while no report has been
+// generated for it is flagged in the list (#148) — that silent pass is what
+// prompted the Reports page. The flag reads the `grade_proposals` container,
+// so it clears as soon as the first student's report is computed.
 
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
 import 'package:ai_tutor_python/services/grading/milestone_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -62,6 +68,7 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
 
   late final Stream<List<Milestone>> _milestonesStream;
   late final Stream<List<Goal>> _goalsStream;
+  late final Stream<Set<String>> _reportedStream;
 
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
@@ -77,11 +84,18 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
   bool _busy = false;
   String? _goalsError;
 
+  /// A validation failure that has to be readable from the Save button — the
+  /// field it belongs to may well be scrolled out of the editor list.
+  String? _saveError;
+
   @override
   void initState() {
     super.initState();
     _milestonesStream = ref.read(milestoneServiceProvider).watchAll();
     _goalsStream = ref.read(goalsServiceProvider).streamAllGoals();
+    _reportedStream = ref
+        .read(gradeProposalServiceProvider)
+        .watchMilestoneIdsWithProposals();
   }
 
   @override
@@ -103,6 +117,7 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
       _subgoalIds.clear();
       _coreKeys.clear();
       _goalsError = null;
+      _saveError = null;
     });
   }
 
@@ -121,6 +136,7 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
         ..clear()
         ..addAll(m.coreLoKeys);
       _goalsError = null;
+      _saveError = null;
     });
   }
 
@@ -143,14 +159,27 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
     final valid = _formKey.currentState?.validate() ?? false;
     final start = parseIsoDate(_periodStartCtrl.text);
     final due = parseIsoDate(_dueAtCtrl.text);
+    final title = _titleCtrl.text.trim();
+    // Checked against the controller, not only through `validate()` (#148).
+    // The editor is a `ListView` inside the `Form` and Save sits at its very
+    // bottom, so by the time a teacher with a real curriculum can press it,
+    // the title field at the top has been unmounted — and an unmounted
+    // `FormField` has deregistered, so its validator never runs. That is how
+    // untitled milestones reached Cosmos and made the milestone dropdown
+    // render blank.
+    if (title.isEmpty) {
+      setState(() => _saveError = l.milestones_validation_title);
+      return;
+    }
     if (!valid || start == null || due == null) return;
     if (_subgoalIds.isEmpty) {
       setState(() => _goalsError = l.milestones_validation_goals);
       return;
     }
+    setState(() => _saveError = null);
     final milestone = Milestone(
       id: id,
-      title: _titleCtrl.text.trim(),
+      title: title,
       periodStart: start,
       dueAt: due,
       expectedDifficulty: _difficulty,
@@ -287,31 +316,60 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
           label: Text(l.milestones_button_new),
         ),
         const SizedBox(height: AppSpacing.m),
+        // Both streams are single-subscription (`pollingStream`), so their
+        // builders sit *outside* every conditional branch: a `StreamBuilder`
+        // that unmounts and comes back would try to listen twice.
         Expanded(
-          child: StreamBuilder<List<Milestone>>(
-            stream: _milestonesStream,
-            builder: (context, snap) {
-              final items = snap.data ?? const <Milestone>[];
-              if (!snap.hasData) {
-                return const LinearProgressIndicator(minHeight: 2);
-              }
-              if (items.isEmpty && !_isNew) {
-                return Text(
-                  l.milestones_list_empty,
-                  style: TextStyle(color: AppColors.fgFaint),
-                );
-              }
-              return ListView(
-                children: [
-                  for (final m in items)
-                    ListTile(
-                      key: Key('milestone-row-${m.id}'),
-                      selected: m.id == _editingId,
-                      title: Text(m.title),
-                      subtitle: Text(formatIsoDate(m.dueAt)),
-                      onTap: _busy ? null : () => _select(m),
-                    ),
-                ],
+          child: StreamBuilder<Set<String>>(
+            stream: _reportedStream,
+            builder: (context, reportedSnap) {
+              // The nudge (#148): a milestone whose report date has gone by
+              // while nothing has been generated for it. Until the set
+              // arrives nothing is flagged — a quiet "not yet known" beats
+              // accusing every milestone for one frame.
+              final reported = reportedSnap.data;
+              final now = DateTime.now();
+              bool overdue(Milestone m) =>
+                  reported != null &&
+                  m.dueAt.isBefore(now) &&
+                  !reported.contains(m.id);
+              return StreamBuilder<List<Milestone>>(
+                stream: _milestonesStream,
+                builder: (context, snap) {
+                  final items = snap.data ?? const <Milestone>[];
+                  if (!snap.hasData) {
+                    return const LinearProgressIndicator(minHeight: 2);
+                  }
+                  if (items.isEmpty && !_isNew) {
+                    return Text(
+                      l.milestones_list_empty,
+                      style: TextStyle(color: AppColors.fgFaint),
+                    );
+                  }
+                  return ListView(
+                    children: [
+                      for (final m in items)
+                        ListTile(
+                          key: Key('milestone-row-${m.id}'),
+                          selected: m.id == _editingId,
+                          title: Text(m.title),
+                          subtitle: Text(formatIsoDate(m.dueAt)),
+                          trailing: overdue(m)
+                              ? Tooltip(
+                                  message: l.milestones_overdue_noReports,
+                                  child: Icon(
+                                    Icons.notification_important_outlined,
+                                    key: Key('milestone-overdue-${m.id}'),
+                                    size: 18,
+                                    color: AppColors.accent3,
+                                  ),
+                                )
+                              : null,
+                          onTap: _busy ? null : () => _select(m),
+                        ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -454,6 +512,17 @@ class _MilestonesPageState extends ConsumerState<MilestonesPage> {
                   _subgoalRow(l, sub, ordered),
               ],
               const SizedBox(height: AppSpacing.lg),
+              // Next to the button that was pressed, not next to the field
+              // it belongs to: that field may well be scrolled out of this
+              // very list.
+              if (_saveError != null) ...[
+                Text(
+                  _saveError!,
+                  key: const Key('milestone-save-error'),
+                  style: TextStyle(color: AppColors.danger, fontSize: 12),
+                ),
+                const SizedBox(height: AppSpacing.s),
+              ],
               Row(
                 children: [
                   FilledButton(

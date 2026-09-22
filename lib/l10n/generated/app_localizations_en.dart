@@ -55,6 +55,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_milestones => 'Milestones';
 
   @override
+  String get sidebar_section_reports => 'Reports';
+
+  @override
   String get sidebar_section_options => 'Options';
 
   @override
@@ -164,83 +167,137 @@ class AppLocalizationsEn extends AppLocalizations {
   String get milestones_delete_dialog_confirm => 'Delete';
 
   @override
+  String get milestones_overdue_noReports =>
+      'Report date passed — no reports generated yet.';
+
+  @override
   String milestones_summary(int core, int extension) {
     return '$core core, $extension extension learning objectives';
   }
 
   @override
-  String get drawer_grade_title => 'Grade proposal';
+  String get reports_page_title => 'Reports';
 
   @override
-  String get drawer_grade_noMilestones =>
+  String get reports_page_subtitle =>
+      'Generate and review the milestone reports of a whole class.';
+
+  @override
+  String get reports_class_label => 'Class';
+
+  @override
+  String get reports_generate => 'Generate reports';
+
+  @override
+  String reports_generating(int done, int total) {
+    return 'Generating… $done / $total';
+  }
+
+  @override
+  String get reports_noStudents => 'No students in this class.';
+
+  @override
+  String get reports_placeholder => 'Pick a student on the left.';
+
+  @override
+  String get reports_status_noData => 'no data';
+
+  @override
+  String get reports_status_computed => 'computed';
+
+  @override
+  String get reports_status_justified => 'justification';
+
+  @override
+  String get reports_status_signedOff => 'signed off';
+
+  @override
+  String reports_rowError(String error) {
+    return 'Failed: $error';
+  }
+
+  @override
+  String get reports_retry => 'Retry';
+
+  @override
+  String get reports_previous => 'Previous student';
+
+  @override
+  String get reports_next => 'Next student';
+
+  @override
+  String get reports_grade_title => 'Grade proposal';
+
+  @override
+  String get reports_grade_noMilestones =>
       'No milestones defined yet — create one under Milestones.';
 
   @override
-  String get drawer_grade_milestone_label => 'Milestone';
+  String get reports_grade_milestone_label => 'Milestone';
 
   @override
-  String get drawer_grade_button_compute => 'Compute proposal';
+  String get reports_grade_button_compute => 'Compute proposal';
 
   @override
-  String get drawer_grade_button_recompute => 'Recompute';
+  String get reports_grade_button_recompute => 'Recompute';
 
   @override
-  String get drawer_grade_button_justify => 'Write justification';
+  String get reports_grade_button_justify => 'Write justification';
 
   @override
-  String get drawer_grade_button_signOff => 'Sign off';
+  String get reports_grade_button_signOff => 'Sign off';
 
   @override
-  String get drawer_grade_button_busy => 'Working…';
+  String get reports_grade_button_busy => 'Working…';
 
   @override
-  String get drawer_grade_proposal_label => 'Proposal';
+  String get reports_grade_proposal_label => 'Proposal';
 
   @override
-  String drawer_grade_masteryEnd(String value) {
+  String reports_grade_masteryEnd(String value) {
     return 'Mastery now: $value';
   }
 
   @override
-  String drawer_grade_masteryStart(String value) {
+  String reports_grade_masteryStart(String value) {
     return 'Mastery at period start: $value';
   }
 
   @override
-  String get drawer_grade_startSource_snapshot =>
+  String get reports_grade_startSource_snapshot =>
       'Period start: exact per-LO snapshot';
 
   @override
-  String drawer_grade_startSource_snapshotLate(int count) {
+  String reports_grade_startSource_snapshotLate(int count) {
     return 'Period start: per-LO snapshot, $count LOs already written when it was taken';
   }
 
   @override
-  String get drawer_grade_startSource_history =>
+  String get reports_grade_startSource_history =>
       'Period start: estimate from progress history (no snapshot for this period)';
 
   @override
-  String drawer_grade_growth(String value) {
+  String reports_grade_growth(String value) {
     return 'Growth: $value';
   }
 
   @override
-  String drawer_grade_core(int counted, int total) {
+  String reports_grade_core(int counted, int total) {
     return 'Core at level: $counted / $total';
   }
 
   @override
-  String drawer_grade_extension(int counted, int total) {
+  String reports_grade_extension(int counted, int total) {
     return 'Extension mastered: $counted / $total';
   }
 
   @override
-  String drawer_grade_hard(int counted, int total) {
+  String reports_grade_hard(int counted, int total) {
     return 'Demonstrated at hard: $counted / $total mastered';
   }
 
   @override
-  String drawer_grade_reliability(
+  String reports_grade_reliability(
     int stale,
     int never,
     int supervised,
@@ -250,40 +307,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String drawer_grade_formulaVersion(String version, String ts) {
+  String reports_grade_formulaVersion(String version, String ts) {
     return 'Formula v$version, computed $ts';
   }
 
   @override
-  String get drawer_grade_justification_title => 'Justification';
+  String get reports_grade_justification_title => 'Justification';
 
   @override
-  String drawer_grade_justification_failed(String error) {
+  String reports_grade_justification_failed(String error) {
     return 'Could not write the justification: $error';
   }
 
   @override
-  String get drawer_grade_adjusted_label => 'Grade for the report card';
+  String get reports_grade_adjusted_label => 'Grade for the report card';
 
   @override
-  String get drawer_grade_adjusted_invalid =>
+  String get reports_grade_adjusted_invalid =>
       'Enter a whole number from 0 to 100.';
 
   @override
-  String get drawer_grade_note_label => 'Reason for adjustment (optional)';
+  String get reports_grade_note_label => 'Reason for adjustment (optional)';
 
   @override
-  String drawer_grade_signed(String ts, int grade) {
+  String reports_grade_signed(String ts, int grade) {
     return 'Signed off $ts: $grade/100';
   }
 
   @override
-  String drawer_grade_signed_note(String note) {
+  String reports_grade_signed_note(String note) {
     return 'Note: $note';
   }
 
   @override
-  String drawer_grade_failed(String error) {
+  String reports_grade_failed(String error) {
     return 'Could not compute the proposal: $error';
   }
 

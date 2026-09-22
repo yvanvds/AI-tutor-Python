@@ -1,4 +1,3 @@
-import 'package:ai_tutor_python/features/account/detail/grade_proposal_section.dart';
 import 'package:ai_tutor_python/features/account/detail/progress_history_charts.dart';
 import 'package:ai_tutor_python/features/account/detail/signal_events_section.dart';
 import 'package:ai_tutor_python/features/account/detail/status_reports_section.dart';
@@ -13,7 +12,14 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Right-hand peek panel for one student.
+/// Right-hand peek panel for one student: continuous progress, status
+/// reports, signal events.
+///
+/// Grading is deliberately *not* here (#148). The grade proposal lived at
+/// the bottom of this list while it was a per-student action, which meant a
+/// passed milestone produced nothing until the teacher opened every drawer
+/// in the class one by one. It now lives on the Reports page, so sign-off
+/// happens in exactly one place.
 class StudentDetailDrawer extends ConsumerWidget {
   const StudentDetailDrawer({super.key, required this.account});
 
@@ -73,11 +79,6 @@ class StudentDetailDrawer extends ConsumerWidget {
                           StatusReportsSection(uid: account.uid, goals: goals),
                           const Divider(height: 1),
                           ProgressHistoryCharts(uid: account.uid, goals: goals),
-                          const Divider(height: 1),
-                          // Teacher-only by construction (#99): this drawer
-                          // exists only on the Students page, which a
-                          // student's shell never routes to.
-                          GradeProposalSection(account: account),
                         ],
                       );
                     },

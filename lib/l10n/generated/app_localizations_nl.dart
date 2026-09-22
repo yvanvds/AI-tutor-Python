@@ -55,6 +55,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_milestones => 'Mijlpalen';
 
   @override
+  String get sidebar_section_reports => 'Rapporten';
+
+  @override
   String get sidebar_section_options => 'Opties';
 
   @override
@@ -165,83 +168,137 @@ class AppLocalizationsNl extends AppLocalizations {
   String get milestones_delete_dialog_confirm => 'Verwijderen';
 
   @override
+  String get milestones_overdue_noReports =>
+      'Rapportdatum voorbij — nog geen rapporten gegenereerd.';
+
+  @override
   String milestones_summary(int core, int extension) {
     return '$core kern-, $extension uitbreidingsleerdoelen';
   }
 
   @override
-  String get drawer_grade_title => 'Puntvoorstel';
+  String get reports_page_title => 'Rapporten';
 
   @override
-  String get drawer_grade_noMilestones =>
+  String get reports_page_subtitle =>
+      'Genereer en overloop de mijlpaalrapporten van een hele klas.';
+
+  @override
+  String get reports_class_label => 'Klas';
+
+  @override
+  String get reports_generate => 'Genereer rapporten';
+
+  @override
+  String reports_generating(int done, int total) {
+    return 'Bezig… $done / $total';
+  }
+
+  @override
+  String get reports_noStudents => 'Geen leerlingen in deze klas.';
+
+  @override
+  String get reports_placeholder => 'Kies links een leerling.';
+
+  @override
+  String get reports_status_noData => 'geen data';
+
+  @override
+  String get reports_status_computed => 'berekend';
+
+  @override
+  String get reports_status_justified => 'verantwoording';
+
+  @override
+  String get reports_status_signedOff => 'afgetekend';
+
+  @override
+  String reports_rowError(String error) {
+    return 'Mislukt: $error';
+  }
+
+  @override
+  String get reports_retry => 'Opnieuw';
+
+  @override
+  String get reports_previous => 'Vorige leerling';
+
+  @override
+  String get reports_next => 'Volgende leerling';
+
+  @override
+  String get reports_grade_title => 'Puntvoorstel';
+
+  @override
+  String get reports_grade_noMilestones =>
       'Nog geen mijlpalen — maak er een onder Mijlpalen.';
 
   @override
-  String get drawer_grade_milestone_label => 'Mijlpaal';
+  String get reports_grade_milestone_label => 'Mijlpaal';
 
   @override
-  String get drawer_grade_button_compute => 'Voorstel berekenen';
+  String get reports_grade_button_compute => 'Voorstel berekenen';
 
   @override
-  String get drawer_grade_button_recompute => 'Opnieuw berekenen';
+  String get reports_grade_button_recompute => 'Opnieuw berekenen';
 
   @override
-  String get drawer_grade_button_justify => 'Verantwoording schrijven';
+  String get reports_grade_button_justify => 'Verantwoording schrijven';
 
   @override
-  String get drawer_grade_button_signOff => 'Aftekenen';
+  String get reports_grade_button_signOff => 'Aftekenen';
 
   @override
-  String get drawer_grade_button_busy => 'Bezig…';
+  String get reports_grade_button_busy => 'Bezig…';
 
   @override
-  String get drawer_grade_proposal_label => 'Voorstel';
+  String get reports_grade_proposal_label => 'Voorstel';
 
   @override
-  String drawer_grade_masteryEnd(String value) {
+  String reports_grade_masteryEnd(String value) {
     return 'Beheersing nu: $value';
   }
 
   @override
-  String drawer_grade_masteryStart(String value) {
+  String reports_grade_masteryStart(String value) {
     return 'Beheersing bij start periode: $value';
   }
 
   @override
-  String get drawer_grade_startSource_snapshot =>
+  String get reports_grade_startSource_snapshot =>
       'Start periode: exacte momentopname per leerdoel';
 
   @override
-  String drawer_grade_startSource_snapshotLate(int count) {
+  String reports_grade_startSource_snapshotLate(int count) {
     return 'Start periode: momentopname per leerdoel, $count leerdoelen al geschreven toen ze genomen werd';
   }
 
   @override
-  String get drawer_grade_startSource_history =>
+  String get reports_grade_startSource_history =>
       'Start periode: schatting uit de voortgangshistoriek (geen momentopname voor deze periode)';
 
   @override
-  String drawer_grade_growth(String value) {
+  String reports_grade_growth(String value) {
     return 'Groei: $value';
   }
 
   @override
-  String drawer_grade_core(int counted, int total) {
+  String reports_grade_core(int counted, int total) {
     return 'Kern op niveau: $counted / $total';
   }
 
   @override
-  String drawer_grade_extension(int counted, int total) {
+  String reports_grade_extension(int counted, int total) {
     return 'Uitbreiding beheerst: $counted / $total';
   }
 
   @override
-  String drawer_grade_hard(int counted, int total) {
+  String reports_grade_hard(int counted, int total) {
     return 'Aangetoond op moeilijk: $counted / $total beheerst';
   }
 
   @override
-  String drawer_grade_reliability(
+  String reports_grade_reliability(
     int stale,
     int never,
     int supervised,
@@ -251,40 +308,40 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
-  String drawer_grade_formulaVersion(String version, String ts) {
+  String reports_grade_formulaVersion(String version, String ts) {
     return 'Formule v$version, berekend $ts';
   }
 
   @override
-  String get drawer_grade_justification_title => 'Verantwoording';
+  String get reports_grade_justification_title => 'Verantwoording';
 
   @override
-  String drawer_grade_justification_failed(String error) {
+  String reports_grade_justification_failed(String error) {
     return 'De verantwoording kon niet geschreven worden: $error';
   }
 
   @override
-  String get drawer_grade_adjusted_label => 'Punt voor het rapport';
+  String get reports_grade_adjusted_label => 'Punt voor het rapport';
 
   @override
-  String get drawer_grade_adjusted_invalid =>
+  String get reports_grade_adjusted_invalid =>
       'Geef een geheel getal van 0 tot 100.';
 
   @override
-  String get drawer_grade_note_label => 'Reden voor aanpassing (optioneel)';
+  String get reports_grade_note_label => 'Reden voor aanpassing (optioneel)';
 
   @override
-  String drawer_grade_signed(String ts, int grade) {
+  String reports_grade_signed(String ts, int grade) {
     return 'Afgetekend $ts: $grade/100';
   }
 
   @override
-  String drawer_grade_signed_note(String note) {
+  String reports_grade_signed_note(String note) {
     return 'Opmerking: $note';
   }
 
   @override
-  String drawer_grade_failed(String error) {
+  String reports_grade_failed(String error) {
     return 'Het voorstel kon niet berekend worden: $error';
   }
 
