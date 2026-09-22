@@ -585,6 +585,23 @@ Finder optionsScrollable() => find
     .descendant(of: find.byType(OptionsPage), matching: find.byType(Scrollable))
     .first;
 
+/// The Students page's free-text search box, and the class-name field of the
+/// "Assign class" dialog it opens (#158).
+///
+/// Same rule as [optionsScrollable], one level in: these two were
+/// `find.byType(TextField).first` and `.last`, which only worked because the
+/// page happens to lay its fields out in that order. Add one field above the
+/// search box, or leave a dialog open that keeps a field of its own, and the
+/// ordinal re-points at a different widget — the flow then fails somewhere
+/// unrelated, with nothing static to warn anyone. Both keys come from
+/// `lib/features/account/accounts_page.dart`, so the key guard in
+/// `test/tooling/integration_flow_symbols_test.dart` keeps them honest.
+Finder studentsSearchField() => find.byKey(const Key('students-search-field'));
+
+/// The class-name field of the "Assign class" dialog — the per-row one and
+/// the bulk one are the same widget. See [studentsSearchField].
+Finder classNameField() => find.byKey(const Key('class-name-field'));
+
 /// Pumps real frames until [condition] holds. Preferred over
 /// `pumpAndSettle` here: the code editor's cursor blink and the 5 s Cosmos
 /// polls mean the app never fully settles.

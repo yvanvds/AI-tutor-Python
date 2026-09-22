@@ -356,6 +356,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       children: [
         Expanded(
           child: TextField(
+            // Named so a flow can ask for the search box instead of taking
+            // whichever TextField happens to come first (#158).
+            key: const Key('students-search-field'),
             controller: _searchCtrl,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
@@ -883,6 +886,10 @@ class _ClassNameDialogState extends State<_ClassNameDialog> {
       content: SizedBox(
         width: 320,
         child: TextField(
+          // Named for the same reason as the search box above (#158): the
+          // page behind this dialog has a TextField of its own, so a flow
+          // reaching for `.last` was only ever right by accident.
+          key: const Key('class-name-field'),
           controller: _ctrl,
           autofocus: true,
           decoration: InputDecoration(

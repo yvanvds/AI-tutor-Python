@@ -81,8 +81,14 @@ jobs:
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test integration_test packages/py_runner
 
+      # `integration_test` is analysed too (#155). It was missing while the
+      # format gate above already covered it, which made this gate weaker than
+      # the bare `flutter analyze` run locally: a flow naming a widget class
+      # that lib/ no longer has is an unresolved identifier the analyzer would
+      # report in a second, and without this it was instead found — if at all —
+      # by the Windows integration job below, ten minutes later.
       - name: Analyze
-        run: flutter analyze lib test
+        run: flutter analyze lib test integration_test
 
       - name: Test with coverage
         run: flutter test --coverage
