@@ -4,29 +4,36 @@
 //      the period start: `period_start_snapshots` gets one doc for the
 //      started milestone, with per-LO mastery and difficulty ratchet as of
 //      `periodStart`; a milestone whose period has not started gets none.
-//   2. Later in the period the teacher computes the proposal: M_start comes
-//      from that doc — the same §2.3 arithmetic as M_end, expected level
-//      included — and the drawer says so. The `progress_history` estimate
-//      is only the fallback for a period without a snapshot
-//      (grade_proposal.dart covers it).
+//   2. Later in the period the teacher computes the proposal on the Reports
+//      page (#148): M_start comes from that doc — the same §2.3 arithmetic
+//      as M_end, expected level included — and the page says so. The
+//      `progress_history` estimate is only the fallback for a period without
+//      a snapshot (grade_proposal.dart covers it).
 //
 // Real app both times: the student's real session start (TutorService →
-// snapshot service → Cosmos), then the real Students page and drawer over
-// the in-memory Cosmos. No model call is needed for the number.
+// snapshot service → Cosmos), then the real Reports page over the in-memory
+// Cosmos. Only the justification the single-student action asks for is
+// scripted; the number itself is never a model call.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
 //   flutter test integration_test/flows/period_start_snapshot.dart -d windows
 
-import 'package:ai_tutor_python/features/account/accounts_page.dart';
-import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
+import 'package:ai_tutor_python/features/reports/reports_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import '../harness/app_harness.dart';
+import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
+
+/// The prose the Reports page asks the model for once the number is in. This
+/// flow is about the number, not the sentence — it is scripted only so the
+/// single-student action runs the way it does in production.
+const String _justification =
+    'Sam toonde print() binnen de periode op moeilijk niveau aan.';
 
 final DateTime _now = DateTime.now().toUtc();
 final DateTime _periodStart = _now.subtract(const Duration(days: 10));
@@ -83,25 +90,6 @@ Map<String, dynamic> _sample(String goalId, double progress, int daysAgo) {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  Finder drawerList() => find
-      .descendant(
-        of: find.byType(StudentDetailDrawer),
-        matching: find.byType(Scrollable),
-      )
-      .first;
-
-  /// Scrolls the drawer's *outer* list until [finder] is built (see
-  /// grade_proposal.dart for why not `scrollUntilVisible`).
-  Future<void> reveal(WidgetTester tester, Finder finder) async {
-    for (var i = 0; i < 40 && finder.evaluate().isEmpty; i++) {
-      final position = tester.state<ScrollableState>(drawerList()).position;
-      position.jumpTo(position.maxScrollExtent);
-      await tester.pump();
-    }
-    await tester.ensureVisible(finder);
-    await tester.pump();
-  }
-
   testWidgets('the first student session after the period start freezes it '
       "per LO, and the teacher's proposal reads M_start from that snapshot", (
     tester,
@@ -155,8 +143,10 @@ void main() {
     // v1.0.5 rule would credit k_start = 1 (M_start = 50, proposal 86);
     // the snapshot knows its ratchet stood at medium, below the expected
     // hard: k_start = 0.
+    final llm = ScriptedLlm([_justification]);
     final teacher = AppHarness(
       identity: teacherIdentity,
+      llm: llm,
       extraDocs: {
         'accounts': [accountDoc(studentIdentity)],
         'milestones': [_milestone('m1', periodStart: _periodStart)],
@@ -184,29 +174,40 @@ void main() {
     );
     await teacher.boot(tester);
 
-    await tester.tap(find.byTooltip('Students'));
-    await pumpUntilFound(tester, find.byType(AccountsPage));
-    await pumpUntilFound(tester, find.text('Sam Student'));
-    await tester.tap(find.text('Sam Student'));
-    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    // The Reports page owns this chain since #148; with one milestone in the
+    // container the selector falls back to it.
+    await tester.tap(find.byTooltip('Reports'));
+    await pumpUntilFound(tester, find.byType(ReportsPage));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-milestone')));
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
 
-    await reveal(tester, find.text('Grade proposal'));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-compute')));
-    await reveal(tester, find.byKey(const Key('grade-compute')));
-    await tester.tap(find.byKey(const Key('grade-compute')));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-proposal')));
+    // The single-student action: the deterministic number, then the one
+    // justification call.
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    await pumpUntilFound(tester, find.text(_justification));
+    expect(llm.sends, 1);
 
     // M_end = 50 + 50·(0.6·1 + 0.4·0.5) = 90; M_start = 0 (snapshot);
     // G = 0.9; P = 0.6·90 + 0.4·90 = 90.
     expect(
-      tester.widget<Text>(find.byKey(const Key('grade-proposal'))).data,
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
       '90',
     );
     expect(find.text('Mastery now: 90.0'), findsOneWidget);
     expect(find.text('Mastery at period start: 0.0'), findsOneWidget);
     expect(find.text('Growth: 0.90'), findsOneWidget);
     expect(
-      tester.widget<Text>(find.byKey(const Key('grade-start-source'))).data,
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-start-source')))
+          .data,
       'Period start: exact per-LO snapshot',
     );
 

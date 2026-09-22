@@ -56,12 +56,7 @@ const String _xpWiped = '0 / 500';
 /// and a widget that is built but off-screen would be "tapped" at the wrong
 /// place without a sound.
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
-  final scrollable = find
-      .descendant(
-        of: find.byType(OptionsPage),
-        matching: find.byType(Scrollable),
-      )
-      .first;
+  final scrollable = optionsScrollable();
   // Always search downwards from the top: `scrollUntilVisible` only moves one
   // way, and a flow steps between cards in both directions.
   tester.state<ScrollableState>(scrollable).position.jumpTo(0);

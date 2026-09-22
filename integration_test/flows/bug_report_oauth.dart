@@ -70,12 +70,7 @@ class _MissingPythonLocator implements PyHostLocator {
 /// and a widget that is built but off-screen would be "tapped" at the wrong
 /// place without a sound.
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
-  final scrollable = find
-      .descendant(
-        of: find.byType(OptionsPage),
-        matching: find.byType(Scrollable),
-      )
-      .first;
+  final scrollable = optionsScrollable();
   tester.state<ScrollableState>(scrollable).position.jumpTo(0);
   await tester.pump();
   await tester.scrollUntilVisible(finder, 120, scrollable: scrollable);

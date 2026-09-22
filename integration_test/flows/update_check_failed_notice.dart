@@ -46,7 +46,7 @@ Future<void> _openAbout(WidgetTester tester) async {
   await tester.scrollUntilVisible(
     _aboutCheck,
     200,
-    scrollable: find.byType(Scrollable).first,
+    scrollable: optionsScrollable(),
   );
   await tester.pump();
 }

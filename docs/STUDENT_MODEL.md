@@ -379,6 +379,65 @@ falls back to the `progress_history` rule and says so
 the snapshot alone: it is a fact about the period start, and wiping it
 would let a reset re-take `M_start` at zero.
 
+### `reports` container (#150)
+
+Partitioned `/uid`, one doc per `(uid, milestoneId)` with id
+`{uid}_{milestoneId}`: the **published** report — the frozen,
+student-facing copy of a signed-off grade proposal. The proposal itself is
+already on the server the moment it is computed, so what approval adds is
+publication, not storage.
+
+```
+PublishedReport {
+  id: string              // "{uid}_{milestoneId}"
+  type: "report"
+  uid: string             // partition key
+  milestoneId: string
+  milestoneTitle: string  // copied, so a later rename cannot change what was read
+  dueAt: string           // ISO 8601, the milestone's report moment
+  grade: int              // adjustedGrade ?? proposal
+  justification: string   // the text as published
+  note: string            // the teacher's adjustmentNote; "" when there is none
+  computedAt: string      // when the formula measured ("berekend op")
+  publishedAt: string     // when the report was first released
+  updatedAt: string       // when this copy was last written (see below)
+  formulaVersion: string
+  mStart, mEnd, g, k, u, d: number          // the breakdown a student may recompute
+  coreCounted, coreTotal: int
+  extensionMastered, extensionTotal: int
+  expectedDifficulty: "easy" | "medium" | "hard"
+}
+```
+
+**A separate container, not a `publishedAt` flag on the proposal:** the
+teacher's working doc stays the teacher's, a later recompute can never
+mutate what a student already read, and the student query is trivially
+scoped to their own partition. With master-key auth that is a clean
+boundary, not a privacy one.
+
+**Deliberately not copied** from the proposal: `supervisedTurns` /
+`homeTurns` (a turn tally reads as a surveillance count on a student's own
+page, and PUNTENFORMULE §2.7 already discloses the principle) and
+`staleLoCount` / `neverProbedCount` (teacher diagnostics about how much
+the system knows, which land on a student as an accusation about how much
+they did). Neither is an input to the number a student recomputes.
+
+**Written by the teacher's per-milestone release action**
+(`PublishedReportService.publish`, the Reports page's "Vrijgeven"), which
+publishes every signed-off proposal of that milestone at once. Sign-off is
+per student and takes a couple of evenings; release is one action, pressed
+when the grades go into the report card, so no student reads their grade
+days before a classmate. A milestone nobody released has no docs here at
+all, and a student with no belief data in the period has no proposal to
+sign and is never published.
+
+**Republish, no history.** PUNTENFORMULE §5 freezes the grade, not the
+sentence explaining it, so the teacher can rewrite the justification after
+sign-off (#149). When the report is already out, that rewrite overwrites
+the published copy with a fresh `updatedAt` and no revision record: the
+current text is what the report says. `publishedAt` never moves, and a
+release pressed again for reports nobody touched rewrites nothing.
+
 ## Settled decisions
 
 - **Belief is Beta-distributed**, parameterized by `(α, β)`. Both the

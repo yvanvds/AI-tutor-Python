@@ -101,6 +101,10 @@ class InMemoryCosmos {
     if (sql.contains('c.subgoalId = @sid')) {
       rows = rows.where((d) => d['subgoalId'] == params['@sid']);
     }
+    // Cross-partition: one milestone, every student (#148).
+    if (sql.contains('c.milestoneId = @milestoneId')) {
+      rows = rows.where((d) => d['milestoneId'] == params['@milestoneId']);
+    }
 
     var list = rows.toList();
     if (sql.contains('ORDER BY c.title')) {

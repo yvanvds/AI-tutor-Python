@@ -75,12 +75,7 @@ String _editorText(WidgetTester tester) =>
 /// `ListView` in a real window: a row below the fold is not built yet, and
 /// one that is built but off-screen would be "tapped" at the wrong place.
 Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
-  final scrollable = find
-      .descendant(
-        of: find.byType(OptionsPage),
-        matching: find.byType(Scrollable),
-      )
-      .first;
+  final scrollable = optionsScrollable();
   await tester.scrollUntilVisible(finder, 120, scrollable: scrollable);
   await tester.ensureVisible(finder);
   await tester.pump(const Duration(milliseconds: 200));

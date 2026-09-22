@@ -17,6 +17,7 @@ const String _playgroundFilesContainer = 'playground_files';
 const String _milestonesContainer = 'milestones';
 const String _gradeProposalsContainer = 'grade_proposals';
 const String _periodStartSnapshotsContainer = 'period_start_snapshots';
+const String _reportsContainer = 'reports';
 
 /// Constant partition-key values for the single-partition containers
 /// (`goals`, `instructions`, `config`, `content`, `modules`, `milestones`).
@@ -104,4 +105,11 @@ class CosmosPaths {
   /// grade formula as `M_start` (#110, PUNTENFORMULE §2.4).
   static CosmosContainer periodStartSnapshots() =>
       _client.container(_periodStartSnapshotsContainer);
+
+  /// `/uid` partition. Doc id `${uid}_${milestoneId}`: the published report
+  /// of one student on one milestone — the frozen, student-facing copy of a
+  /// signed-off grade proposal, written by the teacher's per-milestone
+  /// release action (#150). The only grading container a student reads, and
+  /// only their own partition of it.
+  static CosmosContainer reports() => _client.container(_reportsContainer);
 }

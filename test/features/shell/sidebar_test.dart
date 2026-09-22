@@ -10,6 +10,22 @@
 // Issue #129 — the grade formula document is a section of its own, in the
 // student group, so every signed-in user (a teacher included) can open it.
 //
+// Issue #151 — "My reports" is a second student-group section, next to the
+// formula. Unlike the formula it is student-only: it lists the signed-in
+// user's own published reports, and a teacher is never graded, so they get
+// the class-wide "Reports" of #148 instead.
+//
+// Issue #156 — the rail has to fit. It grew a section per feature until it
+// was 25 px short of the 720 px window the Windows runner creates, and the
+// tenth entry overflowed it by 21 px — which only the end-to-end run found,
+// because nothing here said "the rail must fit". The two height tests below
+// are that missing statement: at 720 px every entry is reachable *without*
+// scrolling (the flows tap `find.byTooltip('Reports')` with no
+// `ensureVisible`) with a whole entry of slack left over, and on anything
+// shorter the destinations scroll instead of overflowing while Options and
+// sign-out stay pinned. An eleventh entry now fails here, cheaply, instead
+// of in a Windows integration run.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
 // what a signed-in user actually sees in the navigation rail.
@@ -19,6 +35,7 @@
 
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
+import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -61,8 +78,9 @@ void main() {
     WidgetTester tester, {
     required Profile profile,
     required bool devTools,
+    Size window = const Size(1400, 900),
   }) async {
-    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.physicalSize = window;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(buildApp(profile: profile, devTools: devTools));
@@ -168,6 +186,168 @@ void main() {
       tester.getTopLeft(entry).dy,
       lessThan(tester.getTopLeft(find.text('TEACHER')).dy),
     );
+  });
+
+  testWidgets('student sees the My reports entry and tapping it routes to '
+      'the section', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+    final container = containerOf(tester);
+
+    expect(find.byTooltip('My reports'), findsOneWidget);
+    // The teacher's class-wide run is a different section, and a student has
+    // no entry for it.
+    expect(find.byTooltip('Reports'), findsNothing);
+
+    await tester.tap(find.byTooltip('My reports'));
+    await tester.pump();
+
+    expect(container.read(sectionProvider), Section.myReports);
+  });
+
+  testWidgets('a teacher gets the class-wide Reports and not My reports', (
+    tester,
+  ) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    expect(find.byTooltip('My reports'), findsNothing);
+    final classWide = find.byTooltip('Reports');
+    expect(classWide, findsOneWidget);
+    expect(
+      tester.getTopLeft(classWide).dy,
+      greaterThan(tester.getTopLeft(find.text('TEACHER')).dy),
+    );
+  });
+
+  /// The scrolling half of the rail — the destinations, without the pinned
+  /// Options + sign-out strip below it (#156).
+  Finder destinations() => find.byKey(const Key('sidebar-destinations'));
+
+  ScrollPosition railScroll(WidgetTester tester) => tester
+      .state<ScrollableState>(
+        find.descendant(of: destinations(), matching: find.byType(Scrollable)),
+      )
+      .position;
+
+  /// The room left under the last destination before the pinned strip — how
+  /// many more entries the rail could take at this window height.
+  double slackUnder(WidgetTester tester, Finder lastEntry) =>
+      tester.getRect(destinations()).bottom - tester.getRect(lastEntry).bottom;
+
+  // A teacher with developer tools is the tallest the rail ever gets: every
+  // student section they are shown, every teacher section including the
+  // developer-gated instructions editor.
+  const teacherEntries = [
+    'Session',
+    'Learning path',
+    'Grade formula',
+    'Goals',
+    'Lesson content',
+    'Instructions',
+    'Students',
+    'Milestones',
+    'Reports',
+  ];
+
+  testWidgets('the tallest rail fits the runner window with every entry '
+      'reachable without scrolling and an entry of slack to spare', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      profile: _teacher,
+      devTools: true,
+      window: const Size(1280, 720),
+    );
+
+    for (final entry in teacherEntries) {
+      expect(find.byTooltip(entry), findsOneWidget, reason: entry);
+    }
+    // Nothing to scroll: every entry is on screen, which is what the
+    // end-to-end flows that tap an entry straight away depend on.
+    expect(
+      railScroll(tester).maxScrollExtent,
+      0,
+      reason:
+          'the rail does not fit a 720 px window — it is '
+          '${railScroll(tester).maxScrollExtent} px too tall, so an entry is '
+          'only reachable by scrolling',
+    );
+    // ... and with room for the next feature that wants one, so the entry
+    // after this does not land on the edge again.
+    expect(
+      slackUnder(tester, find.byTooltip('Reports')),
+      greaterThanOrEqualTo(sidebarItemExtent),
+      reason:
+          'the rail has less than one entry of room left at 720 px; tighten '
+          'it before adding another section',
+    );
+
+    // The pinned strip is on screen too, at the bottom of the rail.
+    final rail = tester.getRect(find.byType(Sidebar));
+    for (final entry in ['Options', 'Sign out']) {
+      final rect = tester.getRect(find.byTooltip(entry));
+      expect(rect.bottom, lessThanOrEqualTo(rail.bottom), reason: entry);
+      expect(rect.top, greaterThan(tester.getRect(destinations()).top));
+    }
+    expect(
+      tester.getRect(find.byTooltip('Sign out')).bottom,
+      closeTo(rail.bottom - AppSpacing.m, 0.01),
+    );
+
+    // No `ensureVisible` — a flow taps the last entry as it is.
+    await tester.tap(find.byTooltip('Reports'));
+    await tester.pump();
+    expect(containerOf(tester).read(sectionProvider), Section.reports);
+  });
+
+  for (final height in [600.0, 480.0]) {
+    testWidgets('at ${height.toInt()} px the destinations scroll instead of '
+        'overflowing, Options and sign-out stay pinned, and every entry is '
+        'still reachable', (tester) async {
+      await mount(
+        tester,
+        profile: _teacher,
+        devTools: true,
+        window: Size(1280, height),
+      );
+
+      // A RenderFlex overflow is an exception, so getting this far is half
+      // the assertion; say it out loud for the failure message.
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'the rail overflowed a ${height.toInt()} px window',
+      );
+      expect(railScroll(tester).maxScrollExtent, greaterThan(0));
+
+      // The bottom strip never scrolls away: it is outside the scroll view.
+      final rail = tester.getRect(find.byType(Sidebar));
+      expect(
+        tester.getRect(find.byTooltip('Sign out')).bottom,
+        closeTo(rail.bottom - AppSpacing.m, 0.01),
+      );
+      await tester.tap(find.byTooltip('Options'));
+      await tester.pump();
+      expect(containerOf(tester).read(sectionProvider), Section.options);
+
+      // And every destination can still be reached, the last one included.
+      for (final entry in teacherEntries) {
+        await tester.ensureVisible(find.byTooltip(entry));
+        await tester.pump();
+      }
+      await tester.tap(find.byTooltip('Reports'));
+      await tester.pump();
+      expect(containerOf(tester).read(sectionProvider), Section.reports);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('Section.myReports is the one student-only section', () {
+    expect(Section.values.where((s) => s.isStudentOnly), [Section.myReports]);
+    expect(Section.myReports.isTeacherOnly, isFalse);
+    expect(Section.myReports.isDeveloperOnly, isFalse);
+    expect(Section.reports.isTeacherOnly, isTrue);
+    expect(Section.reports.isStudentOnly, isFalse);
   });
 
   test('Section.puntenformule is reachable by students', () {

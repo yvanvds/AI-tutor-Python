@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-11.
+schaduwperiode (zie §4). Laatste wijziging: 2026-09-22.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -18,8 +18,11 @@ Drie afspraken vooraf:
    dit document.
 3. **De AI kiest nooit het punt.** De formule berekent het getal; de AI
    schrijft alleen de tekstuele verantwoording erbij; de leerkracht kan het
-   voorstel aanpassen en zet de handtekening. Punten verschijnen alleen op
-   het rapport, nooit live in de app.
+   voorstel aanpassen en zet de handtekening. Punten verschijnen pas op een
+   rapportmoment, nooit live tijdens het werk: wanneer het punt op het
+   rapport gaat, geeft de leerkracht het vrij en lees je in de app het
+   afgetekende rapport met de verantwoording erbij (§2.9). Tussentijds zie
+   je je voortgang, geen cijfer (§1.7).
 
 ---
 
@@ -342,8 +345,11 @@ verantwoording, naar de leerkracht. De verantwoording wordt door de AI
 geschreven op basis van je statusrapporten en je voortgangshistoriek en
 legt uit *waarom* de cijfers zijn wat ze zijn — ze bevat geen eigen
 oordeel over het punt. De leerkracht kan het voorstel aanpassen voor
-context die het systeem niet ziet, en tekent af. Het getekende punt is
-het rapportpunt.
+context die het systeem niet ziet, kan de verantwoording ook zelf
+herschrijven — ook nog na het aftekenen, wanneer een gesprek met jou de
+eerste formulering achterhaald heeft — en tekent af. Het getekende punt is
+het rapportpunt; aan het getal verandert een herschreven tekst niets
+(§3.3).
 
 ### 2.7 Herkomst van bewijs: klas en thuis
 
@@ -411,6 +417,39 @@ niemand oneerlijk raakt:
 
 Samen betekenen ze: wie vroeg klaar was en gewoon is blijven werken,
 staat er op het rapportmoment vers en terecht goed voor.
+
+### 2.9 Je rapport in de app
+
+Het afgetekende punt blijft niet bij de leerkracht liggen. Per mijlpaal
+geeft de leerkracht de afgetekende rapporten in één keer vrij — op het
+moment dat de punten op het rapport gaan, zodat niemand zijn punt dagen
+vóór een klasgenoot te zien krijgt. Wat vrijgegeven is, staat in de app
+onder **Mijn rapporten**: alleen je eigen rapporten, nieuwste eerst.
+
+Bovenaan staat waar het om gaat: het punt en de verantwoording erbij, plus
+de opmerking van de leerkracht als die er een schreef. Daaronder,
+opgevouwen tot je ze opent, de cijfers om het na te rekenen — M_start en
+M_eind, G, en k, u en d met de kern- en uitbreidingsaantallen en het
+verwachte niveau van de mijlpaal. Dit document nodigt je uit om je eigen
+punt na te rekenen, dus horen die cijfers erbij; maar een rapport opent met
+een punt en een uitleg, niet met een formule.
+
+Er staat ook **berekend op [datum]**. Dat is niet automatisch de datum van
+de mijlpaal: de leerkracht kiest zelf wanneer de berekening loopt. Wie tot
+dat moment is blijven doorwerken, zag dat werk nog meetellen — daarom
+staat die datum erbij, zodat een verschil met een klasgenoot geen raadsel
+is.
+
+Twee dingen staan er bewust *niet* op: hoeveel beurten je in de klas dan
+wel thuis maakte, en hoeveel mijlpaal-leerdoelen als verouderd of
+nooit-bevraagd gemeld werden. Het eerste is een principe dat §2.7 al
+openlijk uitlegt, het tweede is een betrouwbaarheidssignaal voor de
+leerkracht (§3.2). Geen van beide gaat in het getal, en op je eigen
+rapportpagina zouden ze lezen als een tellertje over jou in plaats van als
+een punt met een uitleg. Wat wél vrijgegeven is, ligt vast: het wordt niet
+herrekend wanneer je daarna verder werkt (§5). Herschrijft de leerkracht
+achteraf nog de verantwoording, dan wordt die kopie met de nieuwe tekst
+opnieuw vrijgegeven; het punt blijft wat het was.
 
 ---
 
@@ -493,6 +532,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.6 | 2026-09-03 | Geen structuurwijziging. §1.2: signalen van de grader op een leerdoel uit een eerder subdoel tellen nu ook echt mee in de code (voorheen liet de tutor ze vallen): met de opgegeven sterkte, gerekend als gemiddeld, zonder de ratel van §2.5 of de voortgangsbalkjes te bewegen. §2.8 verduidelijkt dat een benoemd gat in oude leerstof via zo'n signaal loopt, niet via transfer-krediet (#108). |
 | 1.0.7 | 2026-09-03 | Geen structuurwijziging. §2.4: M_start komt nu uit een exacte momentopname per leerdoel bij de periodestart (beheerst? en ratel, teruggerekend naar dat moment), geschreven door de app bij de eerste sessie na de periodestart, en volgt uit dezelfde formule als M_eind, verwacht niveau inbegrepen. De regel van v1.0.5 (fractie per subdoel uit de historiek, d_start = 0) blijft alleen als overgangsregel voor een periode zonder momentopname; het voorstel vermeldt welke van de twee gebruikt is (#110). |
 | 1.0.8 | 2026-09-11 | Geen structuurwijziging. §2.8 en bijlage A: een opfrisvraag wacht niet langer altijd 30 dagen — een eerder beheerst leerdoel waarin een later signaal op een eerder subdoel (§1.2) een gat blootlegt, wordt bij de eerstvolgende sessiestart opgefrist (markering `regressedAt`, gewist door de eerstvolgende rechtstreekse meting of door een onrechtstreekse schrijving die de beheersing herstelt) en gaat voor op de gewoon-verouderde leerdoelen. Beschrijft gedrag dat sinds #112 in de code staat; de formule van deel 2 verandert niet (#113). |
+| 1.0.9 | 2026-09-22 | Geen structuurwijziging. De app is nu ook het kanaal waarlangs je je rapport leest (#148–#151), dus afspraak 3 vooraan zegt "punten verschijnen pas op een rapportmoment, nooit live tijdens het werk" in plaats van "alleen op het rapport, nooit live in de app": de regel van #99 blijft dezelfde — een vrijgegeven, bevroren rapport *is* het rapportmoment — en §1.7 blijft onaangeroerd. Nieuw §2.9: wat je onder "Mijn rapporten" ziet (punt en verantwoording eerst, de berekening opgevouwen eronder, **berekend op [datum]** omdat de leerkracht zelf kiest wanneer gerekend wordt) en wat er bewust niet op staat (beurten klas/thuis, verouderde of nooit-bevraagde leerdoelen). §2.6: de leerkracht kan de verantwoording ook zelf herschrijven, ook na het aftekenen, zonder het getal te raken (#149). Bijlage A: de Rapporten-pagina en de berekening per klas, `justificationSource`, de container `reports` en de leerlingpagina. Omdat dit een afspraak herformuleert, gaat ze zoals §5 vraagt in bij het begin van een rapportperiode en wordt ze in de klas toegelicht (#152). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -587,9 +627,8 @@ dat leerdoel (gewicht van §1.2, herkomst van §2.7, ratel van §2.5), telt
 niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
 de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
 code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
-uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel
-in het leerlingoverzicht — μ, n en de ratel per leerdoel na decay op het
-moment van berekenen, M_start uit de momentopname van de periodestart
+uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel —
+μ, n en de ratel per leerdoel na decay op het moment van berekenen, M_start uit de momentopname van de periodestart
 volgens §2.4 (sinds v1.0.7; uit de historiek voor een periode zonder
 momentopname, en het voorstel vermeldt welke) — vraagt de
 verantwoording aan de AI (die het getal als vaststaand feit meekrijgt,
@@ -597,7 +636,23 @@ samen met de statusrapporten uit de periode en het verloop per subdoel),
 past aan en tekent af. Het voorstel meldt ook de eerlijke
 onzekerheidssignalen van §3.2: hoeveel mijlpaal-leerdoelen al langer dan
 30 dagen niet meer geschreven zijn (of nooit bevraagd), en hoeveel beurten
-in de periode onder toezicht dan wel thuis gebeurden. Van §2.7 staat de weging in de code
+in de periode onder toezicht dan wel thuis gebeurden. Sinds v1.0.9 staat de
+rest van de rapportketen erbij: de leerkracht rekent, verantwoordt, past aan
+en tekent af op de Rapporten-pagina
+(`lib/features/reports/reports_page.dart`, de berekening voor een hele klas
+in `lib/services/grading/report_batch.dart`) — het "moment van berekenen"
+is het moment waarop die pagina de berekening start, niet de vervaldatum van
+de mijlpaal; de verantwoording is daar ook met de hand herschrijfbaar, vóór
+en na het aftekenen (`justificationSource` = `ai` of `edited`: alleen
+herkomst, nooit input voor het getal, §3.3); en het vrijgeven van een
+mijlpaal schrijft per leerling een bevroren kopie in de container `reports`
+(`lib/services/grading/published_report.dart` en
+`published_report_service.dart`) met precies de velden van §2.9, dus zonder
+`supervisedTurns`/`homeTurns` en zonder `staleLoCount`/`neverProbedCount`.
+De leerling leest die kopie — en alleen de eigen kopie — in
+`lib/features/my_reports/my_reports_page.dart`; een herschreven
+verantwoording overschrijft ze (`updatedAt` beweegt, `publishedAt` niet)
+zonder het punt te raken. Van §2.7 staat de weging in de code
 (elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
 s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
 tot die er is, telt elke beurt als thuis en verandert s niets.

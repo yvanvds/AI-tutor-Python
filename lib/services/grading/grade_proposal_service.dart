@@ -5,7 +5,9 @@
 // Three steps, each persisted on the same doc:
 //   1. [compute]          — the deterministic number from the student model
 //                           (`grade_formula.dart`), no LLM involved;
-//   2. [writeJustification] — the AI-written narrative around that number;
+//   2. [writeJustification] — the AI-written narrative around that number,
+//                           which [editJustification] lets the teacher
+//                           rewrite in their own words (#149);
 //   3. [signOff]          — the teacher's (possibly adjusted) grade, after
 //                           which the doc is frozen (§5: never recomputed).
 
@@ -120,6 +122,39 @@ class GradeProposalService {
     ),
   );
 
+  /// Every stored proposal for one milestone, across students (#148).
+  ///
+  /// Cross-partition by necessity — the container is partitioned by `/uid`
+  /// and the Reports page asks the other question ("this milestone, every
+  /// student"). A handful of docs per milestone, read once when the teacher
+  /// picks one.
+  Future<List<GradeProposal>> getForMilestone(String milestoneId) =>
+      safeCosmos(() async {
+        final docs = await _container.query(
+          'SELECT * FROM c WHERE c.milestoneId = @milestoneId',
+          parameters: {'@milestoneId': milestoneId},
+          crossPartition: true,
+        );
+        return docs.map(GradeProposal.fromCosmos).toList();
+      });
+
+  /// Milestone ids that already have at least one stored proposal (#148).
+  /// The Milestones page flags an overdue milestone that has none — the
+  /// silent pass that prompted the issue.
+  Future<Set<String>> milestoneIdsWithProposals() => safeCosmos(() async {
+    final docs = await _container.query(
+      'SELECT c.milestoneId FROM c',
+      crossPartition: true,
+    );
+    return {
+      for (final doc in docs)
+        if (doc['milestoneId'] is String) doc['milestoneId'] as String,
+    };
+  });
+
+  Stream<Set<String>> watchMilestoneIdsWithProposals() =>
+      safeCosmosStream(pollingStream(milestoneIdsWithProposals));
+
   Future<void> _save(GradeProposal p) =>
       safeCosmos(() => _container.upsert(p.toMap(), partitionKey: p.uid));
 
@@ -128,10 +163,11 @@ class GradeProposalService {
   /// The proposal for [uid] on [milestone] as of now, persisted as a draft.
   ///
   /// A signed-off proposal is returned as stored, untouched: grades on a
-  /// report card are never recomputed (§5). A draft is recomputed; its
-  /// justification survives only when the number did not move (a
-  /// narrative written for another number would mislead), the teacher's
-  /// adjustment and note always survive.
+  /// report card are never recomputed (§5). A draft is recomputed; an
+  /// AI-written justification survives only when the number did not move (a
+  /// narrative written for another number would mislead), a teacher-written
+  /// one always survives and is flagged stale when the number moved under
+  /// it (#149), and the teacher's adjustment and note always survive.
   Future<GradeProposal> compute({
     required String uid,
     required Milestone milestone,
@@ -212,7 +248,17 @@ class GradeProposalService {
       }
     }
 
-    final keepJustification = stored != null && stored.proposal == proposal;
+    // The justification's fate on a recompute (#149). AI prose written
+    // around a number that has since moved would mislead, so it goes. Prose
+    // the teacher typed is theirs: it survives the move and is flagged
+    // stale, for them to reread rather than for us to delete. Staleness,
+    // once set, only a rewrite clears.
+    final sameNumber = stored != null && stored.proposal == proposal;
+    final teacherWrote =
+        stored?.justificationSource == JustificationSource.edited;
+    final kept = stored?.justification != null && (sameNumber || teacherWrote)
+        ? stored
+        : null;
     final result = GradeProposal(
       uid: uid,
       milestoneId: milestone.id,
@@ -237,8 +283,12 @@ class GradeProposalService {
       homeTurns: home,
       mStartSource: mStartSource,
       mStartInexactCount: mStartInexact,
-      justification: keepJustification ? stored.justification : null,
-      justificationAt: keepJustification ? stored.justificationAt : null,
+      justification: kept?.justification,
+      justificationAt: kept?.justificationAt,
+      justificationSource: kept?.justificationSource ?? JustificationSource.ai,
+      justificationEditedAt: kept?.justificationEditedAt,
+      justificationStale:
+          kept != null && (!sameNumber || kept.justificationStale),
       adjustedGrade: stored?.adjustedGrade,
       adjustmentNote: stored?.adjustmentNote ?? '',
     );
@@ -315,10 +365,43 @@ class GradeProposalService {
         final updated = proposal.copyWith(
           justification: text,
           justificationAt: now,
+          justificationSource: JustificationSource.ai,
+          justificationStale: false,
         );
         await _save(updated);
         return updated;
     }
+  }
+
+  /// Replaces the justification with [text], the teacher's own (#149).
+  ///
+  /// Prose only. PUNTENFORMULE §3.3 keeps the two apart — the formula
+  /// computes, the teacher signs — so nothing the formula reads is touched
+  /// here, and a signed-off doc keeps its number and its signature: §5
+  /// freezes the grade, not the sentence explaining it. That is what makes
+  /// a rewrite after a conversation with the student possible at all.
+  ///
+  /// The text is recorded as teacher-written, so a later recompute keeps it
+  /// (flagging it stale if the number moved) instead of dropping it, and
+  /// the class batch leaves that student's model call unspent.
+  Future<GradeProposal> editJustification({
+    required GradeProposal proposal,
+    required String text,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(text, 'text', 'justification cannot be empty');
+    }
+    final now = _now();
+    final edited = proposal.copyWith(
+      justification: trimmed,
+      justificationAt: proposal.justificationAt ?? now,
+      justificationSource: JustificationSource.edited,
+      justificationEditedAt: now,
+      justificationStale: false,
+    );
+    await _save(edited);
+    return edited;
   }
 
   // ---- 3. the signature ---------------------------------------------------------

@@ -1,22 +1,37 @@
-// End-to-end (#99): the periodic grade proposal, teacher side.
+// End-to-end (#99, #148, #149, #150): the periodic grade proposal, teacher
+// side, now as a class-wide workflow that ends in a published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
-//      period — and it lands in `milestones`.
-//   2. In a student's detail drawer the teacher computes the proposal
-//      against a seeded milestone: the number is the formula's, from the
-//      seeded beliefs and history (PUNTENFORMULE bijlage B arithmetic;
-//      M_start from the history estimate, as no period-start snapshot was
-//      taken for this student — period_start_snapshot.dart drives the
-//      exact path, #110);
-//      asks the model for the justification — the prompt carries that
-//      number as a fixed fact and only the period's status reports; adjusts
-//      the grade with a note; signs off. The `grade_proposals` doc holds
-//      the computed number, the model's text and the teacher's decision.
-//   3. A student's shell has no Milestones entry at all.
+//      period — and it lands in `milestones`. A milestone whose report date
+//      has gone by with nothing generated for it is flagged in that list
+//      (#148), and the flag clears once the reports exist.
+//   2. On the Reports page the teacher picks the milestone (the selector
+//      shows its title — an untitled milestone used to make it render
+//      blank), narrows to one class and presses "Generate reports". The
+//      batch computes the deterministic number for every student in one
+//      pass (PUNTENFORMULE bijlage B arithmetic; M_start from the history
+//      estimate, as no period-start snapshot was taken for this student —
+//      period_start_snapshot.dart drives the exact path, #110) and asks the
+//      model for one justification per student who needs one. A student
+//      with no belief data on the milestone lands on "no data" instead of a
+//      computed 0, and costs no model call. The teacher then walks the
+//      class in the detail pane, adjusts a grade with a note and signs off.
+//   3. The justification is the teacher's to rewrite (#149), before signing
+//      and after: a recompute that moves the number drops AI prose but
+//      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
+//      not the sentence explaining it.
+//   4. Nothing reaches a student until the teacher presses "Release" (#150),
+//      once per milestone: every signed-off report becomes a frozen doc in
+//      the `reports` container, carrying the grade, the prose and the
+//      breakdown — and deliberately not the turn tally or the staleness
+//      diagnostics. A rewrite after release republishes that one copy.
+//   5. The student detail drawer no longer carries any of this: sign-off
+//      lives in exactly one place.
+//   6. A student's shell has no Milestones and no Reports entry at all.
 //
-// Real app, real navigation, the real Students page and drawer over the
-// in-memory Cosmos; only the model is scripted.
+// Real app, real navigation, the real Students page, Milestones page and
+// Reports page over the in-memory Cosmos; only the model is scripted.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -26,6 +41,7 @@
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
+import 'package:ai_tutor_python/features/reports/reports_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -37,6 +53,9 @@ import '../harness/seed.dart';
 const String kJustification =
     'Sam beheerst de kern en toonde print() op moeilijk niveau aan.';
 
+/// A classmate of Sam's who never worked on the milestone's objectives.
+const String kQuietUid = 'it-quiet';
+
 final DateTime _now = DateTime.now().toUtc();
 final DateTime _periodStart = _now.subtract(const Duration(days: 30));
 
@@ -47,12 +66,13 @@ Map<String, dynamic> _belief(
   required double beta,
   required int daysAgo,
   required String highest,
+  String uid = kStudentUid,
 }) {
   final at = _now.subtract(Duration(days: daysAgo)).toIso8601String();
   return {
-    'id': '${kStudentUid}_${subgoalId}_$loId',
+    'id': '${uid}_${subgoalId}_$loId',
     'type': 'lo_belief',
-    'uid': kStudentUid,
+    'uid': uid,
     'subgoalId': subgoalId,
     'loId': loId,
     'alpha': alpha,
@@ -65,12 +85,16 @@ Map<String, dynamic> _belief(
   };
 }
 
-Map<String, dynamic> _milestone() => {
-  'id': 'm1',
+Map<String, dynamic> _milestone({
+  String id = 'm1',
+  String title = 'Rapport 1',
+  int dueInDays = 7,
+}) => {
+  'id': id,
   'type': 'milestone',
-  'title': 'Rapport 1',
+  'title': title,
   'periodStart': _periodStart.toIso8601String(),
-  'dueAt': _now.add(const Duration(days: 7)).toIso8601String(),
+  'dueAt': _now.add(Duration(days: dueInDays)).toIso8601String(),
   'expectedDifficulty': 'medium',
   'subgoalIds': ['s1', 's2'],
   'coreLoKeys': ['s1/lo-print'],
@@ -96,31 +120,73 @@ Map<String, dynamic> _report(String goalId, String text, int daysAgo) => {
   'updatedAt': _now.subtract(Duration(days: daysAgo)).toIso8601String(),
 };
 
+/// The seeded student, plus a classmate in the same class who has no belief
+/// data at all. Both carry the class the Reports page filters on.
+List<Map<String, dynamic>> _classDocs() => [
+  {...accountDoc(studentIdentity), 'className': '5A'},
+  {
+    'id': kQuietUid,
+    'uid': kQuietUid,
+    'email': 'kim@example.com',
+    'firstName': 'Kim',
+    'lastName': 'Zwijger',
+    'targetGoal': 'Python',
+    'mayUseGlobalKey': true,
+    'className': '5A',
+    'calibration': {
+      'difficulty': 'medium',
+      'recentAnswers': <String>[],
+      'recentQuestionTypes': <String>[],
+    },
+  },
+];
+
+Map<String, List<Map<String, dynamic>>> _gradedClass() => {
+  'accounts': _classDocs(),
+  'milestones': [_milestone()],
+  'lo_beliefs': [
+    // Core LO, mastered and demonstrated at hard: k = 1, and the one hard
+    // ratchet among the two mastered LOs: d = 0.5.
+    _belief('s1', 'lo-print', alpha: 6, beta: 1, daysAgo: 5, highest: 'hard'),
+    // Extension LO, mastered at medium: u = 1.
+    _belief('s2', 'lo-var', alpha: 5, beta: 1, daysAgo: 3, highest: 'medium'),
+  ],
+  // "Print" was already done before the period (k_start = 1, u_start = 0 →
+  // M_start = 50); "Variables" was finished inside it.
+  'progress_history': [_sample('s1', 1.0, 45), _sample('s2', 1.0, 10)],
+  'status_reports': [
+    _report('s2', 'Werkt vlot met variabelen.', 2),
+    _report('s1', 'OUD RAPPORT van voor de periode.', 60),
+  ],
+};
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  /// The drawer's outer list; the sections below the fold are only built
-  /// once scrolled to.
-  Finder drawerList() => find
-      .descendant(
-        of: find.byType(StudentDetailDrawer),
-        matching: find.byType(Scrollable),
-      )
-      .first;
+  /// Opens the Reports page and waits for the class list to be there.
+  Future<void> openReports(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('Reports'));
+    await pumpUntilFound(tester, find.byType(ReportsPage));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-milestone')));
+  }
 
-  /// Scrolls the drawer's *outer* list to the bottom until [finder] is built,
-  /// then brings it into view. Not `scrollUntilVisible`: that drags at the
-  /// list's centre, which here lands on the nested goal list and scrolls
-  /// that one instead.
-  Future<void> reveal(WidgetTester tester, Finder finder) async {
-    for (var i = 0; i < 40 && finder.evaluate().isEmpty; i++) {
-      final position = tester.state<ScrollableState>(drawerList()).position;
-      position.jumpTo(position.maxScrollExtent);
-      await tester.pump();
-    }
-    await tester.ensureVisible(finder);
+  /// Scrolls [key] into the detail pane's view and taps it. The pane is a
+  /// `ListView`, so an action below the fold is not hit-testable yet.
+  Future<void> tapInDetail(WidgetTester tester, Key key) async {
+    await tester.ensureVisible(find.byKey(key));
+    await tester.pump();
+    await tester.tap(find.byKey(key));
     await tester.pump();
   }
+
+  String chipText(WidgetTester tester, String uid) => tester
+      .widget<Text>(
+        find.descendant(
+          of: find.byKey(Key('reports-status-$uid')),
+          matching: find.byType(Text),
+        ),
+      )
+      .data!;
 
   testWidgets('teacher defines a milestone with an Angoff split and it is '
       'stored', (tester) async {
@@ -168,79 +234,124 @@ void main() {
       DateTime.parse(doc['dueAt'] as String).toLocal().day,
       _now.add(const Duration(days: 40)).toLocal().day,
     );
-    // And the list on the left now shows it.
+    // And the list on the left now shows it — with no overdue flag: the
+    // report date is still ahead.
     await pumpUntilFound(tester, find.byKey(Key('milestone-row-${doc['id']}')));
+    expect(find.byKey(Key('milestone-overdue-${doc['id']}')), findsNothing);
 
     await harness.dispose(tester);
   });
 
-  testWidgets('teacher computes, justifies, adjusts and signs off a grade '
-      'proposal in the student drawer', (tester) async {
+  testWidgets('an untitled milestone cannot be saved from the bottom of the '
+      'editor', (tester) async {
+    final harness = AppHarness(identity: teacherIdentity);
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Milestones'));
+    await pumpUntilFound(tester, find.byType(MilestonesPage));
+    await tester.tap(find.text('New milestone'));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('milestone-due-at')),
+      formatIsoDate(_now.add(const Duration(days: 40))),
+    );
+    await pumpUntilFound(tester, find.byKey(const Key('milestone-subgoal-s1')));
+    await tester.tap(find.byKey(const Key('milestone-subgoal-s1')));
+    await tester.pump();
+
+    await tester.ensureVisible(find.byKey(const Key('milestone-save')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('milestone-save')));
+    await pumpUntilFound(tester, find.byKey(const Key('milestone-save-error')));
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('milestone-save-error'))).data,
+      'Give the milestone a title.',
+    );
+    expect(harness.cosmos['milestones'].docs, isEmpty);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('teacher generates the class\'s reports, walks the list and '
+      'signs one off', (tester) async {
     final llm = ScriptedLlm([kJustification]);
     final harness = AppHarness(
       identity: teacherIdentity,
       llm: llm,
-      extraDocs: {
-        'accounts': [accountDoc(studentIdentity)],
-        'milestones': [_milestone()],
-        'lo_beliefs': [
-          // Core LO, mastered and demonstrated at hard: k = 1, and the one
-          // hard ratchet among the two mastered LOs: d = 0.5.
-          _belief(
-            's1',
-            'lo-print',
-            alpha: 6,
-            beta: 1,
-            daysAgo: 5,
-            highest: 'hard',
-          ),
-          // Extension LO, mastered at medium: u = 1.
-          _belief(
-            's2',
-            'lo-var',
-            alpha: 5,
-            beta: 1,
-            daysAgo: 3,
-            highest: 'medium',
-          ),
-        ],
-        // "Print" was already done before the period (k_start = 1, u_start
-        // = 0 → M_start = 50); "Variables" was finished inside it.
-        'progress_history': [_sample('s1', 1.0, 45), _sample('s2', 1.0, 10)],
-        'status_reports': [
-          _report('s2', 'Werkt vlot met variabelen.', 2),
-          _report('s1', 'OUD RAPPORT van voor de periode.', 60),
-        ],
-      },
+      extraDocs: _gradedClass(),
     );
     await harness.boot(tester);
 
-    await tester.tap(find.byTooltip('Students'));
-    await pumpUntilFound(tester, find.byType(AccountsPage));
-    await pumpUntilFound(tester, find.text('Sam Student'));
-    await tester.tap(find.text('Sam Student'));
-    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    await openReports(tester);
 
-    // The section sits at the bottom of the drawer; the milestone list
-    // arrives on its poll and the earliest milestone is picked by default.
-    await reveal(tester, find.text('Grade proposal'));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-compute')));
-    await reveal(tester, find.byKey(const Key('grade-compute')));
-    await tester.tap(find.byKey(const Key('grade-compute')));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-proposal')));
+    // The selector shows the milestone by name. (An untitled milestone used
+    // to leave this blank — #148.)
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('reports-milestone')),
+        matching: find.text('Rapport 1'),
+      ),
+      findsOneWidget,
+    );
+
+    // Both classmates are listed, on "no data" until the run.
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kQuietUid')));
+    expect(chipText(tester, kStudentUid), 'no data');
+
+    // Narrow to the class, then run the batch.
+    await tester.tap(find.byKey(const Key('reports-class-filter')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('5A').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // The classmate with no belief data is skipped, not handed a 0 — and
+    // cost no model call.
+    expect(chipText(tester, kQuietUid), 'no data');
+    expect(
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kQuietUid'))).data,
+      '—',
+    );
+    expect(llm.sends, 1);
+    expect(harness.cosmos['grade_proposals'].docs.keys, ['${kStudentUid}_m1']);
 
     // M_end = 50 + 50·(0.6·1 + 0.4·0.5) = 90; M_start = 50; G = 0.8;
     // P = 0.6·90 + 0.4·80 = 86.
     expect(
-      tester.widget<Text>(find.byKey(const Key('grade-proposal'))).data,
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
+      '86',
+    );
+
+    // The detail pane carries the whole report.
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
       '86',
     );
     expect(find.text('Mastery now: 90.0'), findsOneWidget);
     expect(find.text('Mastery at period start: 50.0'), findsOneWidget);
-    // No period-start snapshot was ever taken for this student: the
-    // history estimate is the fallback, and the drawer says so (#110).
+    // No period-start snapshot was ever taken for this student: the history
+    // estimate is the fallback, and the page says so (#110).
     expect(
-      tester.widget<Text>(find.byKey(const Key('grade-start-source'))).data,
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-start-source')))
+          .data,
       'Period start: estimate from progress history '
       '(no snapshot for this period)',
     );
@@ -248,36 +359,43 @@ void main() {
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
-    // No model call was needed for the number.
-    expect(llm.sends, 0);
-
-    await reveal(tester, find.byKey(const Key('grade-justify')));
-    await tester.tap(find.byKey(const Key('grade-justify')));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-justification')));
     expect(find.text(kJustification), findsOneWidget);
-    expect(llm.sends, 1);
     // The model was told the number, and only the period's reports.
     final prompt = llm.sentInputs.single;
     expect(prompt, contains('"proposal":86'));
     expect(prompt, contains('Werkt vlot met variabelen.'));
     expect(prompt, isNot(contains('OUD RAPPORT')));
 
+    // Next/prev walk the class without going back to the list.
+    await tester.tap(find.byKey(const Key('reports-next')));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('reports-detail-name'))).data,
+      'Kim Zwijger',
+    );
+    await tester.tap(find.byKey(const Key('reports-previous')));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('reports-detail-name'))).data,
+      'Sam Student',
+    );
+
     // Adjust for what the system cannot see, then sign.
-    await reveal(tester, find.byKey(const Key('grade-sign-off')));
-    await tester.enterText(find.byKey(const Key('grade-adjusted')), '84');
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '84');
     await tester.enterText(
-      find.byKey(const Key('grade-note')),
+      find.byKey(const Key('reports-note')),
       'Ziek in week 3.',
     );
-    await tester.tap(find.byKey(const Key('grade-sign-off')));
-    await pumpUntilFound(tester, find.byKey(const Key('grade-signed')));
+    await tester.tap(find.byKey(const Key('reports-sign-off')));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
     expect(
-      tester.widget<Text>(find.byKey(const Key('grade-signed'))).data,
+      tester.widget<Text>(find.byKey(const Key('reports-signed'))).data,
       contains('84/100'),
     );
+    expect(chipText(tester, kStudentUid), 'signed off');
     // The signed proposal is locked: no recompute, no rewrite.
-    expect(find.byKey(const Key('grade-compute')), findsNothing);
-    expect(find.byKey(const Key('grade-justify')), findsNothing);
+    expect(find.byKey(const Key('reports-run-one')), findsNothing);
+    expect(find.byKey(const Key('reports-sign-off')), findsNothing);
 
     final doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
     expect(doc['proposal'], 86);
@@ -288,12 +406,296 @@ void main() {
     expect(doc['mStartSource'], 'history');
     expect(doc['formulaVersion'], '1.0.7');
 
+    // And the drawer that used to own all of this has let it go.
+    await tester.tap(find.byTooltip('Students'));
+    await pumpUntilFound(tester, find.byType(AccountsPage));
+    await pumpUntilFound(tester, find.text('Sam Student'));
+    await tester.tap(find.text('Sam Student'));
+    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    expect(find.byKey(const Key('grade-milestone')), findsNothing);
+    expect(find.byKey(const Key('grade-compute')), findsNothing);
+
     await harness.dispose(tester);
   });
 
-  testWidgets('a student has no Milestones entry and no grade anywhere', (
+  testWidgets('teacher rewrites the justification; a recompute keeps the text '
+      'and flags it stale, and a signed report can still be rewritten', (
     tester,
   ) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+
+    // One student from the detail pane: compute + one model call.
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+
+    // The model wrote a first draft; the prose is the teacher's (#149).
+    const own = 'Sam legde de lus zelf uit tijdens de les.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('reports-justification-field')),
+          )
+          .controller!
+          .text,
+      kJustification,
+    );
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      own,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(own));
+    expect(find.text(kJustification), findsNothing);
+    expect(
+      find.byKey(const Key('reports-justification-edited')),
+      findsOneWidget,
+    );
+
+    var doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], own);
+    expect(doc['justificationSource'], 'edited');
+    expect(doc['justificationEditedAt'], isA<String>());
+    // Prose only (PUNTENFORMULE §3.3): the number did not move.
+    expect(doc['proposal'], 86);
+
+    // Now the evidence moves under the text: the extension LO is no longer
+    // mastered, so M_end = 70, G = 0.4 and P = 58. AI prose would be
+    // dropped here; the teacher's survives, flagged for rereading — and
+    // costs no second model call.
+    harness.cosmos['lo_beliefs'].upsert(
+      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+    );
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-justification-stale')),
+    );
+    expect(find.text(own), findsOneWidget);
+    expect(llm.sends, 1);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
+      '58',
+    );
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 58);
+    expect(doc['justification'], own);
+    expect(doc['justificationStale'], true);
+
+    // Sign off, then rewrite after a conversation with the student: §5
+    // freezes the grade, not the sentence explaining it.
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '60');
+    await tapInDetail(tester, const Key('reports-sign-off'));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
+
+    const afterTalk = 'Na ons gesprek: Sam had de opdracht wel begrepen.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      afterTalk,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(afterTalk));
+
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], afterTalk);
+    expect(doc['signedOffAt'], isA<String>());
+    expect(doc['adjustedGrade'], 60);
+    expect(doc['proposal'], 58);
+    // The signed report is still locked against a recompute.
+    expect(find.byKey(const Key('reports-run-one')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('nothing reaches a student until the milestone is released, and '
+      'a later rewrite republishes the same doc', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // Sign Sam off — and nothing a student can read exists yet: release is
+    // its own action, pressed once for the whole milestone.
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '84');
+    await tester.enterText(
+      find.byKey(const Key('reports-note')),
+      'Ziek in week 3.',
+    );
+    await tapInDetail(tester, const Key('reports-sign-off'));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
+    expect(harness.cosmos['reports'].docs, isEmpty);
+    expect(find.byKey(const Key('reports-published')), findsNothing);
+    expect(find.byKey(Key('reports-published-$kStudentUid')), findsNothing);
+
+    // The dialog guards an irreversible, class-visible action: cancelling
+    // publishes nothing.
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-cancel')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-cancel')));
+    await pumpUntilGone(
+      tester,
+      find.byKey(const Key('reports-release-cancel')),
+    );
+    expect(harness.cosmos['reports'].docs, isEmpty);
+
+    // Release the milestone.
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-confirm')));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-published')));
+    expect(find.byKey(Key('reports-published-$kStudentUid')), findsOneWidget);
+
+    // Exactly one doc: the classmate with no data in the period has nothing
+    // signed, so they are not published at all.
+    final published = harness.cosmos['reports'].docs;
+    expect(published.keys, ['${kStudentUid}_m1']);
+    final report = published['${kStudentUid}_m1']!;
+    expect(report['type'], 'report');
+    expect(report['uid'], kStudentUid);
+    expect(report['milestoneId'], 'm1');
+    expect(report['milestoneTitle'], 'Rapport 1');
+    // The teacher's number, their note, and the prose as published.
+    expect(report['grade'], 84);
+    expect(report['note'], 'Ziek in week 3.');
+    expect(report['justification'], kJustification);
+    // The breakdown a student may recompute, and when it was measured.
+    expect(report['formulaVersion'], '1.0.7');
+    expect(report['mEnd'], 90);
+    expect(report['mStart'], 50);
+    expect((report['g'] as num).toDouble(), closeTo(0.8, 1e-9));
+    expect(report['coreCounted'], 1);
+    expect(report['coreTotal'], 1);
+    expect(report['extensionMastered'], 1);
+    expect(report['extensionTotal'], 1);
+    expect(report['expectedDifficulty'], 'medium');
+    expect(report['computedAt'], isA<String>());
+    final publishedAt = report['publishedAt'] as String;
+    // What a student's own page must never carry (#150): the turn tally
+    // reads as surveillance, the staleness counts as an accusation.
+    for (final key in const [
+      'supervisedTurns',
+      'homeTurns',
+      'staleLoCount',
+      'neverProbedCount',
+    ]) {
+      expect(
+        report.containsKey(key),
+        isFalse,
+        reason: '$key must not reach the published report',
+      );
+    }
+
+    // PUNTENFORMULE §5 freezes the grade, not the sentence explaining it, so
+    // a rewrite after release is a republish: the same doc, overwritten with
+    // a fresh updatedAt and no revision history. Let the wall clock move
+    // first, so "republished later" is a real comparison.
+    await tester.pump(const Duration(milliseconds: 50));
+    const afterTalk = 'Na ons gesprek: Sam had de opdracht wel begrepen.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      afterTalk,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-published-revised')),
+    );
+
+    final revised = harness.cosmos['reports'].docs;
+    expect(revised.keys, ['${kStudentUid}_m1'], reason: 'no revision history');
+    final after = revised['${kStudentUid}_m1']!;
+    expect(after['justification'], afterTalk);
+    expect(
+      after['publishedAt'],
+      publishedAt,
+      reason: 'still the first release',
+    );
+    expect(
+      DateTime.parse(after['updatedAt'] as String)
+          .isAfter(DateTime.parse(publishedAt)),
+      isTrue,
+    );
+    // Prose only: the signed number did not move.
+    expect(after['grade'], 84);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a milestone whose report date has passed with no reports is '
+      'flagged on the Milestones page', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: {
+        ..._gradedClass(),
+        'milestones': [_milestone(dueInDays: -2)],
+      },
+    );
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Milestones'));
+    await pumpUntilFound(tester, find.byType(MilestonesPage));
+    await pumpUntilFound(tester, find.byKey(const Key('milestone-overdue-m1')));
+
+    // Generating the reports answers the nudge, and it clears on the poll.
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    await tester.tap(find.byTooltip('Milestones'));
+    await pumpUntilFound(tester, find.byType(MilestonesPage));
+    await pumpUntilGone(tester, find.byKey(const Key('milestone-overdue-m1')));
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a student has no Milestones or Reports entry and no grade '
+      'anywhere', (tester) async {
     final harness = AppHarness(
       extraDocs: {
         'milestones': [_milestone()],
@@ -301,6 +703,7 @@ void main() {
     );
     await harness.boot(tester);
     expect(find.byTooltip('Milestones'), findsNothing);
+    expect(find.byTooltip('Reports'), findsNothing);
     expect(find.byTooltip('Students'), findsNothing);
     await harness.dispose(tester);
   });
