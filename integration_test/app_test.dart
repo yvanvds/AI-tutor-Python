@@ -25,6 +25,7 @@ import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
+import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
@@ -77,6 +78,7 @@ void main() {
   tutor_language.main();
   playground_files.main();
   editor_comment_space.main();
+  editor_gutter_alignment.main();
   practice_complete_code.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
