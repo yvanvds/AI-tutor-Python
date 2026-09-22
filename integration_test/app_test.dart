@@ -30,6 +30,7 @@ import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
+import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -82,6 +83,7 @@ void main() {
   editor_comment_space.main();
   editor_gutter_alignment.main();
   practice_complete_code.main();
+  garbled_reply_retry.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
   transfer_credit.main();

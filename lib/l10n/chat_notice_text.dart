@@ -20,6 +20,8 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_tutorUnreachable;
       case ChatNoticeKind.replyTruncated:
         return chat_notice_replyTruncated;
+      case ChatNoticeKind.replyGarbled:
+        return chat_notice_replyGarbled;
       case ChatNoticeKind.ownKeyMissing:
         return chat_notice_ownKeyMissing;
       case ChatNoticeKind.ownKeyRejected:
