@@ -543,6 +543,39 @@ void main() {
       expect(moved.justification, isNull);
       expect(moved.adjustedGrade, 40);
     });
+
+    test('recomputing a draft keeps a justification the teacher wrote and '
+        'flags it stale once the number moved under it', () async {
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+      );
+      final svc = f.service();
+      final first = await svc.compute(uid: _student, milestone: _milestone());
+      const own = 'Sam kan de kern, maar rekent nog traag.';
+      final edited = await svc.editJustification(proposal: first, text: own);
+      expect(edited.justificationSource, JustificationSource.edited);
+      expect(edited.justificationStale, isFalse);
+
+      // Same data → same number → nothing moves, nothing is flagged.
+      final again = await svc.compute(uid: _student, milestone: _milestone());
+      expect(again.justification, own);
+      expect(again.justificationStale, isFalse);
+
+      // More mastery → different number. AI prose would go here; the
+      // teacher's stays, marked for rereading.
+      f.beliefs.upsert(_belief('s1', 'b', alpha: 5, beta: 1, at: fresh));
+      final moved = await svc.compute(uid: _student, milestone: _milestone());
+      expect(moved.proposal, isNot(first.proposal));
+      expect(moved.justification, own);
+      expect(moved.justificationSource, JustificationSource.edited);
+      expect(moved.justificationStale, isTrue);
+      expect(f.proposals.docs['${_student}_m1']!['justificationStale'], true);
+
+      // A later recompute on the new number does not quietly unflag it: the
+      // text was still written around the old one.
+      final settled = await svc.compute(uid: _student, milestone: _milestone());
+      expect(settled.justificationStale, isTrue);
+    });
   });
 
   group('writeJustification', () {
@@ -621,6 +654,127 @@ void main() {
         f.proposals.docs['${_student}_m1']!.containsKey('justification'),
         isFalse,
       );
+    });
+
+    test('regenerating over the teacher\'s own text hands provenance back to '
+        'the model and clears the stale flag', () async {
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+      );
+      final svc = f.service();
+      final draft = await svc.compute(uid: _student, milestone: _milestone());
+      await svc.editJustification(proposal: draft, text: 'Mijn eigen tekst.');
+      f.beliefs.upsert(_belief('s1', 'b', alpha: 5, beta: 1, at: fresh));
+      final stale = await svc.compute(uid: _student, milestone: _milestone());
+      expect(stale.justificationStale, isTrue);
+
+      final rewritten = await svc.writeJustification(
+        proposal: stale,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'medium',
+        languageCode: 'en',
+      );
+      expect(rewritten.justification, 'Sam did well.');
+      expect(rewritten.justificationSource, JustificationSource.ai);
+      expect(rewritten.justificationStale, isFalse);
+      final stored = f.proposals.docs['${_student}_m1']!;
+      expect(stored['justificationSource'], 'ai');
+      expect(stored.containsKey('justificationStale'), isFalse);
+    });
+  });
+
+  group('editJustification', () {
+    test('stores the teacher\'s text as theirs and leaves every number the '
+        'formula reads alone', () async {
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+      );
+      final svc = f.service();
+      final draft = await svc.compute(uid: _student, milestone: _milestone());
+      final written = await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'medium',
+        languageCode: 'en',
+      );
+
+      final edited = await svc.editJustification(
+        proposal: written,
+        text: '  Sam legde de lus zelf uit in de les.  ',
+      );
+      expect(edited.justification, 'Sam legde de lus zelf uit in de les.');
+      expect(edited.justificationSource, JustificationSource.edited);
+      expect(edited.justificationEditedAt, _now);
+      // The model's stamp survives: it says when the text first existed.
+      expect(edited.justificationAt, written.justificationAt);
+      // PUNTENFORMULE §3.3: the prose is not an input to the number.
+      expect(edited.proposal, draft.proposal);
+      expect(edited.mEnd, draft.mEnd);
+      expect(edited.g, draft.g);
+      expect(edited.adjustedGrade, draft.adjustedGrade);
+
+      final stored = f.proposals.docs['${_student}_m1']!;
+      expect(stored['justification'], 'Sam legde de lus zelf uit in de les.');
+      expect(stored['justificationSource'], 'edited');
+      expect(stored['justificationEditedAt'], _now.toIso8601String());
+      expect(stored['proposal'], draft.proposal);
+    });
+
+    test('an empty text is refused and nothing is stored', () async {
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+      );
+      final svc = f.service();
+      final draft = await svc.compute(uid: _student, milestone: _milestone());
+      await expectLater(
+        svc.editJustification(proposal: draft, text: '   '),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        f.proposals.docs['${_student}_m1']!.containsKey('justification'),
+        isFalse,
+      );
+    });
+
+    test('a signed-off report can still be rewritten: §5 freezes the grade, '
+        'not the sentence explaining it', () async {
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+      );
+      final svc = f.service();
+      final draft = await svc.compute(uid: _student, milestone: _milestone());
+      final written = await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'medium',
+        languageCode: 'en',
+      );
+      final signed = await svc.signOff(
+        proposal: written,
+        adjustedGrade: 61,
+        note: 'ill in week 3',
+      );
+
+      final edited = await svc.editJustification(
+        proposal: signed,
+        text: 'Na ons gesprek: Sam had de opdracht wel begrepen.',
+      );
+      expect(edited.justification, startsWith('Na ons gesprek'));
+      expect(edited.isSignedOff, isTrue);
+      expect(edited.signedOffAt, signed.signedOffAt);
+      expect(edited.finalGrade, 61);
+      expect(edited.adjustmentNote, 'ill in week 3');
+
+      // And the frozen doc stays frozen where it matters: a recompute after
+      // the rewrite still hands back the signed numbers.
+      f.beliefs.upsert(_belief('s1', 'b', alpha: 5, beta: 1, at: fresh));
+      final after = await svc.compute(uid: _student, milestone: _milestone());
+      expect(after.proposal, draft.proposal);
+      expect(after.justification, edited.justification);
+      expect(after.justificationStale, isFalse);
     });
   });
 

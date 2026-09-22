@@ -631,6 +631,42 @@ abstract class AppLocalizations {
   /// **'Could not write the justification: {error}'**
   String reports_grade_justification_failed(String error);
 
+  /// No description provided for @reports_grade_justification_edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewrite'**
+  String get reports_grade_justification_edit;
+
+  /// No description provided for @reports_grade_justification_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save text'**
+  String get reports_grade_justification_save;
+
+  /// No description provided for @reports_grade_justification_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get reports_grade_justification_cancel;
+
+  /// No description provided for @reports_grade_justification_field_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Justification for the student'**
+  String get reports_grade_justification_field_label;
+
+  /// No description provided for @reports_grade_justification_edited.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewritten by you on {ts}'**
+  String reports_grade_justification_edited(String ts);
+
+  /// No description provided for @reports_grade_justification_stale.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade changed after you wrote this text — reread it before signing off.'**
+  String get reports_grade_justification_stale;
+
   /// No description provided for @reports_grade_adjusted_label.
   ///
   /// In en, this message translates to:

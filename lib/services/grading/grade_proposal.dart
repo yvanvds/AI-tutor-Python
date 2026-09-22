@@ -1,6 +1,7 @@
 // One row of the `grade_proposals` Cosmos container (#99): the computed
-// proposal for one student on one milestone, the AI-written justification
-// once the teacher asked for it, and the teacher's adjustment + sign-off.
+// proposal for one student on one milestone, the justification — written by
+// the model, rewritable by the teacher (#149) — and the teacher's
+// adjustment + sign-off.
 // Doc id `${uid}_${milestoneId}`, partition key `/uid`.
 //
 // A signed-off doc is frozen: PUNTENFORMULE §5 says a grade that reached a
@@ -8,6 +9,23 @@
 // the stored doc back untouched once `signedOffAt` is set.
 
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+
+/// Who wrote the justification currently on the doc (#149).
+///
+/// Only provenance — the text is never an input to the number either way
+/// (PUNTENFORMULE §3.3). What it buys is that a recompute may drop AI prose
+/// written around a number that has since moved, while prose the teacher
+/// typed is theirs and survives.
+enum JustificationSource {
+  /// Written by the model (`GradeProposalService.writeJustification`).
+  ai,
+
+  /// Typed or rewritten by the teacher.
+  edited;
+
+  static JustificationSource parse(Object? raw) =>
+      raw == edited.name ? edited : ai;
+}
 
 /// Where `M_start` came from (#110, PUNTENFORMULE §2.4).
 enum MStartSource {
@@ -50,6 +68,9 @@ class GradeProposal {
     this.mStartInexactCount = 0,
     this.justification,
     this.justificationAt,
+    this.justificationSource = JustificationSource.ai,
+    this.justificationEditedAt,
+    this.justificationStale = false,
     this.adjustedGrade,
     this.adjustmentNote = '',
     this.signedOffAt,
@@ -106,6 +127,21 @@ class GradeProposal {
   final String? justification;
   final DateTime? justificationAt;
 
+  /// Who wrote the text currently in [justification] (#149). A doc from
+  /// before #149 carries no field: back then only the model could write it.
+  final JustificationSource justificationSource;
+
+  /// When the teacher last rewrote it, if they ever did.
+  final DateTime? justificationEditedAt;
+
+  /// The number moved under this text after it was written (#149).
+  ///
+  /// Set by a recompute that kept a teacher-written justification although
+  /// the proposal changed: deleting someone's prose is worse than asking
+  /// them to reread it. Cleared the moment the text is rewritten, by the
+  /// teacher or by the model.
+  final bool justificationStale;
+
   /// What goes on the report card once signed: the teacher's number, which
   /// defaults to [proposal].
   final int? adjustedGrade;
@@ -120,6 +156,9 @@ class GradeProposal {
   GradeProposal copyWith({
     String? justification,
     DateTime? justificationAt,
+    JustificationSource? justificationSource,
+    DateTime? justificationEditedAt,
+    bool? justificationStale,
     int? adjustedGrade,
     String? adjustmentNote,
     DateTime? signedOffAt,
@@ -149,6 +188,9 @@ class GradeProposal {
     mStartInexactCount: mStartInexactCount,
     justification: justification ?? this.justification,
     justificationAt: justificationAt ?? this.justificationAt,
+    justificationSource: justificationSource ?? this.justificationSource,
+    justificationEditedAt: justificationEditedAt ?? this.justificationEditedAt,
+    justificationStale: justificationStale ?? this.justificationStale,
     adjustedGrade: adjustedGrade ?? this.adjustedGrade,
     adjustmentNote: adjustmentNote ?? this.adjustmentNote,
     signedOffAt: signedOffAt ?? this.signedOffAt,
@@ -183,6 +225,10 @@ class GradeProposal {
     if (justification != null) 'justification': justification,
     if (justificationAt != null)
       'justificationAt': justificationAt!.toUtc().toIso8601String(),
+    if (justification != null) 'justificationSource': justificationSource.name,
+    if (justificationEditedAt != null)
+      'justificationEditedAt': justificationEditedAt!.toUtc().toIso8601String(),
+    if (justificationStale) 'justificationStale': true,
     if (adjustedGrade != null) 'adjustedGrade': adjustedGrade,
     if (adjustmentNote.isNotEmpty) 'adjustmentNote': adjustmentNote,
     if (signedOffAt != null)
@@ -221,6 +267,12 @@ class GradeProposal {
       mStartInexactCount: int_('mStartInexactCount'),
       justification: doc['justification'] as String?,
       justificationAt: date('justificationAt'),
+      // Docs from before #149 carry no source: only the model wrote then.
+      justificationSource: JustificationSource.parse(
+        doc['justificationSource'],
+      ),
+      justificationEditedAt: date('justificationEditedAt'),
+      justificationStale: doc['justificationStale'] == true,
       adjustedGrade: (doc['adjustedGrade'] as num?)?.toInt(),
       adjustmentNote: (doc['adjustmentNote'] as String?) ?? '',
       signedOffAt: date('signedOffAt'),

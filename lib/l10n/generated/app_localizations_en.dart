@@ -320,6 +320,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get reports_grade_justification_edit => 'Rewrite';
+
+  @override
+  String get reports_grade_justification_save => 'Save text';
+
+  @override
+  String get reports_grade_justification_cancel => 'Cancel';
+
+  @override
+  String get reports_grade_justification_field_label =>
+      'Justification for the student';
+
+  @override
+  String reports_grade_justification_edited(String ts) {
+    return 'Rewritten by you on $ts';
+  }
+
+  @override
+  String get reports_grade_justification_stale =>
+      'The grade changed after you wrote this text — reread it before signing off.';
+
+  @override
   String get reports_grade_adjusted_label => 'Grade for the report card';
 
   @override

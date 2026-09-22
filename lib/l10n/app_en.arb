@@ -152,6 +152,15 @@
   "@reports_grade_justification_failed": {
     "placeholders": { "error": { "type": "String" } }
   },
+  "reports_grade_justification_edit": "Rewrite",
+  "reports_grade_justification_save": "Save text",
+  "reports_grade_justification_cancel": "Cancel",
+  "reports_grade_justification_field_label": "Justification for the student",
+  "reports_grade_justification_edited": "Rewritten by you on {ts}",
+  "@reports_grade_justification_edited": {
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "reports_grade_justification_stale": "The grade changed after you wrote this text — reread it before signing off.",
   "reports_grade_adjusted_label": "Grade for the report card",
   "reports_grade_adjusted_invalid": "Enter a whole number from 0 to 100.",
   "reports_grade_note_label": "Reason for adjustment (optional)",

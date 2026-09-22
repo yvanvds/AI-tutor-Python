@@ -1,5 +1,5 @@
-// End-to-end (#99, #148): the periodic grade proposal, teacher side, now as
-// a class-wide workflow.
+// End-to-end (#99, #148, #149): the periodic grade proposal, teacher side,
+// now as a class-wide workflow.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
@@ -17,9 +17,13 @@
 //      with no belief data on the milestone lands on "no data" instead of a
 //      computed 0, and costs no model call. The teacher then walks the
 //      class in the detail pane, adjusts a grade with a note and signs off.
-//   3. The student detail drawer no longer carries any of this: sign-off
+//   3. The justification is the teacher's to rewrite (#149), before signing
+//      and after: a recompute that moves the number drops AI prose but
+//      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
+//      not the sentence explaining it.
+//   4. The student detail drawer no longer carries any of this: sign-off
 //      lives in exactly one place.
-//   4. A student's shell has no Milestones and no Reports entry at all.
+//   5. A student's shell has no Milestones and no Reports entry at all.
 //
 // Real app, real navigation, the real Students page, Milestones page and
 // Reports page over the in-memory Cosmos; only the model is scripted.
@@ -159,6 +163,15 @@ void main() {
     await tester.tap(find.byTooltip('Reports'));
     await pumpUntilFound(tester, find.byType(ReportsPage));
     await pumpUntilFound(tester, find.byKey(const Key('reports-milestone')));
+  }
+
+  /// Scrolls [key] into the detail pane's view and taps it. The pane is a
+  /// `ListView`, so an action below the fold is not hit-testable yet.
+  Future<void> tapInDetail(WidgetTester tester, Key key) async {
+    await tester.ensureVisible(find.byKey(key));
+    await tester.pump();
+    await tester.tap(find.byKey(key));
+    await tester.pump();
   }
 
   String chipText(WidgetTester tester, String uid) => tester
@@ -396,6 +409,110 @@ void main() {
     await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
     expect(find.byKey(const Key('grade-milestone')), findsNothing);
     expect(find.byKey(const Key('grade-compute')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('teacher rewrites the justification; a recompute keeps the text '
+      'and flags it stale, and a signed report can still be rewritten', (
+    tester,
+  ) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+
+    // One student from the detail pane: compute + one model call.
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+
+    // The model wrote a first draft; the prose is the teacher's (#149).
+    const own = 'Sam legde de lus zelf uit tijdens de les.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('reports-justification-field')),
+          )
+          .controller!
+          .text,
+      kJustification,
+    );
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      own,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(own));
+    expect(find.text(kJustification), findsNothing);
+    expect(
+      find.byKey(const Key('reports-justification-edited')),
+      findsOneWidget,
+    );
+
+    var doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], own);
+    expect(doc['justificationSource'], 'edited');
+    expect(doc['justificationEditedAt'], isA<String>());
+    // Prose only (PUNTENFORMULE §3.3): the number did not move.
+    expect(doc['proposal'], 86);
+
+    // Now the evidence moves under the text: the extension LO is no longer
+    // mastered, so M_end = 70, G = 0.4 and P = 58. AI prose would be
+    // dropped here; the teacher's survives, flagged for rereading — and
+    // costs no second model call.
+    harness.cosmos['lo_beliefs'].upsert(
+      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+    );
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-justification-stale')),
+    );
+    expect(find.text(own), findsOneWidget);
+    expect(llm.sends, 1);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
+      '58',
+    );
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 58);
+    expect(doc['justification'], own);
+    expect(doc['justificationStale'], true);
+
+    // Sign off, then rewrite after a conversation with the student: §5
+    // freezes the grade, not the sentence explaining it.
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '60');
+    await tapInDetail(tester, const Key('reports-sign-off'));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
+
+    const afterTalk = 'Na ons gesprek: Sam had de opdracht wel begrepen.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      afterTalk,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(afterTalk));
+
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], afterTalk);
+    expect(doc['signedOffAt'], isA<String>());
+    expect(doc['adjustedGrade'], 60);
+    expect(doc['proposal'], 58);
+    // The signed report is still locked against a recompute.
+    expect(find.byKey(const Key('reports-run-one')), findsNothing);
 
     await harness.dispose(tester);
   });

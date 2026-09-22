@@ -11,6 +11,11 @@
 //   right  the full report for the selected student, with next/prev so the
 //          class can be walked without going back to the list.
 //
+// The justification in the right-hand pane is editable (#149): the model
+// writes the first draft, the teacher rewrites what they disagree with —
+// before signing, and after, once a conversation with the student has made
+// the first wording wrong.
+//
 // The batch itself lives in `ReportBatchService` (#148): the deterministic
 // number for everyone in one pass, then the model calls a few at a time,
 // with a per-row error state and a per-row retry. This page only drives it
@@ -112,8 +117,12 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   /// Guards the detail pane while a single-student action is in flight.
   bool _busy = false;
 
+  /// The justification of the selected student is open for rewriting (#149).
+  bool _editingJustification = false;
+
   final _gradeCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _justificationCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -126,6 +135,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   void dispose() {
     _gradeCtrl.dispose();
     _noteCtrl.dispose();
+    _justificationCtrl.dispose();
     super.dispose();
   }
 
@@ -137,6 +147,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       _milestoneId = id;
       _proposals.clear();
       _errors.clear();
+      _editingJustification = false;
       _loading = true;
     });
     List<GradeProposal> stored;
@@ -158,15 +169,23 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   void _selectStudent(String uid) {
     setState(() {
       _selectedUid = uid;
+      _editingJustification = false;
       _syncControllers();
     });
   }
 
-  /// Mirrors the selected student's stored numbers into the adjust fields.
+  /// Mirrors the selected student's stored text into the edit fields.
+  ///
+  /// The justification box is left alone while it is open: a batch result
+  /// landing on the selected row must not eat half a sentence the teacher
+  /// is in the middle of typing.
   void _syncControllers() {
     final p = _selectedUid == null ? null : _proposals[_selectedUid];
     _gradeCtrl.text = p == null ? '' : '${p.finalGrade}';
     _noteCtrl.text = p?.adjustmentNote ?? '';
+    if (!_editingJustification) {
+      _justificationCtrl.text = p?.justification ?? '';
+    }
   }
 
   void _apply(String uid, ReportBatchResult result) {
@@ -214,6 +233,28 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         languageCode: Localizations.localeOf(context).languageCode,
       );
       _apply(student.uid, result);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Stores the teacher's own justification text (#149). The number is not
+  /// touched — not the proposal, not the adjustment, not the signature.
+  Future<void> _saveJustification(Account student) async {
+    final proposal = _proposals[student.uid];
+    if (proposal == null) return;
+    final text = _justificationCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final edited = await _service.editJustification(
+        proposal: proposal,
+        text: text,
+      );
+      if (mounted) setState(() => _editingJustification = false);
+      _apply(student.uid, ReportBatchResult(proposal: edited));
+    } catch (error) {
+      _apply(student.uid, ReportBatchResult(proposal: proposal, error: error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -621,12 +662,89 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             l.reports_grade_justification_title,
             style: theme.textTheme.titleSmall,
           ),
-          if (p.justification != null) ...[
+          // The prose is the teacher's to rewrite (#149) — before signing,
+          // and after, once a conversation with the student has made the
+          // first wording wrong. §5 freezes the grade, not the sentence
+          // explaining it, and §3.3 keeps the text out of the number, so
+          // rewriting one never moves the other.
+          if (p.justificationStale) ...[
             const SizedBox(height: 4),
-            SelectableText(
-              p.justification!,
-              key: const Key('reports-detail-justification'),
+            Text(
+              l.reports_grade_justification_stale,
+              key: const Key('reports-justification-stale'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ],
+          if (_editingJustification) ...[
+            const SizedBox(height: 4),
+            TextField(
+              key: const Key('reports-justification-field'),
+              controller: _justificationCtrl,
+              minLines: 4,
+              maxLines: 12,
+              keyboardType: TextInputType.multiline,
               style: theme.textTheme.bodySmall,
+              decoration: InputDecoration(
+                labelText: l.reports_grade_justification_field_label,
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                FilledButton.tonal(
+                  key: const Key('reports-justification-save'),
+                  onPressed: _busy ? null : () => _saveJustification(student),
+                  child: Text(l.reports_grade_justification_save),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  key: const Key('reports-justification-cancel'),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                          _editingJustification = false;
+                          _justificationCtrl.text = p.justification ?? '';
+                        }),
+                  child: Text(l.reports_grade_justification_cancel),
+                ),
+              ],
+            ),
+          ] else ...[
+            if (p.justification != null) ...[
+              const SizedBox(height: 4),
+              SelectableText(
+                p.justification!,
+                key: const Key('reports-detail-justification'),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            if (p.justificationSource == JustificationSource.edited &&
+                p.justificationEditedAt != null)
+              Text(
+                l.reports_grade_justification_edited(
+                  formatTs(p.justificationEditedAt!, context),
+                ),
+                key: const Key('reports-justification-edited'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('reports-justification-edit'),
+                onPressed: _busy || _running
+                    ? null
+                    : () => setState(() {
+                        _editingJustification = true;
+                        _justificationCtrl.text = p.justification ?? '';
+                      }),
+                child: Text(l.reports_grade_justification_edit),
+              ),
             ),
           ],
           if (!signed) ...[

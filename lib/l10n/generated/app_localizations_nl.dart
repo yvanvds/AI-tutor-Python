@@ -321,6 +321,28 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get reports_grade_justification_edit => 'Herschrijven';
+
+  @override
+  String get reports_grade_justification_save => 'Tekst bewaren';
+
+  @override
+  String get reports_grade_justification_cancel => 'Annuleren';
+
+  @override
+  String get reports_grade_justification_field_label =>
+      'Verantwoording voor de leerling';
+
+  @override
+  String reports_grade_justification_edited(String ts) {
+    return 'Door jou herschreven op $ts';
+  }
+
+  @override
+  String get reports_grade_justification_stale =>
+      'Het punt is veranderd nadat je deze tekst schreef — lees ze na voor je aftekent.';
+
+  @override
   String get reports_grade_adjusted_label => 'Punt voor het rapport';
 
   @override
