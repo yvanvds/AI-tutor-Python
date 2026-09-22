@@ -117,11 +117,11 @@ void main() {
 
     // Search composes on top of the sort: "na" narrows to Anna, Hana and
     // Lena, still in descending name order.
-    await tester.enterText(find.byType(TextField).first, 'na');
+    await tester.enterText(studentsSearchField(), 'na');
     await pumpUntilFound(tester, find.text('Showing 1–3 of 3'));
     expect(dy('it-lena@example.com'), lessThan(dy('it-hana@example.com')));
     expect(dy('it-hana@example.com'), lessThan(dy('it-anna@example.com')));
-    await tester.enterText(find.byType(TextField).first, '');
+    await tester.enterText(studentsSearchField(), '');
     await pumpUntilFound(tester, find.text('Showing 1–13 of 13'));
 
     // Shrink the page to 10 rows so the sort has to cross a page boundary.

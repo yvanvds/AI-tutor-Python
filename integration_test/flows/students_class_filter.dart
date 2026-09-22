@@ -70,10 +70,10 @@ void main() {
     expect(find.text('it-dave@example.com'), findsNothing);
 
     // Search composes on top of the class filter.
-    await tester.enterText(find.byType(TextField).first, 'anna');
+    await tester.enterText(studentsSearchField(), 'anna');
     await pumpUntilFound(tester, find.text('Showing 1–1 of 1'));
     expect(find.text('it-ben@example.com'), findsNothing);
-    await tester.enterText(find.byType(TextField).first, '');
+    await tester.enterText(studentsSearchField(), '');
     await pumpUntilFound(tester, find.text('Showing 1–2 of 2'));
 
     // "No class": the untagged student and the teacher stay reachable.
@@ -90,7 +90,7 @@ void main() {
     // Assign Dave to a brand-new class through the row's class cell.
     await tester.tap(find.byKey(const Key('class-cell-it-dave')));
     await pumpUntilFound(tester, find.text('Assign class'));
-    await tester.enterText(find.byType(TextField).last, '6C');
+    await tester.enterText(classNameField(), '6C');
     await tester.tap(find.text('Save'));
     await pumpUntil(
       tester,

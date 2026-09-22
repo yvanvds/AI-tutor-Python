@@ -79,7 +79,7 @@ void main() {
       tester,
       find.text('Class name (leave empty to clear)'),
     );
-    await tester.enterText(find.byType(TextField).last, '6C');
+    await tester.enterText(classNameField(), '6C');
     await tester.tap(find.text('Save'));
     await pumpUntil(
       tester,
@@ -124,7 +124,7 @@ void main() {
       tester,
       find.text('Class name (leave empty to clear)'),
     );
-    await tester.enterText(find.byType(TextField).last, '7A');
+    await tester.enterText(classNameField(), '7A');
     await tester.tap(find.text('Save'));
     await pumpUntil(
       tester,

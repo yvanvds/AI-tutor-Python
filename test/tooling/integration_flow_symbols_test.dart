@@ -38,10 +38,30 @@
 // precondition: picking an ambient framework type by position is a bomb
 // waiting for the tree to grow another one. The second test below forbids the
 // unscoped `find.byType(Scrollable)` that made the failure silent (it fires on
-// all three flows as they stood before dc57931). The rest of that class — a
-// page's own ordinal finders, `find.byType(TextField).first` and friends — is
-// tracked separately in #158, and "the tree changed shape" in general stays
-// the full Windows sweep's job.
+// all three flows as they stood before dc57931).
+//
+// The third test (#158) is the same precondition one step out, for the types a
+// page contributes itself. Three Students flows drove the search box and the
+// class dialog's field as `find.byType(TextField).first` / `.last` at seven
+// call sites — correct only because AccountsPage happens to lay its fields out
+// in that order, and one field added above the search box away from silently
+// pointing at a different widget. So an ordinal may not be taken off a bare
+// type finder at all. What stays allowed is an ordinal on a finder that has
+// already named its subtree — `find.descendant(of: <the page>, matching:
+// find.byType(X)).first`, the shape `optionsScrollable()` uses — because there
+// the position is taken inside something the flow named rather than inside the
+// whole app. A flow whose subject really is order opts out with
+// `// ordinal-finder-ok: <why>` in the statement.
+//
+// Deliberately not covered: `find.text('…').last`, which several flows use to
+// reach a `DropdownButton`'s menu entry rather than the same label inside the
+// closed button. That ordinal is not a guess about layout — the button renders
+// the selected item twice by construction, and the menu's copy is always the
+// second — and the subtree that would scope it is private to Flutter. Widening
+// the rule there would fire on correct code, and a guard that does that gets
+// deleted.
+//
+// "The tree changed shape" in general stays the full Windows sweep's job.
 
 import 'dart:io';
 
@@ -57,6 +77,22 @@ final _keyLiteral = RegExp(r"(?<![A-Za-z0-9_])(?:Value)?Key\('([^']*)'\)");
 final _interpolation = RegExp(r'\$\{[^}]*\}|\$[A-Za-z0-9_.]+');
 
 final _scrollableByType = RegExp(r'find\.byType\(Scrollable\)');
+
+/// An ordinal taken straight off a bare type finder — `find.byType(X).first`,
+/// `.last` or `.at(n)` — however it is wrapped across lines.
+///
+/// `[^()]*` is what keeps the scoped form out of the match: a type name cannot
+/// contain a paren, so the `\)` here can only ever be `byType`'s own, and in
+/// `find.descendant(…, matching: find.byType(X)).first` what follows it is the
+/// descendant's closing paren, not the ordinal.
+final _ordinalByType = RegExp(
+  r'find\s*\.\s*byType\([^()]*\)\s*\.\s*(?:first|last|at\()',
+);
+
+/// Opt-out for the check above, for a flow whose assertion really is about
+/// position. Honoured anywhere in the statement the finder sits in — see
+/// [_optedOut].
+const _ordinalOptOut = 'ordinal-finder-ok:';
 
 List<File> _dartFiles(String dir) {
   final root = Directory(dir);
@@ -87,6 +123,27 @@ bool _inComment(String source, int offset) {
   final lineStart = source.lastIndexOf('\n', offset) + 1;
   final before = source.substring(lineStart, offset).trimLeft();
   return before.startsWith('//') || before.startsWith('*');
+}
+
+/// Whether a match carries the [_ordinalOptOut] marker anywhere in the
+/// statement it sits in — the comment that introduces the statement and the
+/// comment that trails it included.
+///
+/// The range runs from the first non-blank character after the previous `;` to
+/// the line the statement's own `;` is on, so the marker reads the same
+/// whether the author put it above the call or after it, and the formatter
+/// rewrapping the call cannot move it out of range.
+bool _optedOut(String source, Match match) {
+  final afterPrevious = source.lastIndexOf(';', match.start) + 1;
+  final opens = source.indexOf(RegExp(r'\S'), afterPrevious);
+  final closes = source.indexOf(';', match.end);
+  final from = _lineOf(source, opens < 0 ? match.start : opens) - 1;
+  final to = _lineOf(source, closes < 0 ? source.length - 1 : closes) - 1;
+  final lines = source.split('\n');
+  for (var i = from; i <= to && i < lines.length; i++) {
+    if (lines[i].contains(_ordinalOptOut)) return true;
+  }
+  return false;
 }
 
 /// The statement a match sits in, so a wrapped `expect(…)` keeps the
@@ -233,6 +290,39 @@ void main() {
             'find.byType(Scrollable))` for any other one. Never the bare '
             'finder, and never its `.first`.\n'
             'Unscoped finders:',
+      );
+    });
+
+    test('no flow takes an ordinal off a bare type finder', () {
+      final positional = <String>[];
+      for (final file in flows) {
+        final source = file.readAsStringSync();
+        for (final match in _ordinalByType.allMatches(source)) {
+          if (_inComment(source, match.start)) continue;
+          if (_optedOut(source, match)) continue;
+          positional.add('${_rel(file)}:${_lineOf(source, match.start)}');
+        }
+      }
+
+      expect(
+        positional,
+        isEmpty,
+        reason:
+            '`find.byType(X).first` / `.last` / `.at(n)` picks a widget by '
+            'where it happens to sit in the tree, so it keeps passing until '
+            'the page grows another X above it — and then the flow fails '
+            'somewhere else entirely, with nothing static to warn anyone. '
+            'That is #156 (a Scrollable the shell added) and #158 (a TextField '
+            'the Students page adds) in one shape.\n'
+            'The fix: give the widget a key in lib/ and ask for it by key — '
+            '`studentsSearchField()` and `classNameField()` in '
+            'integration_test/harness/app_harness.dart are the two from #158 '
+            '— or scope the ordinal to a subtree you name, '
+            '`find.descendant(of: find.byType(<the page>), matching: '
+            'find.byType(X)).first`, which this check allows.\n'
+            'If the assertion genuinely is about order, say so on the line: '
+            '`// $_ordinalOptOut <why>`.\n'
+            'Positional finders:',
       );
     });
   });
