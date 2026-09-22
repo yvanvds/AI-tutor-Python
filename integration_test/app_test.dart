@@ -21,6 +21,7 @@ import 'package:integration_test/integration_test.dart';
 import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/chat_collapse.dart' as chat_collapse;
+import 'flows/chat_composer_growth.dart' as chat_composer_growth;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
@@ -73,6 +74,7 @@ void main() {
   explain_paging.main();
   explain_poll_steady.main();
   chat_collapse.main();
+  chat_composer_growth.main();
   content_question.main();
   language_switch.main();
   tutor_language.main();
