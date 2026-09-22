@@ -27,6 +27,52 @@ void main() {
     expect(html, contains('<strong>Versie '));
   });
 
+  test('the version log and the header date agree (§5)', () {
+    // §5: every edit to the document gets a new version number *and* a row
+    // in the log, and the header's "Laatste wijziging" is that row's date.
+    // A bump that forgets one of the two would otherwise only be noticed by
+    // a student reading a document that dates itself wrong.
+    final rows = RegExp(
+      r'^\|\s*(\d+\.\d+(?:\.\d+)?)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|',
+      multiLine: true,
+    ).allMatches(source).toList();
+    expect(rows.length, greaterThan(1), reason: 'the version log went missing');
+
+    final versions = rows.map((m) => m.group(1)!).toList();
+    expect(
+      versions.toSet().length,
+      versions.length,
+      reason: 'two log rows claim the same version: $versions',
+    );
+
+    // Highest version wins, not last row: the log is append-ordered by hand
+    // and has been out of order before.
+    List<int> parts(String v) {
+      final p = v.split('.').map(int.parse).toList();
+      return [...p, ...List<int>.filled(3 - p.length, 0)];
+    }
+
+    var newest = rows.first;
+    for (final row in rows.skip(1)) {
+      final a = parts(row.group(1)!);
+      final b = parts(newest.group(1)!);
+      for (var i = 0; i < 3; i++) {
+        if (a[i] != b[i]) {
+          if (a[i] > b[i]) newest = row;
+          break;
+        }
+      }
+    }
+
+    expect(
+      source,
+      contains('Laatste wijziging: ${newest.group(2)}.'),
+      reason:
+          'the header date is not the date of the newest log row '
+          '(${newest.group(1)}, ${newest.group(2)})',
+    );
+  });
+
   test('every pipe table in the source becomes a <table>', () {
     // One separator row (`| --- | --- |`) per table.
     final separators = RegExp(
