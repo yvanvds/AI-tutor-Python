@@ -47,6 +47,7 @@ import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
 import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
+import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
@@ -111,6 +112,7 @@ void main() {
   grade_proposal.main();
   period_start_snapshot.main();
   my_reports_tab.main();
+  sidebar_rail.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

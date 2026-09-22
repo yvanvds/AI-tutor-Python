@@ -19,9 +19,10 @@
 //     open, and survives leaving the tab and coming back — `pollingStream`
 //     is single-subscription, so a second listen would throw;
 //   - who gets the entry: a teacher does not. They are never graded, so the
-//     page would be empty for them, and their rail has no room for an
-//     eleventh entry at the runner's window size (#156) — which a real run
-//     is the only thing that shows.
+//     page would be empty for them next to the class-wide "Reports" they
+//     actually want — which a real run is the only thing that shows. (The
+//     rail no longer leans on that: it fits, and scrolls, on its own since
+//     #156 — see sidebar_rail.dart.)
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -264,10 +265,9 @@ void main() {
     expect(find.text('Hi Yvan,'), findsOneWidget);
 
     // A teacher is never graded, so "My reports" would be an empty page next
-    // to the class-wide run they actually want. It is also what keeps the
-    // rail inside a 720 px window — an eleventh entry overflows it (#156),
-    // and `tester` fails a test on an overflow, so this assertion is the
-    // guard.
+    // to the class-wide run they actually want. The rail's own fit is no
+    // longer part of that argument — it scrolls and keeps an entry of slack
+    // since #156, which sidebar_rail.dart pins.
     expect(find.byTooltip('My reports'), findsNothing);
     expect(
       tester.getTopLeft(find.byTooltip('Reports')).dy,
