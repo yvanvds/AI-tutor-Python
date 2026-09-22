@@ -27,11 +27,15 @@ import '../../helpers/in_memory_cosmos.dart';
 final DateTime _computedAt = DateTime.utc(2026, 10, 15, 12);
 final DateTime _released = DateTime.utc(2026, 10, 20, 17, 30);
 
-Milestone _milestone({String title = 'Rapport 1'}) => Milestone(
-  id: 'm1',
+Milestone _milestone({
+  String id = 'm1',
+  String title = 'Rapport 1',
+  DateTime? dueAt,
+}) => Milestone(
+  id: id,
   title: title,
   periodStart: DateTime.utc(2026, 9, 1),
-  dueAt: DateTime.utc(2026, 10, 15),
+  dueAt: dueAt ?? DateTime.utc(2026, 10, 15),
   expectedDifficulty: QuestionDifficulty.hard,
   subgoalIds: const ['s1'],
   coreLoKeys: {Milestone.loKey('s1', 'a')},
@@ -255,6 +259,51 @@ void main() {
         expect(await f.service.getForMilestone('other'), isEmpty);
       },
     );
+  });
+
+  // The student's own read (#151) — the only way a report leaves the
+  // teacher's side.
+  group('watchForUser', () {
+    test('streams this student\'s released reports, newest report date '
+        'first', () async {
+      final f = _Fixture();
+      await f.service.publish(
+        milestone: _milestone(),
+        proposals: [
+          _signed(),
+          _signed(uid: 'u2'),
+        ],
+      );
+      await f.service.publish(
+        milestone: _milestone(
+          id: 'm2',
+          title: 'Rapport 2',
+          dueAt: DateTime.utc(2026, 12, 20),
+        ),
+        proposals: [_signed()],
+      );
+
+      final mine = await f.service.watchForUser('u1').first;
+
+      expect(mine.map((r) => r.milestoneTitle), ['Rapport 2', 'Rapport 1']);
+      expect(
+        mine.every((r) => r.uid == 'u1'),
+        isTrue,
+        reason: 'a student reads their own partition and nothing else',
+      );
+      expect(mine.first.grade, 84);
+    });
+
+    test('a student with nothing released streams an empty list, not an '
+        'error', () async {
+      final f = _Fixture();
+      await f.service.publish(
+        milestone: _milestone(),
+        proposals: [_signed(uid: 'u2')],
+      );
+
+      expect(await f.service.watchForUser('u1').first, isEmpty);
+    });
   });
 
   group('republish', () {

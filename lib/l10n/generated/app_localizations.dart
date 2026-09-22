@@ -158,6 +158,12 @@ abstract class AppLocalizations {
   /// **'Grade formula'**
   String get sidebar_section_puntenformule;
 
+  /// Student section listing their own released reports; the teacher's class-wide run is sidebar_section_reports
+  ///
+  /// In en, this message translates to:
+  /// **'My reports'**
+  String get sidebar_section_myReports;
+
   /// No description provided for @sidebar_section_goals.
   ///
   /// In en, this message translates to:
@@ -762,6 +768,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Released to the student'**
   String get reports_published_tooltip;
+
+  /// No description provided for @myReports_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'My reports'**
+  String get myReports_page_title;
+
+  /// No description provided for @myReports_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The reports your teacher has released, newest first — your grade and why you got it.'**
+  String get myReports_page_subtitle;
+
+  /// No description provided for @myReports_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No report has been released to you yet. One shows up here at a report moment, together with the reasoning behind the grade.'**
+  String get myReports_empty;
+
+  /// No description provided for @myReports_grade_outOf.
+  ///
+  /// In en, this message translates to:
+  /// **'/100'**
+  String get myReports_grade_outOf;
+
+  /// When the formula measured — earlier than the release, and not the same moment for every class
+  ///
+  /// In en, this message translates to:
+  /// **'Computed on {ts}'**
+  String myReports_computedAt(String ts);
+
+  /// No description provided for @myReports_revised.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewritten on {ts} — this is the current text of your report.'**
+  String myReports_revised(String ts);
+
+  /// No description provided for @myReports_note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note from your teacher: {note}'**
+  String myReports_note(String note);
+
+  /// No description provided for @myReports_breakdown_title.
+  ///
+  /// In en, this message translates to:
+  /// **'How this grade was computed'**
+  String get myReports_breakdown_title;
+
+  /// No description provided for @myReports_breakdown_mastery.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastery score M: {start} at the start of the period → {end} now'**
+  String myReports_breakdown_mastery(String start, String end);
+
+  /// No description provided for @myReports_breakdown_growth.
+  ///
+  /// In en, this message translates to:
+  /// **'Growth score G = {value}'**
+  String myReports_breakdown_growth(String value);
+
+  /// The three fractions of PUNTENFORMULE §2.2, named as the document names them
+  ///
+  /// In en, this message translates to:
+  /// **'k = {k} (core) · u = {u} (extension) · d = {d} (shown at hard)'**
+  String myReports_breakdown_fractions(String k, String u, String d);
+
+  /// No description provided for @myReports_breakdown_core.
+  ///
+  /// In en, this message translates to:
+  /// **'Core at the expected level: {counted} / {total}'**
+  String myReports_breakdown_core(int counted, int total);
+
+  /// No description provided for @myReports_breakdown_extension.
+  ///
+  /// In en, this message translates to:
+  /// **'Extension mastered: {counted} / {total}'**
+  String myReports_breakdown_extension(int counted, int total);
+
+  /// No description provided for @myReports_breakdown_expectedLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected level for the core: {level}'**
+  String myReports_breakdown_expectedLevel(String level);
+
+  /// No description provided for @myReports_breakdown_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Recompute it yourself with the grade formula (§2) — this grade used formula v{version}.'**
+  String myReports_breakdown_hint(String version);
 
   /// No description provided for @options_page_title.
   ///

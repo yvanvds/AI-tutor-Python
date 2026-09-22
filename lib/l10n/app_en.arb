@@ -20,6 +20,10 @@
   "sidebar_section_session": "Session",
   "sidebar_section_map": "Learning path",
   "sidebar_section_puntenformule": "Grade formula",
+  "sidebar_section_myReports": "My reports",
+  "@sidebar_section_myReports": {
+    "description": "Student section listing their own released reports; the teacher's class-wide run is sidebar_section_reports"
+  },
   "sidebar_section_goals": "Goals",
   "sidebar_section_lessonContent": "Lesson content",
   "sidebar_section_instructions": "Instructions",
@@ -202,6 +206,58 @@
     "placeholders": { "ts": { "type": "String" } }
   },
   "reports_published_tooltip": "Released to the student",
+
+  "myReports_page_title": "My reports",
+  "myReports_page_subtitle": "The reports your teacher has released, newest first — your grade and why you got it.",
+  "myReports_empty": "No report has been released to you yet. One shows up here at a report moment, together with the reasoning behind the grade.",
+  "myReports_grade_outOf": "/100",
+  "myReports_computedAt": "Computed on {ts}",
+  "@myReports_computedAt": {
+    "description": "When the formula measured — earlier than the release, and not the same moment for every class",
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "myReports_revised": "Rewritten on {ts} — this is the current text of your report.",
+  "@myReports_revised": {
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "myReports_note": "Note from your teacher: {note}",
+  "@myReports_note": {
+    "placeholders": { "note": { "type": "String" } }
+  },
+  "myReports_breakdown_title": "How this grade was computed",
+  "myReports_breakdown_mastery": "Mastery score M: {start} at the start of the period → {end} now",
+  "@myReports_breakdown_mastery": {
+    "placeholders": { "start": { "type": "String" }, "end": { "type": "String" } }
+  },
+  "myReports_breakdown_growth": "Growth score G = {value}",
+  "@myReports_breakdown_growth": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "myReports_breakdown_fractions": "k = {k} (core) · u = {u} (extension) · d = {d} (shown at hard)",
+  "@myReports_breakdown_fractions": {
+    "description": "The three fractions of PUNTENFORMULE §2.2, named as the document names them",
+    "placeholders": {
+      "k": { "type": "String" },
+      "u": { "type": "String" },
+      "d": { "type": "String" }
+    }
+  },
+  "myReports_breakdown_core": "Core at the expected level: {counted} / {total}",
+  "@myReports_breakdown_core": {
+    "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "myReports_breakdown_extension": "Extension mastered: {counted} / {total}",
+  "@myReports_breakdown_extension": {
+    "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "myReports_breakdown_expectedLevel": "Expected level for the core: {level}",
+  "@myReports_breakdown_expectedLevel": {
+    "placeholders": { "level": { "type": "String" } }
+  },
+  "myReports_breakdown_hint": "Recompute it yourself with the grade formula (§2) — this grade used formula v{version}.",
+  "@myReports_breakdown_hint": {
+    "placeholders": { "version": { "type": "String" } }
+  },
 
   "options_page_title": "Options",
   "options_page_subtitle": "Settings, maintenance and bug reports.",

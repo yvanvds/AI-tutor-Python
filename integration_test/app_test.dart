@@ -38,6 +38,7 @@ import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
+import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
 import 'flows/period_start_snapshot.dart' as period_start_snapshot;
@@ -109,6 +110,7 @@ void main() {
   students_view_prefs_persist.main();
   grade_proposal.main();
   period_start_snapshot.main();
+  my_reports_tab.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

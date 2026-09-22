@@ -12,10 +12,18 @@ class Sidebar extends ConsumerWidget {
 
   // Everyone gets the grade formula (#129): it is written for students,
   // and a teacher reads the same document the students do.
+  //
+  // "My reports" (#151) sits right after it — the formula explains the
+  // number, this is where the number arrives. Unlike the formula it is
+  // `isStudentOnly`: it lists the signed-in user's own published reports, so
+  // a teacher would get an empty page next to the class-wide `reports` entry
+  // they actually want. (It also keeps the teacher's rail off the edge of a
+  // 720 px window, which an eleventh entry overflows — see #156.)
   static const _studentSections = [
     Section.session,
     Section.map,
     Section.puntenformule,
+    Section.myReports,
   ];
 
   static const _teacherSections = [
@@ -32,6 +40,9 @@ class Sidebar extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final selected = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
+    final studentSections = _studentSections.where(
+      (s) => !profile.isTeacher || !s.isStudentOnly,
+    );
     final teacherSections = _teacherSections.where(
       (s) => devTools || !s.isDeveloperOnly,
     );
@@ -45,7 +56,7 @@ class Sidebar extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           const _Logo(),
           const SizedBox(height: AppSpacing.xl),
-          ..._studentSections.map(
+          ...studentSections.map(
             (s) => _SidebarItem(
               section: s,
               icon: _iconFor(s),
@@ -97,6 +108,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.insights_outlined;
       case Section.puntenformule:
         return Icons.calculate_outlined;
+      case Section.myReports:
+        return Icons.workspace_premium_outlined;
       case Section.goals:
         return Icons.flag_outlined;
       case Section.lessonContent:

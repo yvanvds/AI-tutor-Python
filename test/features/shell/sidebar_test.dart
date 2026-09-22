@@ -10,6 +10,11 @@
 // Issue #129 — the grade formula document is a section of its own, in the
 // student group, so every signed-in user (a teacher included) can open it.
 //
+// Issue #151 — "My reports" is a second student-group section, next to the
+// formula. Unlike the formula it is student-only: it lists the signed-in
+// user's own published reports, and a teacher is never graded, so they get
+// the class-wide "Reports" of #148 instead.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
 // what a signed-in user actually sees in the navigation rail.
@@ -168,6 +173,44 @@ void main() {
       tester.getTopLeft(entry).dy,
       lessThan(tester.getTopLeft(find.text('TEACHER')).dy),
     );
+  });
+
+  testWidgets('student sees the My reports entry and tapping it routes to '
+      'the section', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+    final container = containerOf(tester);
+
+    expect(find.byTooltip('My reports'), findsOneWidget);
+    // The teacher's class-wide run is a different section, and a student has
+    // no entry for it.
+    expect(find.byTooltip('Reports'), findsNothing);
+
+    await tester.tap(find.byTooltip('My reports'));
+    await tester.pump();
+
+    expect(container.read(sectionProvider), Section.myReports);
+  });
+
+  testWidgets('a teacher gets the class-wide Reports and not My reports', (
+    tester,
+  ) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    expect(find.byTooltip('My reports'), findsNothing);
+    final classWide = find.byTooltip('Reports');
+    expect(classWide, findsOneWidget);
+    expect(
+      tester.getTopLeft(classWide).dy,
+      greaterThan(tester.getTopLeft(find.text('TEACHER')).dy),
+    );
+  });
+
+  test('Section.myReports is the one student-only section', () {
+    expect(Section.values.where((s) => s.isStudentOnly), [Section.myReports]);
+    expect(Section.myReports.isTeacherOnly, isFalse);
+    expect(Section.myReports.isDeveloperOnly, isFalse);
+    expect(Section.reports.isTeacherOnly, isTrue);
+    expect(Section.reports.isStudentOnly, isFalse);
   });
 
   test('Section.puntenformule is reachable by students', () {

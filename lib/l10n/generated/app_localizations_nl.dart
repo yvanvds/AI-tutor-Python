@@ -40,6 +40,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_puntenformule => 'Puntenformule';
 
   @override
+  String get sidebar_section_myReports => 'Mijn rapporten';
+
+  @override
   String get sidebar_section_goals => 'Doelen';
 
   @override
@@ -406,6 +409,73 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get reports_published_tooltip => 'Vrijgegeven aan de leerling';
+
+  @override
+  String get myReports_page_title => 'Mijn rapporten';
+
+  @override
+  String get myReports_page_subtitle =>
+      'De rapporten die je leraar vrijgegeven heeft, nieuwste eerst — je punt en waarom je het kreeg.';
+
+  @override
+  String get myReports_empty =>
+      'Er is nog geen rapport voor je vrijgegeven. Op een rapportmoment verschijnt het hier, samen met de verantwoording bij het punt.';
+
+  @override
+  String get myReports_grade_outOf => '/100';
+
+  @override
+  String myReports_computedAt(String ts) {
+    return 'Berekend op $ts';
+  }
+
+  @override
+  String myReports_revised(String ts) {
+    return 'Herschreven op $ts — dit is de huidige tekst van je rapport.';
+  }
+
+  @override
+  String myReports_note(String note) {
+    return 'Opmerking van je leraar: $note';
+  }
+
+  @override
+  String get myReports_breakdown_title => 'Hoe dit punt berekend is';
+
+  @override
+  String myReports_breakdown_mastery(String start, String end) {
+    return 'Beheersingsscore M: $start bij de start van de periode → $end nu';
+  }
+
+  @override
+  String myReports_breakdown_growth(String value) {
+    return 'Groeiscore G = $value';
+  }
+
+  @override
+  String myReports_breakdown_fractions(String k, String u, String d) {
+    return 'k = $k (kern) · u = $u (uitbreiding) · d = $d (op moeilijk aangetoond)';
+  }
+
+  @override
+  String myReports_breakdown_core(int counted, int total) {
+    return 'Kern op het verwachte niveau: $counted / $total';
+  }
+
+  @override
+  String myReports_breakdown_extension(int counted, int total) {
+    return 'Uitbreiding beheerst: $counted / $total';
+  }
+
+  @override
+  String myReports_breakdown_expectedLevel(String level) {
+    return 'Verwacht niveau voor de kern: $level';
+  }
+
+  @override
+  String myReports_breakdown_hint(String version) {
+    return 'Reken het zelf na met de Puntenformule (§2) — dit punt gebruikte formule v$version.';
+  }
 
   @override
   String get options_page_title => 'Opties';

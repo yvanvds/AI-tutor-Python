@@ -40,6 +40,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_puntenformule => 'Grade formula';
 
   @override
+  String get sidebar_section_myReports => 'My reports';
+
+  @override
   String get sidebar_section_goals => 'Goals';
 
   @override
@@ -405,6 +408,73 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reports_published_tooltip => 'Released to the student';
+
+  @override
+  String get myReports_page_title => 'My reports';
+
+  @override
+  String get myReports_page_subtitle =>
+      'The reports your teacher has released, newest first — your grade and why you got it.';
+
+  @override
+  String get myReports_empty =>
+      'No report has been released to you yet. One shows up here at a report moment, together with the reasoning behind the grade.';
+
+  @override
+  String get myReports_grade_outOf => '/100';
+
+  @override
+  String myReports_computedAt(String ts) {
+    return 'Computed on $ts';
+  }
+
+  @override
+  String myReports_revised(String ts) {
+    return 'Rewritten on $ts — this is the current text of your report.';
+  }
+
+  @override
+  String myReports_note(String note) {
+    return 'Note from your teacher: $note';
+  }
+
+  @override
+  String get myReports_breakdown_title => 'How this grade was computed';
+
+  @override
+  String myReports_breakdown_mastery(String start, String end) {
+    return 'Mastery score M: $start at the start of the period → $end now';
+  }
+
+  @override
+  String myReports_breakdown_growth(String value) {
+    return 'Growth score G = $value';
+  }
+
+  @override
+  String myReports_breakdown_fractions(String k, String u, String d) {
+    return 'k = $k (core) · u = $u (extension) · d = $d (shown at hard)';
+  }
+
+  @override
+  String myReports_breakdown_core(int counted, int total) {
+    return 'Core at the expected level: $counted / $total';
+  }
+
+  @override
+  String myReports_breakdown_extension(int counted, int total) {
+    return 'Extension mastered: $counted / $total';
+  }
+
+  @override
+  String myReports_breakdown_expectedLevel(String level) {
+    return 'Expected level for the core: $level';
+  }
+
+  @override
+  String myReports_breakdown_hint(String version) {
+    return 'Recompute it yourself with the grade formula (§2) — this grade used formula v$version.';
+  }
 
   @override
   String get options_page_title => 'Options';

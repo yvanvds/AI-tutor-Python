@@ -12,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Which session mode the workspace is rendering.
 enum SessionMode { explain, practice, playground }
 
-/// Top-level sidebar destinations. Student sees the first three; teacher
+/// Top-level sidebar destinations. Student sees the first four; teacher
 /// additionally sees goals / lessonContent / students / milestones / reports.
 /// `instructions` is a developer tool (tutor system-prompt editor) and is
 /// only reachable when [developerToolsProvider] is true (issue #26).
@@ -23,10 +23,19 @@ enum SessionMode { explain, practice, playground }
 /// app for every student to read (#129). `reports` is the class-wide report
 /// run and review surface (#148) — grades, so teacher-only like
 /// `milestones`.
+///
+/// `myReports` is the other end of that surface (#151): the reports #150
+/// released, as the student they belong to reads them. It is *not* a second
+/// view of `reports` — it reads only the signed-in user's own `/uid`
+/// partition of the published copies, so it carries no live score and
+/// nothing unreleased. It is the one student-only section: a teacher is not
+/// graded, so their own list is always empty, and the class-wide run they do
+/// want is `reports`.
 enum Section {
   session,
   map,
   puntenformule,
+  myReports,
   goals,
   lessonContent,
   instructions,
@@ -206,6 +215,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_map;
       case Section.puntenformule:
         return l.sidebar_section_puntenformule;
+      case Section.myReports:
+        return l.sidebar_section_myReports;
       case Section.goals:
         return l.sidebar_section_goals;
       case Section.lessonContent:
@@ -235,10 +246,18 @@ extension SectionLabel on Section {
       case Section.session:
       case Section.map:
       case Section.puntenformule:
+      case Section.myReports:
       case Section.options:
         return false;
     }
   }
+
+  /// Sections a teacher does not get — the mirror of [isTeacherOnly].
+  ///
+  /// Only [Section.myReports] (#151): it lists the signed-in user's own
+  /// published reports, and a teacher is never graded, so for them it is an
+  /// empty page next to the class-wide [Section.reports] they actually want.
+  bool get isStudentOnly => this == Section.myReports;
 
   /// Sections that are hidden unless [developerToolsProvider] is true.
   bool get isDeveloperOnly => this == Section.instructions;

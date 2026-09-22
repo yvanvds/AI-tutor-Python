@@ -46,6 +46,40 @@ class PublishedReportService {
         return doc == null ? null : PublishedReport.fromCosmos(doc);
       });
 
+  /// Every published report of one student, newest report date first — the
+  /// student's own read (#151).
+  ///
+  /// Single-partition: this is the query the container was partitioned by
+  /// `/uid` for, so a student's tab reads their own partition and nothing
+  /// else. Polled like every other student-facing stream, so a report
+  /// released while the tab is open appears on the next tick instead of on
+  /// the next launch.
+  ///
+  /// Only published docs exist here at all (an unreleased milestone has none
+  /// — see [publish]), so "what this student may read" needs no filter.
+  Stream<List<PublishedReport>> watchForUser(String uid) => safeCosmosStream(
+    pollingStream(
+      () => safeCosmos(() async {
+        final docs = await _container.query(
+          'SELECT * FROM c WHERE c.uid = @uid',
+          parameters: {'@uid': uid},
+          partitionKey: uid,
+        );
+        return docs.map(PublishedReport.fromCosmos).toList()..sort((a, b) {
+          // Newest report moment first; the rest of the ordering only has
+          // to be stable, so two milestones due the same day don't swap
+          // places on every poll.
+          final byDue = b.dueAt.compareTo(a.dueAt);
+          if (byDue != 0) return byDue;
+          final byPublished = b.publishedAt.compareTo(a.publishedAt);
+          return byPublished != 0
+              ? byPublished
+              : a.milestoneId.compareTo(b.milestoneId);
+        });
+      }),
+    ),
+  );
+
   /// Every published report of one milestone, across students.
   ///
   /// Cross-partition by necessity — the container is partitioned by `/uid`

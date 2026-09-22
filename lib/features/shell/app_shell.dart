@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
+import 'package:ai_tutor_python/features/my_reports/my_reports_page.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/puntenformule/puntenformule_page.dart';
@@ -66,11 +67,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     final section = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
 
-    // If a teacher-only section is active but the user is not a teacher (or
-    // a developer-only section without developer tools), bounce back to the
-    // default section. Schedule the state mutation for after this build to
-    // keep Riverpod happy.
+    // If a teacher-only section is active but the user is not a teacher, a
+    // student-only one while they are (#151: sign-out and back in as the
+    // other role keeps `sectionProvider`), or a developer-only section
+    // without developer tools, bounce back to the default section. Schedule
+    // the state mutation for after this build to keep Riverpod happy.
     if ((section.isTeacherOnly && !profile.isTeacher) ||
+        (section.isStudentOnly && profile.isTeacher) ||
         (section.isDeveloperOnly && !devTools)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(sectionProvider.notifier).state = Section.session;
@@ -124,6 +127,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const LeerpadPage();
       case Section.puntenformule:
         return const PuntenformulePage();
+      case Section.myReports:
+        return const MyReportsPage();
       case Section.goals:
         return const GoalsPage();
       case Section.lessonContent:
