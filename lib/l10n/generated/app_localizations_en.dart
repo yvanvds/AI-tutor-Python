@@ -367,6 +367,46 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get reports_release => 'Release';
+
+  @override
+  String reports_release_count(int count) {
+    return '$count released';
+  }
+
+  @override
+  String get reports_release_dialog_title => 'Release reports';
+
+  @override
+  String reports_release_dialog_message(int count) {
+    return 'Publish the $count signed-off reports of this milestone? Those students can read their grade and its justification from that moment on. Do this when the grades go into the report card, so nobody reads theirs days before a classmate.';
+  }
+
+  @override
+  String get reports_release_dialog_cancel => 'Cancel';
+
+  @override
+  String get reports_release_dialog_confirm => 'Release';
+
+  @override
+  String reports_release_failed(String error) {
+    return 'Releasing failed: $error';
+  }
+
+  @override
+  String reports_published_at(String ts) {
+    return 'Released to the student $ts';
+  }
+
+  @override
+  String reports_published_revised(String ts) {
+    return 'Republished $ts with your rewritten justification.';
+  }
+
+  @override
+  String get reports_published_tooltip => 'Released to the student';
+
+  @override
   String get options_page_title => 'Options';
 
   @override

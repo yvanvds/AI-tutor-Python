@@ -703,6 +703,66 @@ abstract class AppLocalizations {
   /// **'Could not compute the proposal: {error}'**
   String reports_grade_failed(String error);
 
+  /// No description provided for @reports_release.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get reports_release;
+
+  /// No description provided for @reports_release_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} released'**
+  String reports_release_count(int count);
+
+  /// No description provided for @reports_release_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Release reports'**
+  String get reports_release_dialog_title;
+
+  /// No description provided for @reports_release_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish the {count} signed-off reports of this milestone? Those students can read their grade and its justification from that moment on. Do this when the grades go into the report card, so nobody reads theirs days before a classmate.'**
+  String reports_release_dialog_message(int count);
+
+  /// No description provided for @reports_release_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get reports_release_dialog_cancel;
+
+  /// No description provided for @reports_release_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get reports_release_dialog_confirm;
+
+  /// No description provided for @reports_release_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Releasing failed: {error}'**
+  String reports_release_failed(String error);
+
+  /// No description provided for @reports_published_at.
+  ///
+  /// In en, this message translates to:
+  /// **'Released to the student {ts}'**
+  String reports_published_at(String ts);
+
+  /// No description provided for @reports_published_revised.
+  ///
+  /// In en, this message translates to:
+  /// **'Republished {ts} with your rewritten justification.'**
+  String reports_published_revised(String ts);
+
+  /// No description provided for @reports_published_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Released to the student'**
+  String get reports_published_tooltip;
+
   /// No description provided for @options_page_title.
   ///
   /// In en, this message translates to:

@@ -21,6 +21,16 @@
 // with a per-row error state and a per-row retry. This page only drives it
 // and shows what comes back.
 //
+// Publication is the last step (#150), and it is a *milestone* action, not a
+// per-student one: sign-off happens student by student over a couple of
+// evenings, and "Release" is pressed once, when the grades go into the
+// report card, so no student reads their grade days before a classmate.
+// `PublishedReportService` writes the frozen, student-facing copies; this
+// page shows which rows are out. A rewrite of the prose after release
+// (#149) republishes that one student's copy, because leaving the old
+// wording on their page would make the app contradict the conversation that
+// produced the new one.
+//
 // Teacher-only by construction, like the drawer section it replaces: the
 // section is `isTeacherOnly`, so a student's shell never routes here and
 // the "students never see a live score" constraint is kept.
@@ -37,6 +47,8 @@ import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
 import 'package:ai_tutor_python/services/grading/milestone_service.dart';
+import 'package:ai_tutor_python/services/grading/published_report.dart';
+import 'package:ai_tutor_python/services/grading/published_report_service.dart';
 import 'package:ai_tutor_python/services/grading/report_batch.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -109,10 +121,21 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   /// Whatever the last run had to say about a row that failed.
   final Map<String, Object> _errors = <String, Object>{};
 
+  /// The published copies of the selected milestone, by uid (#150). A uid
+  /// that is absent has not been released: their report exists only on the
+  /// teacher's side.
+  final Map<String, PublishedReport> _published = <String, PublishedReport>{};
+
   bool _loading = false;
   bool _running = false;
   int _done = 0;
   int _total = 0;
+
+  /// The release action is in flight.
+  bool _releasing = false;
+
+  /// Why the last release failed, if it did.
+  String? _releaseError;
 
   /// Guards the detail pane while a single-student action is in flight.
   bool _busy = false;
@@ -142,11 +165,27 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   GradeProposalService get _service => ref.read(gradeProposalServiceProvider);
   ReportBatchService get _batch => ref.read(reportBatchServiceProvider);
 
+  /// The publication side (#150) — the `reports` container, not to be
+  /// confused with [_published], the copies this page has already loaded.
+  PublishedReportService get _reports =>
+      ref.read(publishedReportServiceProvider);
+
+  /// The signed-off proposals of the selected milestone — what "Release"
+  /// publishes. Whole milestone, not the class filter: the filter narrows
+  /// what the teacher *looks at*, while only a signature decides what goes
+  /// out, so an unsigned class can never be released by accident.
+  List<GradeProposal> get _approved => [
+    for (final p in _proposals.values)
+      if (p.isSignedOff) p,
+  ];
+
   Future<void> _selectMilestone(String id) async {
     setState(() {
       _milestoneId = id;
       _proposals.clear();
+      _published.clear();
       _errors.clear();
+      _releaseError = null;
       _editingJustification = false;
       _loading = true;
     });
@@ -156,11 +195,20 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     } catch (_) {
       stored = const [];
     }
+    List<PublishedReport> published;
+    try {
+      published = await _reports.getForMilestone(id);
+    } catch (_) {
+      published = const [];
+    }
     if (!mounted || _milestoneId != id) return;
     setState(() {
       _loading = false;
       for (final p in stored) {
         _proposals[p.uid] = p;
+      }
+      for (final r in published) {
+        _published[r.uid] = r;
       }
       _syncControllers();
     });
@@ -240,7 +288,11 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 
   /// Stores the teacher's own justification text (#149). The number is not
   /// touched — not the proposal, not the adjustment, not the signature.
-  Future<void> _saveJustification(Account student) async {
+  ///
+  /// When this student's report is already out, the published copy is
+  /// rewritten too (#150): the app must not keep showing the student prose
+  /// the teacher has just replaced.
+  Future<void> _saveJustification(Milestone milestone, Account student) async {
     final proposal = _proposals[student.uid];
     if (proposal == null) return;
     final text = _justificationCtrl.text.trim();
@@ -253,10 +305,70 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       );
       if (mounted) setState(() => _editingJustification = false);
       _apply(student.uid, ReportBatchResult(proposal: edited));
+      final republished = await _reports.republish(
+        milestone: milestone,
+        proposal: edited,
+      );
+      if (republished != null && mounted) {
+        setState(() => _published[student.uid] = republished);
+      }
     } catch (error) {
       _apply(student.uid, ReportBatchResult(proposal: proposal, error: error));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Publishes every approved report of [milestone] (#150).
+  ///
+  /// One action per milestone, pressed when the grades go into the report
+  /// card: sign-off runs student by student over a couple of evenings, and
+  /// releasing per student would let one read their grade on Tuesday while
+  /// a classmate waits until Thursday. A student with nothing signed is not
+  /// published, so a milestone nobody has signed shows a student nothing.
+  Future<void> _release(Milestone milestone) async {
+    final l = AppLocalizations.of(context);
+    final approved = _approved;
+    if (approved.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.reports_release_dialog_title),
+        content: Text(l.reports_release_dialog_message(approved.length)),
+        actions: [
+          TextButton(
+            key: const Key('reports-release-cancel'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.reports_release_dialog_cancel),
+          ),
+          FilledButton(
+            key: const Key('reports-release-confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.reports_release_dialog_confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _milestoneId != milestone.id) return;
+    setState(() {
+      _releasing = true;
+      _releaseError = null;
+    });
+    try {
+      final published = await _reports.publish(
+        milestone: milestone,
+        proposals: approved,
+      );
+      if (!mounted || _milestoneId != milestone.id) return;
+      setState(() {
+        for (final r in published) {
+          _published[r.uid] = r;
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _releaseError = '$error');
+    } finally {
+      if (mounted) setState(() => _releasing = false);
     }
   }
 
@@ -397,66 +509,119 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             classes.contains(_classFilter)
         ? _classFilter
         : kReportsClassAll;
-    return Row(
+    final labelStyle = TextStyle(color: AppColors.fgMute, fontSize: 13);
+    final hintStyle = TextStyle(color: AppColors.fgMute, fontSize: 12);
+    // A `Wrap`, not a `Row`: the toolbar carries two dropdowns, two actions
+    // and their status lines, which is more than a narrow window fits on one
+    // line. Each label is grouped with its control so a wrap never separates
+    // the two.
+    return Wrap(
+      spacing: AppSpacing.lg,
+      runSpacing: AppSpacing.s,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(
-          '${l.reports_grade_milestone_label}: ',
-          style: TextStyle(color: AppColors.fgMute, fontSize: 13),
-        ),
-        DropdownButton<String>(
-          key: const Key('reports-milestone'),
-          value: selected.id,
-          onChanged: _running
-              ? null
-              : (id) {
-                  if (id != null) _selectMilestone(id);
-                },
-          items: [
-            for (final m in milestones)
-              DropdownMenuItem(value: m.id, child: Text(m.title)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${l.reports_grade_milestone_label}: ', style: labelStyle),
+            DropdownButton<String>(
+              key: const Key('reports-milestone'),
+              value: selected.id,
+              onChanged: _running || _releasing
+                  ? null
+                  : (id) {
+                      if (id != null) _selectMilestone(id);
+                    },
+              items: [
+                for (final m in milestones)
+                  DropdownMenuItem(value: m.id, child: Text(m.title)),
+              ],
+            ),
           ],
         ),
-        const SizedBox(width: AppSpacing.lg),
-        Text(
-          '${l.reports_class_label}: ',
-          style: TextStyle(color: AppColors.fgMute, fontSize: 13),
-        ),
-        DropdownButton<String>(
-          key: const Key('reports-class-filter'),
-          value: classValue,
-          onChanged: _running
-              ? null
-              : (v) {
-                  if (v == null) return;
-                  setState(() => _classFilter = v);
-                },
-          items: [
-            DropdownMenuItem(
-              value: kReportsClassAll,
-              child: Text(l.accounts_classFilter_all),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${l.reports_class_label}: ', style: labelStyle),
+            DropdownButton<String>(
+              key: const Key('reports-class-filter'),
+              value: classValue,
+              onChanged: _running
+                  ? null
+                  : (v) {
+                      if (v == null) return;
+                      setState(() => _classFilter = v);
+                    },
+              items: [
+                DropdownMenuItem(
+                  value: kReportsClassAll,
+                  child: Text(l.accounts_classFilter_all),
+                ),
+                DropdownMenuItem(
+                  value: kReportsClassNone,
+                  child: Text(l.accounts_classFilter_none),
+                ),
+                ...classes.map(
+                  (c) => DropdownMenuItem(value: c, child: Text(c)),
+                ),
+              ],
             ),
-            DropdownMenuItem(
-              value: kReportsClassNone,
-              child: Text(l.accounts_classFilter_none),
-            ),
-            ...classes.map((c) => DropdownMenuItem(value: c, child: Text(c))),
           ],
         ),
-        const SizedBox(width: AppSpacing.lg),
-        FilledButton(
-          key: const Key('reports-generate'),
-          onPressed: _running || students.isEmpty
-              ? null
-              : () => _generate(selected, students),
-          child: Text(l.reports_generate),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton(
+              key: const Key('reports-generate'),
+              onPressed: _running || _releasing || students.isEmpty
+                  ? null
+                  : () => _generate(selected, students),
+              child: Text(l.reports_generate),
+            ),
+            if (_running) ...[
+              const SizedBox(width: AppSpacing.m),
+              Text(
+                l.reports_generating(_done, _total),
+                key: const Key('reports-progress'),
+                style: hintStyle,
+              ),
+            ],
+          ],
         ),
-        const SizedBox(width: AppSpacing.m),
-        if (_running)
-          Text(
-            l.reports_generating(_done, _total),
-            key: const Key('reports-progress'),
-            style: TextStyle(color: AppColors.fgMute, fontSize: 12),
-          ),
+        // Release: the milestone's batch action (#150). Enabled once
+        // something is signed off — an unapproved class has nothing to
+        // publish, and a re-press only refreshes what actually changed.
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton.tonal(
+              key: const Key('reports-release'),
+              onPressed: _running || _releasing || _approved.isEmpty
+                  ? null
+                  : () => _release(selected),
+              child: Text(l.reports_release),
+            ),
+            if (_published.isNotEmpty) ...[
+              const SizedBox(width: AppSpacing.m),
+              Text(
+                l.reports_release_count(_published.length),
+                key: const Key('reports-release-count'),
+                style: hintStyle,
+              ),
+            ],
+            if (_releaseError != null) ...[
+              const SizedBox(width: AppSpacing.m),
+              Text(
+                l.reports_release_failed(_releaseError!),
+                key: const Key('reports-release-error'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -477,6 +642,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             student: student,
             proposal: _proposals[student.uid],
             failed: _errors.containsKey(student.uid),
+            published: _published.containsKey(student.uid),
             selected: student.uid == _selectedUid,
             onTap: () => _selectStudent(student.uid),
           ),
@@ -503,6 +669,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     final p = _proposals[student.uid];
     final error = _errors[student.uid];
     final signed = p?.isSignedOff ?? false;
+    final published = _published[student.uid];
     String pct(double v) => v.toStringAsFixed(1);
 
     return ListView(
@@ -696,7 +863,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
               children: [
                 FilledButton.tonal(
                   key: const Key('reports-justification-save'),
-                  onPressed: _busy ? null : () => _saveJustification(student),
+                  onPressed: _busy
+                      ? null
+                      : () => _saveJustification(milestone, student),
                   child: Text(l.reports_grade_justification_save),
                 ),
                 const SizedBox(width: 8),
@@ -803,6 +972,30 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                 l.reports_grade_signed_note(p.adjustmentNote),
                 style: theme.textTheme.bodySmall,
               ),
+            // Whether this report has actually reached its student (#150).
+            // Signed is not published: release is one action per milestone.
+            if (published != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                l.reports_published_at(
+                  formatTs(published.publishedAt, context),
+                ),
+                key: const Key('reports-published'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (published.isRepublished)
+                Text(
+                  l.reports_published_revised(
+                    formatTs(published.updatedAt, context),
+                  ),
+                  key: const Key('reports-published-revised'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ],
         ],
       ],
@@ -818,6 +1011,7 @@ class _StudentRow extends StatelessWidget {
     required this.student,
     required this.proposal,
     required this.failed,
+    required this.published,
     required this.selected,
     required this.onTap,
   });
@@ -825,6 +1019,9 @@ class _StudentRow extends StatelessWidget {
   final Account student;
   final GradeProposal? proposal;
   final bool failed;
+
+  /// The student can read this report (#150).
+  final bool published;
   final bool selected;
   final VoidCallback onTap;
 
@@ -861,6 +1058,19 @@ class _StudentRow extends StatelessWidget {
                 key: Key('reports-failed-${student.uid}'),
                 size: 16,
                 color: theme.colorScheme.error,
+              ),
+            ),
+          if (published)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Tooltip(
+                key: Key('reports-published-${student.uid}'),
+                message: l.reports_published_tooltip,
+                child: Icon(
+                  Icons.visibility_outlined,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
               ),
             ),
           _StatusChip(

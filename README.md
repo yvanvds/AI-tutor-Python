@@ -103,6 +103,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `turn_history`   | `/uid`        |
    | `grade_proposals` | `/uid`       |
    | `period_start_snapshots` | `/uid` |
+   | `reports`        | `/uid`        |
    | `goals`          | `/type`       |
    | `instructions`   | `/type`       |
    | `config`         | `/type`       |

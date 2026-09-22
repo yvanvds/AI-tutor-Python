@@ -107,6 +107,17 @@
   "reports_grade_signed_note": "Opmerking: {note}",
   "reports_grade_failed": "Het voorstel kon niet berekend worden: {error}",
 
+  "reports_release": "Vrijgeven",
+  "reports_release_count": "{count} vrijgegeven",
+  "reports_release_dialog_title": "Rapporten vrijgeven",
+  "reports_release_dialog_message": "De {count} afgetekende rapporten van deze mijlpaal vrijgeven? Die leerlingen kunnen hun punt en de verantwoording vanaf dat moment lezen. Doe dit wanneer de punten op het rapport gaan, zodat niemand het zijne dagen vóór een klasgenoot leest.",
+  "reports_release_dialog_cancel": "Annuleren",
+  "reports_release_dialog_confirm": "Vrijgeven",
+  "reports_release_failed": "Vrijgeven mislukt: {error}",
+  "reports_published_at": "Vrijgegeven aan de leerling {ts}",
+  "reports_published_revised": "Opnieuw vrijgegeven {ts} met je herschreven verantwoording.",
+  "reports_published_tooltip": "Vrijgegeven aan de leerling",
+
   "sidebar_section_students":"Studenten",
   "sidebar_section_options": "Opties",
 

@@ -1,5 +1,5 @@
-// End-to-end (#99, #148, #149): the periodic grade proposal, teacher side,
-// now as a class-wide workflow.
+// End-to-end (#99, #148, #149, #150): the periodic grade proposal, teacher
+// side, now as a class-wide workflow that ends in a published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
@@ -21,9 +21,14 @@
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
 //      not the sentence explaining it.
-//   4. The student detail drawer no longer carries any of this: sign-off
+//   4. Nothing reaches a student until the teacher presses "Release" (#150),
+//      once per milestone: every signed-off report becomes a frozen doc in
+//      the `reports` container, carrying the grade, the prose and the
+//      breakdown — and deliberately not the turn tally or the staleness
+//      diagnostics. A rewrite after release republishes that one copy.
+//   5. The student detail drawer no longer carries any of this: sign-off
 //      lives in exactly one place.
-//   5. A student's shell has no Milestones and no Reports entry at all.
+//   6. A student's shell has no Milestones and no Reports entry at all.
 //
 // Real app, real navigation, the real Students page, Milestones page and
 // Reports page over the in-memory Cosmos; only the model is scripted.
@@ -513,6 +518,144 @@ void main() {
     expect(doc['proposal'], 58);
     // The signed report is still locked against a recompute.
     expect(find.byKey(const Key('reports-run-one')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('nothing reaches a student until the milestone is released, and '
+      'a later rewrite republishes the same doc', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // Sign Sam off — and nothing a student can read exists yet: release is
+    // its own action, pressed once for the whole milestone.
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '84');
+    await tester.enterText(
+      find.byKey(const Key('reports-note')),
+      'Ziek in week 3.',
+    );
+    await tapInDetail(tester, const Key('reports-sign-off'));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
+    expect(harness.cosmos['reports'].docs, isEmpty);
+    expect(find.byKey(const Key('reports-published')), findsNothing);
+    expect(find.byKey(Key('reports-published-$kStudentUid')), findsNothing);
+
+    // The dialog guards an irreversible, class-visible action: cancelling
+    // publishes nothing.
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-cancel')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-cancel')));
+    await pumpUntilGone(
+      tester,
+      find.byKey(const Key('reports-release-cancel')),
+    );
+    expect(harness.cosmos['reports'].docs, isEmpty);
+
+    // Release the milestone.
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-confirm')));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-published')));
+    expect(find.byKey(Key('reports-published-$kStudentUid')), findsOneWidget);
+
+    // Exactly one doc: the classmate with no data in the period has nothing
+    // signed, so they are not published at all.
+    final published = harness.cosmos['reports'].docs;
+    expect(published.keys, ['${kStudentUid}_m1']);
+    final report = published['${kStudentUid}_m1']!;
+    expect(report['type'], 'report');
+    expect(report['uid'], kStudentUid);
+    expect(report['milestoneId'], 'm1');
+    expect(report['milestoneTitle'], 'Rapport 1');
+    // The teacher's number, their note, and the prose as published.
+    expect(report['grade'], 84);
+    expect(report['note'], 'Ziek in week 3.');
+    expect(report['justification'], kJustification);
+    // The breakdown a student may recompute, and when it was measured.
+    expect(report['formulaVersion'], '1.0.7');
+    expect(report['mEnd'], 90);
+    expect(report['mStart'], 50);
+    expect((report['g'] as num).toDouble(), closeTo(0.8, 1e-9));
+    expect(report['coreCounted'], 1);
+    expect(report['coreTotal'], 1);
+    expect(report['extensionMastered'], 1);
+    expect(report['extensionTotal'], 1);
+    expect(report['expectedDifficulty'], 'medium');
+    expect(report['computedAt'], isA<String>());
+    final publishedAt = report['publishedAt'] as String;
+    // What a student's own page must never carry (#150): the turn tally
+    // reads as surveillance, the staleness counts as an accusation.
+    for (final key in const [
+      'supervisedTurns',
+      'homeTurns',
+      'staleLoCount',
+      'neverProbedCount',
+    ]) {
+      expect(
+        report.containsKey(key),
+        isFalse,
+        reason: '$key must not reach the published report',
+      );
+    }
+
+    // PUNTENFORMULE §5 freezes the grade, not the sentence explaining it, so
+    // a rewrite after release is a republish: the same doc, overwritten with
+    // a fresh updatedAt and no revision history. Let the wall clock move
+    // first, so "republished later" is a real comparison.
+    await tester.pump(const Duration(milliseconds: 50));
+    const afterTalk = 'Na ons gesprek: Sam had de opdracht wel begrepen.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      afterTalk,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-published-revised')),
+    );
+
+    final revised = harness.cosmos['reports'].docs;
+    expect(revised.keys, ['${kStudentUid}_m1'], reason: 'no revision history');
+    final after = revised['${kStudentUid}_m1']!;
+    expect(after['justification'], afterTalk);
+    expect(
+      after['publishedAt'],
+      publishedAt,
+      reason: 'still the first release',
+    );
+    expect(
+      DateTime.parse(after['updatedAt'] as String)
+          .isAfter(DateTime.parse(publishedAt)),
+      isTrue,
+    );
+    // Prose only: the signed number did not move.
+    expect(after['grade'], 84);
 
     await harness.dispose(tester);
   });

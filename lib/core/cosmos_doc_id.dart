@@ -43,6 +43,12 @@ class CosmosDocId {
   static String periodStartSnapshot(String uid, String milestoneId) =>
       '${uid}_$milestoneId';
 
+  /// Doc id for the `reports` container (#150): one published report per
+  /// student per milestone. Same shape as the proposal it is published
+  /// from, in its own container.
+  static String publishedReport(String uid, String milestoneId) =>
+      '${uid}_$milestoneId';
+
   /// Single global config doc.
   static const String globalConfig = 'global';
 

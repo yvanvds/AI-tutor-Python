@@ -177,6 +177,32 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "reports_release": "Release",
+  "reports_release_count": "{count} released",
+  "@reports_release_count": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "reports_release_dialog_title": "Release reports",
+  "reports_release_dialog_message": "Publish the {count} signed-off reports of this milestone? Those students can read their grade and its justification from that moment on. Do this when the grades go into the report card, so nobody reads theirs days before a classmate.",
+  "@reports_release_dialog_message": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "reports_release_dialog_cancel": "Cancel",
+  "reports_release_dialog_confirm": "Release",
+  "reports_release_failed": "Releasing failed: {error}",
+  "@reports_release_failed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "reports_published_at": "Released to the student {ts}",
+  "@reports_published_at": {
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "reports_published_revised": "Republished {ts} with your rewritten justification.",
+  "@reports_published_revised": {
+    "placeholders": { "ts": { "type": "String" } }
+  },
+  "reports_published_tooltip": "Released to the student",
+
   "options_page_title": "Options",
   "options_page_subtitle": "Settings, maintenance and bug reports.",
 

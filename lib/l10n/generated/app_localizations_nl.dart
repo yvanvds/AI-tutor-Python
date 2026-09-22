@@ -368,6 +368,46 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String get reports_release => 'Vrijgeven';
+
+  @override
+  String reports_release_count(int count) {
+    return '$count vrijgegeven';
+  }
+
+  @override
+  String get reports_release_dialog_title => 'Rapporten vrijgeven';
+
+  @override
+  String reports_release_dialog_message(int count) {
+    return 'De $count afgetekende rapporten van deze mijlpaal vrijgeven? Die leerlingen kunnen hun punt en de verantwoording vanaf dat moment lezen. Doe dit wanneer de punten op het rapport gaan, zodat niemand het zijne dagen vóór een klasgenoot leest.';
+  }
+
+  @override
+  String get reports_release_dialog_cancel => 'Annuleren';
+
+  @override
+  String get reports_release_dialog_confirm => 'Vrijgeven';
+
+  @override
+  String reports_release_failed(String error) {
+    return 'Vrijgeven mislukt: $error';
+  }
+
+  @override
+  String reports_published_at(String ts) {
+    return 'Vrijgegeven aan de leerling $ts';
+  }
+
+  @override
+  String reports_published_revised(String ts) {
+    return 'Opnieuw vrijgegeven $ts met je herschreven verantwoording.';
+  }
+
+  @override
+  String get reports_published_tooltip => 'Vrijgegeven aan de leerling';
+
+  @override
   String get options_page_title => 'Opties';
 
   @override
