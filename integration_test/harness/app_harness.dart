@@ -571,6 +571,20 @@ class AppHarness {
   }
 }
 
+/// The Options page's own scroll view — the one a flow means when it scrolls
+/// down to a card below the fold.
+///
+/// Never `find.byType(Scrollable)` or its `.first` for this. The navigation
+/// rail is a scroll view of its own since it learned to fit a short window
+/// (#156), and it comes *first* in the tree, so `.first` hands a flow the
+/// rail: `scrollUntilVisible` then drags the rail up and down 50 times and
+/// gives up on a target that was never going to appear, with a bare
+/// `Bad state: No element` from deep inside `dragUntilVisible`. Name the
+/// scrollable you mean — the shell has more than one.
+Finder optionsScrollable() => find
+    .descendant(of: find.byType(OptionsPage), matching: find.byType(Scrollable))
+    .first;
+
 /// Pumps real frames until [condition] holds. Preferred over
 /// `pumpAndSettle` here: the code editor's cursor blink and the 5 s Cosmos
 /// polls mean the app never fully settles.

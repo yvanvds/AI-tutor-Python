@@ -144,7 +144,7 @@ Future<void> _openFromAbout(WidgetTester tester) async {
   await tester.scrollUntilVisible(
     _whatsNewButton,
     200,
-    scrollable: find.byType(Scrollable).first,
+    scrollable: optionsScrollable(),
   );
   await tester.pump();
   await tester.tap(_whatsNewButton);

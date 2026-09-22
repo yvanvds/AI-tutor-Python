@@ -55,7 +55,7 @@ void main() {
     await tester.scrollUntilVisible(
       checkButton,
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: optionsScrollable(),
     );
     await tester.pump();
 
