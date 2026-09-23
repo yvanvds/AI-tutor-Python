@@ -255,6 +255,21 @@ class AppLocalizationsNl extends AppLocalizations {
   String get reports_grade_button_busy => 'Bezig…';
 
   @override
+  String reports_recompute_unchanged(int grade) {
+    return 'Het punt is niet veranderd: $grade/100.';
+  }
+
+  @override
+  String reports_recompute_unchanged_rewritten(int grade) {
+    return 'Het punt is niet veranderd: $grade/100. De verantwoording is opnieuw geschreven.';
+  }
+
+  @override
+  String reports_recompute_unchanged_kept(int grade) {
+    return 'Het punt is niet veranderd: $grade/100. Je eigen tekst blijft staan.';
+  }
+
+  @override
   String get reports_grade_proposal_label => 'Voorstel';
 
   @override

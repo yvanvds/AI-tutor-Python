@@ -1,5 +1,6 @@
-// End-to-end (#99, #148, #149, #150, #160): the periodic grade proposal, teacher
-// side, now as a class-wide workflow that ends in a published report.
+// End-to-end (#99, #148, #149, #150, #160, #166): the periodic grade
+// proposal, teacher side, now as a class-wide workflow that ends in a
+// published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
@@ -24,7 +25,10 @@
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
-//      not the sentence explaining it.
+//      not the sentence explaining it. "Recompute" on one student is an
+//      order, not a resume (#166): it rewrites AI prose even when the
+//      number stayed put, and the pane says the number did not move rather
+//      than looking like a dead button — a teacher-written text still stays.
 //   4. Nothing reaches a student until the teacher presses "Release" (#150),
 //      once per milestone: every signed-off report becomes a frozen doc in
 //      the `reports` container, carrying the grade, the prose and the
@@ -581,6 +585,118 @@ void main() {
     expect(doc['proposal'], 58);
     // The signed report is still locked against a recompute.
     expect(find.byKey(const Key('reports-run-one')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('"Recompute" on a settled grade rewrites the AI justification '
+      'and says the number did not move; a teacher-written text stays', (
+    tester,
+  ) async {
+    const second =
+        'Sam beheerst de kern en gebruikt variabelen nu zonder aarzelen.';
+    final llm = ScriptedLlm([kJustification, second]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+
+    // The first compute: a number, one model call, and nothing to compare
+    // the number against yet.
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+
+    // Nothing moved. Before #166 this press was a no-op with no feedback:
+    // same number → the AI text was kept → `runOne` returned before the
+    // model was asked → the pane looked exactly as it did.
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-recompute-unchanged')),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
+          .data,
+      'The grade did not change: 86/100. The justification was rewritten.',
+    );
+    expect(find.text(second), findsOneWidget);
+    expect(find.text(kJustification), findsNothing);
+    expect(llm.sends, 2);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
+      '86',
+    );
+    var doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 86);
+    expect(doc['justification'], second);
+    expect(doc['justificationSource'], 'ai');
+
+    // The teacher rewrites it. The notice was about that recompute, and
+    // goes with the next thing that happens to the row.
+    const own = 'Sam legde de lus zelf uit tijdens de les.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      own,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(own));
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+
+    // Recompute again: the number still stands and the text is the
+    // teacher's (#149) — no model call, and the notice says which.
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-recompute-unchanged')),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
+          .data,
+      'The grade did not change: 86/100. Your own text stays as it is.',
+    );
+    expect(find.text(own), findsOneWidget);
+    expect(llm.sends, 2);
+    expect(llm.remaining, 0);
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], own);
+    expect(doc['justificationSource'], 'edited');
+
+    // Once the number does move there is nothing to announce: the new grade
+    // is the feedback (M_end = 70, G = 0.4, P = 58, as in the rewrite flow
+    // above), and the teacher's text is flagged for rereading.
+    harness.cosmos['lo_beliefs'].upsert(
+      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+    );
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntil(
+      tester,
+      () =>
+          tester
+              .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+              .data ==
+          '58',
+      reason: 'the recompute never moved the grade',
+    );
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+    expect(
+      find.byKey(const Key('reports-justification-stale')),
+      findsOneWidget,
+    );
+    expect(llm.sends, 2);
 
     await harness.dispose(tester);
   });

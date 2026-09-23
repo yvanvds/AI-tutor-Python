@@ -17,6 +17,14 @@
 // re-run after a crash picks up where it broke instead of re-billing the
 // whole class.
 //
+// That thrift is right for the class run and wrong for the "Recompute"
+// button in the detail pane (#166): an explicit action on one student, where
+// "skip it, it already exists" reads as a button that does nothing. So
+// `runOne(force: true)` is that button — it rewrites an AI justification
+// even when the number stayed put, still leaves a teacher-written text alone
+// (#149) and a signed-off doc frozen (PUNTENFORMULE §5), and says when the
+// number did not move so the page can say so too.
+//
 // Teacher-side only, like everything else in this folder: every read is
 // addressed by an explicit student uid.
 
@@ -61,7 +69,12 @@ ReportStatus reportStatusOf(GradeProposal? proposal) {
 
 /// What the batch has to say about one student, as it happens.
 class ReportBatchResult {
-  const ReportBatchResult({this.proposal, this.error, this.noData = false});
+  const ReportBatchResult({
+    this.proposal,
+    this.error,
+    this.noData = false,
+    this.unchanged = false,
+  });
 
   /// The doc as it now stands, when there is one.
   final GradeProposal? proposal;
@@ -73,6 +86,11 @@ class ReportBatchResult {
 
   /// The student had no belief data for this milestone and was skipped.
   final bool noData;
+
+  /// The recomputed number is the one the doc already had (#166). Set by
+  /// [ReportBatchService.runOne] so the page can say so: a recompute that
+  /// lands on the same grade otherwise looks like a button that did nothing.
+  final bool unchanged;
 }
 
 /// Called once per student per step, on the calling (UI) isolate.
@@ -160,26 +178,51 @@ class ReportBatchService {
 
   /// Steps 1 and 2 for a single student — the per-row retry behind a failed
   /// row, and the "recompute this one" action in the detail pane.
+  ///
+  /// Without [force] this is the batch's rule for one student: an existing
+  /// justification is kept and not paid for again, so a retry after a failed
+  /// model call finishes the job at the cost of that one call.
+  ///
+  /// With [force] — the button (#166) — the request is "do it again", not
+  /// "fill in what is missing": an AI-written justification is rewritten
+  /// even when the number came out the same. Two things still hold. A text
+  /// the teacher wrote is theirs and stays (#149), and a signed-off doc is
+  /// frozen (PUNTENFORMULE §5) — `compute` hands it back untouched. Either
+  /// way [ReportBatchResult.unchanged] reports whether the number moved,
+  /// read against the doc as it stood before this call.
   Future<ReportBatchResult> runOne({
     required Milestone milestone,
     required Account student,
     required String languageCode,
+    bool force = false,
   }) async {
+    final GradeProposal? before;
     final GradeProposal? computed;
     try {
+      before = await _proposals.getStored(student.uid, milestone.id);
       computed = await computeFor(uid: student.uid, milestone: milestone);
     } catch (error) {
       return ReportBatchResult(error: error);
     }
     if (computed == null) return const ReportBatchResult(noData: true);
-    if (computed.justification != null || computed.isSignedOff) {
-      return ReportBatchResult(proposal: computed);
+    if (computed.isSignedOff) return ReportBatchResult(proposal: computed);
+
+    final unchanged = before != null && before.proposal == computed.proposal;
+    final teacherWrote =
+        computed.justificationSource == JustificationSource.edited;
+    if (computed.justification != null && (!force || teacherWrote)) {
+      return ReportBatchResult(proposal: computed, unchanged: unchanged);
     }
-    return justifyFor(
+    final justified = await justifyFor(
       proposal: computed,
       milestone: milestone,
       student: student,
       languageCode: languageCode,
+    );
+    return ReportBatchResult(
+      proposal: justified.proposal,
+      error: justified.error,
+      unchanged: unchanged,
     );
   }
 

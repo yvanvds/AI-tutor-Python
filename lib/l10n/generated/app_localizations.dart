@@ -548,6 +548,24 @@ abstract class AppLocalizations {
   /// **'Working…'**
   String get reports_grade_button_busy;
 
+  /// No description provided for @reports_recompute_unchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade did not change: {grade}/100.'**
+  String reports_recompute_unchanged(int grade);
+
+  /// No description provided for @reports_recompute_unchanged_rewritten.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade did not change: {grade}/100. The justification was rewritten.'**
+  String reports_recompute_unchanged_rewritten(int grade);
+
+  /// No description provided for @reports_recompute_unchanged_kept.
+  ///
+  /// In en, this message translates to:
+  /// **'The grade did not change: {grade}/100. Your own text stays as it is.'**
+  String reports_recompute_unchanged_kept(int grade);
+
   /// No description provided for @reports_grade_proposal_label.
   ///
   /// In en, this message translates to:
