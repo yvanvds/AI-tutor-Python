@@ -1235,7 +1235,10 @@ class Conductor {
 
     // Cache the subgoal progress (fraction of non-optional LOs that are
     // mastered). Stuck LOs do *not* count as progress in the cache — they
-    // count for advancement but the chip honestly reflects mastery.
+    // count for advancement but the chip honestly reflects mastery. That
+    // holds on the advancing turn too (#161): a stuck-advance leaves the
+    // bar below 1.0, and "finished" travels as the `advancedAt` stamp on
+    // the progress doc, which is what the next-subgoal walk reads.
     final nonOptional = subgoal.objectives.where((lo) => !lo.optional).toList();
     final masteredNonOptional = loStatus
         .where(
@@ -1246,7 +1249,7 @@ class Conductor {
         .length;
     final cached = nonOptional.isEmpty
         ? 1.0
-        : (subgoalMastered ? 1.0 : masteredNonOptional / nonOptional.length);
+        : masteredNonOptional / nonOptional.length;
 
     bool advanced = false;
     if (!activeTouched) {
@@ -1282,8 +1285,9 @@ class Conductor {
         cached,
         quality: answer.overallQuality,
         recordHistory: true,
+        advancedAt: DateTime.now().toUtc(),
       );
-      _deps.setCurrentProgress(1.0);
+      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
       _deps.showGoalReached(
         goalTitle: subgoal.title,
@@ -1398,7 +1402,7 @@ class Conductor {
           .toList(growable: false),
       appliedSignals: appliedSignals,
       loStatusAfter: loStatus,
-      subgoalProgressAfter: subgoalMastered ? 1.0 : cached,
+      subgoalProgressAfter: cached,
       calibrationBefore: calibrationBefore,
       calibrationAfter: calibrationAfter,
       hadFallback: answer.hadFallback,
@@ -1671,8 +1675,9 @@ class Conductor {
         _lastQuestionType = null;
         return;
       }
-      // Pretend this subgoal is already marked done in the progress cache.
-      await _persistCacheFor(next.id, 1.0);
+      // Every non-optional LO is mastered, so 1.0 is the honest fraction;
+      // the stamp is what marks it finished for the walk (#161).
+      await _persistCacheFor(next.id, 1.0, advancedAt: DateTime.now().toUtc());
       await _recomputeRoot();
     }
   }
@@ -1684,16 +1689,19 @@ class Conductor {
     final roots = await _deps.getRootGoals();
     final progressList = await _deps.getProgressAll();
 
-    double progressFor(Goal g) {
-      final p = progressList.firstWhereOrNull((x) => x.goalID == g.id);
-      return p?.progress ?? 0.0;
-    }
+    Progress? docFor(Goal g) =>
+        progressList.firstWhereOrNull((x) => x.goalID == g.id);
+    double progressFor(Goal g) => docFor(g)?.progress ?? 0.0;
 
     for (final root in roots) {
+      // The root doc is a derived average; with a stuck-advanced child it
+      // never reaches 1.0, so the walk descends and finds no open child.
       if (progressFor(root) < 1.0) {
         final subgoals = await _deps.getChildren(root.id);
+        // Finished means stamped `advancedAt` (#161), not a full bar: a
+        // subgoal advanced with a stuck LO sits below 1.0 for good.
         final targetChild = subgoals.firstWhereOrNull(
-          (g) => progressFor(g) < 1.0,
+          (g) => !(docFor(g)?.isAdvanced ?? false),
         );
 
         if (targetChild != null) {
@@ -1737,10 +1745,14 @@ class Conductor {
 
   Goal? get _activeChildGoal => _deps.getGoalSelection().activeChildGoal;
 
+  /// Writes the active subgoal's cached fraction. [advancedAt] is the
+  /// "finished" stamp (#161): passed on the advancing turn only, so an
+  /// ordinary write on a subgoal the student came back to clears it.
   Future<void> _persistSubgoalCache(
     double cached, {
     AnswerQuality? quality,
     bool recordHistory = true,
+    DateTime? advancedAt,
   }) async {
     final goal = _activeChildGoal;
     if (goal == null) return;
@@ -1749,6 +1761,7 @@ class Conductor {
       cached,
       quality: quality,
       recordHistory: recordHistory,
+      advancedAt: advancedAt,
     );
   }
 
@@ -1757,9 +1770,10 @@ class Conductor {
     double cached, {
     AnswerQuality? quality,
     bool recordHistory = true,
+    DateTime? advancedAt,
   }) async {
     await _deps.upsertProgress(
-      Progress(goalID: goalId, progress: cached),
+      Progress(goalID: goalId, progress: cached, advancedAt: advancedAt),
       quality: quality,
       recordHistory: recordHistory,
     );

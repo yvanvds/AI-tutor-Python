@@ -51,6 +51,7 @@ import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
+import 'flows/stuck_advance_progress.dart' as stuck_advance_progress;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
 import 'flows/students_current_goal.dart' as students_current_goal;
@@ -102,6 +103,7 @@ void main() {
   options_panel.main();
   own_key.main();
   status_report_retry.main();
+  stuck_advance_progress.main();
   level_up_gate.main();
   bug_report_oauth.main();
   bug_report_file.main();

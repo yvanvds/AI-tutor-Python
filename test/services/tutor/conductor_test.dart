@@ -2797,4 +2797,171 @@ void main() {
       expect((await both.c.planNext()).targetLOs.single.id, 'lo-input');
     });
   });
+
+  // ---- #161 an honest cache on advance -------------------------------------
+  group('#161 the cache stays the honest fraction on advance; "finished" is '
+      'the advancedAt stamp', () {
+    Goal root() => Goal(id: 'r', title: 'r', order: 0);
+    Goal twoLoSubgoal() => Goal(
+      id: 's',
+      title: 's',
+      parentId: 'r',
+      order: 0,
+      objectives: const [
+        LearningObjective(id: 'mastered', statement: 'm', kind: LoKind.apply),
+        LearningObjective(id: 'stucky', statement: 's', kind: LoKind.apply),
+      ],
+    );
+    Goal nextSubgoal() => Goal(
+      id: 's2',
+      title: 's2',
+      parentId: 'r',
+      order: 1,
+      objectives: const [
+        LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+      ],
+    );
+
+    /// A strong positive on `mastered` while `stucky` sits in the stuck
+    /// range (§4.4 stuck-advance), or — with [stuckToo] false — while
+    /// `stucky` is mastered as well. Returns the fakes after the turn.
+    Future<({_Fakes f, TurnOutcome outcome})> advance({
+      required bool stuckToo,
+    }) async {
+      final f = _Fakes();
+      final r = root();
+      final subgoal = twoLoSubgoal();
+      f.roots.add(r);
+      f.children[r.id] = [subgoal, nextSubgoal()];
+      f.selection = GoalSelectionState(selectedRoot: r, selectedChild: subgoal);
+      final now = DateTime.now().toUtc();
+      f.beliefs[f._key('s', 'mastered')] = LoBelief(
+        subgoalId: 's',
+        loId: 'mastered',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: now,
+        lastPositiveAtCalibratedAt: now,
+      );
+      f.beliefs[f._key('s', 'stucky')] = stuckToo
+          ? LoBelief(
+              subgoalId: 's',
+              loId: 'stucky',
+              alpha: 2,
+              beta: 7, // mean 0.22, evidence 9 → stuck
+              lastUpdatedAt: now,
+            )
+          : LoBelief(
+              subgoalId: 's',
+              loId: 'stucky',
+              alpha: 5,
+              beta: 1,
+              lastUpdatedAt: now,
+              lastPositiveAtCalibratedAt: now,
+            );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final plan = QuestionPlan(
+        type: ChatRequestType.writeCodeQuestion,
+        difficulty: QuestionDifficulty.medium,
+        targetLOs: const [
+          LearningObjective(id: 'mastered', statement: 'm', kind: LoKind.apply),
+        ],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: const [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'mastered',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+        ),
+      );
+      return (f: f, outcome: outcome);
+    }
+
+    test(
+      'a stuck-advance caches 1/2, stamps advancedAt and moves on',
+      () async {
+        final s = await advance(stuckToo: true);
+        expect(s.outcome.subgoalAdvanced, isTrue);
+        final doc = s.f.progressById['s']!;
+        expect(doc.progress, closeTo(0.5, 1e-9));
+        expect(doc.advancedAt, isNotNull);
+        expect(doc.isAdvanced, isTrue);
+        expect(s.outcome.subgoalProgressAfter, closeTo(0.5, 1e-9));
+        // The walk went on regardless of the partial bar.
+        expect(s.f.selection.activeChildGoal?.id, 's2');
+        expect(s.f.progressById['s2'], isNull);
+        // The root rollup is the honest average too, (0.5 + 0) / 2, unstamped.
+        expect(s.f.progressById['r']!.progress, closeTo(0.25, 1e-9));
+        expect(s.f.progressById['r']!.advancedAt, isNull);
+      },
+    );
+
+    test('a full-mastery advance writes 1.0 with the same stamp', () async {
+      final s = await advance(stuckToo: false);
+      expect(s.outcome.subgoalAdvanced, isTrue);
+      expect(s.outcome.signalEvents, isEmpty);
+      final doc = s.f.progressById['s']!;
+      expect(doc.progress, 1.0);
+      expect(doc.advancedAt, isNotNull);
+      expect(s.outcome.subgoalProgressAfter, 1.0);
+      expect(s.f.selection.activeChildGoal?.id, 's2');
+    });
+
+    group('the next-subgoal walk reads the stamp, not the bar', () {
+      Future<_Fakes> walkWith(Progress first) async {
+        final f = _Fakes();
+        final r = root();
+        f.roots.add(r);
+        f.children[r.id] = [twoLoSubgoal(), nextSubgoal()];
+        f.progressById['s'] = first;
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        return f;
+      }
+
+      test('a subgoal advanced past at 0.5 is skipped', () async {
+        final f = await walkWith(
+          Progress(
+            goalID: 's',
+            progress: 0.5,
+            advancedAt: DateTime.now().toUtc(),
+          ),
+        );
+        expect(f.selection.activeChildGoal?.id, 's2');
+        expect(f.currentProgress, 0.0);
+      });
+
+      test(
+        'a pre-#161 doc at 1.0 without the stamp is still skipped',
+        () async {
+          final f = await walkWith(Progress(goalID: 's', progress: 1.0));
+          expect(f.selection.activeChildGoal?.id, 's2');
+        },
+      );
+
+      test('a half-mastered subgoal without the stamp is where the student '
+          'lands', () async {
+        final f = await walkWith(Progress(goalID: 's', progress: 0.5));
+        expect(f.selection.activeChildGoal?.id, 's');
+        expect(f.currentProgress, 0.5);
+      });
+    });
+  });
 }

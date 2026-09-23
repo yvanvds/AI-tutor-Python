@@ -33,5 +33,43 @@ void main() {
     expect(p.progress, 0.5);
     expect(p.updatedAt, isNotNull);
     expect(p.lastSessionAt, isNotNull);
+    expect(p.advancedAt, isNull);
+  });
+
+  group('advancedAt — the finished stamp (#161)', () {
+    final stamp = DateTime.utc(2026, 9, 23, 10);
+
+    test('toMap carries the stamp when set and leaves it out when not', () {
+      final stamped = Progress(
+        goalID: 'g',
+        progress: 0.8,
+        advancedAt: stamp,
+      ).toMap(uid: 'u');
+      expect(stamped['advancedAt'], stamp.toIso8601String());
+      expect(stamped['progress'], 0.8);
+
+      final plain = Progress(goalID: 'g', progress: 0.8).toMap(uid: 'u');
+      expect(plain.containsKey('advancedAt'), isFalse);
+    });
+
+    test('fromCosmos reads the stamp back', () {
+      final p = Progress.fromCosmos({
+        'goalId': 'g',
+        'progress': 0.8,
+        'advancedAt': '2026-09-23T10:00:00.000Z',
+      });
+      expect(p.advancedAt, stamp);
+      expect(p.isAdvanced, isTrue);
+    });
+
+    test('isAdvanced: the stamp marks a subgoal finished, a partial bar '
+        'without it does not, and a pre-#161 full bar still does', () {
+      expect(
+        Progress(goalID: 'g', progress: 0.8, advancedAt: stamp).isAdvanced,
+        isTrue,
+      );
+      expect(Progress(goalID: 'g', progress: 0.8).isAdvanced, isFalse);
+      expect(Progress(goalID: 'g', progress: 1.0).isAdvanced, isTrue);
+    });
   });
 }

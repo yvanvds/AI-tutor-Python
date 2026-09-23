@@ -280,6 +280,7 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
 **`progress`** — *derived cache* of subgoal completion. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/progress/progress.dart](lib/services/progress/progress.dart). The previous `recentAnswers`, `difficulty`, and `recentConceptAttributions` fields are **gone** — answer history now lives on `account.calibration` and per-LO beliefs; concept attributions are subsumed by per-LO `TurnSignalEvent`s on `turn_history`.
 - `id: string`, `uid: string`, `goalId: string`
 - `progress: double` (0.0–1.0) — aggregated from per-LO beliefs
+- `advancedAt: ISO8601?` — set when the conductor moved the student past this subgoal (#161), on full mastery or a stuck-advance. The next-subgoal walk and the leerpad's finished marks read this (`Progress.isAdvanced`), not `progress == 1.0`; the fraction stays the honest mastered share, so a stuck-advanced subgoal sits below 1.0 for good. Absent on root docs and on docs from before #161 (where 1.0 still counts as finished).
 - `updatedAt: string`, `lastSessionAt: string`
 
 **`progress_history`** — append-only time series. Doc id = ISO timestamp + random suffix from [CosmosDocId.progressHistory](lib/core/cosmos_doc_id.dart); partition key `uid`. Model: [services/progress/progress_sample.dart](lib/services/progress/progress_sample.dart). Drives the per-root-goal line charts in the teacher detail drawer.

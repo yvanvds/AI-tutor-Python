@@ -315,9 +315,10 @@ incidental under 2.4's rules (#108).
   warm-up turn is not presented (6.3, condition 5).
 - **No advancement, no cache write.** The old subgoal's cached
   `progress` is left alone even after a wrong answer, exactly as for
-  transfer credit: a review is not a re-enrolment, and lowering the
-  cache would make the conductor's next-subgoal walk (4.5) drag the
-  student back to the old topic next session. The honest belief is on
+  transfer credit: a review is not a re-enrolment, and rewriting the
+  doc would drop its `advancedAt` stamp (4.5, #161), which is what
+  keeps the conductor's next-subgoal walk from dragging the student
+  back to the old topic next session. The honest belief is on
   `lo_beliefs`, where the grade formula and the teacher drawer read it;
   the LO simply comes up for review again once it is stale again. The
   active subgoal is untouched too: unless the grader landed an incidental
@@ -1171,8 +1172,13 @@ on_answer_processed():
 
 Advancement:
 
-- The subgoal's cached `progress` is set to 1.0 (per part 2 — the
-  cache, not the source of truth).
+- The subgoal's `progress` doc is stamped `advancedAt` (#161). Its
+  cached fraction is *not* forced to 1.0: it stays the share of
+  non-optional LOs actually mastered, so a stuck-advance (4.4) leaves
+  the bar honestly below 100% — the same gap the grade formula sees
+  per LO. The next-subgoal walk skips on the stamp, not on the
+  fraction (a doc written before #161 carries "finished" only as
+  `progress == 1.0`, and still counts).
 - The conductor selects the next unmastered subgoal in curriculum
   order.
 - The next question targets the new subgoal's first LO using the

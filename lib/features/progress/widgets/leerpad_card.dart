@@ -37,7 +37,11 @@ class LeerpadCard extends StatelessWidget {
                       .fold<double>(0, (a, b) => a + b) /
                   required.length)
               .clamp(0.0, 1.0);
-    final completed = required.isNotEmpty && progress >= 0.999;
+    // Finished means every required subgoal was advanced past (#161); the
+    // bar can sit below 100% when one of them advanced on a stuck LO.
+    final completed =
+        required.isNotEmpty &&
+        required.every((c) => progressById[c.id]?.isAdvanced ?? false);
 
     final bg = isActive
         ? AppColors.accent.withValues(alpha: 0.06)
@@ -259,6 +263,7 @@ class _ChildrenRow extends StatelessWidget {
               child: LeerpadChildChip(
                 goal: c,
                 progress: progressById[c.id]?.progress ?? 0.0,
+                completed: progressById[c.id]?.isAdvanced ?? false,
               ),
             ),
         ],

@@ -347,6 +347,8 @@ class TutorService extends Notifier<TutorState> {
       }
     }
     final cached = mastered / nonOptional.length;
+    // No `advancedAt` (#161): a subgoal that just grew an LO is open again,
+    // and the next-subgoal walk must be able to land on it.
     await ref
         .read(progressServiceProvider)
         .upsert(
