@@ -987,6 +987,7 @@ class TutorService extends Notifier<TutorState> {
       signalEvents: outcome.signalEvents,
       provenance: provenance,
       transferCredits: outcome.transferCredits,
+      reviewFlags: outcome.reviewFlags,
     );
     _debug.recordPersistedTurn(record, followUp: followUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));

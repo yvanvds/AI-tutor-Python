@@ -9,9 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 PersistedTurnRecord _record({
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
+  List<TurnReviewFlag> reviewFlags = const [],
   List<TurnAppliedSignal> appliedSignals = const [],
   bool isWarmUp = false,
 }) => PersistedTurnRecord(
+  reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
@@ -100,6 +102,21 @@ void main() {
       ).toMap(uid: 'u1');
       expect(map['transferCredits'], [
         {'subgoalId': 's0', 'loId': 'lo-print', 'alphaDelta': 0.5},
+      ]);
+    });
+  });
+
+  group('PersistedTurnRecord reviewFlags (#167)', () {
+    test('an ordinary turn writes no field at all', () {
+      expect(_record().toMap(uid: 'u1').containsKey('reviewFlags'), isFalse);
+    });
+
+    test('flags are written with their subgoal and LO', () {
+      final map = _record(
+        reviewFlags: const [TurnReviewFlag(subgoalId: 's0', loId: 'lo-print')],
+      ).toMap(uid: 'u1');
+      expect(map['reviewFlags'], [
+        {'subgoalId': 's0', 'loId': 'lo-print'},
       ]);
     });
   });

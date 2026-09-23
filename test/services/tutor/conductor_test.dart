@@ -2150,47 +2150,57 @@ void main() {
 
     LoBelief printAfter(_Fakes f) => f.beliefs[f._key('s0', 'lo-print')]!;
 
-    test(
-      'a negative on an earlier LO debits that LO as medium — the probe\'s '
-      'difficulty was set for the target — and moves nothing else on it',
-      () async {
-        final s = await setup(printBelief: masteredPrint());
-        final before = printAfter(s.f);
-        final outcome = await grade(s.c, extra: const [negativeOnPrint]);
+    test('a negative on an earlier LO is not evidence (#167): nothing on its '
+        'doc moves — not (α, β), not the clock — it is flagged for review, '
+        'and the audit trail says so', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final before = printAfter(s.f);
+      final outcome = await grade(s.c, extra: const [negativeOnPrint]);
 
-        final after = printAfter(s.f);
-        // Moderate × medium (1.0), not × hard (1.4). 1e-3: a minute of decay.
-        expect(after.beta, closeTo(1.0 + PolicyConstants.weightModerate, 1e-3));
-        expect(after.alpha, closeTo(5.0, 1e-3));
-        expect(after.lastUpdatedAt.isAfter(before.lastUpdatedAt), isTrue);
-        // Not a probe of this LO: no ratchet, no strike, no type rotation.
-        expect(after.lastPositiveAtCalibratedAt, stamp);
-        expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
-        expect(after.recentNegativesAtCalibrated, 1);
-        expect(after.lastQuestionType, 'completeCodeQuestion');
-        expect(after.firstMasteredAt, stamp);
-        // The earlier subgoal is not re-enrolled.
-        expect(s.f.progressById['s0']!.progress, 1.0);
+      final after = printAfter(s.f);
+      // Exactly as stored: no debit, no decay persisted, no clock bump.
+      expect(after.alpha, 5.0);
+      expect(after.beta, 1.0);
+      expect(after.lastUpdatedAt, before.lastUpdatedAt);
+      // Not a probe of this LO: no ratchet, no strike, no type rotation.
+      expect(after.lastPositiveAtCalibratedAt, stamp);
+      expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
+      expect(after.recentNegativesAtCalibrated, 1);
+      expect(after.lastQuestionType, 'completeCodeQuestion');
+      expect(after.firstMasteredAt, stamp);
+      // What the negative leaves behind: the review flag (#112).
+      expect(after.regressedAt, isNotNull);
+      // The earlier subgoal is not re-enrolled.
+      expect(s.f.progressById['s0']!.progress, 1.0);
 
-        // The target took its own signal at the probe's difficulty, and the
-        // audit trail names both with their subgoal.
-        expect(outcome.appliedSignals, hasLength(2));
-        final onTarget = outcome.appliedSignals.firstWhere(
-          (a) => a.loId == 'lo-var',
-        );
-        expect(onTarget.subgoalId, 's1');
-        expect(onTarget.betaDelta, closeTo(2.0 * 1.4, 1e-6));
-        final onPrint = outcome.appliedSignals.firstWhere(
-          (a) => a.loId == 'lo-print',
-        );
-        expect(onPrint.subgoalId, 's0');
-        expect(
-          onPrint.betaDelta,
-          closeTo(PolicyConstants.weightModerate, 1e-6),
-        );
-        expect(onPrint.alphaDelta, 0.0);
-      },
-    );
+      // Only the target took a signal, at the probe's difficulty. The
+      // grader's negative is on record under loSignals and reviewFlags,
+      // never under appliedSignals.
+      final onTarget = outcome.appliedSignals.single;
+      expect(onTarget.subgoalId, 's1');
+      expect(onTarget.loId, 'lo-var');
+      expect(onTarget.betaDelta, closeTo(2.0 * 1.4, 1e-6));
+      expect(
+        outcome.loSignals.where((l) => l.loId == 'lo-print').single.subgoalId,
+        's0',
+      );
+      final flag = outcome.reviewFlags.single;
+      expect(flag.subgoalId, 's0');
+      expect(flag.loId, 'lo-print');
+    });
+
+    test('a second negative keeps the older flag and writes nothing', () async {
+      final s = await setup(printBelief: masteredPrint());
+      await grade(s.c, extra: const [negativeOnPrint]);
+      final first = printAfter(s.f).regressedAt;
+      final outcome = await grade(s.c, extra: const [negativeOnPrint]);
+      final after = printAfter(s.f);
+      expect(after.regressedAt, first);
+      expect(after.beta, 1.0);
+      expect(after.lastUpdatedAt, aMinuteAgo);
+      // Still reported: the turn did put this LO in line for review.
+      expect(outcome.reviewFlags.single.loId, 'lo-print');
+    });
 
     test('a positive on an earlier LO credits it in the grader\'s strength, '
         'without certifying it at the probe\'s difficulty', () async {
@@ -2217,20 +2227,42 @@ void main() {
       expect(after.recentNegativesAtCalibrated, 1);
     });
 
-    test('an LO never probed before gets a belief doc at the prior plus '
-        'the signal (§3.5), with no ratchet and no mastery stamp', () async {
+    test('a negative on an earlier LO never probed writes nothing: no doc '
+        'at the prior, no flag — there is nothing to review (#167)', () async {
       final s = await setup();
-      await grade(s.c, extra: const [negativeOnPrint]);
+      final outcome = await grade(s.c, extra: const [negativeOnPrint]);
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
+      expect(outcome.reviewFlags, isEmpty);
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+    });
+
+    test('a positive on an earlier LO never probed gets a belief doc at '
+        'the prior plus the signal (§3.5), with no ratchet and no mastery '
+        'stamp', () async {
+      final s = await setup();
+      await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.moderate,
+          ),
+        ],
+      );
       final after = printAfter(s.f);
-      expect(after.alpha, PolicyConstants.prior);
       expect(
-        after.beta,
+        after.alpha,
         PolicyConstants.prior + PolicyConstants.weightModerate,
       );
+      expect(after.beta, PolicyConstants.prior);
       expect(after.lastPositiveAtCalibratedAt, isNull);
       expect(after.highestPositiveDifficulty, isNull);
       expect(after.firstMasteredAt, isNull);
       expect(after.lastQuestionType, isNull);
+      expect(after.regressedAt, isNull);
     });
 
     test('a signal on a later subgoal is a forward reference and is dropped; '
@@ -2259,7 +2291,29 @@ void main() {
       expect(printAfter(s.f).beta, 1);
     });
 
-    test('follow-up grading caps the cross-subgoal signal at weak', () async {
+    test('follow-up grading caps a cross-subgoal positive at weak', () async {
+      final s = await setup(printBelief: masteredPrint());
+      await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        isFollowUp: true,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+      );
+      expect(
+        printAfter(s.f).alpha,
+        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
+      );
+    });
+
+    test('a follow-up negative on an earlier LO is a prompt like any other: '
+        'no debit, flagged', () async {
       final s = await setup(printBelief: masteredPrint());
       await grade(
         s.c,
@@ -2273,24 +2327,31 @@ void main() {
           ),
         ],
       );
-      expect(
-        printAfter(s.f).beta,
-        closeTo(1.0 + PolicyConstants.weightWeak, 1e-3),
-      );
+      final after = printAfter(s.f);
+      expect(after.beta, 1.0);
+      expect(after.regressedAt, isNotNull);
     });
 
-    test('is weighted by provenance (#100)', () async {
+    test('a cross-subgoal positive is weighted by provenance (#100)', () async {
       final s = await setup(printBelief: masteredPrint());
       final outcome = await grade(
         s.c,
-        extra: const [negativeOnPrint],
+        quality: AnswerQuality.correct,
+        extra: const [
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-print',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.moderate,
+          ),
+        ],
         provenance: EvidenceProvenance.supervised,
       );
       final onPrint = outcome.appliedSignals.firstWhere(
         (a) => a.loId == 'lo-print',
       );
       expect(
-        onPrint.betaDelta,
+        onPrint.alphaDelta,
         closeTo(
           PolicyConstants.weightModerate *
               PolicyConstants.supervisedWeightFactor,
@@ -2321,6 +2382,27 @@ void main() {
         closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
       );
     });
+
+    test(
+      'a transfer nomination on an LO flagged for review this turn is '
+      'dropped too: the same answer never both doubts and credits an LO',
+      () async {
+        final s = await setup(printBelief: masteredPrint());
+        final outcome = await grade(
+          s.c,
+          quality: AnswerQuality.correct,
+          extra: const [negativeOnPrint],
+          transferLOs: const [
+            GradedTransfer(subgoalId: 's0', loId: 'lo-print'),
+          ],
+        );
+        expect(outcome.transferCredits, isEmpty);
+        final after = printAfter(s.f);
+        expect(after.alpha, 5.0);
+        expect(after.beta, 1.0);
+        expect(after.regressedAt, isNotNull);
+      },
+    );
 
     test('a signal on another LO of the warm-up subgoal is incidental, '
         'while the warm-up target itself is a probe', () async {
@@ -2384,15 +2466,14 @@ void main() {
           ],
         ),
       );
-      expect(outcome.appliedSignals, hasLength(2));
       // The target: a probe at medium, ratchet moved.
+      expect(outcome.appliedSignals.single.loId, 'lo-print');
       final print = f.beliefs[f._key('s0', 'lo-print')]!;
       expect(print.lastPositiveAtCalibratedAt!.isAfter(stale), isTrue);
-      // The other LO: incidental — doc created, nothing certified.
-      final input = f.beliefs[f._key('s0', 'lo-input')]!;
-      expect(input.beta, PolicyConstants.prior + PolicyConstants.weightStrong);
-      expect(input.lastPositiveAtCalibratedAt, isNull);
-      expect(input.lastQuestionType, isNull);
+      // The other LO: incidental, and a negative — not evidence (#167).
+      // Never probed, so nothing is written and nothing is flagged.
+      expect(f.beliefs.containsKey(f._key('s0', 'lo-input')), isFalse);
+      expect(outcome.reviewFlags, isEmpty);
       // Still a warm-up turn as far as the active subgoal is concerned.
       expect(f.progressById.containsKey('s1'), isFalse);
     });
@@ -2537,47 +2618,56 @@ void main() {
           strength: strength,
         );
 
-    test(
-      'a cross-subgoal negative that drops a fresh, once-mastered LO below '
-      'mastery flags it, and the next session opens with its review',
-      () async {
-        final s = await setup([older('lo-print')]);
-        // Fresh: no review due on staleness.
-        expect((await s.c.planNext()).isWarmUp, isFalse);
+    test('a cross-subgoal negative on a fresh, once-mastered LO leaves the '
+        'belief exactly as it was, flags it, and the next session opens with '
+        'its review (#167)', () async {
+      final s = await setup([older('lo-print')]);
+      // Fresh: no review due on staleness.
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+      final before = stored(s.f, 'lo-print');
 
-        await grade(
-          s.c,
-          extra: [onPrint(LoSignalKind.negative, LoSignalStrength.moderate)],
-        );
-        final after = stored(s.f, 'lo-print');
-        // (5, 2): mean 0.71 — flagged at the moment of the write.
-        expect(after.beta, closeTo(2.0, 1e-3));
-        expect(after.regressedAt, isNotNull);
-        expect(after.regressedAt, after.lastUpdatedAt);
+      await grade(
+        s.c,
+        extra: [onPrint(LoSignalKind.negative, LoSignalStrength.moderate)],
+      );
+      final after = stored(s.f, 'lo-print');
+      // (5, 1) stays (5, 1), clock untouched: the negative is a prompt,
+      // not evidence. Only the flag is new.
+      expect(after.alpha, 5.0);
+      expect(after.beta, 1.0);
+      expect(after.lastUpdatedAt, before.lastUpdatedAt);
+      expect(after.regressedAt, isNotNull);
+      expect(after.regressedAt!.isAfter(before.lastUpdatedAt), isTrue);
 
-        // The write made the LO fresh, yet the next session reviews it.
-        await s.c.setTarget();
-        final plan = _expectQuestion(await s.c.planNext());
-        expect(plan.isWarmUp, isTrue);
-        expect(plan.warmUp!.subgoal.id, 's0');
-        expect(plan.targetLOs.single.id, 'lo-print');
-        expect(plan.reason.chosenReason, contains('regressed'));
-      },
-    );
+      // Fresh and at mastery, yet the next session reviews it.
+      await s.c.setTarget();
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isWarmUp, isTrue);
+      expect(plan.warmUp!.subgoal.id, 's0');
+      expect(plan.targetLOs.single.id, 'lo-print');
+      expect(plan.reason.chosenReason, contains('regressed'));
+    });
 
-    test('a negative that leaves the LO at mastery does not flag it', () async {
+    test('the flag does not depend on the belief: a weak negative on a '
+        'strong belief flags the LO too (#167)', () async {
       final s = await setup([older('lo-print', alpha: 10)]);
       await grade(
         s.c,
         extra: [onPrint(LoSignalKind.negative, LoSignalStrength.weak)],
       );
-      // (10, 1.5): mean 0.87 — the grade formula sees the dip, no review.
-      expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      // Before #167 this left (10, 1.5), mean 0.87, and no flag: the dip
+      // went to the grade and nobody ever asked. Now nothing dips and the
+      // question is asked next session.
+      final after = stored(s.f, 'lo-print');
+      expect(after.alpha, 10.0);
+      expect(after.beta, 1.0);
+      expect(after.regressedAt, isNotNull);
       await s.c.setTarget();
-      expect((await s.c.planNext()).isWarmUp, isFalse);
+      expect((await s.c.planNext()).isWarmUp, isTrue);
     });
 
-    test('an LO never mastered cannot regress: no flag, no review', () async {
+    test('an LO never mastered is not review material: nothing written, '
+        'no flag, no review', () async {
       final s = await setup([
         LoBelief(
           subgoalId: 's0',
@@ -2591,13 +2681,16 @@ void main() {
         s.c,
         extra: [onPrint(LoSignalKind.negative, LoSignalStrength.strong)],
       );
-      expect(stored(s.f, 'lo-print').regressedAt, isNull);
+      final after = stored(s.f, 'lo-print');
+      expect(after.regressedAt, isNull);
+      expect(after.beta, 1.0);
+      expect(after.lastUpdatedAt, aMinuteAgo);
       await s.c.setTarget();
       expect((await s.c.planNext()).isWarmUp, isFalse);
     });
 
-    test('a transfer credit never flags a recurring LO, and clears the flag '
-        'only when it brings the belief back to mastery', () async {
+    test('a transfer credit never flags a recurring LO, and never clears '
+        'the flag either: the review does (#167)', () async {
       // Healthy and recurring: credited, not flagged, not reviewed.
       final healthy = await setup([older('lo-print')]);
       await grade(
@@ -2609,66 +2702,43 @@ void main() {
       await healthy.c.setTarget();
       expect((await healthy.c.planNext()).isWarmUp, isFalse);
 
-      // Regressed, and the credit does not restore it: still due.
-      final flagged = await setup([
-        older('lo-print', beta: 2, regressedAt: aMinuteAgo),
-      ]);
+      // Flagged — and at mastery, since the negative never touched the
+      // belief: the credit is applied, the flag stays, the LO is still
+      // due. Good news from the side does not answer the question.
+      final flagged = await setup([older('lo-print', regressedAt: aMinuteAgo)]);
       await grade(
         flagged.c,
         quality: AnswerQuality.correct,
         transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
       );
-      // (5.5, 2): mean 0.73.
-      expect(stored(flagged.f, 'lo-print').regressedAt, aMinuteAgo);
+      final after = stored(flagged.f, 'lo-print');
+      expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-3));
+      expect(after.regressedAt, aMinuteAgo);
       await flagged.c.setTarget();
       expect((await flagged.c.planNext()).isWarmUp, isTrue);
-
-      // Regressed just under the line: the credit restores mastery and
-      // clears the flag.
-      final restored = await setup([
-        older('lo-print', alpha: 4.5, beta: 1.2, regressedAt: aMinuteAgo),
-      ]);
-      await grade(
-        restored.c,
-        quality: AnswerQuality.correct,
-        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
-      );
-      // (5.0, 1.2): mean 0.806.
-      expect(stored(restored.f, 'lo-print').regressedAt, isNull);
-      await restored.c.setTarget();
-      expect((await restored.c.planNext()).isWarmUp, isFalse);
     });
 
-    test(
-      'a positive incidental that restores mastery clears the flag',
-      () async {
-        final s = await setup([
-          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
-        ]);
-        await grade(
-          s.c,
-          quality: AnswerQuality.correct,
-          extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
-        );
-        // (7, 2): mean 0.78 — not yet.
-        expect(stored(s.f, 'lo-print').regressedAt, aMinuteAgo);
-        await grade(
-          s.c,
-          quality: AnswerQuality.correct,
-          extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
-        );
-        // (9, 2): mean 0.82 — restored.
-        expect(stored(s.f, 'lo-print').regressedAt, isNull);
-      },
-    );
+    test('a positive incidental leaves the flag as it was; only the review '
+        'clears it (#167)', () async {
+      final s = await setup([older('lo-print', regressedAt: aMinuteAgo)]);
+      await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
+      );
+      final after = stored(s.f, 'lo-print');
+      // (7, 1): comfortably at mastery — and still due for review.
+      expect(after.alpha, closeTo(7.0, 1e-3));
+      expect(after.regressedAt, aMinuteAgo);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isWarmUp, isTrue);
+    });
 
     test(
       'the review clears the flag whichever way it went, and a failed '
       'review does not re-flag: the LO is back on the staleness clock',
       () async {
-        final s = await setup([
-          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
-        ]);
+        final s = await setup([older('lo-print', regressedAt: aMinuteAgo)]);
         final plan = await s.c.planNext();
         expect(plan.isWarmUp, isTrue);
         expect(plan.targetLOs.single.id, 'lo-print');
@@ -2681,7 +2751,8 @@ void main() {
           ),
         );
         final after = stored(s.f, 'lo-print');
-        expect(after.beta, greaterThan(2.0));
+        // A direct probe debits honestly, at full weight.
+        expect(after.beta, greaterThan(1.0));
         expect(after.regressedAt, isNull);
         // Fresh and unflagged: no review next session.
         await s.c.setTarget();
@@ -2693,7 +2764,7 @@ void main() {
       'a probe while the LO\'s own subgoal is active clears the flag',
       () async {
         final s = await setup([
-          older('lo-print', beta: 2, regressedAt: aMinuteAgo),
+          older('lo-print', regressedAt: aMinuteAgo),
         ], onPrint: true);
         await grade(
           s.c,
@@ -2709,7 +2780,7 @@ void main() {
         'the oldest flag wins', () async {
       final s = await setup([
         older('lo-print', lastUpdatedAt: stale),
-        older('lo-input', beta: 2, regressedAt: aMinuteAgo),
+        older('lo-input', regressedAt: aMinuteAgo),
       ]);
       final plan = await s.c.planNext();
       expect(plan.isWarmUp, isTrue);
@@ -2719,8 +2790,8 @@ void main() {
 
       final twoDaysAgo = now.subtract(const Duration(days: 2));
       final both = await setup([
-        older('lo-print', beta: 2, regressedAt: aMinuteAgo),
-        older('lo-input', beta: 2, regressedAt: twoDaysAgo),
+        older('lo-print', regressedAt: aMinuteAgo),
+        older('lo-input', regressedAt: twoDaysAgo),
       ]);
       expect((await both.c.planNext()).targetLOs.single.id, 'lo-input');
     });

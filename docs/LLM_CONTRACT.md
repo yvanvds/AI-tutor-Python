@@ -352,10 +352,12 @@ answer was just graded.
 - **Scope of `loSignals` is the current root goal**, not just the
   current subgoal. Cross-goal forgetting is handled by belief decay
   (part 2), not per-question signals. A signal on an earlier subgoal's
-  LO is applied by the conductor as ordinary evidence on that LO,
-  treated as `medium` difficulty and without any ratchet (conductor
-  policy 2.4, #108) — it is how a prerequisite gap revealed by later
-  work reaches the belief it belongs to.
+  LO is handled by the conductor per its sign (conductor policy 2.4): a
+  positive is ordinary evidence on that LO, treated as `medium`
+  difficulty and without any ratchet (#108); a negative is not applied
+  to the belief but flags the LO for a direct re-probe at the next
+  session start (#167) — it is how a prerequisite gap suspected from
+  later work gets checked rather than assumed.
 - **Categorical signals only.** No numeric scores from the LLM. The
   conductor maps `(signal, strength)` to evidence weights — keeping
   calibration in code, not prompts.

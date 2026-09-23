@@ -63,14 +63,16 @@ class LoBelief {
   final DateTime? firstMasteredAt;
 
   /// Set when an incidental cross-subgoal negative (CONDUCTOR_POLICY §2.4,
-  /// #108) leaves a once-mastered LO below the mastery rule — later work
-  /// revealed a regression on it (#112). While set, the LO is due for a
-  /// warm-up review (§1.5) regardless of how recently it was written: the
-  /// negative itself bumps `lastUpdatedAt`, which would otherwise push
-  /// the review `warmUpStaleAfter` out. Cleared by the next direct probe
-  /// of the LO (the review, or a probe while its subgoal is active) and by
-  /// any write that brings the stored belief back to mastery (a transfer
-  /// credit, a positive incidental). Missing on older docs: not regressed.
+  /// #108) lands on a once-mastered LO: later work *suggested* a gap in it
+  /// (#112). Since #167 that negative is not written to the belief — it is
+  /// the least reliable verdict the system has, and it lands on LOs the
+  /// tutor no longer probes directly, so a debit would never be re-tested
+  /// — and this flag is all it leaves behind: while set, the LO is due for
+  /// a warm-up review (§1.5) regardless of how recently it was written,
+  /// and that direct probe is the measurement that counts. Cleared only by
+  /// the next direct probe of the LO (the review, or a probe while its
+  /// subgoal is active); a transfer credit or positive incidental leaves it
+  /// as it was. Missing on older docs: not flagged.
   final DateTime? regressedAt;
 
   const LoBelief({

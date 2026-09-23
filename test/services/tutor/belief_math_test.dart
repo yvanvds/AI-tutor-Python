@@ -134,39 +134,29 @@ void main() {
     });
   });
 
-  group('nextRegressedAt (#112)', () {
+  group('nextRegressedAt (#112, #167)', () {
     final now = DateTime.utc(2026, 9, 3, 10);
     final earlier = DateTime.utc(2026, 8, 20);
-    // (5, 2): mean 0.71 — below mastery. (10, 1.5): mean 0.87 — at it.
-    const below = BeliefSnapshot(5, 2);
-    const atMastery = BeliefSnapshot(10, 1.5);
 
     DateTime? next({
       DateTime? current,
       bool directProbe = false,
       bool everMastered = true,
       bool negative = true,
-      BeliefSnapshot stored = below,
     }) => nextRegressedAt(
       current: current,
       directProbe: directProbe,
       everMastered: everMastered,
       negative: negative,
-      stored: stored,
       now: now,
     );
 
-    test('a negative that leaves a mastered LO below mastery sets it', () {
+    test('an incidental negative on a once-mastered LO sets it', () {
       expect(next(), now);
     });
 
-    test('an already set flag is kept, so the oldest regression wins', () {
+    test('an already set flag is kept, so the oldest open question wins', () {
       expect(next(current: earlier), earlier);
-    });
-
-    test('a negative that leaves the LO at mastery does not set it', () {
-      expect(next(stored: atMastery), isNull);
-      expect(next(stored: atMastery, current: earlier), isNull);
     });
 
     test('a direct probe clears it whichever way the answer went', () {
@@ -177,17 +167,14 @@ void main() {
       );
     });
 
-    test('an LO never mastered cannot regress', () {
+    test('an LO never mastered is not review material: never flagged', () {
       expect(next(everMastered: false), isNull);
       expect(next(everMastered: false, current: earlier), isNull);
     });
 
-    test('an indirect positive (credit, incidental) clears it only when '
-        'it restores mastery; otherwise the flag is left as it was', () {
-      expect(
-        next(negative: false, current: earlier, stored: atMastery),
-        isNull,
-      );
+    test('an indirect positive (credit, incidental) leaves it as it was: '
+        'good news from the side does not answer the question, the review '
+        'does (#167)', () {
       expect(next(negative: false, current: earlier), earlier);
       expect(next(negative: false, current: null), isNull);
     });

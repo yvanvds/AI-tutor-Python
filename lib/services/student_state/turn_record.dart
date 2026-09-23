@@ -70,6 +70,20 @@ class TurnAppliedSignal {
   };
 }
 
+/// One LO an incidental cross-subgoal negative put — or kept — in line for
+/// the warm-up review this turn (#167, CONDUCTOR_POLICY §2.4). Such a
+/// negative is not applied to the belief: it appears in `loSignals` but not
+/// in `appliedSignals`, and this is the audit trail's record of what the
+/// app did with it instead (`regressedAt` on the LO's doc, §1.5). Carries
+/// the subgoal because the LO is never one of the active subgoal's.
+class TurnReviewFlag {
+  final String subgoalId;
+  final String loId;
+  const TurnReviewFlag({required this.subgoalId, required this.loId});
+
+  Map<String, dynamic> toJson() => {'subgoalId': subgoalId, 'loId': loId};
+}
+
 /// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
 /// previously mastered LO in *another* subgoal that the working solution
 /// correctly used. Carries the subgoal because, unlike `appliedSignals`,
@@ -260,6 +274,11 @@ class PersistedTurnRecord {
   /// every non-code turn; omitted from the doc when empty.
   final List<TurnTransferCredit> transferCredits;
 
+  /// LOs of earlier subgoals flagged for the warm-up review by this turn's
+  /// incidental negatives (#167). Empty on most turns; omitted from the doc
+  /// when empty.
+  final List<TurnReviewFlag> reviewFlags;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -299,6 +318,7 @@ class PersistedTurnRecord {
     this.signalEvents = const [],
     this.provenance = EvidenceProvenance.home,
     this.transferCredits = const [],
+    this.reviewFlags = const [],
     this.isWarmUp = false,
   });
 
@@ -325,6 +345,8 @@ class PersistedTurnRecord {
     'provenance': provenance.name,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
+    if (reviewFlags.isNotEmpty)
+      'reviewFlags': reviewFlags.map((r) => r.toJson()).toList(),
     'calibrationBefore': calibrationBefore.name,
     'calibrationAfter': calibrationAfter.name,
     'subgoalProgressAfter': subgoalProgressAfter,
