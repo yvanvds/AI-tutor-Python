@@ -175,7 +175,7 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
     L.append("")
     L.append(f"Opgesteld {now.strftime('%Y-%m-%d %H:%M')} UTC · regels `{rules.RULES_VERSION}` · sidecar `{json_path.name}`")
     L.append("")
-    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.10, met drie afwijkingen die op 23-09 met de leerkracht beslist zijn: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en `P = M` omdat M_start = 0 voor een eerste rapport dat alles sinds de start van het jaar beslaat.")
+    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.16. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
     L.append("")
@@ -426,14 +426,13 @@ def cmd_apply(args) -> None:
             "formulaVersion": data["rulesVersion"],
             "computedAt": data["computedAt"],
             "k": c["k"], "u": c["u"], "d": c["d"],
-            "mEnd": c["mEnd"], "mStart": 0.0, "g": c["mEnd"] / 100.0,
+            "mEnd": c["mEnd"],
             "proposal": c["proposal"],
             "coreTotal": c["coreTotal"], "coreCounted": c["coreCounted"],
             "extensionTotal": c["extensionTotal"], "extensionMastered": c["extensionMastered"],
             "masteredTotal": c["masteredTotal"], "hardCount": c["hardCount"],
             "staleLoCount": 0, "neverProbedCount": c["neverProbedCount"],
             "supervisedTurns": 0, "homeTurns": 0,
-            "mStartSource": "snapshot", "mStartInexactCount": 0,
             "justification": s["justification"],
             "justificationAt": now,
             "justificationSource": s.get("justificationSource") or "ai",

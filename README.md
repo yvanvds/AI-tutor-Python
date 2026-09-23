@@ -102,7 +102,6 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `lo_beliefs`     | `/uid`        |
    | `turn_history`   | `/uid`        |
    | `grade_proposals` | `/uid`       |
-   | `period_start_snapshots` | `/uid` |
    | `reports`        | `/uid`        |
    | `goals`          | `/type`       |
    | `instructions`   | `/type`       |
@@ -116,6 +115,10 @@ This stores accounts, goals, progress, instructions, and status reports.
    comment. This table is checked against that file by
    `test/core/cosmos_paths_readme_parity_test.dart`, so the two cannot drift
    apart unnoticed again.
+
+   An existing deployment may still have a `period_start_snapshots`
+   container: nothing writes or reads it since formula v1.0.16 (#191), and
+   a fresh deployment does not need it.
 
 5. Go to **Settings** → **Keys**. Copy:
    - **URI** → this is your `COSMOS_ENDPOINT` (looks like `https://yourname.documents.azure.com:443/`).

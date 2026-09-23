@@ -16,7 +16,6 @@ import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
-import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -36,8 +35,6 @@ import 'grade_formula.dart';
 import 'grade_justification.dart';
 import 'grade_proposal.dart';
 import 'milestone.dart';
-import 'period_start_snapshot.dart';
-import 'period_start_snapshot_service.dart';
 
 /// The model call behind [GradeProposalService.writeJustification] failed.
 class GradeJustificationException implements Exception {
@@ -56,7 +53,6 @@ class GradeProposalService {
     required ProgressService progress,
     required ReportService reports,
     required TurnHistoryService turns,
-    required PeriodStartSnapshotService snapshots,
     required SupervisionSource supervision,
     required OpenaiConnector Function() connector,
     DateTime Function()? now,
@@ -67,7 +63,6 @@ class GradeProposalService {
          progress,
          reports,
          turns,
-         snapshots,
          supervision,
          connector,
          now ?? _utcNow,
@@ -80,7 +75,6 @@ class GradeProposalService {
     this._progress,
     this._reports,
     this._turns,
-    this._snapshots,
     this._supervision,
     this._connector,
     this._now,
@@ -94,7 +88,6 @@ class GradeProposalService {
   final ProgressService _progress;
   final ReportService _reports;
   final TurnHistoryService _turns;
-  final PeriodStartSnapshotService _snapshots;
   final SupervisionSource _supervision;
   final OpenaiConnector Function() _connector;
   final DateTime Function() _now;
@@ -198,32 +191,8 @@ class GradeProposalService {
       expectedDifficulty: milestone.expectedDifficulty,
     );
 
-    // M_start (§2.4): the exact per-LO snapshot of this period when the
-    // student app has taken one (#110), else the history rule for a period
-    // that predates it.
-    final double mStart;
-    final MStartSource mStartSource;
-    var mStartInexact = 0;
-    final snapshot = await _snapshots.getStored(uid, milestone.id);
-    if (snapshot != null && snapshot.isFor(milestone)) {
-      mStart = masteryScoreFromSnapshot(
-        los: los,
-        snapshot: snapshot,
-        expectedDifficulty: milestone.expectedDifficulty,
-      );
-      mStartSource = MStartSource.snapshot;
-      mStartInexact = snapshot.inexactCountFor(los);
-    } else {
-      final history = await _progress.getHistoryForUser(uid);
-      mStart = masteryScoreAtPeriodStart(
-        los: los,
-        history: history,
-        periodStart: milestone.periodStart,
-      );
-      mStartSource = MStartSource.history;
-    }
-    final g = growthScore(mStart: mStart, mEnd: end.m);
-    final proposal = roundedProposal(proposalScore(mEnd: end.m, g: g));
+    // P = M (§2.6, v1.0.16): the mastery score on the stamps, rounded.
+    final proposal = roundedProposal(proposalScore(mEnd: end.m));
 
     var stale = 0;
     var neverProbed = 0;
@@ -273,8 +242,6 @@ class GradeProposalService {
       u: end.u,
       d: end.d,
       mEnd: end.m,
-      mStart: mStart,
-      g: g,
       proposal: proposal,
       coreTotal: end.coreTotal,
       coreCounted: end.coreCounted,
@@ -286,8 +253,6 @@ class GradeProposalService {
       neverProbedCount: neverProbed,
       supervisedTurns: supervised,
       homeTurns: home,
-      mStartSource: mStartSource,
-      mStartInexactCount: mStartInexact,
       justification: kept?.justification,
       justificationAt: kept?.justificationAt,
       justificationSource: kept?.justificationSource ?? JustificationSource.ai,
@@ -467,53 +432,6 @@ class GradeProposalService {
     }
     return out;
   }
-
-  /// `M_start` (§2.4) from the period-start snapshot (#110): the same §2.3
-  /// arithmetic as `M_end`, over the per-LO mastery and ratchet the student
-  /// app froze at `periodStart`. An LO the snapshot does not list had no
-  /// belief at the period start: never probed, not mastered.
-  static double masteryScoreFromSnapshot({
-    required List<MilestoneLo> los,
-    required PeriodStartSnapshot snapshot,
-    required QuestionDifficulty expectedDifficulty,
-  }) => computeMasteryScore(
-    los: los,
-    inputs: snapshot.inputs,
-    expectedDifficulty: expectedDifficulty,
-  ).m;
-
-  /// `M_start` (§2.4) from the stored history — the v1.0.5 rule, kept for
-  /// periods that predate the snapshot: the history holds one mastered
-  /// *fraction* per subgoal, not per-LO mastery, so each LO of a subgoal
-  /// is credited that subgoal's fraction as of [periodStart] (0 when the
-  /// subgoal had no sample yet), on both the core and the extension side,
-  /// and nothing is assumed about the difficulty ratchet (`d_start = 0`).
-  /// Deterministic and recomputable from the same stored data a student
-  /// can ask for.
-  static double masteryScoreAtPeriodStart({
-    required List<MilestoneLo> los,
-    required List<ProgressSample> history,
-    required DateTime periodStart,
-  }) {
-    final fraction = progressAt(history, periodStart);
-    var coreTotal = 0;
-    var coreSum = 0.0;
-    var extTotal = 0;
-    var extSum = 0.0;
-    for (final lo in los) {
-      final p = (fraction[lo.subgoalId] ?? 0.0).clamp(0.0, 1.0);
-      if (lo.isCore) {
-        coreTotal += 1;
-        coreSum += p;
-      } else {
-        extTotal += 1;
-        extSum += p;
-      }
-    }
-    final k = coreTotal == 0 ? 1.0 : coreSum / coreTotal;
-    final u = extTotal == 0 ? 0.0 : extSum / extTotal;
-    return masteryFromFractions(k: k, u: u, d: 0.0);
-  }
 }
 
 /// The model behind the justification. Its own connector, not the tutor's:
@@ -536,7 +454,6 @@ final gradeProposalServiceProvider = Provider<GradeProposalService>(
     progress: ref.read(progressServiceProvider),
     reports: ref.read(reportServiceProvider),
     turns: ref.read(turnHistoryServiceProvider),
-    snapshots: ref.read(periodStartSnapshotServiceProvider),
     supervision: ref.read(supervisionSourceProvider),
     connector: () => ref.read(gradeJustificationConnectorProvider),
   ),

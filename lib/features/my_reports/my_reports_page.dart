@@ -310,11 +310,7 @@ class _Breakdown extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l.myReports_breakdown_mastery(m(r.mStart), m(r.mEnd)),
-            style: style,
-          ),
-          Text(l.myReports_breakdown_growth(frac(r.g)), style: style),
+          Text(l.myReports_breakdown_mastery(m(r.mEnd)), style: style),
           Text(
             l.myReports_breakdown_fractions(frac(r.k), frac(r.u), frac(r.d)),
             style: style,

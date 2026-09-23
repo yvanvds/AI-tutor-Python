@@ -277,29 +277,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String reports_grade_masteryStart(String value) {
-    return 'Mastery at period start: $value';
-  }
-
-  @override
-  String get reports_grade_startSource_snapshot =>
-      'Period start: exact per-LO snapshot';
-
-  @override
-  String reports_grade_startSource_snapshotLate(int count) {
-    return 'Period start: per-LO snapshot, $count LOs already written when it was taken';
-  }
-
-  @override
-  String get reports_grade_startSource_history =>
-      'Period start: estimate from progress history (no snapshot for this period)';
-
-  @override
-  String reports_grade_growth(String value) {
-    return 'Growth: $value';
-  }
-
-  @override
   String reports_grade_core(int counted, int total) {
     return 'Core at level: $counted / $total';
   }
@@ -462,13 +439,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get myReports_breakdown_title => 'How this grade was computed';
 
   @override
-  String myReports_breakdown_mastery(String start, String end) {
-    return 'Mastery score M: $start at the start of the period → $end now';
-  }
-
-  @override
-  String myReports_breakdown_growth(String value) {
-    return 'Growth score G = $value';
+  String myReports_breakdown_mastery(String value) {
+    return 'Mastery score M = $value (the proposed grade is M, rounded)';
   }
 
   @override

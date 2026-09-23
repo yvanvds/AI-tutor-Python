@@ -295,55 +295,22 @@ M = 50 · C(k)  +  50 · k · ( w_u · u + w_d · d )        (op 100)
 Volledige kern, volledige uitbreiding, alles op moeilijk aangetoond
 → M = 100.
 
-### 2.4 Groeiscore G
+### 2.4 Groeiscore G — vervallen sinds v1.0.16
 
-De beheersingsscore alleen zou een trage starter dubbel straffen: het
-lage beginpunt blijft in het voortschrijdend gemiddelde staan, ook als de
-achterstand volledig is ingehaald. Daarom telt naast de *stand* ook de
-*beweging*:
+Tot v1.0.15 telde naast de stand M ook een **groeiscore G** mee: welk deel
+van je persoonlijke kloof naar de mijlpaal je in de periode had gedicht,
+gemeten tegen een momentopname van je beheersing bij de periodestart. Die
+term is geschrapt; het punt is sindsdien de beheersingsscore zelf (§2.6).
 
-```
-G = (M_eind − M_start) / (100 − M_start)      begrensd op [0, 1]
-```
-
-met M_start de beheersingsscore aan het begin van de periode (uit de
-momentopname van de periodestart, zie verder) en M_eind die op het
-rapportmoment. G meet **welk
-deel van jouw persoonlijke kloof naar de mijlpaal je deze periode hebt
-gedicht** — wie van ver komt en veel inhaalt, scoort hier hoog, precies
-even hoog als wie van dichtbij hetzelfde relatieve deel dicht. Stond je
-aan het begin al op 100, dan is G = 1 (er viel geen kloof meer te
-dichten). Achteruitgang (M_eind < M_start) telt als G = 0, niet negatief:
-de gezakte M_eind weegt al in de beheersingscomponent.
-
-**Hoe M_start bepaald wordt (regel sinds v1.0.7).** Bij het begin van
-elke rapportperiode legt de app per leerling een **momentopname** vast:
-voor elk leerdoel of het op dat moment beheerst was (zoals §2.2 dat
-leest: sinds v1.0.12 de stempel, daarvoor de drie voorwaarden van §1.5 op
-de opgeslagen overtuiging) en op welke trap de moeilijkheidsratel van §2.5
-stond. De momentopname wordt geschreven bij je eerste sessie na de
-periodestart, vóór er in die sessie iets gemeten wordt. Ze is **exact**,
-ook al gebeurt dat schrijven dagen later: een overtuiging die sinds de
-periodestart niet meer geschreven is, staat nog precies zoals op dat
-moment (sinds v1.0.10 wordt er niets meer naar de periodestart
-teruggerekend, §2.8). Alleen een leerdoel
-dat al vóór de momentopname in de nieuwe periode gemeten werd — bv. een
-mijlpaal die de leerkracht pas later aanmaakte — wordt gelezen zoals het
-op het moment van de opname stond; het voorstel vermeldt hoeveel
-mijlpaal-leerdoelen dat betreft. M_start volgt dan uit **exact dezelfde
-formule als §2.3**, met dezelfde k, u en d — inclusief de eis dat een
-kernleerdoel op het verwachte niveau van de mijlpaal aangetoond moet zijn
-om in k_start mee te tellen. Een leerdoel waarvoor bij de periodestart nog
-geen overtuiging bestond, telt als niet beheerst. De momentopname wordt
-nooit herschreven, ook niet door een reset van je voortgang.
-
-*Overgangsregel (v1.0.5, alleen voor een periode zonder momentopname).*
-Voor een rapportperiode die al liep vóór de momentopname bestond, leest de
-formule M_start uit de opgeslagen voortgangshistoriek: per subdoel van de
-mijlpaal de laatst opgeslagen fractie beheerste leerdoelen op of vóór de
-periodestart (0 als er nog niets opgeslagen was), toegekend aan elk
-leerdoel van dat subdoel, kern én uitbreiding; d_start = 0. Het voorstel
-vermeldt dat het om die schatting gaat.
+Waarom. De trage starter die G moest beschermen, is al beschermd door wat
+M leest: de stempel van §2.2 zegt *of* je een leerdoel hebt aangetoond,
+niet *wanneer*, dus een leerdoel dat je in de laatste week aantoonde telt
+precies even zwaar als een uit de eerste week (§3.1). G voegde daar vooral
+ruis aan toe — een getal dat afhing van het moment waarop de momentopname
+toevallig genomen werd — en liet de app anders rekenen dan de evaluatie
+buiten de app, die al P = M gebruikte. Hoe een mijlpaal met verwachtingen
+per periode om moet gaan met wat je vóór die periode al kon, is een
+latere herziening van deel 2 (§4).
 
 ### 2.5 De rol van moeilijkheid
 
@@ -375,14 +342,13 @@ nooit een extra poort naar beneden.
 ### 2.6 Het puntvoorstel
 
 ```
-P = w_M · M  +  w_G · (100 · G)
+P = M
 ```
 
-De gewichten w_M + w_G = 1 kunnen per periode verschillen en staan vooraf
-vast in dit document (§4). In vroege periodes weegt groei zwaarder (het
-eerste jaar is een ijkjaar en beginposities verschillen sterk); later
-verschuift het gewicht richting beheersing, omdat het rapport uiteindelijk
-beheersing van de leerstof certificeert.
+Het puntvoorstel is de beheersingsscore van §2.3 op het moment van
+berekenen — sinds v1.0.16 zonder groeiterm en zonder beginpunt van de
+periode (§2.4). Het rapport certificeert beheersing van de leerstof, en
+dat is wat M meet.
 
 Het voorstel P wordt afgerond op een geheel punt en gaat, samen met de
 verantwoording, naar de leerkracht. De verantwoording wordt door de AI
@@ -488,8 +454,7 @@ onder **Mijn rapporten**: alleen je eigen rapporten, nieuwste eerst.
 
 Bovenaan staat waar het om gaat: het punt en de verantwoording erbij, plus
 de opmerking van de leerkracht als die er een schreef. Daaronder,
-opgevouwen tot je ze opent, de cijfers om het na te rekenen — M_start en
-M_eind, G, en k, u en d met de kern- en uitbreidingsaantallen en het
+opgevouwen tot je ze opent, de cijfers om het na te rekenen — M, en k, u en d met de kern- en uitbreidingsaantallen en het
 verwachte niveau van de mijlpaal. Dit document nodigt je uit om je eigen
 punt na te rekenen, dus horen die cijfers erbij; maar een rapport opent met
 een punt en een uitleg, niet met een formule.
@@ -520,10 +485,13 @@ opnieuw vrijgegeven; het punt blijft wat het was.
 Het klassieke probleem van permanente evaluatie: een laag punt in
 september blijft in het voortschrijdend gemiddelde staan, ook al is de
 achterstand in oktober ingehaald. Deze formule vangt dat drievoudig op:
-de groeiscore G normaliseert op je *eigen* beginpositie (§2.4), de
-overtuigingen zelf zijn — anders dan een vastgezet cijfer — altijd
-herzienbaar door nieuw bewijs, en de leerkracht bepaalt de frequentie van
-de rapportpunten, zodat latere punten vroege punten verdunnen.
+het punt leest per leerdoel *of* je het aangetoond hebt, niet *wanneer*
+(de stempel van §2.2) — wat je in de laatste week inhaalt, telt even zwaar
+als wat je in de eerste week al kon, en een trage start laat in M geen
+spoor na; de overtuigingen zelf zijn — anders dan een vastgezet cijfer —
+altijd herzienbaar door nieuw bewijs; en de leerkracht bepaalt de
+frequentie van de rapportpunten, zodat latere punten vroege punten
+verdunnen.
 
 ### 3.2 Weinig vragen gekregen ≠ verdacht
 
@@ -546,8 +514,7 @@ opgevangen door §2.8) en *waar* het vandaan komt (toezicht, §2.7).
   getal: het punt komt uit de formule, en de leerkracht leest de
   verantwoording zelf na.
 - **Stilvallen na een goede start.** Wat je aantoonde, blijft aangetoond
-  (§2.2) — maar stilvallen brengt ook niets meer op: de groeiscore G
-  (§2.4) meet wat je déze periode bijleerde, en een volgende mijlpaal
+  (§2.2) — maar stilvallen brengt ook niets meer op: een volgende mijlpaal
   verwacht meer leerdoelen op een hoger niveau (§2.1, §2.5). Intussen
   blijven de opfrisvragen van §2.8 komen, want de tutor volgt wél de
   levende overtuiging.
@@ -567,7 +534,6 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 | C(k) | curve onder de 50 | voorlopig C(k) = k in de code; vorm na schaduwrun |
 | w_u, w_d | gewicht uitbreiding vs. moeilijkheid boven de 50 | voorlopig 0,6 / 0,4 in de code (de waarden van bijlage B); definitief na schaduwrun (som = 1) |
 | koppeling boven-50 | lineair met k, of hardere kerndrempel | voorlopig lineair met k in de code |
-| w_M, w_G per periode | mix beheersing/groei | voorlopig 0,6 / 0,4 in de code voor elke periode (de waarden van bijlage B); definitief na schaduwrun, vroege periodes groei-zwaarder |
 | s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
 | transfergewicht | grootte van het transfer-krediet (§2.8) | voorlopig het zwak-gewicht 0,5 (gerekend als gemiddeld) × s in de code; definitief na schaduwrun (klein; ≤ 0,5) |
 | opfrisdrempel | hoe lang een beheerst leerdoel onaangeroerd moet zijn voor een opfrisvraag (§2.8) | voorlopig 30 dagen (de halve halveringstijd) in de code; definitief na schaduwrun |
@@ -602,6 +568,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.13 | 2026-09-23 | Geen structuurwijziging aan M of P; het punt verandert niet (het leest sinds v1.0.12 de stempel en de ratel, en geen van beide werd door deze signalen ooit geraakt). §1.2: een **negatief** signaal op een leerdoel uit een eerder subdoel is geen bewijs meer maar een aanleiding — het schrijft niets naar de overtuiging (geen β, geen decay-klok, geen nieuw document) en zet alleen de markering van §2.8 op een ooit beheerst leerdoel, zodat de eerstvolgende sessie er een opfrisvraag over stelt; die rechtstreekse meting telt met volle sterkte. Een positief signaal blijft wat het was. §2.8: de markering wordt alleen nog gewist door een rechtstreekse meting, niet meer door transfer-krediet of een positief signaal van opzij. Reden: zo'n negatief is het minst betrouwbare oordeel dat het systeem kent (afgeleid uit een antwoord over iets anders, zonder dat de vraag daarvoor ontworpen was) en treft per definitie leerdoelen die de tutor niet meer rechtstreeks bevraagt, dus het werd nooit meer getoetst; in de klasdata haalde het een zesmaal op rij aangetoond leerdoel een week later blijvend van 0,82 naar 0,65, en het stuurde zo de vraagkeuze, de vastgelopen-detectie en de voortgangsbalkjes op een nooit gecontroleerd oordeel (#167). Bijlage A zegt hoe de tutor het nu verwerkt; bestaande overtuigingen van leerlingen op de nieuwe build worden eenmalig, buiten de app, uit de beurthistoriek herspeeld zonder deze signalen. |
 | 1.0.14 | 2026-09-23 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de moeilijkheidsfactor van §1.2 is niet langer symmetrisch. Een positief signaal weegt zoals voorheen (makkelijk × 0,6, gemiddeld × 1,0, moeilijk × 1,4); een negatief signaal krijgt het spiegelbeeld (makkelijk × 1,4, gemiddeld × 1,0, moeilijk × 0,6). Daardoor is μ niveaubewust: dezelfde grens van 0,80 is ongeveer 90% juist op makkelijk, 80% op gemiddeld en ongeveer 63% op moeilijk; een promotie op de kalibratieladder (§1.6) verandert μ nauwelijks meer en kan je dus niet meer uit je beheersing duwen, en "vastgelopen" (§1.7) leest het niveau vanzelf mee. De "belangrijk gevolg"-alinea van §1.2 keert daarmee om; §2.5 zegt dat moeilijkheid voorlopig twee keer telt (via μ en via de ratel), te herbekijken bij de herziening van deel 2. Reden: de kalibratie parkeert een leerling bewust waar hij 40–75% scoort, terwijl beheersing μ ≥ 0,80 vraagt en "vastgelopen" μ < 0,75 is — met een symmetrische factor was μ gewoon het scorepercentage, zodat een goed gekalibreerde leerling die lang genoeg bevraagd werd per ontwerp onder de grens eindigde (in de klasdata: 154 vragen op moeilijk, 65% juist, en toch "vastgelopen" en niet beheerst). De bestaande overtuigingen worden eenmalig, buiten de app, uit de beurthistoriek herspeeld met de nieuwe factor (alleen α, β en de stempel van §2.2), ná de verplichte client-update en vóór deze versie in gebruik gaat (#169). |
 | 1.0.15 | 2026-09-23 | Geen structuurwijziging aan M of P. §1.7: het voortgangsbalkje van een subdoel blijft ook na het doorschuiven de echte fractie beheerste leerdoelen tonen. Voorheen zette de app de opgeslagen fractie hard op 1,0 zodra een subdoel doorschoof, ook wanneer dat met een vastgelopen leerdoel gebeurde: het balkje stond dan op 100% terwijl het punt, dat per leerdoel meet, het gat wél zag. "Afgerond" is nu een eigen stempel op het voortgangsdocument (`advancedAt`), waarop de tutor de keuze van het volgende subdoel en de app het vinkje baseren; de fractie zelf beweegt er niet door. Gevolg voor §2.4: de overgangsregel van v1.0.5 leest diezelfde fractie uit de voortgangshistoriek en kende zo aan élk leerdoel van een doorgeschoven subdoel 1,0 toe, het vastgelopen inbegrepen, waardoor M_start te hoog uitkwam en de groei G op 0 viel; vanaf nu staat in de historiek de echte fractie. Eerder opgeslagen historiek wordt niet herschreven (#161). |
+| 1.0.16 | 2026-09-23 | **Structuurwijziging aan P.** §2.6: het puntvoorstel is de beheersingsscore, P = M; de groeiscore G (§2.4) vervalt, en daarmee M_start, de momentopname bij de periodestart (v1.0.7) en de overgangsregel uit de voortgangshistoriek (v1.0.5). §4: de open parameter w_M / w_G vervalt; bijlage A en B volgen. §2.9: "Mijn rapporten" toont M, k, u en d, geen beginscore of groei meer. §3.1 en §3.3 steunen niet langer op G: een trage start laat in M geen spoor na omdat de stempel van §2.2 niet vraagt wanneer je iets aantoonde. Reden: de app rekende 60/40 met G, terwijl de evaluatie buiten de app (regelset `1.0.10-eval1`, kader 4) al P = M schreef in dezelfde puntvoorstellen — wie in de app op "Opnieuw berekenen" drukte, kreeg een ander getal dan wat er stond; en G hing af van een momentopname die het ene keer exact en het andere keer een schatting was. De container `period_start_snapshots` wordt niet meer geschreven of gelezen; oude voorstellen en rapporten met `mStart` en `g` blijven leesbaar en worden niet herschreven (#191). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -637,18 +604,13 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | vastgelopen (verzadigd) | α + β ≥ 18 én μ < 0,75 | idem, bij vol bewijsplafond (§1.7) |
 | C(k) | k | curve onder de 50 (§2.3; voorlopig, §4) |
 | w_u / w_d | 0,6 / 0,4 | uitbreiding vs. moeilijkheid boven de 50 (§2.3; voorlopig, §4) |
-| w_M / w_G | 0,6 / 0,4 | beheersing vs. groei in P (§2.6; voorlopig, §4) |
 | verouderd-drempel | 30 dagen (= opfrisdrempel) | wanneer een mijlpaal-leerdoel in het voorstel als "verouderd" gemeld wordt (§3.2) |
 
 De constanten van deel 2 staan sinds v1.0.5 in
 `lib/services/grading/grade_formula.dart` (`GradingConstants`), de
-berekening zelf ook daar; het lezen van de leerlingdata, de twee regels voor
-M_start (§2.4) en de opslag in `lib/services/grading/grade_proposal_service.dart`;
-de momentopname van de periodestart (sinds v1.0.7) in
-`lib/services/grading/period_start_snapshot.dart`, geschreven door de
-leerling-app bij sessiestart via `period_start_snapshot_service.dart`
-(container `period_start_snapshots`);
-de tekst van de verantwoording in `lib/services/grading/grade_justification.dart`.
+berekening zelf ook daar (sinds v1.0.16 P = M, `proposalScore`); het
+lezen van de leerlingdata en de opslag in
+`lib/services/grading/grade_proposal_service.dart`; de tekst van de verantwoording in `lib/services/grading/grade_justification.dart`.
 Elk opgeslagen voorstel draagt het versienummer van dit document waarmee
 het berekend werd (`formulaVersion`); een afgetekend voorstel wordt nooit
 herrekend (§5).
@@ -679,7 +641,7 @@ zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
 wordt op het beurtrecord vermeld. Sinds v1.0.12 leest ook de **formule
 van deel 2** die stempel als "beheerst?" (§2.2; `LoGradeInput.fromBelief`
 in `grade_formula.dart`, de enige lezer van de leerlingdata voor het punt,
-ook voor de momentopname van §2.4): gezet, dan beheerst; niet gezet, dan
+): gezet, dan beheerst; niet gezet, dan
 niet — ook wanneer de opgeslagen α, β en ratel vandaag aan §1.5 voldoen.
 De oude-data-regel van daarnet is dus een regel voor de tutor (transfer,
 opfrissen), niet voor het punt: ze is een lezing van de levende
@@ -723,9 +685,8 @@ niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
 de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
 code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
 uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel —
-per leerdoel de stempel van §2.2 en de ratel van §2.5, zoals ze op het moment van berekenen opgeslagen staan, M_start uit de momentopname van de periodestart
-volgens §2.4 (sinds v1.0.7; uit de historiek voor een periode zonder
-momentopname, en het voorstel vermeldt welke) — vraagt de
+per leerdoel de stempel van §2.2 en de ratel van §2.5, zoals ze op het
+moment van berekenen opgeslagen staan — vraagt de
 verantwoording aan de AI (die het getal als vaststaand feit meekrijgt,
 samen met de statusrapporten uit de periode en het verloop per subdoel),
 past aan en tekent af. Het voorstel meldt ook de eerlijke
@@ -756,30 +717,28 @@ tot die er is, telt elke beurt als thuis en verandert s niets.
 
 Mijlpaal: 8 kernleerdoelen, 3 uitbreidingsleerdoelen, verwacht niveau
 *gemiddeld*. Ter illustratie met voorbeeldwaarden (géén vastgelegde
-parameters): C(k) = k, w_u = 0,6, w_d = 0,4, w_M = 0,6, w_G = 0,4.
+parameters): C(k) = k, w_u = 0,6, w_d = 0,4.
 
-**Leerling A** startte de periode op M_start = 40. Op het rapportmoment:
+**Leerling A**, op het rapportmoment:
 kern 8/8 beheerst op niveau (k = 1), uitbreiding 2/3 (u = 0,667), en 4 van
 de 10 beheerste leerdoelen op *moeilijk* aangetoond (d = 0,4).
 
 ```
 M = 50·1 + 50·1·(0,6·0,667 + 0,4·0,4) = 50 + 28,0 = 78,0
-G = (78,0 − 40) / (100 − 40) = 0,633
-P = 0,6·78,0 + 0,4·63,3 = 72,1  →  voorstel 72
+P = M = 78,0  →  voorstel 78
 ```
 
-**Leerling B** kwam van ver: M_start = 10. Op het rapportmoment: kern 7/8
+**Leerling B** kwam van ver. Op het rapportmoment: kern 7/8
 (k = 0,875), uitbreiding 1/3 (u = 0,333), niets op moeilijk (d = 0).
 
 ```
 M = 50·0,875 + 50·0,875·(0,6·0,333 + 0,4·0) = 43,75 + 8,75 = 52,5
-G = (52,5 − 10) / (100 − 10) = 0,472
-P = 0,6·52,5 + 0,4·47,2 = 50,4  →  voorstel 50
+P = M = 52,5  →  voorstel 53
 ```
 
 B haalt ondanks de trage start een voldoende — niet uit medelijden, maar
-omdat B aantoonbaar bijna de helft van een grote persoonlijke kloof heeft
-gedicht én de kern nagenoeg beheerst. A's hogere punt komt waar het
+omdat B de kern nagenoeg beheerst; waar B vandaan kwam, telt niet mee,
+in de ene noch de andere richting (§3.1). A's hogere punt komt waar het
 vandaan hoort te komen: meer beheersing, uitbreiding, en aantonen op
 moeilijk.
 

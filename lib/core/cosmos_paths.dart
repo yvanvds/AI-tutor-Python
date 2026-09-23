@@ -16,7 +16,6 @@ const String _turnHistoryContainer = 'turn_history';
 const String _playgroundFilesContainer = 'playground_files';
 const String _milestonesContainer = 'milestones';
 const String _gradeProposalsContainer = 'grade_proposals';
-const String _periodStartSnapshotsContainer = 'period_start_snapshots';
 const String _reportsContainer = 'reports';
 
 /// Constant partition-key values for the single-partition containers
@@ -98,13 +97,6 @@ class CosmosPaths {
   /// student app never reads it.
   static CosmosContainer gradeProposals() =>
       _client.container(_gradeProposalsContainer);
-
-  /// `/uid` partition. Doc id `${uid}_${milestoneId}`: per-LO mastery and
-  /// difficulty ratchet as of a milestone's period start, written by the
-  /// student app on its first session after that instant and read by the
-  /// grade formula as `M_start` (#110, PUNTENFORMULE §2.4).
-  static CosmosContainer periodStartSnapshots() =>
-      _client.container(_periodStartSnapshotsContainer);
 
   /// `/uid` partition. Doc id `${uid}_${milestoneId}`: the published report
   /// of one student on one milestone — the frozen, student-facing copy of a

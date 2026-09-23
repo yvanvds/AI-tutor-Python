@@ -67,9 +67,7 @@ Map<String, dynamic> _reportDoc({
   publishedAt: publishedAt ?? DateTime.utc(2026, 10, 20, 17, 30),
   updatedAt: updatedAt ?? publishedAt ?? DateTime.utc(2026, 10, 20, 17, 30),
   formulaVersion: '1.0.7',
-  mStart: 50,
   mEnd: 90,
-  g: 0.8,
   k: 1,
   u: 0.5,
   d: 0.5,
@@ -162,10 +160,12 @@ void main() {
 
     expect(find.byKey(const Key('my-reports-breakdown-m1')), findsOneWidget);
     expect(
-      find.text('Mastery score M: 50.0 at the start of the period → 90.0 now'),
+      find.text('Mastery score M = 90.0 (the proposed grade is M, rounded)'),
       findsOneWidget,
     );
-    expect(find.text('Growth score G = 0.80'), findsOneWidget);
+    // P = M since v1.0.16 (#191): no period-start score, no growth term.
+    expect(find.textContaining('Growth score'), findsNothing);
+    expect(find.textContaining('start of the period'), findsNothing);
     expect(
       find.text(
         'k = 1.00 (core) · u = 0.50 (extension) · d = 0.50 (shown at hard)',

@@ -13,8 +13,11 @@ it with the symmetric factor and incidentals on reproduces the stored
 beliefs exactly (validated 2026-09-23 on 6EWI) — `evaluate.py validate`
 checks that on demand.
 
-Rule set `1.0.10-eval1` = PUNTENFORMULE v1.0.10 with three deliberate
-departures, each decided with the teacher on 2026-09-23:
+Rule set `1.0.16-eval1` = PUNTENFORMULE v1.0.16, replayed from the turn
+log. It computes exactly what `1.0.10-eval1` computed; what changed is the
+formula around it. That set was v1.0.10 with three deliberate departures,
+each decided with the teacher on 2026-09-23, which the formula has since
+taken over (v1.0.12–v1.0.14):
 
   * asymmetric difficulty factor (#169): a wrong answer on `hard` weighs
     ×0.6, on `easy` ×1.4 — so μ becomes level-aware and promotion on the
@@ -24,9 +27,10 @@ departures, each decided with the teacher on 2026-09-23:
   * incidental *negative* signals (grader remarks about an earlier subgoal's
     LO while grading another) are not evidence (#167).
 
-and one framing choice: P = M. M_start is 0 for a first report that covers
-everything since the start of the year, which makes G = M/100 and the mix
-collapse to M. The growth term is under redesign; this keeps it neutral.
+and P = M. In `1.0.10-eval1` that was a framing choice (M_start = 0 for a
+first report, so G = M/100 and the 60/40 mix collapsed to M); since
+PUNTENFORMULE v1.0.16 (#191) it is the rule itself: the growth term G, and
+with it M_start, is gone from the formula, in the app as here.
 """
 
 from __future__ import annotations
@@ -34,7 +38,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
-RULES_VERSION = "1.0.10-eval1"
+RULES_VERSION = "1.0.16-eval1"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0

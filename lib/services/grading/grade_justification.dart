@@ -68,7 +68,7 @@ JustificationPrompt buildJustificationPrompt({
       '''
 You write the justification that accompanies a report-card grade proposal for a secondary-school Python course. The teacher reads it before signing the grade off.
 
-THE NUMBER IS FIXED. The proposal of ${proposal.proposal}/100 was computed by a published, deterministic formula from the student's learning data. You do not choose, estimate, question, round, or recommend a grade, and you do not suggest that it should be higher or lower. Your job is to explain, from the evidence provided, *why* the underlying measurements are what they are.
+THE NUMBER IS FIXED. The proposal of ${proposal.proposal}/100 was computed by a published, deterministic formula from the student's learning data. You do not choose, estimate, question, round, or recommend a grade, and you do not suggest that it should be higher or lower. Your job is to explain, from the evidence provided, *why* the underlying measurements are what they are. The proposal is the mastery score at the moment of computing, rounded; the formula has no growth component, so do not present progress over the period as part of the number.
 
 Write in $language. Plain prose only: no JSON, no markdown headings, no bullet lists, no tags or envelopes. Two to four short paragraphs, addressed to the teacher, about the student in the third person by first name.
 
@@ -89,9 +89,6 @@ The student's current difficulty level is context only ("works at the hard level
       'version': proposal.formulaVersion,
       'proposal': proposal.proposal,
       'masteryScoreEnd': _round(proposal.mEnd),
-      'masteryScoreStart': _round(proposal.mStart),
-      'masteryScoreStartSource': proposal.mStartSource.name,
-      'growth': _round(proposal.g),
       'coreMasteredAtLevel': '${proposal.coreCounted}/${proposal.coreTotal}',
       'extensionMastered':
           '${proposal.extensionMastered}/${proposal.extensionTotal}',

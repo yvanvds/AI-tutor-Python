@@ -278,29 +278,6 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
-  String reports_grade_masteryStart(String value) {
-    return 'Beheersing bij start periode: $value';
-  }
-
-  @override
-  String get reports_grade_startSource_snapshot =>
-      'Start periode: exacte momentopname per leerdoel';
-
-  @override
-  String reports_grade_startSource_snapshotLate(int count) {
-    return 'Start periode: momentopname per leerdoel, $count leerdoelen al geschreven toen ze genomen werd';
-  }
-
-  @override
-  String get reports_grade_startSource_history =>
-      'Start periode: schatting uit de voortgangshistoriek (geen momentopname voor deze periode)';
-
-  @override
-  String reports_grade_growth(String value) {
-    return 'Groei: $value';
-  }
-
-  @override
   String reports_grade_core(int counted, int total) {
     return 'Kern op niveau: $counted / $total';
   }
@@ -463,13 +440,8 @@ class AppLocalizationsNl extends AppLocalizations {
   String get myReports_breakdown_title => 'Hoe dit punt berekend is';
 
   @override
-  String myReports_breakdown_mastery(String start, String end) {
-    return 'Beheersingsscore M: $start bij de start van de periode → $end nu';
-  }
-
-  @override
-  String myReports_breakdown_growth(String value) {
-    return 'Groeiscore G = $value';
+  String myReports_breakdown_mastery(String value) {
+    return 'Beheersingsscore M = $value (het puntvoorstel is M, afgerond)';
   }
 
   @override

@@ -283,8 +283,8 @@ class ReportBatchService {
   ///
   /// This is the "geen data" guard. It is deliberately about the *existence*
   /// of belief docs, not about their age: a student who mastered the
-  /// milestone's objectives before the period still has a real grade (with
-  /// zero growth), while a student the tutor never saw on any of them would
+  /// milestone's objectives before the period still has a real grade (its
+  /// mastery score, P = M), while a student the tutor never saw on any of them would
   /// otherwise be handed a computed 0.
   Future<bool> hasEvidence({
     required String uid,
