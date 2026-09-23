@@ -4,6 +4,7 @@
 // round trip (only in-window reports reach the model; the stored text is
 // the model's, the stored number is not), and sign-off.
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -18,6 +19,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +47,21 @@ class _FakeConnector extends OpenaiConnector {
     lastScope = inputs;
     return reply;
   }
+}
+
+/// A registry with Anchor behind it. Nothing here grades a turn, so what
+/// it answers never matters; that it is wired does (#160).
+class _WiredRegistry implements SupervisionSource {
+  const _WiredRegistry();
+
+  @override
+  bool get isWired => true;
+
+  @override
+  Future<EvidenceProvenance> provenanceFor({
+    required String uid,
+    required DateTime at,
+  }) async => EvidenceProvenance.supervised;
 }
 
 final DateTime _now = DateTime.utc(2026, 10, 15, 12);
@@ -77,6 +94,11 @@ Map<String, dynamic> _belief(
   required DateTime at,
   String? highest = 'medium',
   bool calibrated = true,
+
+  /// The one-way stamp the grade reads as "mastered" (#168). Off for a doc
+  /// that never crossed the §1.5 bar, or one an old client rewrote without
+  /// the field (#165) before the one-off reconstruction.
+  bool mastered = true,
 }) => {
   'id': '${_student}_${subgoalId}_$loId',
   'type': 'lo_belief',
@@ -89,6 +111,7 @@ Map<String, dynamic> _belief(
   if (calibrated) 'lastPositiveAtCalibratedAt': at.toIso8601String(),
   if (highest != null) 'highestPositiveDifficulty': highest,
   'recentNegativesAtCalibrated': 0,
+  if (mastered) 'firstMasteredAt': at.toIso8601String(),
 };
 
 Map<String, dynamic> _sample(String goalId, double progress, DateTime at) =>
@@ -160,6 +183,7 @@ class _Fixture {
     List<Map<String, dynamic>> proposals = const [],
     List<Map<String, dynamic>> snapshots = const [],
     ConnectorResult reply = const ConnectorOk('Sam did well.'),
+    this.supervision = const NoSupervisionSource(),
   }) : goals = InMemoryCosmos([
          _goal('r'),
          _goal('s1', parentId: 'r', los: ['a', 'b']),
@@ -183,6 +207,9 @@ class _Fixture {
   final InMemoryCosmos proposals;
   final InMemoryCosmos snapshots;
   final _FakeConnector connector;
+
+  /// The app's own binding unless a test says otherwise (#160).
+  final SupervisionSource supervision;
 
   GradeProposalService service({DateTime? now}) => GradeProposalService(
     container: proposals.container,
@@ -213,6 +240,7 @@ class _Fixture {
       ),
       getUid: () => _teacher,
     ),
+    supervision: supervision,
     connector: () => connector,
     now: () => now ?? _now,
   );
@@ -223,7 +251,7 @@ void main() {
   final stale = _now.subtract(const Duration(days: 45));
 
   group('compute', () {
-    test('reads the student\'s beliefs as stored against the milestone and '
+    test('reads the student\'s belief docs against the milestone and '
         'persists a draft with the counts', () async {
       final f = _Fixture(
         beliefs: [
@@ -231,7 +259,7 @@ void main() {
           _belief('s1', 'a', alpha: 6, beta: 1, at: fresh, highest: 'hard'),
           _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
           // Extension: c mastered, d not (one easy positive, never at
-          // calibration).
+          // calibration, never stamped).
           _belief('s2', 'c', alpha: 5, beta: 1, at: fresh),
           _belief(
             's2',
@@ -241,6 +269,7 @@ void main() {
             at: fresh,
             highest: 'easy',
             calibrated: false,
+            mastered: false,
           ),
         ],
         turns: [
@@ -279,13 +308,94 @@ void main() {
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.10');
+      expect(p.formulaVersion, '1.0.12');
       expect(p.mStartSource, MStartSource.history);
 
       final stored = f.proposals.docs['${_student}_m1'];
       expect(stored, isNotNull);
       expect(stored!['proposal'], 72);
       expect(stored['type'], 'grade_proposal');
+    });
+
+    test('mastery is the one-way stamp, not the live belief (#168): a core '
+        'LO whose (α, β) later collapsed still counts, and a doc without the '
+        'stamp does not, however high it stands', () async {
+      final f = _Fixture(
+        beliefs: [
+          // Core a: stamped at hard; two strong incidental negatives since
+          // left the stored belief at mean 0,29 (#167's pattern), and the
+          // tutor no longer probes a mastered LO.
+          _belief('s1', 'a', alpha: 2, beta: 5, at: fresh, highest: 'hard'),
+          // Core b: stamped, healthy.
+          _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
+          // Extension c: (5, 1) with the old flag but no stamp — the doc an
+          // old client keeps rewriting (#165), before the reconstruction.
+          // The live belief is not a fallback: reading it would quietly
+          // keep exactly these students' grades on the belief.
+          _belief('s2', 'c', alpha: 5, beta: 1, at: fresh, mastered: false),
+          // Extension d: stamped at medium.
+          _belief('s2', 'd', alpha: 5, beta: 1, at: fresh),
+        ],
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      // Read live, a would fail the 0,80 bar: k = 0.5. The stamp: k = 1.
+      expect(p.coreCounted, 2);
+      expect(p.k, 1.0);
+      expect(p.extensionMastered, 1);
+      expect(p.u, 0.5);
+      expect(p.masteredTotal, 3);
+      expect(p.hardCount, 1);
+      // M = 50 + 50·(0.6·0.5 + 0.4·(1/3)) = 71.67, as in the first test.
+      expect(p.mEnd, closeTo(71.667, 1e-3));
+      // Grading is a read: the collapsed belief and the missing stamp are
+      // left exactly as they were.
+      expect(f.beliefs.docs['${_student}_s1_a']!['alpha'], 2);
+      expect(
+        f.beliefs.docs['${_student}_s2_c']!.containsKey('firstMasteredAt'),
+        isFalse,
+      );
+    });
+
+    test('a belief doc from before the ratchet field (#164) is read under '
+        '§2.5 at grade time — medium when the old flag is set — and the doc '
+        'itself is left without a level', () async {
+      final f = _Fixture(
+        beliefs: [
+          // Core a: mastered, old flag set, no level on disk (a pre-#103
+          // doc, or one an older client rewrote — #165).
+          _belief('s1', 'a', alpha: 5, beta: 1, at: fresh, highest: null),
+          // Core b: mastered, level stored.
+          _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
+        ],
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      // Both core LOs count at the milestone's medium: k = 1.
+      expect(p.coreCounted, 2);
+      expect(p.k, 1.0);
+      // The reading is medium, so it never buys the hard band.
+      expect(p.masteredTotal, 2);
+      expect(p.hardCount, 0);
+      expect(p.d, 0.0);
+      // The reading stayed in the formula: the stored doc still says
+      // "unknown", ready for the next measured positive.
+      final doc = f.beliefs.docs['${_student}_s1_a']!;
+      expect(doc.containsKey('highestPositiveDifficulty'), isFalse);
+
+      // At a milestone expecting hard, the same reading gates the LO out.
+      final hard = await f.service().compute(
+        uid: _student,
+        milestone: _milestone().copyWith(
+          expectedDifficulty: QuestionDifficulty.hard,
+        ),
+      );
+      expect(hard.coreCounted, 0);
+      expect(hard.k, 0.0);
     });
 
     test('M_start comes from the latest history sample at or before the '
@@ -626,6 +736,66 @@ void main() {
       final stored = f.proposals.docs['${_student}_m1']!;
       expect(stored['justification'], 'Sam beheerst de kern.');
       expect(stored['proposal'], draft.proposal);
+    });
+
+    test('the supervised/home tally reaches the model only while a '
+        'supervision registry is bound (#160)', () async {
+      final turns = [
+        _turn(_now.subtract(const Duration(days: 10))),
+        _turn(_now.subtract(const Duration(days: 9)), provenance: 'supervised'),
+      ];
+      final beliefs = [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)];
+
+      // The app's own binding: the tally is "0 supervised" for everyone and
+      // says nothing about this student, so neither the facts nor the
+      // contract carry it. The counts still land on the doc (§2.7 stands).
+      final unwired = _Fixture(beliefs: beliefs, turns: turns);
+      var svc = unwired.service();
+      var draft = await svc.compute(uid: _student, milestone: _milestone());
+      expect(draft.supervisedTurns, 1);
+      expect(draft.homeTurns, 1);
+      await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'hard',
+        languageCode: 'nl',
+      );
+      expect(
+        unwired.connector.lastInput,
+        isNot(contains('supervisedTurnsInPeriod')),
+      );
+      expect(unwired.connector.lastInput, isNot(contains('homeTurnsInPeriod')));
+      expect(
+        unwired.connector.lastInput,
+        contains('"staleLearningObjectives"'),
+      );
+      expect(
+        unwired.connector.lastInstructions,
+        isNot(contains('no supervised work')),
+      );
+
+      // Anchor bound: the same tally is a measurement, and it is back.
+      final wired = _Fixture(
+        beliefs: beliefs,
+        turns: turns,
+        supervision: const _WiredRegistry(),
+      );
+      svc = wired.service();
+      draft = await svc.compute(uid: _student, milestone: _milestone());
+      await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'hard',
+        languageCode: 'nl',
+      );
+      expect(
+        wired.connector.lastInput,
+        contains('"supervisedTurnsInPeriod":1'),
+      );
+      expect(wired.connector.lastInput, contains('"homeTurnsInPeriod":1'));
+      expect(wired.connector.lastInstructions, contains('no supervised work'));
     });
 
     test('a transport failure surfaces as GradeJustificationException and '

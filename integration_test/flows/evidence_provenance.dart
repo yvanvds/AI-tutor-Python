@@ -36,6 +36,9 @@ class _InSession implements SupervisionSource {
   final List<({String uid, DateTime at})> asked = [];
 
   @override
+  bool get isWired => true;
+
+  @override
   Future<EvidenceProvenance> provenanceFor({
     required String uid,
     required DateTime at,

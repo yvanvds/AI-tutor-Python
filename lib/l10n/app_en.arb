@@ -107,6 +107,18 @@
   "reports_grade_button_justify": "Write justification",
   "reports_grade_button_signOff": "Sign off",
   "reports_grade_button_busy": "Working…",
+  "reports_recompute_unchanged": "The grade did not change: {grade}/100.",
+  "@reports_recompute_unchanged": {
+    "placeholders": { "grade": { "type": "int" } }
+  },
+  "reports_recompute_unchanged_rewritten": "The grade did not change: {grade}/100. The justification was rewritten.",
+  "@reports_recompute_unchanged_rewritten": {
+    "placeholders": { "grade": { "type": "int" } }
+  },
+  "reports_recompute_unchanged_kept": "The grade did not change: {grade}/100. Your own text stays as it is.",
+  "@reports_recompute_unchanged_kept": {
+    "placeholders": { "grade": { "type": "int" } }
+  },
   "reports_grade_proposal_label": "Proposal",
   "reports_grade_masteryEnd": "Mastery now: {value}",
   "@reports_grade_masteryEnd": {
@@ -146,6 +158,10 @@
       "supervised": { "type": "int" },
       "home": { "type": "int" }
     }
+  },
+  "reports_grade_reliability_unwired": "Stale: {stale} LOs (never probed: {never}).",
+  "@reports_grade_reliability_unwired": {
+    "placeholders": { "stale": { "type": "int" }, "never": { "type": "int" } }
   },
   "reports_grade_formulaVersion": "Formula v{version}, computed {ts}",
   "@reports_grade_formulaVersion": {

@@ -28,10 +28,17 @@ class LoBelief {
   /// force at the time; this one is absolute, which is what the grade
   /// formula needs as its difficulty differentiator above the 50-line.
   ///
-  /// Backwards compatibility: docs written before the field existed read
-  /// the old binary flag's documented meaning — "ever demonstrated at
-  /// non-easy" — as [QuestionDifficulty.medium] when
-  /// [lastPositiveAtCalibratedAt] is set, and `null` otherwise.
+  /// Backwards compatibility: a doc without the field reads as `null` and
+  /// stays that way — the model never invents a level (#164). Before, a
+  /// doc written before the field existed was read as
+  /// [QuestionDifficulty.medium] whenever [lastPositiveAtCalibratedAt] was
+  /// set (the old flag's documented "ever demonstrated at non-easy"), and
+  /// the next write stored that guess as if it had been measured; a
+  /// student who had really demonstrated the LO at hard lost that for
+  /// good, since the tutor does not re-probe a mastered LO. The one place
+  /// that needs the *meaning* of such a doc — the grade formula's core
+  /// gate — applies PUNTENFORMULE §2.5's old-data reading itself, at grade
+  /// time (`LoGradeInput.fromBelief`), and nothing is written back.
   final QuestionDifficulty? highestPositiveDifficulty;
 
   /// Count of consecutive negative signals on this LO whose answer was at
@@ -44,10 +51,15 @@ class LoBelief {
   /// When this LO first met all three mastery conditions (CONDUCTOR_POLICY
   /// §4.1) — a one-way stamp, `null` until then, never cleared by decay or
   /// later negatives. It is the gate for transfer credit (#101, §3.7): only
-  /// an LO once mastered by direct probing can be refreshed sideways.
+  /// an LO once mastered by direct probing can be refreshed sideways. And
+  /// it is what the grade formula reads as "mastered" (#168, PUNTENFORMULE
+  /// §2.2): the belief steers the teaching, the stamp steers the grade.
   /// Docs written before the field existed are read by the conductor as
   /// "mastered as of the last direct write" (`belief_math.everMastered`)
-  /// and get the stamp on their next write; nothing is backfilled.
+  /// and get the stamp on their next write; the grade applies no such
+  /// fallback — a doc without the stamp is not mastered — and the app
+  /// backfills nothing: older docs get their stamp once, outside the app,
+  /// from `turn_history`.
   final DateTime? firstMasteredAt;
 
   /// Set when an incidental cross-subgoal negative (CONDUCTOR_POLICY §2.4,
@@ -143,13 +155,11 @@ class LoBelief {
         ? DateTime.tryParse(positiveRaw)
         : null;
     final highestRaw = doc['highestPositiveDifficulty'];
-    // An unrecognised level is treated like a missing one.
-    final highestPositiveDifficulty =
-        QuestionDifficulty.values.cast<QuestionDifficulty?>().firstWhere(
-          (d) => d!.name == highestRaw,
-          orElse: () => null,
-        ) ??
-        _legacyHighest(lastPositiveAtCalibratedAt);
+    // An unrecognised level is treated like a missing one, and a missing
+    // one is *missing*: not derived from the old flag (#164).
+    final highestPositiveDifficulty = QuestionDifficulty.values
+        .cast<QuestionDifficulty?>()
+        .firstWhere((d) => d!.name == highestRaw, orElse: () => null);
     return LoBelief(
       subgoalId: (doc['subgoalId'] as String?) ?? '',
       loId: (doc['loId'] as String?) ?? '',
@@ -172,9 +182,3 @@ class LoBelief {
     );
   }
 }
-
-/// What a doc without `highestPositiveDifficulty` says about the level: the
-/// old flag's documented reading ("ever demonstrated at non-easy") maps to
-/// `medium`; no flag means no positive on record.
-QuestionDifficulty? _legacyHighest(DateTime? lastPositiveAtCalibratedAt) =>
-    lastPositiveAtCalibratedAt == null ? null : QuestionDifficulty.medium;

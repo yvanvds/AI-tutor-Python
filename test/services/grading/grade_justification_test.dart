@@ -1,7 +1,9 @@
 // The justification prompt (#99, PUNTENFORMULE §2.6/§3.3): the number goes
 // in as a fixed fact, the contract forbids the model an own verdict, the
 // evidence is exactly what was passed, and the reply is stored as prose
-// even when the model wraps it in the tutor envelope.
+// even when the model wraps it in the tutor envelope. The supervised/home
+// split is in the facts and the contract only while a supervision registry
+// is bound (#160).
 
 import 'dart:convert';
 
@@ -56,6 +58,7 @@ void main() {
       reports: const [],
       trajectory: const [],
       languageCode: 'nl',
+      supervisionWired: true,
     );
     expect(p.instructions, contains('78/100'));
     expect(p.instructions, contains('THE NUMBER IS FIXED'));
@@ -63,10 +66,49 @@ void main() {
     final input = jsonDecode(p.input) as Map<String, dynamic>;
     expect((input['formula'] as Map)['proposal'], 78);
     expect((input['formula'] as Map)['coreMasteredAtLevel'], '4/4');
+    // With a registry bound the split is a measurement: it is in the facts
+    // and the contract names it (#160).
     expect((input['reliability'] as Map)['supervisedTurnsInPeriod'], 3);
+    expect((input['reliability'] as Map)['homeTurnsInPeriod'], 9);
+    expect(p.instructions, contains('no supervised work'));
+    expect(p.instructions, contains('where the evidence was produced'));
     // Calibration is context, and labelled as such.
     expect((input['contextOnly'] as Map)['currentDifficultyLevel'], 'hard');
     expect(input['student'], 'Sam');
+  });
+
+  test('without a supervision registry the supervised/home split is neither '
+      'a fact nor an uncertainty signal the model is asked to name (#160)', () {
+    final p = buildJustificationPrompt(
+      proposal: _proposal(),
+      milestone: _milestone(),
+      studentName: 'Sam',
+      calibrationLevel: 'hard',
+      reports: const [],
+      trajectory: const [],
+      languageCode: 'nl',
+      supervisionWired: false,
+    );
+    final input = jsonDecode(p.input) as Map<String, dynamic>;
+    final reliability = input['reliability'] as Map;
+    // The real uncertainty signals stay; the inert tally goes.
+    expect(
+      reliability.keys,
+      unorderedEquals([
+        'staleLearningObjectives',
+        'neverProbedLearningObjectives',
+      ]),
+    );
+    expect(reliability['staleLearningObjectives'], 1);
+    expect(p.instructions, isNot(contains('supervised')));
+    expect(p.instructions, isNot(contains('where the evidence was produced')));
+    expect(
+      p.instructions,
+      contains('staleness is the honest uncertainty signal'),
+    );
+    // Everything else about the contract is unchanged.
+    expect(p.instructions, contains('THE NUMBER IS FIXED'));
+    expect(p.instructions, contains('a small number of questions is not'));
   });
 
   test('reports and trajectory are passed through verbatim', () {
@@ -84,6 +126,7 @@ void main() {
       ],
       trajectory: const [(title: 'Variables', start: 0.25, end: 1.0)],
       languageCode: 'en',
+      supervisionWired: false,
     );
     expect(p.instructions, contains('English'));
     final input = jsonDecode(p.input) as Map<String, dynamic>;

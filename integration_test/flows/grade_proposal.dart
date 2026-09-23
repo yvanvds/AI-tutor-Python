@@ -1,5 +1,6 @@
-// End-to-end (#99, #148, #149, #150): the periodic grade proposal, teacher
-// side, now as a class-wide workflow that ends in a published report.
+// End-to-end (#99, #148, #149, #150, #160, #166, #168, #173): the periodic
+// grade proposal, teacher side, now as a class-wide workflow that ends in a
+// published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
@@ -15,12 +16,25 @@
 //      period_start_snapshot.dart drives the exact path, #110) and asks the
 //      model for one justification per student who needs one. A student
 //      with no belief data on the milestone lands on "no data" instead of a
-//      computed 0, and costs no model call. The teacher then walks the
-//      class in the detail pane, adjusts a grade with a note and signs off.
+//      computed 0, and costs no model call. "Mastered" is the one-way
+//      `firstMasteredAt` stamp, not the live belief (#168): an LO whose
+//      (α, β) later signals pushed under the bar still counts, a doc
+//      without the stamp does not, and no later evidence can lower the
+//      number. With no supervision registry
+//      bound — the shipped app until Anchor lands — the prompt carries no
+//      supervised/home split and no hint to name one, since a split that
+//      reads "0 supervised" for everyone is not a measurement (#160); with
+//      a registry bound it is back. The detail pane's reliability line
+//      follows the same rule (#173): the staleness counts always, the turn
+//      tally only with a registry bound. The teacher then walks the class
+//      in the detail pane, adjusts a grade with a note and signs off.
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
-//      not the sentence explaining it.
+//      not the sentence explaining it. "Recompute" on one student is an
+//      order, not a resume (#166): it rewrites AI prose even when the
+//      number stayed put, and the pane says the number did not move rather
+//      than looking like a dead button — a teacher-written text still stays.
 //   4. Nothing reaches a student until the teacher presses "Release" (#150),
 //      once per milestone: every signed-off report becomes a frozen doc in
 //      the `reports` container, carrying the grade, the prose and the
@@ -38,10 +52,13 @@
 // Run just this flow:
 //   flutter test integration_test/flows/grade_proposal.dart -d windows
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
 import 'package:ai_tutor_python/features/reports/reports_page.dart';
+import 'package:ai_tutor_python/services/grading/grade_formula.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -56,6 +73,22 @@ const String kJustification =
 /// A classmate of Sam's who never worked on the milestone's objectives.
 const String kQuietUid = 'it-quiet';
 
+/// A registry with Anchor behind it — the binding the shipped app gets once
+/// Anchor lands. No turn is graded in these flows, so what it answers per
+/// turn never matters here; that it is *wired* does (#160).
+class _AnchorBound implements SupervisionSource {
+  const _AnchorBound();
+
+  @override
+  bool get isWired => true;
+
+  @override
+  Future<EvidenceProvenance> provenanceFor({
+    required String uid,
+    required DateTime at,
+  }) async => EvidenceProvenance.supervised;
+}
+
 final DateTime _now = DateTime.now().toUtc();
 final DateTime _periodStart = _now.subtract(const Duration(days: 30));
 
@@ -65,8 +98,15 @@ Map<String, dynamic> _belief(
   required double alpha,
   required double beta,
   required int daysAgo,
-  required String highest,
+
+  /// `null`: the doc shape from before the ratchet field existed (#164).
+  required String? highest,
   String uid = kStudentUid,
+
+  /// The one-way stamp the grade reads as "mastered" (#168). `false`: a
+  /// doc that never crossed the §1.5 bar, or one an old client rewrote
+  /// without the field (#165) before the one-off reconstruction.
+  bool mastered = true,
 }) {
   final at = _now.subtract(Duration(days: daysAgo)).toIso8601String();
   return {
@@ -79,9 +119,9 @@ Map<String, dynamic> _belief(
     'beta': beta,
     'lastUpdatedAt': at,
     'lastPositiveAtCalibratedAt': at,
-    'highestPositiveDifficulty': highest,
+    if (highest != null) 'highestPositiveDifficulty': highest,
     'recentNegativesAtCalibrated': 0,
-    'firstMasteredAt': at,
+    if (mastered) 'firstMasteredAt': at,
   };
 }
 
@@ -359,12 +399,37 @@ void main() {
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
+    // The reliability line stops at the staleness counts: with no registry
+    // bound the turn tally would read "0 supervised" against every name in
+    // the class, which is not a measurement (#173). It comes back with the
+    // registry — the wired flow below. The counts stay on the doc.
+    final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
+          .data,
+      'Stale: ${stored['staleLoCount']} LOs '
+      '(never probed: ${stored['neverProbedCount']}).',
+    );
+    expect(find.textContaining('Turns this period'), findsNothing);
+    expect(stored['supervisedTurns'], 0);
     expect(find.text(kJustification), findsOneWidget);
     // The model was told the number, and only the period's reports.
     final prompt = llm.sentInputs.single;
     expect(prompt, contains('"proposal":86'));
     expect(prompt, contains('Werkt vlot met variabelen.'));
     expect(prompt, isNot(contains('OUD RAPPORT')));
+    // No supervision registry is bound — the shipped app's own binding — so
+    // the supervised/home split is not a measurement: it stays out of the
+    // facts, and the contract does not ask the model to name it (#160). The
+    // uncertainty signals that are real stay.
+    expect(prompt, contains('"staleLearningObjectives"'));
+    expect(prompt, isNot(contains('supervisedTurnsInPeriod')));
+    expect(prompt, isNot(contains('homeTurnsInPeriod')));
+    final contract = llm.sentInstructions.single;
+    expect(contract, isNot(contains('no supervised work')));
+    expect(contract, isNot(contains('where the evidence was produced')));
+    expect(contract, contains('staleness'));
 
     // Next/prev walk the class without going back to the list.
     await tester.tap(find.byKey(const Key('reports-next')));
@@ -404,7 +469,7 @@ void main() {
     expect(doc['justification'], kJustification);
     expect(doc['signedOffAt'], isA<String>());
     expect(doc['mStartSource'], 'history');
-    expect(doc['formulaVersion'], '1.0.7');
+    expect(doc['formulaVersion'], GradingConstants.formulaVersion);
 
     // And the drawer that used to own all of this has let it go.
     await tester.tap(find.byTooltip('Students'));
@@ -414,6 +479,217 @@ void main() {
     await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
     expect(find.byKey(const Key('grade-milestone')), findsNothing);
     expect(find.byKey(const Key('grade-compute')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a student whose belief doc predates the ratchet field is '
+      'graded under §2.5\'s reading — medium, never hard — and the doc is '
+      'left without a level (#164)', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: {
+        ..._gradedClass(),
+        'lo_beliefs': [
+          // Core LO: mastered, old flag set, no level on disk — the doc
+          // shape from before #103 (or after an older client rewrote it,
+          // #165). The formula reads it as medium: k = 1 at this medium
+          // milestone, and no hard demonstration: d = 0.
+          _belief(
+            's1',
+            'lo-print',
+            alpha: 6,
+            beta: 1,
+            daysAgo: 5,
+            highest: null,
+          ),
+          // Extension LO, mastered at medium: u = 1.
+          _belief(
+            's2',
+            'lo-var',
+            alpha: 5,
+            beta: 1,
+            daysAgo: 3,
+            highest: 'medium',
+          ),
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-class-filter')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('5A').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // M_end = 50 + 50·(0.6·1 + 0.4·0) = 80; M_start = 50 (the history
+    // estimate, as above); G = 0.6; P = 0.6·80 + 0.4·60 = 72. Had the
+    // reading gone missing with the model's guess, k = 0 and P = 0; had
+    // the guess been read as hard, d = 0.5 and P = 86.
+    expect(
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
+      '72',
+    );
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    expect(find.text('Core at level: 1 / 1'), findsOneWidget);
+    expect(find.text('Demonstrated at hard: 0 / 2 mastered'), findsOneWidget);
+
+    // Grading is a read: the doc still carries no level, for the next
+    // measured positive to set.
+    final doc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
+    expect(doc.containsKey('highestPositiveDifficulty'), isFalse);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('the grade reads the one-way mastery stamp, not the live belief '
+      '(#168): a core LO whose belief later collapsed still counts, and a doc '
+      'without the stamp does not', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: {
+        ..._gradedClass(),
+        'lo_beliefs': [
+          // Core LO: the stamp fell when six answers in a row earned it, at
+          // hard; two strong incidental negatives from later input() work
+          // then left the stored belief at mean 0,29 (#167's pattern), and
+          // the tutor no longer probes a mastered LO, so read live it would
+          // stay there for good.
+          _belief(
+            's1',
+            'lo-print',
+            alpha: 2,
+            beta: 5,
+            daysAgo: 5,
+            highest: 'hard',
+          ),
+          // Extension LO: (5, 1) with the old flag, no stamp — the doc an
+          // old client keeps rewriting without the field (#165), before the
+          // one-off reconstruction from turn_history. The live belief is no
+          // fallback: reading it here would put exactly these students'
+          // grades back on the belief, silently.
+          _belief(
+            's2',
+            'lo-var',
+            alpha: 5,
+            beta: 1,
+            daysAgo: 3,
+            highest: 'medium',
+            mastered: false,
+          ),
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-class-filter')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('5A').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // k = 1 (the stamp), u = 0 (no stamp), d = 1/1: M_end = 50 + 50·0.4 =
+    // 70; M_start = 50 (the history estimate, as above); G = 0.4;
+    // P = 0.6·70 + 0.4·40 = 58. Read from the live belief instead, the core
+    // LO fails the 0,80 bar: k = 0, M_end = 0, P = 0.
+    expect(
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
+      '58',
+    );
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    expect(find.text('Mastery now: 70.0'), findsOneWidget);
+    expect(find.text('Core at level: 1 / 1'), findsOneWidget);
+    expect(find.text('Extension mastered: 0 / 1'), findsOneWidget);
+    expect(find.text('Demonstrated at hard: 1 / 1 mastered'), findsOneWidget);
+
+    // Grading is a read: the collapsed belief keeps its stamp and its
+    // (α, β), and the formula stamps nothing onto the unstamped doc.
+    final printDoc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
+    expect(printDoc['alpha'], 2);
+    expect(printDoc['firstMasteredAt'], isA<String>());
+    final varDoc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
+    expect(varDoc.containsKey('firstMasteredAt'), isFalse);
+    final doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 58);
+    expect(doc['formulaVersion'], GradingConstants.formulaVersion);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('with a supervision registry bound, the justification prompt '
+      'and the detail pane carry the supervised/home split again', (
+    tester,
+  ) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+      supervision: const _AnchorBound(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+
+    // The pane shows the tally again, after the staleness counts: the line
+    // the shipped app cuts short (#173) is whole once a registry is bound.
+    final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
+          .data,
+      'Stale: ${stored['staleLoCount']} LOs '
+      '(never probed: ${stored['neverProbedCount']}). '
+      'Turns this period: ${stored['supervisedTurns']} supervised, '
+      '${stored['homeTurns']} at home.',
+    );
+
+    // Now the split is a measurement, so the model gets it and is asked to
+    // weigh it (#160 — the same prompt that leaves it out unwired).
+    final prompt = llm.sentInputs.single;
+    expect(prompt, contains('"supervisedTurnsInPeriod":'));
+    expect(prompt, contains('"homeTurnsInPeriod":'));
+    expect(llm.sentInstructions.single, contains('no supervised work'));
 
     await harness.dispose(tester);
   });
@@ -471,12 +747,13 @@ void main() {
     // Prose only (PUNTENFORMULE §3.3): the number did not move.
     expect(doc['proposal'], 86);
 
-    // Now the evidence moves under the text: the extension LO is no longer
-    // mastered, so M_end = 70, G = 0.4 and P = 58. AI prose would be
-    // dropped here; the teacher's survives, flagged for rereading — and
-    // costs no second model call.
+    // Now the evidence moves under the text — upward, the only direction
+    // new evidence can move a grade since #168: Sam demonstrates the
+    // extension LO at hard, so d = 1, M_end = 100, G = 1 and P = 100. AI
+    // prose would be dropped here; the teacher's survives, flagged for
+    // rereading — and costs no second model call.
     harness.cosmos['lo_beliefs'].upsert(
-      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+      _belief('s2', 'lo-var', alpha: 6, beta: 1, daysAgo: 1, highest: 'hard'),
     );
     await tester.tap(find.byKey(const Key('reports-run-one')));
     await pumpUntilFound(
@@ -489,16 +766,16 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
           .data,
-      '58',
+      '100',
     );
     doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
-    expect(doc['proposal'], 58);
+    expect(doc['proposal'], 100);
     expect(doc['justification'], own);
     expect(doc['justificationStale'], true);
 
     // Sign off, then rewrite after a conversation with the student: §5
     // freezes the grade, not the sentence explaining it.
-    await tester.enterText(find.byKey(const Key('reports-adjusted')), '60');
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '95');
     await tapInDetail(tester, const Key('reports-sign-off'));
     await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
 
@@ -514,10 +791,123 @@ void main() {
     doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
     expect(doc['justification'], afterTalk);
     expect(doc['signedOffAt'], isA<String>());
-    expect(doc['adjustedGrade'], 60);
-    expect(doc['proposal'], 58);
+    expect(doc['adjustedGrade'], 95);
+    expect(doc['proposal'], 100);
     // The signed report is still locked against a recompute.
     expect(find.byKey(const Key('reports-run-one')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('"Recompute" on a settled grade rewrites the AI justification '
+      'and says the number did not move; a teacher-written text stays', (
+    tester,
+  ) async {
+    const second =
+        'Sam beheerst de kern en gebruikt variabelen nu zonder aarzelen.';
+    final llm = ScriptedLlm([kJustification, second]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+
+    // The first compute: a number, one model call, and nothing to compare
+    // the number against yet.
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+
+    // Nothing moved. Before #166 this press was a no-op with no feedback:
+    // same number → the AI text was kept → `runOne` returned before the
+    // model was asked → the pane looked exactly as it did.
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-recompute-unchanged')),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
+          .data,
+      'The grade did not change: 86/100. The justification was rewritten.',
+    );
+    expect(find.text(second), findsOneWidget);
+    expect(find.text(kJustification), findsNothing);
+    expect(llm.sends, 2);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+          .data,
+      '86',
+    );
+    var doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 86);
+    expect(doc['justification'], second);
+    expect(doc['justificationSource'], 'ai');
+
+    // The teacher rewrites it. The notice was about that recompute, and
+    // goes with the next thing that happens to the row.
+    const own = 'Sam legde de lus zelf uit tijdens de les.';
+    await tapInDetail(tester, const Key('reports-justification-edit'));
+    await tester.enterText(
+      find.byKey(const Key('reports-justification-field')),
+      own,
+    );
+    await tapInDetail(tester, const Key('reports-justification-save'));
+    await pumpUntilFound(tester, find.text(own));
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+
+    // Recompute again: the number still stands and the text is the
+    // teacher's (#149) — no model call, and the notice says which.
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-recompute-unchanged')),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
+          .data,
+      'The grade did not change: 86/100. Your own text stays as it is.',
+    );
+    expect(find.text(own), findsOneWidget);
+    expect(llm.sends, 2);
+    expect(llm.remaining, 0);
+    doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['justification'], own);
+    expect(doc['justificationSource'], 'edited');
+
+    // Once the number does move there is nothing to announce: the new grade
+    // is the feedback (the extension LO demonstrated at hard: d = 1,
+    // M_end = 100, G = 1, P = 100, as in the rewrite flow above), and the
+    // teacher's text is flagged for rereading.
+    harness.cosmos['lo_beliefs'].upsert(
+      _belief('s2', 'lo-var', alpha: 6, beta: 1, daysAgo: 1, highest: 'hard'),
+    );
+    await tapInDetail(tester, const Key('reports-run-one'));
+    await pumpUntil(
+      tester,
+      () =>
+          tester
+              .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
+              .data ==
+          '100',
+      reason: 'the recompute never moved the grade',
+    );
+    expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);
+    expect(
+      find.byKey(const Key('reports-justification-stale')),
+      findsOneWidget,
+    );
+    expect(llm.sends, 2);
 
     await harness.dispose(tester);
   });
@@ -597,7 +987,7 @@ void main() {
     expect(report['note'], 'Ziek in week 3.');
     expect(report['justification'], kJustification);
     // The breakdown a student may recompute, and when it was measured.
-    expect(report['formulaVersion'], '1.0.7');
+    expect(report['formulaVersion'], GradingConstants.formulaVersion);
     expect(report['mEnd'], 90);
     expect(report['mStart'], 50);
     expect((report['g'] as num).toDouble(), closeTo(0.8, 1e-9));

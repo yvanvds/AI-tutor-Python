@@ -1043,17 +1043,23 @@ both ratchets move exactly as on an active-subgoal probe. The conductor does
 not read it — mastery condition 3 stays on the calibration-relative
 timestamp — it exists for the grade formula, where it is the only
 signal that can tell medium from hard. Docs written before the field
-existed read as `medium` when `lastPositiveAtCalibratedAt` is set
-(the old flag's documented "ever demonstrated at non-easy" meaning)
-and as absent otherwise; nothing is backfilled.
+existed stay absent, in the model and on disk (#164): the reading rule —
+`medium` when `lastPositiveAtCalibratedAt` is set (the old flag's
+documented "ever demonstrated at non-easy" meaning), absent otherwise —
+lives in the grade formula's reader alone, so a guess is never written
+back as if it had been measured, and the next positive records the level
+actually asked; nothing is backfilled.
 
 **Mastery stamp (#101).** A third field, `firstMasteredAt`, records
 when the LO first met all three conditions after a belief write. One-way:
 decay and later negatives unmaster the LO (4.1, no latching) but never
 clear the stamp, which answers a different question — "was this ever
-mastered by direct probing?" — the gate for transfer credit (3.7). Set in
+mastered by direct probing?" — the gate for transfer credit (3.7) and,
+since #168, what the grade formula reads as "mastered" (PUNTENFORMULE
+§2.2: the belief steers the teaching, the stamp steers the grade). Set in
 the same write that first satisfies the conditions; nothing is
-backfilled (3.7 says how older docs are read).
+backfilled (3.7 says how older docs are read by the conductor; the grade
+applies no such fallback).
 
 ### 4.4 The stuck rule (advancing despite a missed LO)
 

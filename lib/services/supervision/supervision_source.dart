@@ -10,13 +10,24 @@
 //
 // Anchor is not wired up yet. [NoSupervisionSource] is the production
 // binding until it is: every turn is `home`, which makes the supervised
-// weight factor inert without any migration. The Anchor-backed source lands
-// as its own change and only has to replace [supervisionSourceProvider].
+// weight factor inert without any migration, and it says so through
+// [SupervisionSource.isWired], so nothing downstream reads "all home" as a
+// finding about a student (#160). The Anchor-backed source lands as its own
+// change and only has to replace [supervisionSourceProvider].
 
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 abstract class SupervisionSource {
+  /// Whether a real registry stands behind this source (#160).
+  ///
+  /// While it is `false` every turn is `home` by construction, so a
+  /// supervised/home split is not a measurement and nothing may present it
+  /// as one: the grade justification prompt leaves the split out and does
+  /// not ask the model to name it. The Anchor-backed source answers `true`,
+  /// and the split is back without anyone having to remember it.
+  bool get isWired;
+
   /// Provenance of evidence produced by [uid] at [at].
   ///
   /// Implementations answer per student, not per class hour: a session with
@@ -33,6 +44,9 @@ abstract class SupervisionSource {
 /// No supervision registry: every turn is home work.
 class NoSupervisionSource implements SupervisionSource {
   const NoSupervisionSource();
+
+  @override
+  bool get isWired => false;
 
   @override
   Future<EvidenceProvenance> provenanceFor({

@@ -254,6 +254,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reports_grade_button_busy => 'Working…';
 
   @override
+  String reports_recompute_unchanged(int grade) {
+    return 'The grade did not change: $grade/100.';
+  }
+
+  @override
+  String reports_recompute_unchanged_rewritten(int grade) {
+    return 'The grade did not change: $grade/100. The justification was rewritten.';
+  }
+
+  @override
+  String reports_recompute_unchanged_kept(int grade) {
+    return 'The grade did not change: $grade/100. Your own text stays as it is.';
+  }
+
+  @override
   String get reports_grade_proposal_label => 'Proposal';
 
   @override
@@ -307,6 +322,11 @@ class AppLocalizationsEn extends AppLocalizations {
     int home,
   ) {
     return 'Stale: $stale LOs (never probed: $never). Turns this period: $supervised supervised, $home at home.';
+  }
+
+  @override
+  String reports_grade_reliability_unwired(int stale, int never) {
+    return 'Stale: $stale LOs (never probed: $never).';
   }
 
   @override

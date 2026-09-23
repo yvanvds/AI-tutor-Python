@@ -26,6 +26,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -37,8 +38,10 @@ final DateTime _periodStart = DateTime.utc(2026, 9, 1);
 /// Canned model, keyed on the student name the prompt carries. A name in
 /// [fails] answers with a failure instead.
 class _FakeConnector extends OpenaiConnector {
-  _FakeConnector({this.fails = const {}});
+  _FakeConnector({Set<String> fails = const {}}) : fails = {...fails};
 
+  /// Names whose call fails. Mutable, so a test can take the model down
+  /// after a first round that succeeded.
   final Set<String> fails;
   final List<String> asked = <String>[];
 
@@ -57,7 +60,12 @@ class _FakeConnector extends OpenaiConnector {
         const ChatNotice(ChatNoticeKind.tutorUnreachable),
       );
     }
-    return ConnectorOk('$name did well.');
+    // A second call for the same student answers differently, so a test can
+    // tell a rewritten text from a kept one (#166).
+    final take = asked.where((n) => n == name).length;
+    return ConnectorOk(
+      take == 1 ? '$name did well.' : '$name did well, take $take.',
+    );
   }
 }
 
@@ -110,6 +118,8 @@ Map<String, dynamic> _belief(
       .toIso8601String(),
   'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
+  // The one-way stamp the grade reads as "mastered" (#168).
+  'firstMasteredAt': _now.subtract(const Duration(days: 3)).toIso8601String(),
 };
 
 Milestone _milestone() => Milestone(
@@ -178,6 +188,7 @@ class _Fixture {
       beliefs: beliefsService,
       getUid: () => 'teacher',
     ),
+    supervision: const NoSupervisionSource(),
     connector: () => connector,
     now: () => _now,
   );
@@ -414,6 +425,152 @@ void main() {
         });
       },
     );
+  });
+
+  // The single-student action (#166). The class run's thrift — keep an
+  // existing justification, never pay twice — is right for the batch and
+  // wrong for a button pressed on one student: there "Recompute" means do it
+  // again. `force` keeps the two apart; `unchanged` is what lets the page say
+  // the number did not move instead of looking like a dead button.
+  group('runOne', () {
+    final ann = _account('u1', 'Ann');
+
+    /// A class of one, computed and justified once by the batch — the doc
+    /// every case below starts from.
+    Future<_Fixture> justifiedOnce() async {
+      final f = _Fixture(beliefs: [_belief('u1', 's1', 'a')]);
+      await f.batch.run(
+        milestone: _milestone(),
+        students: [ann],
+        languageCode: 'nl',
+        onResult: (_, _) {},
+      );
+      expect(f.connector.asked, ['Ann']);
+      return f;
+    }
+
+    test('without force, an existing justification is kept and not paid for '
+        'again — the batch rule, for the per-row retry', () async {
+      final f = await justifiedOnce();
+      final r = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+      );
+      expect(f.connector.asked, ['Ann'], reason: 'no second model call');
+      expect(r.error, isNull);
+      expect(r.proposal!.justification, 'Ann did well.');
+      expect(r.unchanged, isTrue);
+    });
+
+    test('force rewrites an AI justification the number did not move under, '
+        'and says the number did not move', () async {
+      final f = await justifiedOnce();
+      final r = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(f.connector.asked, ['Ann', 'Ann']);
+      expect(r.error, isNull);
+      expect(r.unchanged, isTrue);
+      expect(r.proposal!.justification, 'Ann did well, take 2.');
+      expect(r.proposal!.justificationSource, JustificationSource.ai);
+      final doc = f.proposalDocs.docs['u1_m1']!;
+      expect(doc['justification'], 'Ann did well, take 2.');
+      expect(doc['proposal'], r.proposal!.proposal);
+    });
+
+    test('force leaves a teacher-written justification alone and costs no '
+        'model call (#149)', () async {
+      final f = await justifiedOnce();
+      const own = 'Ann kan de kern, maar rekent nog traag.';
+      await f.proposals.editJustification(
+        proposal: (await f.proposals.getStored('u1', 'm1'))!,
+        text: own,
+      );
+      final r = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(f.connector.asked, ['Ann'], reason: 'the text is the teacher\'s');
+      expect(r.error, isNull);
+      expect(r.unchanged, isTrue);
+      expect(r.proposal!.justification, own);
+      expect(r.proposal!.justificationSource, JustificationSource.edited);
+      expect(r.proposal!.justificationStale, isFalse);
+      expect(f.proposalDocs.docs['u1_m1']!['justification'], own);
+    });
+
+    test('force never touches a signed-off doc (PUNTENFORMULE §5)', () async {
+      final f = await justifiedOnce();
+      final signed = await f.proposals.signOff(
+        proposal: (await f.proposals.getStored('u1', 'm1'))!,
+        adjustedGrade: 70,
+        note: 'Ziek.',
+      );
+      // The student masters another objective after signing.
+      f.beliefs.upsert(_belief('u1', 's1', 'b'));
+      final r = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(f.connector.asked, ['Ann']);
+      expect(r.proposal!.proposal, signed.proposal);
+      expect(r.proposal!.adjustedGrade, 70);
+      expect(r.proposal!.justification, 'Ann did well.');
+      expect(reportStatusOf(r.proposal), ReportStatus.signedOff);
+      // Nothing was recomputed, so there is nothing to report as unchanged.
+      expect(r.unchanged, isFalse);
+    });
+
+    test('a first compute and a moved number are not "unchanged"', () async {
+      final f = _Fixture(beliefs: [_belief('u1', 's1', 'a')]);
+      final first = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(first.unchanged, isFalse, reason: 'nothing to compare against');
+      expect(first.proposal!.justification, 'Ann did well.');
+
+      // More mastery → another number → the AI prose goes and is rewritten,
+      // exactly as it would be without force.
+      f.beliefs.upsert(_belief('u1', 's1', 'b'));
+      final moved = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(moved.unchanged, isFalse);
+      expect(moved.proposal!.proposal, isNot(first.proposal!.proposal));
+      expect(moved.proposal!.justification, 'Ann did well, take 2.');
+      expect(f.connector.asked, ['Ann', 'Ann']);
+    });
+
+    test('a failed forced rewrite keeps the old text on the doc, carries the '
+        'error, and still says the number did not move', () async {
+      final f = await justifiedOnce();
+      f.connector.fails.add('Ann');
+      final r = await f.batch.runOne(
+        milestone: _milestone(),
+        student: ann,
+        languageCode: 'nl',
+        force: true,
+      );
+      expect(f.connector.asked, ['Ann', 'Ann']);
+      expect(r.error, isNotNull);
+      expect(r.unchanged, isTrue);
+      expect(r.proposal!.justification, 'Ann did well.');
+      expect(f.proposalDocs.docs['u1_m1']!['justification'], 'Ann did well.');
+    });
   });
 
   group('getForMilestone', () {

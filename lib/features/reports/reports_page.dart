@@ -50,6 +50,7 @@ import 'package:ai_tutor_python/services/grading/milestone_service.dart';
 import 'package:ai_tutor_python/services/grading/published_report.dart';
 import 'package:ai_tutor_python/services/grading/published_report_service.dart';
 import 'package:ai_tutor_python/services/grading/report_batch.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +122,12 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   /// Whatever the last run had to say about a row that failed.
   final Map<String, Object> _errors = <String, Object>{};
 
+  /// Rows whose last single-student recompute landed on the number they
+  /// already had (#166). The pane says so — without it, "Recompute" on a
+  /// settled grade looks like a button that does nothing. Cleared the way
+  /// [_errors] is: by the next result for that row, and with the milestone.
+  final Set<String> _unchanged = <String>{};
+
   /// The published copies of the selected milestone, by uid (#150). A uid
   /// that is absent has not been released: their report exists only on the
   /// teacher's side.
@@ -185,6 +192,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       _proposals.clear();
       _published.clear();
       _errors.clear();
+      _unchanged.clear();
       _releaseError = null;
       _editingJustification = false;
       _loading = true;
@@ -245,6 +253,11 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       } else {
         _errors.remove(uid);
       }
+      if (result.unchanged) {
+        _unchanged.add(uid);
+      } else {
+        _unchanged.remove(uid);
+      }
       if (uid == _selectedUid) _syncControllers();
     });
   }
@@ -255,6 +268,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       _done = 0;
       _total = students.length;
       _errors.clear();
+      _unchanged.clear();
     });
     final language = Localizations.localeOf(context).languageCode;
     try {
@@ -272,6 +286,13 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     }
   }
 
+  /// The single-student action behind "Compute proposal" / "Recompute".
+  ///
+  /// Forced (#166): the teacher asked for this one student again, so an AI
+  /// justification is rewritten even when the number stays put. The batch's
+  /// "keep what exists" thrift is for the class run, not for a button
+  /// pressed on purpose — a teacher-written text and a signed-off doc are
+  /// still left alone, by `runOne` itself.
   Future<void> _retry(Milestone milestone, Account student) async {
     setState(() => _busy = true);
     try {
@@ -279,6 +300,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         milestone: milestone,
         student: student,
         languageCode: Localizations.localeOf(context).languageCode,
+        force: true,
       );
       _apply(student.uid, result);
     } finally {
@@ -650,6 +672,17 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     );
   }
 
+  /// What the pane says when a recompute landed on the number the doc
+  /// already had (#166): the grade, and what became of the prose — rewritten
+  /// by the model, kept because the teacher wrote it, or (with the failure
+  /// shown above it) neither.
+  String _unchangedNotice(AppLocalizations l, GradeProposal p, Object? error) {
+    if (error != null) return l.reports_recompute_unchanged(p.proposal);
+    return p.justificationSource == JustificationSource.edited
+        ? l.reports_recompute_unchanged_kept(p.proposal)
+        : l.reports_recompute_unchanged_rewritten(p.proposal);
+  }
+
   Widget _detail(
     AppLocalizations l,
     Milestone milestone,
@@ -666,6 +699,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     }
     final student = students[index];
     final theme = Theme.of(context);
+    final supervisionWired = ref.watch(supervisionSourceProvider).isWired;
     final p = _proposals[student.uid];
     final error = _errors[student.uid];
     final signed = p?.isSignedOff ?? false;
@@ -746,6 +780,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             style: theme.textTheme.bodySmall,
           ),
         ] else ...[
+          if (_unchanged.contains(student.uid)) ...[
+            const SizedBox(height: 6),
+            Text(
+              _unchangedNotice(l, p, error),
+              key: const Key('reports-recompute-unchanged'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -806,13 +850,27 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 4),
+          // The staleness half of this line is a measurement and always
+          // shows. The supervised/home tally is one only while a supervision
+          // registry is bound (#173, the same inert split #160 took out of
+          // the justification prompt): until Anchor lands every turn is
+          // `home` by construction, and "0 supervised" against every name in
+          // the class says nothing about anyone. The counts stay on the doc;
+          // only what the pane shows changes, and the tally comes back on
+          // its own once `isWired` does.
           Text(
-            l.reports_grade_reliability(
-              p.staleLoCount,
-              p.neverProbedCount,
-              p.supervisedTurns,
-              p.homeTurns,
-            ),
+            supervisionWired
+                ? l.reports_grade_reliability(
+                    p.staleLoCount,
+                    p.neverProbedCount,
+                    p.supervisedTurns,
+                    p.homeTurns,
+                  )
+                : l.reports_grade_reliability_unwired(
+                    p.staleLoCount,
+                    p.neverProbedCount,
+                  ),
+            key: const Key('reports-detail-reliability'),
             style: theme.textTheme.bodySmall,
           ),
           Text(

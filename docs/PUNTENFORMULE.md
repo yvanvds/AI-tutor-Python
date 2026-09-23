@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-22.
+schaduwperiode (zie §4). Laatste wijziging: 2026-09-23.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -160,7 +160,11 @@ blijft aangetoond — een latere kalibratiedaling maakt dat niet ongedaan.
 
 Beheersing wordt bij elke update opnieuw gecontroleerd: door decay of
 nieuwe fouten kan een leerdoel terugvallen naar "niet beheerst"
-(voorwaarden 1 en 2); alleen de ratel van voorwaarde 3 is blijvend.
+(voorwaarden 1 en 2); alleen de ratel van voorwaarde 3 is blijvend. Dat
+terugvallen stuurt wat de tutor doet — vraagkeuze, opfrisvragen — niet je
+punt: de app onthoudt per leerdoel wanneer de drie voorwaarden voor het
+eerst samen golden, en het is die stempel die de formule van deel 2 leest
+(§2.2).
 
 ### 1.6 Jouw moeilijkheidsniveau (kalibratie)
 
@@ -222,9 +226,17 @@ uit aantonen op hogere moeilijkheid.
 
 Op het rapportmoment leest de formule per leerdoel van de mijlpaal:
 
-- **beheerst?** — de drie voorwaarden van §1.5 op de overtuiging **zoals
-  ze opgeslagen staat**. Sinds v1.0.10 past de formule de decay van §1.3
-  hier *niet* toe; zie de eerste alinea van §2.8;
+- **beheerst?** — of dit leerdoel **ooit** aan de drie voorwaarden van
+  §1.5 heeft voldaan. De app zet per leerdoel een eenmalige stempel op het
+  moment dat ze voor het eerst samen gelden, en sinds v1.0.12 leest de
+  formule die stempel — niet de overtuiging zoals ze nu staat. Een latere
+  meting die tegenvalt, een signaal vanuit een ander subdoel (§1.2) of
+  decay (§1.3) kan de stempel niet meer wegnemen; die sturen de tutor
+  (§1.5, §2.8), niet je punt. Verder werken kan je punt dus nooit
+  verlagen. En het punt rust daarmee niet op weinig oordelen: de stempel
+  valt pas wanneer het *opgebouwde* bewijs — alle rechtstreekse metingen
+  tot dan — de grens passeert, dus één verkeerd oordeel van de AI kan hem
+  hoogstens uitstellen, nooit wegnemen;
 - **hoogste aangetoonde moeilijkheid** — de drietraps-ratel van §2.5.
 
 Daaruit volgen drie fracties:
@@ -281,13 +293,15 @@ de gezakte M_eind weegt al in de beheersingscomponent.
 
 **Hoe M_start bepaald wordt (regel sinds v1.0.7).** Bij het begin van
 elke rapportperiode legt de app per leerling een **momentopname** vast:
-voor elk leerdoel of het op dat moment beheerst was (de drie voorwaarden
-van §1.5, na decay) en op welke trap de moeilijkheidsratel van §2.5 stond.
-De momentopname wordt geschreven bij je eerste sessie na de periodestart,
-vóór er in die sessie iets gemeten wordt. Ze is **exact**, ook al gebeurt
-dat schrijven dagen later: een overtuiging die sinds de periodestart niet
-meer geschreven is, wordt teruggerekend naar precies dat moment (decay is
-een zuivere functie van de laatste schrijving, §1.3). Alleen een leerdoel
+voor elk leerdoel of het op dat moment beheerst was (zoals §2.2 dat
+leest: sinds v1.0.12 de stempel, daarvoor de drie voorwaarden van §1.5 op
+de opgeslagen overtuiging) en op welke trap de moeilijkheidsratel van §2.5
+stond. De momentopname wordt geschreven bij je eerste sessie na de
+periodestart, vóór er in die sessie iets gemeten wordt. Ze is **exact**,
+ook al gebeurt dat schrijven dagen later: een overtuiging die sinds de
+periodestart niet meer geschreven is, staat nog precies zoals op dat
+moment (sinds v1.0.10 wordt er niets meer naar de periodestart
+teruggerekend, §2.8). Alleen een leerdoel
 dat al vóór de momentopname in de nieuwe periode gemeten werd — bv. een
 mijlpaal die de leerkracht pas later aanmaakte — wordt gelezen zoals het
 op het moment van de opname stond; het voorstel vermeldt hoeveel
@@ -382,7 +396,9 @@ dus een sterke leerling eindigt met **dunne** bewijsmassa — α ≈ 4 à 5, de
 beheersingsdrempel zelf — en zo'n overtuiging zakt binnen één tot drie
 weken onder gemiddelde 0,80, terwijl de vaak herhaalde overtuiging van een
 worstelende leerling genoeg massa draagt om het uit te zingen. Dat keerde
-§3.2 om in plaats van ze te eerbiedigen.
+§3.2 om in plaats van ze te eerbiedigen. Sinds v1.0.12 volgt dit vanzelf
+uit §2.2: het punt leest de stempel, en aan een stempel valt niets te
+vervallen.
 
 De twee mechanismen hieronder houden je *overtuigingen* vers en blijven
 onveranderd — zij bepalen wanneer de tutor je opnieuw bevraagt:
@@ -499,9 +515,12 @@ opgevangen door §2.8) en *waar* het vandaan komt (toezicht, §2.7).
 - **De AI ompraten.** De verantwoordingstekst is geen input voor het
   getal: het punt komt uit de formule, en de leerkracht leest de
   verantwoording zelf na.
-- **Stilvallen na een goede start.** Decay laat beheersing eerlijk
-  wegzakken; de opfrisvragen geven je de kans om te tonen dat het er nog
-  is — wie ook dat laat liggen, zakt terecht.
+- **Stilvallen na een goede start.** Wat je aantoonde, blijft aangetoond
+  (§2.2) — maar stilvallen brengt ook niets meer op: de groeiscore G
+  (§2.4) meet wat je déze periode bijleerde, en een volgende mijlpaal
+  verwacht meer leerdoelen op een hoger niveau (§2.1, §2.5). Intussen
+  blijven de opfrisvragen van §2.8 komen, want de tutor volgt wél de
+  levende overtuiging.
 
 ---
 
@@ -548,6 +567,8 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.8 | 2026-09-11 | Geen structuurwijziging. §2.8 en bijlage A: een opfrisvraag wacht niet langer altijd 30 dagen — een eerder beheerst leerdoel waarin een later signaal op een eerder subdoel (§1.2) een gat blootlegt, wordt bij de eerstvolgende sessiestart opgefrist (markering `regressedAt`, gewist door de eerstvolgende rechtstreekse meting of door een onrechtstreekse schrijving die de beheersing herstelt) en gaat voor op de gewoon-verouderde leerdoelen. Beschrijft gedrag dat sinds #112 in de code staat; de formule van deel 2 verandert niet (#113). |
 | 1.0.9 | 2026-09-22 | Geen structuurwijziging. De app is nu ook het kanaal waarlangs je je rapport leest (#148–#151), dus afspraak 3 vooraan zegt "punten verschijnen pas op een rapportmoment, nooit live tijdens het werk" in plaats van "alleen op het rapport, nooit live in de app": de regel van #99 blijft dezelfde — een vrijgegeven, bevroren rapport *is* het rapportmoment — en §1.7 blijft onaangeroerd. Nieuw §2.9: wat je onder "Mijn rapporten" ziet (punt en verantwoording eerst, de berekening opgevouwen eronder, **berekend op [datum]** omdat de leerkracht zelf kiest wanneer gerekend wordt) en wat er bewust niet op staat (beurten klas/thuis, verouderde of nooit-bevraagde leerdoelen). §2.6: de leerkracht kan de verantwoording ook zelf herschrijven, ook na het aftekenen, zonder het getal te raken (#149). Bijlage A: de Rapporten-pagina en de berekening per klas, `justificationSource`, de container `reports` en de leerlingpagina. Omdat dit een afspraak herformuleert, gaat ze zoals §5 vraagt in bij het begin van een rapportperiode en wordt ze in de klas toegelicht (#152). |
 | 1.0.10 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2 en §2.8: de decay van §1.3 telt niet langer mee in de puntberekening — "beheerst?" leest de overtuiging zoals ze opgeslagen staat. De conductor past decay nog steeds toe bij elke meting, dus wat wegvalt is alleen het verval tussen de laatste meting en het rapportmoment. Decay blijft onveranderd voor de opfrisvragen van §2.8. Reden: de tutor stopt met doorvragen zodra beheersing vaststaat, dus de sterkste leerling eindigt met de dunste bewijsmassa en verloor daardoor als eerste haar beheersing — het omgekeerde van wat §3.2 belooft. §2.4 zelf verandert niet, maar de momentopname leest om dezelfde reden de opgeslagen waarde in plaats van ze naar de periodestart terug te rekenen. |
+| 1.0.11 | 2026-09-23 | Geen structuurwijziging. Bijlage A: een ouder opgeslagen leerdoel zonder trapinformatie (§2.5) leest de formule nog steeds als "gemiddeld" wanneer de ratel van §1.5 gezet was, maar de app schrijft die lezing niet meer weg als was ze gemeten — het veld blijft leeg tot een nieuw positief signaal het werkelijk gevraagde niveau vastlegt. Voordien versteende de gok bij de eerstvolgende beurt, en wie het leerdoel vóór v1.0.2 op moeilijk had aangetoond verloor dat blijvend, ten koste van d (#164). De formule van deel 2 en de punten veranderen niet; de getroffen data is eenmalig, buiten de app, uit de beurthistoriek hersteld. |
+| 1.0.12 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2: "beheerst?" leest niet langer de overtuiging zoals ze nu staat, maar de eenmalige stempel die de app zet wanneer de drie voorwaarden van §1.5 voor het eerst samen gelden (`firstMasteredAt`, in de code sinds v1.0.3 als poort voor het transfer-krediet). De overtuiging zelf verandert niet en blijft de tutor sturen (vraagkeuze, vastgelopen-detectie, opfrisvragen); alleen het punt leest de stempel. Gevolg: een latere tegenvallende meting, een signaal op een eerder subdoel (§1.2) of decay kan een aangetoond leerdoel niet meer uit het punt halen — verder werken kan het punt nooit verlagen; §1.5, §2.4, §2.8 en §3.3 zeggen dat nu ook. Reden: de overtuiging is een voortschrijdend gemiddelde en hoort dat te zijn, maar omdat de tutor beheerste leerdoelen niet meer rechtstreeks bevraagt, bleef élk later negatief signaal onweersproken staan; de klasdata toonde leerlingen die vroeg fouten maakten en later niet meer, en toch onder de grens eindigden. Bijlage A: een leerdoel zonder stempel telt niet als beheerst; oudere opgeslagen leerdoelen krijgen hun stempel eenmalig, buiten de app, uit de beurthistoriek (#168). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -603,10 +624,17 @@ per leerdoel bewaart de app `highestPositiveDifficulty` (makkelijk /
 gemiddeld / moeilijk), gezet op de moeilijkheid die *werkelijk gevraagd*
 werd bij elk positief signaal, alleen omhoog, nooit aangepast door een
 kalibratiewijziging en niet door vervolgvragen (§1.2). Oudere opgeslagen
-leerdoelen zonder dit veld lezen als "gemiddeld" wanneer de ratel van §1.5
-gezet was, anders als "nog niets aangetoond" — er wordt niets met
-terugwerkende kracht ingevuld. De formule van deel 2 leest dit veld; de
-tutor zelf gebruikt het niet. Van §2.8 staat sinds v1.0.3 het
+leerdoelen zonder dit veld leest de *formule* als "gemiddeld" wanneer de
+ratel van §1.5 gezet was, anders als "nog niets aangetoond" — die lezing
+gebeurt alleen bij het berekenen en wordt sinds v1.0.11 niet meer
+weggeschreven: het veld blijft leeg tot een nieuw positief signaal het
+werkelijk gevraagde niveau vastlegt (#164). Voordien schreef de app de
+lezing "gemiddeld" bij de eerstvolgende beurt weg alsof ze gemeten was,
+waardoor een leerdoel dat vóór v1.0.2 op moeilijk was aangetoond blijvend
+op gemiddeld bleef staan; die data is eenmalig, buiten de app, uit de
+beurthistoriek hersteld. De app zelf vult niets met terugwerkende kracht
+in. De formule van deel 2 leest dit veld; de tutor zelf gebruikt het niet.
+Van §2.8 staat sinds v1.0.3 het
 **transfer-krediet** in de code: de grader noemt bij een juiste oplossing
 de leerdoelen uit andere subdoelen die de code correct gebruikt
 (`transferLOs`), en de tutor kent alleen aan leerdoelen die ooit beheerst
@@ -614,7 +642,19 @@ raakten (`firstMasteredAt` per leerdoel; oudere opgeslagen leerdoelen
 zonder dat veld gelden als "beheerst bij de laatste rechtstreekse
 meting" wanneer hun opgeslagen α, β en ratel aan §1.5 voldoen) een
 zwak-positief signaal toe, gerekend als gemiddeld en gewogen met s; het
-wordt op het beurtrecord vermeld. Sinds v1.0.6 verwerkt de tutor ook de
+wordt op het beurtrecord vermeld. Sinds v1.0.12 leest ook de **formule
+van deel 2** die stempel als "beheerst?" (§2.2; `LoGradeInput.fromBelief`
+in `grade_formula.dart`, de enige lezer van de leerlingdata voor het punt,
+ook voor de momentopname van §2.4): gezet, dan beheerst; niet gezet, dan
+niet — ook wanneer de opgeslagen α, β en ratel vandaag aan §1.5 voldoen.
+De oude-data-regel van daarnet is dus een regel voor de tutor (transfer,
+opfrissen), niet voor het punt: ze is een lezing van de levende
+overtuiging, en precies die mag het punt niet meer sturen. Leerdoelen die
+vóór v1.0.3 of door een oudere client zonder het veld (#165) geschreven
+zijn, krijgen hun stempel eenmalig, buiten de app, uit de beurthistoriek
+(`loStatusAfter[].mastered` is letterlijk de beslissing van de tutor op
+dat moment), vóór deze versie in gebruik gaat; de app zelf vult niets in
+(#168). Sinds v1.0.6 verwerkt de tutor ook de
 **signalen op een eerder subdoel** van §1.2 (voorheen liet hij ze
 vallen): met de sterkte van de grader, gerekend als gemiddeld en gewogen
 met s, zonder ratel, teller of voortgangsbalkje te bewegen; elk verwerkt
@@ -643,7 +683,7 @@ niet mee voor het kalibratieniveau van §1.6, en het beurtrecord markeert
 de beurt als opfrisvraag (`isWarmUp`). Deel 2 staat sinds v1.0.5 in de
 code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
 uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel —
-μ, n en de ratel per leerdoel na decay op het moment van berekenen, M_start uit de momentopname van de periodestart
+per leerdoel de stempel van §2.2 en de ratel van §2.5, zoals ze op het moment van berekenen opgeslagen staan, M_start uit de momentopname van de periodestart
 volgens §2.4 (sinds v1.0.7; uit de historiek voor een periode zonder
 momentopname, en het voorstel vermeldt welke) — vraagt de
 verantwoording aan de AI (die het getal als vaststaand feit meekrijgt,

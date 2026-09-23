@@ -702,40 +702,56 @@ void main() {
       expect(highest(s.f), QuestionDifficulty.medium);
     });
 
-    test(
-      'a level read from an older doc is kept and only ever raised',
-      () async {
-        // A pre-#103 doc with the old ratchet reads as medium; a positive at
-        // easy keeps medium, a positive at hard lifts it. Seeded below the
-        // mastery mean so the single-LO subgoal does not advance between
-        // the two answers (an advanced subgoal is no longer the grading
-        // target).
-        final s = await setupSingleLo();
-        s.f.beliefs[s.f._key('s', 'lo1')] = LoBelief.fromCosmos({
-          'subgoalId': 's',
-          'loId': 'lo1',
-          'alpha': 1.0,
-          'beta': 2.0,
-          'lastUpdatedAt': DateTime.now().toUtc().toIso8601String(),
-          'lastPositiveAtCalibratedAt': DateTime.now()
-              .toUtc()
-              .toIso8601String(),
-        });
-        expect(highest(s.f), QuestionDifficulty.medium);
-        await grade(
-          s.c,
-          difficulty: QuestionDifficulty.easy,
-          kind: LoSignalKind.positive,
-        );
-        expect(highest(s.f), QuestionDifficulty.medium);
-        await grade(
-          s.c,
-          difficulty: QuestionDifficulty.hard,
-          kind: LoSignalKind.positive,
-        );
-        expect(highest(s.f), QuestionDifficulty.hard);
-      },
-    );
+    test('a level missing from an older doc is not invented (#164): it stays '
+        'absent through a negative, and the first positive records the level '
+        'actually asked', () async {
+      // A pre-#103 doc: old ratchet set, no level. Before #164 this read
+      // as `medium`, the ratchet carried that guess through every write
+      // and the doc left the app saying "measured at medium". Seeded
+      // below the mastery mean so the single-LO subgoal does not advance
+      // between the answers (an advanced subgoal is no longer the
+      // grading target).
+      final s = await setupSingleLo();
+      s.f.beliefs[s.f._key('s', 'lo1')] = LoBelief.fromCosmos({
+        'subgoalId': 's',
+        'loId': 'lo1',
+        'alpha': 1.0,
+        'beta': 2.0,
+        'lastUpdatedAt': DateTime.now().toUtc().toIso8601String(),
+        'lastPositiveAtCalibratedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      expect(highest(s.f), isNull);
+
+      // A negative rewrites the doc; the unknown stays unknown on disk.
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.medium,
+        kind: LoSignalKind.negative,
+      );
+      expect(highest(s.f), isNull);
+      expect(
+        s.f.beliefs.values.single
+            .toMap(uid: 'u')
+            .containsKey('highestPositiveDifficulty'),
+        isFalse,
+        reason: 'the write after a negative used to fossilise the guess',
+      );
+
+      // The first positive records what was actually asked — easy here,
+      // where the old reading would have kept a `medium` nobody measured.
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.easy,
+        kind: LoSignalKind.positive,
+      );
+      expect(highest(s.f), QuestionDifficulty.easy);
+      await grade(
+        s.c,
+        difficulty: QuestionDifficulty.hard,
+        kind: LoSignalKind.positive,
+      );
+      expect(highest(s.f), QuestionDifficulty.hard);
+    });
   });
 
   // ---- #101 transfer credit ----------------------------------------------
