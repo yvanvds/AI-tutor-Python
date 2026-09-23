@@ -4,8 +4,9 @@
 # See PYTHON_IMPLEMENTATION.md section 4.1 for context.
 #
 # Idempotent: if build/python_bundle/MANIFEST_LOCK.json already records
-# the same release_tag + sha256 + package set as the manifest, only the
-# import verification (verify_bundle.py) is re-run; nothing is rebuilt.
+# the same release_tag + sha256 + package set as the manifest, only
+# python/Lib/turtle.cfg is (re)written and the import verification
+# (verify_bundle.py) is re-run; nothing is rebuilt.
 
 [CmdletBinding()]
 param()
@@ -28,6 +29,13 @@ $PythonDir    = Join-Path $BundleDir 'python'
 $PythonExe    = Join-Path $PythonDir 'python.exe'
 $LockFile     = Join-Path $BundleDir 'MANIFEST_LOCK.json'
 $VerifyScript = Join-Path $ScriptDir 'verify_bundle.py'
+$TurtleCfg    = Join-Path $PythonDir 'Lib\turtle.cfg'
+
+# Defaults the turtle module reads at import time from turtle.cfg next to
+# turtle.py (#180). The stock shape is 'classic', a small arrowhead; students
+# starting "Tekenen met turtle" expect a turtle. A turtle.cfg in the working
+# directory still wins over this one. Every other setting stays the module's.
+$TurtleCfgContent = "shape = turtle`ntitle = Turtle`n"
 
 function Read-Manifest {
     param([string]$Path)
@@ -52,10 +60,21 @@ function Read-Manifest {
 
 function Write-Step { param([string]$msg) Write-Host "[build_bundle] $msg" }
 
+# Write python/Lib/turtle.cfg. ASCII, no BOM: turtle's config parser reads the
+# file as plain text, so a BOM would glue itself to the first key and the
+# shape would silently stay 'classic' (Windows PowerShell 5.1 writes a BOM for
+# -Encoding utf8). Runs on the cache-hit path too, so a bundle built before
+# #180 gets the file without a rebuild.
+function Write-TurtleConfig {
+    Write-Step "Writing $TurtleCfg (shape = turtle)"
+    [System.IO.File]::WriteAllText($TurtleCfg, $TurtleCfgContent, [System.Text.Encoding]::ASCII)
+}
+
 # Run tooling/python/verify_bundle.py with the bundled interpreter. Every
 # [packages] key plus every module in [verify].stdlib must import, Tcl/Tk must
-# start (turtle), and matplotlib must render via Agg. Throws on failure so a
-# broken bundle never reaches the installer.
+# start (turtle), a new turtle must be a turtle (turtle.cfg, #180), and
+# matplotlib must render via Agg. Throws on failure so a broken bundle never
+# reaches the installer.
 function Test-Bundle {
     param([string[]]$Modules)
     if (-not (Test-Path -LiteralPath $VerifyScript)) { throw "Verify script not found: $VerifyScript" }
@@ -114,6 +133,7 @@ if ((Test-Path -LiteralPath $LockFile) -and (Test-Path -LiteralPath $PythonExe))
         }
         if ($sameInterp -and $samePkgs) {
             Write-Step "Bundle already matches manifest (cache hit); re-verifying imports."
+            Write-TurtleConfig
             Test-Bundle -Modules $verifyModules
             Write-Step "Nothing to rebuild."
             exit 0
@@ -172,6 +192,8 @@ if ($LASTEXITCODE -ne 0) { throw "tar extraction failed (exit $LASTEXITCODE)" }
 if (-not (Test-Path -LiteralPath $PythonExe)) {
     throw "Expected $PythonExe after extraction; install_only layout may have changed"
 }
+
+Write-TurtleConfig
 
 # --- pip install pinned packages ----------------------------------------------
 

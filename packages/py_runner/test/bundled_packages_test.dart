@@ -24,6 +24,7 @@ import 'package:test/test.dart';
 ///     owned by python.exe, not embedded in the Flutter window.
 ///   * turtle: draws in a native Tk window owned by python.exe. The test
 ///     opens one, draws, reads the turtle position and closes it again.
+///     The cursor is a turtle, not the stock arrow (#180).
 void main() {
   final e2ePython = Platform.environment['PY_RUNNER_E2E_PYTHON'];
   final skipReason = (e2ePython == null || e2ePython.isEmpty)
@@ -134,6 +135,39 @@ print(round(x), round(y))
 ''');
       expect(r.result.status, RunStatus.ok, reason: r.stderr);
       expect(r.stdout.trim(), '50 25');
+    });
+
+    // #180: students opening "Tekenen met turtle" saw the stock 'classic'
+    // arrowhead. build_bundle.ps1 writes Lib/turtle.cfg so both a new
+    // Turtle() and the nameless turtle behind turtle.forward() are turtles.
+    // Read back from the Tk canvas itself: the classic arrow is a 4-point
+    // polygon, the turtle one has many more.
+    test('a new turtle is drawn as a turtle, not an arrow', () async {
+      final r = await runOnHost('''
+import turtle
+t = turtle.Turtle()
+turtle.forward(10)
+screen = turtle.Screen()
+cv = screen.getcanvas()
+drawn = sorted(len(cv.coords(i)) // 2 for i in cv.find_all() if cv.type(i) == "polygon")
+print("shapes", t.shape(), turtle.shape())
+print("drawn", drawn, len(t.get_shapepoly()))
+print("title", cv.winfo_toplevel().title())
+turtle.bye()
+''');
+      expect(r.result.status, RunStatus.ok, reason: r.stderr);
+      final lines = r.stdout.trim().split(RegExp(r'\r?\n'));
+      expect(lines, hasLength(3), reason: r.stdout);
+      expect(lines[0], 'shapes turtle turtle');
+      final drawn = RegExp(r'^drawn \[(\d+), (\d+)\] (\d+)$')
+          .firstMatch(lines[1]);
+      expect(drawn, isNotNull, reason: lines[1]);
+      final turtlePoints = int.parse(drawn!.group(3)!);
+      // Both turtles on the canvas carry the turtle polygon, not 4 points.
+      expect(turtlePoints, greaterThan(4));
+      expect(int.parse(drawn.group(1)!), turtlePoints);
+      expect(int.parse(drawn.group(2)!), turtlePoints);
+      expect(lines[2], 'title Turtle');
     });
   }, skip: skipReason);
 }
