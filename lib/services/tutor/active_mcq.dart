@@ -26,8 +26,9 @@ class ActiveMcq {
   /// `applyMcqFeedback` lands.
   final String? feedback;
 
-  /// Quality returned by the tutor — drives the visual state (correct/
-  /// partial → green tint, wrong → red tint) on the picked option.
+  /// Quality returned by the tutor — drives the tint of the picked option
+  /// and the feedback panel (#179): blue while null (being assessed), green
+  /// for correct, sand for partial, red for wrong.
   final AnswerQuality? feedbackQuality;
 
   bool get hasFeedback => feedback != null;

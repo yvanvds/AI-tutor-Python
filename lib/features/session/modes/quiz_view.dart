@@ -185,32 +185,42 @@ class _OptionGrid extends StatelessWidget {
       badge: i < _badges.length ? _badges[i] : '${i + 1}',
       label: options[i],
       state: _stateFor(options[i]),
+      verdict: feedbackQuality,
       onTap: () => onPick(options[i]),
     );
   }
 
   _OptionState _stateFor(String option) {
     if (selected == null) return _OptionState.idle;
-    final isThisSelected = option == selected;
-    if (!isThisSelected) return _OptionState.dismissed;
-    // Selected. Visual depends on feedback (if any yet).
-    switch (feedbackQuality) {
-      case null:
-        return _OptionState.selectedPending;
-      case AnswerQuality.correct:
-      case AnswerQuality.partial:
-        return _OptionState.correctChosen;
-      case AnswerQuality.wrong:
-        return _OptionState.wrongChosen;
-    }
+    return option == selected ? _OptionState.chosen : _OptionState.dismissed;
   }
 }
 
+/// The colour a quiz verdict carries (#179) — one mapping for the picked
+/// option and for the feedback panel under it, so the two always agree:
+///
+/// - no verdict yet → `accent3` (blue, "info"): the pick is registered, the
+///   grade is not in. Deliberately not green: green is what "correct" looks
+///   like, and a pick that waited in green and then turned sand read as a
+///   downgrade at the very moment the answer was confirmed right.
+/// - correct → `accent` (green).
+/// - partial → `accent2` (sand), so "partly right" is visibly not "right".
+/// - wrong → `danger` (red).
+Color _verdictColor(AnswerQuality? verdict) => switch (verdict) {
+  null => AppColors.accent3,
+  AnswerQuality.correct => AppColors.accent,
+  AnswerQuality.partial => AppColors.accent2,
+  AnswerQuality.wrong => AppColors.danger,
+};
+
 enum _OptionState {
+  /// Nothing picked yet — every option is tappable.
   idle,
-  selectedPending,
-  correctChosen,
-  wrongChosen,
+
+  /// The student's pick; coloured by the verdict (or its absence).
+  chosen,
+
+  /// Another option was picked.
   dismissed,
 }
 
@@ -219,12 +229,17 @@ class _Option extends StatefulWidget {
     required this.badge,
     required this.label,
     required this.state,
+    required this.verdict,
     required this.onTap,
   });
 
   final String badge;
   final String label;
   final _OptionState state;
+
+  /// The grade on the pick, null while it is being assessed. Only read in
+  /// the [_OptionState.chosen] state.
+  final AnswerQuality? verdict;
   final VoidCallback onTap;
 
   @override
@@ -301,28 +316,13 @@ class _OptionRowState extends State<_Option> {
           badgeBg: AppColors.ink2,
           badgeFg: AppColors.fgMute,
         );
-      case _OptionState.selectedPending:
+      case _OptionState.chosen:
+        final color = _verdictColor(widget.verdict);
         return _OptionVisuals(
-          bg: AppColors.accent.withValues(alpha: 0.18),
-          border: AppColors.accent.withValues(alpha: 0.6),
-          fg: AppColors.accent,
-          badgeBg: AppColors.accent,
-          badgeFg: AppColors.ink0,
-        );
-      case _OptionState.correctChosen:
-        return _OptionVisuals(
-          bg: AppColors.accent2.withValues(alpha: 0.18),
-          border: AppColors.accent2.withValues(alpha: 0.6),
-          fg: AppColors.accent2,
-          badgeBg: AppColors.accent2,
-          badgeFg: AppColors.ink0,
-        );
-      case _OptionState.wrongChosen:
-        return _OptionVisuals(
-          bg: AppColors.danger.withValues(alpha: 0.18),
-          border: AppColors.danger.withValues(alpha: 0.6),
-          fg: AppColors.danger,
-          badgeBg: AppColors.danger,
+          bg: color.withValues(alpha: 0.18),
+          border: color.withValues(alpha: 0.6),
+          fg: color,
+          badgeBg: color,
           badgeFg: AppColors.ink0,
         );
       case _OptionState.dismissed:
@@ -361,11 +361,7 @@ class _FeedbackPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = switch (quality) {
-      AnswerQuality.correct || AnswerQuality.partial => AppColors.accent2,
-      AnswerQuality.wrong => AppColors.danger,
-      null => AppColors.accent,
-    };
+    final accent = _verdictColor(quality);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
