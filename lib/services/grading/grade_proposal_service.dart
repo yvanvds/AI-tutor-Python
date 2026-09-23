@@ -26,6 +26,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
@@ -56,6 +57,7 @@ class GradeProposalService {
     required ReportService reports,
     required TurnHistoryService turns,
     required PeriodStartSnapshotService snapshots,
+    required SupervisionSource supervision,
     required OpenaiConnector Function() connector,
     DateTime Function()? now,
   }) : this._(
@@ -66,6 +68,7 @@ class GradeProposalService {
          reports,
          turns,
          snapshots,
+         supervision,
          connector,
          now ?? _utcNow,
        );
@@ -78,6 +81,7 @@ class GradeProposalService {
     this._reports,
     this._turns,
     this._snapshots,
+    this._supervision,
     this._connector,
     this._now,
   );
@@ -91,6 +95,7 @@ class GradeProposalService {
   final ReportService _reports;
   final TurnHistoryService _turns;
   final PeriodStartSnapshotService _snapshots;
+  final SupervisionSource _supervision;
   final OpenaiConnector Function() _connector;
   final DateTime Function() _now;
 
@@ -301,6 +306,11 @@ class GradeProposalService {
   /// Asks the model for the justification of [proposal] and stores it on
   /// the doc. [studentName] and [calibrationLevel] come from the account
   /// the teacher is looking at; [languageCode] is the UI language.
+  ///
+  /// The supervised/home turn tally on the doc reaches the model only while
+  /// a supervision registry is bound (#160): unwired, it is "0 supervised"
+  /// for the whole class and would only feed the model a paragraph about
+  /// oversight that is true of nobody in particular.
   Future<GradeProposal> writeJustification({
     required GradeProposal proposal,
     required Milestone milestone,
@@ -348,6 +358,7 @@ class GradeProposalService {
       reports: reports,
       trajectory: trajectory,
       languageCode: languageCode,
+      supervisionWired: _supervision.isWired,
     );
     final result = await _connector().sendRequest(
       instructions: prompt.instructions,
@@ -526,6 +537,7 @@ final gradeProposalServiceProvider = Provider<GradeProposalService>(
     reports: ref.read(reportServiceProvider),
     turns: ref.read(turnHistoryServiceProvider),
     snapshots: ref.read(periodStartSnapshotServiceProvider),
+    supervision: ref.read(supervisionSourceProvider),
     connector: () => ref.read(gradeJustificationConnectorProvider),
   ),
 );

@@ -4,6 +4,7 @@
 // round trip (only in-window reports reach the model; the stored text is
 // the model's, the stored number is not), and sign-off.
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -18,6 +19,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +47,21 @@ class _FakeConnector extends OpenaiConnector {
     lastScope = inputs;
     return reply;
   }
+}
+
+/// A registry with Anchor behind it. Nothing here grades a turn, so what
+/// it answers never matters; that it is wired does (#160).
+class _WiredRegistry implements SupervisionSource {
+  const _WiredRegistry();
+
+  @override
+  bool get isWired => true;
+
+  @override
+  Future<EvidenceProvenance> provenanceFor({
+    required String uid,
+    required DateTime at,
+  }) async => EvidenceProvenance.supervised;
 }
 
 final DateTime _now = DateTime.utc(2026, 10, 15, 12);
@@ -160,6 +177,7 @@ class _Fixture {
     List<Map<String, dynamic>> proposals = const [],
     List<Map<String, dynamic>> snapshots = const [],
     ConnectorResult reply = const ConnectorOk('Sam did well.'),
+    this.supervision = const NoSupervisionSource(),
   }) : goals = InMemoryCosmos([
          _goal('r'),
          _goal('s1', parentId: 'r', los: ['a', 'b']),
@@ -183,6 +201,9 @@ class _Fixture {
   final InMemoryCosmos proposals;
   final InMemoryCosmos snapshots;
   final _FakeConnector connector;
+
+  /// The app's own binding unless a test says otherwise (#160).
+  final SupervisionSource supervision;
 
   GradeProposalService service({DateTime? now}) => GradeProposalService(
     container: proposals.container,
@@ -213,6 +234,7 @@ class _Fixture {
       ),
       getUid: () => _teacher,
     ),
+    supervision: supervision,
     connector: () => connector,
     now: () => now ?? _now,
   );
@@ -626,6 +648,66 @@ void main() {
       final stored = f.proposals.docs['${_student}_m1']!;
       expect(stored['justification'], 'Sam beheerst de kern.');
       expect(stored['proposal'], draft.proposal);
+    });
+
+    test('the supervised/home tally reaches the model only while a '
+        'supervision registry is bound (#160)', () async {
+      final turns = [
+        _turn(_now.subtract(const Duration(days: 10))),
+        _turn(_now.subtract(const Duration(days: 9)), provenance: 'supervised'),
+      ];
+      final beliefs = [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)];
+
+      // The app's own binding: the tally is "0 supervised" for everyone and
+      // says nothing about this student, so neither the facts nor the
+      // contract carry it. The counts still land on the doc (§2.7 stands).
+      final unwired = _Fixture(beliefs: beliefs, turns: turns);
+      var svc = unwired.service();
+      var draft = await svc.compute(uid: _student, milestone: _milestone());
+      expect(draft.supervisedTurns, 1);
+      expect(draft.homeTurns, 1);
+      await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'hard',
+        languageCode: 'nl',
+      );
+      expect(
+        unwired.connector.lastInput,
+        isNot(contains('supervisedTurnsInPeriod')),
+      );
+      expect(unwired.connector.lastInput, isNot(contains('homeTurnsInPeriod')));
+      expect(
+        unwired.connector.lastInput,
+        contains('"staleLearningObjectives"'),
+      );
+      expect(
+        unwired.connector.lastInstructions,
+        isNot(contains('no supervised work')),
+      );
+
+      // Anchor bound: the same tally is a measurement, and it is back.
+      final wired = _Fixture(
+        beliefs: beliefs,
+        turns: turns,
+        supervision: const _WiredRegistry(),
+      );
+      svc = wired.service();
+      draft = await svc.compute(uid: _student, milestone: _milestone());
+      await svc.writeJustification(
+        proposal: draft,
+        milestone: _milestone(),
+        studentName: 'Sam',
+        calibrationLevel: 'hard',
+        languageCode: 'nl',
+      );
+      expect(
+        wired.connector.lastInput,
+        contains('"supervisedTurnsInPeriod":1'),
+      );
+      expect(wired.connector.lastInput, contains('"homeTurnsInPeriod":1'));
+      expect(wired.connector.lastInstructions, contains('no supervised work'));
     });
 
     test('a transport failure surfaces as GradeJustificationException and '

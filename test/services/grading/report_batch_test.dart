@@ -26,6 +26,7 @@ import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -178,6 +179,7 @@ class _Fixture {
       beliefs: beliefsService,
       getUid: () => 'teacher',
     ),
+    supervision: const NoSupervisionSource(),
     connector: () => connector,
     now: () => _now,
   );

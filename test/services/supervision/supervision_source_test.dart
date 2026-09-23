@@ -19,6 +19,11 @@ void main() {
     );
   });
 
+  test('NoSupervisionSource is not wired: its "all home" is a default, not a '
+      'finding about anyone (#160)', () {
+    expect(const NoSupervisionSource().isWired, isFalse);
+  });
+
   test('the app binds NoSupervisionSource by default', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

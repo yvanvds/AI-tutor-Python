@@ -1,4 +1,4 @@
-// End-to-end (#99, #148, #149, #150): the periodic grade proposal, teacher
+// End-to-end (#99, #148, #149, #150, #160): the periodic grade proposal, teacher
 // side, now as a class-wide workflow that ends in a published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
@@ -15,8 +15,12 @@
 //      period_start_snapshot.dart drives the exact path, #110) and asks the
 //      model for one justification per student who needs one. A student
 //      with no belief data on the milestone lands on "no data" instead of a
-//      computed 0, and costs no model call. The teacher then walks the
-//      class in the detail pane, adjusts a grade with a note and signs off.
+//      computed 0, and costs no model call. With no supervision registry
+//      bound — the shipped app until Anchor lands — the prompt carries no
+//      supervised/home split and no hint to name one, since a split that
+//      reads "0 supervised" for everyone is not a measurement (#160); with
+//      a registry bound it is back. The teacher then walks the class in the
+//      detail pane, adjusts a grade with a note and signs off.
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
@@ -38,10 +42,12 @@
 // Run just this flow:
 //   flutter test integration_test/flows/grade_proposal.dart -d windows
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
 import 'package:ai_tutor_python/features/reports/reports_page.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -55,6 +61,22 @@ const String kJustification =
 
 /// A classmate of Sam's who never worked on the milestone's objectives.
 const String kQuietUid = 'it-quiet';
+
+/// A registry with Anchor behind it — the binding the shipped app gets once
+/// Anchor lands. No turn is graded in these flows, so what it answers per
+/// turn never matters here; that it is *wired* does (#160).
+class _AnchorBound implements SupervisionSource {
+  const _AnchorBound();
+
+  @override
+  bool get isWired => true;
+
+  @override
+  Future<EvidenceProvenance> provenanceFor({
+    required String uid,
+    required DateTime at,
+  }) async => EvidenceProvenance.supervised;
+}
 
 final DateTime _now = DateTime.now().toUtc();
 final DateTime _periodStart = _now.subtract(const Duration(days: 30));
@@ -365,6 +387,17 @@ void main() {
     expect(prompt, contains('"proposal":86'));
     expect(prompt, contains('Werkt vlot met variabelen.'));
     expect(prompt, isNot(contains('OUD RAPPORT')));
+    // No supervision registry is bound — the shipped app's own binding — so
+    // the supervised/home split is not a measurement: it stays out of the
+    // facts, and the contract does not ask the model to name it (#160). The
+    // uncertainty signals that are real stay.
+    expect(prompt, contains('"staleLearningObjectives"'));
+    expect(prompt, isNot(contains('supervisedTurnsInPeriod')));
+    expect(prompt, isNot(contains('homeTurnsInPeriod')));
+    final contract = llm.sentInstructions.single;
+    expect(contract, isNot(contains('no supervised work')));
+    expect(contract, isNot(contains('where the evidence was produced')));
+    expect(contract, contains('staleness'));
 
     // Next/prev walk the class without going back to the list.
     await tester.tap(find.byKey(const Key('reports-next')));
@@ -414,6 +447,35 @@ void main() {
     await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
     expect(find.byKey(const Key('grade-milestone')), findsNothing);
     expect(find.byKey(const Key('grade-compute')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('with a supervision registry bound, the justification prompt '
+      'carries the supervised/home split again', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+      supervision: const _AnchorBound(),
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+    expect(llm.sends, 1);
+
+    // Now the split is a measurement, so the model gets it and is asked to
+    // weigh it (#160 — the same prompt that leaves it out unwired).
+    final prompt = llm.sentInputs.single;
+    expect(prompt, contains('"supervisedTurnsInPeriod":'));
+    expect(prompt, contains('"homeTurnsInPeriod":'));
+    expect(llm.sentInstructions.single, contains('no supervised work'));
 
     await harness.dispose(tester);
   });

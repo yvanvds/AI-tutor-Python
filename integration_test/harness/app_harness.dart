@@ -353,7 +353,9 @@ class AppHarness {
   /// answer (#100). `null` (the default) leaves the app's own binding in
   /// place — no registry, every turn is home work — which is also what the
   /// shipped app does until Anchor is wired up. A flow about the supervised
-  /// weight passes a stand-in that says "in session".
+  /// weight passes a stand-in that says "in session"; a flow about what the
+  /// grade justification prompt may claim passes one that is merely wired
+  /// (#160).
   final SupervisionSource? supervision;
 
   /// Cosmos docs upserted on top of the standard seed before the app boots,

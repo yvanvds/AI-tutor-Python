@@ -39,6 +39,13 @@ String _languageName(String languageCode) {
 
 /// Builds the two halves of the request. Everything the model is allowed to
 /// draw on is in [input]; [instructions] carries the contract.
+///
+/// [supervisionWired] is whether the supervised/home turn split is a
+/// measurement (`SupervisionSource.isWired`). Until Anchor lands every turn
+/// is `home` by construction, and a split that reads "0 supervised" for the
+/// whole class says nothing about anyone — so it stays out of the facts and
+/// the contract does not name it as an uncertainty signal (#160). Staleness
+/// is real either way and stays.
 JustificationPrompt buildJustificationPrompt({
   required GradeProposal proposal,
   required Milestone milestone,
@@ -47,8 +54,16 @@ JustificationPrompt buildJustificationPrompt({
   required List<JustificationReport> reports,
   required List<JustificationTrajectory> trajectory,
   required String languageCode,
+  required bool supervisionWired,
 }) {
   final language = _languageName(languageCode);
+  final thin = supervisionWired
+      ? 'few reports, stale beliefs, no supervised work'
+      : 'few reports, stale beliefs';
+  final signals = supervisionWired
+      ? 'staleness and where the evidence was produced are the honest '
+            'uncertainty signals'
+      : 'staleness is the honest uncertainty signal';
   final instructions =
       '''
 You write the justification that accompanies a report-card grade proposal for a secondary-school Python course. The teacher reads it before signing the grade off.
@@ -57,7 +72,7 @@ THE NUMBER IS FIXED. The proposal of ${proposal.proposal}/100 was computed by a 
 
 Write in $language. Plain prose only: no JSON, no markdown headings, no bullet lists, no tags or envelopes. Two to four short paragraphs, addressed to the teacher, about the student in the third person by first name.
 
-Ground every statement in the data you are given: the status reports written during the grading period and the progress trajectory per subgoal. Do not invent events. If the evidence is thin (few reports, stale beliefs, no supervised work), say so plainly — staleness and where the evidence was produced are the honest uncertainty signals; a small number of questions is not (the tutor stops asking once mastery is established).
+Ground every statement in the data you are given: the status reports written during the grading period and the progress trajectory per subgoal. Do not invent events. If the evidence is thin ($thin), say so plainly — $signals; a small number of questions is not (the tutor stops asking once mastery is established).
 
 The student's current difficulty level is context only ("works at the hard level"); it is not an input to the number and you must not present it as one.
 ''';
@@ -86,8 +101,10 @@ The student's current difficulty level is context only ("works at the hard level
     'reliability': {
       'staleLearningObjectives': proposal.staleLoCount,
       'neverProbedLearningObjectives': proposal.neverProbedCount,
-      'supervisedTurnsInPeriod': proposal.supervisedTurns,
-      'homeTurnsInPeriod': proposal.homeTurns,
+      if (supervisionWired) ...{
+        'supervisedTurnsInPeriod': proposal.supervisedTurns,
+        'homeTurnsInPeriod': proposal.homeTurns,
+      },
     },
     'contextOnly': {'currentDifficultyLevel': calibrationLevel},
     'statusReportsInPeriod': [
