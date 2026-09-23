@@ -22,7 +22,7 @@ class GradingConstants {
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
   /// a signed grade was computed under.
-  static const String formulaVersion = '1.0.7';
+  static const String formulaVersion = '1.0.10';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).
@@ -39,28 +39,41 @@ class GradingConstants {
 }
 
 /// What the formula reads per LO on the report moment (§2.2): mastered
-/// under the three conditions of §1.5 *after decay*, plus the three-level
-/// difficulty ratchet of §2.5.
+/// under the three conditions of §1.5 on the belief **as stored**, plus
+/// the three-level difficulty ratchet of §2.5.
+///
+/// Decay (§1.3) is deliberately *not* applied here (v1.0.10). Decay exists to
+/// send the student back to old material — it drives the warm-up review, and
+/// there it belongs. A grade is a record of what was demonstrated, not a
+/// guess about what might since have faded: a leerdoel demonstrated in
+/// September was demonstrated, whatever the report date. Applying it here
+/// also penalised exactly the wrong student, because the tutor stops probing
+/// once mastery is established: the strong student ends on thin evidence
+/// (α ≈ 4–5, the mastery bar itself) and a belief that thin falls back
+/// under mean 0,80 within one to three weeks, while a struggling student's
+/// repeatedly-probed belief carries enough mass to survive. That inverted
+/// §3.2 ("weinig vragen ≠ verdacht") instead of honouring it.
+///
+/// The conductor still decays on read, so the stored (α, β) a probe leaves
+/// behind is already post-decay for every turn the student actually took.
+/// What is dropped is only the extra decay between the last probe and the
+/// report moment.
 class LoGradeInput {
   const LoGradeInput({required this.mastered, required this.highest});
 
   final bool mastered;
   final QuestionDifficulty? highest;
 
-  /// Reads one belief doc as of [now]. A missing doc is an LO that was
+  /// Reads one belief doc as stored. A missing doc is an LO that was
   /// never probed: not mastered, nothing demonstrated.
-  factory LoGradeInput.fromBelief(LoBelief? belief, {required DateTime now}) {
+  factory LoGradeInput.fromBelief(LoBelief? belief) {
     if (belief == null) {
       return const LoGradeInput(mastered: false, highest: null);
     }
-    final snap = applyDecay(
-      alpha: belief.alpha,
-      beta: belief.beta,
-      lastUpdatedAt: belief.lastUpdatedAt,
-      now: now,
-    );
     final mastered =
-        meetsMasteryMeanAndEvidence(snap) &&
+        meetsMasteryMeanAndEvidence(
+          BeliefSnapshot(belief.alpha, belief.beta),
+        ) &&
         belief.lastPositiveAtCalibratedAt != null;
     return LoGradeInput(
       mastered: mastered,

@@ -1,7 +1,7 @@
 // `PeriodStartSnapshot` and its service (#110): a belief untouched since
-// the period start is read as of *that* instant (decay is a pure function
-// of the last write), one already written inside the period is read as of
-// the snapshot moment and flagged; the doc round-trips; the service writes
+// the period start still holds its period-start value and is taken as is,
+// one already written inside the period is read as of the snapshot moment
+// and flagged; the doc round-trips; the service writes
 // one doc per started milestone that has none, is idempotent, and takes a
 // fresh one when the milestone's period start moves.
 
@@ -50,27 +50,14 @@ LoBelief _belief(
 
 void main() {
   group('build', () {
-    test('a belief not written since the period start is read as of the '
-        'period start, not as of the snapshot moment', () {
-      // (8, 1) written 50 days before the period start: decayed to the
-      // period start it is still mastered; decayed to `now` (90 days) it
-      // is not. The snapshot must say mastered.
+    test('a belief not written since the period start still holds its '
+        'period-start value and is taken as is', () {
+      // (8, 1) written 50 days before the period start and untouched since:
+      // the doc the snapshot reads *is* the period-start doc. Since v1.0.8
+      // no decay is applied on either side, so the age is irrelevant.
       final writtenAt = _periodStart.subtract(const Duration(days: 50));
       final b = _belief('s1', 'a', alpha: 8, at: writtenAt);
-      final atStart = applyDecay(
-        alpha: 8,
-        beta: 1,
-        lastUpdatedAt: writtenAt,
-        now: _periodStart,
-      );
-      final atNow = applyDecay(
-        alpha: 8,
-        beta: 1,
-        lastUpdatedAt: writtenAt,
-        now: _now,
-      );
-      expect(meetsMasteryMeanAndEvidence(atStart), isTrue);
-      expect(meetsMasteryMeanAndEvidence(atNow), isFalse);
+      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(8, 1)), isTrue);
 
       final snap = PeriodStartSnapshot.build(
         uid: _uid,

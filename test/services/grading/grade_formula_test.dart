@@ -177,7 +177,8 @@ void main() {
     });
   });
 
-  group('LoGradeInput.fromBelief reads the belief post-decay', () {
+  group('LoGradeInput.fromBelief reads the belief as stored (v1.0.10: no '
+      'decay in the grade path)', () {
     final now = DateTime.utc(2026, 9, 2);
 
     LoBelief belief({
@@ -199,19 +200,26 @@ void main() {
     test('a fresh (5, 1) is mastered', () {
       final i = LoGradeInput.fromBelief(
         belief(alpha: 5, beta: 1, at: now.subtract(const Duration(days: 1))),
-        now: now,
       );
       expect(i.mastered, isTrue);
       expect(i.highest, QuestionDifficulty.medium);
     });
 
-    test('the same belief four months untouched has decayed out of '
-        'mastery (evidence below the minimum)', () {
+    test('the same belief four months untouched is still mastered: a grade '
+        'records what was demonstrated, decay only drives the warm-up '
+        'review', () {
       final i = LoGradeInput.fromBelief(
         belief(alpha: 5, beta: 1, at: now.subtract(const Duration(days: 120))),
-        now: now,
       );
-      expect(i.mastered, isFalse);
+      expect(i.mastered, isTrue);
+    });
+
+    test('a thin just-mastered (4.3, 1) survives three weeks — the case that '
+        'used to dock the strongest student, who gets fewest probes', () {
+      final i = LoGradeInput.fromBelief(
+        belief(alpha: 4.3, beta: 1, at: now.subtract(const Duration(days: 21))),
+      );
+      expect(i.mastered, isTrue);
     });
 
     test('condition 3: no calibrated positive → not mastered however high '
@@ -224,14 +232,13 @@ void main() {
           calibrated: false,
           highest: QuestionDifficulty.easy,
         ),
-        now: now,
       );
       expect(i.mastered, isFalse);
       expect(i.highest, QuestionDifficulty.easy);
     });
 
     test('a missing doc is never probed', () {
-      final i = LoGradeInput.fromBelief(null, now: now);
+      final i = LoGradeInput.fromBelief(null);
       expect(i.mastered, isFalse);
       expect(i.highest, isNull);
     });

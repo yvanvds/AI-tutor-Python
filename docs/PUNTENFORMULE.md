@@ -222,8 +222,9 @@ uit aantonen op hogere moeilijkheid.
 
 Op het rapportmoment leest de formule per leerdoel van de mijlpaal:
 
-- **beheerst?** — de drie voorwaarden van §1.5, na decay (dus de verse
-  stand; §2.8 zorgt dat "vers" ook eerlijk is);
+- **beheerst?** — de drie voorwaarden van §1.5 op de overtuiging **zoals
+  ze opgeslagen staat**. Sinds v1.0.10 past de formule de decay van §1.3
+  hier *niet* toe; zie de eerste alinea van §2.8;
 - **hoogste aangetoonde moeilijkheid** — de drietraps-ratel van §2.5.
 
 Daaruit volgen drie fracties:
@@ -370,8 +371,21 @@ thuiswerk waardevol en oneerlijk thuiswerk zinloos.
 
 ### 2.8 Oude leerstof: opfrissen en transfer
 
-Twee mechanismen zorgen dat de decay van §1.3 op het rapportmoment
-niemand oneerlijk raakt:
+**Decay telt niet mee in het punt (sinds v1.0.10).** Decay bestaat om je
+terug naar oude leerstof te sturen — ze stuurt de opfrisvragen hieronder,
+en daar hoort ze thuis. Een punt is een verslag van wat je hebt aangetoond,
+geen schatting van wat je intussen misschien vergeten bent: een leerdoel
+dat je in september aantoonde, héb je aangetoond, wat de rapportdatum ook
+is. Ze toepassen op het punt strafte bovendien precies de verkeerde
+leerling. De tutor stopt met doorvragen zodra beheersing vaststaat (§3.2),
+dus een sterke leerling eindigt met **dunne** bewijsmassa — α ≈ 4 à 5, de
+beheersingsdrempel zelf — en zo'n overtuiging zakt binnen één tot drie
+weken onder gemiddelde 0,80, terwijl de vaak herhaalde overtuiging van een
+worstelende leerling genoeg massa draagt om het uit te zingen. Dat keerde
+§3.2 om in plaats van ze te eerbiedigen.
+
+De twee mechanismen hieronder houden je *overtuigingen* vers en blijven
+onveranderd — zij bepalen wanneer de tutor je opnieuw bevraagt:
 
 - **Transfer-krediet.** Oudere leerdoelen zitten vaak impliciet in nieuw
   werk: wie in december een while-lus schrijft, gebruikt daarin nog
@@ -533,6 +547,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.7 | 2026-09-03 | Geen structuurwijziging. §2.4: M_start komt nu uit een exacte momentopname per leerdoel bij de periodestart (beheerst? en ratel, teruggerekend naar dat moment), geschreven door de app bij de eerste sessie na de periodestart, en volgt uit dezelfde formule als M_eind, verwacht niveau inbegrepen. De regel van v1.0.5 (fractie per subdoel uit de historiek, d_start = 0) blijft alleen als overgangsregel voor een periode zonder momentopname; het voorstel vermeldt welke van de twee gebruikt is (#110). |
 | 1.0.8 | 2026-09-11 | Geen structuurwijziging. §2.8 en bijlage A: een opfrisvraag wacht niet langer altijd 30 dagen — een eerder beheerst leerdoel waarin een later signaal op een eerder subdoel (§1.2) een gat blootlegt, wordt bij de eerstvolgende sessiestart opgefrist (markering `regressedAt`, gewist door de eerstvolgende rechtstreekse meting of door een onrechtstreekse schrijving die de beheersing herstelt) en gaat voor op de gewoon-verouderde leerdoelen. Beschrijft gedrag dat sinds #112 in de code staat; de formule van deel 2 verandert niet (#113). |
 | 1.0.9 | 2026-09-22 | Geen structuurwijziging. De app is nu ook het kanaal waarlangs je je rapport leest (#148–#151), dus afspraak 3 vooraan zegt "punten verschijnen pas op een rapportmoment, nooit live tijdens het werk" in plaats van "alleen op het rapport, nooit live in de app": de regel van #99 blijft dezelfde — een vrijgegeven, bevroren rapport *is* het rapportmoment — en §1.7 blijft onaangeroerd. Nieuw §2.9: wat je onder "Mijn rapporten" ziet (punt en verantwoording eerst, de berekening opgevouwen eronder, **berekend op [datum]** omdat de leerkracht zelf kiest wanneer gerekend wordt) en wat er bewust niet op staat (beurten klas/thuis, verouderde of nooit-bevraagde leerdoelen). §2.6: de leerkracht kan de verantwoording ook zelf herschrijven, ook na het aftekenen, zonder het getal te raken (#149). Bijlage A: de Rapporten-pagina en de berekening per klas, `justificationSource`, de container `reports` en de leerlingpagina. Omdat dit een afspraak herformuleert, gaat ze zoals §5 vraagt in bij het begin van een rapportperiode en wordt ze in de klas toegelicht (#152). |
+| 1.0.10 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2 en §2.8: de decay van §1.3 telt niet langer mee in de puntberekening — "beheerst?" leest de overtuiging zoals ze opgeslagen staat. De conductor past decay nog steeds toe bij elke meting, dus wat wegvalt is alleen het verval tussen de laatste meting en het rapportmoment. Decay blijft onveranderd voor de opfrisvragen van §2.8. Reden: de tutor stopt met doorvragen zodra beheersing vaststaat, dus de sterkste leerling eindigt met de dunste bewijsmassa en verloor daardoor als eerste haar beheersing — het omgekeerde van wat §3.2 belooft. §2.4 zelf verandert niet, maar de momentopname leest om dezelfde reden de opgeslagen waarde in plaats van ze naar de periodestart terug te rekenen. |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---

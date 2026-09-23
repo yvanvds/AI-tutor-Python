@@ -11,14 +11,15 @@
 // `GradeProposalService.compute`.
 //
 // Why the snapshot can be *exact* although it is written days after the
-// period started: a belief is stored as `(α, β, lastUpdatedAt)` and decay is
-// applied lazily on read, so its state at any instant after `lastUpdatedAt`
-// is a pure function of the doc. A belief not written since `periodStart`
-// is therefore read *as of `periodStart`*, not as of the session. Only a
-// belief already written inside the period (a milestone defined after the
-// student worked, or a session on a machine that lost the write) has lost
-// its period-start state; it is read as of the snapshot moment and flagged
-// `exact: false` so the proposal can say how many of its LOs that concerns.
+// period started: a belief not written since `periodStart` still *holds* its
+// period-start value, so reading it during the next session reads the period
+// start. (Before v1.0.10 this also needed decay to be rolled back to
+// `periodStart`; the grade formula no longer decays, so the stored doc is
+// simply the value.) Only a belief already written inside the period (a
+// milestone defined after the student worked, or a session on a machine that
+// lost the write) has lost its period-start state; it is read as of the
+// snapshot moment and flagged `exact: false` so the proposal can say how many
+// of its LOs that concerns.
 
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
@@ -119,8 +120,9 @@ class PeriodStartSnapshot {
   }
 
   /// Reads [beliefs] as of [milestone]'s period start. A belief last
-  /// written at or before `periodStart` is decayed to exactly that instant;
-  /// one already written inside the period is read as of [now] and flagged.
+  /// written at or before `periodStart` still holds its period-start value
+  /// and is taken as is; one already written inside the period no longer
+  /// does, and is taken as it stands now and flagged `exact: false`.
   factory PeriodStartSnapshot.build({
     required String uid,
     required Milestone milestone,
@@ -131,7 +133,7 @@ class PeriodStartSnapshot {
     final entries = <SnapshotLo>[];
     for (final b in beliefs) {
       final exact = !b.lastUpdatedAt.isAfter(periodStart);
-      final input = LoGradeInput.fromBelief(b, now: exact ? periodStart : now);
+      final input = LoGradeInput.fromBelief(b);
       entries.add(
         SnapshotLo(
           subgoalId: b.subgoalId,

@@ -185,7 +185,7 @@ class GradeProposalService {
     };
     final inputs = {
       for (final lo in los)
-        lo.key: LoGradeInput.fromBelief(beliefByKey[lo.key], now: now),
+        lo.key: LoGradeInput.fromBelief(beliefByKey[lo.key]),
     };
     final end = computeMasteryScore(
       los: los,
