@@ -38,6 +38,12 @@ const Duration _kTransientRetryBaseDelay = Duration(milliseconds: 200);
 /// failure (no HTTP response at all: connection refused, DNS, timeout).
 const int kCosmosNetworkStatus = 0;
 
+/// [CosmosException.code] of a 404 whose cause is a container (or its
+/// database) that does not exist in the account, rather than a missing
+/// document (#170). A deployment gap: the fix is to create the container
+/// (README step 3), not to retry.
+const String kCosmosContainerNotFound = 'ContainerNotFound';
+
 const Set<int> _transientStatusCodes = {
   kCosmosNetworkStatus,
   408,
@@ -66,6 +72,10 @@ class CosmosException implements Exception {
   bool get isAuthError => statusCode == 401 || statusCode == 403;
   bool get isThrottled => statusCode == 429;
   bool get isNotFound => statusCode == 404;
+
+  /// The container this call went to does not exist (#170) — see
+  /// [kCosmosContainerNotFound].
+  bool get isContainerNotFound => code == kCosmosContainerNotFound;
 
   /// No HTTP response at all (socket / DNS / timeout).
   bool get isNetworkError => statusCode == kCosmosNetworkStatus;
@@ -191,6 +201,44 @@ class CosmosClient {
   CosmosContainer container(String containerId) =>
       CosmosContainer._(this, _databaseId, containerId);
 
+  /// Collection links (`dbs/{db}/colls/{coll}`) this client has seen exist.
+  /// A container does not vanish while the app runs, so one positive answer
+  /// per container is enough; a missing one is asked again, so creating it
+  /// while the app is open fixes the next attempt without a restart.
+  final Set<String> _knownContainers = <String>{};
+
+  /// Whether a 404 from [collLink] means the container itself is missing.
+  ///
+  /// Cosmos cannot be asked this from the 404 alone (#170): a document read
+  /// answers "Entity with the specified id does not exist in the system"
+  /// both for a missing document and for a missing container, with no
+  /// documented sub-status to tell them apart. So the container's own
+  /// metadata is read once — `GET dbs/{db}/colls/{coll}`, 404 only when the
+  /// container (or its database) is absent.
+  ///
+  /// Anything but a clean 404 — a 403 from a token without metadata rights,
+  /// a network failure — counts as "exists": the caller then keeps its
+  /// ordinary 404 handling, which is what it did before this check existed.
+  Future<bool> _containerMissing(String collLink) async {
+    if (_knownContainers.contains(collLink)) return false;
+    final http.Response response;
+    try {
+      response = await _send(
+        verb: 'GET',
+        resourceType: 'colls',
+        resourceLink: collLink,
+        pathSegment: collLink,
+      );
+    } on CosmosException {
+      return false;
+    }
+    if (response.statusCode == 404) return true;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _knownContainers.add(collLink);
+    }
+    return false;
+  }
+
   Future<http.Response> _send({
     required String verb,
     required String resourceType,
@@ -295,7 +343,10 @@ class CosmosContainer {
     'x-ms-documentdb-partitionkey': jsonEncode([partitionKey]),
   };
 
-  /// Reads a single document. Returns `null` on 404.
+  /// Reads a single document. Returns `null` when the document does not
+  /// exist; throws [kCosmosContainerNotFound] when the container does not
+  /// (#170) — "no report yet" and "no `reports` container" must not look
+  /// the same to the caller.
   Future<Map<String, dynamic>?> read(
     String id, {
     required Object partitionKey,
@@ -307,8 +358,11 @@ class CosmosContainer {
       pathSegment: _docPath(id),
       extraHeaders: _pkHeader(partitionKey),
     );
-    if (response.statusCode == 404) return null;
-    _ensureOk(response);
+    if (response.statusCode == 404) {
+      await _throwIfContainerMissing();
+      return null;
+    }
+    await _ensureOk(response);
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -351,7 +405,7 @@ class CosmosContainer {
         extraHeaders: headers,
         body: body,
       );
-      _ensureOk(response);
+      await _ensureOk(response);
       final decoded =
           jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       final docs = (decoded['Documents'] as List? ?? const [])
@@ -375,7 +429,7 @@ class CosmosContainer {
       extraHeaders: _pkHeader(partitionKey),
       body: doc,
     );
-    _ensureOk(response);
+    await _ensureOk(response);
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -395,7 +449,7 @@ class CosmosContainer {
       },
       body: doc,
     );
-    _ensureOk(response);
+    await _ensureOk(response);
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -413,11 +467,12 @@ class CosmosContainer {
       extraHeaders: _pkHeader(partitionKey),
       body: doc,
     );
-    _ensureOk(response);
+    await _ensureOk(response);
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
-  /// Deletes a doc. 404 is treated as success (idempotent).
+  /// Deletes a doc. A missing doc is success (idempotent); a missing
+  /// container is not (#170).
   Future<void> delete(String id, {required Object partitionKey}) async {
     final response = await _client._send(
       verb: 'DELETE',
@@ -426,8 +481,11 @@ class CosmosContainer {
       pathSegment: _docPath(id),
       extraHeaders: _pkHeader(partitionKey),
     );
-    if (response.statusCode == 404) return;
-    _ensureOk(response);
+    if (response.statusCode == 404) {
+      await _throwIfContainerMissing();
+      return;
+    }
+    await _ensureOk(response);
   }
 
   /// Transactional batch — all ops succeed or none do. Every op MUST share
@@ -449,11 +507,26 @@ class CosmosContainer {
       },
       body: ops.map((o) => o.toJson()).toList(),
     );
-    _ensureOk(response);
+    await _ensureOk(response);
   }
 
-  void _ensureOk(http.Response response) {
+  /// A 404 that comes from a missing container, turned into an error that
+  /// says so (#170). Before, a document read swallowed it as "no such
+  /// document" and the first write then failed with a bare gateway 404,
+  /// which reads like a missing document rather than a deployment gap.
+  Future<void> _throwIfContainerMissing() async {
+    if (!await _client._containerMissing(_collLink)) return;
+    throw CosmosException(
+      404,
+      'Container "$_coll" does not exist in Cosmos database "$_db". '
+      'Create it with the partition key listed in README step 3.',
+      code: kCosmosContainerNotFound,
+    );
+  }
+
+  Future<void> _ensureOk(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
+    if (response.statusCode == 404) await _throwIfContainerMissing();
     String message = response.body;
     String? code;
     try {

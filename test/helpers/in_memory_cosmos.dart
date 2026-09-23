@@ -191,13 +191,27 @@ class InMemoryCosmosClient implements CosmosClient {
     : _containers = Map.of(containers);
 
   final Map<String, InMemoryCosmos> _containers;
+  final Map<String, CosmosContainer> _routed = {};
 
   /// The store behind [containerId], e.g. `cosmos['goals'].docs`.
   InMemoryCosmos operator [](String containerId) =>
       _containers.putIfAbsent(containerId, InMemoryCosmos.new);
 
+  /// Serves [containerId] from [container] instead of its in-memory store —
+  /// e.g. the real REST container of an account where it was never created
+  /// (`UnprovisionedCosmos`, #170). `null` puts the in-memory store back,
+  /// as creating the container would.
+  void route(String containerId, CosmosContainer? container) {
+    if (container == null) {
+      _routed.remove(containerId);
+    } else {
+      _routed[containerId] = container;
+    }
+  }
+
   @override
-  CosmosContainer container(String containerId) => this[containerId].container;
+  CosmosContainer container(String containerId) =>
+      _routed[containerId] ?? this[containerId].container;
 
   /// Routes every `CosmosPaths.*()` handle through this fake.
   void install() => CosmosClient.overrideInstance(this);

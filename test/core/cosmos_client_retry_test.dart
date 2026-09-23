@@ -137,9 +137,14 @@ void main() {
   });
 
   test('404 on read is still a null, not a retry', () async {
-    var calls = 0;
-    final client = _client((_) async {
-      calls++;
+    var docCalls = 0;
+    final client = _client((request) async {
+      // The container itself exists (#170: a document 404 is followed by
+      // one check of the container's own metadata).
+      if (!request.url.path.contains('/docs')) {
+        return http.Response(jsonEncode({'id': 'goals'}), 200);
+      }
+      docCalls++;
       return http.Response('', 404);
     });
 
@@ -148,6 +153,6 @@ void main() {
         .read('nope', partitionKey: 'goal');
 
     expect(doc, isNull);
-    expect(calls, 1);
+    expect(docCalls, 1);
   });
 }
