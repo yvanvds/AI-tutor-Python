@@ -467,9 +467,11 @@ release pressed again for reports nobody touched rewrites nothing.
 - **`highestPositiveDifficulty` is a three-level one-way ratchet** (#103).
   It records the highest difficulty a positive was ever earned at, in
   absolute terms, and only ever rises. The conductor never reads it; it
-  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
-  because the symmetric difficulty multiplier keeps difficulty out of
-  `(α, β)`. A doc without it is not guessed at on read (#164): the model
+  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5):
+  the mean says whether the student met the bar at their own level
+  (level-aware since #169's asymmetric difficulty multiplier, conductor
+  policy 3.2), the ratchet says which level that was. A doc without it
+  is not guessed at on read (#164): the model
   keeps `null`, the formula's reader applies §2.5's old-data rule at
   grade time, and the next positive records the level actually asked. A
   guess written back as a measurement had permanently capped students

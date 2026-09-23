@@ -191,14 +191,48 @@ void main() {
       expect(d.betaDelta, 0);
     });
 
-    test('negative moderate @ hard → β += 1.4', () {
+    test('negative moderate @ hard → β += 0.6: a mistake above the level '
+        'says little about it (#169)', () {
       final d = signalDeltas(
         kind: LoSignalKind.negative,
         strength: LoSignalStrength.moderate,
         difficulty: QuestionDifficulty.hard,
       );
       expect(d.alphaDelta, 0);
+      expect(d.betaDelta, closeTo(0.6, 1e-9));
+    });
+
+    test('negative moderate @ easy → β += 1.4: a mistake below the level '
+        'says a lot (#169)', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.moderate,
+        difficulty: QuestionDifficulty.easy,
+      );
+      expect(d.alphaDelta, 0);
       expect(d.betaDelta, closeTo(1.4, 1e-9));
+    });
+
+    test('negative strong @ medium → β += 2.0: medium is the unit for both '
+        'signs', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+      );
+      expect(d.alphaDelta, 0);
+      expect(d.betaDelta, closeTo(2.0, 1e-9));
+    });
+
+    test('positive moderate @ hard → α += 1.4: positives are unchanged by '
+        '#169', () {
+      final d = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.moderate,
+        difficulty: QuestionDifficulty.hard,
+      );
+      expect(d.alphaDelta, closeTo(1.4, 1e-9));
+      expect(d.betaDelta, 0);
     });
 
     test('positive weak @ easy → α += 0.3', () {
@@ -219,6 +253,78 @@ void main() {
       );
       expect(d.alphaDelta, 0);
       expect(d.betaDelta, 0);
+    });
+  });
+
+  group('difficulty factor asymmetry (#169, PUNTENFORMULE §1.2)', () {
+    QuestionDifficulty mirror(QuestionDifficulty d) => switch (d) {
+      QuestionDifficulty.easy => QuestionDifficulty.hard,
+      QuestionDifficulty.medium => QuestionDifficulty.medium,
+      QuestionDifficulty.hard => QuestionDifficulty.easy,
+    };
+
+    /// The mean a belief settles on when a fraction [correct] of strong
+    /// answers at [level] is right and the rest wrong: what μ reads as
+    /// "accuracy" at that level once the prior is negligible.
+    double meanAt(QuestionDifficulty level, double correct) {
+      final up = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: level,
+      ).alphaDelta;
+      final down = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.strong,
+        difficulty: level,
+      ).betaDelta;
+      final alpha = correct * up;
+      final beta = (1 - correct) * down;
+      return alpha / (alpha + beta);
+    }
+
+    test('the negative factor is the mirror image of the positive one', () {
+      for (final d in QuestionDifficulty.values) {
+        expect(
+          PolicyConstants.negativeDifficultyMultiplier(d),
+          PolicyConstants.positiveDifficultyMultiplier(mirror(d)),
+          reason: 'negative at $d should equal positive at ${mirror(d)}',
+        );
+      }
+      expect(
+        PolicyConstants.positiveDifficultyMultiplier(QuestionDifficulty.medium),
+        1.0,
+      );
+      expect(
+        PolicyConstants.negativeDifficultyMultiplier(QuestionDifficulty.medium),
+        1.0,
+      );
+    });
+
+    test('μ is level-aware: the 0,80 mastery bar is ~90% raw accuracy at '
+        'easy, 80% at medium and ~63% at hard', () {
+      const bar = PolicyConstants.masteryMeanThreshold;
+      expect(meanAt(QuestionDifficulty.easy, 0.90), closeTo(bar, 0.01));
+      expect(meanAt(QuestionDifficulty.medium, 0.80), closeTo(bar, 1e-9));
+      expect(meanAt(QuestionDifficulty.hard, 0.63), closeTo(bar, 0.01));
+      // The same 80% raw reads very differently by level.
+      expect(meanAt(QuestionDifficulty.easy, 0.80), lessThan(0.65));
+      expect(meanAt(QuestionDifficulty.hard, 0.80), greaterThan(0.90));
+    });
+
+    test('a promotion on the calibration ladder is μ-neutral: 76% at medium '
+        'and the ~60% that follows at hard read the same', () {
+      final atMedium = meanAt(QuestionDifficulty.medium, 0.76);
+      final atHard = meanAt(QuestionDifficulty.hard, 0.60);
+      expect(atMedium, closeTo(0.76, 1e-9));
+      expect(atHard, closeTo(0.78, 0.01));
+      expect((atHard - atMedium).abs(), lessThan(0.03));
+    });
+
+    test('the saturated-stuck ceiling reads the level too: at hard it is '
+        '~57% raw, not 75%', () {
+      const ceiling = PolicyConstants.stuckSaturatedMeanCeiling;
+      expect(meanAt(QuestionDifficulty.hard, 0.5625), closeTo(ceiling, 1e-3));
+      expect(meanAt(QuestionDifficulty.medium, 0.75), closeTo(ceiling, 1e-9));
     });
   });
 
@@ -265,7 +371,8 @@ void main() {
       expect(d.betaDelta, 0);
     });
 
-    test('symmetric: supervised negative moderate @ hard → β += 1.4 × s', () {
+    test('symmetric in sign where difficulty is not (#169): supervised '
+        'negative moderate @ hard → β += 0.6 × s', () {
       final d = signalDeltas(
         kind: LoSignalKind.negative,
         strength: LoSignalStrength.moderate,
@@ -273,7 +380,7 @@ void main() {
         provenance: EvidenceProvenance.supervised,
       );
       expect(d.alphaDelta, 0);
-      expect(d.betaDelta, closeTo(1.4 * s, 1e-9));
+      expect(d.betaDelta, closeTo(0.6 * s, 1e-9));
     });
 
     test('neutral stays a no-op under supervision', () {

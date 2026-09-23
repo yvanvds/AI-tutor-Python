@@ -123,8 +123,8 @@ Map<String, dynamic> printBelief({required DateTime lastUpdatedAt}) => {
 };
 
 /// The seeded account, calibrated at `hard` so the probe is asked at hard
-/// and the target's own debit (× 1.4) is observable next to the untouched
-/// earlier LO.
+/// and the target's own debit (× 0.6, the negative factor at hard, #169) is
+/// observable next to the untouched earlier LO.
 Map<String, dynamic> hardStudent() => {
   ...accountDoc(studentIdentity),
   'calibration': {
@@ -234,12 +234,13 @@ void main() {
       signalled.singleWhere((s) => s['loId'] == 'lo-print')['subgoalId'],
       's1',
     );
-    // Only the target's was applied: a strong negative at hard.
+    // Only the target's was applied: a strong negative at hard, weighted by
+    // the negative factor for hard (#169).
     final applied = (t['appliedSignals'] as List).cast<Map>();
     final onTarget = applied.single;
     expect(onTarget['loId'], 'lo-var');
     expect(onTarget['subgoalId'], 's2');
-    expect(onTarget['betaDelta'], closeTo(2.0 * 1.4, 1e-9));
+    expect(onTarget['betaDelta'], closeTo(2.0 * 0.6, 1e-9));
     // The earlier LO's negative became a review flag instead.
     expect(t['reviewFlags'], [
       {'subgoalId': 's1', 'loId': 'lo-print'},

@@ -60,9 +60,14 @@ double baseWeight(LoSignalStrength s) {
 /// Compute the (αDelta, βDelta) increments for a single signal at a given
 /// difficulty and provenance. `neutral` returns (0, 0).
 ///
+/// [difficulty] picks the positive or the negative multiplier by [kind]
+/// (#169, CONDUCTOR_POLICY §3.2, PUNTENFORMULE §1.2): a positive at hard
+/// weighs more than one at easy, a negative at hard weighs *less* — so the
+/// mean reads the level the question was asked at.
+///
 /// [provenance] applies the supervised weight factor `s`
 /// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §2.7): symmetric in positive and
-/// negative, like the difficulty multiplier, so it changes how *hard* a
+/// negative, unlike the difficulty multiplier, so it changes how *hard* a
 /// piece of evidence is, not which way it points.
 ({double alphaDelta, double betaDelta}) signalDeltas({
   required LoSignalKind kind,
@@ -73,9 +78,12 @@ double baseWeight(LoSignalStrength s) {
   if (kind == LoSignalKind.neutral) {
     return (alphaDelta: 0.0, betaDelta: 0.0);
   }
+  final difficultyFactor = kind == LoSignalKind.positive
+      ? PolicyConstants.positiveDifficultyMultiplier(difficulty)
+      : PolicyConstants.negativeDifficultyMultiplier(difficulty);
   final weighted =
       baseWeight(strength) *
-      PolicyConstants.difficultyMultiplier(difficulty) *
+      difficultyFactor *
       PolicyConstants.provenanceMultiplier(provenance);
   if (kind == LoSignalKind.positive) {
     return (alphaDelta: weighted, betaDelta: 0.0);

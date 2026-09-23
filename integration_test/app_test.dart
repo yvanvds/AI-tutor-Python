@@ -24,6 +24,7 @@ import 'flows/chat_collapse.dart' as chat_collapse;
 import 'flows/chat_composer_growth.dart' as chat_composer_growth;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
+import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
@@ -89,6 +90,7 @@ void main() {
   garbled_reply_retry.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
+  difficulty_asymmetry.main();
   legacy_ratchet.main();
   transfer_credit.main();
   cross_subgoal_signal.main();

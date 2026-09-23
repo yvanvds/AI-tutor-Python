@@ -30,10 +30,10 @@ class PolicyConstants {
   static const double weightModerate = 1.0;
   static const double weightWeak = 0.5;
 
-  /// Difficulty multiplier on the base weight. `correct` at hard is more
-  /// diagnostic than at easy; `wrong` at hard is *less* diagnostic than at
-  /// easy.
-  static double difficultyMultiplier(QuestionDifficulty d) {
+  /// Difficulty multiplier on the base weight of a *positive* signal
+  /// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §1.2): `correct` at hard is more
+  /// diagnostic than `correct` at easy.
+  static double positiveDifficultyMultiplier(QuestionDifficulty d) {
     switch (d) {
       case QuestionDifficulty.easy:
         return 0.6;
@@ -41,6 +41,31 @@ class PolicyConstants {
         return 1.0;
       case QuestionDifficulty.hard:
         return 1.4;
+    }
+  }
+
+  /// Difficulty multiplier on the base weight of a *negative* signal: the
+  /// mirror image of the positive one (#169). `wrong` at hard is *less*
+  /// diagnostic than `wrong` at easy — a mistake above the level the
+  /// milestone expects says little about that level, a mistake below it
+  /// says a lot.
+  ///
+  /// Because the two factors differ, the mean μ is level-aware: the same
+  /// mastery bar (`masteryMeanThreshold`, 0,80) is ~90% raw accuracy at
+  /// easy, 80% at medium and ~63% at hard, so a promotion on the
+  /// calibration ladder (§5) no longer pushes a student out of mastery, and
+  /// the stuck rule (§4.4) reads the level too. Before #169 the factor was
+  /// symmetric and μ was plain accuracy at whatever level the ladder had
+  /// parked the student — 40–75% by construction — which put every
+  /// well-calibrated student under the mastery bar given enough questions.
+  static double negativeDifficultyMultiplier(QuestionDifficulty d) {
+    switch (d) {
+      case QuestionDifficulty.easy:
+        return 1.4;
+      case QuestionDifficulty.medium:
+        return 1.0;
+      case QuestionDifficulty.hard:
+        return 0.6;
     }
   }
 

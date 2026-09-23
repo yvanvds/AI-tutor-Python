@@ -672,11 +672,14 @@ The base weight per `(signal, strength)`:
 | `negative` | `β += 2.0` | `β += 1.0` | `β += 0.5` |
 | `neutral` | (no update) | (no update) | (no update) |
 
-**Symmetric in positive/negative.** Asymmetry would distort
+**Symmetric in positive/negative.** Asymmetry here would distort
 calibration. The "wrong is more diagnostic than right" intuition is
 real but belongs in the LLM contract — the grader emits `moderate` or
 `weak` (not `strong`) on questions where lucky-guess corrects are
-plausible (e.g. binary MCQ). The conductor's weights stay symmetric.
+plausible (e.g. binary MCQ). The conductor's *base* weights stay
+symmetric; the one asymmetry the conductor does apply is by difficulty
+(3.2, #169), and that is about the level of the question relative to
+the student, not about one sign being more trustworthy than the other.
 
 **`neutral` is a no-op.** A neutral signal means "the answer touched
 the LO but gave no clear evidence." Adding `(α + 0.5, β + 0.5)` would
@@ -686,26 +689,43 @@ conductor declines to apply it.
 
 ### 3.2 Difficulty modulation
 
-Multiply the base weight by a difficulty factor:
+Multiply the base weight by a difficulty factor — one for positives,
+its mirror image for negatives (#169):
 
-| Question difficulty | Multiplier |
-| --- | --- |
-| `easy` | 0.6 |
-| `medium` | 1.0 |
-| `hard` | 1.4 |
+| Question difficulty | `positive` | `negative` |
+| --- | --- | --- |
+| `easy` | 0.6 | 1.4 |
+| `medium` | 1.0 | 1.0 |
+| `hard` | 1.4 | 0.6 |
 
-Applies to both positive and negative signals, with the same factor:
-a `correct` at hard is more diagnostic of mastery than a `correct`
-at easy, and a `wrong` at hard is weighted just as heavily as that
-`correct` — the multiplier says how *hard* a piece of evidence is,
-not which way it points (see "Symmetric in positive/negative" above).
-A consequence for the grade formula (PUNTENFORMULE §2.5): the
-multiplier scales how fast evidence accrues but not where the mean
-settles, so difficulty is invisible in `(α, β)`; the per-LO
-`highestPositiveDifficulty` ratchet (4.3) is what carries it.
+A `correct` at hard is more diagnostic of mastery than a `correct` at
+easy; a `wrong` at hard is *less* diagnostic of a gap than a `wrong`
+at easy — a mistake above the level the milestone expects says little
+about that level, a mistake below it says a lot. The consequence is a
+**level-aware mean**: the same mastery bar (mean ≥ 0.8, 4.1) is ~90%
+raw accuracy at easy, 80% at medium and ~63% at hard, and the stuck
+ceilings (4.4) shift the same way. That is what keeps the calibration
+ladder (5) from pushing a student out of mastery: a student promoted
+at 76% on medium who then scores ~60% on hard keeps a mean of ~0.78.
+Until #169 the factor was the same for both signs, so the mean was
+plain accuracy at whatever level the ladder had parked the student —
+40–75% by construction (5.1, 5.2) — and a well-calibrated student
+probed long enough ended under the mastery bar by design.
+(`PolicyConstants.positiveDifficultyMultiplier` /
+`negativeDifficultyMultiplier`; `belief_math.signalDeltas` picks by
+signal kind.)
 
-**E.1 interaction.** Lower easy-weight is one of two mechanisms that
-fix the "good student grinds easy answers to mastery" problem. The
+For the grade formula (PUNTENFORMULE §2.5) the per-LO
+`highestPositiveDifficulty` ratchet (4.3) still carries *which* level
+was demonstrated — the mean says whether the bar at the student's own
+level was met, not how high that bar was — so for now difficulty
+counts twice there (a softer mean at hard, plus the `d` bonus);
+PUNTENFORMULE keeps that deliberately until its part 2 is revised.
+
+**E.1 interaction.** The lower easy-weight on positives is one of two
+mechanisms that fix the "good student grinds easy answers to mastery"
+problem (and the higher easy-weight on negatives makes each easy
+mistake cost more, so easy-only mastery needs ~90% raw accuracy). The
 multiplier alone caps how fast easy-only mastery can accrue: it takes
 more easy-correct answers to reach the same evidence count as one
 medium-correct. The second mechanism — requiring evidence at the
@@ -724,8 +744,8 @@ produced:
 classroom session at grading time, as answered per student, per turn,
 by the `SupervisionSource` the host consults before building the
 `GradedAnswer`. There is no manual toggle. The factor is symmetric in
-positive and negative (like difficulty: it changes how *hard* the
-evidence is, not which way it points), applies to follow-up signals
+positive and negative (unlike difficulty since #169: provenance changes
+how *hard* the evidence is, not which way it points), applies to follow-up signals
 as well, and never drops below 1 — home evidence keeps full weight and
 is confirmed or contradicted by later supervised work on the same LO.
 Until Anchor is wired up every turn resolves to `home`, so the

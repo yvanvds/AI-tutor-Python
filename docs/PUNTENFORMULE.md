@@ -69,25 +69,36 @@ leerdoel, maar bewees niets). Voor de rest geldt:
 | zwak | 0,5 |
 
 Dat basisgewicht wordt vermenigvuldigd met de **moeilijkheidsfactor** van
-de vraag:
+de vraag — en die hangt sinds v1.0.14 af van het teken van het signaal:
 
-| moeilijkheid | factor |
-| --- | --- |
-| makkelijk | × 0,6 |
-| gemiddeld | × 1,0 |
-| moeilijk | × 1,4 |
+| moeilijkheid | positief signaal | negatief signaal |
+| --- | --- | --- |
+| makkelijk | × 0,6 | × 1,4 |
+| gemiddeld | × 1,0 | × 1,0 |
+| moeilijk | × 1,4 | × 0,6 |
 
 Het resultaat komt bij α (positief signaal) of bij β (negatief signaal).
 Een sterk-positief antwoord op een moeilijke vraag telt dus voor
-2,0 × 1,4 = 2,8 bij α.
+2,0 × 1,4 = 2,8 bij α; een sterk-negatief antwoord op diezelfde vraag
+voor 2,0 × 0,6 = 1,2 bij β.
 
-> **Belangrijk gevolg.** De moeilijkheidsfactor geldt *symmetrisch*: ook een
-> fout antwoord op een moeilijke vraag weegt × 1,4. Daardoor bepaalt de
-> moeilijkheid hoe *snel* je bewijs opbouwt, maar niet waar je gemiddelde μ
-> naartoe gaat: twee leerlingen die elk 80% juist antwoorden, de ene op
-> makkelijke en de andere op moeilijke vragen, komen op *dezelfde* μ uit.
-> Moeilijkheid is dus onzichtbaar in μ — en daarom telt ze in de
-> puntformule apart mee, via een eigen mechanisme (§2.5).
+> **Belangrijk gevolg.** De moeilijkheidsfactor is *asymmetrisch*: een
+> juist antwoord op een moeilijke vraag bewijst veel, een fout antwoord
+> erop weinig — en op een makkelijke vraag is het net omgekeerd. Daardoor
+> is je gemiddelde μ **niveaubewust**: dezelfde grens van 0,80 (§1.5)
+> komt overeen met ongeveer 90% juist op makkelijke vragen, 80% op
+> gemiddelde en ongeveer 63% op moeilijke. Wie op gemiddeld 76% haalt en
+> daardoor naar moeilijk gepromoveerd wordt (§1.6), zakt daar naar
+> ongeveer 60% juist — en μ blijft nagenoeg gelijk (≈ 0,78). Een promotie
+> kan je dus niet meer uit je beheersing duwen, en een demotie naar
+> makkelijk maakt beheersing niet goedkoper. Ook "vastgelopen" (§1.7)
+> leest zo het niveau mee: op moeilijk ben je dat pas onder ongeveer 57%
+> juist. Tot v1.0.13 gold de factor symmetrisch (ook een fout op moeilijk
+> woog × 1,4) en was μ gewoon je scorepercentage, op welk niveau je ook
+> zat; omdat de kalibratie je bewust parkeert waar je 40–75% scoort,
+> eindigde een goed gekalibreerde leerling die lang genoeg bevraagd werd
+> per ontwerp onder de beheersingsgrens. Moeilijkheid telt daarnaast nog
+> apart mee in de puntformule, via de ratel van §2.5.
 
 Antwoorden op **vervolgvragen** (de doorvraagjes na een gewoon antwoord)
 tellen ook mee, maar afgetopt op sterkte *zwak* (0,5) en gerekend als
@@ -335,8 +346,12 @@ vermeldt dat het om die schatting gaat.
 Moeilijkheid verdient een eigen plek in het punt — maar via het juiste
 signaal.
 
-- **Niet via μ:** door de symmetrische moeilijkheidsfactor (§1.2) is
-  moeilijkheid onzichtbaar in de gemiddelden.
+- **Niet alleen via μ:** sinds v1.0.14 leest μ het niveau mee (de
+  asymmetrische factor van §1.2), maar μ zegt alleen *of* je de lat op
+  jouw niveau haalt, niet *hoe hoog* die lat lag. Dat laatste onthoudt de
+  ratel hieronder. Moeilijkheid telt zo voorlopig twee keer — een
+  soepelere μ op moeilijk én de bonus via d — en dat blijft bewust zo tot
+  de herziening van deel 2 (§4).
 - **Niet via je globale kalibratieniveau (§1.6):** dat is bewust
   beweeglijk. Eén mindere week doet je zakken — maar de foute antwoorden
   van die week hebben je overtuigingen dan al verlaagd. Het niveau er
@@ -581,6 +596,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.11 | 2026-09-23 | Geen structuurwijziging. Bijlage A: een ouder opgeslagen leerdoel zonder trapinformatie (§2.5) leest de formule nog steeds als "gemiddeld" wanneer de ratel van §1.5 gezet was, maar de app schrijft die lezing niet meer weg als was ze gemeten — het veld blijft leeg tot een nieuw positief signaal het werkelijk gevraagde niveau vastlegt. Voordien versteende de gok bij de eerstvolgende beurt, en wie het leerdoel vóór v1.0.2 op moeilijk had aangetoond verloor dat blijvend, ten koste van d (#164). De formule van deel 2 en de punten veranderen niet; de getroffen data is eenmalig, buiten de app, uit de beurthistoriek hersteld. |
 | 1.0.12 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2: "beheerst?" leest niet langer de overtuiging zoals ze nu staat, maar de eenmalige stempel die de app zet wanneer de drie voorwaarden van §1.5 voor het eerst samen gelden (`firstMasteredAt`, in de code sinds v1.0.3 als poort voor het transfer-krediet). De overtuiging zelf verandert niet en blijft de tutor sturen (vraagkeuze, vastgelopen-detectie, opfrisvragen); alleen het punt leest de stempel. Gevolg: een latere tegenvallende meting, een signaal op een eerder subdoel (§1.2) of decay kan een aangetoond leerdoel niet meer uit het punt halen — verder werken kan het punt nooit verlagen; §1.5, §2.4, §2.8 en §3.3 zeggen dat nu ook. Reden: de overtuiging is een voortschrijdend gemiddelde en hoort dat te zijn, maar omdat de tutor beheerste leerdoelen niet meer rechtstreeks bevraagt, bleef élk later negatief signaal onweersproken staan; de klasdata toonde leerlingen die vroeg fouten maakten en later niet meer, en toch onder de grens eindigden. Bijlage A: een leerdoel zonder stempel telt niet als beheerst; oudere opgeslagen leerdoelen krijgen hun stempel eenmalig, buiten de app, uit de beurthistoriek (#168). |
 | 1.0.13 | 2026-09-23 | Geen structuurwijziging aan M of P; het punt verandert niet (het leest sinds v1.0.12 de stempel en de ratel, en geen van beide werd door deze signalen ooit geraakt). §1.2: een **negatief** signaal op een leerdoel uit een eerder subdoel is geen bewijs meer maar een aanleiding — het schrijft niets naar de overtuiging (geen β, geen decay-klok, geen nieuw document) en zet alleen de markering van §2.8 op een ooit beheerst leerdoel, zodat de eerstvolgende sessie er een opfrisvraag over stelt; die rechtstreekse meting telt met volle sterkte. Een positief signaal blijft wat het was. §2.8: de markering wordt alleen nog gewist door een rechtstreekse meting, niet meer door transfer-krediet of een positief signaal van opzij. Reden: zo'n negatief is het minst betrouwbare oordeel dat het systeem kent (afgeleid uit een antwoord over iets anders, zonder dat de vraag daarvoor ontworpen was) en treft per definitie leerdoelen die de tutor niet meer rechtstreeks bevraagt, dus het werd nooit meer getoetst; in de klasdata haalde het een zesmaal op rij aangetoond leerdoel een week later blijvend van 0,82 naar 0,65, en het stuurde zo de vraagkeuze, de vastgelopen-detectie en de voortgangsbalkjes op een nooit gecontroleerd oordeel (#167). Bijlage A zegt hoe de tutor het nu verwerkt; bestaande overtuigingen van leerlingen op de nieuwe build worden eenmalig, buiten de app, uit de beurthistoriek herspeeld zonder deze signalen. |
+| 1.0.14 | 2026-09-23 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de moeilijkheidsfactor van §1.2 is niet langer symmetrisch. Een positief signaal weegt zoals voorheen (makkelijk × 0,6, gemiddeld × 1,0, moeilijk × 1,4); een negatief signaal krijgt het spiegelbeeld (makkelijk × 1,4, gemiddeld × 1,0, moeilijk × 0,6). Daardoor is μ niveaubewust: dezelfde grens van 0,80 is ongeveer 90% juist op makkelijk, 80% op gemiddeld en ongeveer 63% op moeilijk; een promotie op de kalibratieladder (§1.6) verandert μ nauwelijks meer en kan je dus niet meer uit je beheersing duwen, en "vastgelopen" (§1.7) leest het niveau vanzelf mee. De "belangrijk gevolg"-alinea van §1.2 keert daarmee om; §2.5 zegt dat moeilijkheid voorlopig twee keer telt (via μ en via de ratel), te herbekijken bij de herziening van deel 2. Reden: de kalibratie parkeert een leerling bewust waar hij 40–75% scoort, terwijl beheersing μ ≥ 0,80 vraagt en "vastgelopen" μ < 0,75 is — met een symmetrische factor was μ gewoon het scorepercentage, zodat een goed gekalibreerde leerling die lang genoeg bevraagd werd per ontwerp onder de grens eindigde (in de klasdata: 154 vragen op moeilijk, 65% juist, en toch "vastgelopen" en niet beheerst). De bestaande overtuigingen worden eenmalig, buiten de app, uit de beurthistoriek herspeeld met de nieuwe factor (alleen α, β en de stempel van §2.2), ná de verplichte client-update en vóór deze versie in gebruik gaat (#169). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -598,7 +614,8 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | --- | --- | --- |
 | prior | (1, 1) | startovertuiging per leerdoel (§1.1) |
 | gewicht sterk / matig / zwak | 2,0 / 1,0 / 0,5 | basisgewicht per signaal (§1.2) |
-| moeilijkheidsfactor | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk, symmetrisch (§1.2) |
+| moeilijkheidsfactor, positief signaal | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk (§1.2) |
+| moeilijkheidsfactor, negatief signaal | 1,4 / 1,0 / 0,6 | makkelijk / gemiddeld / moeilijk — het spiegelbeeld, sinds v1.0.14 (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
 | toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
 | transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |

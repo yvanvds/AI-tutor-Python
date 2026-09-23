@@ -2173,13 +2173,14 @@ void main() {
       // The earlier subgoal is not re-enrolled.
       expect(s.f.progressById['s0']!.progress, 1.0);
 
-      // Only the target took a signal, at the probe's difficulty. The
+      // Only the target took a signal, at the probe's difficulty: a strong
+      // negative at hard, 2.0 × the negative factor 0.6 (#169). The
       // grader's negative is on record under loSignals and reviewFlags,
       // never under appliedSignals.
       final onTarget = outcome.appliedSignals.single;
       expect(onTarget.subgoalId, 's1');
       expect(onTarget.loId, 'lo-var');
-      expect(onTarget.betaDelta, closeTo(2.0 * 1.4, 1e-6));
+      expect(onTarget.betaDelta, closeTo(2.0 * 0.6, 1e-6));
       expect(
         outcome.loSignals.where((l) => l.loId == 'lo-print').single.subgoalId,
         's0',
