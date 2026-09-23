@@ -6,9 +6,9 @@ voorstellen naar `grade_proposals`. De leerling ziet het resultaat in
 "Mijn rapporten" zonder dat de app verandert.
 
 Waarom hier en niet in de app: de eerste rapportronde (2026-09-23) keerde
-de klas om, en elke oorzaak — verouderde clients, gewiste ratels,
+de klas om, en elke oorzaak — verouderde clients, gewiste hoogste niveaus,
 incidentele signalen, de kalibratieband tegenover de beheersingsgrens —
-werd pas zichtbaar door de ruwe beurten te herspelen. Die herspeling, plus
+werd pas zichtbaar door de ruwe oefeningen te herspelen. Die herspeling, plus
 de klasobservaties van de leerkracht, is wat een faire beoordeling nodig
 heeft. De app blijft het onderwijs sturen; het punt komt van hier.
 
@@ -46,7 +46,7 @@ volgorde uit en schrijft de verantwoordingen in het concept.
 | | |
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag |
-| `rules.py` | de regel: replay van `turn_history`, stempel, ratel, M en P |
+| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vier commando's; rendert concept en sidecar |
 
@@ -72,32 +72,45 @@ PUNTENFORMULE v1.0.10 met drie afwijkingen (beslist 2026-09-23, zie #167,
 Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
-doel en alleen naar een eerder subdoel, kern telt alleen met ratel ≥
+doel en alleen naar een eerder subdoel, kern telt alleen met hoogste niveau ≥
 verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 
 ## Wat de diagnostiek kan dat de app niet kan
 
-- **per lesdag**: beurten, % juist, kalibratie, afgeronde subdoelen — een
+- **per lesdag**: oefeningen, % juist, kalibratie, afgeronde subdoelen — een
   leerling die van 60% naar 84% ging, zie je hier en nergens anders;
 - **afwezigheid**: dagen waarop de klas werkte en deze leerling niet;
 - **bijna-lijst**: welke leerdoelen op 0,70–0,80 staan en hoeveel
-  kernstempels nog nodig zijn om te slagen;
+  kernstempels nog nodig zijn om te slagen; doelen met te weinig vragen
+  om ooit aangetoond te kunnen worden staan gemarkeerd — een laag punt
+  door dun bevraagde extra doelen is iets anders dan een laag punt door
+  gemiste kerndoelen;
 - **profiel**: denktijd, deels-juist-aandeel, score per vraagtype en per
   soort leerdoel (`recall` / `predict` / `write` / `fix`) — "leest code
   maar schrijft ze niet" staat hier in cijfers;
 - **fossielen**: leerdoelen die niet aangetoond zijn en al een week niet
-  bevraagd, terwijl recent werk ≥ 75% juist is — de 30-dagenregel voor
-  opfrisvragen is daar te traag voor;
+  bevraagd, terwijl recent werk op zijn niveau goed is (niveaugewogen
+  zoals μ onder #169: 63% juist op hard telt als 0,80) — de 30-dagenregel
+  voor opfrisvragen is daar te traag voor;
 - **weggegooide signalen**: oordelen van de grader over de leerdoelen van
   deze mijlpaal terwijl de leerling in een ander doel werkte; de app laat
   ze vallen. Let op: hun frequentie verschilt sterk per sessie (vraagtype?
   grader-versie?) — informatief, geen bewijs.
 
+## Woorden
+
+De leerkracht leest het concept, dus de app-woorden zijn daar vertaald.
+Een turn uit `turn_history` is een **oefening**. Een directe vraag over
+een leerdoel is een **vraag**. Het hoogste niveau waarop een leerdoel
+juist beantwoord werd (`highestPositiveDifficulty`; PUNTENFORMULE §2.5
+noemt dat "ratel", een vertaling van *ratchet* die niemand herkent) is
+het **hoogste niveau**.
+
 ## Grenzen
 
 - De replay leest `loSignals`. Transfer-krediet dat alleen als
   `appliedSignals` gelogd is, ontbreekt; `validate` toont hoe groot dat is.
-- De regel vraagt geen vast aantal metingen per leerdoel: wie vroeg goed
+- De regel vraagt geen vast aantal vragen per leerdoel: wie vroeg goed
   antwoordt, wordt niet meer bevraagd. De stempel is daar de eerlijkste
   maat voor, niet een perfecte. Zie de discussie bij #169.
 - Eén persoon in de lus per rapport. Dat is de bedoeling, geen gebrek.

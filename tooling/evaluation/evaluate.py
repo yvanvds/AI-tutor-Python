@@ -105,6 +105,27 @@ def cmd_draft(args) -> None:
         turns = all_turns[uid]
         st = rules.replay(turns, goals)
         sc = rules.score(los, st, milestone["expectedDifficulty"])
+        tl = dx.timeline(turns)
+        # Accuracy is not a growth measure here: later subgoals are harder and
+        # the calibration ladder raises the questions as the student improves,
+        # so a percentage falls while skill rises. Growth a report can state
+        # honestly is what was demonstrated when, and the level climbed.
+        ms_turns = [t for t in turns if t["subgoalId"] in ms_subgoals]
+        level_start = ms_turns[0].get("calibrationBefore") if ms_turns else None
+        level_end = ms_turns[-1].get("calibrationAfter") if ms_turns else None
+        level_hard_from = next((t["turnAt"][:10] for t in ms_turns if t.get("calibrationAfter") == "hard"), None)
+        # When each part of the milestone was finished, and between which
+        # dates the goals were demonstrated: the "wanneer" a report needs.
+        order = {sid: i for i, sid in enumerate(milestone.get("subgoalIds") or [])}
+        seen: set[str] = set()
+        reached = []
+        for t in turns:
+            sid = t["subgoalId"]
+            if t.get("subgoalAdvanced") and sid in ms_subgoals and sid not in seen:
+                seen.add(sid)
+                reached.append((order.get(sid, 99), (goals.get(sid) or {}).get("title") or sid, t["turnAt"][:10]))
+        reached.sort()
+        stamps = [st[lo.key].first_mastered_at for lo in los if lo.key in st and st[lo.key].first_mastered_at]
         per_student.append(
             {
                 "uid": uid,
@@ -112,7 +133,13 @@ def cmd_draft(args) -> None:
                 "calibration": (a.get("calibration") or {}).get("difficulty"),
                 "score": sc,
                 "needed": rules.stamps_needed_to_pass(sc),
-                "timeline": dx.timeline(turns),
+                "timeline": tl,
+                "level_start": level_start,
+                "level_end": level_end,
+                "level_hard_from": level_hard_from,
+                "reached": [(title, day) for _, title, day in reached],
+                "stamp_first": min(stamps).date().isoformat() if stamps else None,
+                "stamp_last": max(stamps).date().isoformat() if stamps else None,
                 "absent": dx.absences(turns, class_days),
                 "near": dx.near_misses(los, st, milestone["expectedDifficulty"]),
                 "profile": dx.profile(turns),
@@ -138,7 +165,8 @@ def cmd_draft(args) -> None:
 
 
 def _lo_label(lo: rules.MilestoneLo) -> str:
-    return f"{lo.subgoal_id}/{lo.lo_id}" + ("" if lo.is_core else " (uitbreiding)")
+    # The statement is what the report text must use; the id is for the teacher.
+    return f"{lo.statement} `{lo.lo_id}`" + ("" if lo.is_core else " (uitbreiding)")
 
 
 def _render_md(milestone, klas, per_student, now, json_path) -> str:
@@ -147,9 +175,11 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
     L.append("")
     L.append(f"Opgesteld {now.strftime('%Y-%m-%d %H:%M')} UTC · regels `{rules.RULES_VERSION}` · sidecar `{json_path.name}`")
     L.append("")
-    L.append("**Zo is het getal gemaakt.** Elke beurt uit `turn_history` is herspeeld met de regels van v1.0.10, met drie afwijkingen die op 23-09 met de leerkracht beslist zijn: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én ratel ≥ verwacht niveau. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en `P = M` omdat M_start = 0 voor een eerste rapport dat alles sinds de start van het jaar beslaat.")
+    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.10, met drie afwijkingen die op 23-09 met de leerkracht beslist zijn: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en `P = M` omdat M_start = 0 voor een eerste rapport dat alles sinds de start van het jaar beslaat.")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
+    L.append("")
+    L.append("**Drie teksten per leerling.** *Diagnostiek* en *Voor de leerkracht* blijven hier. *Tekst voor het rapport* gaat letterlijk naar de leerling en de ouders: je-vorm, gewone taal, twee koppen als gewone regels (de app toont platte tekst). Benoem een leerdoel met zijn eigen zin ('Je kan …'), nooit met de code erachter. De woordregels staan in de skill.")
     L.append("")
     L.append("## Overzicht")
     L.append("")
@@ -166,6 +196,9 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
             sig.append("afwezig " + ", ".join(d[5:] for d in p["absent"]))
         if p["fossils"]:
             sig.append(f"{len(p['fossils'])} fossiel")
+        thin = sum(1 for r in p["near"] if r["thin"])
+        if thin >= 2:
+            sig.append(f"{thin} doelen te weinig bevraagd")
         if p["cross_root"]["positive"] >= 10:
             sig.append(f"{p['cross_root']['positive']} weggegooide positieven")
         L.append(f"| {p['name']} | {sc.core_counted}/{sc.core_total} | {sc.extension_mastered}/{sc.extension_total} | {sc.hard_count}/{sc.mastered_total} | **{sc.proposal}** | {need_s} | {', '.join(sig)} |")
@@ -175,7 +208,7 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
         L.append(f"## {p['name']}")
         L.append("")
         if not p["has_data"]:
-            L.append("_Geen enkele meting op de leerdoelen van deze mijlpaal. Niet beoordelen._")
+            L.append("_Geen enkele vraag over de leerdoelen van deze mijlpaal. Niet beoordelen._")
             L.append("")
             L.append("**Observatie leerkracht:** ")
             L.append("")
@@ -188,33 +221,49 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
         L.append("")
         L.append("### Diagnostiek")
         L.append("")
-        L.append("**Per lesdag** (beurten · % juist · kalibratie · afgeronde subdoelen · waar):")
+        L.append("**Per lesdag** (oefeningen · % juist · kalibratie · afgeronde subdoelen · waar):")
         L.append("")
         for r in p["timeline"]:
             L.append(f"- {r['day']}: {r['turns']} · {r['correct_pct']}% · {r['calibration_end']} · {r['advanced']} · {r['subgoals']}")
         if p["absent"]:
             L.append(f"- **Afwezig** terwijl de klas werkte: {', '.join(p['absent'])}")
+        if p["level_start"]:
+            nl = {"easy": "makkelijke", "medium": "gewone", "hard": "moeilijke"}
+            path = f"begon met {nl.get(p['level_start'], p['level_start'])} oefeningen, eindigde met {nl.get(p['level_end'], p['level_end'])}"
+            if p["level_hard_from"] and p["level_start"] != "hard":
+                path += f" (moeilijk vanaf {p['level_hard_from'][5:]})"
+            L.append(f"- **Niveau binnen dit onderdeel:** {path}")
         L.append("")
+        if p["reached"]:
+            n_ms = len(milestone.get("subgoalIds") or [])
+            L.append("**Onderdelen afgerond:** " + "; ".join(f"{t} op {d[5:]}" for t, d in p["reached"]) + f" ({len(p['reached'])} van {n_ms})")
+            L.append("")
+        if p["stamp_first"]:
+            L.append(f"**Doelen aangetoond tussen** {p['stamp_first']} en {p['stamp_last']}.")
+            L.append("")
         near = [r for r in p["near"] if r["status"] != "ver"]
         far = [r for r in p["near"] if r["status"] == "ver"]
         if near:
             L.append("**Bijna / aandacht:**")
             L.append("")
             for r in near:
-                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f}, {r['n']} metingen, ratel {r['ratchet']}, laatst {r['last']} — {r['status']}")
+                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f}, {r['n']} vragen, hoogste niveau {r['ratchet']}, laatst {r['last']} — {r['status']}{' — te weinig vragen om aan te tonen' if r['thin'] else ''}")
             L.append("")
         if far:
-            L.append("**Ver:** " + "; ".join(f"{r['lo'].lo_id} ({r['mean']:.2f}, n={r['n']})" for r in far))
+            L.append("**Ver:**")
+            L.append("")
+            for r in far:
+                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f}, {r['n']} vragen{' — te weinig vragen om aan te tonen' if r['thin'] else ''}")
             L.append("")
         pr = p["profile"]
-        L.append(f"**Profiel:** {pr['turns']} beurten · denktijd {pr['think_time_s']} s · juist {pr['correct_pct']}% / deels {pr['partial_pct']}% / fout {pr['wrong_pct']}% · vervolgvragen {pr['follow_up_pct']}%")
+        L.append(f"**Profiel:** {pr['turns']} oefeningen · denktijd {pr['think_time_s']} s · juist {pr['correct_pct']}% / deels {pr['partial_pct']}% / fout {pr['wrong_pct']}% · vervolgvragen {pr['follow_up_pct']}%")
         L.append(f"- per moeilijkheid: {', '.join(f'{k} {v}' for k, v in pr['by_difficulty'].items())}")
         L.append(f"- per vraagtype: {', '.join(f'{k} {v}' for k, v in pr['by_type'].items())}")
         if pr["by_kind"]:
             L.append(f"- per soort leerdoel: {', '.join(f'{k} {v}' for k, v in pr['by_kind'].items())}")
         L.append("")
         if p["fossils"]:
-            L.append("**Fossielen** — niet aangetoond, lang niet meer bevraagd, terwijl recent werk ≥ 75% juist is:")
+            L.append("**Fossielen** — niet aangetoond, al minstens een week niet meer bevraagd, terwijl recent werk op zijn niveau goed is:")
             L.append("")
             for f in p["fossils"]:
                 L.append(f"- {_lo_label(f['lo'])} — μ {f['mean']:.2f}, {f['age_days']} dagen oud")
@@ -225,15 +274,27 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
             for r in cr["top"][:4]:
                 L.append(f"- {r['lo']} +{r['pos']}/−{r['neg']} ({', '.join(r['days'])})")
             L.append("")
-        L.append("### Verantwoording (concept)")
+        L.append("### Voor de leerkracht (concept)")
         L.append("")
-        L.append("_[in te vullen — 2 à 4 korte alinea's, aan de leerkracht, over de leerling in de derde persoon bij voornaam; het getal staat vast en wordt niet in vraag gesteld; gegrond in de diagnostiek hierboven]_")
+        L.append("_[2 à 4 zinnen, vaktaal mag, blijft hier: wat moet de leerkracht weten om te beslissen — bijna-doelen, fossielen, afwezigheid, een profiel dat op iets wijst]_")
         L.append("")
         L.append("**Observatie leerkracht:** ")
         L.append("")
-        L.append("**Aanpassing:** — **Reden:** ")
-        L.append("")
         L.append("**Beslissing:** aftekenen / uitstellen / overslaan")
+        L.append("")
+        L.append("**Aanpassing:** — **Reden** (gaat mee naar het rapport, in je-vorm): ")
+        L.append("")
+        L.append("### Tekst voor het rapport (concept)")
+        L.append("")
+        L.append("_[gaat letterlijk naar de leerling en de ouders — pas schrijven ná de observaties van de leerkracht; twee koppen als gewone regels; je-vorm; geen vaktaal; zie de skill]_")
+        L.append("")
+        L.append("Verantwoording van je score")
+        L.append("")
+        L.append("_[3 à 5 zinnen]_")
+        L.append("")
+        L.append("Feedback")
+        L.append("")
+        L.append("_[4 à 8 zinnen]_")
         L.append("")
     return "\n".join(L)
 
@@ -283,7 +344,7 @@ def cmd_validate(args) -> None:
     A student on the current build should match to the rounding."""
     goals = cosmos.goals()
     students = cosmos.accounts(args.klas)
-    print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'ratel anders':>14}")
+    print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}")
     for a in students:
         turns = cosmos.turns(a["uid"])
         stored = cosmos.beliefs(a["uid"])
@@ -298,7 +359,7 @@ def cmd_validate(args) -> None:
                 off += 1
             if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != s.ratchet:
                 rat += 1
-        print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>14}")
+        print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>24}")
     print("\nAfwijkingen wijzen op een client die anders rekende (oude build) of op transfer-krediet buiten loSignals; ze raken het concept niet, dat leest alleen turn_history.")
 
 
@@ -346,6 +407,10 @@ def cmd_apply(args) -> None:
     if missing and not args.force:
         sys.exit("Zonder verantwoording niet aftekenen (of --force):\n  " + ", ".join(missing))
 
+    for s in todo:
+        j = s.get("justification") or ""
+        if "Verantwoording van je score" not in j or "\nFeedback" not in j:
+            print(f"  let op: {s['name']}: de rapporttekst mist een van de twee koppen")
     path = _backup([by_uid[s["uid"]] for s in todo if s["uid"] in by_uid], mid, BACKUP_DIR, f"{_slug(data['klas'])}_apply")
     print(f"back-up: {path}")
 

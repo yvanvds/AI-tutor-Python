@@ -186,6 +186,8 @@ class MilestoneLo:
     subgoal_id: str
     lo_id: str
     is_core: bool
+    statement: str = ""  # the LO's own Dutch "Je kan ..." sentence; student-facing text uses this, never the id
+    subgoal_title: str = ""
 
     @property
     def key(self) -> tuple[str, str]:
@@ -199,7 +201,15 @@ def milestone_los(milestone: dict, goals: dict) -> list[MilestoneLo]:
     out = []
     for sid in milestone.get("subgoalIds") or []:
         for o in (goals.get(sid) or {}).get("objectives") or []:
-            out.append(MilestoneLo(sid, o["id"], f"{sid}/{o['id']}" in core))
+            out.append(
+                MilestoneLo(
+                    sid,
+                    o["id"],
+                    f"{sid}/{o['id']}" in core,
+                    o.get("statement") or o["id"],
+                    (goals.get(sid) or {}).get("title") or sid,
+                )
+            )
     return out
 
 

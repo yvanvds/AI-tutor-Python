@@ -11,12 +11,34 @@ import datetime as dt
 import statistics
 from collections import Counter, defaultdict
 
-from rules import DIFF_ORDER, LoState, MilestoneLo, parse_at, same_root_backward
+from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, parse_at, same_root_backward
+
+# Plain-Dutch labels for the report text; the raw names are app vocabulary.
+DIFF_NL = {"easy": "makkelijk", "medium": "gewoon", "hard": "moeilijk"}
+TYPE_NL = {
+    "mc": "meerkeuze",
+    "completeCode": "code aanvullen",
+    "explainCode": "code uitleggen",
+    "writeCode": "code schrijven",
+    "socratic": "gesprek over je antwoord",
+}
+KIND_NL = {
+    "recall": "iets benoemen of herinneren",
+    "predict": "voorspellen wat code doet",
+    "write": "zelf code schrijven",
+    "fix": "een fout in code verbeteren",
+    "explain": "uitleggen waarom",
+    "reason": "redeneren over code",
+}
 
 FOSSIL_MIN_AGE_DAYS = 7
 FOSSIL_RECENT_TURNS = 30
-FOSSIL_RECENT_ACCURACY = 0.75
+FOSSIL_RECENT_ACCURACY = 0.75  # level-weighted, see fossils()
 NEAR_MISS_MEAN = 0.70
+# With prior (1,1) and μ ≥ 0.80 a LO needs n·w ≥ 3 of positive weight: three
+# moderate answers, or two strong ones. Below this many direct questions the
+# stamp is out of reach whatever the answers were — "not assessed".
+THIN_QUESTIONS = 3
 
 
 def timeline(turns: list[dict]) -> list[dict]:
@@ -42,6 +64,24 @@ def timeline(turns: list[dict]) -> list[dict]:
     return rows
 
 
+def trend(rows: list[dict]) -> dict | None:
+    """Accuracy over the first two lesson days vs. the last two: the growth
+    a student and their parents can see."""
+    if len(rows) < 3:
+        return None
+
+    def avg(part):
+        t = sum(r["turns"] for r in part)
+        return round(sum(r["correct_pct"] * r["turns"] for r in part) / t) if t else 0
+
+    return {
+        "first": avg(rows[:2]),
+        "last": avg(rows[-2:]),
+        "first_days": [r["day"] for r in rows[:2]],
+        "last_days": [r["day"] for r in rows[-2:]],
+    }
+
+
 def absences(turns: list[dict], class_days: set[str]) -> list[str]:
     """Days the class worked and this student did not."""
     mine = {t["turnAt"][:10] for t in turns}
@@ -57,10 +97,10 @@ def near_misses(los: list[MilestoneLo], st: dict, expected: str) -> list[dict]:
         if s and s.demonstrated and DIFF_ORDER[s.ratchet] >= exp:
             continue
         if s is None:
-            out.append({"lo": lo, "mean": 0.0, "n": 0, "status": "nooit gemeten", "ratchet": None, "last": None})
+            out.append({"lo": lo, "mean": 0.0, "n": 0, "status": "nooit bevraagd", "ratchet": None, "last": None, "thin": True})
             continue
         if s.demonstrated:
-            status = "gestempeld, maar ratel onder verwacht niveau"
+            status = "aangetoond, maar hoogste niveau onder het verwachte"
         elif s.mean >= NEAR_MISS_MEAN:
             status = "bijna"
         else:
@@ -73,6 +113,7 @@ def near_misses(los: list[MilestoneLo], st: dict, expected: str) -> list[dict]:
                 "status": status,
                 "ratchet": s.ratchet,
                 "last": s.last_direct_at.date().isoformat() if s.last_direct_at else None,
+                "thin": s.n_direct < THIN_QUESTIONS,
             }
         )
     out.sort(key=lambda r: -r["mean"])
@@ -114,10 +155,16 @@ def profile(turns: list[dict]) -> dict:
         "wrong_pct": round(100 * q["wrong"] / n),
         "follow_up_pct": round(100 * sum(1 for t in turns if t.get("isFollowUp")) / n),
         "strong_neg_share": round(100 * strong_neg / all_neg) if all_neg else None,
-        "by_difficulty": {k: pct(v) for k, v in sorted(by_diff.items())},
-        "by_type": {k.replace("Question", ""): pct(v) for k, v in sorted(by_type.items(), key=lambda x: -sum(x[1].values()))[:5]},
+        "by_difficulty": {
+            DIFF_NL.get(k, k): pct(v)
+            for k, v in sorted(by_diff.items(), key=lambda x: ["easy", "medium", "hard"].index(x[0]) if x[0] in DIFF_NL else 9)
+        },
+        "by_type": {
+            TYPE_NL.get(k.replace("Question", ""), k.replace("Question", "")): pct(v)
+            for k, v in sorted(by_type.items(), key=lambda x: -sum(x[1].values()))[:5]
+        },
         "by_kind": {
-            k: f"{round(100 * v['positive'] / (v['positive'] + v['negative']))}%"
+            KIND_NL.get(k, k): f"{round(100 * v['positive'] / (v['positive'] + v['negative']))}%"
             for k, v in sorted(by_kind.items())
             if v["positive"] + v["negative"] >= 4
         },
@@ -127,12 +174,24 @@ def profile(turns: list[dict]) -> dict:
 def fossils(los: list[MilestoneLo], st: dict, turns: list[dict], now: dt.datetime) -> list[dict]:
     """Milestone LOs not demonstrated whose last direct probe is old, while
     the student's recent work says they have since moved up. The 30-day
-    warm-up review would catch these eventually; this catches them now."""
+    warm-up review would catch these eventually; this catches them now.
+
+    "Recent work is good" is level-weighted like μ under #169: a correct
+    answer on hard counts ×1.4 and a wrong one ×0.6 (the reverse on easy),
+    so ~63% raw on hard reads as 0.80, the rule's own mastery bar. Raw
+    accuracy never reaches 75% on hard, which hid every fossil in the
+    first 6EWI round."""
     recent = turns[-FOSSIL_RECENT_TURNS:]
     if len(recent) < 10:
         return []
-    acc = sum(1 for t in recent if t.get("overallQuality") == "correct") / len(recent)
-    if acc < FOSSIL_RECENT_ACCURACY:
+    pos = neg = 0.0
+    for t in recent:
+        d = t.get("difficulty") or "medium"
+        if t.get("overallQuality") == "correct":
+            pos += POS_FACTOR.get(d, 1.0)
+        else:
+            neg += NEG_FACTOR.get(d, 1.0)
+    if pos / (pos + neg) < FOSSIL_RECENT_ACCURACY:
         return []
     out = []
     for lo in los:
