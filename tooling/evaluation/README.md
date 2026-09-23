@@ -50,9 +50,13 @@ volgorde uit en schrijft de verantwoordingen in het concept.
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vier commando's; rendert concept en sidecar |
 
-## Regelversie `1.0.16-eval1`
+## Regelversie `1.0.16-eval2`
 
-PUNTENFORMULE v1.0.16, herspeeld uit `turn_history`. Rekent exact wat
+PUNTENFORMULE v1.0.16, herspeeld uit `turn_history`. `eval2` (2026-09-23)
+verandert niets aan de formule: de herspeling past nu ook het
+transfer-krediet toe dat de app logde (`transferCredits`, CONDUCTOR_POLICY
+§3.7) en dat `eval1` oversloeg — een getrouwheidscorrectie op de
+herspeling, geen regelwijziging. Voor het overige rekent ze exact wat
 `1.0.10-eval1` rekende: dat was v1.0.10 met drie afwijkingen (beslist
 2026-09-23, zie #167, #168, #169) en één kader, en de formule heeft ze
 intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
@@ -76,7 +80,8 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
 Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
-doel en alleen naar een eerder subdoel, kern telt alleen met hoogste niveau ≥
+doel en alleen naar een eerder subdoel, transfer-krediet zoals gelogd (een
+zwak positief op gemiddeld), kern telt alleen met hoogste niveau ≥
 verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 
 ## Wat de diagnostiek kan dat de app niet kan
@@ -112,8 +117,11 @@ het **hoogste niveau**.
 
 ## Grenzen
 
-- De replay leest `loSignals`. Transfer-krediet dat alleen als
-  `appliedSignals` gelogd is, ontbreekt; `validate` toont hoe groot dat is.
+- De replay leest `loSignals` en `transferCredits` (sinds `eval2`; `eval1`
+  sloeg het transfer-krediet over en las elk doc dat er kreeg te laag).
+  Wat buiten haar bereik blijft, zijn oefeningen van clients van vóór #108,
+  die een andere set signalen toepasten dan de conductor nu; `validate`
+  toont hoe groot dat is.
 - De regel vraagt geen vast aantal vragen per leerdoel: wie vroeg goed
   antwoordt, wordt niet meer bevraagd. De stempel is daar de eerlijkste
   maat voor, niet een perfecte. Zie de discussie bij #169.

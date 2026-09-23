@@ -9,13 +9,19 @@ Why replay from `turn_history` instead of reading `lo_beliefs`: clients on
 an older build wrote docs without the difficulty ratchet and without the
 mastery stamp, and applied (or dropped) incidental signals differently.
 The turn log is the one record every build wrote the same way. Replaying
-it with the symmetric factor and incidentals on reproduces the stored
-beliefs exactly (validated 2026-09-23 on 6EWI) — `evaluate.py validate`
+it with the symmetric factor, incidentals on and the logged transfer
+credits reproduces the stored beliefs exactly for a client on the current
+build (validated 2026-09-23 on 6EWI and 6WEWI) — `evaluate.py validate`
 checks that on demand.
 
-Rule set `1.0.16-eval1` = PUNTENFORMULE v1.0.16, replayed from the turn
-log. It computes exactly what `1.0.10-eval1` computed; what changed is the
-formula around it. That set was v1.0.10 with three deliberate departures,
+Rule set `1.0.16-eval2` = PUNTENFORMULE v1.0.16, replayed from the turn
+log. `eval2` changes nothing in the formula: the replay now also applies
+the transfer credits the conductor logged (`transferCredits`, CONDUCTOR_POLICY
+§3.7), which `eval1` skipped and therefore under-read on every doc that
+took one — a fidelity fix to the replay, closing the README's known limit.
+Credits aside it computes exactly what `1.0.10-eval1` computed; what
+changed there is the formula around it. That set was v1.0.10 with three
+deliberate departures,
 each decided with the teacher on 2026-09-23, which the formula has since
 taken over (v1.0.12–v1.0.14):
 
@@ -38,7 +44,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
-RULES_VERSION = "1.0.16-eval1"
+RULES_VERSION = "1.0.16-eval2"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -47,6 +53,9 @@ DECAY_HALF_LIFE_DAYS = 60.0  # the conductor decays on every write; replay must 
 WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
 POS_FACTOR = {"easy": 0.6, "medium": 1.0, "hard": 1.4}
 NEG_FACTOR = {"easy": 1.4, "medium": 1.0, "hard": 0.6}  # #169; symmetric would equal POS_FACTOR
+# A transfer credit is a weak positive at `medium` (`belief_math.transferCreditDeltas`,
+# CONDUCTOR_POLICY §3.7); provenance weighting is a no-op until Anchor ships.
+TRANSFER_CREDIT_ALPHA = WEIGHT["weak"] * POS_FACTOR["medium"]
 
 MASTERY_MEAN = 0.80
 MASTERY_EVIDENCE = 4.0
@@ -133,12 +142,14 @@ def replay(
     *,
     asymmetric: bool = True,
     drop_incidental_negatives: bool = True,
+    apply_transfer_credits: bool = True,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
 
     With `asymmetric=False, drop_incidental_negatives=False` this is the
     app's own arithmetic and should match `lo_beliefs` for a client on the
-    current build.
+    current build. `apply_transfer_credits=False` is the `eval1` replay,
+    which skipped the credits and under-read every doc that took one.
     """
     st: dict[tuple[str, str], LoState] = {}
     for t in turns:
@@ -182,6 +193,24 @@ def replay(
                         lo.ratchet = diff
             if lo.first_mastered_at is None and lo.mastered_now:
                 lo.first_mastered_at = now
+        if apply_transfer_credits:
+            # Transfer credit (#101, CONDUCTOR_POLICY §3.7). After the turn's
+            # signals the conductor adds a weak positive at `medium` to each
+            # once-mastered LO of an earlier subgoal that the grader named,
+            # and logs it under `transferCredits` (its `alphaDelta` is the
+            # post-cap difference `next.alpha - snap.alpha`). Replayed as the
+            # conductor computed it — decay, then cap-then-add — in the
+            # logged order; eligibility is not re-decided here, the log is.
+            # The stamp follows the three conditions, as everywhere in this
+            # file, not the conductor's `firstMasteredAt ?? lastUpdatedAt`
+            # fallback for pre-#101 docs.
+            for c in t.get("transferCredits") or []:
+                lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
+                a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
+                lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA, 0.0)
+                lo.last_at = now
+                if lo.first_mastered_at is None and lo.mastered_now:
+                    lo.first_mastered_at = now
     return st
 
 
