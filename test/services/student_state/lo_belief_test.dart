@@ -1,8 +1,10 @@
 // Issue #103 — the three-level difficulty ratchet on a belief doc.
 //
 // What matters at this layer is the wire format: the level round-trips by
-// name, and a doc written before the field existed reads the way the old
-// binary ratchet was documented ("ever demonstrated at non-easy" → medium).
+// name, and a doc written before the field existed reads as *no level* and
+// writes none back (#164) — the old-data reading of PUNTENFORMULE §2.5
+// ("ever demonstrated at non-easy" → medium) is the grade formula's, at
+// grade time, never the model's on disk.
 
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
@@ -59,12 +61,20 @@ void main() {
     });
 
     test('a doc written before the field existed, with the old ratchet '
-        'set, reads as medium', () {
+        'set, reads as no level and writes none back (#164)', () {
+      // Before #164 this read as `medium` — a guess — and the next write
+      // stored the guess as if it had been measured, permanently capping a
+      // student who had really demonstrated the LO at hard.
       final b = LoBelief.fromCosmos(
         _doc(lastPositiveAtCalibratedAt: '2026-05-01T10:00:00Z'),
       );
       expect(b.lastPositiveAtCalibratedAt, isNotNull);
-      expect(b.highestPositiveDifficulty, QuestionDifficulty.medium);
+      expect(b.highestPositiveDifficulty, isNull);
+      expect(
+        b.toMap(uid: 'u').containsKey('highestPositiveDifficulty'),
+        isFalse,
+        reason: 'a level the app never measured must not reach the doc',
+      );
     });
 
     test('a doc written before the field existed, without the old ratchet, '
@@ -106,6 +116,7 @@ void main() {
             .highestPositiveDifficulty,
         isNull,
       );
+      // ... which, with the old ratchet set, is still no level (#164).
       expect(
         LoBelief.fromCosmos(
           _doc(
@@ -114,7 +125,7 @@ void main() {
             lastPositiveAtCalibratedAt: '2026-05-01T10:00:00Z',
           ),
         ).highestPositiveDifficulty,
-        QuestionDifficulty.medium,
+        isNull,
       );
     });
 

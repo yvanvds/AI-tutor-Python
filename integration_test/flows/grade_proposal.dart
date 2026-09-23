@@ -92,7 +92,9 @@ Map<String, dynamic> _belief(
   required double alpha,
   required double beta,
   required int daysAgo,
-  required String highest,
+
+  /// `null`: the doc shape from before the ratchet field existed (#164).
+  required String? highest,
   String uid = kStudentUid,
 }) {
   final at = _now.subtract(Duration(days: daysAgo)).toIso8601String();
@@ -106,7 +108,7 @@ Map<String, dynamic> _belief(
     'beta': beta,
     'lastUpdatedAt': at,
     'lastPositiveAtCalibratedAt': at,
-    'highestPositiveDifficulty': highest,
+    if (highest != null) 'highestPositiveDifficulty': highest,
     'recentNegativesAtCalibrated': 0,
     'firstMasteredAt': at,
   };
@@ -452,6 +454,82 @@ void main() {
     await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
     expect(find.byKey(const Key('grade-milestone')), findsNothing);
     expect(find.byKey(const Key('grade-compute')), findsNothing);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a student whose belief doc predates the ratchet field is '
+      'graded under §2.5\'s reading — medium, never hard — and the doc is '
+      'left without a level (#164)', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: {
+        ..._gradedClass(),
+        'lo_beliefs': [
+          // Core LO: mastered, old flag set, no level on disk — the doc
+          // shape from before #103 (or after an older client rewrote it,
+          // #165). The formula reads it as medium: k = 1 at this medium
+          // milestone, and no hard demonstration: d = 0.
+          _belief(
+            's1',
+            'lo-print',
+            alpha: 6,
+            beta: 1,
+            daysAgo: 5,
+            highest: null,
+          ),
+          // Extension LO, mastered at medium: u = 1.
+          _belief(
+            's2',
+            'lo-var',
+            alpha: 5,
+            beta: 1,
+            daysAgo: 3,
+            highest: 'medium',
+          ),
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-class-filter')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('5A').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // M_end = 50 + 50·(0.6·1 + 0.4·0) = 80; M_start = 50 (the history
+    // estimate, as above); G = 0.6; P = 0.6·80 + 0.4·60 = 72. Had the
+    // reading gone missing with the model's guess, k = 0 and P = 0; had
+    // the guess been read as hard, d = 0.5 and P = 86.
+    expect(
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
+      '72',
+    );
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    expect(find.text('Core at level: 1 / 1'), findsOneWidget);
+    expect(find.text('Demonstrated at hard: 0 / 2 mastered'), findsOneWidget);
+
+    // Grading is a read: the doc still carries no level, for the next
+    // measured positive to set.
+    final doc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
+    expect(doc.containsKey('highestPositiveDifficulty'), isFalse);
 
     await harness.dispose(tester);
   });

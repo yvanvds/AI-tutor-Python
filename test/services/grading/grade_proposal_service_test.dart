@@ -310,6 +310,45 @@ void main() {
       expect(stored['type'], 'grade_proposal');
     });
 
+    test('a belief doc from before the ratchet field (#164) is read under '
+        '§2.5 at grade time — medium when the old flag is set — and the doc '
+        'itself is left without a level', () async {
+      final f = _Fixture(
+        beliefs: [
+          // Core a: mastered, old flag set, no level on disk (a pre-#103
+          // doc, or one an older client rewrote — #165).
+          _belief('s1', 'a', alpha: 5, beta: 1, at: fresh, highest: null),
+          // Core b: mastered, level stored.
+          _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
+        ],
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      // Both core LOs count at the milestone's medium: k = 1.
+      expect(p.coreCounted, 2);
+      expect(p.k, 1.0);
+      // The reading is medium, so it never buys the hard band.
+      expect(p.masteredTotal, 2);
+      expect(p.hardCount, 0);
+      expect(p.d, 0.0);
+      // The reading stayed in the formula: the stored doc still says
+      // "unknown", ready for the next measured positive.
+      final doc = f.beliefs.docs['${_student}_s1_a']!;
+      expect(doc.containsKey('highestPositiveDifficulty'), isFalse);
+
+      // At a milestone expecting hard, the same reading gates the LO out.
+      final hard = await f.service().compute(
+        uid: _student,
+        milestone: _milestone().copyWith(
+          expectedDifficulty: QuestionDifficulty.hard,
+        ),
+      );
+      expect(hard.coreCounted, 0);
+      expect(hard.k, 0.0);
+    });
+
     test('M_start comes from the latest history sample at or before the '
         'period start, per subgoal, credited to each of its LOs', () async {
       final f = _Fixture(

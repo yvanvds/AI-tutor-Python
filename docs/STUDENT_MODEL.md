@@ -201,9 +201,11 @@ StudentLOBelief {
                                         // (conductor policy 4.3, #103).
                                         // One-way per level; absent until
                                         // the first positive. Missing on
-                                        // older docs: reads as "medium"
-                                        // when lastPositiveAtCalibratedAt
-                                        // is set, absent otherwise.
+                                        // older docs: stays missing (#164);
+                                        // the grade formula alone reads
+                                        // such a doc as "medium" when
+                                        // lastPositiveAtCalibratedAt is
+                                        // set, and writes nothing back.
   recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
   firstMasteredAt: string?              // ISO 8601, set the first time all
                                         // three mastery conditions held
@@ -467,7 +469,11 @@ release pressed again for reports nobody touched rewrites nothing.
   absolute terms, and only ever rises. The conductor never reads it; it
   is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
   because the symmetric difficulty multiplier keeps difficulty out of
-  `(α, β)`.
+  `(α, β)`. A doc without it is not guessed at on read (#164): the model
+  keeps `null`, the formula's reader applies §2.5's old-data rule at
+  grade time, and the next positive records the level actually asked. A
+  guess written back as a measurement had permanently capped students
+  who demonstrated an LO at hard before the field existed.
 - **`firstMasteredAt` is a one-way mastery stamp** (#101). Mastery itself
   never latches (decay can demote), but "was this LO ever mastered by
   direct probing?" is a durable fact the model keeps, because transfer

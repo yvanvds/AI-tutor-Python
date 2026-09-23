@@ -243,4 +243,70 @@ void main() {
       expect(i.highest, isNull);
     });
   });
+
+  group('LoGradeInput.fromBelief applies the §2.5 old-data reading itself '
+      '(#164): a doc without a level is not guessed at by the model', () {
+    final at = DateTime.utc(2026, 9, 2);
+
+    LoBelief legacy({required bool calibrated, double alpha = 5}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: alpha,
+      beta: 1,
+      lastUpdatedAt: at,
+      lastPositiveAtCalibratedAt: calibrated ? at : null,
+      // No level on the doc: the shape from before #103.
+    );
+
+    test('the old flag set, no level: read as medium, at grade time only', () {
+      final b = legacy(calibrated: true);
+      expect(b.highestPositiveDifficulty, isNull, reason: 'model: unknown');
+      final i = LoGradeInput.fromBelief(b);
+      expect(i.mastered, isTrue);
+      expect(i.highest, QuestionDifficulty.medium, reason: 'formula: §2.5');
+    });
+
+    test('no flag, no level: nothing demonstrated', () {
+      final i = LoGradeInput.fromBelief(legacy(calibrated: false));
+      expect(i.mastered, isFalse);
+      expect(i.highest, isNull);
+    });
+
+    test('an explicit level always wins over the reading', () {
+      final b = LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: at,
+        lastPositiveAtCalibratedAt: at,
+        highestPositiveDifficulty: QuestionDifficulty.easy,
+      );
+      expect(LoGradeInput.fromBelief(b).highest, QuestionDifficulty.easy);
+    });
+
+    test('through the core gate: the reading opens a medium milestone, '
+        'never a hard one, and never counts as hard for d', () {
+      final los = _los(core: 1, extension: 0);
+      final inputs = {
+        's/k0': LoGradeInput.fromBelief(legacy(calibrated: true)),
+      };
+      final medium = computeMasteryScore(
+        los: los,
+        inputs: inputs,
+        expectedDifficulty: QuestionDifficulty.medium,
+      );
+      expect(medium.coreCounted, 1);
+      expect(medium.k, 1.0);
+      expect(medium.hardCount, 0);
+      expect(medium.d, 0.0);
+      final hard = computeMasteryScore(
+        los: los,
+        inputs: inputs,
+        expectedDifficulty: QuestionDifficulty.hard,
+      );
+      expect(hard.coreCounted, 0);
+      expect(hard.k, 0.0);
+    });
+  });
 }

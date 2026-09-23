@@ -38,13 +38,14 @@ LoBelief _belief(
   required double alpha,
   required DateTime at,
   QuestionDifficulty? highest = QuestionDifficulty.medium,
+  bool calibrated = true,
 }) => LoBelief(
   subgoalId: subgoalId,
   loId: loId,
   alpha: alpha,
   beta: 1,
   lastUpdatedAt: at,
-  lastPositiveAtCalibratedAt: at,
+  lastPositiveAtCalibratedAt: calibrated ? at : null,
   highestPositiveDifficulty: highest,
 );
 
@@ -126,6 +127,23 @@ void main() {
       expect(snap.los.single.mastered, isFalse);
       expect(snap.los.single.highest, QuestionDifficulty.easy);
     });
+
+    test('a doc from before the ratchet field is frozen at the formula\'s '
+        '§2.5 reading (medium), not at "unknown" (#164)', () {
+      // The snapshot is M_start's reading of the beliefs; it must agree
+      // with what the report-moment formula reads for the same doc, or a
+      // legacy student's growth would be measured from a k_start of 0.
+      final b = _belief('s1', 'a', alpha: 6, at: _periodStart, highest: null);
+      expect(b.highestPositiveDifficulty, isNull);
+      final snap = PeriodStartSnapshot.build(
+        uid: _uid,
+        milestone: _milestone(),
+        beliefs: [b],
+        now: _now,
+      );
+      expect(snap.los.single.mastered, isTrue);
+      expect(snap.los.single.highest, QuestionDifficulty.medium);
+    });
   });
 
   test('round-trips through the doc map and matches its milestone', () {
@@ -134,12 +152,16 @@ void main() {
       milestone: _milestone(),
       beliefs: [
         _belief('s1', 'a', alpha: 6, at: _periodStart),
+        // No calibrated positive either: with the flag set, a missing
+        // level would read as medium under §2.5 (#164), and this entry
+        // is here to round-trip a genuine null.
         _belief(
           's2',
           'c',
           alpha: 1.2,
           at: _periodStart.add(const Duration(days: 1)),
           highest: null,
+          calibrated: false,
         ),
       ],
       now: _now,

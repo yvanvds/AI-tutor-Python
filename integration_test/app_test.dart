@@ -36,6 +36,7 @@ import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
+import 'flows/legacy_ratchet.dart' as legacy_ratchet;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
@@ -88,6 +89,7 @@ void main() {
   garbled_reply_retry.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
+  legacy_ratchet.main();
   transfer_credit.main();
   cross_subgoal_signal.main();
   warm_up_review.main();

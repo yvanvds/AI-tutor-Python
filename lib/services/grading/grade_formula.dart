@@ -66,18 +66,28 @@ class LoGradeInput {
 
   /// Reads one belief doc as stored. A missing doc is an LO that was
   /// never probed: not mastered, nothing demonstrated.
+  ///
+  /// A doc without a ratchet level but with the old calibrated-positive
+  /// flag set is read the way §2.5 says old data reads — "demonstrated at
+  /// non-easy", i.e. [QuestionDifficulty.medium]. That reading lives here,
+  /// in the formula, and only here (#164): the model keeps such a doc's
+  /// level `null`, so a guess is never written to Cosmos as if it had been
+  /// measured, and the next positive records the level actually asked.
   factory LoGradeInput.fromBelief(LoBelief? belief) {
     if (belief == null) {
       return const LoGradeInput(mastered: false, highest: null);
     }
+    final calibratedPositive = belief.lastPositiveAtCalibratedAt != null;
     final mastered =
         meetsMasteryMeanAndEvidence(
           BeliefSnapshot(belief.alpha, belief.beta),
         ) &&
-        belief.lastPositiveAtCalibratedAt != null;
+        calibratedPositive;
     return LoGradeInput(
       mastered: mastered,
-      highest: belief.highestPositiveDifficulty,
+      highest:
+          belief.highestPositiveDifficulty ??
+          (calibratedPositive ? QuestionDifficulty.medium : null),
     );
   }
 }
