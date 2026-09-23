@@ -372,7 +372,8 @@ class ConductorDeps {
   getLoBeliefsForSubgoal;
 
   /// Every belief doc of the student, across subgoals — read once per
-  /// session for the warm-up review selection (§1.5, #102).
+  /// session for the warm-up review selection (§1.5, #102, #194) and once
+  /// per open recheck slot (§2.6, #187).
   final Future<List<LoBelief>> Function() getAllLoBeliefs;
   final Future<void> Function(LoBelief belief) upsertLoBelief;
 
@@ -426,11 +427,16 @@ class Conductor {
   /// rides on the same persisted turn that caused the advance.
   TurnSignalEvent? _pendingCascadeHaltEvent;
 
-  /// True once a warm-up review question (§1.5, #102) has been *fired* this
-  /// session — set by `notePlannedQuestion`, not by `planNext`, because the
-  /// host calls `planNext` once at session start only to check for blocks
-  /// and discards that plan. At most one warm-up per session.
-  bool _warmUpAskedThisSession = false;
+  /// True once this session's warm-up review (§1.5, #102) is settled: the
+  /// review question was *fired* (`notePlannedQuestion`), or the check
+  /// found nothing due (#194). A *found* review leaves it false, because
+  /// the host calls `planNext` once at session start only to check for
+  /// blocks and discards that plan: planning stays repeatable until the
+  /// question is fired. A check that finds nothing closes the window for
+  /// the rest of the session, so a review flag set mid-session (§2.4) waits
+  /// for the next session instead of interrupting practice, and the belief
+  /// read the check needs happens once per session, not per question.
+  bool _warmUpSettled = false;
 
   /// Ordinary questions fired since the last question on another subgoal
   /// (a recheck or a warm-up review) — the recheck slot's spacing (§2.6,
@@ -456,7 +462,7 @@ class Conductor {
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
     _pendingCascadeHaltEvent = null;
-    _warmUpAskedThisSession = false;
+    _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
   }
@@ -483,9 +489,12 @@ class Conductor {
 
     // §1.5: the session opens with one review question on a stale,
     // once-mastered LO from an older subgoal, when there is one.
-    if (!_warmUpAskedThisSession) {
+    if (!_warmUpSettled) {
       final warmUp = await _planWarmUp(selection: selection, active: subgoal);
       if (warmUp != null) return warmUp;
+      // Nothing due at the start: no review this session (#194). A flag
+      // raised during practice is for the next session's review.
+      _warmUpSettled = true;
     }
 
     // §2.6 recheck slot (#187): every `recheckSpacing` questions, one
@@ -1091,7 +1100,7 @@ class Conductor {
       // its per-subgoal recency tracking alone. Either one closes the
       // recheck slot for the next `recheckSpacing` questions (§2.6); a
       // warm-up also spends the session's one warm-up (§1.5).
-      if (plan.isWarmUp) _warmUpAskedThisSession = true;
+      if (plan.isWarmUp) _warmUpSettled = true;
       _questionsSinceOffSubgoal = 0;
       return;
     }

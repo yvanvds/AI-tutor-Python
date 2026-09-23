@@ -39,9 +39,10 @@ class LoBeliefsService {
   }
 
   /// Every belief doc of the signed-in user, across subgoals. Used by the
-  /// progress export in the Options panel (#32) and, once per session, by
-  /// the conductor's warm-up review selection (#102, CONDUCTOR_POLICY
-  /// §1.5) — a single-partition query the size of the curriculum.
+  /// progress export in the Options panel (#32) and by the conductor: once
+  /// per session for the warm-up review selection (#102, #194,
+  /// CONDUCTOR_POLICY §1.5) and once per open recheck slot (#187, §2.6) —
+  /// a single-partition query the size of the curriculum.
   Future<List<LoBelief>> getAllForCurrentUser() {
     final uid = _uid;
     return safeCosmos(() async {

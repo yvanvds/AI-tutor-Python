@@ -186,9 +186,10 @@ Putting it all together, every subgoal entry runs the same logic:
 
 ```
 entry(subgoal, student):
-    if no warm-up fired yet this session:
+    if warm-up not settled yet this session:  # settled = fired, or none found
         warm_up = pickWarmUp(root, subgoal, student)   # 1.5
         if warm_up: return warm_up
+        settle warm-up                                 # nothing due: none this session
     if recheck slot open:                              # 2.6 (open at entry)
         recheck = pickRecheck(root, subgoal, student)
         if recheck: return recheck
@@ -230,9 +231,15 @@ question on an older subgoal's LO instead of the active subgoal's probe.
 At most one per session; the slot is spent the moment the question is
 *fired* (`notePlannedQuestion`), not when it is planned — the host plans
 once at session start only to check for blocks (7.1, 1.3) and discards
-that plan. A fixed, predictable ritual — "start the engine" — rather than
-surprise checks scattered through practice; after it the session is
-ordinary practice with no further review. The chat announces it
+that plan. The check itself is made once (#194): when the session's first
+plan finds nothing due, there is no review this session. An LO that
+becomes due during practice — a review flag set by an incidental
+negative (2.4) — waits for the next session's review instead of
+interrupting the practice, and the belief read the selection needs
+happens once per session, not once per question. A fixed, predictable
+ritual — "start the engine" — rather than surprise checks scattered
+through practice; after it the session is ordinary practice with no
+further review. The chat announces it
 (`warmUpReview` notice, naming the old subgoal) so the student knows why
 the first question is off-topic. Spaced retrieval is the point; fresh
 report-time evidence is the by-product.

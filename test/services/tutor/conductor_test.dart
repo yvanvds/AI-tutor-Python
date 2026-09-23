@@ -27,6 +27,10 @@ class _Fakes {
   final List<PersistedTurnRecord> turnHistory = [];
   StudentCalibration calibration = StudentCalibration.fresh();
 
+  /// How often the conductor read the student's whole belief set — the
+  /// warm-up and recheck selections' query (#194).
+  int allBeliefReads = 0;
+
   GoalSelectionState selection = const GoalSelectionState();
   double currentProgress = 0.0;
 
@@ -77,7 +81,10 @@ ConductorDeps _buildDeps(_Fakes f) {
         f.beliefs[f._key(subgoalId, loId)],
     getLoBeliefsForSubgoal: (id) async =>
         f.beliefs.values.where((b) => b.subgoalId == id).toList(),
-    getAllLoBeliefs: () async => f.beliefs.values.toList(),
+    getAllLoBeliefs: () async {
+      f.allBeliefReads += 1;
+      return f.beliefs.values.toList();
+    },
     upsertLoBelief: (b) async {
       f.beliefs[f._key(b.subgoalId, b.loId)] = b;
     },
@@ -1793,6 +1800,26 @@ void main() {
       expect((await s.c.planNext()).isWarmUp, isTrue);
     });
 
+    test('with nothing due at the start the check is made once: ordinary '
+        'questions read no belief set for it (#194)', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: fresh, firstMasteredAt: stale),
+      ]);
+      // The host's session-start block check: the warm-up check finds
+      // nothing, and the recheck slot, open at entry, looks once too.
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+      expect(s.f.allBeliefReads, 2);
+      // Four ordinary questions: the recheck slot is closed until
+      // `recheckSpacing` of them are fired, and the warm-up is settled.
+      for (var i = 0; i < PolicyConstants.recheckSpacing - 1; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isFalse);
+        expect(plan.targetLOs.single.id, 'lo-var');
+        s.c.notePlannedQuestion(plan);
+      }
+      expect(s.f.allBeliefReads, 2);
+    });
+
     test('the most stale candidate wins; ties go to the lowest mean', () async {
       final older = now.subtract(const Duration(days: 80));
       final s = await setup([
@@ -2647,6 +2674,34 @@ void main() {
       expect(plan.warmUp!.subgoal.id, 's0');
       expect(plan.targetLOs.single.id, 'lo-print');
       expect(plan.reason.chosenReason, contains('regressed'));
+    });
+
+    test('a flag raised mid-session waits for the next session: the rest of '
+        'this one is ordinary practice (#194)', () async {
+      final s = await setup([older('lo-print')]);
+      final first = _expectQuestion(await s.c.planNext());
+      expect(first.isWarmUp, isFalse);
+      await grade(
+        s.c,
+        extra: [onPrint(LoSignalKind.negative, LoSignalStrength.moderate)],
+      );
+      expect(stored(s.f, 'lo-print').regressedAt, isNotNull);
+
+      // Due now, but not in this session: no surprise review mid-practice.
+      for (var i = 0; i < 3; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isFalse);
+        expect(plan.isOffSubgoal, isFalse);
+        expect(plan.targetLOs.single.id, 'lo-var');
+        s.c.notePlannedQuestion(plan);
+      }
+
+      // The next session opens with it.
+      await s.c.setTarget();
+      final review = _expectQuestion(await s.c.planNext());
+      expect(review.isWarmUp, isTrue);
+      expect(review.targetLOs.single.id, 'lo-print');
+      expect(review.reason.chosenReason, contains('regressed'));
     });
 
     test('the flag does not depend on the belief: a weak negative on a '
