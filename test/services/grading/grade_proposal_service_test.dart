@@ -266,7 +266,7 @@ void main() {
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.16');
+      expect(p.formulaVersion, '1.0.17');
 
       final stored = f.proposals.docs['${_student}_m1'];
       expect(stored, isNotNull);

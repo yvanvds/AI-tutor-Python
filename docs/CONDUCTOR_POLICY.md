@@ -189,6 +189,9 @@ entry(subgoal, student):
     if no warm-up fired yet this session:
         warm_up = pickWarmUp(root, subgoal, student)   # 1.5
         if warm_up: return warm_up
+    if recheck slot open:                              # 2.6 (open at entry)
+        recheck = pickRecheck(root, subgoal, student)
+        if recheck: return recheck
     beliefs = read lo_beliefs for (student, subgoal), apply decay
     unmastered = LOs with mean < threshold OR evidence < minimum
     if unmastered is non-empty:
@@ -282,7 +285,9 @@ pool is rotated through predictably: once asked, an LO's clock resets,
 its flag clears, and it goes to the back of the queue. A *failed* review
 does not re-flag the LO (it was a direct probe), so a regressed LO comes
 back once it is stale again, not every session. The active subgoal's own
-LOs are never candidates — those are 1.2's business.
+LOs are never candidates — those are 1.2's business. An earlier LO that
+was *never* mastered is not review material either; the recheck slot
+(2.6) is its way back.
 
 **The question.** The gentlest acceptable type for the LO's kind (the
 1.1 cold-start table — an MCQ for `recall`, `completeCode` for `apply`,
@@ -389,7 +394,9 @@ conflicts with goal 3 ("don't poke at things they've shown they
 handle"). Cross-session decay handles forgetting; mastered LOs that
 later work keeps using are refreshed without being probed, by transfer
 credit (3.7); mastered LOs of *earlier* subgoals that nothing refreshes
-get one review question at the start of a session (1.5).
+get one review question at the start of a session (1.5); LOs of earlier
+subgoals the student left *without* mastering get an occasional recheck
+question (2.6).
 
 **Saturated LOs are filtered out of the unmastered pool.** An LO at
 `α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
@@ -607,6 +614,9 @@ After belief has been updated from the previous answer:
 
 ```
 nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
+    if recheck slot open:                          # 2.6
+        recheck = pickRecheck(root, subgoal, student)
+        if recheck: return recheck
     beliefs = read lo_beliefs for (student, subgoal), apply decay
     candidates = unmastered LOs, excluding lastQuestionLOId
     if candidates is empty:
@@ -640,7 +650,99 @@ is tracked, how recency-of-types-on-this-LO is stored). Those are
 storage concerns: the per-LO recent activity in the student model
 (part 2 §3) carries the data we need.
 
-### 2.6 What this section deliberately does not address
+### 2.6 The recheck slot (#187)
+
+2.1 only ever probes the active subgoal, and the warm-up review (1.5)
+only LOs that were once mastered. An LO the student left behind *without*
+the mastery stamp — its subgoal advanced on the other LOs, or on the
+stuck rule (4.4) — was therefore never asked again, and the stamp the
+grade reads (`firstMasteredAt`, 4.3; PUNTENFORMULE §2.2) could never be
+earned: decay pulls a belief toward the prior, never over the bar. The
+first report round showed the cost: ten of fifteen reports needed a
+teacher adjustment for LOs at a mean of 0.74–0.80, asked on hard, then
+left alone for 12–19 days while the student did well on later subgoals
+(#187). The recheck slot is that LO's way back: now and then, one direct
+question on it in the middle of practice.
+
+**The slot.** `planNext` checks it after the warm-up (1.5) and before
+2.1's selection, when it is *open*: at session entry, and again once
+`recheckSpacing` (5) ordinary questions have been fired since the last
+question on another subgoal — a recheck or a warm-up review. Firing a
+recheck or a warm-up closes it; so does a check that finds nothing due,
+which keeps the belief read it needs to once per spacing instead of once
+per question. Planning stays repeatable: a found recheck changes nothing
+until the host fires it (`notePlannedQuestion`), like the warm-up's
+session-start plan-and-discard. The spacing spreads a backlog through the
+practice instead of stacking it; each candidate's own clock (below)
+keeps the same LO from coming back every few questions.
+
+**Candidates.** The LOs of the active root's subgoals *before* the active
+one — the grading scope, where a later subgoal would be a forward
+reference — with a belief doc that one of the slot's rules finds due.
+Each rule is one branch of `Conductor._recheckRuleFor` plus one
+`RecheckRule` value; the rules are the only part that differs per case,
+everything else about the question is shared. One rule so far:
+
+- **Near goal (#187).** Not demonstrated (`everMastered` false, 3.7);
+  decayed mean in [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to
+  0.80, close enough that one or two good answers at the calibrated level
+  can earn the stamp; no *direct* probe for `recheckAfter` (7 days); and
+  the student's recent work at their level is good: the calibration
+  window (section 5, ten answers) is full and its level-weighted share of correct
+  answers (`StudentCalibration.levelWeightedAccuracy`: a correct answer
+  weighs the positive difficulty factor, anything else the negative one,
+  as μ does since #169) is at least `recheckRecentAccuracy` (0.75). A
+  student who is struggling now is not sent back to old material. This is
+  the evaluation tooling's "fossil" (`tooling/evaluation/diagnostics.py`),
+  which the teacher otherwise has to settle by hand at report time.
+
+The clock is the **last direct probe**, `lastProbedAt` on the belief doc
+(part 2): set on every write that may move the ratchets — the target of a
+question, or a signal on the LO while its own subgoal is active — and
+left alone by a follow-up (6.2), a positive from a later subgoal (2.4)
+and a transfer credit (3.7). `lastUpdatedAt` cannot serve: an LO that
+later work keeps touching from the side would read as freshly asked while
+nobody asked it — exactly the LO most likely to pass now. A doc written
+before the field existed reads `lastUpdatedAt` instead when the LO was
+ever the target of a question (`lastQuestionType` set) — never earlier
+than the real last probe, so an old doc is at worst due late, never
+early — and a non-probe write on such a doc stores that reading, so its
+own clock bump does not pass for a probe. An LO never asked directly has
+no clock and is not a near goal.
+
+Among candidates: rule priority (enum order), then the oldest direct
+probe, then the highest decayed mean — the one closest to the stamp.
+
+**The question and its answer: like a warm-up.** The gentlest acceptable
+type for the LO's kind at the student's calibrated difficulty, never
+notch-dropped (condition 3 of 4.1 wants a positive at calibration). From
+here on a recheck is handled exactly like a warm-up review (1.5) — the
+plan carries the other subgoal (`QuestionPlan.offSubgoal`) and every
+consumer reads that: prompted and graded in that subgoal's context; the
+target signal is a direct probe of that LO, decayed then updated with the
+full weight, both ratchets, the counter, `lastQuestionType`, the probe
+clock and — when the answer completes the three conditions of 4.1 — the
+one-way stamp; no calibration window entry (5), no follow-up (6.3), no
+cache write or advancement for either subgoal; a transfer nomination on
+the target itself is dropped (3.7); other signals are incidental under
+2.4. Right or wrong, the probe clock restarts, so the LO waits another
+`recheckAfter` before it can come back. The chat announces it
+(`recheck` notice, naming the old subgoal).
+
+**Audit.** The turn record (8.1) carries `isRecheck: true`, names the old
+subgoal in `subgoalId`, the LO in `targetLOIds` and the subgoal the
+student was practising in `activeSubgoalId`; `selectionReason` lists the
+top candidates with `chosenReason: "recheck: near goal not asked for a
+week"`. The debug event `conductor.recheck_planned` carries the rule, the
+mean, the days since the last direct probe and the recent accuracy.
+
+**Adding a rule.** A new case (#188: a high belief with no positive at
+calibration, or an empty ratchet) adds its `RecheckRule` value and its
+branch in `_recheckRuleFor`, its `chosenReason`, and its tests; the slot,
+spacing, ordering, question, grading, notice and record are reused as
+they are.
+
+### 2.7 What this section deliberately does not address
 
 - **How belief updates compute** (`(α, β)` arithmetic, weight
   conversions). Section 3.
@@ -967,8 +1069,8 @@ not touch the review flag (`regressedAt`, 1.5, #112): since #167 only a
 direct probe of the LO clears it — the incidental negative that set it
 was never applied to the belief, so there is no "restored" state for a
 credit to detect, and the question it raised is the review's to answer.
-On a warm-up turn a nomination on the warm-up target itself is dropped
-— it already took a direct signal; likewise a nomination on an LO that
+On a warm-up or recheck turn (1.5, 2.6) a nomination on its target
+itself is dropped — it already took a direct signal; likewise a nomination on an LO that
 took a cross-subgoal incidental signal, or a review flag, this turn
 (2.4, #108, #167). Other nominations follow the rules above.
 
@@ -1074,8 +1176,9 @@ touch it. Negatives, neutrals and follow-up grading (6.2) leave it
 alone, exactly like `lastPositiveAtCalibratedAt`. So does transfer
 credit (3.7): a credit is not a probe of the LO at any difficulty, so
 neither ratchet moves — only a direct, non-follow-up positive on the LO
-itself is ratchet-worthy. A warm-up review positive (1.5) *is* one: the
-question was generated for that LO at a difficulty chosen for it, so
+itself is ratchet-worthy. A warm-up review or recheck positive (1.5,
+2.6) *is* one: the question was generated for that LO at a difficulty
+chosen for it, so
 both ratchets move exactly as on an active-subgoal probe. The conductor does
 not read it — mastery condition 3 stays on the calibration-relative
 timestamp — it exists for the grade formula, where it is the only
@@ -1370,11 +1473,13 @@ below the student's calibration if the override fired. Those answers
 filter out of the at-calibrated set. They influence neither
 promotion nor demotion.
 
-**Warm-up review answers (1.5) do not enter the window at all**, like
-follow-up answers (6.2): the question is on months-old material from
-another subgoal, so a wrong answer says "forgotten", not "too hard", and
-a right one must not buy a promotion on the current topic. Neither the
-answer nor its question type is appended.
+**Warm-up review and recheck answers (1.5, 2.6) do not enter the window
+at all**, like follow-up answers (6.2): the question is on older material
+from another subgoal, so a wrong answer says "forgotten", not "too hard",
+and a right one must not buy a promotion on the current topic. Neither
+the answer nor its question type is appended. For a recheck there is a
+second reason: the window is its own gate (`levelWeightedAccuracy`), and
+must not be fed by the questions it lets through.
 
 ### 5.4 Edge cases
 
@@ -1501,8 +1606,8 @@ A follow-up presents when **all** of the following hold:
 4. **The subgoal didn't just advance.** A subgoal-mastering answer
    triggers clean advancement; the follow-up is dangled on a
    subgoal the student has already left.
-5. **The turn was not a warm-up review (1.5).** One short question on
-   old material; no dialogue is opened on it.
+5. **The turn was not a warm-up review or a recheck (1.5, 2.6).** One
+   short question on old material; no dialogue is opened on it.
 
 If any condition fails, the follow-up is suppressed and the
 conductor moves directly to the next regular probe via section 2.
@@ -1853,6 +1958,10 @@ TurnRecord {
   clientVersion: string            // #165: kAppVersion of the build that wrote the doc; absent on older docs
   subgoalId: string                // the target LO's subgoal: the active
                                    // one, or the older one on a warm-up
+                                   // or a recheck
+  activeSubgoalId: string?         // #187: the subgoal the student was on
+                                   // when the turn was about another one
+                                   // (warm-up, recheck); omitted otherwise
 
   // What was asked
   targetLOIds: string[]            // typically one
@@ -1861,11 +1970,12 @@ TurnRecord {
   isFollowUp: bool                 // section 6
   chainDepth: int                  // 0, 1, or 2
   isWarmUp: bool                   // section 1.5, #102; omitted when false
+  isRecheck: bool                  // section 2.6, #187; omitted when false
 
   // Why these were picked (section 2 decisions)
   selectionReason: {
     candidateLOs: [{loId, mean, evidence}]   // top 3
-    chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …"
+    chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …", "recheck: …"
     notchDropFired: bool
   }
 

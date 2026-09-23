@@ -41,6 +41,7 @@ import 'flows/legacy_ratchet.dart' as legacy_ratchet;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
+import 'flows/near_goal_recheck.dart' as near_goal_recheck;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
@@ -96,6 +97,7 @@ void main() {
   transfer_credit.main();
   cross_subgoal_signal.main();
   warm_up_review.main();
+  near_goal_recheck.main();
   quiz_ligatures.main();
   playground_during_mcq.main();
   turtle_run_notice.main();

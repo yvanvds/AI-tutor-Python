@@ -36,6 +36,31 @@ class WarmUpReview {
   const WarmUpReview({required this.subgoal});
 }
 
+/// Which rule of the recheck slot (CONDUCTOR_POLICY §2.6) picked the LO.
+/// Every rule names an LO of an earlier subgoal that the student has not
+/// demonstrated yet and that ordinary practice will no longer ask about;
+/// they differ in why one direct question is worth asking now. The enum
+/// order is the priority order among due candidates.
+enum RecheckRule {
+  /// #187: just under the mastery bar (decayed μ in
+  /// [`recheckMeanFloor`, `masteryMeanThreshold`)), no direct probe for
+  /// `recheckAfter`, and the student's recent work at their level is good
+  /// — the student may well have moved past where the last answer left
+  /// them, and only a direct question can show it.
+  nearGoal,
+}
+
+/// A recheck question (CONDUCTOR_POLICY §2.6, #187): a direct probe of an
+/// LO of an *earlier* subgoal of the active root, asked in the middle of
+/// practice so the student can still earn that LO's mastery stamp. Like a
+/// [WarmUpReview] the host needs the whole [subgoal] — title for the chat
+/// notice, teaching tips for the prompt, id for grading and the record.
+class Recheck {
+  final Goal subgoal;
+  final RecheckRule rule;
+  const Recheck({required this.subgoal, required this.rule});
+}
+
 /// Selected target for the next question, computed by [Conductor.planNext].
 /// Returned to TutorService so it can pass `targetLOs` to the question
 /// generator (CONDUCTOR_POLICY §1, §2).
@@ -58,6 +83,11 @@ class QuestionPlan {
   /// active subgoal. `null` for every ordinary probe.
   final WarmUpReview? warmUp;
 
+  /// Set when this is a recheck question (§2.6, #187): the single LO in
+  /// [targetLOs] belongs to [Recheck.subgoal], an earlier subgoal. `null`
+  /// for every other plan; never set together with [warmUp].
+  final Recheck? recheck;
+
   const QuestionPlan({
     required this.type,
     required this.difficulty,
@@ -67,13 +97,25 @@ class QuestionPlan {
     this.blockedSaturated = false,
     this.blockedDegraded = false,
     this.warmUp,
+    this.recheck,
   });
 
   bool get isWarmUp => warmUp != null;
 
+  bool get isRecheck => recheck != null;
+
+  /// The other subgoal a warm-up review or a recheck is about; `null` for
+  /// a probe of the active subgoal. Both are handled the same way from
+  /// here on (§1.5, §2.6): prompted and graded in that subgoal's context,
+  /// its target signal a direct probe of that LO, no follow-up, no
+  /// calibration, no cache or advancement for either subgoal.
+  Goal? get offSubgoal => warmUp?.subgoal ?? recheck?.subgoal;
+
+  bool get isOffSubgoal => offSubgoal != null;
+
   /// The subgoal the target LO belongs to, if this plan targets one.
   String? targetSubgoalIdOr(String? activeSubgoalId) =>
-      warmUp?.subgoal.id ?? activeSubgoalId;
+      offSubgoal?.id ?? activeSubgoalId;
 
   static const QuestionPlan noResult = QuestionPlan(
     type: ChatRequestType.noResult,
@@ -377,6 +419,13 @@ class Conductor {
   /// and discards that plan. At most one warm-up per session.
   bool _warmUpAskedThisSession = false;
 
+  /// Ordinary questions fired since the last question on another subgoal
+  /// (a recheck or a warm-up review) — the recheck slot's spacing (§2.6,
+  /// #187). The slot is open at `recheckSpacing`. Starts open on
+  /// `setTarget`; a fired off-subgoal question and a slot check that found
+  /// nothing due both set it back to 0.
+  int _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
+
   /// Called on session entry / when the active subgoal changes externally.
   /// Picks the next subgoal if needed and resets per-subgoal state.
   Future<void> setTarget() async {
@@ -395,6 +444,7 @@ class Conductor {
     _singleLoDeadlockSubgoalId = null;
     _pendingCascadeHaltEvent = null;
     _warmUpAskedThisSession = false;
+    _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
   }
 
@@ -423,6 +473,18 @@ class Conductor {
     if (!_warmUpAskedThisSession) {
       final warmUp = await _planWarmUp(selection: selection, active: subgoal);
       if (warmUp != null) return warmUp;
+    }
+
+    // §2.6 recheck slot (#187): every `recheckSpacing` questions, one
+    // direct question on a not-yet-demonstrated LO of an earlier subgoal
+    // that ordinary practice will no longer reach.
+    if (_questionsSinceOffSubgoal >= PolicyConstants.recheckSpacing) {
+      final recheck = await _planRecheck(selection: selection, active: subgoal);
+      if (recheck != null) return recheck;
+      // Nothing due: look again after another spacing, not on every
+      // question. Planning stays repeatable — a found recheck changes
+      // nothing until it is fired.
+      _questionsSinceOffSubgoal = 0;
     }
 
     final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
@@ -659,11 +721,7 @@ class Conductor {
     });
     final pick = candidates.first;
 
-    final acceptable =
-        _acceptableTypes[pick.lo.kind] ??
-        const [ChatRequestType.socraticQuestion];
-    final def = _coldStartDefault[pick.lo.kind] ?? acceptable.first;
-    final type = acceptable.contains(def) ? def : acceptable.first;
+    final type = _gentlestTypeFor(pick.lo);
 
     _deps.recordDebugEvent('conductor.warm_up_planned', {
       'subgoalId': pick.subgoal.id,
@@ -702,6 +760,186 @@ class Conductor {
         notchDropFired: false,
       ),
     );
+  }
+
+  /// The recheck slot (CONDUCTOR_POLICY §2.6, #187).
+  ///
+  /// Ordinary practice only asks about the active subgoal (§2.1), and the
+  /// warm-up review (§1.5) only about LOs that were once mastered. An LO
+  /// the student left behind *without* the mastery stamp — its subgoal
+  /// advanced on the other LOs, or on the stuck rule (§4.4) — is never
+  /// asked again, so the stamp can never be earned: decay pulls the mean
+  /// toward the prior, never up. The slot is that LO's way back: one
+  /// direct question at the student's calibrated level, graded like any
+  /// probe of that LO (§3, ratchets and stamp included), so a right
+  /// answer can complete the three conditions of §4.1 that the grade
+  /// reads.
+  ///
+  /// Candidates are the LOs of the active root's subgoals *before* the
+  /// active one — the grading scope, where a later subgoal would be a
+  /// forward reference — whose belief doc one of the [RecheckRule]s finds
+  /// due ([_recheckRuleFor], where each rule lives). Among candidates:
+  /// rule priority (enum order), then the oldest direct probe, then the
+  /// highest decayed mean — the one closest to the stamp. Answering resets
+  /// the LO's direct-probe clock (`LoBelief.lastProbedAt`), so a candidate
+  /// comes back no sooner than its rule allows, whichever way it went.
+  ///
+  /// The question is the gentlest acceptable type for the LO's kind at the
+  /// calibrated difficulty, never notch-dropped: condition 3 of §4.1 wants
+  /// a positive at calibration.
+  Future<QuestionPlan?> _planRecheck({
+    required GoalSelectionState selection,
+    required Goal active,
+  }) async {
+    final root = selection.activeRootGoal;
+    if (root == null) return null;
+    final earlier = (await _deps.getChildren(root.id))
+        .where((g) => g.id != active.id && g.order < active.order)
+        .toList();
+    if (earlier.isEmpty) return null;
+
+    final recentAccuracy = _deps.getCalibration().levelWeightedAccuracy;
+    final beliefs = await _deps.getAllLoBeliefs();
+    final byKey = {for (final b in beliefs) '${b.subgoalId}/${b.loId}': b};
+    final now = DateTime.now().toUtc();
+
+    final candidates =
+        <
+          ({
+            Goal subgoal,
+            LearningObjective lo,
+            LoBelief belief,
+            BeliefSnapshot snap,
+            RecheckRule rule,
+          })
+        >[];
+    for (final sub in earlier) {
+      for (final lo in sub.objectives) {
+        final b = byKey['${sub.id}/${lo.id}'];
+        if (b == null) continue;
+        final snap = applyDecay(
+          alpha: b.alpha,
+          beta: b.beta,
+          lastUpdatedAt: b.lastUpdatedAt,
+          now: now,
+        );
+        final rule = _recheckRuleFor(
+          belief: b,
+          snap: snap,
+          recentAccuracy: recentAccuracy,
+          now: now,
+        );
+        if (rule == null) continue;
+        candidates.add((
+          subgoal: sub,
+          lo: lo,
+          belief: b,
+          snap: snap,
+          rule: rule,
+        ));
+      }
+    }
+    if (candidates.isEmpty) return null;
+
+    candidates.sort((a, b) {
+      if (a.rule != b.rule) return a.rule.index.compareTo(b.rule.index);
+      final pa = a.belief.lastDirectProbeAt;
+      final pb = b.belief.lastDirectProbeAt;
+      if (pa != pb) {
+        // Never asked directly sorts first: the longest wait of all.
+        if (pa == null) return -1;
+        if (pb == null) return 1;
+        final byAge = pa.compareTo(pb);
+        if (byAge != 0) return byAge;
+      }
+      return b.snap.mean.compareTo(a.snap.mean);
+    });
+    final pick = candidates.first;
+    final probedAt = pick.belief.lastDirectProbeAt;
+
+    _deps.recordDebugEvent('conductor.recheck_planned', {
+      'subgoalId': pick.subgoal.id,
+      'loId': pick.lo.id,
+      'rule': pick.rule.name,
+      'mean': pick.snap.mean,
+      if (probedAt != null) 'probeDays': now.difference(probedAt).inDays,
+      'recentAccuracy': recentAccuracy,
+      'candidates': candidates.length,
+    });
+
+    return QuestionPlan(
+      type: _gentlestTypeFor(pick.lo),
+      difficulty: _deps.getCalibration().difficulty,
+      targetLOs: [pick.lo],
+      recheck: Recheck(subgoal: pick.subgoal, rule: pick.rule),
+      reason: TurnSelectionReason(
+        candidateLOs: candidates
+            .take(3)
+            .map(
+              (c) => CandidateLoStat(
+                loId: c.lo.id,
+                mean: c.snap.mean,
+                evidence: c.snap.evidence,
+              ),
+            )
+            .toList(growable: false),
+        chosenReason: _recheckReasons[pick.rule]!,
+        notchDropFired: false,
+      ),
+    );
+  }
+
+  /// `selectionReason.chosenReason` per recheck rule (§8.1).
+  static const Map<RecheckRule, String> _recheckReasons = {
+    RecheckRule.nearGoal: 'recheck: near goal not asked for a week',
+  };
+
+  /// Which rule of the recheck slot finds [belief] due, if any (§2.6).
+  /// [snap] is the decayed belief, [recentAccuracy] the student's
+  /// `levelWeightedAccuracy` (null while the window is not full).
+  ///
+  /// Each rule is one branch here plus one [RecheckRule] value, checked in
+  /// enum order; everything else about the question — slot, spacing,
+  /// ordering, grading, the chat notice — is shared. That is the extension
+  /// point for the next rule (#188: a high belief with no positive at
+  /// calibration, or an empty ratchet).
+  static RecheckRule? _recheckRuleFor({
+    required LoBelief belief,
+    required BeliefSnapshot snap,
+    required double? recentAccuracy,
+    required DateTime now,
+  }) {
+    // #187 near goal: not demonstrated, just under the bar, left alone for
+    // a week, while the student's current work at their level is good —
+    // the evaluation tooling's "fossil" (tooling/evaluation/diagnostics.py),
+    // which the teacher otherwise has to settle by hand at report time.
+    final probedAt = belief.lastDirectProbeAt;
+    final demonstrated = everMastered(
+      firstMasteredAt: belief.firstMasteredAt,
+      alpha: belief.alpha,
+      beta: belief.beta,
+      lastPositiveAtCalibratedAt: belief.lastPositiveAtCalibratedAt,
+    );
+    if (!demonstrated &&
+        probedAt != null &&
+        now.difference(probedAt) >= PolicyConstants.recheckAfter &&
+        snap.mean >= PolicyConstants.recheckMeanFloor &&
+        snap.mean < PolicyConstants.masteryMeanThreshold &&
+        recentAccuracy != null &&
+        recentAccuracy >= PolicyConstants.recheckRecentAccuracy) {
+      return RecheckRule.nearGoal;
+    }
+    return null;
+  }
+
+  /// The gentlest acceptable type for [lo]'s kind — the §1.1 cold-start
+  /// default. Also the type of the one-question probes on another subgoal
+  /// (§1.5 warm-up, §2.6 recheck), which have no per-LO rotation to follow.
+  static ChatRequestType _gentlestTypeFor(LearningObjective lo) {
+    final acceptable =
+        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+    final def = _coldStartDefault[lo.kind] ?? acceptable.first;
+    return acceptable.contains(def) ? def : acceptable.first;
   }
 
   /// Acceptable types per LO `kind` (CONDUCTOR_POLICY §2.2).
@@ -749,10 +987,9 @@ class Conductor {
         snap.alpha == PolicyConstants.prior &&
         snap.beta == PolicyConstants.prior;
     if (priorOnly) {
-      // Cold-start default per kind. Fall back to the first acceptable if
+      // Cold-start default per kind. Falls back to the first acceptable if
       // the default is somehow not in the acceptable set.
-      final def = _coldStartDefault[lo.kind] ?? acceptable.first;
-      return acceptable.contains(def) ? def : acceptable.first;
+      return _gentlestTypeFor(lo);
     }
     final candidates = acceptable
         .where((t) => t.name != _lastQuestionTypeForLo(lo.id))
@@ -813,13 +1050,16 @@ class Conductor {
   /// question. TutorService calls this immediately after deciding to fire
   /// a request so per-LO recency tracking lines up with the actual probe.
   void notePlannedQuestion(QuestionPlan plan) {
-    if (plan.isWarmUp) {
-      // The warm-up is not a probe of the active subgoal: leave its
-      // per-subgoal recency tracking alone, and spend the session's one
-      // warm-up slot.
-      _warmUpAskedThisSession = true;
+    if (plan.isOffSubgoal) {
+      // A warm-up or a recheck is not a probe of the active subgoal: leave
+      // its per-subgoal recency tracking alone. Either one closes the
+      // recheck slot for the next `recheckSpacing` questions (§2.6); a
+      // warm-up also spends the session's one warm-up (§1.5).
+      if (plan.isWarmUp) _warmUpAskedThisSession = true;
+      _questionsSinceOffSubgoal = 0;
       return;
     }
+    _questionsSinceOffSubgoal += 1;
     _lastTargetLoId = plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
     _lastQuestionType = plan.type;
   }
@@ -901,12 +1141,13 @@ class Conductor {
     // are skipped because a follow-up wasn't a calibrated probe.
     final appliedSignals = <TurnAppliedSignal>[];
     final touchedLoIds = <String>{};
-    // A warm-up review (§1.5) is a direct probe of an LO in another
-    // subgoal: its signal lands on that LO's doc through the same update
-    // as an active-subgoal signal, ratchets included. Any other signal
-    // outside the active subgoal is an *incidental cross-subgoal* signal
-    // (#108, §2.4): the grader saw the answer reveal something about an LO
-    // of an earlier subgoal of the root. A positive is ordinary evidence on
+    // A warm-up review (§1.5) or a recheck (§2.6) is a direct probe of an
+    // LO in another subgoal: its signal lands on that LO's doc through the
+    // same update as an active-subgoal signal — ratchets, stamp and the
+    // direct-probe clock included. Any other signal outside the active
+    // subgoal is an *incidental cross-subgoal* signal (#108, §2.4): the
+    // grader saw the answer reveal something about an LO of an earlier
+    // subgoal of the root. A positive is ordinary evidence on
     // that LO's doc, treated as `medium` and with nothing but `(α, β)` and
     // the clock moving (`crossSubgoalSignalDeltas`). A negative is not
     // evidence at all (#167): it is inferred from an answer about something
@@ -919,15 +1160,17 @@ class Conductor {
     // direct probe is the measurement that counts, in full. Forward
     // references (a later subgoal) are dropped per the LLM contract; scope
     // was otherwise validated upstream.
-    final warmUpSubgoal = plan.warmUp?.subgoal;
-    final targetSubgoalId = warmUpSubgoal?.id ?? subgoal.id;
+    final offSubgoal = plan.offSubgoal;
+    final targetSubgoalId = offSubgoal?.id ?? subgoal.id;
     final reviewFlags = <TurnReviewFlag>[];
     // LOs outside the active subgoal written or flagged this turn,
     // `subgoalId/loId` → why: a transfer nomination on one of them is
     // dropped, so the same answer never counts twice on one LO (§3.7).
     final writtenElsewhere = <String, String>{};
-    if (warmUpSubgoal != null && targetLo != null) {
-      writtenElsewhere['${warmUpSubgoal.id}/${targetLo.id}'] = 'warm-up target';
+    if (offSubgoal != null && targetLo != null) {
+      writtenElsewhere['${offSubgoal.id}/${targetLo.id}'] = plan.isWarmUp
+          ? 'warm-up target'
+          : 'recheck target';
     }
     // The root's subgoals, read on the first cross-subgoal signal only.
     List<Goal>? siblings;
@@ -938,11 +1181,11 @@ class Conductor {
       if (sig.subgoalId == subgoal.id) {
         signalSubgoalId = subgoal.id;
         lo = subgoal.objectives.firstWhereOrNull((o) => o.id == sig.loId);
-      } else if (warmUpSubgoal != null &&
-          sig.subgoalId == warmUpSubgoal.id &&
+      } else if (offSubgoal != null &&
+          sig.subgoalId == offSubgoal.id &&
           targetLo != null &&
           sig.loId == targetLo.id) {
-        signalSubgoalId = warmUpSubgoal.id;
+        signalSubgoalId = offSubgoal.id;
         lo = targetLo;
       } else {
         siblings ??= await _rootSubgoals(selection);
@@ -1153,6 +1396,13 @@ class Conductor {
         recentNegativesAtCalibrated: nextNegativesAtCalibrated,
         firstMasteredAt: nextFirstMasteredAt,
         regressedAt: nextRegressed,
+        // #187 direct-probe clock (§2.6). A write that is not a probe of
+        // this LO keeps the old reading — on a doc from before the field,
+        // the pre-write `lastUpdatedAt` — so this write's clock bump does
+        // not pass for a probe.
+        lastProbedAt: isCalibratedProbeOfThisLo
+            ? now
+            : existing?.lastDirectProbeAt,
       );
       await _deps.upsertLoBelief(updated);
       appliedSignals.add(
@@ -1184,10 +1434,11 @@ class Conductor {
     );
 
     // ---- Mastery + advancement ------------------------------------------
-    // A warm-up turn that touched no active-subgoal LO changes nothing the
-    // active subgoal's cache, history or advancement should react to (§1.5):
-    // its status is still reported on the turn record, but not persisted.
-    final activeTouched = !plan.isWarmUp || touchedLoIds.isNotEmpty;
+    // A warm-up or recheck turn that touched no active-subgoal LO changes
+    // nothing the active subgoal's cache, history or advancement should
+    // react to (§1.5, §2.6): its status is still reported on the turn
+    // record, but not persisted.
+    final activeTouched = !plan.isOffSubgoal || touchedLoIds.isNotEmpty;
     final freshBeliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
     final freshById = {for (final b in freshBeliefs) b.loId: b};
     final loStatus = <TurnLoStatus>[];
@@ -1339,10 +1590,12 @@ class Conductor {
     // ---- Calibration update (CONDUCTOR_POLICY §5) ------------------------
     // §6.2 / §6.5: follow-up answers don't enter the calibration window —
     // their difficulty is dialogue (medium-treated), not a calibrated probe.
-    // §1.5: neither do warm-up answers — a slip on months-old material is
-    // forgetting, not miscalibration, and a review must not promote either.
+    // §1.5 / §2.6: neither do warm-up or recheck answers — a slip on older
+    // material is forgetting, not miscalibration, and a question off the
+    // active subgoal must not promote either. It would also feed the
+    // recheck gate its own answers (`levelWeightedAccuracy`).
     final cal = _deps.getCalibration();
-    final updatedCal = answer.isFollowUp || plan.isWarmUp
+    final updatedCal = answer.isFollowUp || plan.isOffSubgoal
         ? cal
         : _updateCalibration(
             current: cal,
@@ -1530,6 +1783,9 @@ class Conductor {
           firstMasteredAt: existing.firstMasteredAt ?? existing.lastUpdatedAt,
           regressedAt: nextRegressed,
           clearRegressedAt: nextRegressed == null,
+          // Not a probe: the direct-probe clock keeps its pre-write reading
+          // (§2.6, #187).
+          lastProbedAt: existing.lastDirectProbeAt,
         ),
       );
       credits.add(

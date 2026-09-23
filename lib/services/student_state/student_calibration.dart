@@ -122,6 +122,29 @@ class StudentCalibration {
     );
   }
 
+  /// How well the student's recent work at their level went (#187): the
+  /// share of correct answers in [recentAnswers], each weighted by the
+  /// level it was asked at the way μ weighs it since #169 — a correct
+  /// answer by `positiveDifficultyMultiplier`, a partial or wrong one by
+  /// `negativeDifficultyMultiplier`. So ~63% raw at hard reads as 0.80,
+  /// the mastery bar; raw accuracy seldom clears 0.75 at hard, since the
+  /// ladder (§5) parks a student where they score 40–75% on purpose.
+  /// `null` until the window is full: fewer answers say too little. The
+  /// recheck slot's "recent work is good" gate (CONDUCTOR_POLICY §2.6).
+  double? get levelWeightedAccuracy {
+    if (recentAnswers.length < PolicyConstants.calibrationWindow) return null;
+    var pos = 0.0;
+    var neg = 0.0;
+    for (final a in recentAnswers) {
+      if (a.quality == AnswerQuality.correct) {
+        pos += PolicyConstants.positiveDifficultyMultiplier(a.difficulty);
+      } else {
+        neg += PolicyConstants.negativeDifficultyMultiplier(a.difficulty);
+      }
+    }
+    return pos / (pos + neg);
+  }
+
   /// Append a fresh calibration answer to the window, evicting the oldest
   /// when over capacity.
   StudentCalibration withAppendedAnswer(CalibrationAnswer answer) {

@@ -254,6 +254,18 @@ class PersistedTurnRecord {
   /// when false.
   final bool isWarmUp;
 
+  /// True when the turn was a recheck question (#187, CONDUCTOR_POLICY
+  /// §2.6): like a warm-up, `subgoalId` and `targetLOIds` name an earlier
+  /// subgoal and its LO. Omitted from the doc when false.
+  final bool isRecheck;
+
+  /// The subgoal the student was practising when the turn was about
+  /// another one (a warm-up or a recheck); `null` — and omitted — on every
+  /// other turn, where it equals `subgoalId`. A replay of `turn_history`
+  /// needs it to tell the target's direct signal from the incidental ones
+  /// the way the conductor did.
+  final String? activeSubgoalId;
+
   // Why these were picked
   final TurnSelectionReason? selectionReason;
 
@@ -328,6 +340,8 @@ class PersistedTurnRecord {
     this.transferCredits = const [],
     this.reviewFlags = const [],
     this.isWarmUp = false,
+    this.isRecheck = false,
+    this.activeSubgoalId,
     this.clientVersion,
   });
 
@@ -346,6 +360,8 @@ class PersistedTurnRecord {
     'isFollowUp': isFollowUp,
     'chainDepth': chainDepth,
     if (isWarmUp) 'isWarmUp': true,
+    if (isRecheck) 'isRecheck': true,
+    if (activeSubgoalId != null) 'activeSubgoalId': activeSubgoalId,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
     'loSignals': loSignals.map((s) => s.toJson()).toList(),
@@ -422,6 +438,8 @@ class PersistedTurnRecord {
       isFollowUp: (doc['isFollowUp'] as bool?) ?? false,
       chainDepth: (doc['chainDepth'] as num?)?.toInt() ?? 0,
       isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
+      isRecheck: (doc['isRecheck'] as bool?) ?? false,
+      activeSubgoalId: doc['activeSubgoalId'] as String?,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),
       loSignals: const [],

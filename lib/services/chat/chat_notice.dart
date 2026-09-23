@@ -78,6 +78,10 @@ enum ChatNoticeKind {
   /// (#102, CONDUCTOR_POLICY §1.5). `args[0]` is that subgoal's title.
   warmUpReview,
 
+  /// One check question on an earlier subgoal in the middle of practice
+  /// (#187, CONDUCTOR_POLICY §2.6). `args[0]` is that subgoal's title.
+  recheck,
+
   /// `args[0]` / `args[1]` are `QuestionDifficulty` names (before / after).
   difficultyChanged,
 

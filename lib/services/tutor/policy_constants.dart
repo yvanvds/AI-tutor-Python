@@ -133,6 +133,37 @@ class PolicyConstants {
   /// flagged `regressedAt` (#112) is due regardless of this clock.
   static const Duration warmUpStaleAfter = Duration(days: 30);
 
+  // ---- Recheck slot (CONDUCTOR_POLICY §2.6, #187) --------------------------
+
+  /// How long a not-yet-demonstrated LO of an earlier subgoal must go
+  /// without a *direct* probe (`LoBelief.lastDirectProbeAt`) before the
+  /// near-goal rule rechecks it. A week: long enough that the student has
+  /// moved on and the answer says something new, short enough to land
+  /// inside a three-week report period — the 30-day warm-up clock never
+  /// does (#187). Same value as the evaluation tooling's fossil rule
+  /// (`tooling/evaluation/diagnostics.py`, `FOSSIL_MIN_AGE_DAYS`).
+  static const Duration recheckAfter = Duration(days: 7);
+
+  /// Near-goal band, lower edge: a decayed mean at or above this (and below
+  /// [masteryMeanThreshold]) is close enough that one or two good answers
+  /// at the calibrated level can earn the stamp. The tooling's near-miss
+  /// list uses the same edge (`NEAR_MISS_MEAN`).
+  static const double recheckMeanFloor = 0.70;
+
+  /// "The student's recent work at their level is good": the level-weighted
+  /// share of correct answers over a full calibration window
+  /// (`StudentCalibration.levelWeightedAccuracy`) must reach this. Weighted
+  /// like μ since #169, so the bar is ~56% raw at hard and ~88% at easy —
+  /// a student who is struggling now is not sent back to old material.
+  static const double recheckRecentAccuracy = 0.75;
+
+  /// The slot opens again only after this many ordinary questions since the
+  /// last question on another subgoal (a recheck or a warm-up review). It
+  /// is open at session start. Spaces a backlog of near-goals through the
+  /// practice instead of stacking them, and bounds the belief read the
+  /// slot needs to once per this many questions.
+  static const int recheckSpacing = 5;
+
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------
 
   /// Recent-answer window size on the account doc.

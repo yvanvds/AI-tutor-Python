@@ -517,14 +517,15 @@ class TutorService extends Notifier<TutorState> {
     var turnOpened = false;
     try {
       final selection = ref.read(goalSelectionProvider);
-      // A warm-up review (#102) is about an older subgoal: the question,
-      // its grading and any hint on it are prompted in that subgoal's
-      // context. Grading and hint calls carry no `plan`; the in-flight one
-      // is the warm-up then. A content question (#132) is about the page on
-      // screen, which is an older subgoal's when the student paged back.
+      // A warm-up review (#102) or a recheck (#187) is about an older
+      // subgoal: the question, its grading and any hint on it are prompted
+      // in that subgoal's context. Grading and hint calls carry no `plan`;
+      // the in-flight one is the warm-up or recheck then. A content
+      // question (#132) is about the page on screen, which is an older
+      // subgoal's when the student paged back.
       final subgoalOverride = type == ChatRequestType.contentQuestion
           ? await _pageSubgoal(selection)
-          : (plan ?? _inFlightPlan)?.warmUp?.subgoal;
+          : (plan ?? _inFlightPlan)?.offSubgoal;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
         goalSelection: selection,
@@ -647,7 +648,7 @@ class TutorService extends Notifier<TutorState> {
     final selection = ref.read(goalSelectionProvider);
     final scope = await _buildGradingScope(selection);
     // The subgoal the in-flight target LOs belong to: the active one, or
-    // the older one a warm-up review (#102) is about.
+    // the older one a warm-up review (#102) or a recheck (#187) is about.
     final targetSubgoalId = _inFlightPlan?.targetSubgoalIdOr(
       selection.activeChildGoal?.id,
     );
@@ -920,9 +921,9 @@ class TutorService extends Notifier<TutorState> {
 
     final now = DateTime.now().toUtc();
     final provenance = await _resolveProvenance(at: now);
-    // A warm-up review (#102) targets an LO of an older subgoal: the
-    // fallback signal and the turn record name that subgoal, not the
-    // active one.
+    // A warm-up review (#102) or a recheck (#187) targets an LO of an
+    // older subgoal: the fallback signal and the turn record name that
+    // subgoal, not the active one.
     final targetSubgoalId = plan.targetSubgoalIdOr(activeChild?.id);
     final answer = GradedAnswerBuilder.build(
       overallQuality: overallQuality,
@@ -950,6 +951,10 @@ class TutorService extends Notifier<TutorState> {
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
       isWarmUp: plan.isWarmUp,
+      isRecheck: plan.isRecheck,
+      // Which subgoal the student was on when the turn was about another
+      // one: what a replay needs to read the signals as the conductor did.
+      activeSubgoalId: plan.isOffSubgoal ? activeChild?.id : null,
       selectionReason: plan.reason,
       overallQuality: outcome.overallQuality,
       loSignals: outcome.loSignals,
@@ -997,10 +1002,10 @@ class TutorService extends Notifier<TutorState> {
       }
     }
 
-    // §6.3 condition 5: a warm-up review stays one short question — no
-    // follow-up dialogue on old material.
+    // §6.3 condition 5: a warm-up review or a recheck stays one short
+    // question — no follow-up dialogue on old material.
     if (followUp != null &&
-        !plan.isWarmUp &&
+        !plan.isOffSubgoal &&
         _shouldPresentFollowUp(
           outcome: outcome,
           targetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
@@ -1322,6 +1327,14 @@ class TutorService extends Notifier<TutorState> {
       // question is about an older topic.
       _chat.addSystemNotice(
         ChatNotice(ChatNoticeKind.warmUpReview, args: [warmUp.subgoal.title]),
+      );
+    }
+    final recheck = plan.recheck;
+    if (recheck != null) {
+      // So is a recheck (#187): one question on an older topic in the
+      // middle of practice needs a reason on screen.
+      _chat.addSystemNotice(
+        ChatNotice(ChatNoticeKind.recheck, args: [recheck.subgoal.title]),
       );
     }
     _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));
