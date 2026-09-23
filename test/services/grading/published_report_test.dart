@@ -56,8 +56,6 @@ GradeProposal _proposal({
   u: 0.5,
   d: 0.5,
   mEnd: 90,
-  mStart: 50,
-  g: 0.8,
   proposal: 86,
   coreTotal: 2,
   coreCounted: 2,
@@ -120,9 +118,7 @@ void main() {
       expect(report.isRepublished, isFalse);
       expect(report.formulaVersion, '1.0.7');
       // The breakdown a student may recompute.
-      expect(report.mStart, 50);
       expect(report.mEnd, 90);
-      expect(report.g, 0.8);
       expect(report.k, 1);
       expect(report.u, 0.5);
       expect(report.d, 0.5);
@@ -176,6 +172,23 @@ void main() {
       expect(back.sameContentAs(report), isTrue);
       expect(back.updatedAt, report.updatedAt);
       expect(back.isRepublished, isTrue);
+    });
+
+    test('P = M (#191): no period-start score or growth is written, and a '
+        'report published before v1.0.16 that carries them still reads', () {
+      final report = PublishedReport.of(
+        proposal: _signed(),
+        milestone: _milestone(),
+        publishedAt: _released,
+        updatedAt: _released,
+      );
+      final doc = report.toMap();
+      expect(doc.containsKey('mStart'), isFalse);
+      expect(doc.containsKey('g'), isFalse);
+
+      final old = {...doc, 'mStart': 50.0, 'g': 0.8};
+      final back = PublishedReport.fromCosmos(old);
+      expect(back.sameContentAs(report), isTrue);
     });
 
     test('a doc with no updatedAt reads as never revised', () {

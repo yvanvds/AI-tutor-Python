@@ -50,10 +50,12 @@ volgorde uit en schrijft de verantwoordingen in het concept.
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vier commando's; rendert concept en sidecar |
 
-## Regelversie `1.0.10-eval1`
+## Regelversie `1.0.16-eval1`
 
-PUNTENFORMULE v1.0.10 met drie afwijkingen (beslist 2026-09-23, zie #167,
-#168, #169) en één kader:
+PUNTENFORMULE v1.0.16, herspeeld uit `turn_history`. Rekent exact wat
+`1.0.10-eval1` rekende: dat was v1.0.10 met drie afwijkingen (beslist
+2026-09-23, zie #167, #168, #169) en één kader, en de formule heeft ze
+intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
 
 1. **Asymmetrische moeilijkheidsfactor.** Fout op `hard` ×0,6, op `easy`
    ×1,4; juist ongewijzigd. μ wordt niveaubewust: 0,80 = ~63% op hard, 80%
@@ -65,9 +67,11 @@ PUNTENFORMULE v1.0.10 met drie afwijkingen (beslist 2026-09-23, zie #167,
 3. **Incidentele negatieven zijn geen bewijs.** Een opmerking van de grader
    over een leerdoel uit een eerder subdoel, terwijl een ander antwoord
    beoordeeld werd, schrijft niets naar β. Positieven blijven (transfer).
-4. **P = M.** M_start = 0 voor een eerste rapport over alles sinds de start
-   van het jaar; dan is G = M/100 en valt het 60/40-mengsel samen tot M. De
-   groeiterm zelf wordt herdacht.
+4. **P = M.** Het punt is de beheersingsscore op de stempels. In
+   `1.0.10-eval1` was dat een kader (M_start = 0 voor een eerste rapport,
+   dus G = M/100 en het 60/40-mengsel viel samen tot M); sinds v1.0.16
+   (#191) is het de regel: de groeiterm G en M_start zijn uit de formule,
+   in de app net zo.
 
 Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op

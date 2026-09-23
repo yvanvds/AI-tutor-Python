@@ -38,11 +38,6 @@ class CosmosDocId {
   static String gradeProposal(String uid, String milestoneId) =>
       '${uid}_$milestoneId';
 
-  /// Doc id for the `period_start_snapshots` container (#110): one snapshot
-  /// per student per milestone.
-  static String periodStartSnapshot(String uid, String milestoneId) =>
-      '${uid}_$milestoneId';
-
   /// Doc id for the `reports` container (#150): one published report per
   /// student per milestone. Same shape as the proposal it is published
   /// from, in its own container.

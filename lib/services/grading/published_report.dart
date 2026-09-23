@@ -32,9 +32,7 @@ class PublishedReport {
     required this.publishedAt,
     required this.updatedAt,
     required this.formulaVersion,
-    required this.mStart,
     required this.mEnd,
-    required this.g,
     required this.k,
     required this.u,
     required this.d,
@@ -81,9 +79,9 @@ class PublishedReport {
   final String formulaVersion;
 
   // The breakdown the student may recompute (PUNTENFORMULE §2.2–§2.6).
-  final double mStart;
+  // Reports published before v1.0.16 (#191) also carry `mStart` and `g`;
+  // P = M since, and the student page no longer shows them.
   final double mEnd;
-  final double g;
   final double k;
   final double u;
   final double d;
@@ -129,9 +127,7 @@ class PublishedReport {
     publishedAt: publishedAt,
     updatedAt: updatedAt,
     formulaVersion: proposal.formulaVersion,
-    mStart: proposal.mStart,
     mEnd: proposal.mEnd,
-    g: proposal.g,
     k: proposal.k,
     u: proposal.u,
     d: proposal.d,
@@ -159,9 +155,7 @@ class PublishedReport {
       computedAt == other.computedAt &&
       publishedAt == other.publishedAt &&
       formulaVersion == other.formulaVersion &&
-      mStart == other.mStart &&
       mEnd == other.mEnd &&
-      g == other.g &&
       k == other.k &&
       u == other.u &&
       d == other.d &&
@@ -185,9 +179,7 @@ class PublishedReport {
     'publishedAt': publishedAt.toUtc().toIso8601String(),
     'updatedAt': updatedAt.toUtc().toIso8601String(),
     'formulaVersion': formulaVersion,
-    'mStart': mStart,
     'mEnd': mEnd,
-    'g': g,
     'k': k,
     'u': u,
     'd': d,
@@ -221,9 +213,7 @@ class PublishedReport {
           ? (DateTime.tryParse(doc['updatedAt'] as String) ?? published)
           : published,
       formulaVersion: (doc['formulaVersion'] as String?) ?? '',
-      mStart: num_('mStart'),
       mEnd: num_('mEnd'),
-      g: num_('g'),
       k: num_('k'),
       u: num_('u'),
       d: num_('d'),

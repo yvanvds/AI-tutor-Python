@@ -19,8 +19,6 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
-import 'package:ai_tutor_python/services/grading/milestone_service.dart';
-import 'package:ai_tutor_python/services/grading/period_start_snapshot_service.dart';
 import 'package:ai_tutor_python/services/grading/report_batch.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
@@ -154,7 +152,6 @@ class _Fixture {
   final InMemoryCosmos _history = InMemoryCosmos();
   final InMemoryCosmos _turns = InMemoryCosmos();
   final InMemoryCosmos _reports = InMemoryCosmos();
-  final InMemoryCosmos _snapshots = InMemoryCosmos();
 
   late final LoBeliefsService beliefsService = LoBeliefsService(
     container: beliefs.container,
@@ -182,12 +179,6 @@ class _Fixture {
       container: _turns.container,
       getUid: () => 'teacher',
     ),
-    snapshots: PeriodStartSnapshotService(
-      container: _snapshots.container,
-      milestones: MilestoneService(container: InMemoryCosmos().container),
-      beliefs: beliefsService,
-      getUid: () => 'teacher',
-    ),
     supervision: const NoSupervisionSource(),
     connector: () => connector,
     now: () => _now,
@@ -212,8 +203,6 @@ void main() {
           u: 1,
           d: 0,
           mEnd: 100,
-          mStart: 0,
-          g: 1,
           proposal: 90,
           coreTotal: 1,
           coreCounted: 1,

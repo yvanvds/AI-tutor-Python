@@ -21,17 +21,12 @@ class GradingConstants {
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
   /// a signed grade was computed under.
-  static const String formulaVersion = '1.0.15';
+  static const String formulaVersion = '1.0.16';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).
   static const double weightExtension = 0.6;
   static const double weightDifficulty = 0.4;
-
-  /// Proposal mix: mastery vs. growth (§2.6). Sum to 1. Early periods are
-  /// meant to weigh growth heavier; v1 ships a single pair.
-  static const double weightMastery = 0.6;
-  static const double weightGrowth = 0.4;
 
   /// The curve under the 50 (§2.3): `C(k) = k` in v1.
   static double curve(double k) => k;
@@ -212,8 +207,7 @@ MasteryScore computeMasteryScore({
   );
 }
 
-/// The §2.3 arithmetic on already-known fractions. Shared by the
-/// report-moment score and the period-start estimate (§2.4).
+/// The §2.3 arithmetic on already-known fractions.
 double masteryFromFractions({
   required double k,
   required double u,
@@ -225,18 +219,11 @@ double masteryFromFractions({
   return 50 * GradingConstants.curve(k) + 50 * k * above;
 }
 
-/// `G = (M_end − M_start) / (100 − M_start)`, clamped to `[0, 1]` (§2.4).
-/// A student who started at 100 had no gap left to close: `G = 1`.
-double growthScore({required double mStart, required double mEnd}) {
-  if (mStart >= 100) return 1.0;
-  final g = (mEnd - mStart) / (100 - mStart);
-  return g.clamp(0.0, 1.0);
-}
-
-/// `P = w_M·M + w_G·100·G` (§2.6), before rounding.
-double proposalScore({required double mEnd, required double g}) =>
-    GradingConstants.weightMastery * mEnd +
-    GradingConstants.weightGrowth * 100 * g;
+/// `P = M` (§2.6, v1.0.16), before rounding. The proposal is the mastery
+/// score on the stamps and nothing else: the growth term G, and with it
+/// `M_start` and the period-start snapshot, is gone (#191) — exactly what
+/// `tooling/evaluation/rules.py` computes outside the app.
+double proposalScore({required double mEnd}) => mEnd;
 
 /// The proposal as it goes to the teacher: a whole point on 100.
 int roundedProposal(double p) => p.round().clamp(0, 100);

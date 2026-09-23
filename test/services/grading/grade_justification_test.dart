@@ -22,8 +22,6 @@ GradeProposal _proposal() => GradeProposal(
   u: 0.5,
   d: 0.25,
   mEnd: 80,
-  mStart: 20,
-  g: 0.75,
   proposal: 78,
   coreTotal: 4,
   coreCounted: 4,
@@ -66,6 +64,13 @@ void main() {
     final input = jsonDecode(p.input) as Map<String, dynamic>;
     expect((input['formula'] as Map)['proposal'], 78);
     expect((input['formula'] as Map)['coreMasteredAtLevel'], '4/4');
+    // P = M (v1.0.16, #191): no period-start score, no growth among the
+    // facts, and the contract says so.
+    expect(
+      (input['formula'] as Map).keys,
+      isNot(anyElement(anyOf(contains('Start'), contains('growth')))),
+    );
+    expect(p.instructions, contains('no growth component'));
     // With a registry bound the split is a measurement: it is in the facts
     // and the contract names it (#160).
     expect((input['reliability'] as Map)['supervisedTurnsInPeriod'], 3);

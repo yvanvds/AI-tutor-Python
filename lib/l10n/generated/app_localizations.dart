@@ -578,36 +578,6 @@ abstract class AppLocalizations {
   /// **'Mastery now: {value}'**
   String reports_grade_masteryEnd(String value);
 
-  /// No description provided for @reports_grade_masteryStart.
-  ///
-  /// In en, this message translates to:
-  /// **'Mastery at period start: {value}'**
-  String reports_grade_masteryStart(String value);
-
-  /// No description provided for @reports_grade_startSource_snapshot.
-  ///
-  /// In en, this message translates to:
-  /// **'Period start: exact per-LO snapshot'**
-  String get reports_grade_startSource_snapshot;
-
-  /// No description provided for @reports_grade_startSource_snapshotLate.
-  ///
-  /// In en, this message translates to:
-  /// **'Period start: per-LO snapshot, {count} LOs already written when it was taken'**
-  String reports_grade_startSource_snapshotLate(int count);
-
-  /// No description provided for @reports_grade_startSource_history.
-  ///
-  /// In en, this message translates to:
-  /// **'Period start: estimate from progress history (no snapshot for this period)'**
-  String get reports_grade_startSource_history;
-
-  /// No description provided for @reports_grade_growth.
-  ///
-  /// In en, this message translates to:
-  /// **'Growth: {value}'**
-  String reports_grade_growth(String value);
-
   /// No description provided for @reports_grade_core.
   ///
   /// In en, this message translates to:
@@ -844,14 +814,8 @@ abstract class AppLocalizations {
   /// No description provided for @myReports_breakdown_mastery.
   ///
   /// In en, this message translates to:
-  /// **'Mastery score M: {start} at the start of the period → {end} now'**
-  String myReports_breakdown_mastery(String start, String end);
-
-  /// No description provided for @myReports_breakdown_growth.
-  ///
-  /// In en, this message translates to:
-  /// **'Growth score G = {value}'**
-  String myReports_breakdown_growth(String value);
+  /// **'Mastery score M = {value} (the proposed grade is M, rounded)'**
+  String myReports_breakdown_mastery(String value);
 
   /// The three fractions of PUNTENFORMULE §2.2, named as the document names them
   ///

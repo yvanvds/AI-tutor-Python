@@ -11,10 +11,9 @@
 //      shows its title — an untitled milestone used to make it render
 //      blank), narrows to one class and presses "Generate reports". The
 //      batch computes the deterministic number for every student in one
-//      pass (PUNTENFORMULE bijlage B arithmetic; M_start from the history
-//      estimate, as no period-start snapshot was taken for this student —
-//      period_start_snapshot.dart drives the exact path, #110) and asks the
-//      model for one justification per student who needs one. A student
+//      pass (PUNTENFORMULE §2.3 arithmetic; the proposal is the mastery
+//      score itself, P = M since v1.0.16 — no growth term, no period-start
+//      baseline, #191) and asks the model for one justification per student who needs one. A student
 //      with no belief data on the milestone lands on "no data" instead of a
 //      computed 0, and costs no model call. "Mastered" is the one-way
 //      `firstMasteredAt` stamp, not the live belief (#168): an LO whose
@@ -191,8 +190,9 @@ Map<String, List<Map<String, dynamic>>> _gradedClass() => {
     // Extension LO, mastered at medium: u = 1.
     _belief('s2', 'lo-var', alpha: 5, beta: 1, daysAgo: 3, highest: 'medium'),
   ],
-  // "Print" was already done before the period (k_start = 1, u_start = 0 →
-  // M_start = 50); "Variables" was finished inside it.
+  // "Print" was already done before the period, "Variables" was finished
+  // inside it. Only the justification's trajectory reads this: the number
+  // has no period-start baseline since v1.0.16 (#191).
   'progress_history': [_sample('s1', 1.0, 45), _sample('s2', 1.0, 10)],
   'status_reports': [
     _report('s2', 'Werkt vlot met variabelen.', 2),
@@ -365,11 +365,11 @@ void main() {
     expect(llm.sends, 1);
     expect(harness.cosmos['grade_proposals'].docs.keys, ['${kStudentUid}_m1']);
 
-    // M_end = 50 + 50·(0.6·1 + 0.4·0.5) = 90; M_start = 50; G = 0.8;
-    // P = 0.6·90 + 0.4·80 = 86.
+    // M = 50 + 50·(0.6·1 + 0.4·0.5) = 90, and P = M (#191): 90. Under the
+    // old growth mix (M_start = 50, G = 0.8) this student got 86.
     expect(
       tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
-      '86',
+      '90',
     );
 
     // The detail pane carries the whole report.
@@ -382,20 +382,13 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
           .data,
-      '86',
+      '90',
     );
     expect(find.text('Mastery now: 90.0'), findsOneWidget);
-    expect(find.text('Mastery at period start: 50.0'), findsOneWidget);
-    // No period-start snapshot was ever taken for this student: the history
-    // estimate is the fallback, and the page says so (#110).
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('reports-detail-start-source')))
-          .data,
-      'Period start: estimate from progress history '
-      '(no snapshot for this period)',
-    );
-    expect(find.text('Growth: 0.80'), findsOneWidget);
+    // P = M (#191): no period-start score, no source line, no growth.
+    expect(find.textContaining('period start'), findsNothing);
+    expect(find.textContaining('Period start'), findsNothing);
+    expect(find.textContaining('Growth'), findsNothing);
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
@@ -416,7 +409,10 @@ void main() {
     expect(find.text(kJustification), findsOneWidget);
     // The model was told the number, and only the period's reports.
     final prompt = llm.sentInputs.single;
-    expect(prompt, contains('"proposal":86'));
+    expect(prompt, contains('"proposal":90'));
+    // Nor is there a growth term or a period-start score to explain.
+    expect(prompt, isNot(contains('masteryScoreStart')));
+    expect(prompt, isNot(contains('"growth"')));
     expect(prompt, contains('Werkt vlot met variabelen.'));
     expect(prompt, isNot(contains('OUD RAPPORT')));
     // No supervision registry is bound — the shipped app's own binding — so
@@ -463,12 +459,14 @@ void main() {
     expect(find.byKey(const Key('reports-sign-off')), findsNothing);
 
     final doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
-    expect(doc['proposal'], 86);
+    expect(doc['proposal'], 90);
     expect(doc['adjustedGrade'], 84);
     expect(doc['adjustmentNote'], 'Ziek in week 3.');
     expect(doc['justification'], kJustification);
     expect(doc['signedOffAt'], isA<String>());
-    expect(doc['mStartSource'], 'history');
+    for (final key in ['mStart', 'g', 'mStartSource', 'mStartInexactCount']) {
+      expect(doc.containsKey(key), isFalse, reason: key);
+    }
     expect(doc['formulaVersion'], GradingConstants.formulaVersion);
 
     // And the drawer that used to own all of this has let it go.
@@ -534,13 +532,12 @@ void main() {
       reason: 'the batch never justified Sam',
     );
 
-    // M_end = 50 + 50·(0.6·1 + 0.4·0) = 80; M_start = 50 (the history
-    // estimate, as above); G = 0.6; P = 0.6·80 + 0.4·60 = 72. Had the
-    // reading gone missing with the model's guess, k = 0 and P = 0; had
-    // the guess been read as hard, d = 0.5 and P = 86.
+    // M = 50 + 50·(0.6·1 + 0.4·0) = 80 = P. Had the reading gone missing
+    // with the model's guess, k = 0 and P = 0; had the guess been read as
+    // hard, d = 0.5 and P = 90.
     expect(
       tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
-      '72',
+      '80',
     );
     await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
     await pumpUntilFound(
@@ -616,13 +613,12 @@ void main() {
       reason: 'the batch never justified Sam',
     );
 
-    // k = 1 (the stamp), u = 0 (no stamp), d = 1/1: M_end = 50 + 50·0.4 =
-    // 70; M_start = 50 (the history estimate, as above); G = 0.4;
-    // P = 0.6·70 + 0.4·40 = 58. Read from the live belief instead, the core
+    // k = 1 (the stamp), u = 0 (no stamp), d = 1/1: M = 50 + 50·0.4 = 70
+    // = P. Read from the live belief instead, the core
     // LO fails the 0,80 bar: k = 0, M_end = 0, P = 0.
     expect(
       tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
-      '58',
+      '70',
     );
     await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
     await pumpUntilFound(
@@ -644,7 +640,7 @@ void main() {
         harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
     expect(varDoc.containsKey('firstMasteredAt'), isFalse);
     final doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
-    expect(doc['proposal'], 58);
+    expect(doc['proposal'], 70);
     expect(doc['formulaVersion'], GradingConstants.formulaVersion);
 
     await harness.dispose(tester);
@@ -745,11 +741,11 @@ void main() {
     expect(doc['justificationSource'], 'edited');
     expect(doc['justificationEditedAt'], isA<String>());
     // Prose only (PUNTENFORMULE §3.3): the number did not move.
-    expect(doc['proposal'], 86);
+    expect(doc['proposal'], 90);
 
     // Now the evidence moves under the text — upward, the only direction
     // new evidence can move a grade since #168: Sam demonstrates the
-    // extension LO at hard, so d = 1, M_end = 100, G = 1 and P = 100. AI
+    // extension LO at hard, so d = 1 and P = M = 100. AI
     // prose would be dropped here; the teacher's survives, flagged for
     // rereading — and costs no second model call.
     harness.cosmos['lo_beliefs'].upsert(
@@ -837,7 +833,7 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
           .data,
-      'The grade did not change: 86/100. The justification was rewritten.',
+      'The grade did not change: 90/100. The justification was rewritten.',
     );
     expect(find.text(second), findsOneWidget);
     expect(find.text(kJustification), findsNothing);
@@ -846,10 +842,10 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
           .data,
-      '86',
+      '90',
     );
     var doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
-    expect(doc['proposal'], 86);
+    expect(doc['proposal'], 90);
     expect(doc['justification'], second);
     expect(doc['justificationSource'], 'ai');
 
@@ -876,7 +872,7 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-recompute-unchanged')))
           .data,
-      'The grade did not change: 86/100. Your own text stays as it is.',
+      'The grade did not change: 90/100. Your own text stays as it is.',
     );
     expect(find.text(own), findsOneWidget);
     expect(llm.sends, 2);
@@ -887,7 +883,7 @@ void main() {
 
     // Once the number does move there is nothing to announce: the new grade
     // is the feedback (the extension LO demonstrated at hard: d = 1,
-    // M_end = 100, G = 1, P = 100, as in the rewrite flow above), and the
+    // P = M = 100, as in the rewrite flow above), and the
     // teacher's text is flagged for rereading.
     harness.cosmos['lo_beliefs'].upsert(
       _belief('s2', 'lo-var', alpha: 6, beta: 1, daysAgo: 1, highest: 'hard'),
@@ -989,8 +985,8 @@ void main() {
     // The breakdown a student may recompute, and when it was measured.
     expect(report['formulaVersion'], GradingConstants.formulaVersion);
     expect(report['mEnd'], 90);
-    expect(report['mStart'], 50);
-    expect((report['g'] as num).toDouble(), closeTo(0.8, 1e-9));
+    expect(report.containsKey('mStart'), isFalse);
+    expect(report.containsKey('g'), isFalse);
     expect(report['coreCounted'], 1);
     expect(report['coreTotal'], 1);
     expect(report['extensionMastered'], 1);

@@ -43,7 +43,6 @@ import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
-import 'flows/period_start_snapshot.dart' as period_start_snapshot;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
@@ -117,7 +116,6 @@ void main() {
   students_sort_persist.main();
   students_view_prefs_persist.main();
   grade_proposal.main();
-  period_start_snapshot.main();
   my_reports_tab.main();
   sidebar_rail.main();
   goals_row_highlight.main();

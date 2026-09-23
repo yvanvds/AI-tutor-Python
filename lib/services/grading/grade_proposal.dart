@@ -27,20 +27,6 @@ enum JustificationSource {
       raw == edited.name ? edited : ai;
 }
 
-/// Where `M_start` came from (#110, PUNTENFORMULE §2.4).
-enum MStartSource {
-  /// The exact per-LO `period_start_snapshots` doc for this milestone.
-  snapshot,
-
-  /// The pre-snapshot rule: the per-subgoal fraction from
-  /// `progress_history`, credited to each LO, `d_start = 0`. Only for a
-  /// period no snapshot exists for.
-  history;
-
-  static MStartSource parse(Object? raw) =>
-      raw == snapshot.name ? snapshot : history;
-}
-
 class GradeProposal {
   const GradeProposal({
     required this.uid,
@@ -51,8 +37,6 @@ class GradeProposal {
     required this.u,
     required this.d,
     required this.mEnd,
-    required this.mStart,
-    required this.g,
     required this.proposal,
     required this.coreTotal,
     required this.coreCounted,
@@ -64,8 +48,6 @@ class GradeProposal {
     required this.neverProbedCount,
     required this.supervisedTurns,
     required this.homeTurns,
-    this.mStartSource = MStartSource.history,
-    this.mStartInexactCount = 0,
     this.justification,
     this.justificationAt,
     this.justificationSource = JustificationSource.ai,
@@ -83,15 +65,15 @@ class GradeProposal {
   final String formulaVersion;
   final DateTime computedAt;
 
-  // §2.2–§2.6
+  // §2.2–§2.3. Docs written before v1.0.16 (#191) also carry `mStart`,
+  // `g`, `mStartSource` and `mStartInexactCount`; they are read past, not
+  // rewritten.
   final double k;
   final double u;
   final double d;
   final double mEnd;
-  final double mStart;
-  final double g;
 
-  /// The deterministic proposal `P`, rounded to a whole point.
+  /// The deterministic proposal `P = M` (§2.6), rounded to a whole point.
   final int proposal;
 
   // Counts behind the fractions, for display and for the justification.
@@ -115,14 +97,6 @@ class GradeProposal {
   /// Graded turns inside the grading window, by provenance.
   final int supervisedTurns;
   final int homeTurns;
-
-  /// How `M_start` was read (#110).
-  final MStartSource mStartSource;
-
-  /// With [mStartSource] `snapshot`: milestone LOs whose belief had already
-  /// been written inside the period when the snapshot was taken, so their
-  /// period-start state is the snapshot-moment reading, not the exact one.
-  final int mStartInexactCount;
 
   final String? justification;
   final DateTime? justificationAt;
@@ -171,8 +145,6 @@ class GradeProposal {
     u: u,
     d: d,
     mEnd: mEnd,
-    mStart: mStart,
-    g: g,
     proposal: proposal,
     coreTotal: coreTotal,
     coreCounted: coreCounted,
@@ -184,8 +156,6 @@ class GradeProposal {
     neverProbedCount: neverProbedCount,
     supervisedTurns: supervisedTurns,
     homeTurns: homeTurns,
-    mStartSource: mStartSource,
-    mStartInexactCount: mStartInexactCount,
     justification: justification ?? this.justification,
     justificationAt: justificationAt ?? this.justificationAt,
     justificationSource: justificationSource ?? this.justificationSource,
@@ -207,8 +177,6 @@ class GradeProposal {
     'u': u,
     'd': d,
     'mEnd': mEnd,
-    'mStart': mStart,
-    'g': g,
     'proposal': proposal,
     'coreTotal': coreTotal,
     'coreCounted': coreCounted,
@@ -220,8 +188,6 @@ class GradeProposal {
     'neverProbedCount': neverProbedCount,
     'supervisedTurns': supervisedTurns,
     'homeTurns': homeTurns,
-    'mStartSource': mStartSource.name,
-    'mStartInexactCount': mStartInexactCount,
     if (justification != null) 'justification': justification,
     if (justificationAt != null)
       'justificationAt': justificationAt!.toUtc().toIso8601String(),
@@ -249,8 +215,6 @@ class GradeProposal {
       u: num_('u'),
       d: num_('d'),
       mEnd: num_('mEnd'),
-      mStart: num_('mStart'),
-      g: num_('g'),
       proposal: int_('proposal'),
       coreTotal: int_('coreTotal'),
       coreCounted: int_('coreCounted'),
@@ -262,9 +226,6 @@ class GradeProposal {
       neverProbedCount: int_('neverProbedCount'),
       supervisedTurns: int_('supervisedTurns'),
       homeTurns: int_('homeTurns'),
-      // Docs from before #110 carry no source: they were history-based.
-      mStartSource: MStartSource.parse(doc['mStartSource']),
-      mStartInexactCount: int_('mStartInexactCount'),
       justification: doc['justification'] as String?,
       justificationAt: date('justificationAt'),
       // Docs from before #149 carry no source: only the model wrote then.

@@ -816,28 +816,6 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            l.reports_grade_masteryStart(pct(p.mStart)),
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            switch (p.mStartSource) {
-              MStartSource.snapshot when p.mStartInexactCount == 0 =>
-                l.reports_grade_startSource_snapshot,
-              MStartSource.snapshot => l.reports_grade_startSource_snapshotLate(
-                p.mStartInexactCount,
-              ),
-              MStartSource.history => l.reports_grade_startSource_history,
-            },
-            key: const Key('reports-detail-start-source'),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            l.reports_grade_growth(p.g.toStringAsFixed(2)),
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
             l.reports_grade_core(p.coreCounted, p.coreTotal),
             style: theme.textTheme.bodySmall,
           ),

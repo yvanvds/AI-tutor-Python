@@ -11,9 +11,6 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
-import 'package:ai_tutor_python/services/grading/milestone_service.dart';
-import 'package:ai_tutor_python/services/grading/period_start_snapshot.dart';
-import 'package:ai_tutor_python/services/grading/period_start_snapshot_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_sample.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
@@ -150,30 +147,6 @@ Milestone _milestone({DateTime? periodStart}) => Milestone(
   coreLoKeys: {Milestone.loKey('s1', 'a'), Milestone.loKey('s1', 'b')},
 );
 
-/// A `period_start_snapshots` doc as the student app would have written it
-/// (#110), from `(subgoalId, loId, mastered, highest, exact)` tuples.
-Map<String, dynamic> _snapshot(
-  List<(String, String, bool, String?, bool)> los, {
-  DateTime? periodStart,
-}) => PeriodStartSnapshot(
-  uid: _student,
-  milestoneId: 'm1',
-  periodStart: periodStart ?? _periodStart,
-  takenAt: (periodStart ?? _periodStart).add(const Duration(days: 1)),
-  los: [
-    for (final (sid, lid, mastered, highest, exact) in los)
-      SnapshotLo(
-        subgoalId: sid,
-        loId: lid,
-        mastered: mastered,
-        highest: highest == null
-            ? null
-            : QuestionDifficulty.values.byName(highest),
-        exact: exact,
-      ),
-  ],
-).toMap();
-
 class _Fixture {
   _Fixture({
     List<Map<String, dynamic>> beliefs = const [],
@@ -181,7 +154,6 @@ class _Fixture {
     List<Map<String, dynamic>> turns = const [],
     List<Map<String, dynamic>> reports = const [],
     List<Map<String, dynamic>> proposals = const [],
-    List<Map<String, dynamic>> snapshots = const [],
     ConnectorResult reply = const ConnectorOk('Sam did well.'),
     this.supervision = const NoSupervisionSource(),
   }) : goals = InMemoryCosmos([
@@ -195,7 +167,6 @@ class _Fixture {
        turns = InMemoryCosmos(turns),
        reports = InMemoryCosmos(reports),
        proposals = InMemoryCosmos(proposals),
-       snapshots = InMemoryCosmos(snapshots),
        connector = _FakeConnector(reply);
 
   final InMemoryCosmos goals;
@@ -205,7 +176,6 @@ class _Fixture {
   final InMemoryCosmos turns;
   final InMemoryCosmos reports;
   final InMemoryCosmos proposals;
-  final InMemoryCosmos snapshots;
   final _FakeConnector connector;
 
   /// The app's own binding unless a test says otherwise (#160).
@@ -229,15 +199,6 @@ class _Fixture {
     ),
     turns: TurnHistoryService(
       container: turns.container,
-      getUid: () => _teacher,
-    ),
-    snapshots: PeriodStartSnapshotService(
-      container: snapshots.container,
-      milestones: MilestoneService(container: InMemoryCosmos().container),
-      beliefs: LoBeliefsService(
-        container: beliefs.container,
-        getUid: () => _teacher,
-      ),
       getUid: () => _teacher,
     ),
     supervision: supervision,
@@ -298,23 +259,23 @@ void main() {
       expect(p.d, closeTo(1 / 3, 1e-9));
       // M = 50 + 50·(0.6·0.5 + 0.4·(1/3)) = 50 + 50·0.4333 = 71.67
       expect(p.mEnd, closeTo(71.667, 1e-3));
-      // No history at all → M_start = 0 → G = M/100.
-      expect(p.mStart, 0.0);
-      expect(p.g, closeTo(0.71667, 1e-4));
-      // P = 0.6·71.67 + 0.4·71.67 = 71.67 → 72
+      // P = M (§2.6, v1.0.16) = 71.67 → 72
       expect(p.proposal, 72);
       expect(p.staleLoCount, 0);
       expect(p.neverProbedCount, 0);
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.15');
-      expect(p.mStartSource, MStartSource.history);
+      expect(p.formulaVersion, '1.0.16');
 
       final stored = f.proposals.docs['${_student}_m1'];
       expect(stored, isNotNull);
       expect(stored!['proposal'], 72);
       expect(stored['type'], 'grade_proposal');
+      // No period-start baseline and no growth term are written (#191).
+      for (final key in ['mStart', 'g', 'mStartSource', 'mStartInexactCount']) {
+        expect(stored.containsKey(key), isFalse, reason: key);
+      }
     });
 
     test('mastery is the one-way stamp, not the live belief (#168): a core '
@@ -398,166 +359,56 @@ void main() {
       expect(hard.k, 0.0);
     });
 
-    test('M_start comes from the latest history sample at or before the '
-        'period start, per subgoal, credited to each of its LOs', () async {
-      final f = _Fixture(
-        beliefs: [
-          _belief('s1', 'a', alpha: 6, beta: 1, at: fresh, highest: 'hard'),
-          _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
-          _belief('s2', 'c', alpha: 5, beta: 1, at: fresh),
-          _belief('s2', 'd', alpha: 5, beta: 1, at: fresh),
-        ],
-        history: [
-          // s1 was half done before the period, then finished inside it:
-          // the later sample must not leak into M_start.
-          _sample('s1', 0.5, _periodStart.subtract(const Duration(days: 5))),
-          _sample('s1', 1.0, _periodStart.add(const Duration(days: 5))),
-          // s2 had nothing before the period.
-          _sample('s2', 1.0, _periodStart.add(const Duration(days: 20))),
-        ],
-      );
-      final p = await f.service().compute(
-        uid: _student,
-        milestone: _milestone(),
-      );
-      // k_start = 0.5 (both core LOs credited s1's 0.5), u_start = 0,
-      // d_start = 0 → M_start = 50·0.5 = 25.
-      expect(p.mStart, closeTo(25.0, 1e-9));
-      // End: k = 1, u = 1, d = 1/4 → 50 + 50·(0.6 + 0.1) = 85.
-      expect(p.mEnd, closeTo(85.0, 1e-9));
-      expect(p.g, closeTo((85 - 25) / 75, 1e-9));
-      // P = 0.6·85 + 0.4·80 = 83.
-      expect(p.proposal, 83);
-      expect(p.mStartSource, MStartSource.history);
-      expect(f.proposals.docs['${_student}_m1']!['mStartSource'], 'history');
-    });
-
-    group('M_start from the period-start snapshot (#110)', () {
-      final endBeliefs = [
+    test('P = M (#191): where the student stood at the period start does '
+        'not move the proposal', () async {
+      final beliefs = [
         _belief('s1', 'a', alpha: 6, beta: 1, at: fresh, highest: 'hard'),
         _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
         _belief('s2', 'c', alpha: 5, beta: 1, at: fresh),
         _belief('s2', 'd', alpha: 5, beta: 1, at: fresh),
       ];
-      // The history rule would say M_start = 25 (s1 half done).
-      final history = [
-        _sample('s1', 0.5, _periodStart.subtract(const Duration(days: 5))),
-        _sample('s1', 1.0, _periodStart.add(const Duration(days: 5))),
-        _sample('s2', 1.0, _periodStart.add(const Duration(days: 20))),
-      ];
+      // Same end state; one student started from nothing, the other had s1
+      // half done before the period. Under the old growth mix (v1.0.15)
+      // these came out 85 and 83.
+      final fromScratch = await _Fixture(beliefs: beliefs)
+          .service()
+          .compute(uid: _student, milestone: _milestone());
+      final headStart = await _Fixture(
+        beliefs: beliefs,
+        history: [
+          _sample('s1', 0.5, _periodStart.subtract(const Duration(days: 5))),
+          _sample('s1', 1.0, _periodStart.add(const Duration(days: 5))),
+          _sample('s2', 1.0, _periodStart.add(const Duration(days: 20))),
+        ],
+      ).service().compute(uid: _student, milestone: _milestone());
 
-      test(
-        'is the same §2.3 arithmetic as M_end over the frozen per-LO '
-        'state, expected level included, and wins over the history',
-        () async {
-          final f = _Fixture(
-            beliefs: endBeliefs,
-            history: history,
-            snapshots: [
-              _snapshot([
-                // Core: a mastered at medium (counts), b not mastered.
-                ('s1', 'a', true, 'medium', true),
-                ('s1', 'b', false, 'easy', true),
-                // Extension: c mastered at medium, d had no belief yet.
-                ('s2', 'c', true, 'medium', true),
-              ]),
-            ],
-          );
-          final p = await f.service().compute(
-            uid: _student,
-            milestone: _milestone(),
-          );
-          // k_start = 1/2, u_start = 1/2, d_start = 0/2 →
-          // M_start = 50·0.5 + 50·0.5·(0.6·0.5) = 25 + 7.5 = 32.5.
-          expect(p.mStart, closeTo(32.5, 1e-9));
-          expect(p.mEnd, closeTo(85.0, 1e-9));
-          expect(p.g, closeTo((85 - 32.5) / 67.5, 1e-9));
-          // P = 0.6·85 + 0.4·77.78 = 82.1 → 82.
-          expect(p.proposal, 82);
-          expect(p.mStartSource, MStartSource.snapshot);
-          expect(p.mStartInexactCount, 0);
-          final stored = f.proposals.docs['${_student}_m1']!;
-          expect(stored['mStartSource'], 'snapshot');
-          expect(stored['mStartInexactCount'], 0);
-        },
-      );
+      // End: k = 1, u = 1, d = 1/4 → M = 50 + 50·(0.6 + 0.1) = 85 = P.
+      for (final p in [fromScratch, headStart]) {
+        expect(p.mEnd, closeTo(85.0, 1e-9));
+        expect(p.proposal, 85);
+      }
+    });
 
-      test('the expected level gates k_start like it gates k', () async {
-        final f = _Fixture(
-          beliefs: endBeliefs,
-          snapshots: [
-            _snapshot([
-              ('s1', 'a', true, 'medium', true),
-              ('s1', 'b', true, 'medium', true),
-            ]),
-          ],
-        );
-        final hard = Milestone(
-          id: 'm1',
-          title: 'Rapport 1',
-          periodStart: _periodStart,
-          dueAt: DateTime.utc(2026, 10, 15),
-          expectedDifficulty: QuestionDifficulty.hard,
-          subgoalIds: const ['s1', 's2'],
-          coreLoKeys: {Milestone.loKey('s1', 'a'), Milestone.loKey('s1', 'b')},
-        );
-        final p = await f.service().compute(uid: _student, milestone: hard);
-        // Both core LOs mastered at the start, but only at medium: k_start
-        // = 0 → M_start = 0 (the 50 is gated by the expected level).
-        expect(p.mStart, 0.0);
-        expect(p.mStartSource, MStartSource.snapshot);
+    test('a proposal doc from before v1.0.16 that carries M_start and G '
+        'still reads; the old fields are read past, not kept', () {
+      final p = GradeProposal.fromCosmos({
+        'uid': _student,
+        'milestoneId': 'm1',
+        'formulaVersion': '1.0.15',
+        'mEnd': 85,
+        'mStart': 25,
+        'g': 0.8,
+        'mStartSource': 'snapshot',
+        'mStartInexactCount': 2,
+        'proposal': 83,
       });
-
-      test('counts the milestone LOs the snapshot read late', () async {
-        final f = _Fixture(
-          beliefs: endBeliefs,
-          snapshots: [
-            _snapshot([
-              ('s1', 'a', true, 'medium', false),
-              ('s1', 'b', false, null, true),
-              ('s2', 'c', true, 'medium', false),
-              // Not a milestone LO: does not count.
-              ('s9', 'z', true, 'hard', false),
-            ]),
-          ],
-        );
-        final p = await f.service().compute(
-          uid: _student,
-          milestone: _milestone(),
-        );
-        expect(p.mStartSource, MStartSource.snapshot);
-        expect(p.mStartInexactCount, 2);
-      });
-
-      test('a snapshot taken for another period start is ignored: the '
-          'history rule applies', () async {
-        final f = _Fixture(
-          beliefs: endBeliefs,
-          history: history,
-          snapshots: [
-            _snapshot([
-              ('s1', 'a', true, 'hard', true),
-            ], periodStart: _periodStart.subtract(const Duration(days: 30))),
-          ],
-        );
-        final p = await f.service().compute(
-          uid: _student,
-          milestone: _milestone(),
-        );
-        expect(p.mStart, closeTo(25.0, 1e-9));
-        expect(p.mStartSource, MStartSource.history);
-        expect(p.mStartInexactCount, 0);
-      });
-
-      test('a proposal doc from before #110 reads as history-based', () {
-        final p = GradeProposal.fromCosmos({
-          'uid': _student,
-          'milestoneId': 'm1',
-          'mStart': 25,
-        });
-        expect(p.mStartSource, MStartSource.history);
-        expect(p.mStartInexactCount, 0);
-      });
+      expect(p.mEnd, 85);
+      expect(p.proposal, 83);
+      expect(p.formulaVersion, '1.0.15');
+      final back = p.toMap();
+      for (final key in ['mStart', 'g', 'mStartSource', 'mStartInexactCount']) {
+        expect(back.containsKey(key), isFalse, reason: key);
+      }
     });
 
     test('stale and never-probed LOs are counted as the honest uncertainty '
@@ -589,8 +440,6 @@ void main() {
           u: 1,
           d: 0,
           mEnd: 80,
-          mStart: 0,
-          g: 0.8,
           proposal: 80,
           coreTotal: 2,
           coreCounted: 2,
@@ -725,10 +574,9 @@ void main() {
       expect(f.connector.lastInput, isNot(contains('OUD RAPPORT')));
       expect(f.connector.lastInput, contains('"atPeriodStart":0.5'));
       expect(f.connector.lastInput, contains('"now":1.0'));
-      expect(
-        f.connector.lastInput,
-        contains('"masteryScoreStartSource":"history"'),
-      );
+      // P = M (#191): no period-start score or growth among the facts.
+      expect(f.connector.lastInput, isNot(contains('masteryScoreStart')));
+      expect(f.connector.lastInput, isNot(contains('"growth"')));
 
       expect(result.justification, 'Sam beheerst de kern.');
       expect(result.justificationAt, _now);
@@ -882,7 +730,6 @@ void main() {
       // PUNTENFORMULE §3.3: the prose is not an input to the number.
       expect(edited.proposal, draft.proposal);
       expect(edited.mEnd, draft.mEnd);
-      expect(edited.g, draft.g);
       expect(edited.adjustedGrade, draft.adjustedGrade);
 
       final stored = f.proposals.docs['${_student}_m1']!;

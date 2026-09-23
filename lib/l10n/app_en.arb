@@ -124,20 +124,6 @@
   "@reports_grade_masteryEnd": {
     "placeholders": { "value": { "type": "String" } }
   },
-  "reports_grade_masteryStart": "Mastery at period start: {value}",
-  "@reports_grade_masteryStart": {
-    "placeholders": { "value": { "type": "String" } }
-  },
-  "reports_grade_startSource_snapshot": "Period start: exact per-LO snapshot",
-  "reports_grade_startSource_snapshotLate": "Period start: per-LO snapshot, {count} LOs already written when it was taken",
-  "@reports_grade_startSource_snapshotLate": {
-    "placeholders": { "count": { "type": "int" } }
-  },
-  "reports_grade_startSource_history": "Period start: estimate from progress history (no snapshot for this period)",
-  "reports_grade_growth": "Growth: {value}",
-  "@reports_grade_growth": {
-    "placeholders": { "value": { "type": "String" } }
-  },
   "reports_grade_core": "Core at level: {counted} / {total}",
   "@reports_grade_core": {
     "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
@@ -241,12 +227,8 @@
     "placeholders": { "note": { "type": "String" } }
   },
   "myReports_breakdown_title": "How this grade was computed",
-  "myReports_breakdown_mastery": "Mastery score M: {start} at the start of the period → {end} now",
+  "myReports_breakdown_mastery": "Mastery score M = {value} (the proposed grade is M, rounded)",
   "@myReports_breakdown_mastery": {
-    "placeholders": { "start": { "type": "String" }, "end": { "type": "String" } }
-  },
-  "myReports_breakdown_growth": "Growth score G = {value}",
-  "@myReports_breakdown_growth": {
     "placeholders": { "value": { "type": "String" } }
   },
   "myReports_breakdown_fractions": "k = {k} (core) · u = {u} (extension) · d = {d} (shown at hard)",
