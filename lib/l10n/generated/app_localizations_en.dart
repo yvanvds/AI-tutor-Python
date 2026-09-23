@@ -1091,6 +1091,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get update_action_check => 'Check for updates';
 
   @override
+  String get update_required_title => 'Update required';
+
+  @override
+  String update_required_message(String local, String minimum) {
+    return 'This version of the app ($local) is older than the version the school requires ($minimum). Update to continue.';
+  }
+
+  @override
   String get session_explain_placeholder_noSubgoal =>
       'Pick a subgoal in the learning path to see the explanation.';
 

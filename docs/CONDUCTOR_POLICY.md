@@ -246,35 +246,36 @@ graded and are out) whose belief doc:
      the decay half-life: at that age a `(5, 1)` belief has decayed to
      a mean of 0.79, just under mastery, so the review lands where
      decay starts to read as forgetting); or
-   - **regressed (#112):** flagged `regressedAt` on `lo_beliefs` (part
-     2) — an incidental cross-subgoal negative (2.4) left the stored
-     belief below the mastery rule (4.1, conditions 1–2) and no direct
-     probe has happened since.
+   - **flagged for review (#112, #167):** `regressedAt` set on
+     `lo_beliefs` (part 2) — an incidental cross-subgoal negative (2.4)
+     suggested a gap in this once-mastered LO and no direct probe has
+     happened since. The negative itself is not applied to the belief
+     (2.4); the flag is all it leaves behind.
 
 There is no separate "not naturally recurring" test: any write bumps
 `lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
 later work keeps using never *becomes* stale. Staleness is what keeps
-the recurring LOs out. The regression flag exists because that same
-rule cuts the wrong way for bad news: a cross-subgoal negative is a
-write too, and on staleness alone it would make the LO *fresh* and push
-its review 30 days out — the opposite of what the evidence says, while
-the grade formula already reads the lower mean. Two designs were weighed
-(#112): a separate "last direct probe" clock for staleness, or a second
-"due regardless of staleness" candidate rule. The second was chosen: it
-leaves the staleness rule — and with it transfer credit's "recurring,
-skip" effect — exactly as it was, and it needs one marker rather than a
-second clock plus a new reason to skip credited LOs. The marker is set
-by the negative that causes the regression (2.4); it is cleared by the
-next direct probe of the LO (this review, or a probe while its subgoal
-is active — follow-up grading included) and by any indirect write that
-brings the stored belief back to mastery (a transfer credit, a positive
-incidental). An indirect write that leaves the belief below mastery
-leaves the flag as it was: a credit neither flags nor clears. Orphaned
-belief docs (LO or subgoal deleted, 7.4) are skipped because they
-resolve to no live LO.
+the recurring LOs out. The review flag exists because staleness alone
+would never get a suspected gap checked: a fresh, once-mastered LO that
+later work casts doubt on would wait out the full 30 days (and before
+#167, when the negative was still a belief write, that write itself
+made the LO *fresh* again — the opposite of what the evidence said).
+Two designs were weighed (#112): a separate "last direct probe" clock
+for staleness, or a second "due regardless of staleness" candidate
+rule. The second was chosen: it leaves the staleness rule — and with it
+transfer credit's "recurring, skip" effect — exactly as it was, and it
+needs one marker rather than a second clock plus a new reason to skip
+credited LOs. The marker is set by the incidental negative (2.4) — kept
+if already set — and cleared only by the next direct probe of the LO
+(this review, or a probe while its subgoal is active — follow-up grading
+included). An indirect write — a transfer credit, a positive incidental
+— leaves it as it was, whatever it does to the belief (#167): good news
+from the side does not answer the question the negative raised; the
+review does, and it is one short question. Orphaned belief docs (LO or
+subgoal deleted, 7.4) are skipped because they resolve to no live LO.
 
-Among candidates a **regressed LO wins over a stale one** — known bad
-news before suspected forgetting; among regressed LOs the oldest flag
+Among candidates a **regressed LO wins over a stale one** — a suspected
+gap before suspected forgetting; among regressed LOs the oldest flag
 first — then the **most stale wins** (oldest `lastUpdatedAt`); ties go
 to the lowest decayed mean. Staleness order, not mean order, so the
 pool is rotated through predictably: once asked, an LO's clock resets,
@@ -314,9 +315,10 @@ incidental under 2.4's rules (#108).
   warm-up turn is not presented (6.3, condition 5).
 - **No advancement, no cache write.** The old subgoal's cached
   `progress` is left alone even after a wrong answer, exactly as for
-  transfer credit: a review is not a re-enrolment, and lowering the
-  cache would make the conductor's next-subgoal walk (4.5) drag the
-  student back to the old topic next session. The honest belief is on
+  transfer credit: a review is not a re-enrolment, and rewriting the
+  doc would drop its `advancedAt` stamp (4.5, #161), which is what
+  keeps the conductor's next-subgoal walk from dragging the student
+  back to the old topic next session. The honest belief is on
   `lo_beliefs`, where the grade formula and the teacher drawer read it;
   the LO simply comes up for review again once it is stale again. The
   active subgoal is untouched too: unless the grader landed an incidental
@@ -538,46 +540,58 @@ A `writeCode` question targeting `for_loop_structure` may reveal the
 student handles `indentation_defines_block`; that signal lands in the
 indentation LO's belief.
 
-**Cross-subgoal incidental signals count too (#108).** The contract's
-scope for `loSignals` is the whole root goal, and the grading
-instructions ask for a signal on an *earlier* subgoal's LO when a
-mistake points to a gap there (a `print()` slip inside a loop exercise).
-Such a signal lands on that LO's own belief doc — created at the prior
-if the student was never probed on it (3.5) — with these differences
-from an in-subgoal incidental, all following from "the probe was not
-of this LO":
+**Cross-subgoal incidental signals reach the earlier LO too (#108,
+#167).** The contract's scope for `loSignals` is the whole root goal,
+and the grading instructions ask for a signal on an *earlier* subgoal's
+LO when a mistake points to a gap there (a `print()` slip inside a loop
+exercise). What the conductor does with it depends on its sign, because
+the two are not equally trustworthy:
 
-- **Weight:** the grader's `strength`, treated as `medium` difficulty
+- **A positive is evidence.** It lands on that LO's own belief doc —
+  created at the prior if the student was never probed on it (3.5) —
+  with the grader's `strength`, treated as `medium` difficulty
   (multiplier 1.0), times provenance (3.2). The question's difficulty
   was set for the target LO, not this one — the same reasoning that
   keeps a transfer credit (3.7) and a follow-up signal (6.2) at
-  `medium`. Sign is whatever the grader said; a positive is possible
-  (an MCQ that shows a prerequisite is solid) but on a code answer the
-  instructions route "correctly used" to `transferLOs`, so in practice
-  the path carries negatives.
-- **Nothing certified:** neither ratchet (`lastPositiveAtCalibratedAt`,
-  `highestPositiveDifficulty`, 4.3) moves, the notch-drop counter (2.3)
-  and `lastQuestionType` are left alone. Mastery condition 3 therefore
-  still needs a direct probe: an LO cannot be brought to mastery
-  sideways, only confirmed or contradicted in `(α, β)`.
+  `medium`. On a code answer the instructions route "correctly used" to
+  `transferLOs`, so in practice this path is rare (an MCQ that shows a
+  prerequisite is solid).
+- **A negative is a prompt, not evidence (#167).** It is the least
+  reliable verdict the system produces: inferred from an answer about
+  something else, by a probe not designed for this LO. And it lands by
+  definition on LOs the student has left behind — which the tutor no
+  longer probes directly, so a debit here would never be contradicted.
+  Before #167 it was applied like a positive, and one week of `input()`
+  exercises took a six-times-demonstrated earlier LO from a mean of
+  0.82 to 0.65 for good, eroding everything the belief steers (2.1
+  question choice, 4.4 stuck detection, the progress bar) on the
+  strength of a judgement nobody ever tested. Now it writes **nothing**
+  to the belief: not `(α, β)`, not `lastUpdatedAt`. On a once-mastered
+  LO (`everMastered`, 3.7) it sets `regressedAt` — kept if already set
+  — which makes the LO due for the next session's warm-up review
+  (1.5). That review is a direct probe at full weight: the measurement
+  the negative asked for. On an LO never mastered nothing is written at
+  all — no doc is created for an LO never probed, and a not-mastered LO
+  is not review material; the signal is logged
+  (`conductor.incidental_negative`).
+- **Nothing certified:** a positive moves neither ratchet
+  (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty`, 4.3), and
+  leaves the notch-drop counter (2.3) and `lastQuestionType` alone.
+  Mastery condition 3 therefore still needs a direct probe: an LO cannot
+  be brought to mastery sideways, only confirmed in `(α, β)`.
 - **No re-enrolment:** the other subgoal's cached `progress` is not
   recomputed, as for 1.5 and 3.7. The honest belief is on `lo_beliefs`,
-  where the grade formula and the warm-up selection read it.
-- **A regression is flagged for review (#112):** a negative that leaves
-  a once-mastered LO's stored belief below the mastery rule (4.1,
-  conditions 1–2) sets `regressedAt` on its doc, which makes the LO due
-  for a warm-up review (1.5) regardless of the `lastUpdatedAt` bump this
-  write makes — without it the bad news would push the review 30 days
-  out. A positive that brings the stored belief back to mastery clears
-  the flag; one that does not leaves it as it was.
+  where the warm-up selection and the teacher drawer read it.
 - **Once per LO per answer:** a `transferLOs` nomination on an LO that
-  already took a signal this turn is dropped (3.7).
+  already took a signal — or a review flag — this turn is dropped (3.7).
 - **Forward references are dropped and logged**, per the contract's
   scope check: only the active subgoal and subgoals *before* it in the
   root can receive a signal.
 
-The turn record lists every applied signal with its `subgoalId` (8.1),
-so an entry on another subgoal is visible in the audit trail.
+The turn record lists every applied signal with its `subgoalId` and
+every LO flagged for review under `reviewFlags` (8.1), so both are
+visible in the audit trail: a negative on an earlier LO appears in
+`loSignals` and `reviewFlags`, never in `appliedSignals`.
 
 **Deliberate multi-LO targeting is structurally allowed but not yet
 triggered by any rule.** The `targetLOs` field is a list; nothing
@@ -659,11 +673,14 @@ The base weight per `(signal, strength)`:
 | `negative` | `β += 2.0` | `β += 1.0` | `β += 0.5` |
 | `neutral` | (no update) | (no update) | (no update) |
 
-**Symmetric in positive/negative.** Asymmetry would distort
+**Symmetric in positive/negative.** Asymmetry here would distort
 calibration. The "wrong is more diagnostic than right" intuition is
 real but belongs in the LLM contract — the grader emits `moderate` or
 `weak` (not `strong`) on questions where lucky-guess corrects are
-plausible (e.g. binary MCQ). The conductor's weights stay symmetric.
+plausible (e.g. binary MCQ). The conductor's *base* weights stay
+symmetric; the one asymmetry the conductor does apply is by difficulty
+(3.2, #169), and that is about the level of the question relative to
+the student, not about one sign being more trustworthy than the other.
 
 **`neutral` is a no-op.** A neutral signal means "the answer touched
 the LO but gave no clear evidence." Adding `(α + 0.5, β + 0.5)` would
@@ -673,26 +690,43 @@ conductor declines to apply it.
 
 ### 3.2 Difficulty modulation
 
-Multiply the base weight by a difficulty factor:
+Multiply the base weight by a difficulty factor — one for positives,
+its mirror image for negatives (#169):
 
-| Question difficulty | Multiplier |
-| --- | --- |
-| `easy` | 0.6 |
-| `medium` | 1.0 |
-| `hard` | 1.4 |
+| Question difficulty | `positive` | `negative` |
+| --- | --- | --- |
+| `easy` | 0.6 | 1.4 |
+| `medium` | 1.0 | 1.0 |
+| `hard` | 1.4 | 0.6 |
 
-Applies to both positive and negative signals, with the same factor:
-a `correct` at hard is more diagnostic of mastery than a `correct`
-at easy, and a `wrong` at hard is weighted just as heavily as that
-`correct` — the multiplier says how *hard* a piece of evidence is,
-not which way it points (see "Symmetric in positive/negative" above).
-A consequence for the grade formula (PUNTENFORMULE §2.5): the
-multiplier scales how fast evidence accrues but not where the mean
-settles, so difficulty is invisible in `(α, β)`; the per-LO
-`highestPositiveDifficulty` ratchet (4.3) is what carries it.
+A `correct` at hard is more diagnostic of mastery than a `correct` at
+easy; a `wrong` at hard is *less* diagnostic of a gap than a `wrong`
+at easy — a mistake above the level the milestone expects says little
+about that level, a mistake below it says a lot. The consequence is a
+**level-aware mean**: the same mastery bar (mean ≥ 0.8, 4.1) is ~90%
+raw accuracy at easy, 80% at medium and ~63% at hard, and the stuck
+ceilings (4.4) shift the same way. That is what keeps the calibration
+ladder (5) from pushing a student out of mastery: a student promoted
+at 76% on medium who then scores ~60% on hard keeps a mean of ~0.78.
+Until #169 the factor was the same for both signs, so the mean was
+plain accuracy at whatever level the ladder had parked the student —
+40–75% by construction (5.1, 5.2) — and a well-calibrated student
+probed long enough ended under the mastery bar by design.
+(`PolicyConstants.positiveDifficultyMultiplier` /
+`negativeDifficultyMultiplier`; `belief_math.signalDeltas` picks by
+signal kind.)
 
-**E.1 interaction.** Lower easy-weight is one of two mechanisms that
-fix the "good student grinds easy answers to mastery" problem. The
+For the grade formula (PUNTENFORMULE §2.5) the per-LO
+`highestPositiveDifficulty` ratchet (4.3) still carries *which* level
+was demonstrated — the mean says whether the bar at the student's own
+level was met, not how high that bar was — so for now difficulty
+counts twice there (a softer mean at hard, plus the `d` bonus);
+PUNTENFORMULE keeps that deliberately until its part 2 is revised.
+
+**E.1 interaction.** The lower easy-weight on positives is one of two
+mechanisms that fix the "good student grinds easy answers to mastery"
+problem (and the higher easy-weight on negatives makes each easy
+mistake cost more, so easy-only mastery needs ~90% raw accuracy). The
 multiplier alone caps how fast easy-only mastery can accrue: it takes
 more easy-correct answers to reach the same evidence count as one
 medium-correct. The second mechanism — requiring evidence at the
@@ -711,8 +745,8 @@ produced:
 classroom session at grading time, as answered per student, per turn,
 by the `SupervisionSource` the host consults before building the
 `GradedAnswer`. There is no manual toggle. The factor is symmetric in
-positive and negative (like difficulty: it changes how *hard* the
-evidence is, not which way it points), applies to follow-up signals
+positive and negative (unlike difficulty since #169: provenance changes
+how *hard* the evidence is, not which way it points), applies to follow-up signals
 as well, and never drops below 1 — home evidence keeps full weight and
 is confirmed or contradicted by later supervised work on the same LO.
 Until Anchor is wired up every turn resolves to `home`, so the
@@ -796,7 +830,9 @@ recover from after decay or isolated bad answers.
   on an LO the student has never been probed on before). Create the
   belief doc with prior `(α=1, β=1)`, `lastUpdatedAt = now`, then
   apply the update normally. Same code path; only the create-or-load
-  step is special.
+  step is special. A cross-subgoal *negative* is the exception (2.4,
+  #167): it writes nothing, so no doc is created — a never-asked LO
+  must not start life in debit on a verdict nobody will re-test.
 
 ### 3.6 Worked example
 
@@ -927,13 +963,14 @@ later work are refreshed here for free; LOs that nothing later builds on
 are the review question's business. `firstMasteredAt` is the "once
 mastered" signal both mechanisms share, and a credit's `lastUpdatedAt`
 bump is what keeps a recurring LO out of the review pool. A credit does
-not touch the review's regression flag (`regressedAt`, 1.5, #112) unless
-it brings the stored belief back to mastery, in which case it clears it:
-the credited LO is demonstrably fine again. On a warm-up
-turn a nomination on the warm-up target itself is dropped — it already
-took a direct signal; likewise a nomination on an LO that took a
-cross-subgoal incidental signal this turn (2.4, #108). Other nominations
-follow the rules above.
+not touch the review flag (`regressedAt`, 1.5, #112): since #167 only a
+direct probe of the LO clears it — the incidental negative that set it
+was never applied to the belief, so there is no "restored" state for a
+credit to detect, and the question it raised is the review's to answer.
+On a warm-up turn a nomination on the warm-up target itself is dropped
+— it already took a direct signal; likewise a nomination on an LO that
+took a cross-subgoal incidental signal, or a review flag, this turn
+(2.4, #108, #167). Other nominations follow the rules above.
 
 ### 3.8 What this section deliberately does not address
 
@@ -1135,8 +1172,13 @@ on_answer_processed():
 
 Advancement:
 
-- The subgoal's cached `progress` is set to 1.0 (per part 2 — the
-  cache, not the source of truth).
+- The subgoal's `progress` doc is stamped `advancedAt` (#161). Its
+  cached fraction is *not* forced to 1.0: it stays the share of
+  non-optional LOs actually mastered, so a stuck-advance (4.4) leaves
+  the bar honestly below 100% — the same gap the grade formula sees
+  per LO. The next-subgoal walk skips on the stamp, not on the
+  fraction (a doc written before #161 carries "finished" only as
+  `progress == 1.0`, and still counts).
 - The conductor selects the next unmastered subgoal in curriculum
   order.
 - The next question targets the new subgoal's first LO using the
@@ -1808,6 +1850,7 @@ TurnRecord {
   id: string                       // ISO timestamp + suffix
   uid: string                      // partition key
   turnAt: string                   // ISO 8601
+  clientVersion: string            // #165: kAppVersion of the build that wrote the doc; absent on older docs
   subgoalId: string                // the target LO's subgoal: the active
                                    // one, or the older one on a warm-up
 
@@ -1833,6 +1876,7 @@ TurnRecord {
   appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals)
   provenance: string                // home | supervised (3.2, #100); absent on older docs = home
   transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
+  reviewFlags: [{subgoalId, loId}]  // 2.4, #167: earlier LOs an incidental negative flagged for review instead of debiting; omitted when none
 
   // Calibration impact
   calibrationBefore: string

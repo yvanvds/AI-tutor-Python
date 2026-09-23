@@ -151,6 +151,11 @@ class TurnOutcome {
   /// [appliedSignals]; refs the conductor declined are not listed.
   final List<TurnTransferCredit> transferCredits;
 
+  /// Once-mastered LOs of earlier subgoals that this turn's incidental
+  /// negatives put (or kept) in line for the warm-up review (#167, §2.4).
+  /// Those negatives are in [loSignals] but never in [appliedSignals].
+  final List<TurnReviewFlag> reviewFlags;
+
   const TurnOutcome({
     required this.overallQuality,
     required this.subgoalAdvanced,
@@ -164,6 +169,7 @@ class TurnOutcome {
     required this.hadFallback,
     this.signalEvents = const [],
     this.transferCredits = const [],
+    this.reviewFlags = const [],
   });
 }
 
@@ -572,12 +578,13 @@ class Conductor {
   /// Candidates are the LOs of the active root's *other* subgoals whose
   /// belief doc (a) was ever mastered by direct probing (`everMastered`)
   /// and (b) is due: either not written for `warmUpStaleAfter`, or flagged
-  /// `regressedAt` — an incidental cross-subgoal negative (§2.4) left it
-  /// below mastery. Staleness is what keeps naturally recurring LOs out: a
-  /// transfer credit (§3.7) bumps `lastUpdatedAt`, so an LO that later
-  /// work keeps using is never stale. The regression flag is why that
-  /// bump cannot hide bad news: the negative is a write too, and without
-  /// the flag it would make the LO *fresh* for another 30 days (#112).
+  /// `regressedAt` — an incidental cross-subgoal negative (§2.4) suggested
+  /// a gap and asked for a direct re-probe (#112, #167). Staleness is what
+  /// keeps naturally recurring LOs out: a transfer credit (§3.7) bumps
+  /// `lastUpdatedAt`, so an LO that later work keeps using is never stale.
+  /// The flag is how a suspected gap gets checked without waiting for
+  /// that clock — and, since #167, without the negative touching the
+  /// belief at all.
   ///
   /// Regressed candidates come first (oldest flag wins), then stale ones
   /// (most stale wins); ties go to the lowest decayed mean.
@@ -899,16 +906,25 @@ class Conductor {
     // as an active-subgoal signal, ratchets included. Any other signal
     // outside the active subgoal is an *incidental cross-subgoal* signal
     // (#108, §2.4): the grader saw the answer reveal something about an LO
-    // of an earlier subgoal of the root — typically a prerequisite gap. It
-    // is ordinary evidence on that LO's doc, treated as `medium` and with
-    // nothing but `(α, β)` and the clock moving (`crossSubgoalSignalDeltas`).
-    // Forward references (a later subgoal) are dropped per the LLM
-    // contract; scope was otherwise validated upstream.
+    // of an earlier subgoal of the root. A positive is ordinary evidence on
+    // that LO's doc, treated as `medium` and with nothing but `(α, β)` and
+    // the clock moving (`crossSubgoalSignalDeltas`). A negative is not
+    // evidence at all (#167): it is inferred from an answer about something
+    // else, by a probe not designed for this LO, and it lands by definition
+    // on LOs the tutor no longer probes directly — so a debit here would
+    // never be re-tested and would quietly erase demonstrated mastery from
+    // everything the belief steers (question choice, stuck detection, the
+    // progress bar). It writes nothing to the belief and instead flags a
+    // once-mastered LO for next session's warm-up review (§1.5); that
+    // direct probe is the measurement that counts, in full. Forward
+    // references (a later subgoal) are dropped per the LLM contract; scope
+    // was otherwise validated upstream.
     final warmUpSubgoal = plan.warmUp?.subgoal;
     final targetSubgoalId = warmUpSubgoal?.id ?? subgoal.id;
-    // LOs outside the active subgoal written this turn, `subgoalId/loId` →
-    // why: a transfer nomination on one of them is dropped, so the same
-    // answer never counts twice on one LO (§3.7).
+    final reviewFlags = <TurnReviewFlag>[];
+    // LOs outside the active subgoal written or flagged this turn,
+    // `subgoalId/loId` → why: a transfer nomination on one of them is
+    // dropped, so the same answer never counts twice on one LO (§3.7).
     final writtenElsewhere = <String, String>{};
     if (warmUpSubgoal != null && targetLo != null) {
       writtenElsewhere['${warmUpSubgoal.id}/${targetLo.id}'] = 'warm-up target';
@@ -945,6 +961,55 @@ class Conductor {
       }
       if (lo == null) {
         _dropSignal(sig, 'unknown LO');
+        continue;
+      }
+      if (isCrossSubgoal && sig.kind == LoSignalKind.negative) {
+        // #167: a prompt, not evidence. Nothing on the belief moves — not
+        // `(α, β)`, not the clock. A once-mastered LO gets (or keeps) the
+        // review flag; an LO never mastered is not review material (§1.5)
+        // and nothing is written at all — no doc at the prior for an LO
+        // never probed (§3.5 is the positive path).
+        final key = '$signalSubgoalId/${sig.loId}';
+        final existing = await _deps.getLoBelief(
+          subgoalId: signalSubgoalId,
+          loId: sig.loId,
+        );
+        final flaggedAt = nextRegressedAt(
+          current: existing?.regressedAt,
+          directProbe: false,
+          everMastered:
+              existing != null &&
+              everMastered(
+                firstMasteredAt: existing.firstMasteredAt,
+                alpha: existing.alpha,
+                beta: existing.beta,
+                lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
+              ),
+          negative: true,
+          now: DateTime.now().toUtc(),
+        );
+        if (flaggedAt != null) {
+          if (existing!.regressedAt == null) {
+            await _deps.upsertLoBelief(
+              existing.copyWith(regressedAt: flaggedAt),
+            );
+          }
+          reviewFlags.add(
+            TurnReviewFlag(subgoalId: signalSubgoalId, loId: sig.loId),
+          );
+        }
+        _deps.recordDebugEvent('conductor.incidental_negative', {
+          'subgoalId': signalSubgoalId,
+          'loId': sig.loId,
+          'strength': sig.strength.name,
+          'flagged': flaggedAt != null,
+          if (flaggedAt != null)
+            'alreadyFlagged': existing!.regressedAt != null,
+          if (flaggedAt == null) 'reason': 'never mastered',
+        });
+        // Still "this answer is on record for this LO": a transfer
+        // nomination on it is dropped (§3.7).
+        writtenElsewhere.putIfAbsent(key, () => 'flagged for review');
         continue;
       }
       final isTarget =
@@ -1062,17 +1127,15 @@ class Conductor {
         }
       }
 
-      // #112 warm-up regression flag (§1.5): an incidental negative that
-      // leaves a once-mastered LO below mastery makes it due for review
-      // despite the `lastUpdatedAt` bump this write is about to make. A
-      // direct probe of the LO — this turn's target, in-subgoal
-      // incidentals, follow-ups — clears it.
+      // #112 warm-up review flag (§1.5). A direct probe of the LO — this
+      // turn's target, in-subgoal incidentals, follow-ups — clears it; a
+      // cross-subgoal positive (the only cross-subgoal signal that gets
+      // this far, #167) leaves it as it was.
       final nextRegressed = nextRegressedAt(
         current: existing?.regressedAt,
         directProbe: !isCrossSubgoal,
         everMastered: nextFirstMasteredAt != null,
         negative: hasNegative,
-        stored: next,
         now: now,
       );
 
@@ -1115,8 +1178,8 @@ class Conductor {
       answer: answer,
       activeSubgoalId: subgoal.id,
       // The warm-up target and any LO that took a cross-subgoal signal
-      // above already have this answer on record; a nomination on them
-      // would count it twice.
+      // above — or was flagged for review by one — already have this
+      // answer on record; a nomination on them would count it twice.
       excluded: writtenElsewhere,
     );
 
@@ -1172,7 +1235,10 @@ class Conductor {
 
     // Cache the subgoal progress (fraction of non-optional LOs that are
     // mastered). Stuck LOs do *not* count as progress in the cache — they
-    // count for advancement but the chip honestly reflects mastery.
+    // count for advancement but the chip honestly reflects mastery. That
+    // holds on the advancing turn too (#161): a stuck-advance leaves the
+    // bar below 1.0, and "finished" travels as the `advancedAt` stamp on
+    // the progress doc, which is what the next-subgoal walk reads.
     final nonOptional = subgoal.objectives.where((lo) => !lo.optional).toList();
     final masteredNonOptional = loStatus
         .where(
@@ -1183,7 +1249,7 @@ class Conductor {
         .length;
     final cached = nonOptional.isEmpty
         ? 1.0
-        : (subgoalMastered ? 1.0 : masteredNonOptional / nonOptional.length);
+        : masteredNonOptional / nonOptional.length;
 
     bool advanced = false;
     if (!activeTouched) {
@@ -1219,8 +1285,9 @@ class Conductor {
         cached,
         quality: answer.overallQuality,
         recordHistory: true,
+        advancedAt: DateTime.now().toUtc(),
       );
-      _deps.setCurrentProgress(1.0);
+      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
       _deps.showGoalReached(
         goalTitle: subgoal.title,
@@ -1335,12 +1402,13 @@ class Conductor {
           .toList(growable: false),
       appliedSignals: appliedSignals,
       loStatusAfter: loStatus,
-      subgoalProgressAfter: subgoalMastered ? 1.0 : cached,
+      subgoalProgressAfter: cached,
       calibrationBefore: calibrationBefore,
       calibrationAfter: calibrationAfter,
       hadFallback: answer.hadFallback,
       signalEvents: List.unmodifiable(events),
       transferCredits: transferCredits,
+      reviewFlags: reviewFlags,
     );
   }
 
@@ -1363,15 +1431,13 @@ class Conductor {
   /// the "decay clock reset". Nothing else on the doc moves: neither
   /// ratchet (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` —
   /// the difficulty was set for the target LO, not this one), not the
-  /// notch-drop counter, not `lastQuestionType`. The one exception is the
-  /// warm-up regression flag (#112, §1.5): a credit that brings the stored
-  /// belief back to mastery clears `regressedAt` — good news restored the
-  /// LO — while one that does not leaves the flag as it was. The other
-  /// subgoal's cached progress is not recomputed: positive-only credit
-  /// cannot lower it.
+  /// notch-drop counter, not `lastQuestionType`, and not the warm-up
+  /// review flag (`regressedAt`, #112, §1.5): since #167 only a direct
+  /// probe clears it. The other subgoal's cached progress is not
+  /// recomputed: positive-only credit cannot lower it.
   ///
-  /// [excluded] maps `subgoalId/loId` of LOs this turn already wrote
-  /// outside the active subgoal (the warm-up target, cross-subgoal
+  /// [excluded] maps `subgoalId/loId` of LOs this turn already wrote or
+  /// flagged outside the active subgoal (the warm-up target, cross-subgoal
   /// incidental signals) to the reason; a nomination on one is dropped.
   Future<List<TurnTransferCredit>> _applyTransferCredit({
     required GradedAnswer answer,
@@ -1443,12 +1509,14 @@ class Conductor {
         alphaDelta: deltas.alphaDelta,
         betaDelta: deltas.betaDelta,
       );
+      // A credit never flags and, since #167, never clears the review
+      // flag either: the question an incidental negative raised is
+      // answered by the review, not from the side.
       final nextRegressed = nextRegressedAt(
         current: existing.regressedAt,
         directProbe: false,
         everMastered: true,
         negative: false,
-        stored: next,
         now: now,
       );
       await _deps.upsertLoBelief(
@@ -1607,8 +1675,9 @@ class Conductor {
         _lastQuestionType = null;
         return;
       }
-      // Pretend this subgoal is already marked done in the progress cache.
-      await _persistCacheFor(next.id, 1.0);
+      // Every non-optional LO is mastered, so 1.0 is the honest fraction;
+      // the stamp is what marks it finished for the walk (#161).
+      await _persistCacheFor(next.id, 1.0, advancedAt: DateTime.now().toUtc());
       await _recomputeRoot();
     }
   }
@@ -1620,16 +1689,19 @@ class Conductor {
     final roots = await _deps.getRootGoals();
     final progressList = await _deps.getProgressAll();
 
-    double progressFor(Goal g) {
-      final p = progressList.firstWhereOrNull((x) => x.goalID == g.id);
-      return p?.progress ?? 0.0;
-    }
+    Progress? docFor(Goal g) =>
+        progressList.firstWhereOrNull((x) => x.goalID == g.id);
+    double progressFor(Goal g) => docFor(g)?.progress ?? 0.0;
 
     for (final root in roots) {
+      // The root doc is a derived average; with a stuck-advanced child it
+      // never reaches 1.0, so the walk descends and finds no open child.
       if (progressFor(root) < 1.0) {
         final subgoals = await _deps.getChildren(root.id);
+        // Finished means stamped `advancedAt` (#161), not a full bar: a
+        // subgoal advanced with a stuck LO sits below 1.0 for good.
         final targetChild = subgoals.firstWhereOrNull(
-          (g) => progressFor(g) < 1.0,
+          (g) => !(docFor(g)?.isAdvanced ?? false),
         );
 
         if (targetChild != null) {
@@ -1673,10 +1745,14 @@ class Conductor {
 
   Goal? get _activeChildGoal => _deps.getGoalSelection().activeChildGoal;
 
+  /// Writes the active subgoal's cached fraction. [advancedAt] is the
+  /// "finished" stamp (#161): passed on the advancing turn only, so an
+  /// ordinary write on a subgoal the student came back to clears it.
   Future<void> _persistSubgoalCache(
     double cached, {
     AnswerQuality? quality,
     bool recordHistory = true,
+    DateTime? advancedAt,
   }) async {
     final goal = _activeChildGoal;
     if (goal == null) return;
@@ -1685,6 +1761,7 @@ class Conductor {
       cached,
       quality: quality,
       recordHistory: recordHistory,
+      advancedAt: advancedAt,
     );
   }
 
@@ -1693,9 +1770,10 @@ class Conductor {
     double cached, {
     AnswerQuality? quality,
     bool recordHistory = true,
+    DateTime? advancedAt,
   }) async {
     await _deps.upsertProgress(
-      Progress(goalID: goalId, progress: cached),
+      Progress(goalID: goalId, progress: cached, advancedAt: advancedAt),
       quality: quality,
       recordHistory: recordHistory,
     );

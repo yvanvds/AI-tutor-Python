@@ -43,4 +43,47 @@ void main() {
       expect(restored.apiKey, original.apiKey);
     });
   });
+
+  group('MinimumVersion (#165)', () {
+    test('is parsed, trimmed, and absent when missing or blank', () {
+      expect(
+        GlobalConfig.fromMap({'MinimumVersion': '2.6.0'}).minimumVersion,
+        '2.6.0',
+      );
+      expect(
+        GlobalConfig.fromMap({'MinimumVersion': ' 2.6.0+23 '}).minimumVersion,
+        '2.6.0+23',
+      );
+      expect(GlobalConfig.fromMap({}).minimumVersion, isNull);
+      expect(
+        GlobalConfig.fromMap({'MinimumVersion': ''}).minimumVersion,
+        isNull,
+      );
+      expect(
+        GlobalConfig.fromMap({'MinimumVersion': '   '}).minimumVersion,
+        isNull,
+      );
+      expect(
+        GlobalConfig.fromMap({'MinimumVersion': null}).minimumVersion,
+        isNull,
+      );
+    });
+
+    test('is written only when set, and survives a round trip', () {
+      expect(
+        const GlobalConfig(
+          model: 'gpt-4o',
+          apiKey: 'k',
+        ).toMap().containsKey('MinimumVersion'),
+        isFalse,
+      );
+      const withMinimum = GlobalConfig(
+        model: 'gpt-4o',
+        apiKey: 'k',
+        minimumVersion: '2.6.0',
+      );
+      expect(withMinimum.toMap()['MinimumVersion'], '2.6.0');
+      expect(GlobalConfig.fromMap(withMinimum.toMap()).minimumVersion, '2.6.0');
+    });
+  });
 }

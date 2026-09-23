@@ -6,9 +6,9 @@
 // weight, decay clock reset, ratchets moved — with the turn recorded against
 // the old subgoal. The next exercise is the ordinary first probe of
 // "Variables". A student whose old LO was written recently gets no warm-up
-// — unless that recent write was a cross-subgoal negative that flagged the
-// LO as regressed (#112): then the review comes despite the fresh clock,
-// and answering it clears the flag.
+// — unless a cross-subgoal negative flagged the LO for review (#112, #167):
+// then the review comes despite the fresh clock, and answering it clears
+// the flag.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → instruction generator → grader payload → conductor → belief
@@ -243,22 +243,17 @@ void main() {
 
   testWidgets('an old LO written recently but flagged as regressed gets '
       'the review anyway; answering it clears the flag', (tester) async {
-    // Five days ago a loop exercise revealed a print() slip: the
-    // cross-subgoal negative left (5, 2) — mean 0.71, below mastery — and
-    // flagged the doc. On staleness alone the LO would wait another 25
-    // days.
+    // Five days ago a loop exercise suggested a print() slip: the
+    // cross-subgoal negative did not touch the belief — (5, 1), still at
+    // mastery (#167) — but flagged the doc. On staleness alone the LO
+    // would wait another 25 days.
     final recently = DateTime.now().toUtc().subtract(const Duration(days: 5));
     final harness = AppHarness(
       llm: ScriptedLlm(warmUpScript()),
       extraDocs: {
         'progress': [printDone()],
         'lo_beliefs': [
-          printBelief(
-            lastUpdatedAt: recently,
-            alpha: 5.0,
-            beta: 2.0,
-            regressedAt: recently,
-          ),
+          printBelief(lastUpdatedAt: recently, regressedAt: recently),
         ],
       },
     );
@@ -303,7 +298,7 @@ void main() {
     );
     final decayed = applyDecay(
       alpha: 5,
-      beta: 2,
+      beta: 1,
       lastUpdatedAt: recently,
       now: writtenAt,
     );

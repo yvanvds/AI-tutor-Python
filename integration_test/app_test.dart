@@ -24,6 +24,7 @@ import 'flows/chat_collapse.dart' as chat_collapse;
 import 'flows/chat_composer_growth.dart' as chat_composer_growth;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
+import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
@@ -50,6 +51,7 @@ import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
+import 'flows/stuck_advance_progress.dart' as stuck_advance_progress;
 import 'flows/students_bulk_class.dart' as students_bulk_class;
 import 'flows/students_class_filter.dart' as students_class_filter;
 import 'flows/students_current_goal.dart' as students_current_goal;
@@ -67,6 +69,7 @@ import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
 import 'flows/update_proxy.dart' as update_proxy;
+import 'flows/update_required.dart' as update_required;
 import 'flows/update_tls_fallback.dart' as update_tls_fallback;
 import 'flows/warm_up_review.dart' as warm_up_review;
 import 'flows/whats_new_overlay.dart' as whats_new_overlay;
@@ -89,6 +92,7 @@ void main() {
   garbled_reply_retry.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
+  difficulty_asymmetry.main();
   legacy_ratchet.main();
   transfer_credit.main();
   cross_subgoal_signal.main();
@@ -100,6 +104,7 @@ void main() {
   options_panel.main();
   own_key.main();
   status_report_retry.main();
+  stuck_advance_progress.main();
   level_up_gate.main();
   bug_report_oauth.main();
   bug_report_file.main();
@@ -125,5 +130,6 @@ void main() {
   update_check_failed_notice.main();
   update_tls_fallback.main();
   update_proxy.main();
+  update_required.main();
   whats_new_overlay.main();
 }

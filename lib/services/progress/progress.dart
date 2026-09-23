@@ -9,6 +9,11 @@
 /// concept attributions are subsumed by per-LO signals (see STUDENT_MODEL).
 class Progress {
   final String goalID;
+
+  /// Share of the subgoal's non-optional LOs that are mastered, 0.0–1.0.
+  /// Always the honest fraction (#161): advancing past a subgoal with a
+  /// stuck LO (CONDUCTOR_POLICY §4.4) leaves it below 1.0. On a root doc,
+  /// the average over the children.
   final double progress;
   final DateTime? updatedAt;
 
@@ -16,12 +21,26 @@ class Progress {
   /// on every upsert; the constructor parameter is for tests/in-memory use.
   final DateTime? lastSessionAt;
 
+  /// When the conductor moved the student past this subgoal (#161) — on
+  /// full mastery or on a stuck-advance. This, not `progress == 1.0`, is
+  /// the "finished" mark the next-subgoal walk and the leerpad read; see
+  /// [isAdvanced]. Never set on a root doc. A write that leaves it out
+  /// clears it (a Cosmos upsert replaces the doc), which is what re-working
+  /// a finished subgoal is meant to do.
+  final DateTime? advancedAt;
+
   Progress({
     required this.goalID,
     required this.progress,
     this.updatedAt,
     this.lastSessionAt,
+    this.advancedAt,
   });
+
+  /// Whether the student has been moved past this subgoal. Docs written
+  /// before #161 carried "finished" only as `progress == 1.0`, so a full
+  /// bar without the stamp still counts.
+  bool get isAdvanced => advancedAt != null || progress >= 1.0;
 
   /// Build a Cosmos doc map. The container partition key is `/uid`, so
   /// every doc must carry the owner's uid; the composite id keeps doc-id
@@ -35,12 +54,15 @@ class Progress {
       'progress': progress,
       'updatedAt': now,
       'lastSessionAt': now,
+      if (advancedAt != null)
+        'advancedAt': advancedAt!.toUtc().toIso8601String(),
     };
   }
 
   factory Progress.fromCosmos(Map<String, dynamic> doc) {
     final updatedRaw = doc['updatedAt'];
     final lastSessionRaw = doc['lastSessionAt'];
+    final advancedRaw = doc['advancedAt'];
     return Progress(
       goalID: (doc['goalId'] as String?) ?? '',
       progress: (doc['progress'] as num?)?.toDouble() ?? 0.0,
@@ -48,6 +70,7 @@ class Progress {
       lastSessionAt: lastSessionRaw is String
           ? DateTime.tryParse(lastSessionRaw)
           : null,
+      advancedAt: advancedRaw is String ? DateTime.tryParse(advancedRaw) : null,
     );
   }
 }

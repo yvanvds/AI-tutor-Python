@@ -70,6 +70,20 @@ class TurnAppliedSignal {
   };
 }
 
+/// One LO an incidental cross-subgoal negative put — or kept — in line for
+/// the warm-up review this turn (#167, CONDUCTOR_POLICY §2.4). Such a
+/// negative is not applied to the belief: it appears in `loSignals` but not
+/// in `appliedSignals`, and this is the audit trail's record of what the
+/// app did with it instead (`regressedAt` on the LO's doc, §1.5). Carries
+/// the subgoal because the LO is never one of the active subgoal's.
+class TurnReviewFlag {
+  final String subgoalId;
+  final String loId;
+  const TurnReviewFlag({required this.subgoalId, required this.loId});
+
+  Map<String, dynamic> toJson() => {'subgoalId': subgoalId, 'loId': loId};
+}
+
 /// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
 /// previously mastered LO in *another* subgoal that the working solution
 /// correctly used. Carries the subgoal because, unlike `appliedSignals`,
@@ -260,6 +274,19 @@ class PersistedTurnRecord {
   /// every non-code turn; omitted from the doc when empty.
   final List<TurnTransferCredit> transferCredits;
 
+  /// LOs of earlier subgoals flagged for the warm-up review by this turn's
+  /// incidental negatives (#167). Empty on most turns; omitted from the doc
+  /// when empty.
+  final List<TurnReviewFlag> reviewFlags;
+
+  /// The build that wrote this doc (#165): the client's `kAppVersion`. A
+  /// student whose laptop has fallen behind — and whose `toMap`s therefore
+  /// no longer write every field the current schema has — is visible from
+  /// the audit trail instead of having to be inferred from the shape of
+  /// their belief docs. Omitted when unknown; missing on docs written
+  /// before the field existed.
+  final String? clientVersion;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -299,7 +326,9 @@ class PersistedTurnRecord {
     this.signalEvents = const [],
     this.provenance = EvidenceProvenance.home,
     this.transferCredits = const [],
+    this.reviewFlags = const [],
     this.isWarmUp = false,
+    this.clientVersion,
   });
 
   bool get hasStrongEvent =>
@@ -323,8 +352,11 @@ class PersistedTurnRecord {
     'hadFallback': hadFallback,
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
     'provenance': provenance.name,
+    if (clientVersion != null) 'clientVersion': clientVersion,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
+    if (reviewFlags.isNotEmpty)
+      'reviewFlags': reviewFlags.map((r) => r.toJson()).toList(),
     'calibrationBefore': calibrationBefore.name,
     'calibrationAfter': calibrationAfter.name,
     'subgoalProgressAfter': subgoalProgressAfter,
@@ -396,6 +428,7 @@ class PersistedTurnRecord {
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
       appliedSignals: const [],
       provenance: EvidenceProvenance.parse(doc['provenance']),
+      clientVersion: doc['clientVersion'] as String?,
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

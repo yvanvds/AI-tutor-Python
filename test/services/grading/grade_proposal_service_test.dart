@@ -308,7 +308,7 @@ void main() {
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.12');
+      expect(p.formulaVersion, '1.0.15');
       expect(p.mStartSource, MStartSource.history);
 
       final stored = f.proposals.docs['${_student}_m1'];

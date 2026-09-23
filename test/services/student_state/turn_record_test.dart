@@ -7,11 +7,15 @@ import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PersistedTurnRecord _record({
+  String? clientVersion,
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
+  List<TurnReviewFlag> reviewFlags = const [],
   List<TurnAppliedSignal> appliedSignals = const [],
   bool isWarmUp = false,
 }) => PersistedTurnRecord(
+  clientVersion: clientVersion,
+  reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
@@ -104,6 +108,21 @@ void main() {
     });
   });
 
+  group('PersistedTurnRecord reviewFlags (#167)', () {
+    test('an ordinary turn writes no field at all', () {
+      expect(_record().toMap(uid: 'u1').containsKey('reviewFlags'), isFalse);
+    });
+
+    test('flags are written with their subgoal and LO', () {
+      final map = _record(
+        reviewFlags: const [TurnReviewFlag(subgoalId: 's0', loId: 'lo-print')],
+      ).toMap(uid: 'u1');
+      expect(map['reviewFlags'], [
+        {'subgoalId': 's0', 'loId': 'lo-print'},
+      ]);
+    });
+  });
+
   group('PersistedTurnRecord provenance (#100)', () {
     test('defaults to home', () {
       expect(_record().provenance, EvidenceProvenance.home);
@@ -146,6 +165,20 @@ void main() {
     test('null and non-strings are home', () {
       expect(EvidenceProvenance.parse(null), EvidenceProvenance.home);
       expect(EvidenceProvenance.parse(1), EvidenceProvenance.home);
+    });
+  });
+
+  group('PersistedTurnRecord clientVersion (#165)', () {
+    test('a record with no version writes no field and reads back null', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('clientVersion'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).clientVersion, isNull);
+    });
+
+    test('the build that wrote the doc is written and read back', () {
+      final map = _record(clientVersion: '2.5.0+22').toMap(uid: 'u1');
+      expect(map['clientVersion'], '2.5.0+22');
+      expect(PersistedTurnRecord.fromCosmos(map).clientVersion, '2.5.0+22');
     });
   });
 }

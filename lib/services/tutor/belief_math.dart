@@ -60,9 +60,14 @@ double baseWeight(LoSignalStrength s) {
 /// Compute the (αDelta, βDelta) increments for a single signal at a given
 /// difficulty and provenance. `neutral` returns (0, 0).
 ///
+/// [difficulty] picks the positive or the negative multiplier by [kind]
+/// (#169, CONDUCTOR_POLICY §3.2, PUNTENFORMULE §1.2): a positive at hard
+/// weighs more than one at easy, a negative at hard weighs *less* — so the
+/// mean reads the level the question was asked at.
+///
 /// [provenance] applies the supervised weight factor `s`
 /// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §2.7): symmetric in positive and
-/// negative, like the difficulty multiplier, so it changes how *hard* a
+/// negative, unlike the difficulty multiplier, so it changes how *hard* a
 /// piece of evidence is, not which way it points.
 ({double alphaDelta, double betaDelta}) signalDeltas({
   required LoSignalKind kind,
@@ -73,9 +78,12 @@ double baseWeight(LoSignalStrength s) {
   if (kind == LoSignalKind.neutral) {
     return (alphaDelta: 0.0, betaDelta: 0.0);
   }
+  final difficultyFactor = kind == LoSignalKind.positive
+      ? PolicyConstants.positiveDifficultyMultiplier(difficulty)
+      : PolicyConstants.negativeDifficultyMultiplier(difficulty);
   final weighted =
       baseWeight(strength) *
-      PolicyConstants.difficultyMultiplier(difficulty) *
+      difficultyFactor *
       PolicyConstants.provenanceMultiplier(provenance);
   if (kind == LoSignalKind.positive) {
     return (alphaDelta: weighted, betaDelta: 0.0);
@@ -100,13 +108,19 @@ double baseWeight(LoSignalStrength s) {
   provenance: provenance,
 );
 
-/// Incidental signal on an LO of an *earlier* subgoal (#108, CONDUCTOR_POLICY
-/// §2.4): the grader saw the answer reveal something about an LO outside the
-/// active subgoal — typically a gap in a prerequisite. It is ordinary
-/// evidence in the grader's own [strength], but the probe's difficulty was
-/// set for the target LO, not this one, so it is treated as `medium` — the
-/// same footing as a follow-up signal (§6.2) and a transfer credit (§3.7).
-/// Provenance applies as everywhere. Sign is whatever the grader said.
+/// Incidental *positive* signal on an LO of an *earlier* subgoal (#108,
+/// CONDUCTOR_POLICY §2.4): the grader saw the answer show that an LO
+/// outside the active subgoal is solid. It is ordinary evidence in the
+/// grader's own [strength], but the probe's difficulty was set for the
+/// target LO, not this one, so it is treated as `medium` — the same footing
+/// as a follow-up signal (§6.2) and a transfer credit (§3.7). Provenance
+/// applies as everywhere.
+///
+/// A cross-subgoal *negative* never reaches the belief (#167): it is the
+/// least reliable verdict the system has and lands on LOs the tutor no
+/// longer probes directly, so a debit here would never be re-tested. The
+/// conductor turns it into a review flag instead ([nextRegressedAt]) and
+/// does not call this for it.
 ({double alphaDelta, double betaDelta}) crossSubgoalSignalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,
@@ -139,35 +153,35 @@ bool everMastered({
       meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
 }
 
-/// The warm-up "regressed" marker after a belief write (#112,
-/// CONDUCTOR_POLICY §1.5): the value of `regressedAt` to persist, given
-/// [current] and what this write was.
+/// The warm-up review flag after a graded turn touched an LO outside the
+/// active subgoal (#112, #167; CONDUCTOR_POLICY §1.5, §2.4): the value of
+/// `regressedAt` to persist, given [current] and what this turn did.
 ///
-/// A [directProbe] of the LO (a warm-up review, or any probe while its
-/// subgoal is active — follow-up grading included) always clears it: the
-/// review has happened and the ordinary staleness clock takes over. For an
-/// indirect write — a cross-subgoal incidental (§2.4) or a transfer credit
-/// (§3.7) — the marker follows the *stored* belief the write leaves
-/// behind, [stored] (post-decay, post-evidence: what the grade formula
-/// reads until the next write):
+/// The flag means "a direct re-probe is owed". It says nothing about the
+/// belief, which since #167 an incidental negative no longer touches:
 ///
-///   - back at mastery mean and evidence → cleared (good news restored it);
-///   - below, and the write was a [negative] → set (kept if already set,
-///     so the oldest regression is reviewed first);
-///   - below, and the write was not a negative → unchanged (a transfer
-///     credit that fails to restore mastery neither flags nor clears).
+///   - a [directProbe] of the LO (a warm-up review, or any probe while its
+///     subgoal is active — follow-up grading included) clears it whichever
+///     way the answer went: the review has happened and the ordinary
+///     staleness clock takes over;
+///   - an incidental cross-subgoal [negative] (§2.4) sets it — kept if
+///     already set, so the oldest open question is reviewed first. The
+///     negative is not evidence, it is the reason to ask; the flag is all
+///     it leaves behind;
+///   - any other indirect write — a transfer credit (§3.7), a positive
+///     incidental — leaves it as it was. Good news from the side does not
+///     answer the question the negative raised; the review does.
 ///
-/// Only an LO that [everMastered] can regress; anything else reads `null`.
+/// Only an LO that [everMastered] carries the flag: one the student never
+/// had is not review material (§1.5), so anything else reads `null`.
 DateTime? nextRegressedAt({
   required DateTime? current,
   required bool directProbe,
   required bool everMastered,
   required bool negative,
-  required BeliefSnapshot stored,
   required DateTime now,
 }) {
   if (directProbe || !everMastered) return null;
-  if (meetsMasteryMeanAndEvidence(stored)) return null;
   if (negative) return current ?? now;
   return current;
 }

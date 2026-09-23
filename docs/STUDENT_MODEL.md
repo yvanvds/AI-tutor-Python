@@ -219,16 +219,16 @@ StudentLOBelief {
                                         // the mastery rule, else absent.
   regressedAt: string?                  // ISO 8601, set when an incidental
                                         // cross-subgoal negative (conductor
-                                        // policy 2.4, #108) leaves a
-                                        // once-mastered LO below the mastery
-                                        // rule (#112). While set, the LO is
+                                        // policy 2.4, #108) lands on a
+                                        // once-mastered LO (#112). Since
+                                        // #167 that negative is not applied
+                                        // to the belief; this flag is all
+                                        // it leaves. While set, the LO is
                                         // due for a warm-up review (1.5)
                                         // regardless of lastUpdatedAt.
-                                        // Cleared by the next direct probe
-                                        // of the LO, or by an indirect
-                                        // write that restores mastery.
-                                        // Missing on older docs: not
-                                        // regressed.
+                                        // Cleared only by the next direct
+                                        // probe of the LO. Missing on
+                                        // older docs: not flagged.
 }
 ```
 
@@ -467,9 +467,11 @@ release pressed again for reports nobody touched rewrites nothing.
 - **`highestPositiveDifficulty` is a three-level one-way ratchet** (#103).
   It records the highest difficulty a positive was ever earned at, in
   absolute terms, and only ever rises. The conductor never reads it; it
-  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5),
-  because the symmetric difficulty multiplier keeps difficulty out of
-  `(α, β)`. A doc without it is not guessed at on read (#164): the model
+  is the grade formula's difficulty differentiator (PUNTENFORMULE §2.5):
+  the mean says whether the student met the bar at their own level
+  (level-aware since #169's asymmetric difficulty multiplier, conductor
+  policy 3.2), the ratchet says which level that was. A doc without it
+  is not guessed at on read (#164): the model
   keeps `null`, the formula's reader applies §2.5's old-data rule at
   grade time, and the next positive records the level actually asked. A
   guess written back as a measurement had permanently capped students
@@ -487,25 +489,27 @@ release pressed again for reports nobody touched rewrites nothing.
   be written by a graded turn: upward only by a transfer credit, in
   either direction by the once-per-session warm-up review, which is a
   direct probe of that LO and updates its doc like any probe (ratchets
-  and counter included), and in either direction by an incidental
-  `loSignal` the grader places on an earlier subgoal's LO (conductor
-  policy 2.4, #108), which moves only `(α, β)` and `lastUpdatedAt` —
-  never a ratchet, the counter or `lastQuestionType` — and creates the
-  doc at the prior if there was none. `lastUpdatedAt` doubles as the
-  staleness clock for the warm-up review: an LO not written for
-  `warmUpStaleAfter` is due. None of these mechanisms recomputes the
-  other subgoal's cached `progress`.
+  and counter included), and upward only by an incidental `loSignal`
+  the grader places on an earlier subgoal's LO (conductor policy 2.4,
+  #108): a positive moves only `(α, β)` and `lastUpdatedAt` — never a
+  ratchet, the counter or `lastQuestionType` — and creates the doc at
+  the prior if there was none; a negative writes nothing to the belief
+  (#167) and only sets `regressedAt` (next bullet). `lastUpdatedAt`
+  doubles as the staleness clock for the warm-up review: an LO not
+  written for `warmUpStaleAfter` is due. None of these mechanisms
+  recomputes the other subgoal's cached `progress`.
 - **`regressedAt` is the warm-up review's "due now" marker** (#112).
-  Because an incidental negative is itself a write, the staleness clock
-  alone would make a freshly revealed regression *fresh* and defer its
-  review by `warmUpStaleAfter`. The conductor therefore stamps
-  `regressedAt` when such a negative leaves a once-mastered LO below the
-  mastery rule, and the review selection (conductor policy 1.5) treats a
-  flagged LO as due regardless of `lastUpdatedAt`. The flag is not a
+  An incidental negative on an earlier subgoal's LO is the least
+  reliable verdict in the model and lands on LOs the tutor no longer
+  probes, so since #167 it is not evidence but a prompt: the conductor
+  stamps `regressedAt` on a once-mastered LO (and writes nothing else),
+  and the review selection (conductor policy 1.5) treats a flagged LO as
+  due regardless of `lastUpdatedAt` — without the flag a fresh LO would
+  wait out `warmUpStaleAfter` before anyone checked. The flag is not a
   ratchet: the next direct probe of the LO clears it whichever way the
-  answer went, and so does an indirect write (transfer credit, positive
-  incidental) that brings the stored belief back to mastery. Older docs
-  without the field simply follow the staleness clock.
+  answer went. An indirect write (transfer credit, positive incidental)
+  leaves it alone. Older docs without the field simply follow the
+  staleness clock.
 
 ## What this model deliberately does not do
 

@@ -1849,6 +1849,18 @@ abstract class AppLocalizations {
   /// **'Check for updates'**
   String get update_action_check;
 
+  /// Full-screen gate a build below config/global's MinimumVersion gets instead of the app (#165)
+  ///
+  /// In en, this message translates to:
+  /// **'Update required'**
+  String get update_required_title;
+
+  /// No description provided for @update_required_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app ({local}) is older than the version the school requires ({minimum}). Update to continue.'**
+  String update_required_message(String local, String minimum);
+
   /// No description provided for @session_explain_placeholder_noSubgoal.
   ///
   /// In en, this message translates to:

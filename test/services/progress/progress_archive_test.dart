@@ -19,13 +19,19 @@ import '../../helpers/in_memory_cosmos.dart';
 const _from = 'old-account';
 const _to = 'new-account';
 
-Map<String, dynamic> _progressDoc(String uid, String goalId, double value) => {
+Map<String, dynamic> _progressDoc(
+  String uid,
+  String goalId,
+  double value, {
+  String? advancedAt,
+}) => {
   'id': '${uid}_$goalId',
   'uid': uid,
   'goalId': goalId,
   'progress': value,
   'updatedAt': '2026-05-01T10:00:00Z',
   'lastSessionAt': '2026-05-01T10:00:00Z',
+  if (advancedAt != null) 'advancedAt': advancedAt,
 };
 
 Map<String, dynamic> _sampleDoc(String uid, String id, String goalId) => {
@@ -78,7 +84,7 @@ void main() {
   setUp(() {
     progress = InMemoryCosmos([
       _progressDoc(_from, 'r1', 0.75),
-      _progressDoc(_from, 's1', 1.0),
+      _progressDoc(_from, 's1', 1.0, advancedAt: '2026-05-01T10:00:00.000Z'),
       // A doc belonging to somebody else in the same container.
       _progressDoc('stranger', 's1', 0.2),
     ]);
@@ -125,6 +131,8 @@ void main() {
     expect(imported, hasLength(2));
     expect(imported.map((d) => d['goalId']).toSet(), {'r1', 's1'});
     expect(progress['${_to}_s1']!['progress'], 1.0);
+    // The finished stamp (#161) travels with the doc.
+    expect(progress['${_to}_s1']!['advancedAt'], '2026-05-01T10:00:00.000Z');
     expect(docsOf(history, _to), hasLength(2));
 
     final belief = docsOf(

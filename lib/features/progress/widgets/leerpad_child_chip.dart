@@ -4,20 +4,28 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 
 /// Compact child-goal pill rendered inside an active root card. Two-line:
-/// title + tnum percentage; check icon when complete.
+/// title + tnum percentage; check icon when the conductor has moved the
+/// student past it.
 class LeerpadChildChip extends StatelessWidget {
   const LeerpadChildChip({
     super.key,
     required this.goal,
     required this.progress,
+    required this.completed,
   });
 
   final Goal goal;
+
+  /// Honest share of mastered non-optional LOs — stays below 1.0 after a
+  /// stuck-advance (#161), check mark or not.
   final double progress;
+
+  /// `Progress.isAdvanced`: the subgoal was advanced past. Drives the check
+  /// mark and the colour, never the bar's length.
+  final bool completed;
 
   @override
   Widget build(BuildContext context) {
-    final completed = progress >= 0.999;
     final pct = '${(progress.clamp(0.0, 1.0) * 100).round()}%';
 
     return Container(

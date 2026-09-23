@@ -145,6 +145,8 @@ class ProgressArchive {
       'updatedAt': p.updatedAt!.toUtc().toIso8601String(),
     if (p.lastSessionAt != null)
       'lastSessionAt': p.lastSessionAt!.toUtc().toIso8601String(),
+    if (p.advancedAt != null)
+      'advancedAt': p.advancedAt!.toUtc().toIso8601String(),
   };
 
   static Map<String, dynamic> _strippedSample(ProgressSample s) =>

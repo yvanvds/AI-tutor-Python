@@ -12,6 +12,9 @@
 // No Cosmos, no polling, nothing to refresh: the asset is read and converted
 // once per process and cached in a plain `FutureProvider`.
 
+import 'dart:convert' show utf8;
+import 'dart:typed_data' show Uint8List;
+
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -36,17 +39,20 @@ String puntenformuleToHtml(String markdown) =>
 /// per process in the app, like the lesson stylesheet: the file never changes
 /// while the app runs.
 ///
-/// This provider is the cache; `rootBundle`'s own string cache is bypassed.
-/// That cache holds the *future* of the first load, created in whichever
-/// zone asked first — in a widget-test process that is the first test's
-/// fake-async zone, and every later test then awaits a completion that is
-/// never delivered to it. (`_LessonHtmlViewState._loadCss` sidesteps the
-/// same trap by caching the string itself.)
+/// This provider is the cache; `rootBundle.loadString` is not used at all.
+/// Its string cache holds the *future* of the first load, created in
+/// whichever zone asked first — in a widget-test process that is the first
+/// test's fake-async zone, and every later test then awaits a completion
+/// that is never delivered to it. (`_LessonHtmlViewState._loadCss`
+/// sidesteps the same trap by caching the string itself.) And from 50 KB
+/// on — the document crossed that line in v1.0.14 — `loadString` decodes
+/// in an isolate (`compute`), real asynchronous work that the same
+/// fake-async pumps never see complete, and a pointless hop here: the
+/// Markdown conversion right after it is the expensive step and runs on
+/// this thread anyway. So: the bytes, decoded in place.
 final puntenformuleFragmentProvider = FutureProvider<String>((ref) async {
-  final source = await rootBundle.loadString(
-    kPuntenformuleAssetKey,
-    cache: false,
-  );
+  final data = await rootBundle.load(kPuntenformuleAssetKey);
+  final source = utf8.decode(Uint8List.sublistView(data));
   return puntenformuleToHtml(source);
 });
 

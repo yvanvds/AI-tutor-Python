@@ -69,25 +69,36 @@ leerdoel, maar bewees niets). Voor de rest geldt:
 | zwak | 0,5 |
 
 Dat basisgewicht wordt vermenigvuldigd met de **moeilijkheidsfactor** van
-de vraag:
+de vraag — en die hangt sinds v1.0.14 af van het teken van het signaal:
 
-| moeilijkheid | factor |
-| --- | --- |
-| makkelijk | × 0,6 |
-| gemiddeld | × 1,0 |
-| moeilijk | × 1,4 |
+| moeilijkheid | positief signaal | negatief signaal |
+| --- | --- | --- |
+| makkelijk | × 0,6 | × 1,4 |
+| gemiddeld | × 1,0 | × 1,0 |
+| moeilijk | × 1,4 | × 0,6 |
 
 Het resultaat komt bij α (positief signaal) of bij β (negatief signaal).
 Een sterk-positief antwoord op een moeilijke vraag telt dus voor
-2,0 × 1,4 = 2,8 bij α.
+2,0 × 1,4 = 2,8 bij α; een sterk-negatief antwoord op diezelfde vraag
+voor 2,0 × 0,6 = 1,2 bij β.
 
-> **Belangrijk gevolg.** De moeilijkheidsfactor geldt *symmetrisch*: ook een
-> fout antwoord op een moeilijke vraag weegt × 1,4. Daardoor bepaalt de
-> moeilijkheid hoe *snel* je bewijs opbouwt, maar niet waar je gemiddelde μ
-> naartoe gaat: twee leerlingen die elk 80% juist antwoorden, de ene op
-> makkelijke en de andere op moeilijke vragen, komen op *dezelfde* μ uit.
-> Moeilijkheid is dus onzichtbaar in μ — en daarom telt ze in de
-> puntformule apart mee, via een eigen mechanisme (§2.5).
+> **Belangrijk gevolg.** De moeilijkheidsfactor is *asymmetrisch*: een
+> juist antwoord op een moeilijke vraag bewijst veel, een fout antwoord
+> erop weinig — en op een makkelijke vraag is het net omgekeerd. Daardoor
+> is je gemiddelde μ **niveaubewust**: dezelfde grens van 0,80 (§1.5)
+> komt overeen met ongeveer 90% juist op makkelijke vragen, 80% op
+> gemiddelde en ongeveer 63% op moeilijke. Wie op gemiddeld 76% haalt en
+> daardoor naar moeilijk gepromoveerd wordt (§1.6), zakt daar naar
+> ongeveer 60% juist — en μ blijft nagenoeg gelijk (≈ 0,78). Een promotie
+> kan je dus niet meer uit je beheersing duwen, en een demotie naar
+> makkelijk maakt beheersing niet goedkoper. Ook "vastgelopen" (§1.7)
+> leest zo het niveau mee: op moeilijk ben je dat pas onder ongeveer 57%
+> juist. Tot v1.0.13 gold de factor symmetrisch (ook een fout op moeilijk
+> woog × 1,4) en was μ gewoon je scorepercentage, op welk niveau je ook
+> zat; omdat de kalibratie je bewust parkeert waar je 40–75% scoort,
+> eindigde een goed gekalibreerde leerling die lang genoeg bevraagd werd
+> per ontwerp onder de beheersingsgrens. Moeilijkheid telt daarnaast nog
+> apart mee in de puntformule, via de ratel van §2.5.
 
 Antwoorden op **vervolgvragen** (de doorvraagjes na een gewoon antwoord)
 tellen ook mee, maar afgetopt op sterkte *zwak* (0,5) en gerekend als
@@ -95,14 +106,24 @@ moeilijkheid *gemiddeld*. Ze zijn echt bewijs, maar de vraag was niet als
 gekalibreerde meting ontworpen.
 
 De grader mag een antwoord ook laten meetellen voor een leerdoel uit een
-**eerder subdoel** van hetzelfde hoofddoel — meestal wanneer een fout
-laat zien dat een voorkennisleerdoel niet zit (een `print()` die misgaat
-in een lus-oefening). Zo'n signaal telt gewoon mee voor dat oudere
-leerdoel, met de sterkte die de grader opgeeft, maar gerekend als
-moeilijkheid *gemiddeld*: de moeilijkheid van de vraag was gekozen voor
-het leerdoel dat bevraagd werd, niet voor het oudere. De ratel van §2.5
-beweegt er niet door, en de voortgangsbalkjes van het oudere subdoel
-evenmin; alleen α of β en de decay-klok (§1.3) veranderen.
+**eerder subdoel** van hetzelfde hoofddoel. Wat daarmee gebeurt, hangt
+af van het teken. Een **positief** signaal (het antwoord toont dat een
+ouder leerdoel zit) telt gewoon mee voor dat oudere leerdoel, met de
+sterkte die de grader opgeeft, maar gerekend als moeilijkheid
+*gemiddeld*: de moeilijkheid van de vraag was gekozen voor het leerdoel
+dat bevraagd werd, niet voor het oudere. De ratel van §2.5 beweegt er
+niet door, en de voortgangsbalkjes van het oudere subdoel evenmin;
+alleen α en de decay-klok (§1.3) veranderen. Een **negatief** signaal
+(een `print()` die misgaat in een lus-oefening) is sinds v1.0.13 géén
+bewijs maar een **aanleiding**: het is het minst betrouwbare oordeel dat
+het systeem kent — afgeleid uit een antwoord over iets anders, zonder
+dat de vraag daarvoor ontworpen was — en het treft per definitie
+leerdoelen die je al achter je hebt en die de tutor niet meer
+rechtstreeks bevraagt, zodat het nooit meer weersproken zou worden. Het
+verandert dus niets aan α, β of de decay-klok van het oudere leerdoel.
+In plaats daarvan onthoudt de app dat er iets te controleren valt, en
+stelt de eerstvolgende sessie er een opfrisvraag over (§2.8); *die*
+rechtstreekse meting telt, met volle sterkte.
 
 ### 1.3 Vergeten (decay)
 
@@ -193,8 +214,12 @@ Het voortgangsbalkje van een subdoel toont de fractie van de
 niet-optionele leerdoelen die beheerst zijn. Een leerdoel waarop je écht
 bent vastgelopen (veel bewijs, μ blijft laag) blokkeert je doorstroming
 niet — het systeem laat je verder — maar telt in het balkje eerlijk als
-niet-beheerst. Het balkje van een hoofddoel is het gemiddelde van zijn
-subdoelen.
+niet-beheerst. Schuif je zo met een vastgelopen leerdoel door naar het
+volgende subdoel, dan blijft het balkje van het afgeronde subdoel dus
+onder de 100% staan (bijvoorbeeld 4 van de 5); dat het subdoel afgerond
+is, toont de app apart met een vinkje (sinds v1.0.15 een eigen stempel op
+je voortgang, `advancedAt`), niet door het balkje vol te maken. Het
+balkje van een hoofddoel is het gemiddelde van zijn subdoelen.
 
 **De balkjes zijn geen punten.** Ze tonen live de stand van de
 overtuigingen; het rapportpunt komt uit de formule van deel 2 en wordt
@@ -325,8 +350,12 @@ vermeldt dat het om die schatting gaat.
 Moeilijkheid verdient een eigen plek in het punt — maar via het juiste
 signaal.
 
-- **Niet via μ:** door de symmetrische moeilijkheidsfactor (§1.2) is
-  moeilijkheid onzichtbaar in de gemiddelden.
+- **Niet alleen via μ:** sinds v1.0.14 leest μ het niveau mee (de
+  asymmetrische factor van §1.2), maar μ zegt alleen *of* je de lat op
+  jouw niveau haalt, niet *hoe hoog* die lat lag. Dat laatste onthoudt de
+  ratel hieronder. Moeilijkheid telt zo voorlopig twee keer — een
+  soepelere μ op moeilijk én de bonus via d — en dat blijft bewust zo tot
+  de herziening van deel 2 (§4).
 - **Niet via je globale kalibratieniveau (§1.6):** dat is bewust
   beweeglijk. Eén mindere week doet je zakken — maar de foute antwoorden
   van die week hebben je overtuigingen dan al verlaagd. Het niveau er
@@ -428,16 +457,17 @@ onveranderd — zij bepalen wanneer de tutor je opnieuw bevraagt:
   de overtuiging al **30 dagen** niet meer geschreven is — het langst
   onaangeroerde leerdoel eerst. Omdat ook transfer-krediet een schrijving
   is, komen leerdoelen die je in nieuw werk blijft gebruiken hier
-  vanzelf niet in terecht. Eén uitzondering op de 30 dagen: bleek uit
-  een latere oefening een gat in zo'n eerder beheerst leerdoel (een
-  negatief signaal op een eerder subdoel, §1.2, dat de overtuiging onder
-  de drempels van §1.5 duwt), dan wordt het bij de eerstvolgende
+  vanzelf niet in terecht. Eén uitzondering op de 30 dagen: wees een
+  latere oefening op een mogelijk gat in zo'n eerder beheerst leerdoel
+  (een negatief signaal op een eerder subdoel, §1.2 — dat sinds v1.0.13
+  de overtuiging zelf niet raakt), dan wordt het bij de eerstvolgende
   sessiestart opgefrist, ook al is het pas geschreven — de app onthoudt
-  dat gat tot het leerdoel opnieuw rechtstreeks bevraagd is, of tot
-  transfer-krediet of een positief signaal het weer boven die drempels
-  brengt. Zulke leerdoelen gaan voor op de gewoon-verouderde; de
-  opfrisvraag zelf (goed of fout beantwoord) zet het leerdoel daarna
-  terug op de gewone klok van 30 dagen. Het antwoord telt als een gewone
+  die vraag tot het leerdoel opnieuw rechtstreeks bevraagd is;
+  transfer-krediet of een positief signaal van opzij heft ze niet op,
+  want de vraag wordt beantwoord door ze te stellen. Zulke leerdoelen
+  gaan voor op de gewoon-verouderde; de opfrisvraag zelf (goed of fout
+  beantwoord) zet het leerdoel daarna terug op de gewone klok van 30
+  dagen. Het antwoord telt als een gewone
   meting van
   dat leerdoel (§1.2, op je huidige moeilijkheidsniveau, met de
   herkomst van §2.7): een juist antwoord verhoogt de overtuiging en
@@ -569,6 +599,9 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.10 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2 en §2.8: de decay van §1.3 telt niet langer mee in de puntberekening — "beheerst?" leest de overtuiging zoals ze opgeslagen staat. De conductor past decay nog steeds toe bij elke meting, dus wat wegvalt is alleen het verval tussen de laatste meting en het rapportmoment. Decay blijft onveranderd voor de opfrisvragen van §2.8. Reden: de tutor stopt met doorvragen zodra beheersing vaststaat, dus de sterkste leerling eindigt met de dunste bewijsmassa en verloor daardoor als eerste haar beheersing — het omgekeerde van wat §3.2 belooft. §2.4 zelf verandert niet, maar de momentopname leest om dezelfde reden de opgeslagen waarde in plaats van ze naar de periodestart terug te rekenen. |
 | 1.0.11 | 2026-09-23 | Geen structuurwijziging. Bijlage A: een ouder opgeslagen leerdoel zonder trapinformatie (§2.5) leest de formule nog steeds als "gemiddeld" wanneer de ratel van §1.5 gezet was, maar de app schrijft die lezing niet meer weg als was ze gemeten — het veld blijft leeg tot een nieuw positief signaal het werkelijk gevraagde niveau vastlegt. Voordien versteende de gok bij de eerstvolgende beurt, en wie het leerdoel vóór v1.0.2 op moeilijk had aangetoond verloor dat blijvend, ten koste van d (#164). De formule van deel 2 en de punten veranderen niet; de getroffen data is eenmalig, buiten de app, uit de beurthistoriek hersteld. |
 | 1.0.12 | 2026-09-23 | Geen structuurwijziging aan M of P. §2.2: "beheerst?" leest niet langer de overtuiging zoals ze nu staat, maar de eenmalige stempel die de app zet wanneer de drie voorwaarden van §1.5 voor het eerst samen gelden (`firstMasteredAt`, in de code sinds v1.0.3 als poort voor het transfer-krediet). De overtuiging zelf verandert niet en blijft de tutor sturen (vraagkeuze, vastgelopen-detectie, opfrisvragen); alleen het punt leest de stempel. Gevolg: een latere tegenvallende meting, een signaal op een eerder subdoel (§1.2) of decay kan een aangetoond leerdoel niet meer uit het punt halen — verder werken kan het punt nooit verlagen; §1.5, §2.4, §2.8 en §3.3 zeggen dat nu ook. Reden: de overtuiging is een voortschrijdend gemiddelde en hoort dat te zijn, maar omdat de tutor beheerste leerdoelen niet meer rechtstreeks bevraagt, bleef élk later negatief signaal onweersproken staan; de klasdata toonde leerlingen die vroeg fouten maakten en later niet meer, en toch onder de grens eindigden. Bijlage A: een leerdoel zonder stempel telt niet als beheerst; oudere opgeslagen leerdoelen krijgen hun stempel eenmalig, buiten de app, uit de beurthistoriek (#168). |
+| 1.0.13 | 2026-09-23 | Geen structuurwijziging aan M of P; het punt verandert niet (het leest sinds v1.0.12 de stempel en de ratel, en geen van beide werd door deze signalen ooit geraakt). §1.2: een **negatief** signaal op een leerdoel uit een eerder subdoel is geen bewijs meer maar een aanleiding — het schrijft niets naar de overtuiging (geen β, geen decay-klok, geen nieuw document) en zet alleen de markering van §2.8 op een ooit beheerst leerdoel, zodat de eerstvolgende sessie er een opfrisvraag over stelt; die rechtstreekse meting telt met volle sterkte. Een positief signaal blijft wat het was. §2.8: de markering wordt alleen nog gewist door een rechtstreekse meting, niet meer door transfer-krediet of een positief signaal van opzij. Reden: zo'n negatief is het minst betrouwbare oordeel dat het systeem kent (afgeleid uit een antwoord over iets anders, zonder dat de vraag daarvoor ontworpen was) en treft per definitie leerdoelen die de tutor niet meer rechtstreeks bevraagt, dus het werd nooit meer getoetst; in de klasdata haalde het een zesmaal op rij aangetoond leerdoel een week later blijvend van 0,82 naar 0,65, en het stuurde zo de vraagkeuze, de vastgelopen-detectie en de voortgangsbalkjes op een nooit gecontroleerd oordeel (#167). Bijlage A zegt hoe de tutor het nu verwerkt; bestaande overtuigingen van leerlingen op de nieuwe build worden eenmalig, buiten de app, uit de beurthistoriek herspeeld zonder deze signalen. |
+| 1.0.14 | 2026-09-23 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de moeilijkheidsfactor van §1.2 is niet langer symmetrisch. Een positief signaal weegt zoals voorheen (makkelijk × 0,6, gemiddeld × 1,0, moeilijk × 1,4); een negatief signaal krijgt het spiegelbeeld (makkelijk × 1,4, gemiddeld × 1,0, moeilijk × 0,6). Daardoor is μ niveaubewust: dezelfde grens van 0,80 is ongeveer 90% juist op makkelijk, 80% op gemiddeld en ongeveer 63% op moeilijk; een promotie op de kalibratieladder (§1.6) verandert μ nauwelijks meer en kan je dus niet meer uit je beheersing duwen, en "vastgelopen" (§1.7) leest het niveau vanzelf mee. De "belangrijk gevolg"-alinea van §1.2 keert daarmee om; §2.5 zegt dat moeilijkheid voorlopig twee keer telt (via μ en via de ratel), te herbekijken bij de herziening van deel 2. Reden: de kalibratie parkeert een leerling bewust waar hij 40–75% scoort, terwijl beheersing μ ≥ 0,80 vraagt en "vastgelopen" μ < 0,75 is — met een symmetrische factor was μ gewoon het scorepercentage, zodat een goed gekalibreerde leerling die lang genoeg bevraagd werd per ontwerp onder de grens eindigde (in de klasdata: 154 vragen op moeilijk, 65% juist, en toch "vastgelopen" en niet beheerst). De bestaande overtuigingen worden eenmalig, buiten de app, uit de beurthistoriek herspeeld met de nieuwe factor (alleen α, β en de stempel van §2.2), ná de verplichte client-update en vóór deze versie in gebruik gaat (#169). |
+| 1.0.15 | 2026-09-23 | Geen structuurwijziging aan M of P. §1.7: het voortgangsbalkje van een subdoel blijft ook na het doorschuiven de echte fractie beheerste leerdoelen tonen. Voorheen zette de app de opgeslagen fractie hard op 1,0 zodra een subdoel doorschoof, ook wanneer dat met een vastgelopen leerdoel gebeurde: het balkje stond dan op 100% terwijl het punt, dat per leerdoel meet, het gat wél zag. "Afgerond" is nu een eigen stempel op het voortgangsdocument (`advancedAt`), waarop de tutor de keuze van het volgende subdoel en de app het vinkje baseren; de fractie zelf beweegt er niet door. Gevolg voor §2.4: de overgangsregel van v1.0.5 leest diezelfde fractie uit de voortgangshistoriek en kende zo aan élk leerdoel van een doorgeschoven subdoel 1,0 toe, het vastgelopen inbegrepen, waardoor M_start te hoog uitkwam en de groei G op 0 viel; vanaf nu staat in de historiek de echte fractie. Eerder opgeslagen historiek wordt niet herschreven (#161). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
 ---
@@ -586,11 +619,12 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | --- | --- | --- |
 | prior | (1, 1) | startovertuiging per leerdoel (§1.1) |
 | gewicht sterk / matig / zwak | 2,0 / 1,0 / 0,5 | basisgewicht per signaal (§1.2) |
-| moeilijkheidsfactor | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk, symmetrisch (§1.2) |
+| moeilijkheidsfactor, positief signaal | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk (§1.2) |
+| moeilijkheidsfactor, negatief signaal | 1,4 / 1,0 / 0,6 | makkelijk / gemiddeld / moeilijk — het spiegelbeeld, sinds v1.0.14 (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
 | toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
 | transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
-| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt — een leerdoel met een gemarkeerd gat (`regressedAt`, zie onder) komt eerder aan de beurt; hoogstens één per sessie (§2.8) |
+| opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt — een leerdoel dat voor controle gemarkeerd is (`regressedAt`, zie onder) komt eerder aan de beurt; hoogstens één per sessie (§2.8) |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -656,9 +690,14 @@ zijn, krijgen hun stempel eenmalig, buiten de app, uit de beurthistoriek
 dat moment), vóór deze versie in gebruik gaat; de app zelf vult niets in
 (#168). Sinds v1.0.6 verwerkt de tutor ook de
 **signalen op een eerder subdoel** van §1.2 (voorheen liet hij ze
-vallen): met de sterkte van de grader, gerekend als gemiddeld en gewogen
-met s, zonder ratel, teller of voortgangsbalkje te bewegen; elk verwerkt
-signaal staat met zijn subdoel op het beurtrecord. De **opfrisvragen** van §2.8 staan
+vallen), sinds v1.0.13 alleen nog de positieve als bewijs: met de sterkte
+van de grader, gerekend als gemiddeld en gewogen met s, zonder ratel,
+teller of voortgangsbalkje te bewegen. Een negatief signaal op een eerder
+subdoel schrijft niets naar de overtuiging (ook geen nieuw document voor
+een nooit bevraagd leerdoel) en zet alleen de markering `regressedAt` op
+een ooit beheerst leerdoel (zie onder); elk verwerkt signaal staat met
+zijn subdoel op het beurtrecord (`appliedSignals`), elk gemarkeerd
+leerdoel onder `reviewFlags`. De **opfrisvragen** van §2.8 staan
 sinds v1.0.4 in de code: bij het begin van een sessie kiest de tutor
 hoogstens één eerder beheerst leerdoel (`firstMasteredAt`, met dezelfde
 oude-data-regel als hierboven) uit een ander subdoel van het hoofddoel
@@ -667,14 +706,15 @@ stelt daarover de zachtste vraagvorm voor dat soort leerdoel op je
 huidige niveau. Sinds v1.0.8 telt daarnaast een leerdoel met de markering
 `regressedAt` als aan de beurt, ongeacht `lastUpdatedAt`: de tutor zet
 die markering wanneer een negatief signaal op een eerder subdoel (§1.2)
-een ooit beheerst leerdoel onder de voorwaarden 1 en 2 van §1.5 laat
-zakken (een reeds gezette markering blijft staan, zodat het oudste gat
-eerst komt), en wist ze bij elke rechtstreekse meting van dat leerdoel
-(de opfrisvraag zelf, goed of fout, of een gewone vraag zodra het subdoel
-weer actief is) en bij transfer-krediet of een positief signaal dat de
-opgeslagen overtuiging weer aan die voorwaarden laat voldoen; een
-onrechtstreekse schrijving die het leerdoel onder de drempels laat,
-verandert niets aan de markering. Gemarkeerde leerdoelen gaan voor op
+een ooit beheerst leerdoel treft — sinds v1.0.13 ongeacht wat de
+overtuiging doet, want het signaal raakt ze niet meer (voordien alleen
+wanneer het ze onder de voorwaarden 1 en 2 van §1.5 liet zakken); een
+reeds gezette markering blijft staan, zodat de oudste vraag eerst komt.
+Ze wordt gewist bij elke rechtstreekse meting van dat leerdoel (de
+opfrisvraag zelf, goed of fout, of een gewone vraag zodra het subdoel
+weer actief is); transfer-krediet en een positief signaal van opzij laten
+ze staan (tot v1.0.13 wisten die ze wanneer ze de overtuiging weer aan
+die voorwaarden lieten voldoen). Gemarkeerde leerdoelen gaan voor op
 verouderde (oudste markering eerst), daarna het oudste `lastUpdatedAt`,
 bij gelijke stand de laagste μ; het beurtrecord vermeldt welke van de
 twee regels het leerdoel koos. Het antwoord wordt verwerkt als een gewone meting van

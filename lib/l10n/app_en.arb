@@ -610,6 +610,17 @@
   },
   "update_action_later": "Later",
   "update_action_check": "Check for updates",
+  "update_required_title": "Update required",
+  "@update_required_title": {
+    "description": "Full-screen gate a build below config/global's MinimumVersion gets instead of the app (#165)"
+  },
+  "update_required_message": "This version of the app ({local}) is older than the version the school requires ({minimum}). Update to continue.",
+  "@update_required_message": {
+    "placeholders": {
+      "local": { "type": "String" },
+      "minimum": { "type": "String" }
+    }
+  },
 
   "session_explain_placeholder_noSubgoal": "Pick a subgoal in the learning path to see the explanation.",
   "session_explain_loading": "Loading lesson…",
