@@ -51,10 +51,15 @@ class LoBelief {
   /// When this LO first met all three mastery conditions (CONDUCTOR_POLICY
   /// §4.1) — a one-way stamp, `null` until then, never cleared by decay or
   /// later negatives. It is the gate for transfer credit (#101, §3.7): only
-  /// an LO once mastered by direct probing can be refreshed sideways.
+  /// an LO once mastered by direct probing can be refreshed sideways. And
+  /// it is what the grade formula reads as "mastered" (#168, PUNTENFORMULE
+  /// §2.2): the belief steers the teaching, the stamp steers the grade.
   /// Docs written before the field existed are read by the conductor as
   /// "mastered as of the last direct write" (`belief_math.everMastered`)
-  /// and get the stamp on their next write; nothing is backfilled.
+  /// and get the stamp on their next write; the grade applies no such
+  /// fallback — a doc without the stamp is not mastered — and the app
+  /// backfills nothing: older docs get their stamp once, outside the app,
+  /// from `turn_history`.
   final DateTime? firstMasteredAt;
 
   /// Set when an incidental cross-subgoal negative (CONDUCTOR_POLICY §2.4,

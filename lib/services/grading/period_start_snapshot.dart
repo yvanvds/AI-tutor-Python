@@ -1,7 +1,8 @@
 // One row of the `period_start_snapshots` Cosmos container (#110): what the
 // grade formula would have read per learning objective at the start of a
-// milestone's grading period — `mastered` under the three conditions of
-// CONDUCTOR_POLICY §4.1 and the `highestPositiveDifficulty` ratchet — so
+// milestone's grading period — `mastered` as the formula reads it
+// (`LoGradeInput.fromBelief`: since v1.0.12 the one-way `firstMasteredAt`
+// stamp, #168) and the `highestPositiveDifficulty` ratchet — so
 // `M_start` (PUNTENFORMULE §2.4) is the same §2.3 arithmetic as `M_end`
 // instead of the per-subgoal estimate from `progress_history`.
 //

@@ -1054,9 +1054,12 @@ actually asked; nothing is backfilled.
 when the LO first met all three conditions after a belief write. One-way:
 decay and later negatives unmaster the LO (4.1, no latching) but never
 clear the stamp, which answers a different question — "was this ever
-mastered by direct probing?" — the gate for transfer credit (3.7). Set in
+mastered by direct probing?" — the gate for transfer credit (3.7) and,
+since #168, what the grade formula reads as "mastered" (PUNTENFORMULE
+§2.2: the belief steers the teaching, the stamp steers the grade). Set in
 the same write that first satisfies the conditions; nothing is
-backfilled (3.7 says how older docs are read).
+backfilled (3.7 says how older docs are read by the conductor; the grade
+applies no such fallback).
 
 ### 4.4 The stuck rule (advancing despite a missed LO)
 

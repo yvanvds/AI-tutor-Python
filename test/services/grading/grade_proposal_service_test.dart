@@ -94,6 +94,11 @@ Map<String, dynamic> _belief(
   required DateTime at,
   String? highest = 'medium',
   bool calibrated = true,
+
+  /// The one-way stamp the grade reads as "mastered" (#168). Off for a doc
+  /// that never crossed the §1.5 bar, or one an old client rewrote without
+  /// the field (#165) before the one-off reconstruction.
+  bool mastered = true,
 }) => {
   'id': '${_student}_${subgoalId}_$loId',
   'type': 'lo_belief',
@@ -106,6 +111,7 @@ Map<String, dynamic> _belief(
   if (calibrated) 'lastPositiveAtCalibratedAt': at.toIso8601String(),
   if (highest != null) 'highestPositiveDifficulty': highest,
   'recentNegativesAtCalibrated': 0,
+  if (mastered) 'firstMasteredAt': at.toIso8601String(),
 };
 
 Map<String, dynamic> _sample(String goalId, double progress, DateTime at) =>
@@ -245,7 +251,7 @@ void main() {
   final stale = _now.subtract(const Duration(days: 45));
 
   group('compute', () {
-    test('reads the student\'s beliefs as stored against the milestone and '
+    test('reads the student\'s belief docs against the milestone and '
         'persists a draft with the counts', () async {
       final f = _Fixture(
         beliefs: [
@@ -253,7 +259,7 @@ void main() {
           _belief('s1', 'a', alpha: 6, beta: 1, at: fresh, highest: 'hard'),
           _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
           // Extension: c mastered, d not (one easy positive, never at
-          // calibration).
+          // calibration, never stamped).
           _belief('s2', 'c', alpha: 5, beta: 1, at: fresh),
           _belief(
             's2',
@@ -263,6 +269,7 @@ void main() {
             at: fresh,
             highest: 'easy',
             calibrated: false,
+            mastered: false,
           ),
         ],
         turns: [
@@ -301,13 +308,55 @@ void main() {
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.10');
+      expect(p.formulaVersion, '1.0.12');
       expect(p.mStartSource, MStartSource.history);
 
       final stored = f.proposals.docs['${_student}_m1'];
       expect(stored, isNotNull);
       expect(stored!['proposal'], 72);
       expect(stored['type'], 'grade_proposal');
+    });
+
+    test('mastery is the one-way stamp, not the live belief (#168): a core '
+        'LO whose (α, β) later collapsed still counts, and a doc without the '
+        'stamp does not, however high it stands', () async {
+      final f = _Fixture(
+        beliefs: [
+          // Core a: stamped at hard; two strong incidental negatives since
+          // left the stored belief at mean 0,29 (#167's pattern), and the
+          // tutor no longer probes a mastered LO.
+          _belief('s1', 'a', alpha: 2, beta: 5, at: fresh, highest: 'hard'),
+          // Core b: stamped, healthy.
+          _belief('s1', 'b', alpha: 5, beta: 1, at: fresh),
+          // Extension c: (5, 1) with the old flag but no stamp — the doc an
+          // old client keeps rewriting (#165), before the reconstruction.
+          // The live belief is not a fallback: reading it would quietly
+          // keep exactly these students' grades on the belief.
+          _belief('s2', 'c', alpha: 5, beta: 1, at: fresh, mastered: false),
+          // Extension d: stamped at medium.
+          _belief('s2', 'd', alpha: 5, beta: 1, at: fresh),
+        ],
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      // Read live, a would fail the 0,80 bar: k = 0.5. The stamp: k = 1.
+      expect(p.coreCounted, 2);
+      expect(p.k, 1.0);
+      expect(p.extensionMastered, 1);
+      expect(p.u, 0.5);
+      expect(p.masteredTotal, 3);
+      expect(p.hardCount, 1);
+      // M = 50 + 50·(0.6·0.5 + 0.4·(1/3)) = 71.67, as in the first test.
+      expect(p.mEnd, closeTo(71.667, 1e-3));
+      // Grading is a read: the collapsed belief and the missing stamp are
+      // left exactly as they were.
+      expect(f.beliefs.docs['${_student}_s1_a']!['alpha'], 2);
+      expect(
+        f.beliefs.docs['${_student}_s2_c']!.containsKey('firstMasteredAt'),
+        isFalse,
+      );
     });
 
     test('a belief doc from before the ratchet field (#164) is read under '

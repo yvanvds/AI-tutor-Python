@@ -47,6 +47,10 @@ LoBelief _belief(
   lastUpdatedAt: at,
   lastPositiveAtCalibratedAt: calibrated ? at : null,
   highestPositiveDifficulty: highest,
+  // The one-way stamp the formula reads as "mastered" (#168): on every doc
+  // that ever crossed the §1.5 bar — here, whenever the calibrated positive
+  // is there.
+  firstMasteredAt: calibrated ? at : null,
 );
 
 void main() {
@@ -126,6 +130,43 @@ void main() {
       );
       expect(snap.los.single.mastered, isFalse);
       expect(snap.los.single.highest, QuestionDifficulty.easy);
+    });
+
+    test('the snapshot freezes the stamp, not the live belief (#168): a '
+        'stamped LO whose (α, β) had collapsed by the period start is '
+        'mastered, an unstamped one at (9, 1) is not', () {
+      // M_start must read the same thing M_end reads, or a student whose
+      // stamped LO sat under the bar at the period start would be handed
+      // growth for a demonstration made before the period.
+      final snap = PeriodStartSnapshot.build(
+        uid: _uid,
+        milestone: _milestone(),
+        beliefs: [
+          LoBelief(
+            subgoalId: 's1',
+            loId: 'a',
+            alpha: 2,
+            beta: 5,
+            lastUpdatedAt: _periodStart,
+            lastPositiveAtCalibratedAt: _periodStart,
+            highestPositiveDifficulty: QuestionDifficulty.hard,
+            firstMasteredAt: _periodStart.subtract(const Duration(days: 30)),
+          ),
+          LoBelief(
+            subgoalId: 's1',
+            loId: 'b',
+            alpha: 9,
+            beta: 1,
+            lastUpdatedAt: _periodStart,
+            lastPositiveAtCalibratedAt: _periodStart,
+            highestPositiveDifficulty: QuestionDifficulty.medium,
+          ),
+        ],
+        now: _now,
+      );
+      expect(snap.inputs['s1/a']!.mastered, isTrue);
+      expect(snap.inputs['s1/a']!.highest, QuestionDifficulty.hard);
+      expect(snap.inputs['s1/b']!.mastered, isFalse);
     });
 
     test('a doc from before the ratchet field is frozen at the formula\'s '

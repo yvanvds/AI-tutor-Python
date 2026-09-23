@@ -1,4 +1,4 @@
-// End-to-end (#99, #148, #149, #150, #160, #166): the periodic grade
+// End-to-end (#99, #148, #149, #150, #160, #166, #168): the periodic grade
 // proposal, teacher side, now as a class-wide workflow that ends in a
 // published report.
 //
@@ -16,7 +16,11 @@
 //      period_start_snapshot.dart drives the exact path, #110) and asks the
 //      model for one justification per student who needs one. A student
 //      with no belief data on the milestone lands on "no data" instead of a
-//      computed 0, and costs no model call. With no supervision registry
+//      computed 0, and costs no model call. "Mastered" is the one-way
+//      `firstMasteredAt` stamp, not the live belief (#168): an LO whose
+//      (α, β) later signals pushed under the bar still counts, a doc
+//      without the stamp does not, and no later evidence can lower the
+//      number. With no supervision registry
 //      bound — the shipped app until Anchor lands — the prompt carries no
 //      supervised/home split and no hint to name one, since a split that
 //      reads "0 supervised" for everyone is not a measurement (#160); with
@@ -96,6 +100,11 @@ Map<String, dynamic> _belief(
   /// `null`: the doc shape from before the ratchet field existed (#164).
   required String? highest,
   String uid = kStudentUid,
+
+  /// The one-way stamp the grade reads as "mastered" (#168). `false`: a
+  /// doc that never crossed the §1.5 bar, or one an old client rewrote
+  /// without the field (#165) before the one-off reconstruction.
+  bool mastered = true,
 }) {
   final at = _now.subtract(Duration(days: daysAgo)).toIso8601String();
   return {
@@ -110,7 +119,7 @@ Map<String, dynamic> _belief(
     'lastPositiveAtCalibratedAt': at,
     if (highest != null) 'highestPositiveDifficulty': highest,
     'recentNegativesAtCalibrated': 0,
-    'firstMasteredAt': at,
+    if (mastered) 'firstMasteredAt': at,
   };
 }
 
@@ -534,6 +543,97 @@ void main() {
     await harness.dispose(tester);
   });
 
+  testWidgets('the grade reads the one-way mastery stamp, not the live belief '
+      '(#168): a core LO whose belief later collapsed still counts, and a doc '
+      'without the stamp does not', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: {
+        ..._gradedClass(),
+        'lo_beliefs': [
+          // Core LO: the stamp fell when six answers in a row earned it, at
+          // hard; two strong incidental negatives from later input() work
+          // then left the stored belief at mean 0,29 (#167's pattern), and
+          // the tutor no longer probes a mastered LO, so read live it would
+          // stay there for good.
+          _belief(
+            's1',
+            'lo-print',
+            alpha: 2,
+            beta: 5,
+            daysAgo: 5,
+            highest: 'hard',
+          ),
+          // Extension LO: (5, 1) with the old flag, no stamp — the doc an
+          // old client keeps rewriting without the field (#165), before the
+          // one-off reconstruction from turn_history. The live belief is no
+          // fallback: reading it here would put exactly these students'
+          // grades back on the belief, silently.
+          _belief(
+            's2',
+            'lo-var',
+            alpha: 5,
+            beta: 1,
+            daysAgo: 3,
+            highest: 'medium',
+            mastered: false,
+          ),
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-class-filter')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('5A').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+
+    // k = 1 (the stamp), u = 0 (no stamp), d = 1/1: M_end = 50 + 50·0.4 =
+    // 70; M_start = 50 (the history estimate, as above); G = 0.4;
+    // P = 0.6·70 + 0.4·40 = 58. Read from the live belief instead, the core
+    // LO fails the 0,80 bar: k = 0, M_end = 0, P = 0.
+    expect(
+      tester.widget<Text>(find.byKey(Key('reports-grade-$kStudentUid'))).data,
+      '58',
+    );
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    expect(find.text('Mastery now: 70.0'), findsOneWidget);
+    expect(find.text('Core at level: 1 / 1'), findsOneWidget);
+    expect(find.text('Extension mastered: 0 / 1'), findsOneWidget);
+    expect(find.text('Demonstrated at hard: 1 / 1 mastered'), findsOneWidget);
+
+    // Grading is a read: the collapsed belief keeps its stamp and its
+    // (α, β), and the formula stamps nothing onto the unstamped doc.
+    final printDoc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print']!;
+    expect(printDoc['alpha'], 2);
+    expect(printDoc['firstMasteredAt'], isA<String>());
+    final varDoc =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
+    expect(varDoc.containsKey('firstMasteredAt'), isFalse);
+    final doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(doc['proposal'], 58);
+    expect(doc['formulaVersion'], GradingConstants.formulaVersion);
+
+    await harness.dispose(tester);
+  });
+
   testWidgets('with a supervision registry bound, the justification prompt '
       'carries the supervised/home split again', (tester) async {
     final llm = ScriptedLlm([kJustification]);
@@ -616,12 +716,13 @@ void main() {
     // Prose only (PUNTENFORMULE §3.3): the number did not move.
     expect(doc['proposal'], 86);
 
-    // Now the evidence moves under the text: the extension LO is no longer
-    // mastered, so M_end = 70, G = 0.4 and P = 58. AI prose would be
-    // dropped here; the teacher's survives, flagged for rereading — and
-    // costs no second model call.
+    // Now the evidence moves under the text — upward, the only direction
+    // new evidence can move a grade since #168: Sam demonstrates the
+    // extension LO at hard, so d = 1, M_end = 100, G = 1 and P = 100. AI
+    // prose would be dropped here; the teacher's survives, flagged for
+    // rereading — and costs no second model call.
     harness.cosmos['lo_beliefs'].upsert(
-      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+      _belief('s2', 'lo-var', alpha: 6, beta: 1, daysAgo: 1, highest: 'hard'),
     );
     await tester.tap(find.byKey(const Key('reports-run-one')));
     await pumpUntilFound(
@@ -634,16 +735,16 @@ void main() {
       tester
           .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
           .data,
-      '58',
+      '100',
     );
     doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
-    expect(doc['proposal'], 58);
+    expect(doc['proposal'], 100);
     expect(doc['justification'], own);
     expect(doc['justificationStale'], true);
 
     // Sign off, then rewrite after a conversation with the student: §5
     // freezes the grade, not the sentence explaining it.
-    await tester.enterText(find.byKey(const Key('reports-adjusted')), '60');
+    await tester.enterText(find.byKey(const Key('reports-adjusted')), '95');
     await tapInDetail(tester, const Key('reports-sign-off'));
     await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
 
@@ -659,8 +760,8 @@ void main() {
     doc = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
     expect(doc['justification'], afterTalk);
     expect(doc['signedOffAt'], isA<String>());
-    expect(doc['adjustedGrade'], 60);
-    expect(doc['proposal'], 58);
+    expect(doc['adjustedGrade'], 95);
+    expect(doc['proposal'], 100);
     // The signed report is still locked against a recompute.
     expect(find.byKey(const Key('reports-run-one')), findsNothing);
 
@@ -754,10 +855,11 @@ void main() {
     expect(doc['justificationSource'], 'edited');
 
     // Once the number does move there is nothing to announce: the new grade
-    // is the feedback (M_end = 70, G = 0.4, P = 58, as in the rewrite flow
-    // above), and the teacher's text is flagged for rereading.
+    // is the feedback (the extension LO demonstrated at hard: d = 1,
+    // M_end = 100, G = 1, P = 100, as in the rewrite flow above), and the
+    // teacher's text is flagged for rereading.
     harness.cosmos['lo_beliefs'].upsert(
-      _belief('s2', 'lo-var', alpha: 1, beta: 6, daysAgo: 3, highest: 'medium'),
+      _belief('s2', 'lo-var', alpha: 6, beta: 1, daysAgo: 1, highest: 'hard'),
     );
     await tapInDetail(tester, const Key('reports-run-one'));
     await pumpUntil(
@@ -766,7 +868,7 @@ void main() {
           tester
               .widget<Text>(find.byKey(const Key('reports-detail-proposal')))
               .data ==
-          '58',
+          '100',
       reason: 'the recompute never moved the grade',
     );
     expect(find.byKey(const Key('reports-recompute-unchanged')), findsNothing);

@@ -479,7 +479,11 @@ release pressed again for reports nobody touched rewrites nothing.
   direct probing?" is a durable fact the model keeps, because transfer
   credit (conductor policy 3.7) may refresh only such LOs, and the
   warm-up review question (conductor policy 1.5, #102) picks from the
-  same set. Beliefs in *other* subgoals than the active one can therefore
+  same set. Since #168 the grade formula reads it too:
+  `LoGradeInput.fromBelief` takes `mastered` from the stamp, never from
+  the live `(α, β)` — the belief steers the teaching, the stamp steers the
+  grade (PUNTENFORMULE §2.2) — and applies no fallback for a doc without
+  it. Beliefs in *other* subgoals than the active one can therefore
   be written by a graded turn: upward only by a transfer credit, in
   either direction by the once-per-session warm-up review, which is a
   direct probe of that LO and updates its doc like any probe (ratchets

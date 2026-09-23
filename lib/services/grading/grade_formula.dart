@@ -7,7 +7,6 @@
 
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
-import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 
 import 'milestone.dart';
 
@@ -22,7 +21,7 @@ class GradingConstants {
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
   /// a signed grade was computed under.
-  static const String formulaVersion = '1.0.10';
+  static const String formulaVersion = '1.0.12';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).
@@ -38,26 +37,38 @@ class GradingConstants {
   static double curve(double k) => k;
 }
 
-/// What the formula reads per LO on the report moment (§2.2): mastered
-/// under the three conditions of §1.5 on the belief **as stored**, plus
-/// the three-level difficulty ratchet of §2.5.
+/// What the formula reads per LO on the report moment (§2.2): **mastered**
+/// is the one-way `firstMasteredAt` stamp (#168, v1.0.12) — has this LO
+/// *ever* met the three conditions of §1.5 — plus the three-level
+/// difficulty ratchet of §2.5.
 ///
-/// Decay (§1.3) is deliberately *not* applied here (v1.0.10). Decay exists to
-/// send the student back to old material — it drives the warm-up review, and
-/// there it belongs. A grade is a record of what was demonstrated, not a
-/// guess about what might since have faded: a leerdoel demonstrated in
-/// September was demonstrated, whatever the report date. Applying it here
-/// also penalised exactly the wrong student, because the tutor stops probing
-/// once mastery is established: the strong student ends on thin evidence
-/// (α ≈ 4–5, the mastery bar itself) and a belief that thin falls back
-/// under mean 0,80 within one to three weeks, while a struggling student's
-/// repeatedly-probed belief carries enough mass to survive. That inverted
-/// §3.2 ("weinig vragen ≠ verdacht") instead of honouring it.
+/// The live belief is not consulted for mastery. It is designed to move:
+/// that is its job for the tutor (question choice, stuck detection, the
+/// warm-up review, `regressedAt`), and it keeps doing that unchanged. A
+/// grade is a record of what was demonstrated, and a later measurement
+/// that disappoints — an incidental cross-subgoal negative (#167), a bad
+/// day, decay — does not undo a demonstration. The split: the belief
+/// steers the teaching, the stamp steers the grade. It also makes the
+/// grade monotone in the student's work: continuing to work can never
+/// lower it.
 ///
-/// The conductor still decays on read, so the stored (α, β) a probe leaves
-/// behind is already post-decay for every turn the student actually took.
-/// What is dropped is only the extra decay between the last probe and the
-/// report moment.
+/// Reading the live belief hit exactly the wrong student. The tutor stops
+/// probing a mastered LO, so a strong student ends on thin evidence
+/// (α ≈ 4–5, the mastery bar itself); any single later signal pushes that
+/// under mean 0,80, and because mastered LOs are not re-probed it stays
+/// there. v1.0.10 took decay out of this path for that reason; the stamp
+/// subsumes it — nothing that happens to (α, β) after the stamp fell can
+/// reach the grade. Nor does this rest the grade on few judgements: the
+/// stamp falls only when the *accumulated* direct evidence crosses the
+/// bar, so one wrong AI verdict can delay it, never remove it.
+///
+/// A doc without the stamp is not mastered, also when its stored (α, β)
+/// and ratchet would meet §1.5 today. The conductor's fallback for docs
+/// from before the field existed (`belief_math.everMastered`) is
+/// deliberately not applied here: it is a live reading, and for the
+/// students it concerns (old clients, #165) it would quietly keep the grade
+/// on the belief. Such docs get their stamp from a one-off reconstruction
+/// out of `turn_history`, outside the app, before this version ships.
 class LoGradeInput {
   const LoGradeInput({required this.mastered, required this.highest});
 
@@ -67,8 +78,9 @@ class LoGradeInput {
   /// Reads one belief doc as stored. A missing doc is an LO that was
   /// never probed: not mastered, nothing demonstrated.
   ///
-  /// A doc without a ratchet level but with the old calibrated-positive
-  /// flag set is read the way §2.5 says old data reads — "demonstrated at
+  /// Mastery is the stamp and nothing else. The level is the ratchet; a
+  /// doc without a ratchet level but with the old calibrated-positive flag
+  /// set is read the way §2.5 says old data reads — "demonstrated at
   /// non-easy", i.e. [QuestionDifficulty.medium]. That reading lives here,
   /// in the formula, and only here (#164): the model keeps such a doc's
   /// level `null`, so a guess is never written to Cosmos as if it had been
@@ -78,13 +90,8 @@ class LoGradeInput {
       return const LoGradeInput(mastered: false, highest: null);
     }
     final calibratedPositive = belief.lastPositiveAtCalibratedAt != null;
-    final mastered =
-        meetsMasteryMeanAndEvidence(
-          BeliefSnapshot(belief.alpha, belief.beta),
-        ) &&
-        calibratedPositive;
     return LoGradeInput(
-      mastered: mastered,
+      mastered: belief.firstMasteredAt != null,
       highest:
           belief.highestPositiveDifficulty ??
           (calibratedPositive ? QuestionDifficulty.medium : null),

@@ -1,7 +1,8 @@
 // The grade formula (#99) against PUNTENFORMULE part 2: the worked example
 // of bijlage B must come out to the point, the core gate must respect the
 // milestone's expected level, `d` counts only among mastered LOs, growth
-// is clamped, and beliefs are read *after* decay.
+// is clamped, and mastery is the one-way `firstMasteredAt` stamp, not the
+// live belief (#168).
 
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/grading/grade_formula.dart';
@@ -177,64 +178,121 @@ void main() {
     });
   });
 
-  group('LoGradeInput.fromBelief reads the belief as stored (v1.0.10: no '
-      'decay in the grade path)', () {
-    final now = DateTime.utc(2026, 9, 2);
+  group('LoGradeInput.fromBelief reads mastery from the one-way stamp, not '
+      'the live belief (#168, v1.0.12)', () {
+    final now = DateTime.utc(2026, 9, 23);
 
     LoBelief belief({
       required double alpha,
       required double beta,
-      required DateTime at,
+      DateTime? stampedAt,
+      DateTime? at,
       bool calibrated = true,
       QuestionDifficulty? highest = QuestionDifficulty.medium,
-    }) => LoBelief(
-      subgoalId: 's',
-      loId: 'lo',
-      alpha: alpha,
-      beta: beta,
-      lastUpdatedAt: at,
-      lastPositiveAtCalibratedAt: calibrated ? at : null,
-      highestPositiveDifficulty: highest,
-    );
+    }) {
+      final written = at ?? now;
+      return LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: written,
+        lastPositiveAtCalibratedAt: calibrated ? written : null,
+        highestPositiveDifficulty: highest,
+        firstMasteredAt: stampedAt,
+      );
+    }
 
-    test('a fresh (5, 1) is mastered', () {
+    test('a stamped (5, 1) is mastered', () {
       final i = LoGradeInput.fromBelief(
-        belief(alpha: 5, beta: 1, at: now.subtract(const Duration(days: 1))),
+        belief(
+          alpha: 5,
+          beta: 1,
+          stampedAt: now.subtract(const Duration(days: 1)),
+        ),
       );
       expect(i.mastered, isTrue);
       expect(i.highest, QuestionDifficulty.medium);
     });
 
-    test('the same belief four months untouched is still mastered: a grade '
-        'records what was demonstrated, decay only drives the warm-up '
-        'review', () {
-      final i = LoGradeInput.fromBelief(
-        belief(alpha: 5, beta: 1, at: now.subtract(const Duration(days: 120))),
-      );
-      expect(i.mastered, isTrue);
-    });
-
-    test('a thin just-mastered (4.3, 1) survives three weeks — the case that '
-        'used to dock the strongest student, who gets fewest probes', () {
-      final i = LoGradeInput.fromBelief(
-        belief(alpha: 4.3, beta: 1, at: now.subtract(const Duration(days: 21))),
-      );
-      expect(i.mastered, isTrue);
-    });
-
-    test('condition 3: no calibrated positive → not mastered however high '
-        'the mean', () {
+    test('a stamped LO whose belief later signals pushed under the §1.5 bar '
+        'is still mastered: the belief steers the tutor, the stamp the '
+        'grade', () {
+      // Six correct in a row earned the stamp; two strong incidental
+      // negatives a week later left the stored belief at mean 0,65 (#167's
+      // pattern) — and the tutor no longer probes a mastered LO, so read
+      // live it would have stayed there for good.
       final i = LoGradeInput.fromBelief(
         belief(
-          alpha: 10,
-          beta: 1,
-          at: now,
-          calibrated: false,
-          highest: QuestionDifficulty.easy,
+          alpha: 4.7,
+          beta: 2.5,
+          stampedAt: now.subtract(const Duration(days: 14)),
+          at: now.subtract(const Duration(days: 7)),
         ),
       );
+      expect(i.mastered, isTrue);
+    });
+
+    test('nor can decay take it back: a stamped belief shrunk to (2, 1.2) '
+        'over a summer untouched is mastered', () {
+      final i = LoGradeInput.fromBelief(
+        belief(
+          alpha: 2,
+          beta: 1.2,
+          stampedAt: now.subtract(const Duration(days: 120)),
+          at: now.subtract(const Duration(days: 120)),
+        ),
+      );
+      expect(i.mastered, isTrue);
+    });
+
+    test('no stamp: not mastered however high the stored mean — the live '
+        'belief is no fallback (a doc from before the field gets its stamp '
+        'from the one-off reconstruction, not from the formula)', () {
+      final i = LoGradeInput.fromBelief(belief(alpha: 10, beta: 1));
       expect(i.mastered, isFalse);
-      expect(i.highest, QuestionDifficulty.easy);
+      expect(
+        i.highest,
+        QuestionDifficulty.medium,
+        reason: 'the ratchet is read regardless of the stamp',
+      );
+    });
+
+    test('the stamp says nothing about the level: highest is the ratchet', () {
+      final i = LoGradeInput.fromBelief(
+        belief(
+          alpha: 6,
+          beta: 1,
+          stampedAt: now,
+          highest: QuestionDifficulty.hard,
+        ),
+      );
+      expect(i.mastered, isTrue);
+      expect(i.highest, QuestionDifficulty.hard);
+    });
+
+    test('through the formula: a stamped-but-collapsed core LO counts for k '
+        'and d, an unstamped extension LO does not count for u', () {
+      final m = computeMasteryScore(
+        los: _los(core: 1, extension: 1),
+        inputs: {
+          's/k0': LoGradeInput.fromBelief(
+            belief(
+              alpha: 2,
+              beta: 5,
+              stampedAt: now,
+              highest: QuestionDifficulty.hard,
+            ),
+          ),
+          's/u0': LoGradeInput.fromBelief(belief(alpha: 5, beta: 1)),
+        },
+        expectedDifficulty: QuestionDifficulty.medium,
+      );
+      expect(m.k, 1.0);
+      expect(m.u, 0.0);
+      expect(m.d, 1.0);
+      // 50 + 50·(0.6·0 + 0.4·1) = 70.
+      expect(m.m, closeTo(70.0, 1e-9));
     });
 
     test('a missing doc is never probed', () {
@@ -255,7 +313,9 @@ void main() {
       beta: 1,
       lastUpdatedAt: at,
       lastPositiveAtCalibratedAt: calibrated ? at : null,
-      // No level on the doc: the shape from before #103.
+      // No level on the doc: the shape from before #103. The stamp is
+      // there (#168): this group is about the level, not about mastery.
+      firstMasteredAt: calibrated ? at : null,
     );
 
     test('the old flag set, no level: read as medium, at grade time only', () {

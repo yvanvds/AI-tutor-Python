@@ -118,6 +118,8 @@ Map<String, dynamic> _belief(
       .toIso8601String(),
   'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
+  // The one-way stamp the grade reads as "mastered" (#168).
+  'firstMasteredAt': _now.subtract(const Duration(days: 3)).toIso8601String(),
 };
 
 Milestone _milestone() => Milestone(
