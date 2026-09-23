@@ -62,6 +62,7 @@ import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/tutor_language.dart' as tutor_language;
+import 'flows/unconfirmed_recheck.dart' as unconfirmed_recheck;
 import 'flows/update_check_failed_notice.dart' as update_check_failed_notice;
 import 'flows/update_dev_build.dart' as update_dev_build;
 import 'flows/update_failure.dart' as update_failure;
@@ -98,6 +99,7 @@ void main() {
   cross_subgoal_signal.main();
   warm_up_review.main();
   near_goal_recheck.main();
+  unconfirmed_recheck.main();
   quiz_ligatures.main();
   playground_during_mcq.main();
   turtle_run_notice.main();

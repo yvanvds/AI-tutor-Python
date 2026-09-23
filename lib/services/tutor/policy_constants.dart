@@ -133,11 +133,13 @@ class PolicyConstants {
   /// flagged `regressedAt` (#112) is due regardless of this clock.
   static const Duration warmUpStaleAfter = Duration(days: 30);
 
-  // ---- Recheck slot (CONDUCTOR_POLICY §2.6, #187) --------------------------
+  // ---- Recheck slot (CONDUCTOR_POLICY §2.6, #187, #188) --------------------
 
   /// How long a not-yet-demonstrated LO of an earlier subgoal must go
-  /// without a *direct* probe (`LoBelief.lastDirectProbeAt`) before the
-  /// near-goal rule rechecks it. A week: long enough that the student has
+  /// without a *direct* probe (`LoBelief.lastDirectProbeAt`) before a
+  /// recheck rule asks it again — the near goal (#187) and the unconfirmed
+  /// high belief (#188) alike; the latter is due at once when the LO was
+  /// never asked directly. A week: long enough that the student has
   /// moved on and the answer says something new, short enough to land
   /// inside a three-week report period — the 30-day warm-up clock never
   /// does (#187). Same value as the evaluation tooling's fossil rule

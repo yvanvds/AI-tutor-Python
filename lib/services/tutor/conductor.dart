@@ -38,9 +38,10 @@ class WarmUpReview {
 
 /// Which rule of the recheck slot (CONDUCTOR_POLICY §2.6) picked the LO.
 /// Every rule names an LO of an earlier subgoal that the student has not
-/// demonstrated yet and that ordinary practice will no longer ask about;
-/// they differ in why one direct question is worth asking now. The enum
-/// order is the priority order among due candidates.
+/// demonstrated yet — or not at a level the doc recorded — and that
+/// ordinary practice will no longer ask about; they differ in why one
+/// direct question is worth asking now. The enum order is the priority
+/// order among due candidates.
 enum RecheckRule {
   /// #187: just under the mastery bar (decayed μ in
   /// [`recheckMeanFloor`, `masteryMeanThreshold`)), no direct probe for
@@ -48,11 +49,23 @@ enum RecheckRule {
   /// — the student may well have moved past where the last answer left
   /// them, and only a direct question can show it.
   nearGoal,
+
+  /// #188: the belief is high (decayed μ and evidence meet the bar,
+  /// `meetsMasteryMeanAndEvidence`) but no direct right answer backs it —
+  /// no positive at calibration (`lastPositiveAtCalibratedAt`), or no
+  /// recorded level (`highestPositiveDifficulty`, an old client's doc,
+  /// #165) — and no direct probe for `recheckAfter`, or never one. Such a
+  /// belief grows from positives the grader saw in later work (§2.4), which
+  /// move neither ratchet, so the stamp and the level the grade reads can
+  /// only come from asking. After [nearGoal]: the gated near goals are
+  /// few, and a backlog of old docs must not hold them up.
+  unconfirmed,
 }
 
-/// A recheck question (CONDUCTOR_POLICY §2.6, #187): a direct probe of an
-/// LO of an *earlier* subgoal of the active root, asked in the middle of
-/// practice so the student can still earn that LO's mastery stamp. Like a
+/// A recheck question (CONDUCTOR_POLICY §2.6, #187, #188): a direct probe
+/// of an LO of an *earlier* subgoal of the active root, asked in the middle
+/// of practice so the student can still earn that LO's mastery stamp (and
+/// the level the ratchet records). Like a
 /// [WarmUpReview] the host needs the whole [subgoal] — title for the chat
 /// notice, teaching tips for the prompt, id for grading and the record.
 class Recheck {
@@ -769,7 +782,9 @@ class Conductor {
   /// the student left behind *without* the mastery stamp — its subgoal
   /// advanced on the other LOs, or on the stuck rule (§4.4) — is never
   /// asked again, so the stamp can never be earned: decay pulls the mean
-  /// toward the prior, never up. The slot is that LO's way back: one
+  /// toward the prior, never up. Nor can a belief that later work lifted
+  /// over the bar from the side (§2.4, #188): that moves no ratchet, so
+  /// condition 3 stays open. The slot is that LO's way back: one
   /// direct question at the student's calibrated level, graded like any
   /// probe of that LO (§3, ratchets and stamp included), so a right
   /// answer can complete the three conditions of §4.1 that the grade
@@ -892,6 +907,8 @@ class Conductor {
   /// `selectionReason.chosenReason` per recheck rule (§8.1).
   static const Map<RecheckRule, String> _recheckReasons = {
     RecheckRule.nearGoal: 'recheck: near goal not asked for a week',
+    RecheckRule.unconfirmed:
+        'recheck: high belief not confirmed by a direct right answer',
   };
 
   /// Which rule of the recheck slot finds [belief] due, if any (§2.6).
@@ -901,8 +918,7 @@ class Conductor {
   /// Each rule is one branch here plus one [RecheckRule] value, checked in
   /// enum order; everything else about the question — slot, spacing,
   /// ordering, grading, the chat notice — is shared. That is the extension
-  /// point for the next rule (#188: a high belief with no positive at
-  /// calibration, or an empty ratchet).
+  /// point for a next rule.
   static RecheckRule? _recheckRuleFor({
     required LoBelief belief,
     required BeliefSnapshot snap,
@@ -928,6 +944,26 @@ class Conductor {
         recentAccuracy != null &&
         recentAccuracy >= PolicyConstants.recheckRecentAccuracy) {
       return RecheckRule.nearGoal;
+    }
+
+    // #188 unconfirmed: the belief says "known" — conditions 1 and 2 of
+    // §4.1 hold on the decayed reading — but no direct right answer backs
+    // it: condition 3 never held (no positive at calibration), or the doc
+    // cannot say at which level it did (no ratchet level: an old client's
+    // doc, #165). Such a belief grows from what the grader saw in later
+    // work (§2.4, §3.7) — real evidence, but it moves no ratchet, and
+    // nothing else asks an earlier subgoal's LO. No recent-work gate: the
+    // belief already says the student has it, the question lets them show
+    // it. The same clock as a near goal, so a wrong answer that leaves the
+    // belief high waits a week too; an LO never asked directly is due now.
+    final unconfirmed =
+        belief.lastPositiveAtCalibratedAt == null ||
+        belief.highestPositiveDifficulty == null;
+    if (unconfirmed &&
+        meetsMasteryMeanAndEvidence(snap) &&
+        (probedAt == null ||
+            now.difference(probedAt) >= PolicyConstants.recheckAfter)) {
+      return RecheckRule.unconfirmed;
     }
     return null;
   }

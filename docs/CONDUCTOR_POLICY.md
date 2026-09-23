@@ -585,7 +585,9 @@ the two are not equally trustworthy:
   (`lastPositiveAtCalibratedAt`, `highestPositiveDifficulty`, 4.3), and
   leaves the notch-drop counter (2.3) and `lastQuestionType` alone.
   Mastery condition 3 therefore still needs a direct probe: an LO cannot
-  be brought to mastery sideways, only confirmed in `(α, β)`.
+  be brought to mastery sideways, only confirmed in `(α, β)`. When such
+  positives lift a belief over the bar with condition 3 still open, the
+  recheck slot (2.6, #188) asks that direct probe.
 - **No re-enrolment:** the other subgoal's cached `progress` is not
   recomputed, as for 1.5 and 3.7. The honest belief is on `lo_beliefs`,
   where the warm-up selection and the teacher drawer read it.
@@ -650,7 +652,7 @@ is tracked, how recency-of-types-on-this-LO is stored). Those are
 storage concerns: the per-LO recent activity in the student model
 (part 2 §3) carries the data we need.
 
-### 2.6 The recheck slot (#187)
+### 2.6 The recheck slot (#187, #188)
 
 2.1 only ever probes the active subgoal, and the warm-up review (1.5)
 only LOs that were once mastered. An LO the student left behind *without*
@@ -661,7 +663,12 @@ earned: decay pulls a belief toward the prior, never over the bar. The
 first report round showed the cost: ten of fifteen reports needed a
 teacher adjustment for LOs at a mean of 0.74–0.80, asked on hard, then
 left alone for 12–19 days while the student did well on later subgoals
-(#187). The recheck slot is that LO's way back: now and then, one direct
+(#187). The same round had the mirror case (#188): a belief at 0.93 with
+the evidence at the cap, and not demonstrated — both direct questions on
+it answered wrong, the mean lifted by 27 positives the grader saw in
+scripts of the next subgoal. Those are evidence (2.4) but move no
+ratchet, so condition 3 of 4.1 stayed open with nothing left to close
+it. The recheck slot is that LO's way back: now and then, one direct
 question on it in the middle of practice.
 
 **The slot.** `planNext` checks it after the warm-up (1.5) and before
@@ -681,7 +688,8 @@ one — the grading scope, where a later subgoal would be a forward
 reference — with a belief doc that one of the slot's rules finds due.
 Each rule is one branch of `Conductor._recheckRuleFor` plus one
 `RecheckRule` value; the rules are the only part that differs per case,
-everything else about the question is shared. One rule so far:
+everything else about the question is shared. Two rules, whose mean
+bands do not overlap:
 
 - **Near goal (#187).** Not demonstrated (`everMastered` false, 3.7);
   decayed mean in [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to
@@ -695,6 +703,23 @@ everything else about the question is shared. One rule so far:
   student who is struggling now is not sent back to old material. This is
   the evaluation tooling's "fossil" (`tooling/evaluation/diagnostics.py`),
   which the teacher otherwise has to settle by hand at report time.
+- **Unconfirmed (#188).** The belief says "known" — decayed mean and
+  evidence meet the bar (`meetsMasteryMeanAndEvidence`, conditions 1 and
+  2 of 4.1) — but no direct right answer backs it: no positive at
+  calibration (`lastPositiveAtCalibratedAt` unset, condition 3 open), or
+  no recorded level (`highestPositiveDifficulty` unset under a set
+  calibrated-positive flag: an old client's doc, #165, where the grade
+  can only guess the level). And no direct probe for `recheckAfter`, the
+  near goal's clock — or never one: an LO never asked directly is due at
+  once. There is no recent-work gate: the belief already says the student
+  has it; the question lets them show it. A right answer at the
+  calibrated level sets the positive, the ratchet at the level asked
+  (#164: the model records what was asked, never a guess) and — with 1
+  and 2 already met — the stamp. A wrong one debits the belief like any
+  probe; if it is still over the bar, the LO waits a week like any
+  rechecked LO, and a belief that drops under it follows the near-goal
+  rule from there. Near goals go first: they are few, gated and dated,
+  while old docs can form a backlog that must not hold them up.
 
 The clock is the **last direct probe**, `lastProbedAt` on the belief doc
 (part 2): set on every write that may move the ratchets — the target of a
@@ -708,7 +733,7 @@ ever the target of a question (`lastQuestionType` set) — never earlier
 than the real last probe, so an old doc is at worst due late, never
 early — and a non-probe write on such a doc stores that reading, so its
 own clock bump does not pass for a probe. An LO never asked directly has
-no clock and is not a near goal.
+no clock: it is not a near goal, and an unconfirmed one is due at once.
 
 Among candidates: rule priority (enum order), then the oldest direct
 probe, then the highest decayed mean — the one closest to the stamp.
@@ -732,12 +757,13 @@ the target itself is dropped (3.7); other signals are incidental under
 **Audit.** The turn record (8.1) carries `isRecheck: true`, names the old
 subgoal in `subgoalId`, the LO in `targetLOIds` and the subgoal the
 student was practising in `activeSubgoalId`; `selectionReason` lists the
-top candidates with `chosenReason: "recheck: near goal not asked for a
-week"`. The debug event `conductor.recheck_planned` carries the rule, the
-mean, the days since the last direct probe and the recent accuracy.
+top candidates with the rule's `chosenReason`: `"recheck: near goal not
+asked for a week"` or `"recheck: high belief not confirmed by a direct
+right answer"`. The debug event `conductor.recheck_planned` carries the
+rule, the mean, the days since the last direct probe and the recent
+accuracy.
 
-**Adding a rule.** A new case (#188: a high belief with no positive at
-calibration, or an empty ratchet) adds its `RecheckRule` value and its
+**Adding a rule.** A new case adds its `RecheckRule` value and its
 branch in `_recheckRuleFor`, its `chosenReason`, and its tests; the slot,
 spacing, ordering, question, grading, notice and record are reused as
 they are.

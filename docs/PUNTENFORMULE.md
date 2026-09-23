@@ -469,10 +469,32 @@ wanneer de tutor je opnieuw bevraagt:
   een week. Zoals de opfrisvraag telt de controlevraag niet mee voor je
   kalibratieniveau (§1.6) en verandert ze niets aan de voortgangsbalkjes.
 
+  **Sinds v1.0.18 ook boven de grens.** Signalen van opzij (§1.2) kunnen
+  de overtuiging van een ouder leerdoel óver de grens tillen: wie in het
+  volgende subdoel telkens scripts schrijft die invoer omzetten, toont
+  dat hij het kan. Maar ze bewegen de ratel van voorwaarde 3 niet (§1.5).
+  Een leerdoel met μ vanaf 0,80 en genoeg bewijs, waarop je nooit
+  rechtstreeks een juist antwoord gaf op je niveau, kon je dus niet meer
+  aantonen: de tutor vond het gekend en vroeg er niet meer naar. Zo'n
+  leerdoel krijgt nu ook een controlevraag. Dezelfde klok geldt
+  (minstens 7 dagen na de laatste rechtstreekse vraag, of meteen als het
+  nooit rechtstreeks bevraagd werd), maar zonder voorwaarde op je recente
+  werk: de overtuiging zegt al dat je het kan, de vraag laat je dat
+  tonen. Hetzelfde geldt voor een leerdoel waarvan de app wel weet dat je
+  het op je niveau aantoonde, maar niet op welk niveau (ouder opgeslagen
+  data zonder trapinformatie, §2.5): het antwoord legt het niveau vast
+  waarop het gevraagd werd, in plaats van de lezing "gemiddeld" voor oude
+  data. Een juist antwoord vervult voorwaarde 3, en daarmee krijgt het
+  leerdoel de stempel van §2.2 en het niveau in de ratel van §2.5; een
+  fout antwoord verlaagt de overtuiging, en ook dan wacht het leerdoel
+  weer een week. Staan er tegelijk een leerdoel net onder de grens en een
+  onbevestigd leerdoel klaar, dan komt het eerste eerst.
+
 Samen betekenen ze: wie vroeg klaar was en gewoon is blijven werken,
 staat er op het rapportmoment vers en terecht goed voor — en wie een
-leerdoel net niet haalde maar intussen verder is gegroeid, krijgt de kans
-om dat zelf te tonen.
+leerdoel net niet haalde maar intussen verder is gegroeid, of het in
+later werk toonde zonder dat er rechtstreeks naar gevraagd werd, krijgt
+de kans om dat zelf te tonen.
 
 ### 2.9 Je rapport in de app
 
@@ -567,7 +589,7 @@ document, en bevroren. Pas vanaf dan telt de formule echt mee.
 | s | gewichtsfactor bewijs onder toezicht | voorlopig s = 1,25 in de code; definitief na schaduwrun (bescheiden, s ≥ 1) |
 | transfergewicht | grootte van het transfer-krediet (§2.8) | voorlopig het zwak-gewicht 0,5 (gerekend als gemiddeld) × s in de code; definitief na schaduwrun (klein; ≤ 0,5) |
 | opfrisdrempel | hoe lang een beheerst leerdoel onaangeroerd moet zijn voor een opfrisvraag (§2.8) | voorlopig 30 dagen (de halve halveringstijd) in de code; definitief na schaduwrun |
-| controlevraag | wanneer een nog niet aangetoond leerdoel uit een eerder subdoel een controlevraag krijgt (§2.8) | voorlopig 7 dagen zonder rechtstreekse vraag, μ van 0,70 tot 0,80, recent werk niveaugewogen ≥ 0,75, minstens 5 oefeningen ertussen in de code; te herbekijken na de volgende rapportronde |
+| controlevraag | wanneer een nog niet aangetoond leerdoel uit een eerder subdoel een controlevraag krijgt (§2.8) | voorlopig 7 dagen zonder rechtstreekse vraag, μ van 0,70 tot 0,80, recent werk niveaugewogen ≥ 0,75, minstens 5 oefeningen ertussen in de code; boven de grens (sinds v1.0.18) dezelfde klok, of meteen als nooit rechtstreeks bevraagd, zonder voorwaarde op recent werk; te herbekijken na de volgende rapportronde |
 
 Alle overige getallen in dit document (§1) zijn de vandaag werkende
 waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
@@ -600,6 +622,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.14 | 2026-09-23 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de moeilijkheidsfactor van §1.2 is niet langer symmetrisch. Een positief signaal weegt zoals voorheen (makkelijk × 0,6, gemiddeld × 1,0, moeilijk × 1,4); een negatief signaal krijgt het spiegelbeeld (makkelijk × 1,4, gemiddeld × 1,0, moeilijk × 0,6). Daardoor is μ niveaubewust: dezelfde grens van 0,80 is ongeveer 90% juist op makkelijk, 80% op gemiddeld en ongeveer 63% op moeilijk; een promotie op de kalibratieladder (§1.6) verandert μ nauwelijks meer en kan je dus niet meer uit je beheersing duwen, en "vastgelopen" (§1.7) leest het niveau vanzelf mee. De "belangrijk gevolg"-alinea van §1.2 keert daarmee om; §2.5 zegt dat moeilijkheid voorlopig twee keer telt (via μ en via de ratel), te herbekijken bij de herziening van deel 2. Reden: de kalibratie parkeert een leerling bewust waar hij 40–75% scoort, terwijl beheersing μ ≥ 0,80 vraagt en "vastgelopen" μ < 0,75 is — met een symmetrische factor was μ gewoon het scorepercentage, zodat een goed gekalibreerde leerling die lang genoeg bevraagd werd per ontwerp onder de grens eindigde (in de klasdata: 154 vragen op moeilijk, 65% juist, en toch "vastgelopen" en niet beheerst). De bestaande overtuigingen worden eenmalig, buiten de app, uit de beurthistoriek herspeeld met de nieuwe factor (alleen α, β en de stempel van §2.2), ná de verplichte client-update en vóór deze versie in gebruik gaat (#169). |
 | 1.0.15 | 2026-09-23 | Geen structuurwijziging aan M of P. §1.7: het voortgangsbalkje van een subdoel blijft ook na het doorschuiven de echte fractie beheerste leerdoelen tonen. Voorheen zette de app de opgeslagen fractie hard op 1,0 zodra een subdoel doorschoof, ook wanneer dat met een vastgelopen leerdoel gebeurde: het balkje stond dan op 100% terwijl het punt, dat per leerdoel meet, het gat wél zag. "Afgerond" is nu een eigen stempel op het voortgangsdocument (`advancedAt`), waarop de tutor de keuze van het volgende subdoel en de app het vinkje baseren; de fractie zelf beweegt er niet door. Gevolg voor §2.4: de overgangsregel van v1.0.5 leest diezelfde fractie uit de voortgangshistoriek en kende zo aan élk leerdoel van een doorgeschoven subdoel 1,0 toe, het vastgelopen inbegrepen, waardoor M_start te hoog uitkwam en de groei G op 0 viel; vanaf nu staat in de historiek de echte fractie. Eerder opgeslagen historiek wordt niet herschreven (#161). |
 | 1.0.17 | 2026-09-24 | Geen structuurwijziging aan M of P. §2.8: nieuw mechanisme, de **controlevraag**. Een leerdoel uit een eerder subdoel dat je nog niet aantoonde, dat net onder de grens staat (μ vanaf 0,70 en onder 0,80) en dat al een week niet meer rechtstreeks bevraagd is, krijgt af en toe één vraag midden in het oefenen, zolang je recente werk op je niveau goed gaat (niveaugewogen ≥ 0,75 over je laatste tien antwoorden), met minstens vijf gewone oefeningen tussen twee vragen over een ander subdoel. Het antwoord telt als gewone meting van dat leerdoel, dus een juist antwoord kan de stempel van §2.2 alsnog opleveren; het telt niet voor je kalibratieniveau en raakt de voortgangsbalkjes niet. Reden: in de eerste rapportronde paste de leerkracht tien van de vijftien rapporten aan voor precies zulke leerdoelen (μ 0,74–0,80, op moeilijk bevraagd, daarna 12 tot 19 dagen niet meer terwijl de leerling later werk goed deed); de tutor vroeg er nooit meer naar, en decay trekt een overtuiging nooit over de grens, dus de leerling kon de stempel niet meer zelf verdienen (#187). §4 en bijlage A: de voorlopige waarden en de klok `lastProbedAt`. |
+| 1.0.18 | 2026-09-24 | Geen structuurwijziging aan M of P. §2.8: de controlevraag krijgt een tweede geval, **boven de grens**. Een leerdoel uit een eerder subdoel met μ vanaf 0,80 en genoeg bewijs, waarop je nooit rechtstreeks een juist antwoord gaf op je niveau (of waarvan oude data het niveau niet bijhield, §2.5), krijgt één controlevraag: minstens 7 dagen na de laatste rechtstreekse vraag, of meteen als het nooit rechtstreeks bevraagd werd, zonder voorwaarde op je recente werk. Een juist antwoord vervult voorwaarde 3 van §1.5 en geeft zo de stempel van §2.2 en het niveau in de ratel; een fout antwoord verlaagt de overtuiging. Reden: in de eerste rapportronde stond een leerdoel op μ 0,93 met bewijs op het plafond en toch niet aangetoond — de twee rechtstreekse vragen erover waren fout beantwoord, en de overtuiging kwam van 27 positieve signalen van opzij uit scripts in het volgende subdoel. Zulke signalen bewegen de ratel niet, en de tutor vroeg er niet meer naar, dus de leerling kon het niet meer zelf aantonen; de leerkracht moest het met de hand meetellen (#188). §4 en bijlage A: de voorlopige waarden. |
 | 1.0.16 | 2026-09-23 | **Structuurwijziging aan P.** §2.6: het puntvoorstel is de beheersingsscore, P = M; de groeiscore G (§2.4) vervalt, en daarmee M_start, de momentopname bij de periodestart (v1.0.7) en de overgangsregel uit de voortgangshistoriek (v1.0.5). §4: de open parameter w_M / w_G vervalt; bijlage A en B volgen. §2.9: "Mijn rapporten" toont M, k, u en d, geen beginscore of groei meer. §3.1 en §3.3 steunen niet langer op G: een trage start laat in M geen spoor na omdat de stempel van §2.2 niet vraagt wanneer je iets aantoonde. Reden: de app rekende 60/40 met G, terwijl de evaluatie buiten de app (regelset `1.0.10-eval1`, kader 4) al P = M schreef in dezelfde puntvoorstellen — wie in de app op "Opnieuw berekenen" drukte, kreeg een ander getal dan wat er stond; en G hing af van een momentopname die het ene keer exact en het andere keer een schatting was. De container `period_start_snapshots` wordt niet meer geschreven of gelezen; oude voorstellen en rapporten met `mStart` en `g` blijven leesbaar en worden niet herschreven (#191). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
@@ -628,6 +651,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | controlevraag: band | 0,70 ≤ μ < 0,80 (voorlopig, §4) | "net onder de grens", met decay zoals de tutor ze leest (§2.8) |
 | controlevraag: recent werk | ≥ 0,75, niveaugewogen over een vol kalibratievenster (voorlopig, §4) | juist × positieve factor, half/fout × negatieve factor van §1.2 (§2.8) |
 | controlevraag: tussenruimte | ≥ 5 gewone oefeningen (voorlopig, §4) | tussen twee vragen over een ander subdoel, controle- of opfrisvraag (§2.8) |
+| controlevraag boven de grens | μ ≥ 0,8 en α + β ≥ 4 met decay, zonder positief op gekalibreerd niveau of zonder trapinformatie; klok als hierboven, of meteen als nooit rechtstreeks bevraagd; geen voorwaarde op recent werk (voorlopig, §4) | "gekend" volgens de overtuiging, maar niet rechtstreeks bevestigd (§2.8, sinds v1.0.18); na de controlevragen net onder de grens aan de beurt |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
@@ -730,7 +754,13 @@ gezet), anders geldt het als nooit rechtstreeks bevraagd. Het antwoord
 wordt verwerkt als een gewone meting van dat leerdoel, net als een
 opfrisvraag, en het beurtrecord markeert de beurt als controlevraag
 (`isRecheck`) en noemt het subdoel waar je op dat moment mee bezig was
-(`activeSubgoalId`). Deel 2 staat sinds v1.0.5 in de
+(`activeSubgoalId`). Sinds v1.0.18 heeft die code een tweede regel
+(`RecheckRule.unconfirmed`, #188): voldoen μ en bewijs met decay aan
+voorwaarden 1 en 2 van §1.5, maar ontbreekt `lastPositiveAtCalibratedAt`
+of `highestPositiveDifficulty`, dan is het leerdoel aan de beurt op
+dezelfde klok, of meteen wanneer het nooit rechtstreeks bevraagd werd;
+de regel voor net onder de grens (`RecheckRule.nearGoal`) gaat voor. De
+reden in het beurtrecord zegt welke van de twee het leerdoel koos. Deel 2 staat sinds v1.0.5 in de
 code: de leerkracht legt mijlpalen vast (subdoelen, per leerdoel kern of
 uitbreiding, verwacht niveau, periode), berekent per leerling het voorstel —
 per leerdoel de stempel van §2.2 en de ratel van §2.5, zoals ze op het

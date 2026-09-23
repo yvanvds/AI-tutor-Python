@@ -480,9 +480,10 @@ release pressed again for reports nobody touched rewrites nothing.
   using in later work reads as fresh while nobody has put a question on
   it since. The recheck slot (conductor policy 2.6) needs exactly that
   distinction — it re-asks a not-yet-demonstrated LO of an earlier
-  subgoal once a week without a direct probe — so the conductor stamps
-  `lastProbedAt` on every write that may move the ratchets and carries
-  it over unchanged on every other write. A doc from before the field is
+  subgoal once a week without a direct probe, whether it sits just under
+  the bar (#187) or over it on evidence from later work (#188) — so the
+  conductor stamps `lastProbedAt` on every write that may move the
+  ratchets and carries it over unchanged on every other write. A doc from before the field is
   read as `lastUpdatedAt` when `lastQuestionType` says the LO was ever a
   question's target (never earlier than the truth, so at worst due
   late), and an indirect write on such a doc stores that reading instead
