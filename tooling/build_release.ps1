@@ -80,7 +80,10 @@ function Write-Utf8NoBom {
 function Find-Iscc {
     $inPath = Get-Command iscc.exe -ErrorAction SilentlyContinue
     if ($inPath) { return $inPath.Source }
+    # The per-user install location comes first: Inno Setup's installer offers
+    # it when run without admin rights, and that is where this machine has it.
     $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
         'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
         'C:\Program Files\Inno Setup 6\ISCC.exe'
     )
@@ -90,7 +93,9 @@ function Find-Iscc {
     throw @"
 ISCC.exe not found.
 Install Inno Setup 6 from https://jrsoftware.org/isinfo.php
-then either add it to PATH or place it in 'C:\Program Files (x86)\Inno Setup 6\'.
+then either add it to PATH or install it in one of:
+  %LOCALAPPDATA%\Programs\Inno Setup 6\   (per-user install)
+  C:\Program Files (x86)\Inno Setup 6\
 "@
 }
 
