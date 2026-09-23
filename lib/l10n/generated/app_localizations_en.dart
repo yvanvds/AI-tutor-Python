@@ -325,6 +325,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String reports_grade_reliability_unwired(int stale, int never) {
+    return 'Stale: $stale LOs (never probed: $never).';
+  }
+
+  @override
   String reports_grade_formulaVersion(String version, String ts) {
     return 'Formula v$version, computed $ts';
   }

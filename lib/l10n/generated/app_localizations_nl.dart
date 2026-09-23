@@ -326,6 +326,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String reports_grade_reliability_unwired(int stale, int never) {
+    return 'Verouderd: $stale leerdoelen (nooit bevraagd: $never).';
+  }
+
+  @override
   String reports_grade_formulaVersion(String version, String ts) {
     return 'Formule v$version, berekend $ts';
   }

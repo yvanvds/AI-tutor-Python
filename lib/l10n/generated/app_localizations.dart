@@ -637,6 +637,12 @@ abstract class AppLocalizations {
     int home,
   );
 
+  /// No description provided for @reports_grade_reliability_unwired.
+  ///
+  /// In en, this message translates to:
+  /// **'Stale: {stale} LOs (never probed: {never}).'**
+  String reports_grade_reliability_unwired(int stale, int never);
+
   /// No description provided for @reports_grade_formulaVersion.
   ///
   /// In en, this message translates to:

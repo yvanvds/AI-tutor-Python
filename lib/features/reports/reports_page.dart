@@ -50,6 +50,7 @@ import 'package:ai_tutor_python/services/grading/milestone_service.dart';
 import 'package:ai_tutor_python/services/grading/published_report.dart';
 import 'package:ai_tutor_python/services/grading/published_report_service.dart';
 import 'package:ai_tutor_python/services/grading/report_batch.dart';
+import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -698,6 +699,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     }
     final student = students[index];
     final theme = Theme.of(context);
+    final supervisionWired = ref.watch(supervisionSourceProvider).isWired;
     final p = _proposals[student.uid];
     final error = _errors[student.uid];
     final signed = p?.isSignedOff ?? false;
@@ -848,13 +850,27 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 4),
+          // The staleness half of this line is a measurement and always
+          // shows. The supervised/home tally is one only while a supervision
+          // registry is bound (#173, the same inert split #160 took out of
+          // the justification prompt): until Anchor lands every turn is
+          // `home` by construction, and "0 supervised" against every name in
+          // the class says nothing about anyone. The counts stay on the doc;
+          // only what the pane shows changes, and the tally comes back on
+          // its own once `isWired` does.
           Text(
-            l.reports_grade_reliability(
-              p.staleLoCount,
-              p.neverProbedCount,
-              p.supervisedTurns,
-              p.homeTurns,
-            ),
+            supervisionWired
+                ? l.reports_grade_reliability(
+                    p.staleLoCount,
+                    p.neverProbedCount,
+                    p.supervisedTurns,
+                    p.homeTurns,
+                  )
+                : l.reports_grade_reliability_unwired(
+                    p.staleLoCount,
+                    p.neverProbedCount,
+                  ),
+            key: const Key('reports-detail-reliability'),
             style: theme.textTheme.bodySmall,
           ),
           Text(

@@ -1,5 +1,5 @@
-// End-to-end (#99, #148, #149, #150, #160, #166, #168): the periodic grade
-// proposal, teacher side, now as a class-wide workflow that ends in a
+// End-to-end (#99, #148, #149, #150, #160, #166, #168, #173): the periodic
+// grade proposal, teacher side, now as a class-wide workflow that ends in a
 // published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
@@ -24,8 +24,10 @@
 //      bound — the shipped app until Anchor lands — the prompt carries no
 //      supervised/home split and no hint to name one, since a split that
 //      reads "0 supervised" for everyone is not a measurement (#160); with
-//      a registry bound it is back. The teacher then walks the class in the
-//      detail pane, adjusts a grade with a note and signs off.
+//      a registry bound it is back. The detail pane's reliability line
+//      follows the same rule (#173): the staleness counts always, the turn
+//      tally only with a registry bound. The teacher then walks the class
+//      in the detail pane, adjusts a grade with a note and signs off.
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
@@ -397,6 +399,20 @@ void main() {
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
+    // The reliability line stops at the staleness counts: with no registry
+    // bound the turn tally would read "0 supervised" against every name in
+    // the class, which is not a measurement (#173). It comes back with the
+    // registry — the wired flow below. The counts stay on the doc.
+    final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
+          .data,
+      'Stale: ${stored['staleLoCount']} LOs '
+      '(never probed: ${stored['neverProbedCount']}).',
+    );
+    expect(find.textContaining('Turns this period'), findsNothing);
+    expect(stored['supervisedTurns'], 0);
     expect(find.text(kJustification), findsOneWidget);
     // The model was told the number, and only the period's reports.
     final prompt = llm.sentInputs.single;
@@ -635,7 +651,9 @@ void main() {
   });
 
   testWidgets('with a supervision registry bound, the justification prompt '
-      'carries the supervised/home split again', (tester) async {
+      'and the detail pane carry the supervised/home split again', (
+    tester,
+  ) async {
     final llm = ScriptedLlm([kJustification]);
     final harness = AppHarness(
       identity: teacherIdentity,
@@ -652,6 +670,19 @@ void main() {
     await tester.tap(find.byKey(const Key('reports-run-one')));
     await pumpUntilFound(tester, find.text(kJustification));
     expect(llm.sends, 1);
+
+    // The pane shows the tally again, after the staleness counts: the line
+    // the shipped app cuts short (#173) is whole once a registry is bound.
+    final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
+          .data,
+      'Stale: ${stored['staleLoCount']} LOs '
+      '(never probed: ${stored['neverProbedCount']}). '
+      'Turns this period: ${stored['supervisedTurns']} supervised, '
+      '${stored['homeTurns']} at home.',
+    );
 
     // Now the split is a measurement, so the model gets it and is asked to
     // weigh it (#160 — the same prompt that leaves it out unwired).

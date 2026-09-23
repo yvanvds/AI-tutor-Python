@@ -159,6 +159,10 @@
       "home": { "type": "int" }
     }
   },
+  "reports_grade_reliability_unwired": "Stale: {stale} LOs (never probed: {never}).",
+  "@reports_grade_reliability_unwired": {
+    "placeholders": { "stale": { "type": "int" }, "never": { "type": "int" } }
+  },
   "reports_grade_formulaVersion": "Formula v{version}, computed {ts}",
   "@reports_grade_formulaVersion": {
     "placeholders": { "version": { "type": "String" }, "ts": { "type": "String" } }
