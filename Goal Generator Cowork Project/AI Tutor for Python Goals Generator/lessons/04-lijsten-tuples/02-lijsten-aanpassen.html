@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lijsten aanpassen met methodes</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+<p>Een lijst ligt niet vast. Terwijl je programma loopt, kan je er elementen aan toevoegen, ertussen schuiven, eruit halen en de volgorde veranderen.</p>
+
+<h2>Methodes van een lijst</h2>
+
+<p>Een lijst heeft eigen opdrachten, <em>methodes</em>. Je roept ze op met een punt achter de naam van de lijst, zoals je bij turtle <code>t.forward(100)</code> schreef. Een methode werkt rechtstreeks op de lijst zelf.</p>
+
+<h2>Toevoegen: append en insert</h2>
+
+<p><code>append</code> zet een waarde achteraan. <code>insert</code> zet een waarde op een gekozen positie; alles wat erna komt, schuift één plaats op.</p>
+
+<pre><code>boodschappen = ["brood", "kaas"]
+boodschappen.append("appels")
+boodschappen.insert(0, "melk")
+print(boodschappen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>['melk', 'brood', 'kaas', 'appels']</code></pre>
+
+<p>Met <code>append</code> in een lus bouw je een lijst op, vertrekkend van een lege lijst <code>[]</code>:</p>
+
+<pre><code>kwadraten = []
+for i in range(1, 5):
+    kwadraten.append(i * i)
+print(kwadraten)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>[1, 4, 9, 16]</code></pre>
+
+<h2>Verwijderen: remove en pop</h2>
+
+<p><code>remove</code> zoekt een <em>waarde</em> en haalt de eerste die hij vindt weg. <code>pop</code> haalt het element op een <em>positie</em> weg en geeft het terug, zodat je het nog kan gebruiken. Zonder getal neemt <code>pop()</code> het laatste element.</p>
+
+<pre><code>getallen = [5, 2, 8, 2]
+getallen.remove(2)
+print(getallen)
+laatste = getallen.pop()
+print(laatste, getallen)
+getallen.pop(0)
+print(getallen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>[5, 8, 2]
+2 [5, 8]
+[8]</code></pre>
+
+<div class="callout warn"><p>Bij <code>[3, 0, 1]</code> geeft <code>remove(0)</code> de lijst <code>[3, 1]</code>: de waarde 0 verdwijnt. <code>pop(0)</code> geeft <code>[0, 1]</code>: het element op positie 0 verdwijnt. Hetzelfde getal, een ander resultaat.</p></div>
+
+<h2>Zit het erin? in</h2>
+
+<p>Met <code>in</code> vraag je of een waarde in een lijst voorkomt. Het resultaat is <code>True</code> of <code>False</code>, dus je kan het rechtstreeks in een <code>if</code> gebruiken.</p>
+
+<pre><code>print("kaas" in boodschappen)
+print("vis" in boodschappen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>True
+False</code></pre>
+
+<p>Dat is nuttig vóór een <code>remove</code>. Vraag je een waarde weg te halen die er niet in zit, dan stopt je programma met een <code>ValueError</code>. Met <code>if "vis" in boodschappen:</code> ervoor vermijd je dat.</p>
+
+<h2>Samenvatten: sum, min en max</h2>
+
+<p><code>sum</code> telt alle getallen op, <code>min</code> en <code>max</code> geven het kleinste en het grootste. Samen met <code>len</code> heb je meteen een gemiddelde.</p>
+
+<pre><code>temperaturen = [14, 18, 11, 17]
+print(sum(temperaturen), min(temperaturen), max(temperaturen))
+gemiddelde = sum(temperaturen) / len(temperaturen)
+print(gemiddelde)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>60 11 18
+15.0</code></pre>
+
+<p>Merk op: dit zijn gewone functies met de lijst tussen haakjes, geen methodes met een punt.</p>
+
+<h2>Sorteren met sort</h2>
+
+<pre><code>temperaturen.sort()
+print(temperaturen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>[11, 14, 17, 18]</code></pre>
+
+<div class="callout warn"><p><code>sort</code> sorteert de lijst zelf en geeft niets terug. Schrijf dus niet <code>temperaturen = temperaturen.sort()</code>: dan bevat <code>temperaturen</code> daarna <code>None</code>, Pythons manier om "niets" te zeggen. Hetzelfde geldt voor <code>append</code>, <code>insert</code> en <code>remove</code>.</p></div>
+
+<p>Met deze methodes laat je een lijst groeien, krimpen en ordenen terwijl je programma loopt.</p>
+</body>
+</html>

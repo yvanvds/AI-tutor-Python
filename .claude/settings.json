@@ -27,7 +27,11 @@
       "PowerShell(Select-Object *)",
       "PowerShell(Where-Object *)",
       "PowerShell(ForEach-Object *)",
-      "PowerShell(Write-Host *)"
+      "PowerShell(Write-Host *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git branch *)",
+      "PowerShell(gh pr merge *)"
     ]
   }
 }

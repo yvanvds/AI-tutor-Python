@@ -45,3 +45,20 @@ Je kan herhalingen implementeren met for en while, programma's systematisch test
   - LOs: `choose_test_cases`, `predict_testcase_output`, `diagnose_from_error`, `fix_bug_via_testing`
 - **Van probleem naar programma** (`probleem-naar-programma`)
   - LOs: `decompose_problem`, `write_program_from_problem`, `predict_program_behavior`, `fix_logic_error`
+
+### 4. Lijsten en tuples (`lijsten-tuples`)
+
+Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen via hun index of met slicing, lijsten en strings doorlopen met lussen, zelf klassieke lijstalgoritmes schrijven, het verschil tussen veranderbare lijsten en onveranderbare tuples benutten, en met geneste lussen werken op paren en rasters.
+
+- **Lijsten, strings en indexen** (`lijsten-indexeren`)
+  - LOs: `predict_index_value`, `predict_index_error`, `write_modify_by_index`, `write_slice`, `predict_string_index`
+- **Lijsten aanpassen met methodes** (`lijsten-aanpassen`)
+  - LOs: `predict_list_after_methods`, `write_list_methods`, `recall_remove_vs_pop`, `predict_in_membership`, `write_list_builtins`, `predict_sort_in_place`
+- **Lijsten en strings doorlopen** (`lijsten-doorlopen`)
+  - LOs: `predict_for_over_list`, `write_index_loop`, `write_build_new_list`, `predict_loop_variable_copy`, `reason_element_vs_index_loop`, `write_turtle_from_list`
+- **Klassieke lijstpatronen** (`lijstpatronen`)
+  - LOs: `write_find_max_manual`, `predict_bad_initial_value`, `write_count_matching`, `write_search`, `write_swap_elements`, `predict_swap_without_temp`
+- **Tuples en onveranderbaarheid** (`tuples`)
+  - LOs: `predict_immutable_error`, `write_tuple_unpacking`, `write_loop_over_pairs`, `predict_list_aliasing`, `reason_tuple_vs_list`
+- **Geneste lussen en lijsten van lijsten** (`geneste-lussen`)
+  - LOs: `predict_nested_loop_output`, `write_all_pairs`, `reason_unique_pairs`, `predict_grid_index`, `write_grid_traversal`

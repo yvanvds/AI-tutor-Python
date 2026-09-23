@@ -1,0 +1,359 @@
+{
+  "goal": {
+    "id": "lijsten-tuples",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Lijsten en tuples",
+    "description": "Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen via hun index of met slicing, lijsten en strings doorlopen met lussen, zelf klassieke lijstalgoritmes schrijven, het verschil tussen veranderbare lijsten en onveranderbare tuples benutten, en met geneste lussen werken op paren en rasters.",
+    "order": 4000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "lijsten-indexeren",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Lijsten, strings en indexen",
+      "description": "Je kan een lijst aanmaken, elementen opvragen en aanpassen via hun index (ook negatief), een deel eruit halen met slicing, en een string op dezelfde manier indexeren als een reeks tekens.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the last-valid-index off-by-one: lean on `lijst[len(lijst)]` raising an IndexError.",
+        "Tie slice bounds to `range(a, b)` from the loops goal: the end is excluded — probe the length of a slice like `lijst[1:3]`.",
+        "Watch for students who think a negative index is an error; contrast `lijst[-1]` with `lijst[len(lijst) - 1]`.",
+        "Present strings as sequences of characters with the same indexing and slicing; do not probe assigning to a string index or string methods here — immutability belongs to the tuples subgoal."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "predict_index_value",
+          "statement": "Je kan voorspellen welk element lijst[i] oplevert, ook bij een negatieve index.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_index_error",
+          "statement": "Je kan met len() bepalen welke indexen geldig zijn en herkennen wanneer een index een IndexError geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_modify_by_index",
+          "statement": "Je kan een element van een lijst vervangen via zijn index.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_slice",
+          "statement": "Je kan een slice schrijven die een gevraagd deel uit een lijst of string haalt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_string_index",
+          "statement": "Je kan voorspellen welk teken of stuk je krijgt als je een string indexeert of slicet.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "lijsten-aanpassen",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Lijsten aanpassen met methodes",
+      "description": "Je kan een lijst laten groeien en krimpen met append, insert, remove en pop, met in controleren of een waarde erin zit, en sum, min, max en sort gebruiken.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe remove-vs-pop confusion with lists whose values overlap with valid indexes, so the two readings give different results.",
+        "Lean on `lijst = lijst.append(x)` and `lijst = lijst.sort()` as probes: these methods change the list in place and return None.",
+        "Probe that remove deletes only the first occurrence and raises a ValueError when the value is missing; pair it with `in` as a guard.",
+        "Keep sorted(), extend, index() and count() out of scope; a `for i in range(n)` loop with append is fine, but looping over the list itself belongs to the next subgoal."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "predict_list_after_methods",
+          "statement": "Je kan voorspellen hoe een lijst eruitziet na een reeks append-, insert-, remove- en pop-aanroepen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_list_methods",
+          "statement": "Je kan de juiste methode kiezen en schrijven om een element toe te voegen, in te voegen of te verwijderen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "recall_remove_vs_pop",
+          "statement": "Je kan het verschil benoemen tussen remove (verwijdert een waarde) en pop (verwijdert op een positie).",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_in_membership",
+          "statement": "Je kan voorspellen of waarde in lijst True of False oplevert.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_list_builtins",
+          "statement": "Je kan sum(), min(), max() en len() gebruiken om een lijst samen te vatten, bijvoorbeeld tot een gemiddelde.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_sort_in_place",
+          "statement": "Je kan voorspellen dat lijst.sort() de lijst zelf sorteert en niets teruggeeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "lijsten-doorlopen",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Lijsten en strings doorlopen",
+      "description": "Je kan met een for-lus elk element van een lijst of string verwerken, kiezen tussen een lus over de elementen en een lus over de indexen, een nieuwe lijst opbouwen door te filteren of om te zetten, en met turtle tekenen op basis van een lijst.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Watch for `for i in lijst` followed by `lijst[i]` — the student treats the element as an index; use meaningful loop-variable names in examples.",
+        "Probe in-place changes: `x = x * 2` inside an element loop leaves the list unchanged, an index loop with `lijst[i] = ...` does not.",
+        "When building a new list, watch for the empty result list being initialised inside the loop.",
+        "Vary between lists of numbers, lists of words and strings; for turtle, stay within t.forward, t.left, t.right and t.pencolor — no goto."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_for_over_list",
+          "statement": "Je kan voorspellen wat een for-lus over een lijst of string als uitvoer geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_index_loop",
+          "statement": "Je kan een lus over range(len(lijst)) schrijven wanneer je de index nodig hebt, bijvoorbeeld om elementen aan te passen of buren te vergelijken.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_build_new_list",
+          "statement": "Je kan in een lus een nieuwe lijst opbouwen door elementen te filteren of om te zetten.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_loop_variable_copy",
+          "statement": "Je kan voorspellen dat het aanpassen van x in for x in lijst de lijst zelf niet verandert.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_element_vs_index_loop",
+          "statement": "Je kan uitleggen wanneer je over de elementen loopt en wanneer over de indexen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_from_list",
+          "statement": "Je kan met turtle een figuur tekenen waarbij elke zijde haar lengte of kleur uit een lijst haalt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "lijstpatronen",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Klassieke lijstpatronen",
+      "description": "Je kan zelf veelgebruikte algoritmes over een lijst schrijven: het grootste of kleinste element zoeken zonder max() of min(), tellen wat aan een voorwaarde voldoet, zoeken of en waar een waarde voorkomt, en twee elementen van plaats wisselen.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the choice of initial value: starting from the first element is safer than 0 — lists with only negative numbers expose the bug.",
+        "break has not been introduced: searches use a boolean flag or a while loop with an index; watch for 'niet gevonden' being printed inside the loop at every mismatch.",
+        "Probe the lost-value bug when swapping without a temporary variable.",
+        "Once the manual version works, contrast it with the built-ins max(), min() and in."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_find_max_manual",
+          "statement": "Je kan zonder max() of min() een lus schrijven die het grootste of kleinste element vindt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_bad_initial_value",
+          "statement": "Je kan voorspellen wat er misloopt als de beginwaarde slecht gekozen is, zoals grootste = 0 bij enkel negatieve getallen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_count_matching",
+          "statement": "Je kan een lus schrijven die telt hoeveel elementen aan een voorwaarde voldoen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_search",
+          "statement": "Je kan een lus schrijven die zoekt naar een element dat aan een voorwaarde voldoet en onthoudt of en waar het gevonden werd.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_swap_elements",
+          "statement": "Je kan twee elementen van een lijst wisselen met een hulpvariabele.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_swap_without_temp",
+          "statement": "Je kan voorspellen wat er misloopt als je twee elementen wisselt zonder hulpvariabele.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "tuples",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Tuples en onveranderbaarheid",
+      "description": "Je kan tuples aanmaken, indexeren en uitpakken (ook om te wisselen of om een lijst van paren te doorlopen), uitleggen waarom tuples en strings niet aan te passen zijn, en voorspellen wat er gebeurt als twee namen naar dezelfde lijst verwijzen.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Connect immutability back to strings from the first subgoal: probe what `punt[0] = 5` and `woord[0] = 'K'` do.",
+        "Probe aliasing with `b = a`, then `b.append(...)` and `print(a)`; show `a[:]` (slicing) as a real copy.",
+        "Watch for the belief that parentheses make a tuple: the comma does, and `(5)` is just an int.",
+        "Frame tuple-vs-list as a fixed-shape record (coordinate, RGB colour) versus a collection that grows or shrinks."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_immutable_error",
+          "statement": "Je kan herkennen dat toewijzen aan een index van een tuple of string een fout geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_tuple_unpacking",
+          "statement": "Je kan een tuple uitpakken in afzonderlijke variabelen, ook om twee waarden te wisselen met a, b = b, a.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_loop_over_pairs",
+          "statement": "Je kan een lijst van tuples doorlopen met for x, y in punten.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_list_aliasing",
+          "statement": "Je kan voorspellen dat na b = a een wijziging via b ook in a te zien is.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_tuple_vs_list",
+          "statement": "Je kan uitleggen wanneer een tuple beter past dan een lijst.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "geneste-lussen",
+      "type": "goal",
+      "parentId": "lijsten-tuples",
+      "title": "Geneste lussen en lijsten van lijsten",
+      "description": "Je kan een lus in een lus schrijven om paren uit een lijst te overlopen, voorspellen hoe vaak de binnenste lus loopt, en een raster als lijst van lijsten doorlopen en aanpassen met rooster[r][k].",
+      "order": 6000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe iteration counts by tracing small lists and counting, not with a formula.",
+        "Watch for rows and columns being swapped: in `rooster[r][k]` the first index selects the row.",
+        "Probe pairing an element with itself when both loops start at 0, and contrast with an inner loop starting at `i + 1`.",
+        "Build grids with literals or with append in a loop; avoid `[[0]*n]*m` — list repetition has not been introduced and it hides an aliasing trap."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_nested_loop_output",
+          "statement": "Je kan voorspellen welke uitvoer een geneste lus geeft en hoe vaak de binnenste lus loopt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_all_pairs",
+          "statement": "Je kan een geneste lus schrijven die paren elementen uit een lijst vergelijkt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_unique_pairs",
+          "statement": "Je kan uitleggen waarom range(i + 1, len(lijst)) in de binnenste lus elk paar maar één keer oplevert.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_grid_index",
+          "statement": "Je kan voorspellen welk element rooster[r][k] oplevert in een lijst van lijsten.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_grid_traversal",
+          "statement": "Je kan een lijst van lijsten rij per rij doorlopen, bijvoorbeeld om een raster af te drukken of een totaal te berekenen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}
