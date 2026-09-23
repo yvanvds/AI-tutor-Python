@@ -47,6 +47,7 @@ import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/milestones/milestones_page.dart';
 import 'package:ai_tutor_python/features/reports/reports_page.dart';
+import 'package:ai_tutor_python/services/grading/grade_formula.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -437,7 +438,7 @@ void main() {
     expect(doc['justification'], kJustification);
     expect(doc['signedOffAt'], isA<String>());
     expect(doc['mStartSource'], 'history');
-    expect(doc['formulaVersion'], '1.0.7');
+    expect(doc['formulaVersion'], GradingConstants.formulaVersion);
 
     // And the drawer that used to own all of this has let it go.
     await tester.tap(find.byTooltip('Students'));
@@ -659,7 +660,7 @@ void main() {
     expect(report['note'], 'Ziek in week 3.');
     expect(report['justification'], kJustification);
     // The breakdown a student may recompute, and when it was measured.
-    expect(report['formulaVersion'], '1.0.7');
+    expect(report['formulaVersion'], GradingConstants.formulaVersion);
     expect(report['mEnd'], 90);
     expect(report['mStart'], 50);
     expect((report['g'] as num).toDouble(), closeTo(0.8, 1e-9));

@@ -21,6 +21,7 @@
 //   flutter test integration_test/flows/period_start_snapshot.dart -d windows
 
 import 'package:ai_tutor_python/features/reports/reports_page.dart';
+import 'package:ai_tutor_python/services/grading/grade_formula.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -216,7 +217,7 @@ void main() {
     expect(doc['mStart'], 0.0);
     expect(doc['mStartSource'], 'snapshot');
     expect(doc['mStartInexactCount'], 0);
-    expect(doc['formulaVersion'], '1.0.7');
+    expect(doc['formulaVersion'], GradingConstants.formulaVersion);
 
     await teacher.dispose(tester);
   });

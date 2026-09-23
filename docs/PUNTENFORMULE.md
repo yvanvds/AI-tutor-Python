@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-22.
+schaduwperiode (zie §4). Laatste wijziging: 2026-09-23.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
