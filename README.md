@@ -204,7 +204,7 @@ When you start the app for the first time:
 
    You can use `{goal}`, `{subgoal}`, `{suggestions}`, and `{known concepts}` as placeholders in any section. They get filled in at runtime from the active goal.
 4. Go to **Goals** and build your goal tree. Roots are top-level themes ("Variables", "Loops", …); children are concrete subgoals. The tutor walks the tree in order.
-5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`.
+5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build.
 
 Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
 

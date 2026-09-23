@@ -109,4 +109,25 @@ void main() {
       expect(svc.cachedConfig?.apiKey, 'sk-school');
     },
   );
+
+  test('setModel carries the minimum version the portal set (#165)', () async {
+    config = InMemoryCosmos([
+      _configDoc(extra: {'MinimumVersion': '2.6.0'}),
+    ]);
+    final provider = NotifierProvider<GlobalConfigService, GlobalConfig?>(
+      () => GlobalConfigService(container: config.container),
+    );
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await container.read(provider.notifier).setModel('gpt-4.1');
+
+    expect(config['global']!['MinimumVersion'], '2.6.0');
+    expect(config['global']!['Model'], 'gpt-4.1');
+    expect(
+      container.read(provider)?.minimumVersion,
+      '2.6.0',
+      reason: 'the published config lost the minimum the doc still has',
+    );
+  });
 }

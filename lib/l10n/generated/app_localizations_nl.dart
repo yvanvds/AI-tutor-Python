@@ -1099,6 +1099,14 @@ class AppLocalizationsNl extends AppLocalizations {
   String get update_action_check => 'Controleren op updates';
 
   @override
+  String get update_required_title => 'Update vereist';
+
+  @override
+  String update_required_message(String local, String minimum) {
+    return 'Deze versie van de app ($local) is ouder dan de versie die de school vereist ($minimum). Werk bij om verder te gaan.';
+  }
+
+  @override
   String get session_explain_placeholder_noSubgoal =>
       'Kies een subdoel in Leerpad om de uitleg te bekijken.';
 

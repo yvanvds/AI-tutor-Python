@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -9,6 +10,7 @@ import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,6 +52,12 @@ class GoalsApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final identity = ref.watch(authServiceProvider);
     final currentAccount = ref.watch(accountServiceProvider);
+    // Whether this build may run at all (#165), asked only once someone is
+    // signed in so the sign-in page reads nothing: `AsyncLoading` until the
+    // config has answered, then the requirement or `null`.
+    final AsyncValue<UpdateRequirement?>? requirement = identity == null
+        ? null
+        : ref.watch(updateRequirementProvider);
     final hasLocalKey = ref.watch(
       localApiKeyStorageProvider.select((key) => key != null),
     );
@@ -73,11 +81,26 @@ class GoalsApp extends ConsumerWidget {
         builder: (context) {
           if (identity == null) return const SignInPage();
 
-          // Account doc still loading on first sign-in — show a spinner.
-          if (currentAccount == null) {
+          // Account doc still loading on first sign-in, or the config not yet
+          // asked which builds may run (#165) — show a spinner. The second
+          // wait is what keeps a build below the minimum from mounting the
+          // shell, and starting a session, on a `null` that only means "not
+          // read yet".
+          if (currentAccount == null ||
+              requirement == null ||
+              requirement.isLoading) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
+          }
+
+          // Below the school's minimum version (#165): the update screen and
+          // nothing else — no shell, no session, nothing to dismiss. Ahead of
+          // the key gate on purpose: an out-of-date build must not run,
+          // whatever key it would run on.
+          final UpdateRequirement? required = requirement.valueOrNull;
+          if (required != null) {
+            return UpdateRequiredScreen(requirement: required);
           }
 
           final hasGlobalPermission = currentAccount.mayUseGlobalKey;

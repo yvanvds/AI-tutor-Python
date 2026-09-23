@@ -1850,6 +1850,7 @@ TurnRecord {
   id: string                       // ISO timestamp + suffix
   uid: string                      // partition key
   turnAt: string                   // ISO 8601
+  clientVersion: string            // #165: kAppVersion of the build that wrote the doc; absent on older docs
   subgoalId: string                // the target LO's subgoal: the active
                                    // one, or the older one on a warm-up
 

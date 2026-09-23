@@ -279,6 +279,14 @@ class PersistedTurnRecord {
   /// when empty.
   final List<TurnReviewFlag> reviewFlags;
 
+  /// The build that wrote this doc (#165): the client's `kAppVersion`. A
+  /// student whose laptop has fallen behind — and whose `toMap`s therefore
+  /// no longer write every field the current schema has — is visible from
+  /// the audit trail instead of having to be inferred from the shape of
+  /// their belief docs. Omitted when unknown; missing on docs written
+  /// before the field existed.
+  final String? clientVersion;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -320,6 +328,7 @@ class PersistedTurnRecord {
     this.transferCredits = const [],
     this.reviewFlags = const [],
     this.isWarmUp = false,
+    this.clientVersion,
   });
 
   bool get hasStrongEvent =>
@@ -343,6 +352,7 @@ class PersistedTurnRecord {
     'hadFallback': hadFallback,
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
     'provenance': provenance.name,
+    if (clientVersion != null) 'clientVersion': clientVersion,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -418,6 +428,7 @@ class PersistedTurnRecord {
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
       appliedSignals: const [],
       provenance: EvidenceProvenance.parse(doc['provenance']),
+      clientVersion: doc['clientVersion'] as String?,
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

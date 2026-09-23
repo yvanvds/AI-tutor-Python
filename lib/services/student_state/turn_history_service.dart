@@ -8,14 +8,23 @@ import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TurnHistoryService {
-  TurnHistoryService({CosmosContainer? container, required this._getUid})
-    : _containerOverride = container;
+  TurnHistoryService({
+    CosmosContainer? container,
+    required this._getUid,
+    this._clientVersion,
+  }) : _containerOverride = container;
+
+  /// The build stamped on the docs this service synthesises itself (#165) —
+  /// the audit stubs of [appendAudit]. A graded turn's record arrives from
+  /// the tutor with its own.
+  final String? _clientVersion;
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;
@@ -69,6 +78,7 @@ class TurnHistoryService {
       loStatusAfter: const [],
       subgoalAdvanced: false,
       signalEvents: [event],
+      clientVersion: _clientVersion,
     );
     await append(record);
   }
@@ -246,5 +256,8 @@ class TurnHistoryService {
 }
 
 final turnHistoryServiceProvider = Provider<TurnHistoryService>((ref) {
-  return TurnHistoryService(getUid: () => ref.read(authServiceProvider)?.oid);
+  return TurnHistoryService(
+    getUid: () => ref.read(authServiceProvider)?.oid,
+    clientVersion: ref.watch(appVersionProvider),
+  );
 });

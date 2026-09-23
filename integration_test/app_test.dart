@@ -69,6 +69,7 @@ import 'flows/update_install.dart' as update_install;
 import 'flows/update_manual_check.dart' as update_manual_check;
 import 'flows/update_prompt.dart' as update_prompt;
 import 'flows/update_proxy.dart' as update_proxy;
+import 'flows/update_required.dart' as update_required;
 import 'flows/update_tls_fallback.dart' as update_tls_fallback;
 import 'flows/warm_up_review.dart' as warm_up_review;
 import 'flows/whats_new_overlay.dart' as whats_new_overlay;
@@ -129,5 +130,6 @@ void main() {
   update_check_failed_notice.main();
   update_tls_fallback.main();
   update_proxy.main();
+  update_required.main();
   whats_new_overlay.main();
 }

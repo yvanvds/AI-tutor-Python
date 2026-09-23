@@ -54,6 +54,7 @@ import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.d
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum TutorState { idle, working, hasFollowUp }
@@ -990,6 +991,9 @@ class TutorService extends Notifier<TutorState> {
       provenance: provenance,
       transferCredits: outcome.transferCredits,
       reviewFlags: outcome.reviewFlags,
+      // Which build wrote this (#165): the one thing that tells an
+      // out-of-date laptop from old seed data.
+      clientVersion: ref.read(appVersionProvider),
     );
     _debug.recordPersistedTurn(record, followUp: followUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));

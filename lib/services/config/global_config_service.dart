@@ -56,9 +56,13 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
   Future<void> setModel(String model) async {
     await safeCosmos(() async {
       final stored = await _container.read(_docId, partitionKey: _pk);
+      final storedConfig = GlobalConfig.fromMap(stored ?? const {});
       final next = GlobalConfig(
         model: model,
-        apiKey: GlobalConfig.fromMap(stored ?? const {}).apiKey,
+        apiKey: storedConfig.apiKey,
+        // The minimum version (#165) is the portal's to set, like the key;
+        // this writer carries it and never decides it.
+        minimumVersion: storedConfig.minimumVersion,
       );
       final base = Map<String, dynamic>.from(stored ?? const {})
         // Cosmos owns `_rid`, `_etag`, `_ts`…; echoing them back is at best

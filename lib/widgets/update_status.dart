@@ -18,9 +18,20 @@
 /// was a `debugPrint` and a line in About that nobody opens, and students
 /// behind a TLS-inspecting school filter sat two releases behind without a
 /// hint. It says where the reason is and has one button, which closes it.
+///
+/// [UpdateRequiredScreen] is the one place the update is not optional (#165):
+/// what a build below the minimum version the school has set on
+/// `config/global` gets instead of the app. A student who took **Later** on
+/// every launch kept writing with a build that did not know the fields
+/// later builds added, and every write erased them again; the strip's third
+/// option was exactly the problem there, so this screen has **Update** or
+/// **Check for updates**, and no way past.
 library;
 
+import 'dart:async';
+
 import 'package:ai_tutor_python/core/update_controller.dart';
+import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -178,6 +189,124 @@ class UpdateOfferBar extends ConsumerWidget {
               progress: state.progress,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// The screen a build below the school's minimum version gets instead of the
+/// app (#165). Mounted by `GoalsApp` in front of `AppShell`, so there is no
+/// shell behind it, no session, and nothing that writes a student document.
+///
+/// Deliberately not the offer bar with **Later** removed: the bar is chrome
+/// on top of a working app, and here there is no app to work. It says why in
+/// the student's terms — the version running and the version required — and
+/// then gives the one way forward: **Update to …** when a release is on
+/// offer, **Check for updates** when none is (a check that failed, a debug
+/// build that never checks by itself, nothing published yet), with the
+/// download's progress and the check's outcome in the same sentence the
+/// offer bar uses. `apply()` is still reached only from the button.
+///
+/// The shell's launch check (`AppShell.initState`) never runs while this
+/// stands in for the shell, so it runs from here instead — the same call,
+/// under the same rules (#47): nothing on a build that does not check by
+/// itself, and never an install without a press.
+class UpdateRequiredScreen extends ConsumerStatefulWidget {
+  const UpdateRequiredScreen({super.key, required this.requirement});
+
+  final UpdateRequirement requirement;
+
+  @override
+  ConsumerState<UpdateRequiredScreen> createState() =>
+      _UpdateRequiredScreenState();
+}
+
+class _UpdateRequiredScreenState extends ConsumerState<UpdateRequiredScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(updateControllerProvider.notifier).start());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final state = ref.watch(updateControllerProvider);
+    final controller = ref.read(updateControllerProvider.notifier);
+    final text = Theme.of(context).textTheme;
+    final release = state.release;
+
+    return Scaffold(
+      key: const ValueKey('update-required'),
+      backgroundColor: AppColors.ink0,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(
+                  Icons.system_update_alt_outlined,
+                  color: AppColors.accent,
+                  size: 40,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  l.update_required_title,
+                  key: const ValueKey('update-required-title'),
+                  style: text.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  l.update_required_message(
+                    widget.requirement.localVersion,
+                    widget.requirement.minimumVersion,
+                  ),
+                  key: const ValueKey('update-required-message'),
+                  style: text.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  updateStatusText(l, state),
+                  key: const ValueKey('update-required-status'),
+                  style: text.bodySmall?.copyWith(color: AppColors.fgMute),
+                  textAlign: TextAlign.center,
+                ),
+                if (state.phase == UpdatePhase.downloading) ...[
+                  const SizedBox(height: AppSpacing.m),
+                  UpdateProgressBar(
+                    key: const ValueKey('update-required-progress'),
+                    progress: state.progress,
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.lg),
+                Center(
+                  child: release != null
+                      ? FilledButton(
+                          key: const ValueKey('update-required-apply'),
+                          onPressed: state.busy ? null : controller.apply,
+                          child: Text(
+                            l.update_action_applyVersion(release.version),
+                          ),
+                        )
+                      : FilledButton(
+                          key: const ValueKey('update-required-check'),
+                          onPressed: state.busy ? null : controller.check,
+                          child: Text(l.update_action_check),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
