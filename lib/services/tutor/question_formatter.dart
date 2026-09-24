@@ -39,59 +39,82 @@ class QuestionFormatter {
         .toList(growable: false);
   }
 
-  static Map<String, dynamic> _withLOs(
-    Map<String, dynamic> base, {
+  /// Fields of a question-generation request: the LOs to probe, and the
+  /// questions asked most recently this session (#184). Generation goes out
+  /// without conversation history, so `recent_questions` — one line each,
+  /// oldest first, see `RecentQuestions` — is how the model can avoid
+  /// asking the same thing again. Both are omitted when empty.
+  static Map<String, dynamic> _questionFields({
     required List<LearningObjective> targetLOs,
-  }) {
-    if (targetLOs.isNotEmpty) {
-      base['target_los'] = encodeLOs(targetLOs);
-    }
-    return base;
-  }
+    required List<String> recentQuestions,
+  }) => {
+    if (targetLOs.isNotEmpty) 'target_los': encodeLOs(targetLOs),
+    if (recentQuestions.isNotEmpty) 'recent_questions': recentQuestions,
+  };
 
   static String socraticQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
+    List<String> recentQuestions = const [],
   }) => _encodeRequest(
     "socratic_question",
     difficulty: difficulty,
-    additionalFields: _withLOs({}, targetLOs: targetLOs),
+    additionalFields: _questionFields(
+      targetLOs: targetLOs,
+      recentQuestions: recentQuestions,
+    ),
   );
 
   static String mcQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
+    List<String> recentQuestions = const [],
   }) => _encodeRequest(
     "multiple_choice",
     difficulty: difficulty,
-    additionalFields: _withLOs({}, targetLOs: targetLOs),
+    additionalFields: _questionFields(
+      targetLOs: targetLOs,
+      recentQuestions: recentQuestions,
+    ),
   );
 
   static String explainCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
+    List<String> recentQuestions = const [],
   }) => _encodeRequest(
     "explain_code",
     difficulty: difficulty,
-    additionalFields: _withLOs({}, targetLOs: targetLOs),
+    additionalFields: _questionFields(
+      targetLOs: targetLOs,
+      recentQuestions: recentQuestions,
+    ),
   );
 
   static String completeCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
+    List<String> recentQuestions = const [],
   }) => _encodeRequest(
     "complete_code",
     difficulty: difficulty,
-    additionalFields: _withLOs({}, targetLOs: targetLOs),
+    additionalFields: _questionFields(
+      targetLOs: targetLOs,
+      recentQuestions: recentQuestions,
+    ),
   );
 
   static String writeCodeQuestion(
     QuestionDifficulty difficulty, {
     List<LearningObjective> targetLOs = const [],
+    List<String> recentQuestions = const [],
   }) => _encodeRequest(
     "write_code",
     difficulty: difficulty,
-    additionalFields: _withLOs({}, targetLOs: targetLOs),
+    additionalFields: _questionFields(
+      targetLOs: targetLOs,
+      recentQuestions: recentQuestions,
+    ),
   );
 
   static String requestHint(String currentCode) => _encodeRequest(
@@ -167,15 +190,20 @@ class QuestionFormatter {
     ),
   );
 
+  /// Grading payload for a multiple-choice answer. [correctOption] is the
+  /// question's answer key as option text (#197, LLM_CONTRACT "The answer
+  /// key"); the tutor passes it only for a pick the student has made, and
+  /// `answerKeyDirective` tells the grader how to use it. Omitted when null.
   static String mcqAnswer(
     String answer, {
+    String? correctOption,
     List<LearningObjective> targetLOs = const [],
     String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "mcq_answer",
     additionalFields: _gradingFields(
-      {"answer": answer},
+      {"answer": answer, "correct_option": ?correctOption},
       targetLOs: targetLOs,
       targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,

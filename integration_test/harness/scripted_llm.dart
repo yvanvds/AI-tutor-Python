@@ -43,13 +43,34 @@ class ScriptedLlm extends OpenaiConnector {
   /// output-language directive follows the language picked in Options).
   final List<String> sentInstructions = <String>[];
 
+  /// The history scope of every request, streaming or not, in order (#184).
+  final List<PreviousInputs> sentScopes = <PreviousInputs>[];
+
+  /// The conversation history every request carried in front of its input,
+  /// in order (#184) — what the model would have read before it. Kept by
+  /// the connector's own bookkeeping, so a flow sees the real scope.
+  final List<List<Map<String, String>>> sentHistories =
+      <List<Map<String, String>>>[];
+
+  String _lastInput = '';
+  PreviousInputs _lastScope = PreviousInputs.includeSession;
+
   /// What is left unplayed — a flow asserts this is empty when it expected
   /// every scripted reply to be consumed.
   int get remaining => _replies.length;
 
   String? _take() => _replies.isEmpty ? null : _replies.removeAt(0);
 
-  Stream<StreamChunk> _play(String input) {
+  void _open(String input, PreviousInputs inputs) {
+    sends++;
+    sentInputs.add(input);
+    sentScopes.add(inputs);
+    sentHistories.add(historyForCall(inputs));
+    _lastInput = input;
+    _lastScope = inputs;
+  }
+
+  Stream<StreamChunk> _play(String input, PreviousInputs inputs) {
     final reply = _take();
     if (reply == null) {
       return Stream.value(
@@ -60,11 +81,7 @@ class ScriptedLlm extends OpenaiConnector {
         ),
       );
     }
-    return assembleStream(
-      Stream.value(reply),
-      input: input,
-      inputs: PreviousInputs.includeSession,
-    );
+    return assembleStream(Stream.value(reply), input: input, inputs: inputs);
   }
 
   @override
@@ -73,16 +90,15 @@ class ScriptedLlm extends OpenaiConnector {
     required String input,
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) {
-    sends++;
-    sentInputs.add(input);
+    _open(input, inputs);
     sentInstructions.add(instructions);
-    return _play(input);
+    return _play(input, inputs);
   }
 
   @override
   Stream<StreamChunk> resendRequestStream() {
     resends++;
-    return _play('');
+    return _play(_lastInput, _lastScope);
   }
 
   @override
@@ -91,8 +107,7 @@ class ScriptedLlm extends OpenaiConnector {
     required String input,
     PreviousInputs inputs = PreviousInputs.includeSession,
   }) async {
-    sends++;
-    sentInputs.add(input);
+    _open(input, inputs);
     sentInstructions.add(instructions);
     return _reply();
   }

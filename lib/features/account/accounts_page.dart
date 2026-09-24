@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
 import 'package:ai_tutor_python/features/account/students_sort_prefs.dart';
 import 'package:ai_tutor_python/features/account/students_view_prefs.dart';
+import 'package:ai_tutor_python/features/account/token_usage_card.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -207,6 +208,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Tokens per class (#183), over every account — not the filtered
+        // list: the card reports per class already.
+        TokenUsageCard(accounts: all),
+        const SizedBox(height: 12),
         _buildSearchAndPageSizeRow(classes),
         if (_selectedUids.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.s),

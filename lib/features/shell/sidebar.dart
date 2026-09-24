@@ -7,9 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const double sidebarWidth = 72;
 
-/// The 48 px touch target of one rail entry, and the margin around it.
-const double _itemHeight = 48;
+/// The 44 px touch target of one rail entry, and the margin around it.
+///
+/// 48 until #185: the Questions entry took the one entry of slack #156 had
+/// put back, and 44 — with the logo's gaps below trimmed — buys it back. The
+/// entry stays square: its highlight is inset to the same 44 px across.
+const double _itemHeight = 44;
 const double _itemMargin = 1;
+
+/// The highlight's inset from the rail's edges, so it is as wide as it is
+/// tall.
+const double _itemInset = (sidebarWidth - _itemHeight) / 2;
 
 /// The vertical room one rail entry takes — its touch target plus margin.
 ///
@@ -41,6 +49,8 @@ class Sidebar extends ConsumerWidget {
   static const _teacherSections = [
     Section.goals,
     Section.lessonContent,
+    // Next to the lesson content: the questions asked about it (#185).
+    Section.questions,
     Section.instructions,
     Section.students,
     Section.milestones,
@@ -65,9 +75,9 @@ class Sidebar extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.m),
           const _Logo(),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.lg),
           // The destinations scroll; Options and sign-out stay pinned to the
           // bottom (#156). Before this they sat in this Column under a
           // `Spacer()`, which has no room to give: the rail grew a section
@@ -154,6 +164,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.flag_outlined;
       case Section.lessonContent:
         return Icons.menu_book_outlined;
+      case Section.questions:
+        return Icons.quiz_outlined;
       case Section.instructions:
         return Icons.integration_instructions_outlined;
       case Section.students:
@@ -278,7 +290,7 @@ class _SidebarItemState extends State<_SidebarItem> {
                     ),
                   ),
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                  margin: const EdgeInsets.symmetric(horizontal: _itemInset),
                   decoration: BoxDecoration(
                     color: tinted,
                     borderRadius: BorderRadius.circular(AppRadius.inputLarge),

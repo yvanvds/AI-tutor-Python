@@ -227,6 +227,94 @@ void main() {
     expect(out, isEmpty);
   });
 
+  group('answer-key directive (#197)', () {
+    Future<String> generate(ChatRequestType type) =>
+        InstructionGenerator().generateInstructions(
+          type,
+          goalSelection: GoalSelectionState(
+            selectedRoot: root(),
+            selectedChild: subgoal(),
+          ),
+          cachedInstructions: [
+            // A teacher's own grading rules, which the directive does not
+            // replace.
+            makeInstruction('mcqAnswer', {'main': 'Leg kort uit waarom.'}),
+            makeInstruction('mcQuestion', {'main': 'Geef vier opties.'}),
+          ],
+          fetchInstructions: () async => const [],
+          fetchRootGoals: () async => const [],
+          languageCode: 'nl',
+        );
+
+    test(
+      'the grader of a multiple-choice pick is told how to treat the key, '
+      'after the teacher\'s body and before the language directive',
+      () async {
+        final out = await generate(ChatRequestType.mcqAnswer);
+        expect(out, contains(answerKeyDirective));
+        expect(out, contains('Leg kort uit waarom.'));
+        final at = out.indexOf('ANSWER KEY — STRICT.');
+        expect(at, greaterThan(out.indexOf('Leg kort uit waarom.')));
+        expect(at, lessThan(out.indexOf('OUTPUT LANGUAGE')));
+      },
+    );
+
+    test('it takes the key as the intended answer, yet keeps the grade the '
+        'grader\'s own and the key away from the student', () {
+      expect(answerKeyDirective, contains('`correct_option`'));
+      expect(answerKeyDirective, contains('Take it as the intended answer'));
+      expect(
+        answerKeyDirective,
+        contains('grade the pick by what is actually right, not by the key'),
+      );
+      expect(
+        answerKeyDirective,
+        contains('never adjust it to agree with the key'),
+      );
+      expect(answerKeyDirective, contains('Never mention `correct_option`'));
+    });
+
+    test('a wrong key is also said outright, whatever the pick, and never '
+        'to the student (#198)', () {
+      expect(
+        answerKeyDirective,
+        contains(
+          'When you find the key wrong, add `"keyDisputed": true` to META, '
+          'whichever option was picked',
+        ),
+      );
+      expect(
+        answerKeyDirective,
+        contains('Leave `keyDisputed` out when the key is right'),
+      );
+      expect(
+        answerKeyDirective,
+        contains('Never mention `correct_option`, `keyDisputed`'),
+      );
+      expect(answerKeyDirective, contains('not even that the key is wrong'));
+      expect(
+        answerKeyDirective,
+        contains('on its own merits, without `keyDisputed`'),
+      );
+    });
+
+    test('no other request type gets it', () async {
+      for (final type in [
+        ChatRequestType.mcQuestion,
+        ChatRequestType.submitCode,
+        ChatRequestType.followUpAnswer,
+        ChatRequestType.contentQuestion,
+        ChatRequestType.status,
+      ]) {
+        expect(
+          await generate(type),
+          isNot(contains('ANSWER KEY')),
+          reason: type.name,
+        );
+      }
+    });
+  });
+
   group('output-language directive (#117)', () {
     Future<String> generate(String languageCode) =>
         InstructionGenerator().generateInstructions(

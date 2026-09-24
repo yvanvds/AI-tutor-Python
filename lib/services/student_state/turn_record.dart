@@ -7,6 +7,7 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 
 class CandidateLoStat {
   final String loId;
@@ -299,6 +300,34 @@ class PersistedTurnRecord {
   /// before the field existed.
   final String? clientVersion;
 
+  /// What the LLM calls behind this record cost, in tokens (#183): the
+  /// question, the grading, a hint, a follow-up — every call made since the
+  /// previous record, split per kind of call, with the model. `null` — and
+  /// omitted — when none reported a usage block, and on every doc written
+  /// before the field existed.
+  final TurnUsage? usage;
+
+  /// The question bank entry this turn graded an answer to (#185): the
+  /// `id` of its doc in `questions`, whose partition is [subgoalId]. Set on
+  /// the grade of the question itself — not on a follow-up's, which answers
+  /// the grader's own question — and omitted when no question was tracked
+  /// (an audit stub, a doc from before the bank). The id is a content hash,
+  /// so it is there even when the bank write itself failed; #186 reads it
+  /// to tell which bank questions a student already had.
+  final String? questionId;
+
+  /// Whether the question came out of the question bank instead of a
+  /// generation call (#186, CONDUCTOR_POLICY §2.7). Omitted when false.
+  final bool fromBank;
+
+  /// Whether the verdict and the target LO's signal came from the bank's
+  /// answer key rather than from the grader (#186): a multiple-choice pick
+  /// on a bank question, `positive`/`strong` when it is the key and
+  /// `negative`/`moderate` when it is not. False — and omitted — for every
+  /// grade the grader made, including a bank question's pick the grader
+  /// judged against the key.
+  final bool gradedByKey;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -343,6 +372,10 @@ class PersistedTurnRecord {
     this.isRecheck = false,
     this.activeSubgoalId,
     this.clientVersion,
+    this.usage,
+    this.questionId,
+    this.fromBank = false,
+    this.gradedByKey = false,
   });
 
   bool get hasStrongEvent =>
@@ -369,6 +402,10 @@ class PersistedTurnRecord {
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
     'provenance': provenance.name,
     if (clientVersion != null) 'clientVersion': clientVersion,
+    if (usage != null) 'usage': usage!.toJson(),
+    if (questionId != null) 'questionId': questionId,
+    if (fromBank) 'fromBank': true,
+    if (gradedByKey) 'gradedByKey': true,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -447,6 +484,10 @@ class PersistedTurnRecord {
       appliedSignals: const [],
       provenance: EvidenceProvenance.parse(doc['provenance']),
       clientVersion: doc['clientVersion'] as String?,
+      usage: TurnUsage.tryFromJson(doc['usage']),
+      questionId: doc['questionId'] as String?,
+      fromBank: (doc['fromBank'] as bool?) ?? false,
+      gradedByKey: (doc['gradedByKey'] as bool?) ?? false,
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

@@ -499,7 +499,7 @@ Do NOT include the exercise code here. The TEXT must contain only the question (
   "correct": "A"
 }
 
-Provide 3 to 5 options. The `correct` field uses the positional letter (A = first option, B = second, …). It commits you to a specific intended answer for the grader's downstream call. Do NOT put letter prefixes inside the option text — the UI renders the letter badge separately, so any prefix appears twice.
+Provide 3 to 5 options, exactly one of them right. The `correct` field names it with its positional letter (A = first option, B = second, …). It commits you to a specific intended answer: the grader of the student's pick is given that option as the answer key and checks it, and a question whose key the grader contradicts is not asked again from the question bank. Do NOT put letter prefixes inside the option text — the UI renders the letter badge separately, so any prefix appears twice.
 
 ## 04 Rules
 

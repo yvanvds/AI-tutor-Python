@@ -57,6 +57,19 @@ void main() {
     expect((m['goal_scope_los'] as List).last['subgoalId'], 'sub-2');
   });
 
+  test('mcqAnswer carries the answer key as correct_option when given, and '
+      'nothing of it otherwise (#197)', () {
+    final keyed = jsonDecode(
+      QuestionFormatter.mcqAnswer('11', correctOption: '2'),
+    ) as Map<String, dynamic>;
+    expect(keyed['answer'], '11');
+    expect(keyed['correct_option'], '2');
+
+    final plain =
+        jsonDecode(QuestionFormatter.mcqAnswer('11')) as Map<String, dynamic>;
+    expect(plain.containsKey('correct_option'), isFalse);
+  });
+
   test('grading payloads name the subgoal of the target LOs when told '
       '(#102); question payloads never do', () {
     const lo = LearningObjective(id: 't', statement: 't', kind: LoKind.apply);
@@ -94,6 +107,44 @@ void main() {
     final m = jsonDecode(raw) as Map<String, dynamic>;
     expect(m.containsKey('target_los'), isFalse);
     expect(m['difficulty'], 'hard');
+  });
+
+  test('every question request carries the recent questions, oldest first, '
+      'and omits the block when there are none (#184)', () {
+    const recent = [
+      'complete_code | lo-print | Vul aan. `print(___)`',
+      'multiple_choice | lo-var | Wat toont dit? `x = 3; print(x)`',
+    ];
+    final builders = <String, String Function(List<String> recentQuestions)>{
+      'socratic_question': (r) => QuestionFormatter.socraticQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'multiple_choice': (r) => QuestionFormatter.mcQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'explain_code': (r) => QuestionFormatter.explainCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'complete_code': (r) => QuestionFormatter.completeCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'write_code': (r) => QuestionFormatter.writeCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+    };
+    for (final MapEntry(key: type, value: build) in builders.entries) {
+      final withRecent = jsonDecode(build(recent)) as Map<String, dynamic>;
+      expect(withRecent['request_type'], type);
+      expect(withRecent['recent_questions'], recent, reason: type);
+
+      final without = jsonDecode(build(const [])) as Map<String, dynamic>;
+      expect(without.containsKey('recent_questions'), isFalse, reason: type);
+    }
   });
 
   test('contentQuestion carries the question and the page as text, and '

@@ -299,6 +299,8 @@ was *never* mastered is not review material either; the recheck slot
 **The question.** The gentlest acceptable type for the LO's kind (the
 1.1 cold-start table — an MCQ for `recall`, `completeCode` for `apply`,
 …) at the student's calibrated difficulty, no notch-drop override (2.3).
+It comes from the question bank whenever one fits the plan (2.7, no
+minimum, no roll), else it is generated.
 "Light" is the cadence and the type, not the difficulty: a review asked
 at `easy` would carry the 0.6 weight and could not confirm anything at
 the level the LO was mastered at.
@@ -639,6 +641,7 @@ nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
     if shouldDropNotch(target_lo, beliefs[target_lo]):
         difficulty = oneStepDown(difficulty)
     return Question(targetLOs=[target_lo], type=type, difficulty=difficulty)
+    # the host then serves it from the bank or generates it (2.7)
 
 pickType(lo, belief):
     acceptable = acceptableTypes(lo.kind)    # from table
@@ -759,7 +762,8 @@ cache write or advancement for either subgoal; a transfer nomination on
 the target itself is dropped (3.7); other signals are incidental under
 2.4. Right or wrong, the probe clock restarts, so the LO waits another
 `recheckAfter` before it can come back. The chat announces it
-(`recheck` notice, naming the old subgoal).
+(`recheck` notice, naming the old subgoal). Like a warm-up, the question
+comes from the question bank whenever one fits (2.7).
 
 **Audit.** The turn record (8.1) carries `isRecheck: true`, names the old
 subgoal in `subgoalId`, the LO in `targetLOIds` and the subgoal the
@@ -775,7 +779,127 @@ branch in `_recheckRuleFor`, its `chosenReason`, and its tests; the slot,
 spacing, ordering, question, grading, notice and record are reused as
 they are.
 
-### 2.7 What this section deliberately does not address
+### 2.7 Where the question comes from: the question bank (#186)
+
+2.1–2.3 (or 1.5, 2.6) decide *what* to ask: one target LO, of a subgoal,
+with a type and a difficulty. Every question the tutor generates is kept
+in the question bank (the `questions` container, #185), where the teacher
+hides the bad ones on the Questions page. Once the bank holds enough
+questions that fit a plan, the question can come from there instead of a
+generation call: no wait, a question the teacher can have seen, and — for
+multiple choice — no tokens at all. The rule lives in `BankChoice`
+(`lib/services/tutor/bank_choice.dart`); the tutor does the reads and
+hands it what it found.
+
+**What fits a plan.** A bank question that is active (not hidden), filed
+under the plan's target subgoal — the active one, or the older one of a
+warm-up or recheck — with the plan's target LO among its `targetLOIds`, the
+plan's type (as the model returned it) and the plan's difficulty, in the
+student's language (#117). A notch-dropped plan (2.3) takes a question of
+the dropped level: levels are never mixed, so the evidence weighs what was
+asked (3.2).
+
+**What may be served.** Multiple choice, `completeCode`, `explainCode` and
+`writeCode`. Socratic questions are not: an umbrella for dialogue openers
+(1.1) that lean on the moment they were asked in. A multiple-choice question
+needs an answer key that is one of its options (stored as option text,
+since the options are shuffled) and that no grading ever contradicted or
+called wrong (#198) — `graderDisagreesWithKey`, the warning on the
+Questions page: a key the grader doubted is not one to grade by.
+
+**New to the student.** Never the same question twice for one student: not
+one on their turn records (`questionId`, 8.1, read once per subgoal per
+session), not one this session already put in front of them (answered or
+not, generated or served), and not one they got first (`createdByUid`). A
+question served and left unanswered in an earlier session can come back:
+nothing was graded on it.
+
+**The mix.** An ordinary question comes from the bank only when at least
+**N** questions fit, may be served and are new (`QuestionBankMinimum` in
+`config/global`, default `PolicyConstants.bankMinimum` = 8), and then with
+chance **p** (`QuestionBankShare`, default `bankShare` = 0.5); otherwise it
+is generated, and the bank grows. So the bank fills per level, a level with
+fewer than N keeps generating, and students do not all get the same few
+questions. Both knobs are set from the Cosmos portal and can change per
+period without a build; p = 0 switches serving off (the bank still fills).
+The dice are rolled before the bank is read — the same odds as rolling
+after the count, and a plan the roll gives to generation costs no read.
+
+**Warm-up reviews and rechecks come from the bank whenever they can.** A
+warm-up review (1.5) or a recheck (2.6) takes a bank question as soon as one
+fits, with no minimum and no roll (`bankMinimumOffSubgoal` = 1): one short
+question on older material, which the bank has at once and for no tokens.
+The mix is there against copying and for variety in a class; a question on
+an LO each student reaches on their own schedule needs neither. The
+question is still a direct probe of that LO at the calibrated level —
+everything 1.5 and 2.6 say about grading it holds. p = 0 switches this off
+too.
+
+**Which one.** The least recently asked (`lastAskedAt` on the bank doc —
+across the school, which during a lesson is the class), then the least
+asked, then the id. With the options in random order (the handler shuffles
+them; the UI draws the letters) and the mix, that is what keeps neighbours
+from copying each other's answers.
+
+**Put in front of the student like a generated one.** The same handler,
+the same `notePlannedQuestion` (so the per-LO rotation, the recheck spacing
+and the warm-up slot move exactly as for a generated question), the same
+`recent_questions` line (#184). A generation call opens the exercise its
+reply starts; a bank question opens its exercise itself, so a later grading
+or hint call reads it as the exercise's own. The ask is counted on the bank
+doc.
+
+**A multiple-choice pick is graded from the key.** Right or wrong is known.
+The target LO's signal is fixed — the key: `positive`/`strong`; any other
+option: `negative`/`moderate` — and integrated exactly like a grader's
+signal on a direct probe: the plan's difficulty multiplier (3.2) and the
+provenance, both ratchets and the stamp (4.3), the notch-drop counter
+(2.3 — a moderate negative is no strike), `lastQuestionType`, the probe
+clock, the calibration window (5), the cache and advancement (4.5); for a
+warm-up or recheck, everything 1.5 and 2.6 say instead. No incidental
+signals, no transfer nominations, and no follow-up (6.3): the same pick of
+the same question gives the same evidence every time. The feedback text is
+the grader's text for that option, kept in the bank (`optionFeedback`) the
+first time a student picked it, shown in the colour it was written with.
+When the bank has no text for the pick — or one whose verdict does not
+match the key — one `mcqAnswer` grading call fetches it, on the exercise's
+own exchange; the verdict and the signal still come from the key, and the
+bank keeps the text for the next student ("the next time for free"). That
+call is told the key (`correct_option`, #197), as the grading call of a
+pick on a fresh question is: the grader takes it as the intended answer
+but judges the pick itself (LLM_CONTRACT "The answer key"), so a wrong key
+can still be contradicted — the check below means something. If
+the grader on that call judges the pick the other way, or says the key
+itself is wrong (`keyDisputed`, #198 — the only sign of a wrong key when
+the pick is another wrong option, on which grade and key agree), the key
+is in doubt: the grader's grade stands for this turn, as for a fresh
+question, and the bank records the contradiction, so the question is not
+served again and the teacher sees it. A key grade is not a grading call:
+it stays out of the degraded-mode window (7.3).
+
+**A code question from the bank is graded by the model**, as a fresh one
+is: `submitCode` / `explainAnswer` on the exercise's own exchange, whose
+first entry is the bank question; follow-ups as usual.
+
+**The bank is best-effort.** It never breaks or delays an exercise: a
+missing `questions` container, an error, or a bank or turn history that
+does not answer within `kQuestionBankReadTimeout` (2 s) means the question
+is generated as before; a missing container or a bank read that timed out
+leaves the bank alone — reads and writes — for 10 minutes. A question the teacher hides
+while it is open at a student runs out that exercise; after it, it is not
+chosen again (the bank is read afresh for every question that may come
+from it).
+
+**Audit.** The turn record (8.1) carries `questionId` as for any question,
+`fromBank: true` for a served one and `gradedByKey: true` when the key
+decided; a pick graded without a call has no `usage`. The debug recorder
+logs `tutor.question_from_bank` (the question, how many were eligible) and
+`tutor.bank_mcq_graded` (the pick, the key's verdict, the grader's quality
+if a call was made, whether it disputed the key), and
+`tutor.answer_key_disputed` whenever a grader says a key is wrong (#198),
+on a bank question or a fresh one.
+
+### 2.8 What this section deliberately does not address
 
 - **How belief updates compute** (`(α, β)` arithmetic, weight
   conversions). Section 3.
@@ -1641,6 +1765,10 @@ A follow-up presents when **all** of the following hold:
    subgoal the student has already left.
 5. **The turn was not a warm-up review or a recheck (1.5, 2.6).** One
    short question on old material; no dialogue is opened on it.
+6. **The question was not a multiple-choice question from the bank
+   (2.7).** Its grade is the answer key's, the same for every student who
+   picks the same option; a grader's follow-up on the one call that
+   fetched a feedback text is dropped.
 
 If any condition fails, the follow-up is suppressed and the
 conductor moves directly to the next regular probe via section 2.
@@ -1820,7 +1948,9 @@ single-failure fallback shouldn't become the primary signal source.
 
 **Rule.** Track grading-call outcomes per session. If 3 of the last
 5 grading calls produced fallback signals (couldn't be parsed
-normally), enter **degraded mode**:
+normally), enter **degraded mode**. A multiple-choice pick graded from a
+bank question's answer key (2.7) is not a grading call and does not enter
+the window: it says nothing about the grader.
 
 - Stop applying belief updates from the LLM.
 - Surface a system message: "Er is iets mis met de feedback. Probeer
@@ -2043,6 +2173,32 @@ TurnRecord {
       details: object?               // optional, kind-specific payload
     }
   ]
+
+  // What the LLM calls behind this record cost (#183). Every call made
+  // since the previous record: normally the exercise's question, grading,
+  // hints and follow-up; a status report or a question left ungraded rides
+  // along with the next record. Omitted when no call reported usage, and on
+  // docs written before the field existed.
+  // The question bank (2.7). `questionId`: the bank doc of the question
+  // this turn graded (#185) — set on the grade of the question itself, not
+  // a follow-up's; a content hash, so set even when the bank write failed.
+  // `fromBank`: the question was served from the bank, not generated
+  // (#186). `gradedByKey`: the verdict and the target signal came from the
+  // bank question's answer key, not the grader (#186). Each omitted when
+  // absent / false.
+  questionId: string?
+  fromBank: bool?
+  gradedByKey: bool?
+
+  usage: {
+    model: string,                   // the model of the last call
+    promptTokens: int,               // OpenAI's prompt_tokens, cached included
+    cachedTokens: int,               // prompt_tokens_details.cached_tokens
+    completionTokens: int,           // reasoning included
+    byCall: {                        // same three counts per kind of call:
+      question?, grading?, followUp?, hint?, dialogue?, status?
+    }
+  }?
 }
 ```
 

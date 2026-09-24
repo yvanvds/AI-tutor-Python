@@ -22,7 +22,8 @@ enum SessionMode { explain, practice, playground }
 /// `puntenformule` is the grade formula document itself, shipped with the
 /// app for every student to read (#129). `reports` is the class-wide report
 /// run and review surface (#148) — grades, so teacher-only like
-/// `milestones`.
+/// `milestones`. `questions` is the question bank (#185): every question the
+/// tutor generated, for the teacher to review and hide the bad ones.
 ///
 /// `myReports` is the other end of that surface (#151): the reports #150
 /// released, as the student they belong to reads them. It is *not* a second
@@ -38,6 +39,7 @@ enum Section {
   myReports,
   goals,
   lessonContent,
+  questions,
   instructions,
   students,
   milestones,
@@ -221,6 +223,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_goals;
       case Section.lessonContent:
         return l.sidebar_section_lessonContent;
+      case Section.questions:
+        return l.sidebar_section_questions;
       case Section.instructions:
         return l.sidebar_section_instructions;
       case Section.students:
@@ -238,6 +242,7 @@ extension SectionLabel on Section {
     switch (this) {
       case Section.goals:
       case Section.lessonContent:
+      case Section.questions:
       case Section.instructions:
       case Section.students:
       case Section.milestones:

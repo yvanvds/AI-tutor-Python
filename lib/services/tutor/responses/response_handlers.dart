@@ -97,11 +97,16 @@ class TutorContext {
   /// conductor's `integrateAnswer`, optionally presents a follow-up, and
   /// returns the outcome. TutorService owns the implementation since it has
   /// access to the in-flight `QuestionPlan` and current goal scope.
+  ///
+  /// `keyDisputed` is the grader of a multiple-choice pick saying the
+  /// answer key itself is wrong (#198) — for the question bank, never for
+  /// the student.
   final Future<IntegrateOutcome> Function({
     required AnswerQuality overallQuality,
     required List<LoSignal> loSignals,
     required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
+    bool keyDisputed,
   })
   integrateGradedAnswer;
 
@@ -228,6 +233,8 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
   const McqFeedbackHandler();
   @override
   Future<void> handle(McqFeedback r, TutorContext ctx) async {
+    // The quiz gets the text and the verdict only: whether the grader
+    // disputed the answer key (#198) goes to the bank, not on screen.
     ctx.applyMcqFeedback(prompt: r.prompt, quality: r.quality);
     ctx.playQuestion();
     await ctx.integrateGradedAnswer(
@@ -235,6 +242,7 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
       loSignals: r.loSignals,
       transferLOs: r.transferLOs,
       followUp: r.followUp,
+      keyDisputed: r.keyDisputed,
     );
     // Advance is deferred until the student clicks "Volgende" inside the
     // MCQ render — see TutorService.advanceFromMcq. A follow-up presented

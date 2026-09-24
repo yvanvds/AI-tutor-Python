@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -6,6 +7,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -14,6 +16,7 @@ import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
+import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
@@ -28,6 +31,8 @@ import 'package:ai_tutor_python/services/instructions/instructions_service.dart'
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
+import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
+import 'package:ai_tutor_python/services/question_bank/question_bank_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
@@ -37,6 +42,7 @@ import 'package:ai_tutor_python/services/student_state/turn_history_service.dart
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
@@ -45,11 +51,13 @@ import 'package:collection/collection.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
+import 'package:ai_tutor_python/services/tutor/recent_questions.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.dart';
+import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
@@ -81,9 +89,11 @@ class _FollowUpInFlight {
 }
 
 class _RequestInput {
+  /// Every call but question generation and the status report carries the
+  /// current exercise's own exchange, not the session's (#184).
   const _RequestInput(
     this.input, [
-    this.history = PreviousInputs.includeSession,
+    this.history = PreviousInputs.exercise,
     this.streamable = true,
   ]);
   final String input;
@@ -96,11 +106,15 @@ class TutorService extends Notifier<TutorState> {
     this._connectorOverride,
     this._conductorOverride,
     this._instructionGeneratorOverride,
-  });
+    Random? random,
+  }) : _random = random ?? Random();
 
   final OpenaiConnector? _connectorOverride;
   final Conductor? _conductorOverride;
   final InstructionGenerator? _instructionGeneratorOverride;
+
+  /// The question bank's mix is a roll of the dice (#186); a test pins it.
+  final Random _random;
 
   late final OpenaiConnector _connector;
   late final Conductor _conductor;
@@ -118,6 +132,38 @@ class TutorService extends Notifier<TutorState> {
   /// when the grader's feedback comes back so the conductor can integrate
   /// signals against the right LO/difficulty.
   QuestionPlan? _inFlightPlan;
+
+  /// The question bank entry of the question in flight (#185): set when a
+  /// generated question comes in, handed to the turn record and the bank
+  /// when its answer is graded, and dropped with [_inFlightPlan].
+  BankQuestion? _inFlightQuestion;
+
+  /// Whether [_inFlightQuestion] came out of the bank (#186) instead of a
+  /// generation call. A multiple-choice one is then graded from its answer
+  /// key. Set and cleared with it, through [_setInFlightQuestion].
+  bool _inFlightFromBank = false;
+
+  /// The answer key of the last question put in front of the student, when
+  /// that was a multiple-choice one with a key (#197): the text of an
+  /// option, set when the question comes in — generated or from the bank.
+  /// Never shown: it is not in [ActiveMcq], and not on the exercise's
+  /// history the question opens. Only the grading call of a pick carries
+  /// it ([_keyForPick]).
+  String? _mcqKey;
+
+  /// Per subgoal, the bank ids on this student's turn records — the
+  /// questions they answered there — read once when the bank is first
+  /// considered for that subgoal (#186).
+  final Map<String, Set<String>> _answeredQuestionIds = {};
+
+  /// The bank ids of every question put in front of this student since
+  /// sign-in, answered or not, generated or from the bank (#186): with
+  /// [_answeredQuestionIds], what the bank must not serve them again.
+  final Set<String> _seenQuestionIds = <String>{};
+
+  /// The model the last call named, from its usage report (#183) — what a
+  /// question the bank stores was generated by.
+  String? _lastCallModel;
 
   /// Subgoal ids for which `emptyObjectivesBlock` has already fired this
   /// session. Idempotency guard — same teacher-authoring gap shouldn't
@@ -141,6 +187,21 @@ class TutorService extends Notifier<TutorState> {
   StreamSubscription<List<Goal>>? _curriculumSub;
   String? _curriculumWatchedRootId;
   Map<String, Set<String>> _lastSubgoalLoIds = const {};
+
+  /// The questions asked this session, for the `recent_questions` block of
+  /// the next question request (#184). Kept across a restart or a goal
+  /// switch — the same student is still at the keyboard — and dropped on
+  /// sign-out.
+  final RecentQuestions _recentQuestions = RecentQuestions();
+
+  /// What the calls since the last graded turn cost (#183), handed to the
+  /// next turn record. Dropped on sign-out with the rest of the student's
+  /// session.
+  final UsageLedger _usage = UsageLedger();
+
+  /// The kind of call the turn in flight makes — and its automatic re-send
+  /// with it — for the split on the turn record.
+  UsageCallKind _callKind = UsageCallKind.question;
 
   static const int _maxRetriesPerRequest = 1;
   int _retriesLeft = 0;
@@ -167,6 +228,10 @@ class TutorService extends Notifier<TutorState> {
     ref.listen<AccountIdentity?>(authServiceProvider, (prev, next) {
       if (next == null) {
         _initialized = false;
+        _recentQuestions.clear();
+        _usage.clear();
+        _answeredQuestionIds.clear();
+        _seenQuestionIds.clear();
         _stopCurriculumWatch();
         return;
       }
@@ -245,6 +310,7 @@ class TutorService extends Notifier<TutorState> {
       _chat.failStream();
       _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
       _inFlightPlan = null;
+      _setInFlightQuestion(null);
       _followUpInFlight = null;
       if (state == TutorState.working) state = TutorState.idle;
     }
@@ -313,6 +379,7 @@ class TutorService extends Notifier<TutorState> {
           ),
         );
     _inFlightPlan = null;
+    _setInFlightQuestion(null);
     _followUpInFlight = null;
     await _conductor.setTarget();
     await requestExercise();
@@ -427,6 +494,7 @@ class TutorService extends Notifier<TutorState> {
     _currentExerciseType = '';
     _currentExerciseGoalId = null;
     _inFlightPlan = null;
+    _setInFlightQuestion(null);
     _followUpInFlight = null;
     _chat.clear();
 
@@ -513,6 +581,11 @@ class TutorService extends Notifier<TutorState> {
     if (state != TutorState.idle) return;
     state = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
+    // A grade's dispatch asks for the next exercise inside this turn; the
+    // grade's kind is back in place after it, for a re-send of the grade.
+    final enclosingKind = _callKind;
+    _callKind = UsageCallKind.of(type);
+    _lastCallModel = null;
 
     var turnOpened = false;
     try {
@@ -570,22 +643,7 @@ class TutorService extends Notifier<TutorState> {
         instructionsDocId: type.name,
       );
 
-      if (plan != null) {
-        _debug.recordEvent('conductor.planned', {
-          'targetLO': plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id,
-          'questionType': plan.type.name,
-          'difficulty': plan.difficulty.name,
-          'chosenReason': plan.reason.chosenReason,
-          'notchDropFired': plan.reason.notchDropFired,
-          'candidateLOs': plan.reason.candidateLOs
-              .map(
-                (c) => {'loId': c.loId, 'mean': c.mean, 'evidence': c.evidence},
-              )
-              .toList(),
-        });
-        _conductor.notePlannedQuestion(plan);
-        _inFlightPlan = plan;
-      }
+      if (plan != null) _firePlan(plan);
 
       if (request.streamable) {
         await _runStream(
@@ -613,11 +671,39 @@ class TutorService extends Notifier<TutorState> {
       _chat.failStream();
       _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
       _inFlightPlan = null;
+      _setInFlightQuestion(null);
       _followUpInFlight = null;
     } finally {
+      _callKind = enclosingKind;
       if (turnOpened) _debug.endTurn();
       if (state == TutorState.working) state = TutorState.idle;
     }
+  }
+
+  /// [plan]'s question is being put in front of the student — generated or
+  /// from the bank: the conductor's per-LO tracking and slots move on, and
+  /// the plan is the one the answer will be graded against.
+  void _firePlan(QuestionPlan plan) {
+    _debug.recordEvent('conductor.planned', {
+      'targetLO': plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id,
+      'questionType': plan.type.name,
+      'difficulty': plan.difficulty.name,
+      'chosenReason': plan.reason.chosenReason,
+      'notchDropFired': plan.reason.notchDropFired,
+      'candidateLOs': plan.reason.candidateLOs
+          .map((c) => {'loId': c.loId, 'mean': c.mean, 'evidence': c.evidence})
+          .toList(),
+    });
+    _conductor.notePlannedQuestion(plan);
+    _inFlightPlan = plan;
+    // A new question replaces the one in flight, also when it never
+    // arrives.
+    _setInFlightQuestion(null);
+  }
+
+  void _setInFlightQuestion(BankQuestion? question, {bool fromBank = false}) {
+    _inFlightQuestion = question;
+    _inFlightFromBank = question != null && fromBank;
   }
 
   Future<List<({String subgoalId, LearningObjective lo})>> _buildGoalScopeLOs(
@@ -677,6 +763,7 @@ class TutorService extends Notifier<TutorState> {
         return _RequestInput(
           QuestionFormatter.mcqAnswer(
             prompt,
+            correctOption: _keyForPick(prompt),
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
             targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
@@ -761,29 +848,38 @@ class TutorService extends Notifier<TutorState> {
     return _buildGoalScopeLOs(selection);
   }
 
+  /// A question request goes out without history — it opens a new
+  /// exercise — and names the questions asked recently instead, so the
+  /// model can avoid repeating one (#184).
   _RequestInput _buildQuestionRequest(ChatRequestType type, QuestionPlan plan) {
+    final recent = _recentQuestions.lines;
     final input = switch (type) {
       ChatRequestType.socraticQuestion => QuestionFormatter.socraticQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       ChatRequestType.explainCodeQuestion =>
         QuestionFormatter.explainCodeQuestion(
           plan.difficulty,
           targetLOs: plan.targetLOs,
+          recentQuestions: recent,
         ),
       ChatRequestType.completeCodeQuestion =>
         QuestionFormatter.completeCodeQuestion(
           plan.difficulty,
           targetLOs: plan.targetLOs,
+          recentQuestions: recent,
         ),
       ChatRequestType.writeCodeQuestion => QuestionFormatter.writeCodeQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       _ => '',
     };
@@ -801,10 +897,12 @@ class TutorService extends Notifier<TutorState> {
         case StreamTextDelta(:final text):
           accumulated.write(text);
           _chat.updateStream(accumulated.toString());
-        case StreamCompleted(:final response):
+        case StreamCompleted(:final response, :final usage):
           completed = response;
-        case StreamFailed():
+          _noteUsage(usage);
+        case StreamFailed(:final usage):
           failed = chunk;
+          _noteUsage(usage);
       }
     }
 
@@ -817,11 +915,21 @@ class TutorService extends Notifier<TutorState> {
 
     final response =
         completed ?? AIResponseParser.parse(accumulated.toString());
-    _connector.addResponse(response);
+    _recordResponse(response);
     _chat.completeStream(_finalTextFor(response, accumulated));
+    _registerSessionTurn();
 
-    // Streak counter (issue #10): a successful tutor turn marks the day as
-    // "active". Fire-and-forget so a streak write never blocks dispatch.
+    final dispatched = await dispatchResponse(response, _streamingContext());
+    if (!dispatched) {
+      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
+      await _maybeRetryStream();
+    }
+  }
+
+  /// Streak counter (issue #10): a successful tutor turn — a reply, or a
+  /// question or grade the bank answered (#186) — marks the day as
+  /// "active". Fire-and-forget so a streak write never blocks dispatch.
+  void _registerSessionTurn() {
     unawaited(
       ref
           .read(accountServiceProvider.notifier)
@@ -830,12 +938,6 @@ class TutorService extends Notifier<TutorState> {
             debugPrint('TutorService: streak update failed: $e');
           }),
     );
-
-    final dispatched = await dispatchResponse(response, _streamingContext());
-    if (!dispatched) {
-      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
-      await _maybeRetryStream();
-    }
   }
 
   String _finalTextFor(ChatResponse response, StringBuffer accumulated) {
@@ -905,6 +1007,7 @@ class TutorService extends Notifier<TutorState> {
     required List<LoSignal> loSignals,
     required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
+    bool keyDisputed = false,
   }) async {
     final plan = _inFlightPlan;
     if (plan == null) return IntegrateOutcome.continuing;
@@ -918,6 +1021,18 @@ class TutorService extends Notifier<TutorState> {
     final priorFollowUp = _followUpInFlight;
     final isFollowUpGrading = priorFollowUp != null;
     final chainDepthOnAnswer = priorFollowUp?.depth ?? 0;
+    // A follow-up's grade is about the grader's own question, not the bank
+    // question the exercise started with (#185).
+    final bankQuestion = isFollowUpGrading ? null : _inFlightQuestion;
+    final fromBank = bankQuestion != null && _inFlightFromBank;
+    // The grader may say the answer key itself is wrong (#198) — heard only
+    // from the grading call of a pick that carried the key (#197): a key it
+    // was not told is not one it can dispute.
+    final disputed =
+        keyDisputed &&
+        bankQuestion != null &&
+        bankQuestion.isMultipleChoice &&
+        _keyOfPick() != null;
 
     final now = DateTime.now().toUtc();
     final provenance = await _resolveProvenance(at: now);
@@ -925,16 +1040,72 @@ class TutorService extends Notifier<TutorState> {
     // older subgoal: the fallback signal and the turn record name that
     // subgoal, not the active one.
     final targetSubgoalId = plan.targetSubgoalIdOr(activeChild?.id);
+    final targetLO = plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
+
+    // A multiple-choice pick on a bank question is graded by its answer key
+    // (#186, CONDUCTOR_POLICY §2.7): the verdict is the key's and the
+    // target LO's signal is fixed. When a grading call was made for the
+    // feedback text and the grader judged the pick the other way — or said
+    // the key is wrong (#198), whatever it made of the pick — the key is in
+    // doubt: the grader's grade stands, as for a fresh question, and the
+    // bank marks the question (`graderDisagreesWithKey`) so it is not
+    // served again. Either way there is no follow-up on a bank question.
+    var quality = overallQuality;
+    var signals = loSignals;
+    var transfers = transferLOs;
+    var nextFollowUp = followUp;
+    var gradedByKey = false;
+    if (fromBank && bankQuestion.isMultipleChoice) {
+      nextFollowUp = null;
+      final pick = _bankMcqPick();
+      if (pick != null &&
+          targetLO != null &&
+          targetSubgoalId != null &&
+          !disputed &&
+          _keyAgrees(overallQuality, keyCorrect: pick.correct)) {
+        gradedByKey = true;
+        quality = pick.correct ? AnswerQuality.correct : AnswerQuality.wrong;
+        signals = [
+          LoSignal(
+            subgoalId: targetSubgoalId,
+            loId: targetLO.id,
+            kind: pick.correct ? LoSignalKind.positive : LoSignalKind.negative,
+            strength: pick.correct
+                ? LoSignalStrength.strong
+                : LoSignalStrength.moderate,
+          ),
+        ];
+        transfers = const [];
+      }
+      _debug.recordEvent('tutor.bank_mcq_graded', {
+        'questionId': bankQuestion.id,
+        'picked': pick?.picked,
+        'keyCorrect': pick?.correct,
+        'graderQuality': overallQuality.name,
+        'keyDisputed': disputed,
+        'gradedByKey': gradedByKey,
+      });
+    }
+    if (disputed) {
+      _debug.recordEvent('tutor.answer_key_disputed', {
+        'questionId': bankQuestion.id,
+        'fromBank': fromBank,
+        'picked': ref.read(activeMcqProvider)?.selected,
+        'graderQuality': overallQuality.name,
+      });
+    }
+
     final answer = GradedAnswerBuilder.build(
-      overallQuality: overallQuality,
-      rawSignals: loSignals,
-      rawTransferLOs: transferLOs,
+      overallQuality: quality,
+      rawSignals: signals,
+      rawTransferLOs: transfers,
       scopeSubgoals: scopeSubgoals,
-      intendedTargetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
+      intendedTargetLO: targetLO,
       intendedTargetSubgoalId: targetSubgoalId,
       isFollowUp: isFollowUpGrading,
       chainDepth: chainDepthOnAnswer,
       provenance: provenance,
+      fromAnswerKey: gradedByKey,
     );
     final outcome = await _conductor.integrateAnswer(
       plan: plan,
@@ -972,13 +1143,27 @@ class TutorService extends Notifier<TutorState> {
       // Which build wrote this (#165): the one thing that tells an
       // out-of-date laptop from old seed data.
       clientVersion: ref.read(appVersionProvider),
+      // What the calls since the last record cost (#183). The grading call
+      // that led here was noted when its reply came in.
+      usage: _usage.take(),
+      questionId: bankQuestion?.id,
+      fromBank: fromBank,
+      gradedByKey: gradedByKey,
     );
-    _debug.recordPersistedTurn(record, followUp: followUp);
+    _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
+    if (bankQuestion != null) {
+      _bankAnswer(
+        bankQuestion,
+        quality: outcome.overallQuality,
+        keyDisputed: disputed,
+      );
+    }
 
     // The current grading turn is consumed; clear in-flight and decide
     // whether a new follow-up should be presented.
     _inFlightPlan = null;
+    _setInFlightQuestion(null);
     _followUpInFlight = null;
 
     if (outcome.subgoalAdvanced) {
@@ -1004,17 +1189,17 @@ class TutorService extends Notifier<TutorState> {
 
     // §6.3 condition 5: a warm-up review or a recheck stays one short
     // question — no follow-up dialogue on old material.
-    if (followUp != null &&
+    if (nextFollowUp != null &&
         !plan.isOffSubgoal &&
         _shouldPresentFollowUp(
           outcome: outcome,
-          targetLO: plan.targetLOs.isEmpty ? null : plan.targetLOs.first,
+          targetLO: targetLO,
           previousWasFollowUp: isFollowUpGrading,
           previousDepth: chainDepthOnAnswer,
         )) {
       _presentFollowUp(
         plan: plan,
-        question: followUp,
+        question: nextFollowUp,
         depth: chainDepthOnAnswer + 1,
       );
       return IntegrateOutcome.followUpPresented;
@@ -1134,13 +1319,16 @@ class TutorService extends Notifier<TutorState> {
     );
   }
 
-  /// Records the student's MCQ pick and asks the tutor to grade it.
+  /// Records the student's MCQ pick and asks the tutor to grade it — or,
+  /// for a bank question whose feedback on that pick is stored, grades it
+  /// on the spot from the answer key (#186).
   Future<void> submitMcqAnswer(String picked) async {
     final current = ref.read(activeMcqProvider);
     if (current == null || current.selected != null) return;
     ref.read(activeMcqProvider.notifier).state = current.copyWith(
       selected: picked,
     );
+    if (await _gradeBankMcqByKey()) return;
     await queryTutor(type: ChatRequestType.mcqAnswer, prompt: picked);
   }
 
@@ -1177,12 +1365,28 @@ class TutorService extends Notifier<TutorState> {
 
   Future<void> _processNonStreamingResult(ConnectorResult result) async {
     switch (result) {
-      case ConnectorOk(:final output):
+      case ConnectorOk(:final output, :final usage):
+        _noteUsage(usage);
         await _handleResponse(output);
-      case ConnectorFailure(:final notice):
+      case ConnectorFailure(:final notice, :final usage):
+        _noteUsage(usage);
         _chat.addSystemNotice(_tutorFailed(notice));
         if (_worthRetrying(notice)) await _maybeRetry();
     }
+  }
+
+  /// Puts what a call cost on the ledger the next turn record takes (#183),
+  /// under the kind of call in flight. A reply the connector refused cost
+  /// the same as one it kept, and is counted too.
+  void _noteUsage(CallUsage? usage) {
+    if (usage == null) return;
+    _lastCallModel = usage.model;
+    _usage.add(_callKind, usage);
+    _debug.recordEvent('tutor.usage', {
+      'call': _callKind.name,
+      'model': usage.model,
+      ...usage.tokens.toJson(),
+    });
   }
 
   /// Whether the automatic retry can help the turn that just failed with
@@ -1340,6 +1544,7 @@ class TutorService extends Notifier<TutorState> {
     _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));
 
     if (state == TutorState.working) state = TutorState.idle;
+    if (await _serveFromBank(plan)) return;
     await queryTutor(type: plan.type, plan: plan);
   }
 
@@ -1369,13 +1574,380 @@ class TutorService extends Notifier<TutorState> {
 
   Future<void> _handleResponse(String output) async {
     final parsed = AIResponseParser.parse(output);
-    _connector.addResponse(parsed);
+    _recordResponse(parsed);
     final dispatched = await dispatchResponse(parsed, _nonStreamingContext());
     if (!dispatched) {
       _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
       await _maybeRetry();
     }
   }
+
+  /// Puts [response] on the connector's history and, when it is a
+  /// question, on the list the next question request names (#184) — under
+  /// the LO of the plan it was asked for, which is still in flight here —
+  /// and in the bank: stored when it was generated, counted when it came
+  /// [fromBank] (#186).
+  void _recordResponse(ChatResponse response, {BankQuestion? fromBank}) {
+    _connector.addResponse(response);
+    final isQuestion = _recentQuestions.add(
+      response,
+      loId: _inFlightPlan?.targetLOs.firstOrNull?.id,
+    );
+    if (!isQuestion) return;
+    _mcqKey = response is MultipleChoice ? response.correct : null;
+    if (fromBank != null) {
+      _askBankQuestion(fromBank);
+    } else {
+      _bankQuestion(response);
+    }
+  }
+
+  // ---- Question bank (#185) -------------------------------------------------
+  //
+  // Every generated question goes into the bank, and every graded answer to
+  // one is counted there. Neither is waited for: the bank is best-effort
+  // and a failed or slow write — a container not created yet, a Cosmos
+  // blip — never reaches the student (`QuestionBankService`).
+
+  /// Stores [response], a question that just came in for the plan in
+  /// flight, and remembers it for the turn record of its answer.
+  void _bankQuestion(ChatResponse response) {
+    _setInFlightQuestion(null);
+    final plan = _inFlightPlan;
+    final uid = ref.read(authServiceProvider)?.oid;
+    if (plan == null || uid == null) return;
+    final selection = ref.read(goalSelectionProvider);
+    // A warm-up review or a recheck asks about an older subgoal: the
+    // question belongs to that one's bank.
+    final subgoalId = plan.targetSubgoalIdOr(selection.activeChildGoal?.id);
+    if (subgoalId == null) return;
+    final question = BankQuestion.fromResponse(
+      response,
+      subgoalId: subgoalId,
+      rootGoalId:
+          plan.offSubgoal?.parentId ?? selection.activeRootGoal?.id ?? '',
+      targetLOIds: plan.targetLOs.map((lo) => lo.id).toList(),
+      difficulty: plan.difficulty,
+      language: ref.read(appLocaleProvider).languageCode,
+      model: _lastCallModel ?? _configuredModel(),
+      createdByUid: uid,
+      createdAt: DateTime.now().toUtc(),
+    );
+    if (question == null) return;
+    _setInFlightQuestion(question);
+    // The student has seen it: an identical question in the bank is not
+    // served to them later (#186).
+    _seenQuestionIds.add(question.id);
+    _debug.recordEvent('tutor.question_banked', {'questionId': question.id});
+    unawaited(ref.read(questionBankServiceProvider).recordAsked(question));
+  }
+
+  /// Remembers [question], just put in front of the student from the bank
+  /// (#186), for the grading and the turn record of its answer, and counts
+  /// the ask on it.
+  void _askBankQuestion(BankQuestion question) {
+    _setInFlightQuestion(question, fromBank: true);
+    _seenQuestionIds.add(question.id);
+    unawaited(ref.read(questionBankServiceProvider).recordAsked(question));
+  }
+
+  // ---- Serving from the question bank (#186) --------------------------------
+  //
+  // CONDUCTOR_POLICY §2.7. Before a planned question is generated, it may be
+  // taken from the bank instead (`BankChoice`): no generation call, no wait.
+  // A multiple-choice one is graded from its answer key, on the spot when
+  // the bank holds the feedback on the pick; the code types are graded by
+  // the model like a fresh question, on the exercise's own exchange (#184),
+  // which the bank question opens itself. Everything here is best-effort
+  // like the bank's writes: a bank that is missing, failing or slow ends in
+  // generating the question as before, never in an error or a wait longer
+  // than `kQuestionBankReadTimeout`.
+
+  /// Puts a bank question in front of the student for [plan] instead of
+  /// generating one, when the bank has one to give. Returns whether it did;
+  /// on `false` the caller generates as before.
+  Future<bool> _serveFromBank(QuestionPlan plan) async {
+    if (state != TutorState.idle) return false;
+    // Held while the bank is read, as a generation holds it while it is
+    // prepared: nothing else starts a turn in between.
+    state = TutorState.working;
+    try {
+      final pick = await _chooseFromBank(plan);
+      final question = pick?.question;
+      final response = question?.toChatResponse();
+      if (question == null || response == null) return false;
+      await _presentBankQuestion(
+        plan,
+        question,
+        response,
+        eligible: pick!.eligible,
+      );
+      return true;
+    } finally {
+      if (state == TutorState.working) state = TutorState.idle;
+    }
+  }
+
+  /// The bank's pick for [plan], or `null` — the roll gave the plan to
+  /// generation, the bank holds too few, or the bank or the student's turn
+  /// history could not be read. Never throws.
+  Future<BankPick?> _chooseFromBank(QuestionPlan plan) async {
+    try {
+      final mix = BankMix.fromConfig(_globalConfig());
+      if (!BankChoice.rollsForBank(plan, mix, _random)) return null;
+      final uid = ref.read(authServiceProvider)?.oid;
+      final subgoalId = plan.targetSubgoalIdOr(
+        ref.read(goalSelectionProvider).activeChildGoal?.id,
+      );
+      if (uid == null || subgoalId == null) return null;
+      final bank = await ref
+          .read(questionBankServiceProvider)
+          .listServable(subgoalId);
+      if (bank == null || bank.isEmpty) return null;
+      final answered = await _answeredQuestionIdsFor(subgoalId);
+      if (answered == null) return null;
+      return BankChoice.pick(
+        plan: plan,
+        subgoalId: subgoalId,
+        bank: bank,
+        alreadyAsked: {...answered, ..._seenQuestionIds},
+        uid: uid,
+        language: ref.read(appLocaleProvider).languageCode,
+        minimum: BankChoice.minimumFor(plan, mix),
+      );
+    } catch (e) {
+      debugPrint('TutorService: question bank not consulted: $e');
+      return null;
+    }
+  }
+
+  /// The bank ids on this student's turn records for [subgoalId]: read the
+  /// first time, then kept for the session (what this session adds is in
+  /// [_seenQuestionIds]). `null` when the turn history cannot be read in
+  /// time — then nothing can be served there that is sure to be new.
+  Future<Set<String>?> _answeredQuestionIdsFor(String subgoalId) async {
+    final known = _answeredQuestionIds[subgoalId];
+    if (known != null) return known;
+    try {
+      final ids = await ref
+          .read(turnHistoryServiceProvider)
+          .listQuestionIdsFor(subgoalId)
+          .timeout(kQuestionBankReadTimeout);
+      return _answeredQuestionIds[subgoalId] = ids;
+    } catch (e) {
+      debugPrint('TutorService: answered questions not read: $e');
+      return null;
+    }
+  }
+
+  /// Puts [question], taken from the bank for [plan], in front of the
+  /// student: through the same handler a generated one goes through, as
+  /// the first entry of a new exercise.
+  Future<void> _presentBankQuestion(
+    QuestionPlan plan,
+    BankQuestion question,
+    ChatResponse response, {
+    required int eligible,
+  }) async {
+    final selection = ref.read(goalSelectionProvider);
+    _debug.beginTurn(
+      requestType: plan.type.name,
+      currentExerciseTypeAtStart: _currentExerciseType,
+      tutorStateAtStart: TutorState.idle.name,
+      selectedRootGoalId: selection.selectedRoot?.id,
+      selectedChildGoalId: selection.selectedChild?.id,
+      preferredRootGoalId: selection.preferredRoot?.id,
+      preferredChildGoalId: selection.preferredChild?.id,
+      streamable: false,
+      previousInputsMode: 'questionBank',
+    );
+    try {
+      _firePlan(plan);
+      _debug.recordEvent('tutor.question_from_bank', {
+        'questionId': question.id,
+        'eligible': eligible,
+        'askedCount': question.askedCount,
+      });
+      // A generation call opens the exercise its reply starts (#184); a
+      // bank question has none, so it opens its exercise itself.
+      _connector.startNewSession();
+      _recordResponse(response, fromBank: question);
+      _registerSessionTurn();
+      await dispatchResponse(response, _nonStreamingContext());
+    } catch (e, stack) {
+      debugPrint('TutorService: bank question failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {
+        'where': 'bank question',
+        'error': '$e',
+      });
+      _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
+      _inFlightPlan = null;
+      _setInFlightQuestion(null);
+      _followUpInFlight = null;
+    } finally {
+      _debug.endTurn();
+    }
+  }
+
+  /// The answer key an `mcqAnswer` call on [answer] carries (#197): the key
+  /// of the quiz on screen, and only when [answer] is the student's pick on
+  /// it. Text typed in the chat is routed to the grader too while the
+  /// exercise type is still `multiple_choice`, but it is no pick, and the
+  /// key must not reach the model before the student has committed to one.
+  String? _keyForPick(String answer) {
+    final picked = ref.read(activeMcqProvider)?.selected;
+    return picked != null && picked == answer ? _mcqKey : null;
+  }
+
+  /// The key the grading call of the student's pick carried (#197), or
+  /// `null` when nothing was picked or the question has no key: what a
+  /// grader could have disputed (#198).
+  String? _keyOfPick() {
+    final picked = ref.read(activeMcqProvider)?.selected;
+    return picked == null ? null : _keyForPick(picked);
+  }
+
+  /// The pick on the bank multiple-choice question in flight and the key's
+  /// verdict on it (#186); `null` when the question in flight is not one
+  /// from the bank, or nothing was picked (an answer typed in the chat).
+  ({BankQuestion question, String picked, bool correct})? _bankMcqPick() {
+    final question = _inFlightQuestion;
+    if (!_inFlightFromBank || question == null || !question.isMultipleChoice) {
+      return null;
+    }
+    final key = question.correctOption;
+    final picked = ref.read(activeMcqProvider)?.selected;
+    if (key == null || picked == null) return null;
+    return (question: question, picked: picked, correct: picked == key);
+  }
+
+  /// Whether a grade of [quality] says what the answer key says: right is
+  /// `correct`, anything else — `partial` included — is not.
+  static bool _keyAgrees(AnswerQuality quality, {required bool keyCorrect}) =>
+      (quality == AnswerQuality.correct) == keyCorrect;
+
+  /// Grades the pick on the bank multiple-choice question in flight from
+  /// its answer key when the bank holds the feedback on that pick (#186):
+  /// no call at all. The text shown is the one the grader wrote the first
+  /// time a student picked that option, in the colour it gave it; it must
+  /// have been written for the key's verdict — a text that congratulates on
+  /// a pick the key calls wrong is not shown next to a red verdict. Returns
+  /// whether it graded; on `false` a grading call fetches the text, once,
+  /// and the bank keeps it for the next student.
+  Future<bool> _gradeBankMcqByKey() async {
+    final pick = _bankMcqPick();
+    if (pick == null || state != TutorState.idle) return false;
+    final stored = pick.question.feedbackFor(pick.picked);
+    final text = stored?.text.trim() ?? '';
+    final shown = stored?.quality;
+    if (text.isEmpty ||
+        shown == null ||
+        !_keyAgrees(shown, keyCorrect: pick.correct)) {
+      return false;
+    }
+
+    state = TutorState.working;
+    final selection = ref.read(goalSelectionProvider);
+    _debug.beginTurn(
+      requestType: ChatRequestType.mcqAnswer.name,
+      currentExerciseTypeAtStart: _currentExerciseType,
+      tutorStateAtStart: TutorState.idle.name,
+      selectedRootGoalId: selection.selectedRoot?.id,
+      selectedChildGoalId: selection.selectedChild?.id,
+      preferredRootGoalId: selection.preferredRoot?.id,
+      preferredChildGoalId: selection.preferredChild?.id,
+      streamable: false,
+      previousInputsMode: 'answerKey',
+    );
+    try {
+      final plan = _inFlightPlan;
+      // The pick and its feedback go on the history where a grading call
+      // would have left them (#184), for the status report to read.
+      _connector.addExchange(
+        input: QuestionFormatter.mcqAnswer(
+          pick.picked,
+          correctOption: _keyForPick(pick.picked),
+          targetLOs: plan?.targetLOs ?? const [],
+          targetSubgoalId: plan?.targetSubgoalIdOr(
+            selection.activeChildGoal?.id,
+          ),
+        ),
+        response: McqFeedback(
+          type: 'mcq_feedback',
+          quality: shown,
+          prompt: text,
+        ),
+      );
+      _applyMcqFeedback(prompt: text, quality: shown);
+      unawaited(ref.read(soundServiceProvider).askQuestion());
+      _registerSessionTurn();
+      await _integrateGradedAnswer(
+        overallQuality: pick.correct
+            ? AnswerQuality.correct
+            : AnswerQuality.wrong,
+        loSignals: const [],
+        transferLOs: const [],
+        followUp: null,
+      );
+    } catch (e, stack) {
+      debugPrint('TutorService: grading by the answer key failed: $e\n$stack');
+      _debug.recordEvent('tutor.error', {'where': 'answer key', 'error': '$e'});
+      _chat.addSystemNotice(_tutorFailed(describeFailure(e)));
+      _inFlightPlan = null;
+      _setInFlightQuestion(null);
+      _followUpInFlight = null;
+    } finally {
+      _debug.endTurn();
+      if (state == TutorState.working) state = TutorState.idle;
+    }
+    return true;
+  }
+
+  /// Counts the graded answer to [question]; for a multiple-choice pick,
+  /// with the feedback the student got on it, and whether the grader said
+  /// its answer key is wrong ([keyDisputed], #198).
+  void _bankAnswer(
+    BankQuestion question, {
+    required AnswerQuality quality,
+    bool keyDisputed = false,
+  }) {
+    final mcq = question.isMultipleChoice ? ref.read(activeMcqProvider) : null;
+    unawaited(
+      ref
+          .read(questionBankServiceProvider)
+          .recordAnswer(
+            questionId: question.id,
+            subgoalId: question.subgoalId,
+            correct: quality == AnswerQuality.correct,
+            pickedOption: mcq?.selected,
+            feedback: mcq?.feedback,
+            quality: mcq?.feedbackQuality,
+            keyDisputed: keyDisputed,
+          ),
+    );
+  }
+
+  /// The model the next call goes to, as the connector resolves it — for a
+  /// call that reported no usage. Only read, never started: the connector
+  /// keeps both providers alive in the app, and a tutor without them (a
+  /// test's) has nothing better to name than the default.
+  String _configuredModel() {
+    final override = ref.exists(modelPreferenceProvider)
+        ? ref.read(modelPreferenceProvider)
+        : null;
+    if (override != null && override.isNotEmpty) return override;
+    final configured = _globalConfig()?.model;
+    if (configured != null && configured.isNotEmpty) return configured;
+    return OpenaiConnector.defaultModel;
+  }
+
+  /// The school's `config/global`, when the app has it — read, never
+  /// started, for the same reason as in [_configuredModel]: the app keeps
+  /// the provider alive (the update gate watches it), a test's tutor has
+  /// nothing better than the defaults.
+  GlobalConfig? _globalConfig() => ref.exists(globalConfigServiceProvider)
+      ? ref.read(globalConfigServiceProvider)
+      : null;
 
   void _setFollowUp({String? message, String? code}) {
     _nextMessage = message;

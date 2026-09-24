@@ -130,4 +130,25 @@ void main() {
       reason: 'the published config lost the minimum the doc still has',
     );
   });
+
+  test(
+    "setModel carries the question bank's mix the portal set (#186)",
+    () async {
+      config = InMemoryCosmos([
+        _configDoc(extra: {'QuestionBankMinimum': 5, 'QuestionBankShare': 0.3}),
+      ]);
+      final provider = NotifierProvider<GlobalConfigService, GlobalConfig?>(
+        () => GlobalConfigService(container: config.container),
+      );
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await container.read(provider.notifier).setModel('gpt-4.1');
+
+      expect(config['global']!['QuestionBankMinimum'], 5);
+      expect(config['global']!['QuestionBankShare'], 0.3);
+      expect(container.read(provider)?.questionBankMinimum, 5);
+      expect(container.read(provider)?.questionBankShare, 0.3);
+    },
+  );
 }

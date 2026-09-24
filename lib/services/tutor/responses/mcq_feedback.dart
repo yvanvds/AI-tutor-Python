@@ -11,6 +11,16 @@ class McqFeedback implements ChatResponse {
   final List<TransferLoRef> transferLOs;
   final FollowUp? followUp;
 
+  /// META's `keyDisputed` (#198, LLM_CONTRACT "The answer key"): the grader
+  /// of a pick that was told the answer key (`correct_option`) found the
+  /// key itself wrong — whichever option the student picked, also when
+  /// grade and key agree that the pick is wrong. Only `true` counts.
+  ///
+  /// A message to the app, not part of the conversation: [toJson] leaves it
+  /// out, so it is not on the exercise's history a later call reads, and
+  /// nothing the student sees carries it.
+  final bool keyDisputed;
+
   McqFeedback({
     required this.type,
     required this.quality,
@@ -18,6 +28,7 @@ class McqFeedback implements ChatResponse {
     this.loSignals = const [],
     this.transferLOs = const [],
     this.followUp,
+    this.keyDisputed = false,
   });
 
   factory McqFeedback.fromMap(Map<String, dynamic> map) {
@@ -28,6 +39,7 @@ class McqFeedback implements ChatResponse {
       loSignals: parseLoSignals(map['loSignals']),
       transferLOs: parseTransferLOs(map['transferLOs']),
       followUp: FollowUp.tryParse(map['followUp']),
+      keyDisputed: map['keyDisputed'] == true,
     );
   }
 

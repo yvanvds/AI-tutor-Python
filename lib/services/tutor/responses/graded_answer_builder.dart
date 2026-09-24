@@ -33,6 +33,7 @@ class GradedAnswerBuilder {
     bool isFollowUp = false,
     int chainDepth = 0,
     EvidenceProvenance provenance = EvidenceProvenance.home,
+    bool fromAnswerKey = false,
   }) {
     final scopeIndex = <String, Set<String>>{};
     for (final sub in scopeSubgoals) {
@@ -73,6 +74,7 @@ class GradedAnswerBuilder {
         chainDepth: chainDepth,
         provenance: provenance,
         transferLOs: transfers,
+        fromAnswerKey: fromAnswerKey,
       );
     }
 
@@ -86,6 +88,7 @@ class GradedAnswerBuilder {
         chainDepth: chainDepth,
         provenance: provenance,
         transferLOs: transfers,
+        fromAnswerKey: fromAnswerKey,
       );
     }
     final fallbackKind = switch (overallQuality) {
@@ -108,6 +111,7 @@ class GradedAnswerBuilder {
       chainDepth: chainDepth,
       provenance: provenance,
       transferLOs: transfers,
+      fromAnswerKey: fromAnswerKey,
     );
   }
 }

@@ -80,4 +80,38 @@ void main() {
       expect(doc.containsKey('clientVersion'), isFalse);
     }
   });
+
+  test('listQuestionIdsFor names the bank questions the student answered on '
+      'one subgoal (#186)', () async {
+    Map<String, dynamic> doc(
+      String id, {
+      String uid = 'u1',
+      String subgoalId = 's1',
+      String? questionId,
+    }) => {
+      'id': id,
+      'type': 'turn_history',
+      'uid': uid,
+      'subgoalId': subgoalId,
+      'questionType': 'mcQuestion',
+      'questionId': ?questionId,
+    };
+    store = InMemoryCosmos([
+      doc('t1', questionId: 's1_a'),
+      doc('t2', questionId: 's1_b'),
+      doc('t3'),
+      doc('t4', subgoalId: 's0', questionId: 's0_c'),
+      doc('t5', uid: 'u2', questionId: 's1_d'),
+    ]);
+
+    expect(await service().listQuestionIdsFor('s1'), {'s1_a', 's1_b'});
+    expect(await service().listQuestionIdsFor('s0'), {'s0_c'});
+    expect(await service().listQuestionIdsFor('s9'), isEmpty);
+
+    final signedOut = TurnHistoryService(
+      container: store.container,
+      getUid: () => null,
+    );
+    expect(await signedOut.listQuestionIdsFor('s1'), isEmpty);
+  });
 }

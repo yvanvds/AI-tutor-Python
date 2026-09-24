@@ -86,4 +86,52 @@ void main() {
       expect(GlobalConfig.fromMap(withMinimum.toMap()).minimumVersion, '2.6.0');
     });
   });
+
+  group('the question bank mix (#186)', () {
+    test(
+      'QuestionBankMinimum is a whole number of at least 1, else absent',
+      () {
+        int? minimum(Object? raw) =>
+            GlobalConfig.fromMap({'QuestionBankMinimum': raw})
+                .questionBankMinimum;
+        expect(minimum(8), 8);
+        expect(minimum(3.0), 3);
+        expect(minimum(1), 1);
+        expect(minimum(0), isNull);
+        expect(minimum(-2), isNull);
+        expect(minimum('8'), isNull);
+        expect(minimum(null), isNull);
+        expect(GlobalConfig.fromMap({}).questionBankMinimum, isNull);
+      },
+    );
+
+    test('QuestionBankShare is a number held to 0..1, else absent', () {
+      double? share(Object? raw) =>
+          GlobalConfig.fromMap({'QuestionBankShare': raw}).questionBankShare;
+      expect(share(0.5), 0.5);
+      expect(share(0), 0.0);
+      expect(share(1), 1.0);
+      expect(share(1.7), 1.0);
+      expect(share(-0.2), 0.0);
+      expect(share(double.nan), isNull);
+      expect(share('0.5'), isNull);
+      expect(GlobalConfig.fromMap({}).questionBankShare, isNull);
+    });
+
+    test('both are written only when set, and survive a round trip', () {
+      final plain = const GlobalConfig(model: 'gpt-4o', apiKey: 'k').toMap();
+      expect(plain.containsKey('QuestionBankMinimum'), isFalse);
+      expect(plain.containsKey('QuestionBankShare'), isFalse);
+
+      const set = GlobalConfig(
+        model: 'gpt-4o',
+        apiKey: 'k',
+        questionBankMinimum: 4,
+        questionBankShare: 0.25,
+      );
+      final back = GlobalConfig.fromMap(set.toMap());
+      expect(back.questionBankMinimum, 4);
+      expect(back.questionBankShare, 0.25);
+    });
+  });
 }

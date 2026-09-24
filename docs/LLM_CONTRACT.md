@@ -55,11 +55,39 @@ Inputs:
   difficulty.
 - `questionType` — `mcQuestion | writeCode | completeCode | explainCode
   | socraticQuestion | guidingQuestion`. Picked by policy.
+- `recentQuestions` (`recent_questions` in the request, #184) — the last
+  12 questions asked this session, oldest first, one line each:
+  `type | loId | core`, where `core` is the question's prompt with its
+  code on one line, cut at 160 characters (`RecentQuestions`). Omitted
+  before the first question. Generation carries no conversation history
+  (see "Conversation history"), so this block is what the model knows
+  about what it asked before; the teacher-authored question instructions
+  point at it for "do not repeat yourself". Kept by the app, dropped on
+  sign-out.
 
 Outputs: same envelope as today, the META payload matches the existing
 per-question-type schema (MCQ options, code snippet, prompt text, etc.).
 No structural change on this side — only the inputs gain `targetLOs`
 and the question-type prompt is told to focus on those LOs.
+
+A multiple-choice META's `correct` (the positional letter, `"A"` = the
+first option) is read since #185: `MultipleChoice.correct` resolves it to
+the option's *text* — the options are shuffled before the student sees
+them — and the question bank stores it as the answer key. The grading call
+of a pick carries it as `correct_option` (#197, see "The answer key"); the
+question on the exercise's history does not. A letter past the last
+option, or a value that is neither a letter nor an option's text, is no
+key.
+
+A question served from the bank (#186, conductor policy 2.7) makes no
+generation call at all. A multiple-choice pick on one is graded by its key
+on the student's machine; the one `mcqAnswer` call it can still cost — for
+the feedback text of an option no student picked before — is a grading
+call like any other, on the exercise's own exchange (the bank question is
+its first entry) and told the key like any other (#197), and its
+`overallQuality` is compared with the key: if the two disagree — or the
+grader says the key is wrong (`keyDisputed`, #198) — its grade stands and
+the bank stops serving the question.
 
 The conductor may request a question that probes a single LO or
 multiple LOs. The LLM should weight the question to those LOs but is
@@ -84,6 +112,9 @@ Inputs:
   not just `targetLOs`.
 - `question` — the prompt the student received plus any code/options.
 - `studentAnswer` — what the student typed or selected.
+- `correctOption` (`correct_option`, #197) — multiple choice only, and only
+  on the grading call of a pick: the answer key as option text. See "The
+  answer key".
 - `difficulty` — what difficulty the question was set at.
 
 Note: `goalScopeLOs` does not include LOs from earlier root goals.
@@ -99,6 +130,114 @@ LO with its `subgoalId`. Nothing else in the contract changes: the
 grader emits the same shape, `goalScopeLOs` is the same root-wide list,
 and the scope check (below) accepts the signal because the older subgoal
 is in scope.
+
+### The answer key (#197)
+
+The `mcQuestion` instructions make the model commit to an intended answer
+(`correct`, "for the grader's downstream call"). That call now gets it: an
+`mcqAnswer` request for a pick carries `correct_option`, the key as the
+text of an option (the options are shuffled, so a letter would mean
+nothing), for a fresh question and a bank one alike — the bank's
+feedback-fetch call (conductor policy 2.7) is the same call.
+
+**How the grader treats it** — `answerKeyDirective` in
+`lib/services/tutor/instruction_generator.dart`, appended by
+`InstructionGenerator` to every `mcqAnswer` system prompt after the
+teacher-authored bodies and before the output-language directive:
+
+- the key is the intended answer: the pick equal to it is what the question
+  meant to be right, any other pick is not;
+- but the grader checks it, and when the key is wrong (the code does not do
+  what it says, it does not answer the question, another option is at least
+  as right) it grades the pick by what is actually right;
+- `overallQuality` stays the grader's own judgement, never adjusted to agree
+  with the key. A grade that differs from the key is one flag: the app
+  compares the two;
+- a grader that finds the key wrong also says so outright, whatever the
+  pick: `"keyDisputed": true` in META (#198, see "A disputed key" below),
+  the other flag;
+- the key is not for the student: no mention of it, of `correct_option` or
+  of `keyDisputed` — not even that the key is wrong — and on a wrong pick
+  the right option is not given away (the teacher's "a nudge, not the full
+  solution" still holds).
+
+The directive lives in code, like the envelope contract, not in the
+teacher-editable `mcqAnswer` doc: the question bank depends on it. It
+stops serving a question once a grade contradicts its key
+(`graderDisagreesWithKey`), and a grader told to follow the key would
+never contradict a wrong one — a wrong key would be served to every student
+from then on.
+
+**Only the grading call of a pick.** The key never reaches the model
+before the student has committed to an option. It is not on the exercise's
+history (`MultipleChoice.toJson` leaves it out), which every call on the
+exercise reads; and text typed in the chat that is routed to the grader
+while the exercise type is still `multiple_choice` is no pick and carries
+no key (`TutorService._keyForPick`). After the pick the grading input stays
+on the exercise's history like any other turn. Nothing the app draws shows
+the key: the quiz knows the options, the pick and the verdict, not the key
+(`ActiveMcq`).
+
+**Considered and left.** Grading a fresh question locally from its key, as
+a bank question is (#186): a fresh key is unchecked, and the bank serves
+and key-grades only questions whose key no grading has contradicted — the
+grader's own judgement on a fresh question is that check. Dropping the
+sentence from the `mcQuestion` instructions instead: the key is worth
+having — it is what the bank grades by, and the grader now judges against
+the author's intent rather than guessing it.
+
+### A disputed key (#198)
+
+The grade alone reveals a wrong key only when the pick is the key or the
+option that is actually right. When the student picks yet another wrong
+option, grade and key agree — the pick is wrong — and a wrong key went
+unnoticed, even though the grader, told the key, could see it was wrong.
+So the grader of a pick says so in a field of its own: `answerKeyDirective`
+tells it to add `"keyDisputed": true` to the `mcq_feedback` META when it
+finds the key wrong, whichever option was picked, and to leave the field
+out when the key is right or the request carried no `correct_option`.
+
+What the app does with it (`McqFeedback.keyDisputed`, only a JSON `true`
+counts):
+
+- **Heard only from the grading call of a pick that carried the key**
+  (`TutorService._keyOfPick`): a key the grader was not told is not one it
+  can dispute, so text typed in the chat, a follow-up's grading and a
+  question without a key ignore the field.
+- **The bank counts it** on the question (`keyDisputedCount`, the last time
+  in `keyDisputedAt`), and `graderDisagreesWithKey` holds from the first
+  one: the Questions page warns the teacher ("the grading called the
+  answer key wrong n times"), and the bank no longer serves the question
+  (conductor policy 2.7).
+- **On a bank question it is a contradiction**, as a grade against the key
+  is: the grader's grade and signals stand for this turn, not the key's
+  (`gradedByKey` stays false).
+- **Never to the student.** The quiz is given the text and the verdict,
+  as before; `McqFeedback.toJson` leaves the field out, so it is not on the
+  exercise's history a later call on the exercise reads. The TEXT is held
+  to the directive: no word about the key.
+
+The field is optional and additive: a grader that never sets it changes
+nothing, and a reply that sets it on a right key costs one question the
+bank stops serving — the teacher sees why and can look.
+
+### Conversation history (#184)
+
+Every call carries the system prompt and its input; what sits between
+them is set per request type (`PreviousInputs`):
+
+- **Question generation** — none (`newSession`). The call opens a new
+  exercise; earlier questions reach the model through `recentQuestions`.
+- **Grading, hints, follow-ups, student and content questions** — the
+  current exercise's own exchange (`exercise`): the question as the
+  generator returned it (its META as JSON), then every turn since — a
+  hint asked for, the answer, the grade. Nothing of earlier exercises:
+  what the grader needs about older subgoals is in `goalScopeLOs`.
+- **Status report** — everything recorded (`includeAll`, capped at 50
+  messages).
+
+A question put in front of the student without a generation call has to
+open the exercise itself, with that question as its first entry.
 
 ### Content question (#132)
 
@@ -211,6 +350,11 @@ that the answer **correctly used in service of the task** — the
 constructs the solution genuinely needed and got right, not everything
 that happens to appear in it. Meaningful for answers that contain code;
 prose answers rarely have anything to list.
+
+`keyDisputed` is optional and on `mcq_feedback` only (#198): `true` when
+the grader of a pick found the answer key it was told (`correct_option`)
+wrong, whichever option was picked; absent otherwise. For the app, never
+for the student — see "A disputed key".
 
 ### Field semantics
 
@@ -379,6 +523,15 @@ answer was just graded.
   conductor turns that into a small positive only for LOs the student
   once mastered, and only on a `correct` answer. Keeps the "which LOs
   count" judgment in code, not in the prompt.
+- **The grader of a multiple-choice pick is told the answer key and
+  judges it** (#197). The key is the intended answer, not the verdict:
+  the grade stays the grader's, and a grade that contradicts the key
+  flags a wrong key. The key goes to that call only, never before the
+  pick and never to the student.
+- **A wrong key is also said outright** (#198): `keyDisputed` in the
+  `mcq_feedback` META, whatever the pick — the grade cannot show a wrong
+  key when the pick is another wrong option. The bank treats it as a
+  contradiction; the student never sees it.
 
 ## What this contract deliberately does not do
 

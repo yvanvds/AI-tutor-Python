@@ -290,6 +290,14 @@ class GradedAnswer {
   /// not what kind of probe it was.
   final EvidenceProvenance provenance;
 
+  /// True when the verdict came from a bank question's answer key instead
+  /// of a grading call (#186, CONDUCTOR_POLICY §2.7): a multiple-choice
+  /// pick graded on the student's machine. Its signal is integrated like
+  /// any direct probe's — level, ratchets, calibration and all — but it is
+  /// not a grading call, so it stays out of the degraded-mode window (§7.3),
+  /// which watches the grader.
+  final bool fromAnswerKey;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
@@ -298,6 +306,7 @@ class GradedAnswer {
     this.chainDepth = 0,
     this.provenance = EvidenceProvenance.home,
     this.transferLOs = const [],
+    this.fromAnswerKey = false,
   });
 }
 
@@ -1124,10 +1133,14 @@ class Conductor {
 
     final events = <TurnSignalEvent>[];
 
-    // Track sustained-failure (degraded mode rule §7.3).
-    _recentFallbacks.add(answer.hadFallback);
-    while (_recentFallbacks.length > PolicyConstants.degradedWindow) {
-      _recentFallbacks.removeAt(0);
+    // Track sustained-failure (degraded mode rule §7.3). Grading calls
+    // only: a pick graded from a bank question's answer key (§2.7) says
+    // nothing about the grader.
+    if (!answer.fromAnswerKey) {
+      _recentFallbacks.add(answer.hadFallback);
+      while (_recentFallbacks.length > PolicyConstants.degradedWindow) {
+        _recentFallbacks.removeAt(0);
+      }
     }
     final fallbackCount = _recentFallbacks.where((f) => f).length;
     if (fallbackCount >= PolicyConstants.degradedThreshold) {
