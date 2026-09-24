@@ -310,6 +310,37 @@ BUILD_STORED = {
     },
 }
 
+# #202: a class of one made-up student whose grader answered `neutral` —
+# the answer touched the LO but showed nothing either way. Jens gets
+# recall_a1 right four times on 08-10 (stamped at medium), then, on 09-20,
+# a partial answer on write_a2: the grader names write_a2 and recall_a1,
+# both neutral. On 09-22, in Deel B, predict_b1 right, and a neutral from
+# the side on fix_a3. The app writes every one of those neutrals: no
+# weight, but the doc (at the prior if new) and its clock (§3.1).
+KLAS_NEUTRAL = "6NEUTRAAL"
+ACCOUNTS += [
+    {"uid": "u-jens", "firstName": "Jens", "lastName": "Grijs", "className": KLAS_NEUTRAL,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+NEUTRAL_AT = dt.datetime(2026, 9, 20, 9, 0, tzinfo=dt.timezone.utc)
+_NOW_BUILD = {"clientVersion": "2.6.0+23"}
+TURNS["u-jens"] = [
+    *[_turn(f"2026-08-10T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-jens", **_NOW_BUILD) for i in range(4)],
+    _turn("2026-09-20T09:00:00.000Z", "sg-a", "write_a2", uid="u-jens", overallQuality="partial",
+          loSignals=[_sig("sg-a", "write_a2", "weak", "neutral"), _sig("sg-a", "recall_a1", "moderate", "neutral")],
+          **_NOW_BUILD),
+    _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", uid="u-jens",
+          loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-a", "fix_a3", "weak", "neutral")], **_NOW_BUILD),
+]
+# What the app stored: recall_a1's (9, 1) of 08-10 decayed over 41 days to
+# the neutral's write; write_a2 and fix_a3 at the prior; predict_b1 (3, 1).
+JENS_STORED = {
+    ("sg-a", "recall_a1"): {"alpha": 5.9819, "beta": 1.0, "highestPositiveDifficulty": "medium"},
+    ("sg-a", "write_a2"): {"alpha": 1.0, "beta": 1.0},
+    ("sg-a", "fix_a3"): {"alpha": 1.0, "beta": 1.0},
+    ("sg-b", "predict_b1"): {"alpha": 3.0, "beta": 1.0, "highestPositiveDifficulty": "medium"},
+}
+
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
 
@@ -511,6 +542,42 @@ class AuditRecordDraftTest(_CommandTest):
         )
 
 
+class NeutralSignalDraftTest(_CommandTest):
+    """#202: the app writes a neutral signal — the doc and its clock — so
+    the counts on the proposal read it as the app does."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, _ = self.draft(KLAS_NEUTRAL)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.jens = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-jens")["computed"]
+
+    def test_the_counts_on_the_proposal_are_the_apps(self):
+        # recall_a1 was written on 09-20, four days ago; write_a2 and fix_a3
+        # have a doc. `eval3` had 3 stale and 2 never probed.
+        self.assertEqual(
+            {f: self.jens[f] for f in ("staleLoCount", "neverProbedCount", "supervisedTurns", "homeTurns")},
+            {"staleLoCount": 0, "neverProbedCount": 0, "supervisedTurns": 0, "homeTurns": 2},
+        )
+        self.assertIn(
+            "**Mee op het voorstel:** verouderd 0 leerdoel(en) (nooit bevraagd: 0) · "
+            "oefeningen deze periode: 0 onder toezicht, 2 thuis.",
+            self.section(self.md, "Jens Grijs"),
+        )
+
+    def test_the_number_does_not_move(self):
+        # No weight: recall_a1 the one core stamp, nothing else.
+        self.assertEqual((self.jens["coreCounted"], self.jens["masteredTotal"], self.jens["proposal"]), (1, 1, 25))
+
+    def test_a_question_answered_neutral_was_asked(self):
+        jens = self.section(self.md, "Jens Grijs")
+
+        self.assertIn("Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.50, 1 vragen — te weinig vragen om aan te tonen", jens)
+        self.assertIn("Je kan A3 verbeteren. `fix_a3` (uitbreiding) — μ 0.50, 0 vragen — te weinig vragen om aan te tonen", jens)
+        self.assertNotIn("— nooit bevraagd", jens)
+        self.assertIn(f"regels `{rules.RULES_VERSION}`", self.md)
+
+
 class ValidateTest(_CommandTest):
     def row(self, stdout: str, name: str) -> list[str]:
         """docs · compared · |d mean| > 0.01 · hoogste niveau anders · laatste build"""
@@ -545,6 +612,15 @@ class ValidateTest(_CommandTest):
         self.assertIn(f"sinds #167 en #169 ({rules.RULES_VERSION})", stdout)
         self.assertIn("laatste build 'oud'", stdout)
         self.assertNotIn("transfer-krediet", stdout)  # replayed since eval2
+
+    def test_docs_the_app_wrote_on_a_neutral_signal_match(self):
+        # #202: `eval3` compared 2 of the 4 docs, and read recall_a1, whose
+        # last write was a neutral 41 days on, as a deviation.
+        self.cosmos.beliefs = lambda uid: JENS_STORED if uid == "u-jens" else {}
+
+        stdout = self.run_cli("validate", "--klas", KLAS_NEUTRAL)
+
+        self.assertEqual(self.row(stdout, "Jens Grijs"), ["4", "4", "0", "0", "2.6.0+23"])
 
     def test_the_old_arithmetic_is_what_the_old_build_stored(self):
         # The fixture's old-build docs are that arithmetic, not a guess.
@@ -595,6 +671,71 @@ class TurnScopeTest(unittest.TestCase):
                   difficulty="hard", calibrationBefore="hard")
         s = rules.replay([t], GOALS)[("sg-b", "predict_b1")]
         self.assertEqual((s.n_direct, s.ratchet), (1, "hard"))
+
+
+class NeutralSignalTest(unittest.TestCase):
+    """#202: a neutral signal down the conductor's write path, at its edges."""
+
+    def test_it_moves_the_clocks_and_not_the_belief(self):
+        st = rules.replay(TURNS["u-jens"], GOALS)
+
+        recall = st[("sg-a", "recall_a1")]
+        self.assertEqual((recall.last_at, recall.last_direct_at), (NEUTRAL_AT, NEUTRAL_AT))
+        before = rules.replay(TURNS["u-jens"][:4], GOALS)[("sg-a", "recall_a1")]
+        a, b = rules._decay(before.alpha, before.beta, before.last_at, NEUTRAL_AT)
+        self.assertEqual((recall.alpha, recall.beta), (a, b))  # decayed to its moment, nothing added
+        self.assertEqual((recall.n_direct, recall.ratchet), (5, "medium"))
+        self.assertEqual(recall.direct_signals[-1], (NEUTRAL_AT, "neutral", "moderate", "medium"))
+        # A new LO starts at the prior: asked, with nothing to show for it.
+        write = st[("sg-a", "write_a2")]
+        self.assertEqual((write.alpha, write.beta, write.last_at, write.last_direct_at), (1.0, 1.0, NEUTRAL_AT, NEUTRAL_AT))
+        self.assertEqual((write.n_direct, write.ratchet, write.demonstrated), (1, None, False))
+        # From the side: the doc and its clock, but nobody asked it.
+        fix = st[("sg-a", "fix_a3")]
+        self.assertEqual((fix.alpha, fix.beta, fix.last_at), (1.0, 1.0, dt.datetime(2026, 9, 22, 9, 0, tzinfo=dt.timezone.utc)))
+        self.assertEqual((fix.last_direct_at, fix.n_direct), (None, 0))
+
+    def test_the_next_evidence_lands_as_if_it_were_not_there(self):
+        # Decay composes: the belief a later answer lands on is the same
+        # with or without the neutral write in between.
+        later = _turn("2026-10-01T09:00:00.000Z", "sg-a", "recall_a1", uid="u-jens")
+        with_neutral = rules.replay([*TURNS["u-jens"][:5], later], GOALS)[("sg-a", "recall_a1")]
+        without = rules.replay([*TURNS["u-jens"][:4], later], GOALS)[("sg-a", "recall_a1")]
+        self.assertAlmostEqual(with_neutral.alpha, without.alpha, places=12)
+        self.assertAlmostEqual(with_neutral.beta, without.beta, places=12)
+
+    def test_a_follow_up_or_a_forward_neutral_is_no_probe(self):
+        follow = _turn("2026-09-21T09:00:00.000Z", "sg-a", "write_a2", uid="u-jens", isFollowUp=True,
+                       loSignals=[_sig("sg-a", "write_a2", "weak", "neutral"), _sig("sg-b", "predict_b1", "weak", "neutral")])
+        st = rules.replay([*TURNS["u-jens"][:5], follow], GOALS)
+
+        write = st[("sg-a", "write_a2")]
+        self.assertEqual(write.last_at, dt.datetime(2026, 9, 21, 9, 0, tzinfo=dt.timezone.utc))
+        self.assertEqual((write.last_direct_at, write.n_direct), (NEUTRAL_AT, 1))  # §6.2: not a probe
+        self.assertNotIn(("sg-b", "predict_b1"), st)  # a later subgoal: dropped, no doc
+
+    def test_the_review_flag_clears_on_a_neutral_review(self):
+        # recall_a1 is stamped; in Deel B the grader blames it twice from the
+        # side, then names it neutral from the side: the oldest flag stands.
+        # write_a2, never asked, is blamed too. A warm-up review answered
+        # neutral is the direct measurement.
+        side = [
+            _turn(f"2026-09-2{d}T09:00:00.000Z", "sg-b", "predict_b1", uid="u-jens",
+                  loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-a", "recall_a1", "moderate", signal),
+                             _sig("sg-a", "write_a2", "moderate", "negative")])
+            for d, signal in ((1, "negative"), (2, "negative"), (3, "neutral"))
+        ]
+        flagged_at = dt.datetime(2026, 9, 21, 9, 0, tzinfo=dt.timezone.utc)
+        st = rules.replay([*TURNS["u-jens"][:4], *side], GOALS)
+        self.assertEqual(st[("sg-a", "recall_a1")].regressed_at, flagged_at)
+        self.assertNotIn(("sg-a", "write_a2"), st)  # never demonstrated: no flag, and no doc
+
+        review = _turn("2026-09-24T09:00:00.000Z", "sg-a", "recall_a1", uid="u-jens", isWarmUp=True,
+                       activeSubgoalId="sg-b", overallQuality="partial",
+                       loSignals=[_sig("sg-a", "recall_a1", "weak", "neutral")])
+        recall = rules.replay([*TURNS["u-jens"][:4], *side, review], GOALS)[("sg-a", "recall_a1")]
+        self.assertIsNone(recall.regressed_at)
+        self.assertEqual(recall.last_direct_at, dt.datetime(2026, 9, 24, 9, 0, tzinfo=dt.timezone.utc))
 
 
 class ReliabilityTest(unittest.TestCase):

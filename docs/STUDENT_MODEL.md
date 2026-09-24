@@ -100,7 +100,9 @@ Half-life on the order of months, not weeks. Exact curve is policy
 (part 4).
 
 When evidence arrives, the decayed values are persisted as the new
-`(α, β)` and `lastUpdatedAt` is bumped to `now`.
+`(α, β)` and `lastUpdatedAt` is bumped to `now`. So does a `neutral`
+signal, which adds no evidence but is written all the same (conductor
+policy 3.1, #202).
 
 ### 2. Per-student difficulty calibration
 
@@ -457,7 +459,8 @@ release pressed again for reports nobody touched rewrites nothing.
   the grader places on an earlier subgoal's LO (conductor policy 2.4,
   #108): a positive moves only `(α, β)` and `lastUpdatedAt` — never a
   ratchet, the counter or `lastQuestionType` — and creates the doc at
-  the prior if there was none; a negative writes nothing to the belief
+  the prior if there was none; a neutral does the same with no weight,
+  so only `lastUpdatedAt` moves; a negative writes nothing to the belief
   (#167) and only sets `regressedAt` (next bullet). `lastUpdatedAt`
   doubles as the staleness clock for the warm-up review: an LO not
   written for `warmUpStaleAfter` is due. None of these mechanisms
@@ -489,7 +492,7 @@ release pressed again for reports nobody touched rewrites nothing.
   late), and an indirect write on such a doc stores that reading instead
   of letting its own clock bump pass for a probe. A replay from
   `turn_history` can backfill it exactly (the last direct signal per
-  LO).
+  LO, a neutral one included: conductor policy 3.1, #202).
 
 ## What this model deliberately does not do
 

@@ -572,6 +572,9 @@ the two are not equally trustworthy:
   `medium`. On a code answer the instructions route "correctly used" to
   `transferLOs`, so in practice this path is rare (an MCQ that shows a
   prerequisite is solid).
+- **A neutral carries no weight** (3.1) but is written like a positive:
+  the doc, at the prior if the LO had none, and `lastUpdatedAt`. Nothing
+  else moves.
 - **A negative is a prompt, not evidence (#167).** It is the least
   reliable verdict the system produces: inferred from an answer about
   something else, by a probe not designed for this LO. And it lands by
@@ -733,7 +736,8 @@ bands do not overlap:
 
 The clock is the **last direct probe**, `lastProbedAt` on the belief doc
 (part 2): set on every write that may move the ratchets — the target of a
-question, or a signal on the LO while its own subgoal is active — and
+question, or a signal on the LO while its own subgoal is active, a
+neutral one included (3.1) — and
 left alone by a follow-up (6.2), a positive from a later subgoal (2.4)
 and a transfer credit (3.7). `lastUpdatedAt` cannot serve: an LO that
 later work keeps touching from the side would read as freshly asked while
@@ -760,7 +764,7 @@ clock and — when the answer completes the three conditions of 4.1 — the
 one-way stamp; no calibration window entry (5), no follow-up (6.3), no
 cache write or advancement for either subgoal; a transfer nomination on
 the target itself is dropped (3.7); other signals are incidental under
-2.4. Right or wrong, the probe clock restarts, so the LO waits another
+2.4. Right, wrong or neutral (3.1), the probe clock restarts, so the LO waits another
 `recheckAfter` before it can come back. The chat announces it
 (`recheck` notice, naming the old subgoal). Like a warm-up, the question
 comes from the question bank whenever one fits (2.7).
@@ -930,7 +934,7 @@ The base weight per `(signal, strength)`:
 | --- | --- | --- | --- |
 | `positive` | `α += 2.0` | `α += 1.0` | `α += 0.5` |
 | `negative` | `β += 2.0` | `β += 1.0` | `β += 0.5` |
-| `neutral` | (no update) | (no update) | (no update) |
+| `neutral` | (no weight) | (no weight) | (no weight) |
 
 **Symmetric in positive/negative.** Asymmetry here would distort
 calibration. The "wrong is more diagnostic than right" intuition is
@@ -941,11 +945,36 @@ symmetric; the one asymmetry the conductor does apply is by difficulty
 (3.2, #169), and that is about the level of the question relative to
 the student, not about one sign being more trustworthy than the other.
 
-**`neutral` is a no-op.** A neutral signal means "the answer touched
-the LO but gave no clear evidence." Adding `(α + 0.5, β + 0.5)` would
-inflate the evidence count without informing belief — wrong. The
-LLM still emits `neutral` for grading honesty (per part 3); the
-conductor declines to apply it.
+**`neutral` carries no weight, but it is written.** A neutral signal
+means "the answer touched the LO but gave no clear evidence." Adding
+`(α + 0.5, β + 0.5)` would inflate the evidence count without informing
+belief — wrong. The LLM still emits `neutral` for grading honesty (per
+part 3), and when grading fails on a `partial` answer the fallback
+signal is `(neutral, weak)` (LLM contract). The conductor adds nothing to `(α, β)`
+(`signalDeltas` returns zero), but the signal goes down the same write
+as any other, so it is a measurement without weight:
+
+- `(α, β)` are persisted decayed to now and `lastUpdatedAt = now` (3.3).
+  Decay composes exactly, so the belief the next signal lands on is the
+  same as without the neutral write.
+- An LO without a doc gets one at the prior (3.5), also from the side
+  (2.4).
+- A direct probe (the question's target, or a signal on an LO of the
+  active subgoal; not a follow-up, 6.2) also sets `lastProbedAt = now`,
+  the recheck clock (2.6), and `lastQuestionType` when it is the target.
+  Every write that is not from the side, a follow-up's included, clears
+  `regressedAt` (1.5, #112). The question was asked, whichever way the
+  answer went.
+- Neither ratchet nor the notch-drop counter moves (2.3, 4.3), and the
+  mastery stamp cannot be set by it: decay only moves a belief toward
+  the prior.
+- The turn record lists it under `appliedSignals` with zero deltas (8.1).
+
+Why a write and not a no-op: a recheck or warm-up answered only
+partially was still asked. Without the clock bump the same LO would be
+due again in the next free recheck slot. The evaluation replay
+(`tooling/evaluation/rules.replay`) writes a neutral the same way since
+rule set `eval4` (#202).
 
 ### 3.2 Difficulty modulation
 
@@ -1088,7 +1117,8 @@ recover from after decay or isolated bad answers.
 - **Signal on an LO with no existing belief doc** (incidental signal
   on an LO the student has never been probed on before). Create the
   belief doc with prior `(α=1, β=1)`, `lastUpdatedAt = now`, then
-  apply the update normally. Same code path; only the create-or-load
+  apply the update normally — a neutral too, which leaves the doc at
+  the prior (3.1). Same code path; only the create-or-load
   step is special. A cross-subgoal *negative* is the exception (2.4,
   #167): it writes nothing, so no doc is created — a never-asked LO
   must not start life in debit on a verdict nobody will re-test.

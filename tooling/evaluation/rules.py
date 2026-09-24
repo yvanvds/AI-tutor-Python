@@ -20,8 +20,19 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.18-eval3` = PUNTENFORMULE v1.0.18, replayed from the turn
-log. v1.0.17 and v1.0.18 (#187, #188) change nothing in M or P; they add
+Rule set `1.0.18-eval4` = PUNTENFORMULE v1.0.18, replayed from the turn
+log. `eval4` (#202) replays a `neutral` signal as the conductor writes it
+(CONDUCTOR_POLICY §3.1): no weight, but a write all the same — the belief
+decayed to that moment, the clock (`last_at`), on a direct probe the probe
+clock (`last_direct_at`, the app's `lastProbedAt`) and the cleared review
+flag (`regressed_at`), and the LO's state created at the prior if it had
+none. `eval3` skipped neutrals: a clock too early where the last write was
+a neutral, and no state — "never probed", stale — for an LO that only
+neutrals reached, where the app has a doc. M and P do not move (decay
+composes exactly); the counts on the proposal (`reliability`,
+`never_probed`) and the diagnostics can. A fidelity fix, like `eval3`.
+
+v1.0.17 and v1.0.18 (#187, #188) change nothing in M or P; they add
 the recheck ("controlevraag", CONDUCTOR_POLICY §2.6), a direct question
 about an LO of an earlier subgoal asked while the student works on
 another. `eval3` (#195) reads those turns, and the warm-up reviews
@@ -61,7 +72,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
-RULES_VERSION = "1.0.18-eval3"
+RULES_VERSION = "1.0.18-eval4"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -100,17 +111,27 @@ def is_audit(turn: dict) -> bool:
 
 @dataclass
 class LoState:
+    """One LO as the conductor stored it. A state exists where the app has
+    a doc in `lo_beliefs` (a neutral signal creates one too, #202)."""
+
     alpha: float = PRIOR
     beta: float = PRIOR
+    # `lastUpdatedAt`: every write, a neutral one included (#202).
     last_at: dt.datetime | None = None
     positive_at_calibrated_at: dt.datetime | None = None
     first_mastered_at: dt.datetime | None = None
     ratchet: str | None = None
+    # Direct probes of the LO, neutral ones included: the questions asked.
     n_direct: int = 0
     # The app's direct-probe clock `lastProbedAt` (#187): what the one-time
     # post-release replay can backfill on docs without it (README).
     last_direct_at: dt.datetime | None = None
     direct_signals: list[tuple[dt.datetime, str, str, str]] = field(default_factory=list)  # (at, signal, strength, difficulty)
+    # The warm-up review flag `regressedAt` (#112, #167), as the app keeps
+    # it: set by an incidental negative on a once-demonstrated LO, kept if
+    # already set, cleared by every write that is not incidental (§2.4),
+    # follow-ups and neutrals included.
+    regressed_at: dt.datetime | None = None
 
     @property
     def mean(self) -> float:
@@ -247,6 +268,13 @@ def replay(
     of the builds before, which write no `clientVersion` (#165).
     `apply_transfer_credits=False` is the `eval1` replay, which skipped the
     credits and under-read every doc that took one.
+
+    A `neutral` signal goes down the same write as the others (#202,
+    CONDUCTOR_POLICY §3.1): no weight, so `(α, β)` only decay to its
+    moment, but the clock moves, the state is created at the prior, and on
+    a direct probe the probe clock moves and the review flag clears.
+    `regressed_at` follows the app since #167 whatever the keyword
+    arguments.
     """
     st: dict[tuple[str, str], LoState] = {}
     for t in turns:
@@ -256,16 +284,24 @@ def replay(
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
         for s in t.get("loSignals") or []:
-            if s.get("signal") not in ("positive", "negative"):
+            kind = s.get("signal")
+            if kind not in ("positive", "negative", "neutral"):
                 continue
             sig_sg = s.get("subgoalId") or scope.probed
             reading = scope.reading(goals, sig_sg, s["loId"])
             if reading is None:
                 continue  # cross-root or forward: the conductor drops it
             incidental = reading == "incidental"
-            if incidental and s["signal"] == "negative" and drop_incidental_negatives:
-                continue  # #167
             key = (sig_sg, s["loId"])
+            if incidental and kind == "negative":
+                # #167: a prompt for the warm-up review, not evidence. It
+                # flags a once-demonstrated LO (the oldest flag stands) and
+                # writes nothing else: no clock, no state for a new LO.
+                flagged = st.get(key)
+                if flagged is not None and flagged.demonstrated and flagged.regressed_at is None:
+                    flagged.regressed_at = now
+                if drop_incidental_negatives:
+                    continue
             lo = st.setdefault(key, LoState())
             a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
             strength = s.get("strength") or "moderate"
@@ -273,18 +309,22 @@ def replay(
                 strength = "weak"  # §6.2
             eff_diff = "medium" if (follow_up or incidental) else diff
             base = WEIGHT.get(strength, 1.0)
-            if s["signal"] == "positive":
+            if kind == "positive":
                 a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
-            else:
+            elif kind == "negative":
                 factor = NEG_FACTOR if asymmetric else POS_FACTOR
                 a, b = _apply(a, b, 0.0, base * factor[eff_diff])
+            # A neutral adds nothing, and is written all the same: the
+            # decayed values, with the clock at its moment (#202).
             lo.alpha, lo.beta, lo.last_at = a, b, now
+            if not incidental:
+                lo.regressed_at = None  # a direct measurement, whichever way it went
             direct = not follow_up and not incidental
             if direct:
                 lo.n_direct += 1
                 lo.last_direct_at = now
-                lo.direct_signals.append((now, s["signal"], strength, diff))
-                if s["signal"] == "positive":
+                lo.direct_signals.append((now, kind, strength, diff))
+                if kind == "positive":
                     if DIFF_ORDER[diff] >= DIFF_ORDER[cal]:
                         lo.positive_at_calibrated_at = now
                     if DIFF_ORDER[diff] > DIFF_ORDER[lo.ratchet]:
@@ -414,11 +454,12 @@ def reliability(
     period_start: dt.datetime | None,
     now: dt.datetime,
 ) -> Reliability:
-    """Stale = a milestone LO whose replayed state got no evidence for more
-    than `WARM_UP_STALE_AFTER_DAYS` before [now], or none at all (the app's
-    `lastUpdatedAt` test on the belief doc; not the diagnostics' fossils,
-    which ask another question). The tally counts the graded oefeningen in
-    `[period_start, now]` by `provenance`, a missing one reading as `home`
+    """Stale = a milestone LO whose replayed state was not written for more
+    than `WARM_UP_STALE_AFTER_DAYS` before [now], or has no state at all
+    (the app's `lastUpdatedAt` test on the belief doc, which a neutral
+    signal moves too since the app writes it, #202; not the diagnostics'
+    fossils, which ask another question). The tally counts the graded
+    oefeningen in `[period_start, now]` by `provenance`, a missing one reading as `home`
     like `EvidenceProvenance.parse`; audit records (`is_audit`) are not
     evidence and not counted (`listTurnsBetween`). No
     [period_start] counts from the first turn, as the app's 1970 fallback."""

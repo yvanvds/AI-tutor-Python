@@ -59,11 +59,14 @@ Naast het getal zet `apply` de betrouwbaarheidssignalen van PUNTENFORMULE
 §3.2 op het voorstel, zoals de app ze telt; `draft` rekent ze uit en toont
 ze in concept en sidecar, dus de leerkracht ziet ze voor het "go":
 
-- **verouderd** (`staleLoCount`): leerdoelen van de mijlpaal die langer dan
-  30 dagen vóór het concept geen nieuw bewijs kregen in de herspeling, plus
-  de nooit bevraagde. Dezelfde drempel als de app
-  (`PolicyConstants.warmUpStaleAfter`), een andere vraag dan de fossielen;
-- **nooit bevraagd** (`neverProbedCount`);
+- **verouderd** (`staleLoCount`): leerdoelen van de mijlpaal waarop de
+  herspeling langer dan 30 dagen vóór het concept niets meer schreef, plus
+  de nooit bevraagde. Zoals in de app telt elke schrijving, ook een
+  neutraal signaal: dat verzet de klok zonder bewijs toe te voegen (#202).
+  Dezelfde drempel als de app (`PolicyConstants.warmUpStaleAfter`), een
+  andere vraag dan de fossielen;
+- **nooit bevraagd** (`neverProbedCount`): leerdoelen zonder document in de
+  app. Een neutraal signaal maakt er een, op de prior;
 - **oefeningen deze periode** (`supervisedTurns`, `homeTurns`): de
   beoordeelde oefeningen sinds `periodStart` van de mijlpaal, per
   `provenance`; zonder veld telt een oefening als thuis, zoals in de app.
@@ -72,9 +75,26 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.0.18-eval3`
+## Regelversie `1.0.18-eval4`
 
-PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. v1.0.17 en v1.0.18
+PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. `eval4`
+(2026-09-24, #202) herspeelt een **neutraal signaal** zoals de app het
+schrijft (CONDUCTOR_POLICY §3.1). Het weegt niets, maar het is wel een
+schrijving: μ en het bewijs vervallen tot dat moment, de klok verspringt,
+en een leerdoel zonder document krijgt er een op de prior. Een
+rechtstreeks neutraal signaal verzet ook de klok van de controlevraag
+(`lastProbedAt`) en wist de markering voor een opfrisvraag
+(`regressedAt`), welke kant het antwoord ook uitging. `eval3` sloeg
+neutrale signalen over. Het gaf dan een te vroege klok als de laatste
+schrijving neutraal was. Een leerdoel dat alleen neutrale signalen
+kreeg, stond als nooit bevraagd en verouderd, terwijl de app er een
+document voor heeft. M en P veranderen niet: een neutraal signaal weegt
+niets, en verval na verval is exact hetzelfde verval. Wel kunnen
+*verouderd* en *nooit bevraagd* op het voorstel veranderen, en in de
+diagnostiek het aantal vragen en de datum van de laatste vraag. Een
+getrouwheidscorrectie, geen regelwijziging.
+
+v1.0.17 en v1.0.18
 (#187, #188) veranderen niets aan M of P; ze voegen de **controlevraag**
 toe: een rechtstreekse vraag over een leerdoel van een eerder subdoel,
 midden in het werk aan een ander. `eval3` (2026-09-24, #195) leest die
@@ -119,7 +139,8 @@ decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
 doel en alleen naar een eerder subdoel, transfer-krediet zoals gelogd (een
 zwak positief op gemiddeld), opfris- en controlevragen als rechtstreekse
-meting van hun leerdoel (sinds `eval3`), kern telt alleen met hoogste
+meting van hun leerdoel (sinds `eval3`), een neutraal signaal als
+schrijving zonder gewicht (sinds `eval4`), kern telt alleen met hoogste
 niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 
 ## Wat de diagnostiek kan dat de app niet kan
@@ -179,20 +200,19 @@ release, die de gebruiker zelf draait (#195). `evaluate.py` krijgt er geen
 commando voor: deze tooling schrijft alleen naar `grade_proposals`, en
 alleen na een "go". Voor die herspeling geldt:
 
-- herspeel met `eval3` of later. `eval2` gaf de andere leerdoelen van
+- herspeel met `eval4` of later. `eval2` gaf de andere leerdoelen van
   het subdoel van een opfris- of controlevraag een te late klok, en een
-  leerdoel van het actieve subdoel een te vroege of geen klok;
+  leerdoel van het actieve subdoel een te vroege of geen klok. `eval3`
+  sloeg neutrale signalen over, die de app wel als rechtstreekse vraag
+  telt (#202). Was de laatste rechtstreekse vraag neutraal, dan gaf het
+  een te vroege klok: hoogstens één controlevraag te vroeg. Een leerdoel
+  met alleen neutrale rechtstreekse vragen kreeg geen klok;
 - schrijf het veld alleen op documenten die het nog niet hebben. Wat de
   app zelf schreef, gaat voor;
 - laat het weg als `last_direct_at` leeg is. Dan werd het leerdoel nooit
   rechtstreeks bevraagd, en zo leest de app het al;
 - zoals bij de vorige herspeling: eerst `backup`, dan `If-Match`, en
   buiten de lesuren.
-
-Een neutraal signaal verzet de klok in de app wel, maar in de herspeling
-niet (#202). Tot dat beslist is, kan de aangevulde waarde daar vroeger
-liggen dan wat de app zou schrijven: hoogstens één controlevraag te
-vroeg.
 
 ## `validate`: de herspeling tegenover de opslag
 
@@ -202,7 +222,11 @@ meer dan 0,01 afwijkt of het hoogste niveau anders is. Tot #203
 herspeelde het met de rekenregels van vóór #167 en #169 (symmetrische
 factor, incidentele negatieven als bewijs). Dan telde elk document met
 een fout op `easy` of `hard`, of met een incidenteel negatief, als
-afwijking, ook bij een leerling op de huidige build.
+afwijking, ook bij een leerling op de huidige build. Tot `eval4` (#202)
+sloeg de herspeling neutrale signalen over. Een document dat de app het
+laatst op een neutraal signaal schreef, week dan af: de app liet μ tot
+dat moment vervallen, de herspeling niet. En een document dat alleen
+neutrale signalen kreeg, werd niet vergeleken.
 
 De kolom **laatste build** is de `clientVersion` op de laatste oefening
 (#165). Elke build die dat veld schrijft (vanaf 2.6.0) rekent met #167 en
@@ -225,8 +249,9 @@ Een afwijking betekent dus:
   (Grenzen);
 - het document werd met een oudere herspeling herschreven. De
   herschrijving van 2026-09-23 gebruikte `eval2`, dat een opfrisvraag
-  anders las dan `eval3` (#195). Zulke documenten wijken af tot de
-  herspeling na de release, met `eval3` of later (hierboven);
+  anders las dan `eval3` (#195) en neutrale signalen oversloeg (#202).
+  Zulke documenten kunnen afwijken tot de herspeling na de release, met
+  `eval4` of later (hierboven);
 - iets wat de log niet draagt: een signaal meer of minder dan gelogd.
 
 ## Grenzen
