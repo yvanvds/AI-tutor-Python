@@ -1,4 +1,4 @@
-// End-to-end (#99, #148, #149, #150, #160, #166, #168, #170, #173): the
+// End-to-end (#99, #148, #149, #150, #160, #166, #168, #170, #173, #200): the
 // periodic grade proposal, teacher side, now as a class-wide workflow that
 // ends in a published report.
 //
@@ -25,8 +25,10 @@
 //      reads "0 supervised" for everyone is not a measurement (#160); with
 //      a registry bound it is back. The detail pane's reliability line
 //      follows the same rule (#173): the staleness counts always, the turn
-//      tally only with a registry bound. The teacher then walks the class
-//      in the detail pane, adjusts a grade with a note and signs off.
+//      tally only with a registry bound — counted as oefeningen, the
+//      teacher's word, in Dutch as in English (#200). The teacher then
+//      walks the class in the detail pane, adjusts a grade with a note and
+//      signs off.
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
@@ -208,8 +210,13 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   /// Opens the Reports page and waits for the class list to be there.
-  Future<void> openReports(WidgetTester tester) async {
-    await tester.tap(find.byTooltip('Reports'));
+  /// [tooltip] is the sidebar entry's name in the language the app runs in.
+  Future<void> openReports(
+    WidgetTester tester, {
+    String tooltip = 'Reports',
+  }) async {
+    await pumpUntilFound(tester, find.byTooltip(tooltip));
+    await tester.tap(find.byTooltip(tooltip));
     await pumpUntilFound(tester, find.byType(ReportsPage));
     await pumpUntilFound(tester, find.byKey(const Key('reports-milestone')));
   }
@@ -408,7 +415,7 @@ void main() {
       'Stale: ${stored['staleLoCount']} LOs '
       '(never probed: ${stored['neverProbedCount']}).',
     );
-    expect(find.textContaining('Turns this period'), findsNothing);
+    expect(find.textContaining('Exercises this period'), findsNothing);
     expect(stored['supervisedTurns'], 0);
     expect(find.text(kJustification), findsOneWidget);
     // The model was told the number, and only the period's reports.
@@ -680,7 +687,7 @@ void main() {
           .data,
       'Stale: ${stored['staleLoCount']} LOs '
       '(never probed: ${stored['neverProbedCount']}). '
-      'Turns this period: ${stored['supervisedTurns']} supervised, '
+      'Exercises this period: ${stored['supervisedTurns']} supervised, '
       '${stored['homeTurns']} at home.',
     );
 
@@ -690,6 +697,41 @@ void main() {
     expect(prompt, contains('"supervisedTurnsInPeriod":'));
     expect(prompt, contains('"homeTurnsInPeriod":'));
     expect(llm.sentInstructions.single, contains('no supervised work'));
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('in Dutch the tally counts oefeningen, the word the teacher '
+      'uses for them (#200)', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+      supervision: const _AnchorBound(),
+      // The language the teacher picked on the Options page last time.
+      prefs: {'app_locale': 'nl'},
+    );
+    await harness.boot(tester);
+
+    await openReports(tester, tooltip: 'Rapporten');
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reports-run-one')));
+    await pumpUntilFound(tester, find.text(kJustification));
+
+    final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
+          .data,
+      'Verouderd: ${stored['staleLoCount']} leerdoelen '
+      '(nooit bevraagd: ${stored['neverProbedCount']}). '
+      'Oefeningen deze periode: ${stored['supervisedTurns']} onder toezicht, '
+      '${stored['homeTurns']} thuis.',
+    );
+    expect(find.textContaining('Beurten'), findsNothing);
 
     await harness.dispose(tester);
   });

@@ -137,7 +137,7 @@
   "@reports_grade_hard": {
     "placeholders": { "counted": { "type": "int" }, "total": { "type": "int" } }
   },
-  "reports_grade_reliability": "Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.",
+  "reports_grade_reliability": "Stale: {stale} LOs (never probed: {never}). Exercises this period: {supervised} supervised, {home} at home.",
   "@reports_grade_reliability": {
     "placeholders": {
       "stale": { "type": "int" },

@@ -605,7 +605,7 @@ abstract class AppLocalizations {
   /// No description provided for @reports_grade_reliability.
   ///
   /// In en, this message translates to:
-  /// **'Stale: {stale} LOs (never probed: {never}). Turns this period: {supervised} supervised, {home} at home.'**
+  /// **'Stale: {stale} LOs (never probed: {never}). Exercises this period: {supervised} supervised, {home} at home.'**
   String reports_grade_reliability(
     int stale,
     int never,

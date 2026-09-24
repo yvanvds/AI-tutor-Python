@@ -301,7 +301,7 @@ class AppLocalizationsEn extends AppLocalizations {
     int supervised,
     int home,
   ) {
-    return 'Stale: $stale LOs (never probed: $never). Turns this period: $supervised supervised, $home at home.';
+    return 'Stale: $stale LOs (never probed: $never). Exercises this period: $supervised supervised, $home at home.';
   }
 
   @override

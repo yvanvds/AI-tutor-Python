@@ -1,6 +1,6 @@
 // The reliability line of the Reports detail pane (#173).
 //
-// "Stale: X LOs (never probed: Y). Turns this period: 0 supervised, N at
+// "Stale: X LOs (never probed: Y). Exercises this period: 0 supervised, N at
 // home." stood against every student while no supervision registry is
 // bound — the shipped app until Anchor lands, where every turn is `home`
 // by construction. The staleness half is a measurement and stays; the turn
@@ -8,6 +8,9 @@
 // behind it, and the pane shows it only then. Same rule #160 applied to the
 // justification prompt; here it is the line the teacher reads. The counts
 // themselves stay on the `grade_proposals` doc either way.
+//
+// The tally counts oefeningen, the teacher's word for them, and says so in
+// both languages (#200): "Oefeningen deze periode", not "Beurten".
 //
 // The real page over the real services against in-memory Cosmos. The same
 // pane in the real Windows app, reached through the sidebar, is
@@ -167,7 +170,7 @@ void main() {
     await mount(tester);
 
     expect(reliability(tester), 'Stale: 2 LOs (never probed: 1).');
-    expect(find.textContaining('Turns this period'), findsNothing);
+    expect(find.textContaining('Exercises this period'), findsNothing);
     // The rest of the report is untouched.
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
   });
@@ -179,7 +182,7 @@ void main() {
     expect(
       reliability(tester),
       'Stale: 2 LOs (never probed: 1). '
-      'Turns this period: 0 supervised, 14 at home.',
+      'Exercises this period: 0 supervised, 14 at home.',
     );
   });
 
@@ -188,5 +191,21 @@ void main() {
 
     expect(reliability(tester), 'Verouderd: 2 leerdoelen (nooit bevraagd: 1).');
     expect(find.textContaining('onder toezicht'), findsNothing);
+  });
+
+  testWidgets('the Dutch tally counts oefeningen, the word the teacher uses '
+      '(#200)', (tester) async {
+    await mount(
+      tester,
+      supervision: const _AnchorBound(),
+      locale: const Locale('nl'),
+    );
+
+    expect(
+      reliability(tester),
+      'Verouderd: 2 leerdoelen (nooit bevraagd: 1). '
+      'Oefeningen deze periode: 0 onder toezicht, 14 thuis.',
+    );
+    expect(find.textContaining('Beurten'), findsNothing);
   });
 }

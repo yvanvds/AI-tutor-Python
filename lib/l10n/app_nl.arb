@@ -90,7 +90,7 @@
   "reports_grade_core": "Kern op niveau: {counted} / {total}",
   "reports_grade_extension": "Uitbreiding beheerst: {counted} / {total}",
   "reports_grade_hard": "Aangetoond op moeilijk: {counted} / {total} beheerst",
-  "reports_grade_reliability": "Verouderd: {stale} leerdoelen (nooit bevraagd: {never}). Beurten deze periode: {supervised} onder toezicht, {home} thuis.",
+  "reports_grade_reliability": "Verouderd: {stale} leerdoelen (nooit bevraagd: {never}). Oefeningen deze periode: {supervised} onder toezicht, {home} thuis.",
   "reports_grade_reliability_unwired": "Verouderd: {stale} leerdoelen (nooit bevraagd: {never}).",
   "reports_grade_formulaVersion": "Formule v{version}, berekend {ts}",
   "reports_grade_justification_title": "Verantwoording",
