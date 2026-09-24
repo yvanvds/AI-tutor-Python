@@ -8,6 +8,10 @@
 // clipped off the bottom, and a hard test failure. The workaround was to
 // make that entry student-only; this is the rail actually being fixed.
 //
+// #185 added the eleventh entry this fix left room for — the teacher's
+// Questions page — and tightened the rail (44 px entries, trimmed logo
+// gaps) to put the entry of slack back.
+//
 // What only a full-app run can pin — and what a widget test structurally
 // cannot:
 //   - the *real* height budget. `test/features/shell/sidebar_test.dart`
@@ -56,6 +60,7 @@ const List<String> _entries = [
   'Grade formula',
   'Goals',
   'Lesson content',
+  'Questions',
   'Instructions',
   'Students',
   'Milestones',

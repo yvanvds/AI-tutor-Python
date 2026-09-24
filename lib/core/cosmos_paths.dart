@@ -17,6 +17,7 @@ const String _playgroundFilesContainer = 'playground_files';
 const String _milestonesContainer = 'milestones';
 const String _gradeProposalsContainer = 'grade_proposals';
 const String _reportsContainer = 'reports';
+const String _questionsContainer = 'questions';
 
 /// Constant partition-key values for the single-partition containers
 /// (`goals`, `instructions`, `config`, `content`, `modules`, `milestones`).
@@ -104,4 +105,13 @@ class CosmosPaths {
   /// release action (#150). The only grading container a student reads, and
   /// only their own partition of it.
   static CosmosContainer reports() => _client.container(_reportsContainer);
+
+  /// `/subgoalId` partition. The question bank (#185): one doc per question
+  /// the tutor generated, doc id `${subgoalId}_${contentHash}`, so the same
+  /// generation lands on the same doc. Partitioned by subgoal because every
+  /// student-side read and write names exactly one: storing a question,
+  /// counting an answer, and (#186) finding the questions that fit a plan
+  /// are point reads or single-partition queries. Only the teacher's
+  /// Questions page fans out across partitions.
+  static CosmosContainer questions() => _client.container(_questionsContainer);
 }

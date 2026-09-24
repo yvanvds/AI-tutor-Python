@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 PersistedTurnRecord _record({
   String? clientVersion,
   TurnUsage? usage,
+  String? questionId,
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
   List<TurnReviewFlag> reviewFlags = const [],
@@ -20,6 +21,7 @@ PersistedTurnRecord _record({
 }) => PersistedTurnRecord(
   clientVersion: clientVersion,
   usage: usage,
+  questionId: questionId,
   reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   isRecheck: isRecheck,
@@ -213,6 +215,21 @@ void main() {
       final map = _record(clientVersion: '2.5.0+22').toMap(uid: 'u1');
       expect(map['clientVersion'], '2.5.0+22');
       expect(PersistedTurnRecord.fromCosmos(map).clientVersion, '2.5.0+22');
+    });
+  });
+
+  group('PersistedTurnRecord questionId (#185)', () {
+    test('a turn without a bank question writes no field and reads back '
+        'null — as does every doc from before the bank', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('questionId'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).questionId, isNull);
+    });
+
+    test('the bank question the turn graded is written and read back', () {
+      final map = _record(questionId: 's1_abc123').toMap(uid: 'u1');
+      expect(map['questionId'], 's1_abc123');
+      expect(PersistedTurnRecord.fromCosmos(map).questionId, 's1_abc123');
     });
   });
 

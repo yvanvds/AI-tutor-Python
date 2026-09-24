@@ -70,6 +70,14 @@ per-question-type schema (MCQ options, code snippet, prompt text, etc.).
 No structural change on this side — only the inputs gain `targetLOs`
 and the question-type prompt is told to focus on those LOs.
 
+A multiple-choice META's `correct` (the positional letter, `"A"` = the
+first option) is read since #185: `MultipleChoice.correct` resolves it to
+the option's *text* — the options are shuffled before the student sees
+them — and the question bank stores it as the answer key. It is not sent
+back: the grader's exercise history carries the question without it, as
+before. A letter past the last option, or a value that is neither a letter
+nor an option's text, is no key.
+
 The conductor may request a question that probes a single LO or
 multiple LOs. The LLM should weight the question to those LOs but is
 not forbidden from incidentally probing others.

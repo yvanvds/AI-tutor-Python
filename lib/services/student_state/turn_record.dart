@@ -307,6 +307,15 @@ class PersistedTurnRecord {
   /// before the field existed.
   final TurnUsage? usage;
 
+  /// The question bank entry this turn graded an answer to (#185): the
+  /// `id` of its doc in `questions`, whose partition is [subgoalId]. Set on
+  /// the grade of the question itself — not on a follow-up's, which answers
+  /// the grader's own question — and omitted when no question was tracked
+  /// (an audit stub, a doc from before the bank). The id is a content hash,
+  /// so it is there even when the bank write itself failed; #186 reads it
+  /// to tell which bank questions a student already had.
+  final String? questionId;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -352,6 +361,7 @@ class PersistedTurnRecord {
     this.activeSubgoalId,
     this.clientVersion,
     this.usage,
+    this.questionId,
   });
 
   bool get hasStrongEvent =>
@@ -379,6 +389,7 @@ class PersistedTurnRecord {
     'provenance': provenance.name,
     if (clientVersion != null) 'clientVersion': clientVersion,
     if (usage != null) 'usage': usage!.toJson(),
+    if (questionId != null) 'questionId': questionId,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -458,6 +469,7 @@ class PersistedTurnRecord {
       provenance: EvidenceProvenance.parse(doc['provenance']),
       clientVersion: doc['clientVersion'] as String?,
       usage: TurnUsage.tryFromJson(doc['usage']),
+      questionId: doc['questionId'] as String?,
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

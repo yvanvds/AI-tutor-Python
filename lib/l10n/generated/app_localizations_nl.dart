@@ -49,6 +49,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_lessonContent => 'Lesinhoud';
 
   @override
+  String get sidebar_section_questions => 'Vragen';
+
+  @override
   String get sidebar_section_instructions => 'Instructies';
 
   @override
@@ -2498,4 +2501,168 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get chat_notice_submitViaEditor =>
       'Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.';
+
+  @override
+  String get questions_page_title => 'Vragen';
+
+  @override
+  String get questions_page_subtitle =>
+      'Elke vraag die de tutor maakte, per subdoel. Verberg de vragen die fout of onduidelijk zijn: een verborgen vraag wordt niet opnieuw gesteld.';
+
+  @override
+  String get questions_refresh_tooltip => 'Vernieuwen';
+
+  @override
+  String get questions_containerMissing_title =>
+      'De vragenbank is nog niet aangemaakt';
+
+  @override
+  String get questions_containerMissing_body =>
+      'De Cosmos-container `questions` bestaat niet. Maak hem aan met partitiesleutel `/subgoalId` (README, stap 3). Tot dan oefenen leerlingen gewoon verder, maar hun vragen worden niet bewaard.';
+
+  @override
+  String questions_loadError(String error) {
+    return 'De vragenbank kon niet geladen worden: $error';
+  }
+
+  @override
+  String get questions_retry => 'Opnieuw proberen';
+
+  @override
+  String get questions_tree_empty =>
+      'Nog geen vragen bewaard. Ze verschijnen hier zodra leerlingen oefenen.';
+
+  @override
+  String questions_tree_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count vragen',
+      one: '1 vraag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String questions_tree_unreviewed(int count) {
+    return '$count nieuw';
+  }
+
+  @override
+  String questions_tree_unknownSubgoal(String id) {
+    return 'Verwijderd subdoel ($id)';
+  }
+
+  @override
+  String get questions_tree_otherGroup => 'Niet meer in het leerpad';
+
+  @override
+  String get questions_placeholder => 'Kies links een subdoel.';
+
+  @override
+  String get questions_filter_unreviewed => 'Nog niet nagekeken';
+
+  @override
+  String get questions_sort_newest => 'Nieuwste';
+
+  @override
+  String get questions_sort_shareAsc => 'Aandeel juist ↑';
+
+  @override
+  String get questions_sort_shareDesc => 'Aandeel juist ↓';
+
+  @override
+  String get questions_sort_mostAsked => 'Meest gesteld';
+
+  @override
+  String get questions_list_empty => 'Geen vragen voor dit subdoel.';
+
+  @override
+  String get questions_list_allReviewed =>
+      'Alle vragen van dit subdoel zijn nagekeken.';
+
+  @override
+  String get questions_type_mcQuestion => 'Meerkeuze';
+
+  @override
+  String get questions_type_completeCodeQuestion => 'Code aanvullen';
+
+  @override
+  String get questions_type_explainCodeQuestion => 'Code uitleggen';
+
+  @override
+  String get questions_type_writeCodeQuestion => 'Code schrijven';
+
+  @override
+  String get questions_type_socraticQuestion => 'Open vraag';
+
+  @override
+  String questions_asked(int count) {
+    return '$count× gesteld';
+  }
+
+  @override
+  String questions_shareCorrect(int percent, int correct, int answered) {
+    return '$percent% juist ($correct/$answered)';
+  }
+
+  @override
+  String get questions_notAnswered => 'nog geen antwoorden';
+
+  @override
+  String questions_targets(String ids) {
+    return 'Doel-LO $ids';
+  }
+
+  @override
+  String get questions_badge_hidden => 'Verborgen';
+
+  @override
+  String get questions_badge_reviewed => 'Nagekeken';
+
+  @override
+  String get questions_keyDisagreement =>
+      'De beoordeling sprak de antwoordsleutel minstens één keer tegen.';
+
+  @override
+  String get questions_noKey =>
+      'Geen antwoordsleutel: het model noemde de juiste optie niet.';
+
+  @override
+  String get questions_answerKey_tooltip => 'Antwoordsleutel';
+
+  @override
+  String questions_note(String note) {
+    return 'Notitie: $note';
+  }
+
+  @override
+  String get questions_action_markReviewed => 'Nagekeken';
+
+  @override
+  String get questions_action_hide => 'Verbergen';
+
+  @override
+  String get questions_action_unhide => 'Weer tonen';
+
+  @override
+  String get questions_action_note => 'Notitie';
+
+  @override
+  String get questions_note_dialog_title => 'Notitie bij deze vraag';
+
+  @override
+  String get questions_note_dialog_hint =>
+      'Wat is er mis mee, of wat wil je onthouden';
+
+  @override
+  String get questions_note_dialog_cancel => 'Annuleren';
+
+  @override
+  String get questions_note_dialog_save => 'Opslaan';
+
+  @override
+  String questions_actionFailed(String error) {
+    return 'Dat lukte niet: $error';
+  }
 }

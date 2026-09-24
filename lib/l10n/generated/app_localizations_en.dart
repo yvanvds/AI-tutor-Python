@@ -49,6 +49,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_lessonContent => 'Lesson content';
 
   @override
+  String get sidebar_section_questions => 'Questions';
+
+  @override
   String get sidebar_section_instructions => 'Instructions';
 
   @override
@@ -2470,4 +2473,168 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chat_notice_submitViaEditor =>
       'Adjust your code in the editor on the left and press Run to submit your solution.';
+
+  @override
+  String get questions_page_title => 'Questions';
+
+  @override
+  String get questions_page_subtitle =>
+      'Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.';
+
+  @override
+  String get questions_refresh_tooltip => 'Refresh';
+
+  @override
+  String get questions_containerMissing_title =>
+      'The question bank has not been set up yet';
+
+  @override
+  String get questions_containerMissing_body =>
+      'The Cosmos container `questions` does not exist. Create it with partition key `/subgoalId` (README, step 3). Until then students practise as usual, but their questions are not stored.';
+
+  @override
+  String questions_loadError(String error) {
+    return 'The question bank could not be loaded: $error';
+  }
+
+  @override
+  String get questions_retry => 'Try again';
+
+  @override
+  String get questions_tree_empty =>
+      'No questions stored yet. They appear here as students practise.';
+
+  @override
+  String questions_tree_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count questions',
+      one: '1 question',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String questions_tree_unreviewed(int count) {
+    return '$count new';
+  }
+
+  @override
+  String questions_tree_unknownSubgoal(String id) {
+    return 'Removed subgoal ($id)';
+  }
+
+  @override
+  String get questions_tree_otherGroup => 'No longer in the curriculum';
+
+  @override
+  String get questions_placeholder => 'Pick a subgoal on the left.';
+
+  @override
+  String get questions_filter_unreviewed => 'Not reviewed yet';
+
+  @override
+  String get questions_sort_newest => 'Newest';
+
+  @override
+  String get questions_sort_shareAsc => 'Share correct ↑';
+
+  @override
+  String get questions_sort_shareDesc => 'Share correct ↓';
+
+  @override
+  String get questions_sort_mostAsked => 'Most asked';
+
+  @override
+  String get questions_list_empty => 'No questions for this subgoal.';
+
+  @override
+  String get questions_list_allReviewed =>
+      'Every question of this subgoal has been reviewed.';
+
+  @override
+  String get questions_type_mcQuestion => 'Multiple choice';
+
+  @override
+  String get questions_type_completeCodeQuestion => 'Complete the code';
+
+  @override
+  String get questions_type_explainCodeQuestion => 'Explain the code';
+
+  @override
+  String get questions_type_writeCodeQuestion => 'Write code';
+
+  @override
+  String get questions_type_socraticQuestion => 'Open question';
+
+  @override
+  String questions_asked(int count) {
+    return 'asked $count×';
+  }
+
+  @override
+  String questions_shareCorrect(int percent, int correct, int answered) {
+    return '$percent% correct ($correct/$answered)';
+  }
+
+  @override
+  String get questions_notAnswered => 'no answers yet';
+
+  @override
+  String questions_targets(String ids) {
+    return 'LO $ids';
+  }
+
+  @override
+  String get questions_badge_hidden => 'Hidden';
+
+  @override
+  String get questions_badge_reviewed => 'Reviewed';
+
+  @override
+  String get questions_keyDisagreement =>
+      'The grading disagreed with the answer key at least once.';
+
+  @override
+  String get questions_noKey =>
+      'No answer key: the model did not name the correct option.';
+
+  @override
+  String get questions_answerKey_tooltip => 'Answer key';
+
+  @override
+  String questions_note(String note) {
+    return 'Note: $note';
+  }
+
+  @override
+  String get questions_action_markReviewed => 'Mark reviewed';
+
+  @override
+  String get questions_action_hide => 'Hide';
+
+  @override
+  String get questions_action_unhide => 'Show again';
+
+  @override
+  String get questions_action_note => 'Note';
+
+  @override
+  String get questions_note_dialog_title => 'Note on this question';
+
+  @override
+  String get questions_note_dialog_hint =>
+      'What is wrong with it, or what to remember';
+
+  @override
+  String get questions_note_dialog_cancel => 'Cancel';
+
+  @override
+  String get questions_note_dialog_save => 'Save';
+
+  @override
+  String questions_actionFailed(String error) {
+    return 'That did not work: $error';
+  }
 }

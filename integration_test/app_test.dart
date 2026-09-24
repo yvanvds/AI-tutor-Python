@@ -49,6 +49,7 @@ import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
 import 'flows/puntenformule_tab.dart' as puntenformule_tab;
+import 'flows/question_bank.dart' as question_bank;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
@@ -104,6 +105,7 @@ void main() {
   warm_up_review.main();
   near_goal_recheck.main();
   unconfirmed_recheck.main();
+  question_bank.main();
   quiz_ligatures.main();
   quiz_verdict_colors.main();
   playground_during_mcq.main();

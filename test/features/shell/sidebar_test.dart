@@ -26,6 +26,11 @@
 // sign-out stay pinned. An eleventh entry now fails here, cheaply, instead
 // of in a Windows integration run.
 //
+// Issue #185 — that eleventh entry: the teacher's Questions page (the
+// question bank). It took the entry of slack, and the rail was tightened to
+// buy it back (44 px entries, trimmed logo gaps), as the height test below
+// demands.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
 // what a signed-in user actually sees in the navigation rail.
@@ -97,8 +102,29 @@ void main() {
     expect(find.byTooltip('Instructions'), findsNothing);
     expect(find.byTooltip('Goals'), findsOneWidget);
     expect(find.byTooltip('Lesson content'), findsOneWidget);
+    expect(find.byTooltip('Questions'), findsOneWidget);
     expect(find.byTooltip('Students'), findsOneWidget);
     expect(find.byTooltip('Debug'), findsNothing);
+  });
+
+  testWidgets('a teacher gets the Questions entry right after Lesson content, '
+      'and tapping it routes to the question bank (#185)', (tester) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    final entry = find.byTooltip('Questions');
+    expect(entry, findsOneWidget);
+    expect(
+      tester.getTopLeft(entry).dy,
+      greaterThan(tester.getTopLeft(find.byTooltip('Lesson content')).dy),
+    );
+    expect(
+      tester.getTopLeft(entry).dy,
+      lessThan(tester.getTopLeft(find.byTooltip('Students')).dy),
+    );
+
+    await tester.tap(entry);
+    await tester.pump();
+    expect(containerOf(tester).read(sectionProvider), Section.questions);
   });
 
   testWidgets('teacher with developer tools sees the instructions entry', (
@@ -115,6 +141,7 @@ void main() {
 
     expect(find.byTooltip('Instructions'), findsNothing);
     expect(find.byTooltip('Goals'), findsNothing);
+    expect(find.byTooltip('Questions'), findsNothing);
   });
 
   testWidgets('bottom strip is Options + sign out for a student; the old '
@@ -242,6 +269,7 @@ void main() {
     'Grade formula',
     'Goals',
     'Lesson content',
+    'Questions',
     'Instructions',
     'Students',
     'Milestones',
@@ -360,6 +388,12 @@ void main() {
       Section.instructions,
     ]);
     expect(Section.instructions.isTeacherOnly, isTrue);
+  });
+
+  test('Section.questions is teacher-only, not developer-only (#185)', () {
+    expect(Section.questions.isTeacherOnly, isTrue);
+    expect(Section.questions.isDeveloperOnly, isFalse);
+    expect(Section.questions.isStudentOnly, isFalse);
   });
 
   test('Section.options is reachable by students', () {

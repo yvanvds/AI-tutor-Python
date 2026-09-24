@@ -109,6 +109,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `content`        | `/type`       |
    | `modules`        | `/type`       |
    | `milestones`     | `/type`       |
+   | `questions`      | `/subgoalId`  |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc
@@ -122,6 +123,11 @@ This stores accounts, goals, progress, instructions, and status reports.
    containers in your database. A container that is still missing shows up
    in the app as `Container "<name>" does not exist in Cosmos database
    "python-tutor"` (#170) — create it with the partition key listed above.
+
+   `questions` (the question bank, #185) is the one container the app can
+   run without: until it exists, students practise as before and nothing is
+   stored, and the teacher's **Questions** page says the container is
+   missing. Its partition key is `/subgoalId`, not `/uid` or `/type`.
 
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and

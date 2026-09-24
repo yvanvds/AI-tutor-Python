@@ -176,6 +176,12 @@ abstract class AppLocalizations {
   /// **'Lesson content'**
   String get sidebar_section_lessonContent;
 
+  /// No description provided for @sidebar_section_questions.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get sidebar_section_questions;
+
   /// No description provided for @sidebar_section_instructions.
   ///
   /// In en, this message translates to:
@@ -4177,6 +4183,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Adjust your code in the editor on the left and press Run to submit your solution.'**
   String get chat_notice_submitViaEditor;
+
+  /// No description provided for @questions_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get questions_page_title;
+
+  /// No description provided for @questions_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.'**
+  String get questions_page_subtitle;
+
+  /// No description provided for @questions_refresh_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get questions_refresh_tooltip;
+
+  /// No description provided for @questions_containerMissing_title.
+  ///
+  /// In en, this message translates to:
+  /// **'The question bank has not been set up yet'**
+  String get questions_containerMissing_title;
+
+  /// No description provided for @questions_containerMissing_body.
+  ///
+  /// In en, this message translates to:
+  /// **'The Cosmos container `questions` does not exist. Create it with partition key `/subgoalId` (README, step 3). Until then students practise as usual, but their questions are not stored.'**
+  String get questions_containerMissing_body;
+
+  /// No description provided for @questions_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'The question bank could not be loaded: {error}'**
+  String questions_loadError(String error);
+
+  /// No description provided for @questions_retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get questions_retry;
+
+  /// No description provided for @questions_tree_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No questions stored yet. They appear here as students practise.'**
+  String get questions_tree_empty;
+
+  /// No description provided for @questions_tree_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 question} other{{count} questions}}'**
+  String questions_tree_count(int count);
+
+  /// Questions of a subgoal the teacher has not reviewed yet
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new'**
+  String questions_tree_unreviewed(int count);
+
+  /// No description provided for @questions_tree_unknownSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed subgoal ({id})'**
+  String questions_tree_unknownSubgoal(String id);
+
+  /// No description provided for @questions_tree_otherGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer in the curriculum'**
+  String get questions_tree_otherGroup;
+
+  /// No description provided for @questions_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a subgoal on the left.'**
+  String get questions_placeholder;
+
+  /// No description provided for @questions_filter_unreviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reviewed yet'**
+  String get questions_filter_unreviewed;
+
+  /// No description provided for @questions_sort_newest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get questions_sort_newest;
+
+  /// No description provided for @questions_sort_shareAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share correct ↑'**
+  String get questions_sort_shareAsc;
+
+  /// No description provided for @questions_sort_shareDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share correct ↓'**
+  String get questions_sort_shareDesc;
+
+  /// No description provided for @questions_sort_mostAsked.
+  ///
+  /// In en, this message translates to:
+  /// **'Most asked'**
+  String get questions_sort_mostAsked;
+
+  /// No description provided for @questions_list_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No questions for this subgoal.'**
+  String get questions_list_empty;
+
+  /// No description provided for @questions_list_allReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Every question of this subgoal has been reviewed.'**
+  String get questions_list_allReviewed;
+
+  /// No description provided for @questions_type_mcQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple choice'**
+  String get questions_type_mcQuestion;
+
+  /// No description provided for @questions_type_completeCodeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the code'**
+  String get questions_type_completeCodeQuestion;
+
+  /// No description provided for @questions_type_explainCodeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain the code'**
+  String get questions_type_explainCodeQuestion;
+
+  /// No description provided for @questions_type_writeCodeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Write code'**
+  String get questions_type_writeCodeQuestion;
+
+  /// No description provided for @questions_type_socraticQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Open question'**
+  String get questions_type_socraticQuestion;
+
+  /// No description provided for @questions_asked.
+  ///
+  /// In en, this message translates to:
+  /// **'asked {count}×'**
+  String questions_asked(int count);
+
+  /// No description provided for @questions_shareCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% correct ({correct}/{answered})'**
+  String questions_shareCorrect(int percent, int correct, int answered);
+
+  /// No description provided for @questions_notAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'no answers yet'**
+  String get questions_notAnswered;
+
+  /// No description provided for @questions_targets.
+  ///
+  /// In en, this message translates to:
+  /// **'LO {ids}'**
+  String questions_targets(String ids);
+
+  /// No description provided for @questions_badge_hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get questions_badge_hidden;
+
+  /// No description provided for @questions_badge_reviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get questions_badge_reviewed;
+
+  /// No description provided for @questions_keyDisagreement.
+  ///
+  /// In en, this message translates to:
+  /// **'The grading disagreed with the answer key at least once.'**
+  String get questions_keyDisagreement;
+
+  /// No description provided for @questions_noKey.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer key: the model did not name the correct option.'**
+  String get questions_noKey;
+
+  /// No description provided for @questions_answerKey_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer key'**
+  String get questions_answerKey_tooltip;
+
+  /// No description provided for @questions_note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: {note}'**
+  String questions_note(String note);
+
+  /// No description provided for @questions_action_markReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark reviewed'**
+  String get questions_action_markReviewed;
+
+  /// No description provided for @questions_action_hide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get questions_action_hide;
+
+  /// No description provided for @questions_action_unhide.
+  ///
+  /// In en, this message translates to:
+  /// **'Show again'**
+  String get questions_action_unhide;
+
+  /// No description provided for @questions_action_note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get questions_action_note;
+
+  /// No description provided for @questions_note_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Note on this question'**
+  String get questions_note_dialog_title;
+
+  /// No description provided for @questions_note_dialog_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'What is wrong with it, or what to remember'**
+  String get questions_note_dialog_hint;
+
+  /// No description provided for @questions_note_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get questions_note_dialog_cancel;
+
+  /// No description provided for @questions_note_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get questions_note_dialog_save;
+
+  /// No description provided for @questions_actionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not work: {error}'**
+  String questions_actionFailed(String error);
 }
 
 class _AppLocalizationsDelegate
