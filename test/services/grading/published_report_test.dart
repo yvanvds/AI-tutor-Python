@@ -15,6 +15,7 @@
 //     fresh `updatedAt`, no revision history — and it is a no-op for a
 //     student whose report was never released.
 
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
@@ -23,6 +24,7 @@ import 'package:ai_tutor_python/services/grading/published_report_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/unprovisioned_cosmos.dart';
 
 final DateTime _computedAt = DateTime.utc(2026, 10, 15, 12);
 final DateTime _released = DateTime.utc(2026, 10, 20, 17, 30);
@@ -358,6 +360,39 @@ void main() {
 
       expect(republished, isNull);
       expect(f.store.docs, isEmpty, reason: 'nothing leaks out before release');
+    });
+  });
+
+  // #170: the account had no `reports` container. The read before the write
+  // took the 404 for "not released yet", so release only failed at the
+  // upsert, with a gateway message that named neither the container nor the
+  // fix — and a rewrite after sign-off skipped the republish in silence.
+  group('a `reports` container missing from the account (#170)', () {
+    final containerMissing = isA<CosmosException>().having(
+      (e) => e.isContainerNotFound,
+      'isContainerNotFound',
+      isTrue,
+    );
+
+    test('release fails naming the container, before any write', () async {
+      final cosmos = UnprovisionedCosmos('reports');
+      final service = PublishedReportService(container: cosmos.container);
+
+      await expectLater(
+        service.publish(milestone: _milestone(), proposals: [_signed()]),
+        throwsA(containerMissing),
+      );
+      expect(cosmos.writes, isEmpty);
+    });
+
+    test('a rewrite after sign-off does not pass for "never released"', () {
+      final cosmos = UnprovisionedCosmos('reports');
+      final service = PublishedReportService(container: cosmos.container);
+
+      expect(
+        service.republish(milestone: _milestone(), proposal: _signed()),
+        throwsA(containerMissing),
+      );
     });
   });
 }

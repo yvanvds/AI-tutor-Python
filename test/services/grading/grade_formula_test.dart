@@ -160,7 +160,9 @@ void main() {
       for (final m in [0.0, 37.5, 52.5, 78.0, 100.0]) {
         expect(proposalScore(mEnd: m), m);
       }
-      expect(GradingConstants.formulaVersion, '1.0.16');
+      // v1.0.17 (#187) and v1.0.18 (#188) changed when evidence is asked
+      // for, not the formula.
+      expect(GradingConstants.formulaVersion, '1.0.18');
     });
     test('the proposal is a whole point on 100', () {
       expect(roundedProposal(72.1), 72);

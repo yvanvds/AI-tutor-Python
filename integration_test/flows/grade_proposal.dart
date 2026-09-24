@@ -1,6 +1,6 @@
-// End-to-end (#99, #148, #149, #150, #160, #166, #168, #173): the periodic
-// grade proposal, teacher side, now as a class-wide workflow that ends in a
-// published report.
+// End-to-end (#99, #148, #149, #150, #160, #166, #168, #170, #173): the
+// periodic grade proposal, teacher side, now as a class-wide workflow that
+// ends in a published report.
 //
 //   1. The teacher defines a milestone on the Milestones page — subgoals,
 //      the Angoff split per learning objective, the expected level, the
@@ -39,6 +39,9 @@
 //      the `reports` container, carrying the grade, the prose and the
 //      breakdown — and deliberately not the turn tally or the staleness
 //      diagnostics. A rewrite after release republishes that one copy.
+//      On an account where `reports` was never created, release fails with
+//      an error that names the container (#170) instead of a gateway 404,
+//      and pressing it again once the container exists publishes.
 //   5. The student detail drawer no longer carries any of this: sign-off
 //      lives in exactly one place.
 //   6. A student's shell has no Milestones and no Reports entry at all.
@@ -62,6 +65,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../../test/helpers/unprovisioned_cosmos.dart';
 import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
@@ -1042,6 +1046,95 @@ void main() {
     );
     // Prose only: the signed number did not move.
     expect(after['grade'], 84);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('release on an account without a `reports` container names the '
+      'container, and works once it is created (#170)', (tester) async {
+    final llm = ScriptedLlm([kJustification]);
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      llm: llm,
+      extraDocs: _gradedClass(),
+    );
+    await harness.boot(tester);
+    // The live deployment's state when this was reported: every other
+    // container exists, `reports` was never created. It goes through the
+    // real REST client, which is where the 404 used to be misread.
+    final missing = UnprovisionedCosmos('reports');
+    harness.cosmos.route('reports', missing.container);
+
+    await openReports(tester);
+    await pumpUntilFound(tester, find.byKey(Key('reports-row-$kStudentUid')));
+    await tester.tap(find.byKey(const Key('reports-generate')));
+    await pumpUntil(
+      tester,
+      () => chipText(tester, kStudentUid) == 'justification',
+      reason: 'the batch never justified Sam',
+    );
+    await tester.tap(find.byKey(Key('reports-row-$kStudentUid')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-detail-proposal')),
+    );
+    await tapInDetail(tester, const Key('reports-sign-off'));
+    await pumpUntilFound(tester, find.byKey(const Key('reports-signed')));
+
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-confirm')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-error')),
+    );
+    // The failure lands while the confirm dialog is still fading out. Let it
+    // leave before the second attempt below: otherwise that attempt's
+    // "confirm is there" can be answered by the leaving button, and on a
+    // slow runner the new dialog and the leaving one are both in the tree
+    // when the test taps confirm (two matches, the CI failure on PR #196).
+    await pumpUntilGone(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
+
+    // The teacher reads what is wrong and what to do about it — not a
+    // gateway dump that looks like a missing document.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('reports-release-error'))).data,
+      'Releasing failed: CosmosException(404 ContainerNotFound): Container '
+      '"reports" does not exist in Cosmos database "python-tutor". Create it '
+      'with the partition key listed in README step 3.',
+    );
+    // It failed on the read, before anything was sent to be written.
+    expect(missing.writes, isEmpty);
+    expect(find.byKey(Key('reports-published-$kStudentUid')), findsNothing);
+    // The signed-off proposal is untouched, so a retry has what it needs.
+    expect(
+      harness
+          .cosmos['grade_proposals']
+          .docs['${kStudentUid}_m1']!['signedOffAt'],
+      isNotNull,
+    );
+
+    // Create the container and press release again: no restart, no new
+    // sign-off.
+    harness.cosmos.route('reports', null);
+    await tester.tap(find.byKey(const Key('reports-release')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
+    await tester.tap(find.byKey(const Key('reports-release-confirm')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(Key('reports-published-$kStudentUid')),
+    );
+    expect(find.byKey(const Key('reports-release-error')), findsNothing);
+    expect(harness.cosmos['reports'].docs.keys, ['${kStudentUid}_m1']);
 
     await harness.dispose(tester);
   });

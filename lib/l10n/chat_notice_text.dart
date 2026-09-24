@@ -56,6 +56,8 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_newGoalSelected(arg(0));
       case ChatNoticeKind.warmUpReview:
         return chat_notice_warmUpReview(arg(0));
+      case ChatNoticeKind.recheck:
+        return chat_notice_recheck(arg(0));
       case ChatNoticeKind.difficultyChanged:
         return chat_notice_difficultyChanged(
           difficultyName(arg(0)),

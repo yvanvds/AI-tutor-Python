@@ -100,7 +100,12 @@ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 - **fossielen**: leerdoelen die niet aangetoond zijn en al een week niet
   bevraagd, terwijl recent werk op zijn niveau goed is (niveaugewogen
   zoals μ onder #169: 63% juist op hard telt als 0,80) — de 30-dagenregel
-  voor opfrisvragen is daar te traag voor;
+  voor opfrisvragen is daar te traag voor. Sinds PUNTENFORMULE v1.0.17
+  (#187) stelt de app zelf een controlevraag over zo'n leerdoel wanneer μ
+  op 0,70–0,80 staat (CONDUCTOR_POLICY §2.6), en sinds v1.0.18 (#188)
+  ook wanneer μ boven 0,80 staat zonder rechtstreeks juist antwoord op
+  niveau (of zonder ratel); een fossiel dat hier nog opduikt, lag
+  daarbuiten of kreeg die vraag nog niet;
 - **weggegooide signalen**: oordelen van de grader over de leerdoelen van
   deze mijlpaal terwijl de leerling in een ander doel werkte; de app laat
   ze vallen. Let op: hun frequentie verschilt sterk per sessie (vraagtype?

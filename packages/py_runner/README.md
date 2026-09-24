@@ -28,10 +28,11 @@ What "supported" means on the student machine:
   works without any window.
 - `turtle`: draws in a native Tk window owned by `python.exe`, same caveat as
   `plt.show()`. The run stays active until the window closes or the student
-  presses Stop.
+  presses Stop. The cursor is a turtle, not the stock `classic` arrow:
+  `build_bundle.ps1` writes `Lib/turtle.cfg` with `shape = turtle` (#180).
 
 `build_bundle.ps1` fails the build unless `tooling/python/verify_bundle.py`
-passes inside the bundle (imports, Tcl/Tk start, Agg render). The same promise
+passes inside the bundle (imports, Tcl/Tk start, turtle shape, Agg render). The same promise
 is checked through the real `host.py` path by
 `test/bundled_packages_test.dart`, gated on `PY_RUNNER_E2E_PYTHON`:
 

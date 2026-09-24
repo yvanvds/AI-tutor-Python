@@ -75,6 +75,17 @@ class LoBelief {
   /// as it was. Missing on older docs: not flagged.
   final DateTime? regressedAt;
 
+  /// When a *direct* probe last landed on this LO (#187): a question that
+  /// targeted it, or a signal on it while its own subgoal was active — the
+  /// writes that may move the ratchets. Not a follow-up, not a signal from
+  /// a later subgoal (§2.4), not a transfer credit: those move
+  /// [lastUpdatedAt] and leave this alone. It is the clock of the recheck
+  /// slot (CONDUCTOR_POLICY §2.6), which [lastUpdatedAt] cannot be: an LO
+  /// that later work keeps touching from the side would look freshly
+  /// asked while nobody asked it. Missing on docs written before #187 —
+  /// read through [lastDirectProbeAt].
+  final DateTime? lastProbedAt;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -87,7 +98,16 @@ class LoBelief {
     this.recentNegativesAtCalibrated = 0,
     this.firstMasteredAt,
     this.regressedAt,
+    this.lastProbedAt,
   });
+
+  /// When a direct probe last landed, as far as this doc can tell:
+  /// [lastProbedAt]; on a doc from before #187 that was ever the target of
+  /// a question ([lastQuestionType] set), [lastUpdatedAt] — never earlier
+  /// than the real last probe, so an old doc is at worst due a little
+  /// later, never early. `null` for an LO never asked directly.
+  DateTime? get lastDirectProbeAt =>
+      lastProbedAt ?? (lastQuestionType != null ? lastUpdatedAt : null);
 
   /// [regressedAt] is the one field that legitimately goes back to `null`
   /// (a review clears it), hence the explicit [clearRegressedAt].
@@ -102,6 +122,7 @@ class LoBelief {
     DateTime? firstMasteredAt,
     DateTime? regressedAt,
     bool clearRegressedAt = false,
+    DateTime? lastProbedAt,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -118,6 +139,7 @@ class LoBelief {
           recentNegativesAtCalibrated ?? this.recentNegativesAtCalibrated,
       firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
       regressedAt: clearRegressedAt ? null : (regressedAt ?? this.regressedAt),
+      lastProbedAt: lastProbedAt ?? this.lastProbedAt,
     );
   }
 
@@ -148,6 +170,8 @@ class LoBelief {
       'firstMasteredAt': firstMasteredAt!.toUtc().toIso8601String(),
     if (regressedAt != null)
       'regressedAt': regressedAt!.toUtc().toIso8601String(),
+    if (lastProbedAt != null)
+      'lastProbedAt': lastProbedAt!.toUtc().toIso8601String(),
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -180,6 +204,9 @@ class LoBelief {
           : null,
       regressedAt: doc['regressedAt'] is String
           ? DateTime.tryParse(doc['regressedAt'] as String)
+          : null,
+      lastProbedAt: doc['lastProbedAt'] is String
+          ? DateTime.tryParse(doc['lastProbedAt'] as String)
           : null,
     );
   }

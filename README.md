@@ -116,6 +116,13 @@ This stores accounts, goals, progress, instructions, and status reports.
    `test/core/cosmos_paths_readme_parity_test.dart`, so the two cannot drift
    apart unnoticed again.
 
+   **Updating an existing deployment:** a new app version can add a container
+   (`reports` arrived with report publishing, #150), and nothing creates it
+   in your account for you. After an update, compare this table with the
+   containers in your database. A container that is still missing shows up
+   in the app as `Container "<name>" does not exist in Cosmos database
+   "python-tutor"` (#170) — create it with the partition key listed above.
+
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and
    a fresh deployment does not need it.

@@ -2419,6 +2419,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String chat_notice_recheck(String title) {
+    return 'In between: one check question on $title, so you can show you\'ve got it now.';
+  }
+
+  @override
   String chat_notice_difficultyChanged(String from, String to) {
     return 'Difficulty adjusted: $from -> $to';
   }

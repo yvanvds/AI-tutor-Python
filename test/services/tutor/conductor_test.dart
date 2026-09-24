@@ -27,6 +27,10 @@ class _Fakes {
   final List<PersistedTurnRecord> turnHistory = [];
   StudentCalibration calibration = StudentCalibration.fresh();
 
+  /// How often the conductor read the student's whole belief set — the
+  /// warm-up and recheck selections' query (#194).
+  int allBeliefReads = 0;
+
   GoalSelectionState selection = const GoalSelectionState();
   double currentProgress = 0.0;
 
@@ -77,7 +81,10 @@ ConductorDeps _buildDeps(_Fakes f) {
         f.beliefs[f._key(subgoalId, loId)],
     getLoBeliefsForSubgoal: (id) async =>
         f.beliefs.values.where((b) => b.subgoalId == id).toList(),
-    getAllLoBeliefs: () async => f.beliefs.values.toList(),
+    getAllLoBeliefs: () async {
+      f.allBeliefReads += 1;
+      return f.beliefs.values.toList();
+    },
     upsertLoBelief: (b) async {
       f.beliefs[f._key(b.subgoalId, b.loId)] = b;
     },
@@ -1793,6 +1800,26 @@ void main() {
       expect((await s.c.planNext()).isWarmUp, isTrue);
     });
 
+    test('with nothing due at the start the check is made once: ordinary '
+        'questions read no belief set for it (#194)', () async {
+      final s = await setup([
+        mastered('lo-print', lastUpdatedAt: fresh, firstMasteredAt: stale),
+      ]);
+      // The host's session-start block check: the warm-up check finds
+      // nothing, and the recheck slot, open at entry, looks once too.
+      expect((await s.c.planNext()).isWarmUp, isFalse);
+      expect(s.f.allBeliefReads, 2);
+      // Four ordinary questions: the recheck slot is closed until
+      // `recheckSpacing` of them are fired, and the warm-up is settled.
+      for (var i = 0; i < PolicyConstants.recheckSpacing - 1; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isFalse);
+        expect(plan.targetLOs.single.id, 'lo-var');
+        s.c.notePlannedQuestion(plan);
+      }
+      expect(s.f.allBeliefReads, 2);
+    });
+
     test('the most stale candidate wins; ties go to the lowest mean', () async {
       final older = now.subtract(const Duration(days: 80));
       final s = await setup([
@@ -2649,6 +2676,34 @@ void main() {
       expect(plan.reason.chosenReason, contains('regressed'));
     });
 
+    test('a flag raised mid-session waits for the next session: the rest of '
+        'this one is ordinary practice (#194)', () async {
+      final s = await setup([older('lo-print')]);
+      final first = _expectQuestion(await s.c.planNext());
+      expect(first.isWarmUp, isFalse);
+      await grade(
+        s.c,
+        extra: [onPrint(LoSignalKind.negative, LoSignalStrength.moderate)],
+      );
+      expect(stored(s.f, 'lo-print').regressedAt, isNotNull);
+
+      // Due now, but not in this session: no surprise review mid-practice.
+      for (var i = 0; i < 3; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isWarmUp, isFalse);
+        expect(plan.isOffSubgoal, isFalse);
+        expect(plan.targetLOs.single.id, 'lo-var');
+        s.c.notePlannedQuestion(plan);
+      }
+
+      // The next session opens with it.
+      await s.c.setTarget();
+      final review = _expectQuestion(await s.c.planNext());
+      expect(review.isWarmUp, isTrue);
+      expect(review.targetLOs.single.id, 'lo-print');
+      expect(review.reason.chosenReason, contains('regressed'));
+    });
+
     test('the flag does not depend on the belief: a weak negative on a '
         'strong belief flags the LO too (#167)', () async {
       final s = await setup([older('lo-print', alpha: 10)]);
@@ -2961,6 +3016,783 @@ void main() {
         final f = await walkWith(Progress(goalID: 's', progress: 0.5));
         expect(f.selection.activeChildGoal?.id, 's');
         expect(f.currentProgress, 0.5);
+      });
+    });
+  });
+
+  // ---- #187 / #188 the recheck slot -----------------------------------------
+  group('#187 recheck slot: an LO of an earlier subgoal (§2.6)', () {
+    const printLo = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    const inputLo = LearningObjective(
+      id: 'lo-input',
+      statement: 'input',
+      kind: LoKind.recall,
+    );
+    const varLo = LearningObjective(
+      id: 'lo-var',
+      statement: 'variables',
+      kind: LoKind.apply,
+    );
+    const loopLo = LearningObjective(
+      id: 'lo-loop',
+      statement: 'loops',
+      kind: LoKind.apply,
+    );
+    final printGoal = Goal(
+      id: 's0',
+      title: 'Print',
+      parentId: 'r',
+      order: 0,
+      objectives: const [printLo, inputLo],
+    );
+    final active = Goal(
+      id: 's1',
+      title: 'Variables',
+      parentId: 'r',
+      order: 1000,
+      objectives: const [varLo],
+    );
+    final later = Goal(
+      id: 's2',
+      title: 'Loops',
+      parentId: 'r',
+      order: 2000,
+      objectives: const [loopLo],
+    );
+    final now = DateTime.now().toUtc();
+    DateTime daysAgo(int d) => now.subtract(Duration(days: d));
+    final tenDaysAgo = daysAgo(10);
+
+    /// A full calibration window: [correct] of 10 right at [at].
+    List<CalibrationAnswer> window(
+      QuestionDifficulty at, {
+      int correct = PolicyConstants.calibrationWindow,
+    }) => [
+      for (var i = 0; i < PolicyConstants.calibrationWindow; i++)
+        CalibrationAnswer(
+          quality: i < correct ? AnswerQuality.correct : AnswerQuality.wrong,
+          difficulty: at,
+          at: daysAgo(1),
+        ),
+    ];
+
+    /// A belief just under the bar — stored (7.7, 2.3), μ 0.77; ten days of
+    /// decay read it as ~0.76 — last asked directly [probedAt] (ten days
+    /// ago by default) and never demonstrated. [withClock] false is a doc
+    /// from before `lastProbedAt` existed.
+    LoBelief near(
+      String loId, {
+      String subgoalId = 's0',
+      double alpha = 7.7,
+      double beta = 2.3,
+      DateTime? probedAt,
+      DateTime? lastUpdatedAt,
+      bool withClock = true,
+      String? lastQuestionType = 'completeCodeQuestion',
+      DateTime? firstMasteredAt,
+      DateTime? lastPositiveAtCalibratedAt,
+    }) {
+      final probed = probedAt ?? tenDaysAgo;
+      return LoBelief(
+        subgoalId: subgoalId,
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: lastUpdatedAt ?? probed,
+        lastQuestionType: lastQuestionType,
+        lastPositiveAtCalibratedAt: lastPositiveAtCalibratedAt,
+        highestPositiveDifficulty: lastPositiveAtCalibratedAt == null
+            ? null
+            : QuestionDifficulty.medium,
+        firstMasteredAt: firstMasteredAt,
+        lastProbedAt: withClock ? probed : null,
+      );
+    }
+
+    /// The student left "Print" on a stuck-advance ten days ago and is on
+    /// "Variables"; "Loops" is still ahead. [recent] is the calibration
+    /// window (by default: every answer right at [calibration]).
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LoBelief> beliefs, {
+      QuestionDifficulty calibration = QuestionDifficulty.medium,
+      List<CalibrationAnswer>? recent,
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [printGoal, active, later];
+      f.progressById['s0'] = Progress(
+        goalID: 's0',
+        progress: 0.5,
+        advancedAt: tenDaysAgo,
+      );
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: active,
+      );
+      f.calibration = StudentCalibration(
+        difficulty: calibration,
+        recentAnswers: recent ?? window(calibration),
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(f.selection.activeChildGoal?.id, 's1');
+      return (c: c, f: f);
+    }
+
+    LoBelief stored(_Fakes f, String loId) => f.beliefs[f._key('s0', loId)]!;
+
+    /// Fires [plan] and grades it: the target's own signal plus [extra].
+    Future<TurnOutcome> grade(
+      ({Conductor c, _Fakes f}) s,
+      QuestionPlan plan, {
+      AnswerQuality quality = AnswerQuality.correct,
+      List<GradedSignal> extra = const [],
+      List<GradedTransfer> transferLOs = const [],
+    }) {
+      s.c.notePlannedQuestion(plan);
+      return s.c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: plan.targetSubgoalIdOr('s1')!,
+              loId: plan.targetLOs.single.id,
+              kind: quality == AnswerQuality.correct
+                  ? LoSignalKind.positive
+                  : LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+            ...extra,
+          ],
+          transferLOs: transferLOs,
+        ),
+      );
+    }
+
+    /// An ordinary probe of "Variables", built by hand so the slot does
+    /// not get in the way.
+    QuestionPlan varProbe() => const QuestionPlan(
+      type: ChatRequestType.writeCodeQuestion,
+      difficulty: QuestionDifficulty.medium,
+      targetLOs: [varLo],
+      reason: TurnSelectionReason(
+        candidateLOs: [],
+        chosenReason: 'test',
+        notchDropFired: false,
+      ),
+    );
+
+    const sidePositive = GradedSignal(
+      subgoalId: 's0',
+      loId: 'lo-print',
+      kind: LoSignalKind.positive,
+      strength: LoSignalStrength.weak,
+    );
+
+    Future<bool> rechecks(List<LoBelief> beliefs) async =>
+        (await (await setup(beliefs)).c.planNext()).isRecheck;
+
+    /// The rule of the recheck the session opens with, `null` for none.
+    Future<RecheckRule?> ruleOf(
+      List<LoBelief> beliefs, {
+      List<CalibrationAnswer>? recent,
+    }) async => (await (await setup(
+      beliefs,
+      recent: recent,
+    )).c.planNext()).recheck?.rule;
+
+    test('a near goal of an earlier subgoal not asked directly for a week gets '
+        'a recheck: gentlest type for its kind, calibrated level', () async {
+      final s = await setup([
+        near('lo-print'),
+      ], calibration: QuestionDifficulty.hard);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isRecheck, isTrue);
+      expect(plan.isWarmUp, isFalse);
+      expect(plan.recheck!.subgoal.id, 's0');
+      expect(plan.recheck!.rule, RecheckRule.nearGoal);
+      expect(plan.offSubgoal!.id, 's0');
+      expect(plan.targetSubgoalIdOr('s1'), 's0');
+      expect(plan.targetLOs.single.id, 'lo-print');
+      expect(plan.type, ChatRequestType.completeCodeQuestion);
+      expect(plan.difficulty, QuestionDifficulty.hard);
+      expect(plan.reason.notchDropFired, isFalse);
+      expect(plan.reason.chosenReason, contains('recheck'));
+      expect(plan.reason.candidateLOs.single.loId, 'lo-print');
+
+      final recall = await setup([near('lo-input')]);
+      final mcq = _expectQuestion(await recall.c.planNext());
+      expect(mcq.isRecheck, isTrue);
+      expect(mcq.type, ChatRequestType.mcQuestion);
+    });
+
+    test('the clock is the last direct probe, not the last write: a near '
+        'goal touched from the side yesterday is still due; one asked three '
+        'days ago is not', () async {
+      expect(
+        await rechecks([near('lo-print', lastUpdatedAt: daysAgo(1))]),
+        isTrue,
+      );
+      expect(await rechecks([near('lo-print', probedAt: daysAgo(3))]), isFalse);
+    });
+
+    test('a doc from before the clock existed: asked as a target once, its '
+        'lastUpdatedAt is the clock; never asked directly, it is not a near '
+        'goal', () async {
+      expect(await rechecks([near('lo-print', withClock: false)]), isTrue);
+      expect(
+        await rechecks([
+          near('lo-print', withClock: false, probedAt: daysAgo(3)),
+        ]),
+        isFalse,
+      );
+      expect(
+        await rechecks([
+          near('lo-print', withClock: false, lastQuestionType: null),
+        ]),
+        isFalse,
+      );
+    });
+
+    test('only a near goal: below the floor or once demonstrated, it is left '
+        'alone; over the bar without a calibrated positive it is not a near '
+        'goal but #188', () async {
+      // μ 0.6: too far for one or two answers to reach the stamp.
+      expect(await rechecks([near('lo-print', alpha: 6, beta: 4)]), isFalse);
+      // μ 0.9 with no positive at calibration: the unconfirmed rule's case.
+      expect(
+        await ruleOf([near('lo-print', alpha: 9, beta: 1)]),
+        RecheckRule.unconfirmed,
+      );
+      // Demonstrated once: the stamp is already earned (§1.5 reviews it).
+      expect(
+        await rechecks([
+          near(
+            'lo-print',
+            firstMasteredAt: daysAgo(20),
+            lastPositiveAtCalibratedAt: daysAgo(20),
+          ),
+        ]),
+        isFalse,
+      );
+    });
+
+    test("the student's current work gates it, weighted by level: not "
+        'before the window is full, not at 7 of 10 on medium, yes at 6 of 10 '
+        'on hard', () async {
+      Future<bool> withWindow(
+        List<CalibrationAnswer> recent,
+        QuestionDifficulty calibration,
+      ) async => (await (await setup(
+        [near('lo-print')],
+        calibration: calibration,
+        recent: recent,
+      )).c.planNext()).isRecheck;
+
+      expect(
+        await withWindow(
+          window(QuestionDifficulty.medium).take(5).toList(),
+          QuestionDifficulty.medium,
+        ),
+        isFalse,
+      );
+      expect(
+        await withWindow(
+          window(QuestionDifficulty.medium, correct: 7),
+          QuestionDifficulty.medium,
+        ),
+        isFalse,
+      );
+      expect(
+        await withWindow(
+          window(QuestionDifficulty.hard, correct: 6),
+          QuestionDifficulty.hard,
+        ),
+        isTrue,
+      );
+    });
+
+    test('only earlier subgoals: an LO of the active subgoal or of a later '
+        'one is never rechecked', () async {
+      expect(
+        await rechecks([
+          near('lo-var', subgoalId: 's1'),
+          near('lo-loop', subgoalId: 's2'),
+        ]),
+        isFalse,
+      );
+    });
+
+    test('the oldest direct probe goes first; on a tie, the highest mean — '
+        'the one closest to the stamp', () async {
+      final s = await setup([
+        near('lo-print'),
+        near('lo-input', probedAt: daysAgo(20)),
+      ]);
+      final plan = await s.c.planNext();
+      expect(plan.targetLOs.single.id, 'lo-input');
+      expect(plan.reason.candidateLOs, hasLength(2));
+
+      final tie = await setup([
+        near('lo-print'),
+        near('lo-input', alpha: 7.2, beta: 2.8),
+      ]);
+      expect((await tie.c.planNext()).targetLOs.single.id, 'lo-print');
+    });
+
+    test('the slot: planning is repeatable until the recheck is fired; then '
+        'recheckSpacing ordinary questions; then the next near goal; a new '
+        'session opens it again', () async {
+      final s = await setup([
+        near('lo-print'),
+        near('lo-input', probedAt: daysAgo(20)),
+      ]);
+      // The host's session-start block check plans and discards.
+      expect((await s.c.planNext()).isRecheck, isTrue);
+      final first = await s.c.planNext();
+      expect(first.targetLOs.single.id, 'lo-input');
+      await grade(s, first);
+
+      for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isRecheck, isFalse, reason: 'question ${i + 1}');
+        expect(plan.targetLOs.single.id, 'lo-var');
+        s.c.notePlannedQuestion(plan);
+      }
+      final second = await s.c.planNext();
+      expect(second.isRecheck, isTrue);
+      expect(second.targetLOs.single.id, 'lo-print');
+
+      s.c.notePlannedQuestion(second);
+      expect((await s.c.planNext()).isRecheck, isFalse);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).targetLOs.single.id, 'lo-print');
+    });
+
+    test('a check that finds nothing due closes the slot as well: a near goal '
+        'that becomes due mid-session waits for the next spacing', () async {
+      final s = await setup(const []);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isRecheck, isFalse);
+      s.c.notePlannedQuestion(plan);
+      s.f.beliefs[s.f._key('s0', 'lo-print')] = near('lo-print');
+      for (var i = 1; i < PolicyConstants.recheckSpacing; i++) {
+        final next = await s.c.planNext();
+        expect(next.isRecheck, isFalse, reason: 'question ${i + 1}');
+        s.c.notePlannedQuestion(next);
+      }
+      expect((await s.c.planNext()).isRecheck, isTrue);
+    });
+
+    test('a warm-up review comes first at session start and closes the slot '
+        'too', () async {
+      final stale = daysAgo(45);
+      final s = await setup([
+        near('lo-print'),
+        LoBelief(
+          subgoalId: 's0',
+          loId: 'lo-input',
+          alpha: 5,
+          beta: 1,
+          lastUpdatedAt: stale,
+          lastQuestionType: 'mcQuestion',
+          lastPositiveAtCalibratedAt: stale,
+          highestPositiveDifficulty: QuestionDifficulty.medium,
+          firstMasteredAt: stale,
+        ),
+      ]);
+      final warmUp = await s.c.planNext();
+      expect(warmUp.isWarmUp, isTrue);
+      expect(warmUp.isRecheck, isFalse);
+      expect(warmUp.targetLOs.single.id, 'lo-input');
+      s.c.notePlannedQuestion(warmUp);
+      final next = _expectQuestion(await s.c.planNext());
+      expect(next.isOffSubgoal, isFalse);
+      expect(next.targetLOs.single.id, 'lo-var');
+    });
+
+    test('a right answer is a direct probe of the old LO: decayed α plus the '
+        'full weight, both ratchets, the probe clock — and the stamp, now '
+        'that the three conditions hold', () async {
+      final s = await setup([near('lo-print')]);
+      final windowBefore = s.f.calibration.recentAnswers;
+      final plan = await s.c.planNext();
+      expect(plan.isRecheck, isTrue);
+      final outcome = await grade(s, plan);
+
+      final after = stored(s.f, 'lo-print');
+      final decayed = applyDecay(
+        alpha: 7.7,
+        beta: 2.3,
+        lastUpdatedAt: tenDaysAgo,
+        now: after.lastUpdatedAt,
+      );
+      expect(decayed.mean, lessThan(PolicyConstants.masteryMeanThreshold));
+      // Strong positive at medium: 2.0 × 1.0.
+      expect(after.alpha, closeTo(decayed.alpha + 2.0, 1e-6));
+      expect(after.beta, closeTo(decayed.beta, 1e-6));
+      expect(
+        after.alpha / (after.alpha + after.beta),
+        greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
+      );
+      expect(after.lastPositiveAtCalibratedAt, after.lastUpdatedAt);
+      expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
+      expect(after.lastProbedAt, after.lastUpdatedAt);
+      expect(after.lastQuestionType, plan.type.name);
+      // The student earned the stamp the grade reads (PUNTENFORMULE §2.2).
+      expect(after.firstMasteredAt, after.lastUpdatedAt);
+      expect(outcome.appliedSignals.single.subgoalId, 's0');
+      expect(outcome.appliedSignals.single.alphaDelta, closeTo(2.0, 1e-6));
+
+      // Not a calibrated probe of the active subgoal: the window is as it
+      // was, no cache moves, nothing advances, "Variables" is untouched.
+      expect(s.f.calibration.recentAnswers, windowBefore);
+      expect(outcome.calibrationAfter, outcome.calibrationBefore);
+      expect(outcome.subgoalAdvanced, isFalse);
+      expect(s.f.progressById['s0']!.progress, 0.5);
+      expect(s.f.progressById.containsKey('s1'), isFalse);
+      expect(s.f.beliefs.containsKey(s.f._key('s1', 'lo-var')), isFalse);
+
+      // Demonstrated now: never a near goal again.
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isRecheck, isFalse);
+    });
+
+    test('a wrong answer debits the old LO honestly and restarts its clock: '
+        'no recheck for another week', () async {
+      final s = await setup([near('lo-print')]);
+      final plan = await s.c.planNext();
+      await grade(s, plan, quality: AnswerQuality.wrong);
+      final after = stored(s.f, 'lo-print');
+      expect(after.beta, greaterThan(2.3));
+      expect(after.recentNegativesAtCalibrated, 1);
+      expect(after.firstMasteredAt, isNull);
+      expect(after.lastProbedAt, after.lastUpdatedAt);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isRecheck, isFalse);
+    });
+
+    test('a positive from the side moves the belief and lastUpdatedAt, not '
+        'the probe clock (§2.4): the LO stays due', () async {
+      final s = await setup([near('lo-print')]);
+      await grade(s, varProbe(), extra: const [sidePositive]);
+      final after = stored(s.f, 'lo-print');
+      expect(after.alpha, greaterThan(7.0));
+      expect(
+        DateTime.now().toUtc().difference(after.lastUpdatedAt),
+        lessThan(const Duration(seconds: 5)),
+      );
+      expect(after.lastProbedAt, tenDaysAgo);
+      await s.c.setTarget();
+      expect((await s.c.planNext()).targetLOs.single.id, 'lo-print');
+
+      // A doc from before the clock: the write freezes its old reading
+      // instead of letting the new lastUpdatedAt pass for a probe.
+      final legacy = await setup([near('lo-print', withClock: false)]);
+      await grade(legacy, varProbe(), extra: const [sidePositive]);
+      expect(stored(legacy.f, 'lo-print').lastProbedAt, tenDaysAgo);
+    });
+
+    test('a transfer credit leaves the probe clock where it was', () async {
+      final mastered = LoBelief(
+        subgoalId: 's0',
+        loId: 'lo-input',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: daysAgo(2),
+        lastQuestionType: 'mcQuestion',
+        lastPositiveAtCalibratedAt: daysAgo(20),
+        highestPositiveDifficulty: QuestionDifficulty.medium,
+        firstMasteredAt: daysAgo(20),
+      );
+      const credit = [GradedTransfer(subgoalId: 's0', loId: 'lo-input')];
+      final s = await setup([mastered.copyWith(lastProbedAt: daysAgo(20))]);
+      await grade(s, varProbe(), transferLOs: credit);
+      expect(stored(s.f, 'lo-input').alpha, greaterThan(5.0));
+      expect(stored(s.f, 'lo-input').lastProbedAt, daysAgo(20));
+
+      final legacy = await setup([mastered]);
+      await grade(legacy, varProbe(), transferLOs: credit);
+      expect(stored(legacy.f, 'lo-input').lastProbedAt, daysAgo(2));
+    });
+
+    test('a transfer nomination on the recheck target itself is dropped: the '
+        'answer counts once', () async {
+      final s = await setup([near('lo-print')]);
+      final plan = await s.c.planNext();
+      final outcome = await grade(
+        s,
+        plan,
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      expect(outcome.transferCredits, isEmpty);
+      expect(outcome.appliedSignals.single.alphaDelta, closeTo(2.0, 1e-6));
+    });
+
+    // ---- #188 a high belief no direct right answer backs --------------------
+    group('#188 unconfirmed: over the bar without a direct right answer', () {
+      /// #188's profile: a belief lifted over the bar from the side —
+      /// stored (18.6, 1.4), μ 0.93 at the evidence cap — that no direct
+      /// right answer backs: last asked directly [probedAt] (ten days ago
+      /// by default; [asked] false: never), no positive at calibration, no
+      /// ratchet level, no stamp. Last written two days ago.
+      LoBelief high(
+        String loId, {
+        DateTime? probedAt,
+        bool asked = true,
+        DateTime? lastPositiveAtCalibratedAt,
+        QuestionDifficulty? highestPositiveDifficulty,
+        DateTime? firstMasteredAt,
+      }) => LoBelief(
+        subgoalId: 's0',
+        loId: loId,
+        alpha: 18.6,
+        beta: 1.4,
+        lastUpdatedAt: daysAgo(2),
+        lastQuestionType: asked ? 'completeCodeQuestion' : null,
+        lastPositiveAtCalibratedAt: lastPositiveAtCalibratedAt,
+        highestPositiveDifficulty: highestPositiveDifficulty,
+        firstMasteredAt: firstMasteredAt,
+        lastProbedAt: asked ? (probedAt ?? tenDaysAgo) : null,
+      );
+
+      const strongSidePositive = GradedSignal(
+        subgoalId: 's0',
+        loId: 'lo-print',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+      );
+
+      test(
+        'it gets a recheck under its own rule: gentlest type for its '
+        'kind, calibrated level, never notch-dropped, its own reason',
+        () async {
+          final s = await setup([
+            high('lo-print'),
+          ], calibration: QuestionDifficulty.hard);
+          final plan = _expectQuestion(await s.c.planNext());
+          expect(plan.isRecheck, isTrue);
+          expect(plan.isWarmUp, isFalse);
+          expect(plan.recheck!.rule, RecheckRule.unconfirmed);
+          expect(plan.recheck!.subgoal.id, 's0');
+          expect(plan.targetLOs.single.id, 'lo-print');
+          expect(plan.type, ChatRequestType.completeCodeQuestion);
+          expect(plan.difficulty, QuestionDifficulty.hard);
+          expect(plan.reason.notchDropFired, isFalse);
+          expect(plan.reason.chosenReason, contains('recheck'));
+          expect(plan.reason.chosenReason, contains('not confirmed'));
+          expect(plan.reason.candidateLOs.single.mean, greaterThan(0.9));
+        },
+      );
+
+      test('the case of #188: direct answers wrong, then positives from '
+          'later work lift the belief over the bar without moving a ratchet; '
+          'the next open slot asks it', () async {
+        // Just under the near-goal floor after two wrong direct answers:
+        // nothing is due at session start, so the slot closes.
+        final s = await setup([near('lo-print', alpha: 5, beta: 2.6)]);
+        final first = _expectQuestion(await s.c.planNext());
+        expect(first.isRecheck, isFalse);
+        // Practice on "Variables" (a weak positive on its own LO, so it
+        // does not advance) in which the grader sees `print` used well.
+        for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
+          final plan = varProbe();
+          s.c.notePlannedQuestion(plan);
+          await s.c.integrateAnswer(
+            plan: plan,
+            answer: GradedAnswer(
+              overallQuality: AnswerQuality.correct,
+              signals: const [
+                GradedSignal(
+                  subgoalId: 's1',
+                  loId: 'lo-var',
+                  kind: LoSignalKind.positive,
+                  strength: LoSignalStrength.weak,
+                ),
+                strongSidePositive,
+              ],
+            ),
+          );
+        }
+        expect(s.f.selection.activeChildGoal?.id, 's1');
+        final lifted = stored(s.f, 'lo-print');
+        expect(
+          lifted.alpha / (lifted.alpha + lifted.beta),
+          greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
+        );
+        expect(lifted.lastPositiveAtCalibratedAt, isNull);
+        expect(lifted.highestPositiveDifficulty, isNull);
+        expect(lifted.firstMasteredAt, isNull);
+        expect(lifted.lastProbedAt, tenDaysAgo);
+
+        final plan = await s.c.planNext();
+        expect(plan.isRecheck, isTrue);
+        expect(plan.recheck!.rule, RecheckRule.unconfirmed);
+        expect(plan.targetLOs.single.id, 'lo-print');
+      });
+
+      test('the clock is the near goal\'s: asked directly within the week, it '
+          'waits; never asked directly, it is due at once', () async {
+        expect(await ruleOf([high('lo-print', probedAt: daysAgo(3))]), isNull);
+        expect(
+          await ruleOf([high('lo-print', asked: false)]),
+          RecheckRule.unconfirmed,
+        );
+      });
+
+      test('an empty ratchet is enough (an old client\'s doc, #165), and so is '
+          'a level without a positive at calibration; a positive at '
+          'calibration with its level recorded is confirmed', () async {
+        expect(
+          await ruleOf([
+            high(
+              'lo-print',
+              lastPositiveAtCalibratedAt: daysAgo(20),
+              firstMasteredAt: daysAgo(20),
+            ),
+          ]),
+          RecheckRule.unconfirmed,
+        );
+        expect(
+          await ruleOf([
+            high(
+              'lo-print',
+              highestPositiveDifficulty: QuestionDifficulty.easy,
+            ),
+          ]),
+          RecheckRule.unconfirmed,
+        );
+        expect(
+          await ruleOf([
+            high(
+              'lo-print',
+              lastPositiveAtCalibratedAt: daysAgo(20),
+              highestPositiveDifficulty: QuestionDifficulty.medium,
+              firstMasteredAt: daysAgo(20),
+            ),
+          ]),
+          isNull,
+        );
+      });
+
+      test('no recent-work gate: the belief already says the student has it, '
+          'so a struggling window or one not yet full still asks', () async {
+        expect(
+          await ruleOf([
+            high('lo-print'),
+          ], recent: window(QuestionDifficulty.medium, correct: 3)),
+          RecheckRule.unconfirmed,
+        );
+        expect(
+          await ruleOf([
+            high('lo-print'),
+          ], recent: window(QuestionDifficulty.medium).take(5).toList()),
+          RecheckRule.unconfirmed,
+        );
+      });
+
+      test('only earlier subgoals, as for a near goal', () async {
+        final s = await setup([
+          LoBelief(
+            subgoalId: 's1',
+            loId: 'lo-var',
+            alpha: 18.6,
+            beta: 1.4,
+            lastUpdatedAt: daysAgo(2),
+          ),
+          LoBelief(
+            subgoalId: 's2',
+            loId: 'lo-loop',
+            alpha: 18.6,
+            beta: 1.4,
+            lastUpdatedAt: daysAgo(2),
+          ),
+        ]);
+        expect((await s.c.planNext()).isRecheck, isFalse);
+      });
+
+      test('a due near goal goes first, even when the unconfirmed LO waited '
+          'longer; the unconfirmed one gets the next slot', () async {
+        final s = await setup([
+          near('lo-print'),
+          high('lo-input', probedAt: daysAgo(20)),
+        ]);
+        final first = await s.c.planNext();
+        expect(first.recheck!.rule, RecheckRule.nearGoal);
+        expect(first.targetLOs.single.id, 'lo-print');
+        expect(first.reason.candidateLOs, hasLength(2));
+        await grade(s, first);
+        for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
+          s.c.notePlannedQuestion(_expectQuestion(await s.c.planNext()));
+        }
+        final second = await s.c.planNext();
+        expect(second.recheck!.rule, RecheckRule.unconfirmed);
+        expect(second.targetLOs.single.id, 'lo-input');
+        expect(second.type, ChatRequestType.mcQuestion);
+      });
+
+      test(
+        'a right answer confirms it: the positive at calibration, the '
+        'level asked, the stamp and the probe clock; never asked again',
+        () async {
+          final s = await setup([
+            high('lo-print'),
+          ], calibration: QuestionDifficulty.hard);
+          final windowBefore = s.f.calibration.recentAnswers;
+          final plan = await s.c.planNext();
+          expect(plan.recheck!.rule, RecheckRule.unconfirmed);
+          final outcome = await grade(s, plan);
+
+          final after = stored(s.f, 'lo-print');
+          expect(
+            after.alpha / (after.alpha + after.beta),
+            greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
+          );
+          expect(after.lastPositiveAtCalibratedAt, after.lastUpdatedAt);
+          expect(after.highestPositiveDifficulty, QuestionDifficulty.hard);
+          expect(after.firstMasteredAt, after.lastUpdatedAt);
+          expect(after.lastProbedAt, after.lastUpdatedAt);
+          expect(outcome.appliedSignals.single.subgoalId, 's0');
+          // Off the active subgoal: no calibration entry, nothing advances.
+          expect(s.f.calibration.recentAnswers, windowBefore);
+          expect(outcome.subgoalAdvanced, isFalse);
+
+          await s.c.setTarget();
+          expect((await s.c.planNext()).isRecheck, isFalse);
+        },
+      );
+
+      test('a wrong answer that leaves the belief high restarts the clock: no '
+          'recheck for a week, then it comes back', () async {
+        final s = await setup([high('lo-print')]);
+        final plan = await s.c.planNext();
+        await grade(s, plan, quality: AnswerQuality.wrong);
+        final after = stored(s.f, 'lo-print');
+        expect(after.beta, greaterThan(1.4));
+        expect(
+          after.alpha / (after.alpha + after.beta),
+          greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
+        );
+        expect(after.lastPositiveAtCalibratedAt, isNull);
+        expect(after.firstMasteredAt, isNull);
+        expect(after.lastProbedAt, after.lastUpdatedAt);
+        await s.c.setTarget();
+        expect((await s.c.planNext()).isRecheck, isFalse);
+
+        s.f.beliefs[s.f._key('s0', 'lo-print')] = after.copyWith(
+          lastProbedAt: daysAgo(8),
+        );
+        await s.c.setTarget();
+        expect((await s.c.planNext()).recheck?.rule, RecheckRule.unconfirmed);
       });
     });
   });

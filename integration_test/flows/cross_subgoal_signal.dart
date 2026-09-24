@@ -7,10 +7,12 @@
 // that negative: (α, β) and the decay clock stay exactly as they were, and
 // the doc is only flagged `regressedAt` (#112). The `turn_history` doc
 // names both grader signals, applies only the target's, and lists
-// `lo-print` under `reviewFlags`. The student's next session then opens
-// with the warm-up review on "Print" (#102) although the LO is nowhere near
-// stale, and answering it is the direct measurement that counts: full
-// weight, flag cleared. An LO never probed before gets neither a doc nor a
+// `lo-print` under `reviewFlags`. The rest of this session is ordinary
+// practice — the flag does not interrupt it with a review (#194) — and
+// the student's next session opens with the warm-up review on "Print"
+// (#102) although the LO is nowhere near stale, and answering it is the
+// direct measurement that counts: full weight, flag cleared. An LO never
+// probed before gets neither a doc nor a
 // flag: there is nothing to review, and a never-asked LO must not start
 // life in debit.
 //
@@ -264,6 +266,14 @@ void main() {
     expect(
       DateTime.now().toUtc().difference(flaggedAt),
       lessThan(const Duration(minutes: 1)),
+    );
+    // The flag is for the next session (#194): the exercise the app asked
+    // for after this grade is ordinary practice, not a review that
+    // interrupts the session.
+    expect(
+      pills(tester),
+      isNot(contains(contains('review question'))),
+      reason: 'the flag started a warm-up review in the middle of the session',
     );
     // "Print" stays done: nothing here re-enrols the student.
     expect(

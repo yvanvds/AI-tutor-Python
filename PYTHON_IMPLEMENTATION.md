@@ -206,7 +206,7 @@ Shipped as a regular file via the installer to `{app}\py_runner\host.py`, **not*
 
 1. Read `tooling/python/manifest.toml`.
 2. Download `cpython-…-install_only.tar.gz` from the github release; verify SHA-256 against the manifest. Cache under `tooling/python/.cache/` so re-runs are fast.
-3. Extract to `build/python_bundle/` so `build/python_bundle/python/python.exe` exists.
+3. Extract to `build/python_bundle/` so `build/python_bundle/python/python.exe` exists. Write `python/Lib/turtle.cfg` (`shape = turtle`, `title = Turtle`) so a new turtle is a turtle instead of the stock arrowhead (#180); this also runs on a cache hit, and `verify_bundle.py` fails the build if `turtle` no longer picks it up.
 4. `build/python_bundle/python/python.exe -m pip install --no-warn-script-location <every package from manifest>`.
 5. (Optional) Pre-compile to `.pyc` with `python -m compileall -q build/python_bundle/python` to cut first-import latency.
 6. Write `build/python_bundle/MANIFEST_LOCK.json` — the resolved versions actually installed, for runtime sanity-check.

@@ -13,10 +13,14 @@ PersistedTurnRecord _record({
   List<TurnReviewFlag> reviewFlags = const [],
   List<TurnAppliedSignal> appliedSignals = const [],
   bool isWarmUp = false,
+  bool isRecheck = false,
+  String? activeSubgoalId,
 }) => PersistedTurnRecord(
   clientVersion: clientVersion,
   reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
+  isRecheck: isRecheck,
+  activeSubgoalId: activeSubgoalId,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
   subgoalId: 's1',
@@ -51,6 +55,33 @@ void main() {
       final map = _record(isWarmUp: true).toMap(uid: 'u1');
       expect(map['isWarmUp'], isTrue);
       expect(PersistedTurnRecord.fromCosmos(map).isWarmUp, isTrue);
+    });
+  });
+
+  group('PersistedTurnRecord isRecheck and activeSubgoalId (#187)', () {
+    test('an ordinary turn writes neither field and reads back false / '
+        'null', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('isRecheck'), isFalse);
+      expect(map.containsKey('activeSubgoalId'), isFalse);
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.isRecheck, isFalse);
+      expect(back.activeSubgoalId, isNull);
+    });
+
+    test('a recheck turn writes the flag and the subgoal the student was '
+        'on, and reads both back', () {
+      final map = _record(
+        isRecheck: true,
+        activeSubgoalId: 's3',
+      ).toMap(uid: 'u1');
+      expect(map['isRecheck'], isTrue);
+      expect(map['subgoalId'], 's1');
+      expect(map['activeSubgoalId'], 's3');
+      expect(map.containsKey('isWarmUp'), isFalse);
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.isRecheck, isTrue);
+      expect(back.activeSubgoalId, 's3');
     });
   });
 

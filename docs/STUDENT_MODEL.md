@@ -229,6 +229,17 @@ StudentLOBelief {
                                         // Cleared only by the next direct
                                         // probe of the LO. Missing on
                                         // older docs: not flagged.
+  lastProbedAt: string?                 // ISO 8601, #187: the last *direct*
+                                        // probe — the question's target, or
+                                        // a signal while the LO's own
+                                        // subgoal is active. Not moved by a
+                                        // follow-up, a later subgoal's
+                                        // signal or a transfer credit. The
+                                        // recheck slot's clock (conductor
+                                        // policy 2.6). Missing on older
+                                        // docs: lastUpdatedAt stands in if
+                                        // the LO was ever a question's
+                                        // target (lastQuestionType set).
 }
 ```
 
@@ -439,9 +450,10 @@ release pressed again for reports nobody touched rewrites nothing.
   grade (PUNTENFORMULE §2.2) — and applies no fallback for a doc without
   it. Beliefs in *other* subgoals than the active one can therefore
   be written by a graded turn: upward only by a transfer credit, in
-  either direction by the once-per-session warm-up review, which is a
-  direct probe of that LO and updates its doc like any probe (ratchets
-  and counter included), and upward only by an incidental `loSignal`
+  either direction by the once-per-session warm-up review or a recheck
+  question (conductor policy 2.6, #187), each a direct probe of that LO
+  that updates its doc like any probe (ratchets, counter and stamp
+  included), and upward only by an incidental `loSignal`
   the grader places on an earlier subgoal's LO (conductor policy 2.4,
   #108): a positive moves only `(α, β)` and `lastUpdatedAt` — never a
   ratchet, the counter or `lastQuestionType` — and creates the doc at
@@ -462,6 +474,22 @@ release pressed again for reports nobody touched rewrites nothing.
   answer went. An indirect write (transfer credit, positive incidental)
   leaves it alone. Older docs without the field simply follow the
   staleness clock.
+- **`lastProbedAt` is the direct-probe clock** (#187). `lastUpdatedAt`
+  moves on every write, including the indirect ones above, so it cannot
+  say when the LO was last *asked*: an earlier LO the student keeps
+  using in later work reads as fresh while nobody has put a question on
+  it since. The recheck slot (conductor policy 2.6) needs exactly that
+  distinction — it re-asks a not-yet-demonstrated LO of an earlier
+  subgoal once a week without a direct probe, whether it sits just under
+  the bar (#187) or over it on evidence from later work (#188) — so the
+  conductor stamps `lastProbedAt` on every write that may move the
+  ratchets and carries it over unchanged on every other write. A doc from before the field is
+  read as `lastUpdatedAt` when `lastQuestionType` says the LO was ever a
+  question's target (never earlier than the truth, so at worst due
+  late), and an indirect write on such a doc stores that reading instead
+  of letting its own clock bump pass for a probe. A replay from
+  `turn_history` can backfill it exactly (the last direct signal per
+  LO).
 
 ## What this model deliberately does not do
 

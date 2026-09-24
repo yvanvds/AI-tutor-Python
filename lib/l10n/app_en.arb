@@ -1321,6 +1321,10 @@
   "@chat_notice_warmUpReview": {
     "placeholders": { "title": { "type": "String" } }
   },
+  "chat_notice_recheck": "In between: one check question on {title}, so you can show you've got it now.",
+  "@chat_notice_recheck": {
+    "placeholders": { "title": { "type": "String" } }
+  },
   "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",
   "@chat_notice_difficultyChanged": {
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }

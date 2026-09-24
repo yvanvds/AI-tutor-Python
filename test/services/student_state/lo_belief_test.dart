@@ -243,4 +243,63 @@ void main() {
       expect(belief().copyWith(alpha: 4).regressedAt, isNull);
     });
   });
+
+  group('LoBelief.lastProbedAt (#187)', () {
+    final probed = DateTime.utc(2026, 9, 11, 8, 53);
+    final updated = DateTime.utc(2026, 9, 18, 9, 30);
+
+    LoBelief belief({DateTime? lastProbedAt, String? lastQuestionType}) =>
+        LoBelief(
+          subgoalId: 's',
+          loId: 'lo',
+          alpha: 6,
+          beta: 2,
+          lastUpdatedAt: updated,
+          lastQuestionType: lastQuestionType,
+          lastProbedAt: lastProbedAt,
+        );
+
+    test('is written as ISO 8601 and read back', () {
+      final map = belief(lastProbedAt: probed).toMap(uid: 'u');
+      expect(map['lastProbedAt'], probed.toIso8601String());
+      expect(LoBelief.fromCosmos(map).lastProbedAt, probed);
+    });
+
+    test('is omitted while unknown; a malformed value reads as absent', () {
+      expect(belief().toMap(uid: 'u').containsKey('lastProbedAt'), isFalse);
+      expect(LoBelief.fromCosmos(_doc()).lastProbedAt, isNull);
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'lastProbedAt': 42}).lastProbedAt,
+        isNull,
+      );
+    });
+
+    test('copyWith keeps it unless given one', () {
+      final b = belief(lastProbedAt: probed);
+      expect(b.copyWith(alpha: 7, lastUpdatedAt: updated).lastProbedAt, probed);
+      expect(b.copyWith(lastProbedAt: updated).lastProbedAt, updated);
+    });
+
+    test('lastDirectProbeAt is the field when set, even if the doc was '
+        'written since — a later write from the side is not a probe', () {
+      expect(
+        belief(
+          lastProbedAt: probed,
+          lastQuestionType: 'mcQuestion',
+        ).lastDirectProbeAt,
+        probed,
+      );
+    });
+
+    test('on a doc from before the field, lastDirectProbeAt falls back to '
+        'lastUpdatedAt when the LO was ever the target of a question, and '
+        'is null for an LO never asked directly', () {
+      expect(
+        belief(lastQuestionType: 'mcQuestion').lastDirectProbeAt,
+        updated,
+        reason: 'never earlier than the real last probe: due late, not early',
+      );
+      expect(belief().lastDirectProbeAt, isNull);
+    });
+  });
 }

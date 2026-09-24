@@ -4094,6 +4094,12 @@ abstract class AppLocalizations {
   /// **'Quick warm-up first: one review question on {title}.'**
   String chat_notice_warmUpReview(String title);
 
+  /// No description provided for @chat_notice_recheck.
+  ///
+  /// In en, this message translates to:
+  /// **'In between: one check question on {title}, so you can show you\'ve got it now.'**
+  String chat_notice_recheck(String title);
+
   /// No description provided for @chat_notice_difficultyChanged.
   ///
   /// In en, this message translates to:

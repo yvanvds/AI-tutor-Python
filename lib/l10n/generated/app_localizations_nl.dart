@@ -2447,6 +2447,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String chat_notice_recheck(String title) {
+    return 'Tussendoor: één controlevraag over $title, om te tonen dat je het nu kan.';
+  }
+
+  @override
   String chat_notice_difficultyChanged(String from, String to) {
     return 'Moeilijkheid aangepast: $from -> $to';
   }
