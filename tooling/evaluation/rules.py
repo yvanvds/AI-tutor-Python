@@ -9,10 +9,16 @@ Why replay from `turn_history` instead of reading `lo_beliefs`: clients on
 an older build wrote docs without the difficulty ratchet and without the
 mastery stamp, and applied (or dropped) incidental signals differently.
 The turn log is the one record every build wrote the same way. Replaying
-it with the symmetric factor, incidentals on and the logged transfer
-credits reproduces the stored beliefs exactly for a client on the current
-build (validated 2026-09-23 on 6EWI and 6WEWI) — `evaluate.py validate`
-checks that on demand.
+it with the rules below and the logged transfer credits reproduces the
+stored beliefs for a client that computes as the app does since #167 and
+#169 (every build that stamps `clientVersion` on its turns, #165) —
+`evaluate.py validate` checks that on demand, with this same replay (#203).
+The builds before computed with the symmetric factor and took incidental
+negatives as evidence; `replay(asymmetric=False,
+drop_incidental_negatives=False)` is that arithmetic. It reproduced
+storage for the clients of that day (checked 2026-09-23 on 6EWI and
+6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
+the current rules.
 
 Rule set `1.0.18-eval3` = PUNTENFORMULE v1.0.18, replayed from the turn
 log. v1.0.17 and v1.0.18 (#187, #188) change nothing in M or P; they add
@@ -235,10 +241,12 @@ def replay(
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
 
-    With `asymmetric=False, drop_incidental_negatives=False` this is the
-    app's own arithmetic and should match `lo_beliefs` for a client on the
-    current build. `apply_transfer_credits=False` is the `eval1` replay,
-    which skipped the credits and under-read every doc that took one.
+    The defaults are the app's own arithmetic since #167 and #169: what
+    `draft` grades on and what `validate` compares `lo_beliefs` to (#203).
+    `asymmetric=False, drop_incidental_negatives=False` is the arithmetic
+    of the builds before, which write no `clientVersion` (#165).
+    `apply_transfer_credits=False` is the `eval1` replay, which skipped the
+    credits and under-read every doc that took one.
     """
     st: dict[tuple[str, str], LoState] = {}
     for t in turns:

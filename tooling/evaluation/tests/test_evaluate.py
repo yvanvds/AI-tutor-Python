@@ -269,6 +269,47 @@ TURNS["u-gust"] = [
     _audit("2026-09-15T09:00:00.000Z", "sg-weg", "u-gust", "subgoalDeletedRedirect"),
 ]
 
+# #203: a class of two made-up students with the same two wrong answers:
+# recall_a1 at `easy` (strong), then, in Deel B at `hard`, predict_b1
+# (strong) with the grader naming recall_a1 as well (moderate, from the
+# side). Hans's client stamps its build on every turn (#165) and computes
+# as the app does since #167 and #169: a negative weighs ×1.4 at easy and
+# ×0.6 at hard, and the incidental one is no evidence. Ivo's client has no
+# `clientVersion`, and still computes the old way: ×0.6 at easy, ×1.4 at
+# hard, and the incidental negative at medium after a week of decay.
+KLAS_BUILD = "6BUILD"
+ACCOUNTS += [
+    {"uid": "u-hans", "firstName": "Hans", "lastName": "Nieuw", "className": KLAS_BUILD,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "hard"}},
+    {"uid": "u-ivo", "firstName": "Ivo", "lastName": "Vroeger", "className": KLAS_BUILD,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "hard"}},
+]
+
+
+def _wrong_on_easy_and_hard(uid: str, **build) -> list[dict]:
+    return [
+        _turn("2026-09-15T09:00:00.000Z", "sg-a", "recall_a1", uid=uid, overallQuality="wrong",
+              difficulty="easy", calibrationBefore="easy", calibrationAfter="medium",
+              loSignals=[_sig("sg-a", "recall_a1", signal="negative")], **build),
+        _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", uid=uid, overallQuality="wrong", **_HARD,
+              loSignals=[_sig("sg-b", "predict_b1", signal="negative"),
+                         _sig("sg-a", "recall_a1", "moderate", "negative")], **build),
+    ]
+
+
+TURNS["u-hans"] = _wrong_on_easy_and_hard("u-hans", clientVersion="2.6.0+23")
+TURNS["u-ivo"] = _wrong_on_easy_and_hard("u-ivo")
+BUILD_STORED = {
+    "u-hans": {  # β = 1 + 2.0 × 1.4; β = 1 + 2.0 × 0.6, and nothing for the incidental
+        ("sg-a", "recall_a1"): {"alpha": 1.0, "beta": 3.8},
+        ("sg-b", "predict_b1"): {"alpha": 1.0, "beta": 2.2},
+    },
+    "u-ivo": {  # β = 1 + 2.0 × 0.6, decayed 7 days, + 1.0 × 1.0; β = 1 + 2.0 × 1.4
+        ("sg-a", "recall_a1"): {"alpha": 1.0, "beta": 3.1068},
+        ("sg-b", "predict_b1"): {"alpha": 1.0, "beta": 3.8},
+    },
+}
+
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
 
@@ -471,14 +512,48 @@ class AuditRecordDraftTest(_CommandTest):
 
 
 class ValidateTest(_CommandTest):
+    def row(self, stdout: str, name: str) -> list[str]:
+        """docs · compared · |d mean| > 0.01 · hoogste niveau anders · laatste build"""
+        line = next(line for line in stdout.splitlines() if line.startswith(name))
+        return line.split()[-5:]
+
     def test_the_replay_reproduces_what_the_app_stored_after_a_recheck(self):
         self.cosmos.beliefs = lambda uid: CAS_STORED if uid == "u-cas" else {}
 
         stdout = self.run_cli("validate", "--klas", KLAS_OFF)
 
-        row = next(line for line in stdout.splitlines() if line.startswith("Cas Voorbeeld"))
-        # docs · compared · |d mean| > 0.01 · hoogste niveau anders
-        self.assertEqual(row.split()[-4:], ["3", "3", "0", "0"])
+        self.assertEqual(self.row(stdout, "Cas Voorbeeld"), ["3", "3", "0", "0", "oud"])
+
+    def test_negatives_as_the_current_app_stores_them_match(self):
+        # #203: a wrong answer at easy and at hard, and an incidental one,
+        # as the app has stored them since #167 and #169. The replay with
+        # the arithmetic from before read both docs as an old build.
+        self.cosmos.beliefs = lambda uid: BUILD_STORED.get(uid, {})
+
+        stdout = self.run_cli("validate", "--klas", KLAS_BUILD)
+
+        self.assertEqual(self.row(stdout, "Hans Nieuw"), ["2", "2", "0", "0", "2.6.0+23"])
+
+    def test_an_old_build_still_shows(self):
+        # The same oefeningen from a client without `clientVersion`, which
+        # still computes the old way: both docs deviate, and the build says why.
+        self.cosmos.beliefs = lambda uid: BUILD_STORED.get(uid, {})
+
+        stdout = self.run_cli("validate", "--klas", KLAS_BUILD)
+
+        self.assertEqual(self.row(stdout, "Ivo Vroeger"), ["2", "2", "2", "0", "oud"])
+        self.assertIn(f"sinds #167 en #169 ({rules.RULES_VERSION})", stdout)
+        self.assertIn("laatste build 'oud'", stdout)
+        self.assertNotIn("transfer-krediet", stdout)  # replayed since eval2
+
+    def test_the_old_arithmetic_is_what_the_old_build_stored(self):
+        # The fixture's old-build docs are that arithmetic, not a guess.
+        old = rules.replay(TURNS["u-ivo"], GOALS, asymmetric=False, drop_incidental_negatives=False)
+        for key, b in BUILD_STORED["u-ivo"].items():
+            self.assertAlmostEqual(old[key].beta, b["beta"], places=4)
+        now = rules.replay(TURNS["u-hans"], GOALS)
+        for key, b in BUILD_STORED["u-hans"].items():
+            self.assertAlmostEqual(now[key].beta, b["beta"], places=9)
 
 
 class TurnScopeTest(unittest.TestCase):

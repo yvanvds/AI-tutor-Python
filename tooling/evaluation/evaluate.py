@@ -372,15 +372,29 @@ def _render_json(milestone, klas, per_student, now) -> dict:
 
 
 def cmd_validate(args) -> None:
-    """Replays with the app's own arithmetic and compares to `lo_beliefs`.
-    A student on the current build should match to the rounding."""
+    """Replays with the rules the app computes with now and compares to
+    `lo_beliefs`. A student whose client computes the same, on docs no older
+    replay rewrote, matches to the rounding.
+
+    The replay is `rules.replay` as `draft` calls it, not a variant of its
+    own: until #203 this passed the flags of the arithmetic from before #167
+    and #169, and every doc with a negative on `easy` or `hard`, or an
+    incidental negative, read as an old build. Which build wrote the last
+    oefening is on the record since #165 (`clientVersion`); a record
+    without it comes from a build that still computes the old way. The
+    oefeningen are not replayed each with its own build's arithmetic: the
+    one-time rewrite of `lo_beliefs` (2026-09-23) recomputed the docs of
+    every student on a client since #108 from the whole log, with the
+    arithmetic of #167 and #169. The old arithmetic lives on in storage only
+    where an old build wrote after that, or on a doc the rewrite left alone,
+    and that is the deviation this command is for (README, *validate*)."""
     goals = cosmos.goals()
     students = cosmos.accounts(args.klas)
-    print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}")
+    print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}{'laatste build':>16}")
     for a in students:
         turns = cosmos.turns(a["uid"])
         stored = cosmos.beliefs(a["uid"])
-        st = rules.replay(turns, goals, asymmetric=False, drop_incidental_negatives=False)
+        st = rules.replay(turns, goals)
         n = off = rat = 0
         for key, b in stored.items():
             s = st.get(key)
@@ -391,8 +405,15 @@ def cmd_validate(args) -> None:
                 off += 1
             if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != s.ratchet:
                 rat += 1
-        print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>24}")
-    print("\nAfwijkingen wijzen op een client die anders rekende (oude build) of op transfer-krediet buiten loSignals; ze raken het concept niet, dat leest alleen turn_history.")
+        build = (turns[-1].get("clientVersion") or "oud") if turns else "geen"
+        print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>24}{build:>16}")
+    print(
+        f"\nHerspeeld met de regels van de app sinds #167 en #169 ({rules.RULES_VERSION}), zoals het concept."
+        " Een afwijking wijst op een document dat een oude build schreef (laatste build 'oud': de laatste oefening"
+        " kwam van een build zonder clientVersion, die nog met de oude rekenregels werkt), of op een document"
+        " dat met een oudere herspeling herschreven werd."
+        " Ze raken het concept niet, dat leest alleen turn_history."
+    )
 
 
 # ---- backup ------------------------------------------------------------------

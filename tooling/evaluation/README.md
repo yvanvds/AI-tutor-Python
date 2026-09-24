@@ -194,6 +194,41 @@ niet (#202). Tot dat beslist is, kan de aangevulde waarde daar vroeger
 liggen dan wat de app zou schrijven: hoogstens één controlevraag te
 vroeg.
 
+## `validate`: de herspeling tegenover de opslag
+
+`validate` herspeelt elke leerling met dezelfde `rules.replay` als
+`draft`, en telt per leerling de documenten in `lo_beliefs` waarvan μ
+meer dan 0,01 afwijkt of het hoogste niveau anders is. Tot #203
+herspeelde het met de rekenregels van vóór #167 en #169 (symmetrische
+factor, incidentele negatieven als bewijs). Dan telde elk document met
+een fout op `easy` of `hard`, of met een incidenteel negatief, als
+afwijking, ook bij een leerling op de huidige build.
+
+De kolom **laatste build** is de `clientVersion` op de laatste oefening
+(#165). Elke build die dat veld schrijft (vanaf 2.6.0) rekent met #167 en
+#169. `oud` is een build zonder dat veld, die nog met de oude regels
+rekent; `geen` betekent geen oefeningen.
+
+**Waarom niet elke oefening met de regels van haar eigen build.** De
+eenmalige herschrijving van `lo_beliefs` op 2026-09-23 rekende de
+documenten van elke leerling op een client sinds #108 opnieuw uit, uit de
+hele log en met de regels van #167 en #169. Wat er nog van de oude regels
+in de opslag staat, schreef een oude build daarna, of het staat op een
+document dat de herschrijving oversloeg. Dat moet `validate` tonen. Wie
+de oefeningen zonder `clientVersion` met de oude regels herspeelt, ziet
+elk herschreven document als afwijking.
+
+Een afwijking betekent dus:
+
+- een oude build schreef het document na de herschrijving (laatste build
+  `oud`), of een client van vóór #108, die nog niet herschreven is
+  (Grenzen);
+- het document werd met een oudere herspeling herschreven. De
+  herschrijving van 2026-09-23 gebruikte `eval2`, dat een opfrisvraag
+  anders las dan `eval3` (#195). Zulke documenten wijken af tot de
+  herspeling na de release, met `eval3` of later (hierboven);
+- iets wat de log niet draagt: een signaal meer of minder dan gelogd.
+
 ## Grenzen
 
 - De replay leest `loSignals` en `transferCredits` (sinds `eval2`; `eval1`

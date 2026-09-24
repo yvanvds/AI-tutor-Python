@@ -49,9 +49,10 @@ leerkracht. Het script print het overzicht en de paden van het concept
 (`.md`) en de sidecar (`.json`). Lees het concept volledig.
 
 Draai ook `validate --klas <klas>` en meld kort of de replay de opslag
-reproduceert. Afwijkingen bij één leerling wijzen meestal op een client op
-een oude build; dat raakt het concept niet, maar de leerkracht wil het
-weten.
+reproduceert. Een afwijking wijst op een client op een oude build (kolom
+*laatste build* `oud`) of op documenten die met een oudere herspeling
+herschreven zijn; de README (*validate*) zegt hoe je dat leest. Het raakt
+het concept niet, maar de leerkracht wil het weten.
 
 ### 2. Voor de leerkracht — en stop
 
