@@ -11,7 +11,7 @@ import datetime as dt
 import statistics
 from collections import Counter, defaultdict
 
-from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, parse_at, same_root_backward
+from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, parse_at, turn_scope
 
 # Plain-Dutch labels for the report text; the raw names are app vocabulary.
 DIFF_NL = {"easy": "makkelijk", "medium": "gewoon", "hard": "moeilijk"}
@@ -208,18 +208,20 @@ def discarded_cross_root(turns: list[dict], goals: dict, milestone_subgoals: set
     """Grader signals on the milestone's LOs produced while the student
     worked in another root goal. The conductor drops these ("outside the
     active root"). Positives are direct evidence of "she can do it now";
-    negatives are the least reliable judgment the system has."""
+    negatives are the least reliable judgment the system has. On a warm-up
+    or recheck the active subgoal is the one the student was on, not the
+    one the question was about (`rules.turn_scope`, #195)."""
     pos = neg = 0
     per: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
     days: dict[tuple[str, str], set[str]] = defaultdict(set)
     for t in turns:
-        active = t["subgoalId"]
+        scope = turn_scope(t, goals)
         for s in t.get("loSignals") or []:
             sg = s.get("subgoalId")
-            if sg not in milestone_subgoals or sg == active:
+            if sg not in milestone_subgoals:
                 continue
-            if same_root_backward(goals, sg, active):
-                continue  # same root: the conductor applies these
+            if scope.reading(goals, sg, s["loId"]) is not None:
+                continue  # the conductor applies these
             key = (sg, s["loId"])
             if s.get("signal") == "positive":
                 pos += 1

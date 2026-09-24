@@ -14,8 +14,19 @@ credits reproduces the stored beliefs exactly for a client on the current
 build (validated 2026-09-23 on 6EWI and 6WEWI) — `evaluate.py validate`
 checks that on demand.
 
-Rule set `1.0.16-eval2` = PUNTENFORMULE v1.0.16, replayed from the turn
-log. `eval2` changes nothing in the formula: the replay now also applies
+Rule set `1.0.18-eval3` = PUNTENFORMULE v1.0.18, replayed from the turn
+log. v1.0.17 and v1.0.18 (#187, #188) change nothing in M or P; they add
+the recheck ("controlevraag", CONDUCTOR_POLICY §2.6), a direct question
+about an LO of an earlier subgoal asked while the student works on
+another. `eval3` (#195) reads those turns, and the warm-up reviews
+("opfrisvraag", §1.5) that work the same way, as the conductor does
+(`turn_scope`): the question's target is a direct probe of its LO, and
+every other signal of the turn is read against the subgoal the student
+was on — where `eval2` took the old subgoal for the active one, counting
+its other LOs as direct and dropping the active subgoal's LOs as forward
+references. A fidelity fix to the replay, like `eval2`.
+
+`eval2` changed nothing in the formula either: the replay also applies
 the transfer credits the conductor logged (`transferCredits`, CONDUCTOR_POLICY
 §3.7), which `eval1` skipped and therefore under-read on every doc that
 took one — a fidelity fix to the replay, closing the README's known limit.
@@ -44,7 +55,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
-RULES_VERSION = "1.0.16-eval2"
+RULES_VERSION = "1.0.18-eval3"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -80,6 +91,8 @@ class LoState:
     first_mastered_at: dt.datetime | None = None
     ratchet: str | None = None
     n_direct: int = 0
+    # The app's direct-probe clock `lastProbedAt` (#187): what the one-time
+    # post-release replay can backfill on docs without it (README).
     last_direct_at: dt.datetime | None = None
     direct_signals: list[tuple[dt.datetime, str, str, str]] = field(default_factory=list)  # (at, signal, strength, difficulty)
 
@@ -136,6 +149,72 @@ def same_root_backward(goals: dict, signal_sg: str, active_sg: str) -> bool:
     )
 
 
+@dataclass(frozen=True)
+class TurnScope:
+    """How the conductor read a turn's signals (`Conductor.integrateAnswer`).
+
+    `probed` is the subgoal of the question's target LO (`subgoalId` on the
+    record), `active` the subgoal the student was on, `target` the LO the
+    question was about. They differ only on a warm-up review (`isWarmUp`,
+    CONDUCTOR_POLICY §1.5) or a recheck (`isRecheck`, §2.6): a direct
+    question about an LO of another subgoal (`QuestionPlan.offSubgoal`)."""
+
+    active: str
+    probed: str
+    target: str | None
+
+    @property
+    def off_subgoal(self) -> bool:
+        return self.active != self.probed
+
+    def reading(self, goals: dict, signal_sg: str, lo_id: str) -> str | None:
+        """`"direct"`, `"incidental"` (§2.4), or None when the conductor
+        drops the signal (another root, or later than the active subgoal).
+        Direct: an LO of the active subgoal, or the target of a warm-up or
+        recheck — ratchets, stamp and probe clock included. Anything else,
+        another LO of the warm-up's subgoal included, is incidental."""
+        if signal_sg == self.active:
+            return "direct"
+        if self.off_subgoal and signal_sg == self.probed and lo_id == self.target:
+            return "direct"
+        if same_root_backward(goals, signal_sg, self.active):
+            return "incidental"
+        return None
+
+
+def turn_scope(turn: dict, goals: dict) -> TurnScope:
+    """The turn's scope as the conductor had it.
+
+    Since #187 the app names the active subgoal on every warm-up and
+    recheck (`activeSubgoalId`). A warm-up from an older build does not,
+    but its `loStatusAfter` lists the active subgoal's LOs (the conductor
+    reports them on every turn), so the one other subgoal of the same root
+    whose objectives cover them is the active one. When nothing singles
+    one out — no status, or a goal tree edited since — the probed subgoal
+    stands in: the `eval2` reading, a known limit (README, Grenzen)."""
+    probed = turn["subgoalId"]
+    targets = turn.get("targetLOIds") or []
+    active = turn.get("activeSubgoalId")
+    if not active and (turn.get("isWarmUp") or turn.get("isRecheck")):
+        active = _active_from_status(turn, goals, probed)
+    return TurnScope(active or probed, probed, targets[0] if targets else None)
+
+
+def _active_from_status(turn: dict, goals: dict, probed: str) -> str | None:
+    status = {s.get("loId") for s in turn.get("loStatusAfter") or []} - {None}
+    root = (goals.get(probed) or {}).get("parentId")
+    if not status or not root:
+        return None
+    hits = [
+        sid
+        for sid, g in goals.items()
+        if sid != probed
+        and g.get("parentId") == root
+        and status <= {o.get("id") for o in g.get("objectives") or []}
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
 def replay(
     turns: list[dict],
     goals: dict,
@@ -157,14 +236,15 @@ def replay(
         follow_up = t.get("isFollowUp") is True
         diff = t.get("difficulty") or "medium"
         cal = t.get("calibrationBefore") or "medium"
-        active = t["subgoalId"]
+        scope = turn_scope(t, goals)
         for s in t.get("loSignals") or []:
             if s.get("signal") not in ("positive", "negative"):
                 continue
-            sig_sg = s.get("subgoalId") or active
-            incidental = sig_sg != active
-            if incidental and not same_root_backward(goals, sig_sg, active):
+            sig_sg = s.get("subgoalId") or scope.probed
+            reading = scope.reading(goals, sig_sg, s["loId"])
+            if reading is None:
                 continue  # cross-root or forward: the conductor drops it
+            incidental = reading == "incidental"
             if incidental and s["signal"] == "negative" and drop_incidental_negatives:
                 continue  # #167
             key = (sig_sg, s["loId"])

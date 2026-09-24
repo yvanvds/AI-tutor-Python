@@ -135,7 +135,9 @@ def cmd_draft(args) -> None:
         seen: set[str] = set()
         reached = []
         for t in turns:
-            sid = t["subgoalId"]
+            # What advances is the subgoal the student was on, also on a
+            # warm-up or recheck about another one (#195).
+            sid = rules.turn_scope(t, goals).active
             if t.get("subgoalAdvanced") and sid in ms_subgoals and sid not in seen:
                 seen.add(sid)
                 reached.append((order.get(sid, 99), (goals.get(sid) or {}).get("title") or sid, t["turnAt"][:10]))
@@ -192,7 +194,7 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
     L.append("")
     L.append(f"Opgesteld {now.strftime('%Y-%m-%d %H:%M')} UTC · regels `{rules.RULES_VERSION}` · sidecar `{json_path.name}`")
     L.append("")
-    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.16. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
+    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.18. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
     L.append("")

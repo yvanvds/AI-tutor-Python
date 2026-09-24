@@ -70,11 +70,26 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.0.16-eval2`
+## Regelversie `1.0.18-eval3`
 
-PUNTENFORMULE v1.0.16, herspeeld uit `turn_history`. `eval2` (2026-09-23)
-verandert niets aan de formule: de herspeling past nu ook het
-transfer-krediet toe dat de app logde (`transferCredits`, CONDUCTOR_POLICY
+PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. v1.0.17 en v1.0.18
+(#187, #188) veranderen niets aan M of P; ze voegen de **controlevraag**
+toe: een rechtstreekse vraag over een leerdoel van een eerder subdoel,
+midden in het werk aan een ander. `eval3` (2026-09-24, #195) leest die
+oefeningen, en de **opfrisvragen** die op dezelfde manier werken, zoals de
+app ze verwerkt (`rules.turn_scope`): de vraag telt rechtstreeks voor haar
+eigen leerdoel, en elk ander signaal van die oefening telt tegenover het
+subdoel waar de leerling mee bezig was (`activeSubgoalId`). `eval2` nam
+het oude subdoel (`subgoalId`) voor het actieve: een ander leerdoel van
+dat oude subdoel telde als rechtstreekse vraag (op het gevraagde niveau,
+met hoogste niveau en stempel), en een leerdoel van het subdoel dat echt
+actief was, viel weg als verwijzing vooruit. Ook de diagnostiek leest zo
+(*weggegooide signalen*, *onderdelen afgerond*). Een
+getrouwheidscorrectie, geen regelwijziging.
+
+`eval2` (2026-09-23) veranderde evenmin iets aan de formule: de
+herspeling past sindsdien ook het transfer-krediet toe dat de app logde
+(`transferCredits`, CONDUCTOR_POLICY
 §3.7) en dat `eval1` oversloeg — een getrouwheidscorrectie op de
 herspeling, geen regelwijziging. Voor het overige rekent ze exact wat
 `1.0.10-eval1` rekende: dat was v1.0.10 met drie afwijkingen (beslist
@@ -101,8 +116,9 @@ Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
 doel en alleen naar een eerder subdoel, transfer-krediet zoals gelogd (een
-zwak positief op gemiddeld), kern telt alleen met hoogste niveau ≥
-verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
+zwak positief op gemiddeld), opfris- en controlevragen als rechtstreekse
+meting van hun leerdoel (sinds `eval3`), kern telt alleen met hoogste
+niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 
 ## Wat de diagnostiek kan dat de app niet kan
 
@@ -140,6 +156,35 @@ juist beantwoord werd (`highestPositiveDifficulty`; PUNTENFORMULE §2.5
 noemt dat "ratel", een vertaling van *ratchet* die niemand herkent) is
 het **hoogste niveau**.
 
+## `lastProbedAt` aanvullen na de release
+
+Sinds #187 bewaart de app per leerdoel `lastProbedAt`: de laatste
+rechtstreekse vraag, de klok van de controlevraag. Een ouder document
+heeft dat veld niet. De app leest dan `lastUpdatedAt` wanneer het
+leerdoel ooit zelf bevraagd werd, dus komt een controlevraag hoogstens
+te laat, nooit te vroeg. `LoState.last_direct_at` is dezelfde klok,
+herspeeld uit `turn_history`.
+
+Het aanvullen hoort bij de eenmalige herspeling van `lo_beliefs` na de
+release, die de gebruiker zelf draait (#195). `evaluate.py` krijgt er geen
+commando voor: deze tooling schrijft alleen naar `grade_proposals`, en
+alleen na een "go". Voor die herspeling geldt:
+
+- herspeel met `eval3` of later. `eval2` gaf de andere leerdoelen van
+  het subdoel van een opfris- of controlevraag een te late klok, en een
+  leerdoel van het actieve subdoel een te vroege of geen klok;
+- schrijf het veld alleen op documenten die het nog niet hebben. Wat de
+  app zelf schreef, gaat voor;
+- laat het weg als `last_direct_at` leeg is. Dan werd het leerdoel nooit
+  rechtstreeks bevraagd, en zo leest de app het al;
+- zoals bij de vorige herspeling: eerst `backup`, dan `If-Match`, en
+  buiten de lesuren.
+
+Een neutraal signaal verzet de klok in de app wel, maar in de herspeling
+niet (#202). Tot dat beslist is, kan de aangevulde waarde daar vroeger
+liggen dan wat de app zou schrijven: hoogstens één controlevraag te
+vroeg.
+
 ## Grenzen
 
 - De replay leest `loSignals` en `transferCredits` (sinds `eval2`; `eval1`
@@ -147,6 +192,13 @@ het **hoogste niveau**.
   Wat buiten haar bereik blijft, zijn oefeningen van clients van vóór #108,
   die een andere set signalen toepasten dan de conductor nu; `validate`
   toont hoe groot dat is.
+- Een opfrisvraag van een build van vóór #187 heeft geen
+  `activeSubgoalId`. De herspeling leidt het actieve subdoel dan af uit
+  `loStatusAfter`, waar de app de leerdoelen van het actieve subdoel
+  opsomt: het is het enige andere subdoel van hetzelfde doel dat ze
+  allemaal bevat. Lukt dat niet (geen status, of het doel is sindsdien
+  aangepast), dan geldt het bevraagde subdoel als actief, zoals in
+  `eval2`. Controlevragen hebben het veld altijd.
 - De regel vraagt geen vast aantal vragen per leerdoel: wie vroeg goed
   antwoordt, wordt niet meer bevraagd. De stempel is daar de eerlijkste
   maat voor, niet een perfecte. Zie de discussie bij #169.

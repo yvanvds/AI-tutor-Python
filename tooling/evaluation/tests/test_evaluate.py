@@ -148,6 +148,61 @@ TURNS = {
     ],
 }
 
+
+# #195: a class of two made-up students with the same oefeningen. recall_a1
+# was left at μ 0.75 in Deel A; fix_a3 got over the bar from the side while
+# the student worked in Deel B, without a direct right answer, so without a
+# stamp. Then, still on Deel B and now at `hard`, one question about
+# recall_a1 whose grader also names fix_a3 and the active predict_b1.
+# Cas has it as the app writes a recheck since #187; Dirk as an older build
+# wrote a warm-up, without `activeSubgoalId`.
+KLAS_OFF = "6OPFRIS"
+ACCOUNTS += [
+    {"uid": "u-cas", "firstName": "Cas", "lastName": "Voorbeeld", "className": KLAS_OFF,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "hard"}},
+    {"uid": "u-dirk", "firstName": "Dirk", "lastName": "Proef", "className": KLAS_OFF,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "hard"}},
+]
+OFF_AT = dt.datetime(2026, 9, 22, 9, 0, tzinfo=dt.timezone.utc)
+
+
+def _sig(subgoal: str, lo: str, strength: str = "strong", signal: str = "positive") -> dict:
+    return {"subgoalId": subgoal, "loId": lo, "signal": signal, "strength": strength}
+
+
+def _off_subgoal_log(uid: str, **marker) -> list[dict]:
+    side = _sig("sg-a", "fix_a3")  # a signal from Deel B on an earlier LO (§2.4)
+    return [
+        _turn("2026-09-10T09:00:00.000Z", "sg-a", "recall_a1", uid=uid, loSignals=[_sig("sg-a", "recall_a1", "moderate")]),
+        _turn("2026-09-10T09:05:00.000Z", "sg-a", "recall_a1", uid=uid, loSignals=[_sig("sg-a", "recall_a1", "moderate")]),
+        _turn("2026-09-15T09:00:00.000Z", "sg-b", "predict_b1", uid=uid, loSignals=[_sig("sg-b", "predict_b1", "moderate"), side]),
+        _turn("2026-09-15T09:05:00.000Z", "sg-b", "predict_b1", uid=uid, loSignals=[_sig("sg-b", "predict_b1", "moderate"), side]),
+        _turn(
+            "2026-09-22T09:00:00.000Z", "sg-a", "recall_a1", uid=uid,
+            difficulty="hard", calibrationBefore="hard", calibrationAfter="hard",
+            loSignals=[_sig("sg-a", "recall_a1"), _sig("sg-a", "fix_a3"), _sig("sg-b", "predict_b1")],
+            # The conductor reports the active subgoal's LOs on every turn;
+            # predict_b1 made the stamp, so Deel B advanced on this turn.
+            loStatusAfter=[{"loId": "predict_b1", "mean": 0.85, "evidence": 6.6, "mastered": True, "stuck": False}],
+            subgoalProgressAfter=1.0,
+            subgoalAdvanced=True,
+            **marker,
+        ),
+    ]
+
+
+TURNS["u-cas"] = _off_subgoal_log("u-cas", isRecheck=True, activeSubgoalId="sg-b")
+TURNS["u-dirk"] = _off_subgoal_log("u-dirk", isWarmUp=True)
+
+# What the conductor stored for Cas (CONDUCTOR_POLICY §3): decay toward the
+# prior over the time since the last write, then the weight — the recheck's
+# target and the active LO at `hard` (×1.4), fix_a3 from the side at `medium`.
+CAS_STORED = {
+    ("sg-a", "recall_a1"): {"alpha": 5.5411, "beta": 1.0, "highestPositiveDifficulty": "hard"},
+    ("sg-a", "fix_a3"): {"alpha": 6.6893, "beta": 1.0},
+    ("sg-b", "predict_b1"): {"alpha": 5.6447, "beta": 1.0, "highestPositiveDifficulty": "hard"},
+}
+
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
 
@@ -172,8 +227,8 @@ class _CommandTest(unittest.TestCase):
             evaluate.main()
         return out.getvalue()
 
-    def draft(self) -> tuple[Path, Path, str]:
-        stdout = self.run_cli("draft", "--klas", KLAS, "--out", str(self.tmp / "out"))
+    def draft(self, klas: str = KLAS) -> tuple[Path, Path, str]:
+        stdout = self.run_cli("draft", "--klas", klas, "--out", str(self.tmp / "out"))
         md = next((self.tmp / "out").glob("*.md"))
         return md, md.with_suffix(".json"), stdout
 
@@ -246,6 +301,98 @@ class ApplyTest(_CommandTest):
         self.assertEqual(doc["neverProbedCount"], 1)
         self.assertIn("die velden blijven weg in plaats van 0", stdout)
         self.assertIn("Anna Peeters", stdout)
+
+
+class OffSubgoalDraftTest(_CommandTest):
+    """#195: a warm-up or recheck asks about an LO of another subgoal; the
+    rest of its signals count against the subgoal the student was on."""
+
+    COUNTS = ("coreCounted", "extensionMastered", "masteredTotal", "hardCount", "neverProbedCount", "proposal")
+
+    def section(self, md: str, name: str) -> str:
+        start = md.index(f"## {name}")
+        end = md.find("\n## ", start + 1)
+        return md[start:] if end == -1 else md[start:end]
+
+    def test_a_recheck_counts_the_active_subgoal_and_not_the_old_one(self):
+        md_path, json_path, _ = self.draft(KLAS_OFF)
+        cas = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-cas")["computed"]
+
+        # recall_a1 (the question) and predict_b1 (the active LO) make the
+        # stamp at hard; fix_a3, named from the side, does not.
+        self.assertEqual(
+            {f: cas[f] for f in self.COUNTS},
+            {"coreCounted": 2, "extensionMastered": 0, "masteredTotal": 2, "hardCount": 2,
+             "neverProbedCount": 1, "proposal": 70},
+        )
+        md = md_path.read_text(encoding="utf-8")
+        self.assertIn("| Cas Voorbeeld | 2/2 | 0/2 | 2/2 | **70** |", md)
+        mine = self.section(md, "Cas Voorbeeld")
+        self.assertIn("`fix_a3` (uitbreiding) — μ 0.87, 0 vragen", mine)
+        self.assertIn("**Onderdelen afgerond:** Deel B op 09-22 (1 van 2)", mine)
+        self.assertNotIn("door de app weggegooid", mine)
+
+    def test_an_older_warm_up_reads_the_active_subgoal_from_its_status(self):
+        md_path, json_path, _ = self.draft(KLAS_OFF)
+        sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+        dirk = self.student(sidecar, "u-dirk")["computed"]
+
+        self.assertEqual(dirk["proposal"], 70)
+        self.assertEqual(dirk, self.student(sidecar, "u-cas")["computed"])
+        dirks = self.section(md_path.read_text(encoding="utf-8"), "Dirk Proef")
+        self.assertIn("**Onderdelen afgerond:** Deel B op 09-22 (1 van 2)", dirks)
+
+
+class ValidateTest(_CommandTest):
+    def test_the_replay_reproduces_what_the_app_stored_after_a_recheck(self):
+        self.cosmos.beliefs = lambda uid: CAS_STORED if uid == "u-cas" else {}
+
+        stdout = self.run_cli("validate", "--klas", KLAS_OFF)
+
+        row = next(line for line in stdout.splitlines() if line.startswith("Cas Voorbeeld"))
+        # docs · compared · |d mean| > 0.01 · hoogste niveau anders
+        self.assertEqual(row.split()[-4:], ["3", "3", "0", "0"])
+
+
+class TurnScopeTest(unittest.TestCase):
+    """The conductor's reading of a warm-up or recheck, at its edges."""
+
+    def test_the_probe_clock_is_what_the_app_stores_as_lastProbedAt(self):
+        st = rules.replay(TURNS["u-cas"], GOALS)
+
+        self.assertEqual(st[("sg-a", "recall_a1")].last_direct_at, OFF_AT)
+        self.assertEqual(st[("sg-b", "predict_b1")].last_direct_at, OFF_AT)
+        fix = st[("sg-a", "fix_a3")]
+        self.assertEqual(fix.last_at, OFF_AT)  # its evidence moved,
+        self.assertIsNone(fix.last_direct_at)  # but nobody asked it
+        self.assertEqual((fix.n_direct, fix.ratchet), (0, None))
+
+    def test_an_incidental_negative_on_the_old_subgoal_is_not_evidence(self):
+        t = _turn("2026-09-22T09:00:00.000Z", "sg-a", "recall_a1", isRecheck=True, activeSubgoalId="sg-b",
+                  difficulty="hard", loSignals=[_sig("sg-a", "write_a2", signal="negative")])
+
+        self.assertNotIn(("sg-a", "write_a2"), rules.replay([t], GOALS))  # #167
+        # Counted anyway, it lands at `medium` and not as a question.
+        s = rules.replay([t], GOALS, drop_incidental_negatives=False)[("sg-a", "write_a2")]
+        self.assertEqual((s.beta, s.n_direct), (3.0, 0))
+
+    def test_without_a_status_that_names_it_the_old_subgoal_stands_in(self):
+        warm = dict(TURNS["u-dirk"][-1])
+        self.assertEqual(rules.turn_scope(warm, GOALS).active, "sg-b")
+        for status in ([], [{"loId": "an_lo_since_removed"}]):
+            warm["loStatusAfter"] = status
+            self.assertEqual(rules.turn_scope(warm, GOALS).active, "sg-a")
+        # An ordinary turn is about the active subgoal, whatever it reports.
+        plain = _turn("2026-09-22T09:00:00.000Z", "sg-a", "recall_a1", loStatusAfter=[{"loId": "predict_b1"}])
+        self.assertEqual(rules.turn_scope(plain, GOALS).active, "sg-a")
+
+    def test_a_warm_up_target_in_a_later_subgoal_is_still_a_direct_probe(self):
+        # Back in Deel A, a review of Deel B: §1.5 takes any other subgoal of
+        # the root, and the conductor checks the target before the order.
+        t = _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", isWarmUp=True, activeSubgoalId="sg-a",
+                  difficulty="hard", calibrationBefore="hard")
+        s = rules.replay([t], GOALS)[("sg-b", "predict_b1")]
+        self.assertEqual((s.n_direct, s.ratchet), (1, "hard"))
 
 
 class ReliabilityTest(unittest.TestCase):
