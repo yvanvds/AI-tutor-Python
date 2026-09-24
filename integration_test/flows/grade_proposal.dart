@@ -1091,6 +1091,15 @@ void main() {
       tester,
       find.byKey(const Key('reports-release-error')),
     );
+    // The failure lands while the confirm dialog is still fading out. Let it
+    // leave before the second attempt below: otherwise that attempt's
+    // "confirm is there" can be answered by the leaving button, and on a
+    // slow runner the new dialog and the leaving one are both in the tree
+    // when the test taps confirm (two matches, the CI failure on PR #196).
+    await pumpUntilGone(
+      tester,
+      find.byKey(const Key('reports-release-confirm')),
+    );
 
     // The teacher reads what is wrong and what to do about it — not a
     // gateway dump that looks like a missing document.
