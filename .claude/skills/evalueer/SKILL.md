@@ -1,6 +1,6 @@
 ---
 name: evalueer
-description: Beoordeel een klas op een mijlpaal buiten de app — herspeel turn_history met de versioneerde regels (tooling/evaluation), maak een concept met diagnostiek, vraag de leerkracht om zijn klasobservaties en beslissingen, schrijf dan per leerling de rapporttekst (je-vorm, gewone taal, twee koppen), en schrijf pas na een expliciet "go" afgetekende voorstellen naar grade_proposals. Gebruik bij "/evalueer", "maak de rapporten voor 6WEWI", "beoordeel mijlpaal X", "evalueer de klas".
+description: Beoordeel een klas op een mijlpaal buiten de app — herspeel turn_history met de versioneerde regels (tooling/evaluation), maak een concept met diagnostiek, vraag de leerkracht om zijn klasobservaties en beslissingen, loop die beslissingen na over de hele klas (dezelfde maat voor iedereen), schrijf dan per leerling de rapporttekst (je-vorm, gewone taal, twee koppen, op de aangepaste tellingen), en schrijf pas na een expliciet "go" afgetekende voorstellen naar grade_proposals. Gebruik bij "/evalueer", "maak de rapporten voor 6WEWI", "beoordeel mijlpaal X", "evalueer de klas".
 ---
 
 # /evalueer <klas> [mijlpaal]
@@ -17,16 +17,30 @@ welke volgorde, en wat je níet doet.
 - **Het getal komt uit `rules.py`.** Jij berekent niets zelf en stelt het
   getal niet in vraag. Wil de leerkracht een ander getal, dan is dat een
   *aanpassing* met een *reden*, en die schrijf je zo weg.
-- **Twee stops.** Je schrijft de rapporttekst pas ná de observaties van de
-  leerkracht, en je schrijft niets naar Cosmos vóór een expliciet "go" in
+- **Stops.** Je loopt de beslissingen van de leerkracht pas na als hij ze
+  gaf (stap 3), je schrijft de rapporttekst pas als hij de uitkomst
+  daarvan zag, en je schrijft niets naar Cosmos vóór een expliciet "go" in
   dit gesprek.
 - **De leerling en de ouders lezen mee.** `justification` en
   `adjustmentNote` staan letterlijk op het rapport in de app. Alles wat
   daarin komt is in je-vorm en in gewone taal. Wat de leerkracht moet
   weten in vaktaal, blijft in het concept.
+- **Achtergrond blijft in het concept.** Wat de leerkracht over een
+  leerling vertelt dat niet over zijn werk gaat (schoolverleden,
+  thuissituatie, gezondheid), noteer je onder *Observatie leerkracht*; het
+  helpt je zijn beslissing begrijpen. Het komt niet in `justification`,
+  niet in `adjustmentNote` en niet in publieke tekst. Wat de leerling in
+  de klas toonde ("je legde uit hoe …") mag wel in de reden.
 - **Geen leerlingdata in de repo.** Concept en sidecar staan in
   `~/ai-tutor-evaluaties`, back-ups in `~/ai-tutor-backups`. Niets daarvan
   wordt gecommit.
+- **Geen namen van echte leerlingen in publieke tekst.** De repo is
+  publiek. Een issue, een PR, een commit, een opmerking op GitHub of een
+  bestand in de repo noemt nooit de naam of de uid van een echte
+  leerling, en niets van wat de leerkracht over hem vertelde. Schrijf "een
+  leerling", "bij twee leerlingen", of een voorbeeldnaam die aan niemand
+  gelinkt is; klasnamen (6WEWI) mogen. Het gesprek met de leerkracht en
+  het concept mogen namen hebben: die zijn niet publiek.
 - **Niet tijdens een les.** `apply` weigert als leerlingen de laatste
   minuten actief waren; probeer dat niet te omzeilen.
 - **Woorden, ook in het gesprek met de leerkracht.** Een turn uit
@@ -73,7 +87,9 @@ fossiel (lang niet meer bevraagd terwijl recent werk op zijn niveau goed
 is), een afwezigheid, een profiel dat op iets specifieks wijst, doelen
 die *te weinig bevraagd* zijn om aangetoond te kunnen worden (het concept
 markeert ze; een laag punt door drie extra doelen met elk twee vragen is
-iets anders dan een laag punt door zes gemiste kerndoelen).
+iets anders dan een laag punt door zes gemiste kerndoelen). Noem een
+bijna-doel met een hoge μ en weinig vragen niet "gekend" zonder te zeggen
+waar μ vandaan komt (stap 3, onderdeel 4).
 
 Geef de leerkracht dan in het gesprek:
 
@@ -95,10 +111,72 @@ aangetoond en hun hoogste niveau op minstens het verwachte:
 python tooling/evaluation/evaluate.py what-if --klas <klas> --leerling <naam> --tel <lo_id>[,<lo_id>...]
 ```
 
+Noteer per leerling welke doelen meetellen. Een voorwaardelijke beslissing
+("tel het mee als de laatste oefeningen juist zijn") noteer je als
+voorwaarde: stap 3 beantwoordt ze uit de data.
+
 **Stop hier** tot je die antwoorden hebt. De rapporttekst schrijf je met de
 observaties erbij, niet ervoor.
 
-### 3. Tekst voor het rapport — en stop
+### 3. Consistentie — en stop
+
+Twee leerlingen met hetzelfde profiel krijgen hetzelfde punt. De leerkracht
+beslist per leerling en ziet de klas niet naast elkaar; jij wel. Op 23-09
+voldeden drie doelen bij drie leerlingen aan zijn maat zonder dat hij ze
+noemde, en een voorwaardelijke beslissing kon alleen de data beantwoorden.
+Zonder deze stap hadden die leerlingen een lager punt gekregen dan
+klasgenoten met hetzelfde profiel. Deze stap komt dus elke keer, na zijn
+beslissingen en vóór de eerste rapporttekst, ook als alles consistent
+lijkt.
+
+1. **Leid de maat af.** Lees bij elk doel dat hij meetelde in het concept
+   wat het met de andere gemeen heeft: μ (de drempel; op 23-09 ongeveer
+   0,78), het *hoogste niveau* tegenover het verwachte niveau in de kop,
+   het aantal vragen en hoeveel daarvan juist (*herkomst*), de *laatste
+   vragen*, signalen uit andere doelen (incidenteel en transfer-krediet in
+   de herkomst, *signalen vanuit ander doel*), en de klasobservatie die hij
+   erbij gaf. Zeg de maat in één zin, bv. "μ vanaf ongeveer 0,78, hoogste
+   niveau minstens het verwachte, meer dan tien vragen, de laatste juist".
+   Zeg ook welk deel alleen op klasobservatie rust: dat kun je in de data
+   niet nalopen, dus vraag je het hem per kandidaat.
+2. **Loop de hele klas na.** Voor elke leerling, elk doel onder *Bijna*
+   dat aan dezelfde maat voldoet en niet genoemd is: noem de leerling, de
+   eigen zin van het doel met zijn id, de gegevens waarop het aan de maat
+   voldoet, en het punt als het meetelt. Dat punt komt uit de rij
+   *meegeteld* van `what-if`, nooit uit eigen rekenwerk. Geef in `--tel`
+   alle doelen die bij die leerling al meetellen, plus het nieuwe: het punt
+   is geen som van losse doelen. Een doel dat al meetelt, meldt `what-if`
+   als "telt al mee". Mist een doel de maat op één voorwaarde net, noem
+   het apart als twijfelgeval en zeg welke voorwaarde. Voldoet een doel dat hij uitdrukkelijk
+   niet telde toch aan de maat, of telde hij er een dat er niet aan
+   voldoet, leg dat ook voor, zonder oordeel: er kan een reden zijn die
+   niet in de data staat.
+3. **Voorwaardelijke beslissingen.** "Tel het mee als de laatste
+   oefeningen juist zijn" beantwoord jij, uit de data, per doel. De regel
+   *laatste vragen* in het concept komt uit `direct_signals` van de
+   herspeling: de laatste vijf vragen over dat doel, per dag, en "(de
+   laatste N juist)" als de reeks juiste langer is. Geef per doel de
+   voorwaarde, die regel zoals ze in het concept staat, en je antwoord:
+   voldaan (dan telt het, met het punt uit `what-if`) of niet. Een
+   vervolgvraag of een incidenteel signaal is geen vraag en staat er niet
+   in. Kan de regel de voorwaarde niet beantwoorden (ze vraagt meer dan de
+   laatste vijf, of het doel staat onder *Ver*, zonder die regel), zeg dat
+   en vraag het hem; vul het niet zelf in.
+4. **Een hoge μ met weinig vragen.** Voor je een bijna-doel "gekend"
+   noemt, zeg je waar μ vandaan komt: de *herkomst*. μ 0,91 op "2 vragen
+   (0 juist) · incidenteel 14 juist" zegt dat de grader het doel juist zag
+   gebruiken bij iets anders, niet dat de leerling een vraag erover juist
+   beantwoordde; er is geen hoogste niveau. De leerkracht mag het
+   meetellen, maar dan weet hij waarop.
+5. **Leg het voor en stop.** Geef in het gesprek de maat, per leerling de
+   extra doelen met hun punt, de twijfelgevallen, het antwoord op elke
+   voorwaardelijke beslissing en de doelen met een hoge μ van elders.
+   **Stop** tot hij antwoordt. Noteer daarna in het concept, per leerling,
+   welke doelen meetellen, het `what-if`-commando met al die doelen en zijn
+   rij *meegeteld*. Die rij geeft het punt voor `adjustedGrade` en de
+   tellingen voor de verantwoording (stap 4).
+
+### 4. Tekst voor het rapport — en stop
 
 Per leerling die afgetekend wordt, schrijf je de tekst die de leerling en
 de ouders te lezen krijgen. Zet ze in het concept onder *Tekst voor het
@@ -120,7 +198,7 @@ Feedback
 ```
 
 Het geheel hoogstens zo'n 200 woorden. Je-vorm, altijd: "je hebt", "je
-toonde", nooit "Arjen heeft". Aanspreken zonder aanhef.
+toonde", nooit "hij heeft" of een naam. Aanspreken zonder aanhef.
 
 **Verantwoording van je score.** Waar het punt uit bestaat, in woorden en
 met hooguit een paar hele getallen: hoeveel van de kerndoelen je hebt
@@ -131,6 +209,16 @@ september, het laatste op de 22e"). Benoem wat nog ontbreekt met de eigen
 zin van het leerdoel uit het concept ("Je kan invoer omzetten naar een
 getal wanneer …"), kort herformuleerd als hij te lang is; hoogstens drie.
 Het punt zelf noem je niet — dat staat erboven.
+
+**Op de aangepaste tellingen.** Het punt op het rapport is `adjustedGrade`,
+anders het voorstel (`published_report.dart`), met eronder de
+verantwoording en de reden van de aanpassing ("Opmerking van je leraar:
+…"). Telt de leerkracht doelen mee, dan schrijf je de verantwoording op
+de rij *meegeteld* van `what-if` met al die doelen (stap 3), niet op het
+concept: "18 van de 19 kerndoelen", en ook hoeveel op moeilijk uit die
+rij. Een doel dat meetelt, staat niet bij wat nog ontbreekt. Past hij het
+punt aan zonder doelen mee te tellen, dan blijven de tellingen die van
+het concept en zegt de reden waarom het punt anders is.
 
 **Feedback.** Wat goed ging, concreet, één of twee dingen. Of er een lijn
 zit in wat fout gaat, in gewone woorden en alleen als ze duidelijk is
@@ -176,16 +264,24 @@ niveau waarop je begon en eindigde; de eigen zin van een leerdoel; de
 namen van de onderdelen van de cursus ("variabelen", "invoer met input").
 
 Dezelfde regels gelden voor de **reden van een aanpassing**
-(`adjustmentNote`): die staat ook op het rapport, in je-vorm ("Je legde
-in de klas uit hoe … werkt; daarom telt dat doel mee").
+(`adjustmentNote`): die staat ook op het rapport, in je-vorm. Telt een
+doel mee, dan zegt de reden welk, met zijn eigen zin, en waarom ("Ook 'Je
+kan …' telt mee: je laatste negen vragen daarover waren juist, en je
+legde het in de klas uit"). Onder *Hoe dit punt berekend is* toont het
+rapport, dichtgeklapt, de tellingen van het voorstel, zonder die doelen
+(17 van de 19); de reden is wat het verschil met de verantwoording
+uitlegt. Achtergrond die de leerkracht over de leerling vertelde, komt er
+niet in (*Wat vaststaat*).
 
 Toon de leerkracht alle rapportteksten in het gesprek. **Stop.** Pas zijn
 opmerkingen toe in concept én sidecar; zet `justificationSource` op
 `"edited"` als hij de tekst zelf herschreef, `skip: true` met `skipReason`
-bij uitstellen of overslaan, `adjustedGrade` en `adjustmentNote` bij een
-aanpassing. Schrijf niets tot hij "go" zegt.
+bij uitstellen of overslaan, `adjustedGrade` (het punt van de rij
+*meegeteld* als hij doelen meetelt) en `adjustmentNote` bij een
+aanpassing. Laat `computed` staan: dat is het getal van de regel, en
+`apply` schrijft het als voorstel. Schrijf niets tot hij "go" zegt.
 
-### 4. Schrijven
+### 5. Schrijven
 
 ```
 python tooling/evaluation/evaluate.py apply ~/ai-tutor-evaluaties/<bestand>.json
@@ -200,11 +296,18 @@ het doc intussen veranderde: meld het, schrijf niet opnieuw zonder overleg.
 Vrijgeven naar de leerlingen gebeurt daarna in de app: Rapporten →
 Vrijgeven. Dat kopieert alleen afgetekende voorstellen. Zeg dat.
 
-### 5. Terugkoppelen
+### 6. Terugkoppelen
 
 Vat samen wat geschreven is, wat uitgesteld, en wat opviel dat de regel,
 de diagnostiek of deze skill zou moeten veranderen. De leerkracht bespreekt
 dat in een ander gesprek; wat jij hier leert, hoort in die samenvatting.
+
+Wat daaruit een issue of een wijziging in de repo wordt, is publiek: geen
+namen of uid's van echte leerlingen, en geen achtergrond (*Wat
+vaststaat*). Beschrijf het geval met de gegevens: "bij één leerling
+`write_simple_script` op 0,78 op `hard` na 29 vragen, de laatste negen
+juist". De klasnaam mag erbij; een voorbeeldnaam die aan niemand gelinkt
+is ook.
 
 ## Als iets niet klopt
 

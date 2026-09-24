@@ -26,7 +26,8 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
   `what-if` lezen alleen. `apply` maakt eerst een back-up, weigert als
   de klas nu werkt, weigert zonder verantwoording, en gebruikt `If-Match`.
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
-  repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek.
+  repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek:
+  ook een issue, PR of commit noemt geen echte leerling (#190).
 
 ## Gebruik
 
@@ -42,7 +43,10 @@ Alleen standaardbibliotheek; leest `COSMOS_ENDPOINT`/`COSMOS_KEY` uit `.env`.
 De `az` CLI kan geen documenten lezen of schrijven, vandaar de REST-client.
 
 De skill `/evalueer` (in `.claude/skills/evalueer/`) voert de stappen in
-volgorde uit en schrijft de verantwoordingen in het concept.
+volgorde uit: concept en `validate`, de observaties en beslissingen van de
+leerkracht, een vaste consistentiestap die zijn maat over de hele klas
+naloopt (met `what-if`, hieronder), de rapportteksten op de aangepaste
+tellingen, en pas na een "go" `apply`.
 
 ## Bestanden
 
@@ -209,6 +213,17 @@ commando toont kern, uitbreiding, moeilijk, M en punt, nu en met die
 doelen meegeteld, en per doel de herkomst en wat er geteld werd. Het
 leest alleen; de aanpassing zelf gaat, met haar reden, als
 `adjustedGrade` en `adjustmentNote` in de sidecar.
+
+De skill gebruikt het ook na de beslissingen van de leerkracht (#190):
+voldoet een doel bij een andere leerling aan dezelfde maat (μ, hoogste
+niveau, aantal vragen, laatste vragen, signalen van elders), dan noemt ze
+het met het punt van `what-if`. Geef in `--tel` alle doelen die bij die
+leerling meetellen samen; het punt is geen som van losse doelen. De rij
+*meegeteld* is ook wat de verantwoording noemt ("18 van de 19"): de
+leerling ziet `adjustedGrade` met de verantwoording en de reden. Het
+voorstel zelf houdt de tellingen van de regel (`computed` in de sidecar),
+en die toont het rapport dichtgeklapt onder *Hoe dit punt berekend is*;
+de reden zegt welke doelen meetellen en waarom.
 
 ## Woorden
 
