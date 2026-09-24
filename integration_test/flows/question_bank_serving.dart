@@ -9,7 +9,9 @@
 // model call at all; otherwise one call fetches the text, which the bank
 // keeps for the next student. A code question from the bank is graded by the
 // model like a fresh one, on its own exercise. And a missing bank changes
-// nothing for the student: the question is generated.
+// nothing for the student: the question is generated. A grader on that
+// feedback call that calls the key wrong (#198) — even while grading the
+// pick as the key does — overrules the key like a contradicting grade.
 //
 // Real app, real navigation, real quiz and practice views, real tutor →
 // question bank service → in-memory Cosmos; only the model is scripted, and
@@ -32,6 +34,7 @@ import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
@@ -330,6 +333,100 @@ void main() {
     expect(bank[other['id'] as String]!['optionFeedback'], [
       {'option': _wrong, 'text': _fetchedText, 'quality': 'wrong'},
     ]);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a grader that calls the key wrong (#198) — though it grades '
+      'the pick as the key does — is a contradiction: its grade stands, '
+      'and the bank stops serving the question', (tester) async {
+    const text = 'Nee: print toont de som, niet de cijfers na elkaar.';
+    final llm = ScriptedLlm([
+      llmEnvelope(
+        text: text,
+        meta: jsonEncode({
+          'type': 'mcq_feedback',
+          'overallQuality': 'wrong',
+          'loSignals': [
+            {
+              'subgoalId': 's1',
+              'loId': 'lo-print',
+              'signal': 'negative',
+              'strength': 'strong',
+            },
+          ],
+          'keyDisputed': true,
+        }),
+      ),
+    ]);
+    final harness = AppHarness(
+      llm: llm,
+      extraDocs: {
+        'goals': [_printSubgoal()],
+        'config': [_config(minimum: 1)],
+        'questions': [other],
+      },
+    );
+    await harness.boot(tester);
+    await waitForMix(tester, harness);
+
+    await practise(tester);
+    await pumpUntilFound(tester, find.byType(QuizView));
+    await pumpUntilFound(tester, find.text(_wrong));
+    await waitForIdle(tester, harness);
+    expect(llm.sends, 0, reason: 'served from the bank');
+
+    await tester.tap(find.text(_wrong));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('niet de cijfers na elkaar', findRichText: true),
+    );
+    await waitForIdle(tester, harness);
+    await tester.pump(AppDurations.hover);
+
+    // The student sees the grade and its text, as for any pick.
+    expect(llm.sends, 1);
+    expect(jsonDecode(llm.sentInputs.single)['correct_option'], _key);
+    expect(optionHue(tester, _wrong), AppColors.danger);
+    expect(find.textContaining('keyDisputed'), findsNothing);
+    expect(
+      harness.container.read(activeMcqProvider)?.feedback,
+      text,
+      reason: 'nothing added to the grader\'s text',
+    );
+
+    // The key did not decide: the grader's strong negative, not the key's
+    // fixed moderate one.
+    await pumpUntil(tester, () => turns(harness).length == 1);
+    final turn = turns(harness).single;
+    expect(turn['fromBank'], isTrue);
+    expect(
+      turn.containsKey('gradedByKey'),
+      isFalse,
+      reason: 'written only when the key decided',
+    );
+    expect(turn['overallQuality'], 'wrong');
+    expect(turn['loSignals'], [
+      {
+        'subgoalId': 's1',
+        'loId': 'lo-print',
+        'signal': 'negative',
+        'strength': 'strong',
+      },
+    ]);
+
+    // The bank counts the dispute; the question is in doubt and is not
+    // served again.
+    final bank = harness.cosmos['questions'];
+    await pumpUntil(
+      tester,
+      () => bank[other['id'] as String]!['keyDisputedCount'] == 1,
+      reason: 'the dispute was not counted',
+    );
+    final stored = BankQuestion.tryFromCosmos(bank[other['id'] as String]!)!;
+    expect(stored.optionFeedback.single.quality, AnswerQuality.wrong);
+    expect(stored.graderDisagreesWithKey, isTrue);
+    expect(BankChoice.servable(stored), isFalse);
 
     await harness.dispose(tester);
   });

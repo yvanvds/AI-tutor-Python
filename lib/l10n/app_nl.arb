@@ -783,6 +783,7 @@
   "questions_badge_hidden": "Verborgen",
   "questions_badge_reviewed": "Nagekeken",
   "questions_keyDisagreement": "De beoordeling sprak de antwoordsleutel minstens één keer tegen.",
+  "questions_keyDisputed": "{count, plural, =1{De beoordeling vond de antwoordsleutel één keer fout.} other{De beoordeling vond de antwoordsleutel {count} keer fout.}}",
   "questions_noKey": "Geen antwoordsleutel: het model noemde de juiste optie niet.",
   "questions_answerKey_tooltip": "Antwoordsleutel",
   "questions_note": "Notitie: {note}",

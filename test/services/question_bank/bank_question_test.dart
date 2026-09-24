@@ -247,6 +247,28 @@ void main() {
       );
     });
 
+    test('a grading that called the key wrong disagrees (#198), even when '
+        'every pick was graded as the key says', () {
+      final q = BankQuestion.tryFromCosmos({
+        ..._bank(_mcq())!.toMap(),
+        'optionFeedback': [
+          {'option': 'Error', 'text': 'Nee.', 'quality': 'wrong'},
+        ],
+        'keyDisputedCount': 2,
+        'keyDisputedAt': '2026-09-24T10:00:00.000Z',
+      })!;
+      expect(q.keyDisputedCount, 2);
+      expect(q.keyDisputedAt, DateTime.utc(2026, 9, 24, 10));
+      expect(q.graderDisagreesWithKey, isTrue);
+      // Written back as read; a question never disputed carries neither.
+      expect(q.toMap()['keyDisputedCount'], 2);
+      expect(q.toMap()['keyDisputedAt'], '2026-09-24T10:00:00.000Z');
+      final plain = _bank(_mcq())!;
+      expect(plain.keyDisputedCount, 0);
+      expect(plain.toMap().containsKey('keyDisputedCount'), isFalse);
+      expect(plain.toMap().containsKey('keyDisputedAt'), isFalse);
+    });
+
     test('another option graded correct, or the key graded less, disagree', () {
       expect(
         withFeedback([

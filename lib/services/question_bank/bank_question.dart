@@ -18,6 +18,8 @@
 //     `correctCount` (of those, graded correct), `lastAskedAt`;
 //   - `optionFeedback`: per multiple-choice option a student picked, the
 //     feedback text the grader gave and the verdict it came with;
+//   - `keyDisputedCount`, `keyDisputedAt`: how often the grader of a pick
+//     said the answer key itself is wrong, and the last time (#198);
 //   - the teacher's: `status` (`active` | `hidden`), `teacherNote`,
 //     `reviewedAt`.
 //
@@ -103,6 +105,8 @@ class BankQuestion {
     this.correctCount = 0,
     this.lastAskedAt,
     this.optionFeedback = const [],
+    this.keyDisputedCount = 0,
+    this.keyDisputedAt,
     this.status = BankQuestionStatus.active,
     this.teacherNote,
     this.reviewedAt,
@@ -129,6 +133,13 @@ class BankQuestion {
   final int correctCount;
   final DateTime? lastAskedAt;
   final List<BankOptionFeedback> optionFeedback;
+
+  /// How many gradings said the answer key itself is wrong (#198, META
+  /// `keyDisputed`), whichever option the student had picked.
+  final int keyDisputedCount;
+
+  /// The last time one did; `null` when none ever has.
+  final DateTime? keyDisputedAt;
   final BankQuestionStatus status;
   final String? teacherNote;
 
@@ -162,12 +173,16 @@ class BankQuestion {
   BankOptionFeedback? feedbackFor(String option) =>
       optionFeedback.firstWhereOrNull((f) => f.option == option);
 
-  /// Whether the grader ever judged a pick differently from the answer key:
-  /// the key's own option graded less than correct, or another one graded
-  /// correct. A sign the question — or its key — is off.
+  /// Whether the grader ever judged a pick differently from the answer key
+  /// — the key's own option graded less than correct, or another one
+  /// graded correct — or said the key is wrong ([keyDisputedCount], #198):
+  /// the one sign of a wrong key when the pick was another wrong option,
+  /// which grade and key agree on. A sign the question — or its key — is
+  /// off.
   bool get graderDisagreesWithKey {
     final key = correctOption;
     if (key == null) return false;
+    if (keyDisputedCount > 0) return true;
     return optionFeedback.any((f) {
       final q = f.quality;
       if (q == null) return false;
@@ -313,6 +328,9 @@ class BankQuestion {
     if (lastAskedAt != null)
       'lastAskedAt': lastAskedAt!.toUtc().toIso8601String(),
     'optionFeedback': optionFeedback.map((f) => f.toJson()).toList(),
+    if (keyDisputedCount > 0) 'keyDisputedCount': keyDisputedCount,
+    if (keyDisputedAt != null)
+      'keyDisputedAt': keyDisputedAt!.toUtc().toIso8601String(),
     'status': status.name,
     if (teacherNote != null) 'teacherNote': teacherNote,
     if (reviewedAt != null) 'reviewedAt': reviewedAt!.toUtc().toIso8601String(),
@@ -363,6 +381,8 @@ class BankQuestion {
         for (final f in (doc['optionFeedback'] as List?) ?? const [])
           ?BankOptionFeedback.tryFromJson(f),
       ],
+      keyDisputedCount: count(doc['keyDisputedCount']),
+      keyDisputedAt: date(doc['keyDisputedAt']),
       status: doc['status'] == BankQuestionStatus.hidden.name
           ? BankQuestionStatus.hidden
           : BankQuestionStatus.active,

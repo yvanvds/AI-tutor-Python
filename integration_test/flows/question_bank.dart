@@ -7,7 +7,8 @@
 // the feedback the student got on it. The turn record names the question.
 // The teacher gets a Questions page to weed the bank out: per subgoal, each
 // question as the student saw it, how often it was asked and how often
-// answered right, sorted on that share, with hide and a note.
+// answered right, sorted on that share, with hide and a note — and a
+// warning on a question whose key a grading called wrong (#198).
 //
 // And the bank is the one container the app runs without: until it is
 // created (README step 3), a student practises as before and the teacher's
@@ -349,6 +350,86 @@ void main() {
     await pumpUntilFound(tester, find.byKey(const Key('questions-list-empty')));
     expect(find.byKey(Key('questions-card-${hard.id}')), findsNothing);
     expect(subtitle('s1'), '2 questions');
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a key the grading called wrong (#198) is flagged on the '
+      'teacher\'s card, though every pick was graded as the key says', (
+    tester,
+  ) async {
+    // As the students' apps left it: one wrong pick graded wrong — which
+    // agrees with the key — and two gradings that called the key wrong.
+    final disputed = _stored(
+      MultipleChoice(
+        type: 'multiple_choice',
+        prompt: 'Wat drukt print(2 * 3) af?',
+        code: 'print(2 * 3)',
+        options: const ['6', '23', '5'],
+        correct: '23',
+      ),
+    );
+    final fine = _stored(
+      MultipleChoice(
+        type: 'multiple_choice',
+        prompt: _prompt,
+        code: 'print(1 + 1)',
+        options: const [_right, _wrong],
+        correct: _right,
+      ),
+    );
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      extraDocs: {
+        'questions': [
+          {
+            ..._bankDoc(disputed, asked: 3, answered: 3),
+            'optionFeedback': [
+              {'option': '5', 'text': 'Nee.', 'quality': 'wrong'},
+            ],
+            'keyDisputedCount': 2,
+            'keyDisputedAt': '2026-09-24T09:00:00.000Z',
+          },
+          _bankDoc(fine, asked: 2, answered: 2, correct: 2),
+        ],
+      },
+    );
+    await harness.boot(tester);
+
+    await tester.tap(find.byTooltip('Questions'));
+    await pumpUntilFound(tester, find.byType(QuestionsPage));
+    await pumpUntilFound(tester, find.byKey(const Key('questions-tree')));
+    await tester.tap(find.byKey(const Key('questions-subgoal-s1')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(Key('questions-card-${disputed.id}')),
+    );
+    await pumpUntilFound(tester, find.byKey(Key('questions-card-${fine.id}')));
+
+    final warning = find.byKey(Key('questions-warning-${disputed.id}'));
+    expect(warning, findsOneWidget);
+    expect(
+      tester.widget<Text>(warning).data,
+      'The grading called the answer key wrong 2 times.',
+    );
+    // The card still shows the key the question was written with, for the
+    // teacher to judge.
+    final card = find.byKey(Key('questions-card-${disputed.id}'));
+    expect(
+      find.descendant(of: card, matching: find.byIcon(Icons.check_circle)),
+      findsOneWidget,
+    );
+    expect(find.byKey(Key('questions-warning-${fine.id}')), findsNothing);
+
+    // Hiding it is the teacher's call, as for any question.
+    await tester.tap(find.byKey(Key('questions-hide-${disputed.id}')));
+    await pumpUntilFound(
+      tester,
+      find.byKey(Key('questions-hidden-${disputed.id}')),
+    );
+    final stored = harness.cosmos['questions'][disputed.id]!;
+    expect(stored['status'], 'hidden');
+    expect(stored['keyDisputedCount'], 2, reason: 'kept on the write-back');
 
     await harness.dispose(tester);
   });

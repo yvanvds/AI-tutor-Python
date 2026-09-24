@@ -115,6 +115,8 @@ class QuestionBankService {
   /// always, `correctCount` when [correct]. For a multiple-choice pick, the
   /// grader's [feedback] on [pickedOption] is kept with its [quality] the
   /// first time that option is picked — a later text never replaces it.
+  /// [keyDisputed]: the grader said the answer key itself is wrong (#198);
+  /// counted in `keyDisputedCount`, the last time in `keyDisputedAt`.
   ///
   /// A question the bank does not have (its ask was never stored) is left
   /// alone. Never throws.
@@ -125,10 +127,15 @@ class QuestionBankService {
     String? pickedOption,
     String? feedback,
     AnswerQuality? quality,
+    bool keyDisputed = false,
   }) => _queue('recordAnswer $questionId', () async {
     await _modify(questionId, subgoalId, (doc) {
       doc['answeredCount'] = _count(doc['answeredCount']) + 1;
       if (correct) doc['correctCount'] = _count(doc['correctCount']) + 1;
+      if (keyDisputed) {
+        doc['keyDisputedCount'] = _count(doc['keyDisputedCount']) + 1;
+        doc['keyDisputedAt'] = _now().toIso8601String();
+      }
       final text = feedback?.trim() ?? '';
       if (pickedOption == null || text.isEmpty) return;
       final question = BankQuestion.tryFromCosmos(doc);

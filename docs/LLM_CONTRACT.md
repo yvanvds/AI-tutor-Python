@@ -85,8 +85,9 @@ on the student's machine; the one `mcqAnswer` call it can still cost — for
 the feedback text of an option no student picked before — is a grading
 call like any other, on the exercise's own exchange (the bank question is
 its first entry) and told the key like any other (#197), and its
-`overallQuality` is compared with the key: if the two disagree, its grade
-stands and the bank stops serving the question.
+`overallQuality` is compared with the key: if the two disagree — or the
+grader says the key is wrong (`keyDisputed`, #198) — its grade stands and
+the bank stops serving the question.
 
 The conductor may request a question that probes a single LO or
 multiple LOs. The LLM should weight the question to those LOs but is
@@ -150,12 +151,15 @@ teacher-authored bodies and before the output-language directive:
   what it says, it does not answer the question, another option is at least
   as right) it grades the pick by what is actually right;
 - `overallQuality` stays the grader's own judgement, never adjusted to agree
-  with the key. A grade that differs from the key *is* the flag: the app
-  compares the two, so a wrong key is reported by the ordinary grade, with
-  no field of its own;
-- the key is not for the student: no mention of it or of `correct_option`,
-  and on a wrong pick the right option is not given away (the teacher's
-  "a nudge, not the full solution" still holds).
+  with the key. A grade that differs from the key is one flag: the app
+  compares the two;
+- a grader that finds the key wrong also says so outright, whatever the
+  pick: `"keyDisputed": true` in META (#198, see "A disputed key" below),
+  the other flag;
+- the key is not for the student: no mention of it, of `correct_option` or
+  of `keyDisputed` — not even that the key is wrong — and on a wrong pick
+  the right option is not given away (the teacher's "a nudge, not the full
+  solution" still holds).
 
 The directive lives in code, like the envelope contract, not in the
 teacher-editable `mcqAnswer` doc: the question bank depends on it. It
@@ -180,10 +184,42 @@ and key-grades only questions whose key no grading has contradicted — the
 grader's own judgement on a fresh question is that check. Dropping the
 sentence from the `mcQuestion` instructions instead: the key is worth
 having — it is what the bank grades by, and the grader now judges against
-the author's intent rather than guessing it. A field of its own for "the
-key is wrong": the grade alone reveals a wrong key only when the pick is
-the key or the option that is actually right, not when it is another
-wrong one — kept out to leave the grader's output unchanged (#198).
+the author's intent rather than guessing it.
+
+### A disputed key (#198)
+
+The grade alone reveals a wrong key only when the pick is the key or the
+option that is actually right. When the student picks yet another wrong
+option, grade and key agree — the pick is wrong — and a wrong key went
+unnoticed, even though the grader, told the key, could see it was wrong.
+So the grader of a pick says so in a field of its own: `answerKeyDirective`
+tells it to add `"keyDisputed": true` to the `mcq_feedback` META when it
+finds the key wrong, whichever option was picked, and to leave the field
+out when the key is right or the request carried no `correct_option`.
+
+What the app does with it (`McqFeedback.keyDisputed`, only a JSON `true`
+counts):
+
+- **Heard only from the grading call of a pick that carried the key**
+  (`TutorService._keyOfPick`): a key the grader was not told is not one it
+  can dispute, so text typed in the chat, a follow-up's grading and a
+  question without a key ignore the field.
+- **The bank counts it** on the question (`keyDisputedCount`, the last time
+  in `keyDisputedAt`), and `graderDisagreesWithKey` holds from the first
+  one: the Questions page warns the teacher ("the grading called the
+  answer key wrong n times"), and the bank no longer serves the question
+  (conductor policy 2.7).
+- **On a bank question it is a contradiction**, as a grade against the key
+  is: the grader's grade and signals stand for this turn, not the key's
+  (`gradedByKey` stays false).
+- **Never to the student.** The quiz is given the text and the verdict,
+  as before; `McqFeedback.toJson` leaves the field out, so it is not on the
+  exercise's history a later call on the exercise reads. The TEXT is held
+  to the directive: no word about the key.
+
+The field is optional and additive: a grader that never sets it changes
+nothing, and a reply that sets it on a right key costs one question the
+bank stops serving — the teacher sees why and can look.
 
 ### Conversation history (#184)
 
@@ -314,6 +350,11 @@ that the answer **correctly used in service of the task** — the
 constructs the solution genuinely needed and got right, not everything
 that happens to appear in it. Meaningful for answers that contain code;
 prose answers rarely have anything to list.
+
+`keyDisputed` is optional and on `mcq_feedback` only (#198): `true` when
+the grader of a pick found the answer key it was told (`correct_option`)
+wrong, whichever option was picked; absent otherwise. For the app, never
+for the student — see "A disputed key".
 
 ### Field semantics
 
@@ -484,9 +525,13 @@ answer was just graded.
   count" judgment in code, not in the prompt.
 - **The grader of a multiple-choice pick is told the answer key and
   judges it** (#197). The key is the intended answer, not the verdict:
-  the grade stays the grader's, and a grade that contradicts the key is
-  how a wrong key is flagged — no separate field. The key goes to that
-  call only, never before the pick and never to the student.
+  the grade stays the grader's, and a grade that contradicts the key
+  flags a wrong key. The key goes to that call only, never before the
+  pick and never to the student.
+- **A wrong key is also said outright** (#198): `keyDisputed` in the
+  `mcq_feedback` META, whatever the pick — the grade cannot show a wrong
+  key when the pick is another wrong option. The bank treats it as a
+  contradiction; the student never sees it.
 
 ## What this contract deliberately does not do
 

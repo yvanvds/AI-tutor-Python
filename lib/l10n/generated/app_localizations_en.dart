@@ -2597,6 +2597,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'The grading disagreed with the answer key at least once.';
 
   @override
+  String questions_keyDisputed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The grading called the answer key wrong $count times.',
+      one: 'The grading called the answer key wrong once.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get questions_noKey =>
       'No answer key: the model did not name the correct option.';
 

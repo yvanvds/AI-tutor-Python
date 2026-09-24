@@ -1007,6 +1007,7 @@ class TutorService extends Notifier<TutorState> {
     required List<LoSignal> loSignals,
     required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
+    bool keyDisputed = false,
   }) async {
     final plan = _inFlightPlan;
     if (plan == null) return IntegrateOutcome.continuing;
@@ -1024,6 +1025,14 @@ class TutorService extends Notifier<TutorState> {
     // question the exercise started with (#185).
     final bankQuestion = isFollowUpGrading ? null : _inFlightQuestion;
     final fromBank = bankQuestion != null && _inFlightFromBank;
+    // The grader may say the answer key itself is wrong (#198) — heard only
+    // from the grading call of a pick that carried the key (#197): a key it
+    // was not told is not one it can dispute.
+    final disputed =
+        keyDisputed &&
+        bankQuestion != null &&
+        bankQuestion.isMultipleChoice &&
+        _keyOfPick() != null;
 
     final now = DateTime.now().toUtc();
     final provenance = await _resolveProvenance(at: now);
@@ -1036,9 +1045,10 @@ class TutorService extends Notifier<TutorState> {
     // A multiple-choice pick on a bank question is graded by its answer key
     // (#186, CONDUCTOR_POLICY §2.7): the verdict is the key's and the
     // target LO's signal is fixed. When a grading call was made for the
-    // feedback text and the grader judged the pick the other way, the key
-    // is in doubt: the grader's grade stands, as for a fresh question, and
-    // the bank marks the question (`graderDisagreesWithKey`) so it is not
+    // feedback text and the grader judged the pick the other way — or said
+    // the key is wrong (#198), whatever it made of the pick — the key is in
+    // doubt: the grader's grade stands, as for a fresh question, and the
+    // bank marks the question (`graderDisagreesWithKey`) so it is not
     // served again. Either way there is no follow-up on a bank question.
     var quality = overallQuality;
     var signals = loSignals;
@@ -1051,6 +1061,7 @@ class TutorService extends Notifier<TutorState> {
       if (pick != null &&
           targetLO != null &&
           targetSubgoalId != null &&
+          !disputed &&
           _keyAgrees(overallQuality, keyCorrect: pick.correct)) {
         gradedByKey = true;
         quality = pick.correct ? AnswerQuality.correct : AnswerQuality.wrong;
@@ -1071,7 +1082,16 @@ class TutorService extends Notifier<TutorState> {
         'picked': pick?.picked,
         'keyCorrect': pick?.correct,
         'graderQuality': overallQuality.name,
+        'keyDisputed': disputed,
         'gradedByKey': gradedByKey,
+      });
+    }
+    if (disputed) {
+      _debug.recordEvent('tutor.answer_key_disputed', {
+        'questionId': bankQuestion.id,
+        'fromBank': fromBank,
+        'picked': ref.read(activeMcqProvider)?.selected,
+        'graderQuality': overallQuality.name,
       });
     }
 
@@ -1133,7 +1153,11 @@ class TutorService extends Notifier<TutorState> {
     _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
     if (bankQuestion != null) {
-      _bankAnswer(bankQuestion, quality: outcome.overallQuality);
+      _bankAnswer(
+        bankQuestion,
+        quality: outcome.overallQuality,
+        keyDisputed: disputed,
+      );
     }
 
     // The current grading turn is consumed; clear in-flight and decide
@@ -1775,6 +1799,14 @@ class TutorService extends Notifier<TutorState> {
     return picked != null && picked == answer ? _mcqKey : null;
   }
 
+  /// The key the grading call of the student's pick carried (#197), or
+  /// `null` when nothing was picked or the question has no key: what a
+  /// grader could have disputed (#198).
+  String? _keyOfPick() {
+    final picked = ref.read(activeMcqProvider)?.selected;
+    return picked == null ? null : _keyForPick(picked);
+  }
+
   /// The pick on the bank multiple-choice question in flight and the key's
   /// verdict on it (#186); `null` when the question in flight is not one
   /// from the bank, or nothing was picked (an answer typed in the chat).
@@ -1872,8 +1904,13 @@ class TutorService extends Notifier<TutorState> {
   }
 
   /// Counts the graded answer to [question]; for a multiple-choice pick,
-  /// with the feedback the student got on it.
-  void _bankAnswer(BankQuestion question, {required AnswerQuality quality}) {
+  /// with the feedback the student got on it, and whether the grader said
+  /// its answer key is wrong ([keyDisputed], #198).
+  void _bankAnswer(
+    BankQuestion question, {
+    required AnswerQuality quality,
+    bool keyDisputed = false,
+  }) {
     final mcq = question.isMultipleChoice ? ref.read(activeMcqProvider) : null;
     unawaited(
       ref
@@ -1885,6 +1922,7 @@ class TutorService extends Notifier<TutorState> {
             pickedOption: mcq?.selected,
             feedback: mcq?.feedback,
             quality: mcq?.feedbackQuality,
+            keyDisputed: keyDisputed,
           ),
     );
   }

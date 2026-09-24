@@ -2625,6 +2625,17 @@ class AppLocalizationsNl extends AppLocalizations {
       'De beoordeling sprak de antwoordsleutel minstens één keer tegen.';
 
   @override
+  String questions_keyDisputed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'De beoordeling vond de antwoordsleutel $count keer fout.',
+      one: 'De beoordeling vond de antwoordsleutel één keer fout.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get questions_noKey =>
       'Geen antwoordsleutel: het model noemde de juiste optie niet.';
 

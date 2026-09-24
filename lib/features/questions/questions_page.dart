@@ -739,9 +739,13 @@ class _QuestionCard extends StatelessWidget {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      q.graderDisagreesWithKey
-                          ? l.questions_keyDisagreement
-                          : l.questions_noKey,
+                      // The grader saying outright that the key is wrong
+                      // (#198) is the stronger of the two warnings.
+                      !q.graderDisagreesWithKey
+                          ? l.questions_noKey
+                          : q.keyDisputedCount > 0
+                          ? l.questions_keyDisputed(q.keyDisputedCount)
+                          : l.questions_keyDisagreement,
                       key: Key('questions-warning-${q.id}'),
                       style: TextStyle(
                         color: AppColors.accent2,

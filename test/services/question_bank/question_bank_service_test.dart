@@ -271,6 +271,51 @@ void main() {
       expect(stored.optionFeedback, isEmpty);
     });
 
+    test('a grading that called the key wrong is counted and stamped (#198); '
+        'the question is then in doubt', () async {
+      final q = _mcq();
+      await bank.recordAsked(q);
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: false,
+        pickedOption: 'Error',
+        feedback: 'Nee.',
+        quality: AnswerQuality.wrong,
+      );
+      expect(store[q.id]!.containsKey('keyDisputedCount'), isFalse);
+      expect(
+        BankQuestion.tryFromCosmos(store[q.id]!)!.graderDisagreesWithKey,
+        isFalse,
+        reason: 'a wrong pick graded wrong agrees with the key',
+      );
+
+      now = DateTime.utc(2026, 9, 24, 11);
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: false,
+        pickedOption: '11',
+        feedback: 'Nee: 1 + 1 is een som.',
+        quality: AnswerQuality.wrong,
+        keyDisputed: true,
+      );
+      now = DateTime.utc(2026, 9, 24, 12);
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: false,
+        keyDisputed: true,
+      );
+
+      final stored = BankQuestion.tryFromCosmos(store[q.id]!)!;
+      expect(stored.answeredCount, 3);
+      expect(stored.keyDisputedCount, 2);
+      expect(stored.keyDisputedAt, DateTime.utc(2026, 9, 24, 12));
+      expect(stored.optionFeedback, hasLength(2));
+      expect(stored.graderDisagreesWithKey, isTrue);
+    });
+
     test(
       'an answer to a question the bank never stored is left alone',
       () async {

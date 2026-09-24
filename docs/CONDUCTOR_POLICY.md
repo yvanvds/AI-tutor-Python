@@ -803,9 +803,9 @@ asked (3.2).
 `writeCode`. Socratic questions are not: an umbrella for dialogue openers
 (1.1) that lean on the moment they were asked in. A multiple-choice question
 needs an answer key that is one of its options (stored as option text,
-since the options are shuffled) and that no grading ever contradicted —
-`graderDisagreesWithKey`, the warning on the Questions page: a key the
-grader doubted is not one to grade by.
+since the options are shuffled) and that no grading ever contradicted or
+called wrong (#198) — `graderDisagreesWithKey`, the warning on the
+Questions page: a key the grader doubted is not one to grade by.
 
 **New to the student.** Never the same question twice for one student: not
 one on their turn records (`questionId`, 8.1, read once per subgoal per
@@ -869,11 +869,13 @@ call is told the key (`correct_option`, #197), as the grading call of a
 pick on a fresh question is: the grader takes it as the intended answer
 but judges the pick itself (LLM_CONTRACT "The answer key"), so a wrong key
 can still be contradicted — the check below means something. If
-the grader on that call judges the pick the other way, the key is in doubt:
-the grader's grade stands for this turn, as for a fresh question, and the
-bank records the contradiction, so the question is not served again and
-the teacher sees it. A key grade is not a grading call: it stays out of the
-degraded-mode window (7.3).
+the grader on that call judges the pick the other way, or says the key
+itself is wrong (`keyDisputed`, #198 — the only sign of a wrong key when
+the pick is another wrong option, on which grade and key agree), the key
+is in doubt: the grader's grade stands for this turn, as for a fresh
+question, and the bank records the contradiction, so the question is not
+served again and the teacher sees it. A key grade is not a grading call:
+it stays out of the degraded-mode window (7.3).
 
 **A code question from the bank is graded by the model**, as a fresh one
 is: `submitCode` / `explainAnswer` on the exercise's own exchange, whose
@@ -893,7 +895,9 @@ from it).
 decided; a pick graded without a call has no `usage`. The debug recorder
 logs `tutor.question_from_bank` (the question, how many were eligible) and
 `tutor.bank_mcq_graded` (the pick, the key's verdict, the grader's quality
-if a call was made).
+if a call was made, whether it disputed the key), and
+`tutor.answer_key_disputed` whenever a grader says a key is wrong (#198),
+on a bank question or a fresh one.
 
 ### 2.8 What this section deliberately does not address
 

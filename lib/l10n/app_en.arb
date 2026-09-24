@@ -1408,6 +1408,10 @@
   "questions_badge_hidden": "Hidden",
   "questions_badge_reviewed": "Reviewed",
   "questions_keyDisagreement": "The grading disagreed with the answer key at least once.",
+  "questions_keyDisputed": "{count, plural, =1{The grading called the answer key wrong once.} other{The grading called the answer key wrong {count} times.}}",
+  "@questions_keyDisputed": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "questions_noKey": "No answer key: the model did not name the correct option.",
   "questions_answerKey_tooltip": "Answer key",
   "questions_note": "Note: {note}",

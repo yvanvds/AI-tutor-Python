@@ -61,6 +61,7 @@ BankQuestion _mcq(
   List<BankOptionFeedback> optionFeedback = const [],
   DateTime? lastAskedAt,
   int askedCount = 1,
+  int keyDisputedCount = 0,
 }) => BankQuestion(
   id: id,
   subgoalId: subgoalId,
@@ -84,6 +85,7 @@ BankQuestion _mcq(
   askedCount: askedCount,
   lastAskedAt: lastAskedAt,
   optionFeedback: optionFeedback,
+  keyDisputedCount: keyDisputedCount,
   status: status,
 );
 
@@ -298,6 +300,24 @@ void main() {
           ),
         ),
         isTrue,
+      );
+      // Every pick graded as the key says, but a grader called the key
+      // itself wrong (#198): in doubt all the same.
+      expect(
+        BankChoice.servable(
+          _mcq(
+            'disputed',
+            optionFeedback: const [
+              BankOptionFeedback(
+                option: '11',
+                text: 'Nee.',
+                quality: AnswerQuality.wrong,
+              ),
+            ],
+            keyDisputedCount: 1,
+          ),
+        ),
+        isFalse,
       );
     });
 

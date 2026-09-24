@@ -12,6 +12,12 @@
 // pick and after the grade, and it is not on the exercise's history the
 // question opens.
 //
+// And #198: a wrong key with a pick of yet another wrong option — grade and
+// key agree the pick is wrong, so only the grader saying outright that the
+// key is wrong (META `keyDisputed`) reveals it. The bank counts that and
+// flags the question; the student sees the grade and nothing of the
+// dispute, and the reply goes on the exercise's history without it.
+//
 // Real app, real navigation, real quiz view, real TutorService → question
 // formatter → instruction generator → connector history bookkeeping → question
 // bank over the in-memory Cosmos. Only the model is scripted (`ScriptedLlm`,
@@ -62,15 +68,19 @@ String _mcqReply({
   }),
 );
 
-String _gradeReply({required String text, required String quality}) =>
-    llmEnvelope(
-      text: text,
-      meta: jsonEncode({
-        'type': 'mcq_feedback',
-        'overallQuality': quality,
-        'loSignals': <Object>[],
-      }),
-    );
+String _gradeReply({
+  required String text,
+  required String quality,
+  bool keyDisputed = false,
+}) => llmEnvelope(
+  text: text,
+  meta: jsonEncode({
+    'type': 'mcq_feedback',
+    'overallQuality': quality,
+    'loSignals': <Object>[],
+    if (keyDisputed) 'keyDisputed': true,
+  }),
+);
 
 /// The option row for [label] — the `AnimatedContainer` that draws it.
 BoxDecoration _row(WidgetTester tester, String label) =>
@@ -266,6 +276,104 @@ void main() {
     final stored = BankQuestion.tryFromCosmos(bank.docs.values.single)!;
     expect(stored.correctOption, wrongKey);
     expect(stored.graderDisagreesWithKey, isTrue);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a wrong key and a pick of yet another wrong option: the grader '
+      'says the key is wrong (#198) — the bank flags the question, the '
+      'student sees only the grade, and the exercise\'s history does not '
+      'carry the dispute', (tester) async {
+    const truth = '6';
+    const wrongKey = '23';
+    const picked = '5';
+    const feedback = 'Nee: 2 * 3 is een vermenigvuldiging, geen optelling.';
+    final llm = ScriptedLlm([
+      // The model's key is off: `2 * 3` prints 6, not 23.
+      _mcqReply(
+        prompt: 'Wat drukt print(2 * 3) af?',
+        code: 'print(2 * 3)',
+        options: const [truth, wrongKey, picked],
+        letter: 'B',
+      ),
+      // The pick is wrong by the key and by the grader alike, so the grade
+      // cannot show the wrong key; the grader says so outright.
+      _gradeReply(text: feedback, quality: 'wrong', keyDisputed: true),
+    ]);
+    final harness = AppHarness(llm: llm);
+    await harness.boot(tester);
+    final bank = harness.cosmos['questions'];
+
+    await openQuiz(tester, truth);
+    await waitForIdle(tester, harness);
+    await pickAndWait(tester, harness, picked, 'geen optelling');
+
+    // The grader was told the (wrong) key, and how to dispute it.
+    expect(sent(llm, 1)['correct_option'], wrongKey);
+    expect(
+      llm.sentInstructions[1],
+      contains('When you find the key wrong, add `"keyDisputed": true`'),
+    );
+
+    // The student sees the grade on their pick and nothing more: the text
+    // as the grader wrote it, the pick red, the key and the right option
+    // drawn alike — neither singled out.
+    expect(
+      harness.container.read(activeMcqProvider)?.feedback,
+      feedback,
+      reason: 'the student sees the grader\'s text, nothing added to it',
+    );
+    expect(
+      _border(_row(tester, picked)).withValues(alpha: 1),
+      AppColors.danger,
+    );
+    expect(_border(_row(tester, wrongKey)), AppColors.ink2);
+    expect(_border(_row(tester, wrongKey)), _border(_row(tester, truth)));
+    expect(_row(tester, wrongKey).color, _row(tester, truth).color);
+    expect(find.textContaining('keyDisputed'), findsNothing);
+    expect(find.textContaining('answer key'), findsNothing);
+
+    // The turn is the grader's; the bank counts the dispute, and with it
+    // the question is in doubt — though every pick so far was graded as
+    // the key says.
+    await pumpUntil(
+      tester,
+      () => harness.cosmos['turn_history'].docs.isNotEmpty,
+      reason: 'the grade was not recorded',
+    );
+    expect(
+      harness.cosmos['turn_history'].docs.values.single['overallQuality'],
+      'wrong',
+    );
+    await pumpUntil(
+      tester,
+      () =>
+          bank.docs.isNotEmpty &&
+          bank.docs.values.single['keyDisputedCount'] == 1,
+      reason: 'the dispute was not counted on the bank question',
+    );
+    final stored = BankQuestion.tryFromCosmos(bank.docs.values.single)!;
+    expect(stored.correctOption, wrongKey);
+    expect(stored.optionFeedback.single.option, picked);
+    expect(stored.optionFeedback.single.quality?.name, 'wrong');
+    expect(stored.keyDisputedAt, isNotNull);
+    expect(stored.graderDisagreesWithKey, isTrue);
+
+    // A later call on this exercise — a hint, a question typed in the chat
+    // — reads its history as the connector keeps it: the grader's reply is
+    // on it without the dispute.
+    final replies = [
+      for (final m in llm.exerciseHistory)
+        if (m['role'] == 'assistant')
+          jsonDecode(m['content']!) as Map<String, dynamic>,
+    ];
+    final grade = replies.singleWhere((r) => r['type'] == 'mcq_feedback');
+    expect(grade['prompt'], feedback);
+    expect(grade.containsKey('keyDisputed'), isFalse);
+    expect(
+      llm.exerciseHistory.any((m) => m['content']!.contains('keyDisputed')),
+      isFalse,
+    );
 
     await harness.dispose(tester);
   });

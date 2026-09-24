@@ -839,6 +839,151 @@ void main() {
     });
   });
 
+  // #198: a wrong key and a pick of yet another wrong option — grade and
+  // key agree the pick is wrong, so only the grader saying so outright
+  // (`keyDisputed`) reveals the key.
+  group('a key the grader disputes (#198)', () {
+    List<StreamChunk> disputing({
+      AnswerQuality quality = AnswerQuality.wrong,
+      String text = _wrongText,
+    }) => _reply(
+      McqFeedback(
+        type: 'mcq_feedback',
+        quality: quality,
+        prompt: text,
+        loSignals: const [
+          LoSignal(
+            subgoalId: 's1',
+            loId: 'lo-print',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+        keyDisputed: true,
+      ),
+    );
+
+    MultipleChoice fresh({String? correct = _key}) => MultipleChoice(
+      type: 'multiple_choice',
+      prompt: 'Vers',
+      code: 'print(1 + 1)',
+      options: const [_key, _wrong, 'Error'],
+      correct: correct,
+    );
+
+    test('on a fresh question: the grade is the grader\'s, the bank counts '
+        'the dispute and flags the question — though the pick was wrong by '
+        'the key too', () async {
+      final bank = await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+
+      connector.scripts.add(disputing());
+      await tutor().submitMcqAnswer('Error');
+      await bank.idle;
+
+      expect(jsonDecode(connector.sent[1].input)['correct_option'], _key);
+      expect(graded.single.overallQuality, AnswerQuality.wrong);
+      final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.optionFeedback.single.option, 'Error');
+      expect(q.optionFeedback.single.quality, AnswerQuality.wrong);
+      expect(q.keyDisputedCount, 1);
+      expect(q.keyDisputedAt, isNotNull);
+      expect(q.graderDisagreesWithKey, isTrue);
+
+      // The student gets the text and the verdict, nothing else; and the
+      // reply goes on the exercise's history without the dispute.
+      final mcq = pc!.read(activeMcqProvider)!;
+      expect(mcq.feedback, _wrongText);
+      expect(mcq.feedbackQuality, AnswerQuality.wrong);
+      final reply = jsonDecode(connector.exerciseHistory.last['content']!);
+      expect(reply['type'], 'mcq_feedback');
+      expect(reply.containsKey('keyDisputed'), isFalse);
+    });
+
+    test('on a bank question: a contradiction — the grader\'s grade and '
+        'signals stand, not the key\'s, and the question is not served '
+        'again', () async {
+      final doc = _mcqDoc('q');
+      final bank = await boot(docs: [doc], minimum: 1, share: 1);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      connector.scripts.add(disputing());
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      // Grade and key agree the pick is wrong …
+      expect(jsonDecode(connector.sent.single.input)['correct_option'], _key);
+      final answer = graded.single;
+      expect(answer.overallQuality, AnswerQuality.wrong);
+      // … but the key is in doubt, so it does not decide: the grader's
+      // strong negative, not the key's fixed moderate one.
+      expect(answer.fromAnswerKey, isFalse);
+      expect(answer.signals.single.strength, LoSignalStrength.strong);
+      final record = history.records.single;
+      expect(record.fromBank, isTrue);
+      expect(record.gradedByKey, isFalse);
+      final q = stored(idOf(doc));
+      expect(q.keyDisputedCount, 1);
+      expect(q.graderDisagreesWithKey, isTrue);
+      expect(pc!.read(activeMcqProvider)!.feedback, _wrongText);
+
+      connector.scripts.add(
+        _reply(
+          MultipleChoice(
+            type: 'multiple_choice',
+            prompt: 'Vers',
+            code: 'print(2)',
+            options: const ['2', 'Error'],
+          ),
+        ),
+      );
+      history.answered = {};
+      await tutor().advanceFromMcq();
+      expect(connector.sent, hasLength(2), reason: 'generated, not served');
+      expect(pc!.read(activeMcqProvider)!.prompt, 'Vers');
+    });
+
+    test('a key the grader was not told is not one it can dispute: text '
+        'typed in the chat, and a question without a key', () async {
+      final bank = await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+
+      // Typed, not picked: no key went out, so the field means nothing.
+      connector.scripts.add(disputing(text: 'Kies een optie.'));
+      await tutor().handleStudentMessage('Welke is het?');
+      await bank.idle;
+      expect(
+        jsonDecode(connector.sent[1].input).containsKey('correct_option'),
+        isFalse,
+      );
+      var q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.answeredCount, 1);
+      expect(q.keyDisputedCount, 0);
+      expect(q.graderDisagreesWithKey, isFalse);
+
+      // A question without a key: the pick carries none either. (Same
+      // options and code, so the same bank doc: start that afresh.)
+      store.docs.clear();
+      graded.clear();
+      connector.scripts.add(_reply(fresh(correct: null)));
+      await tutor().advanceFromMcq();
+      connector.scripts.add(disputing());
+      await tutor().submitMcqAnswer('Error');
+      await bank.idle;
+      expect(
+        jsonDecode(connector.sent.last.input).containsKey('correct_option'),
+        isFalse,
+      );
+      q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.keyDisputedCount, 0);
+    });
+  });
+
   group('what is new to the student', () {
     test('a question they answered before, one they got first, and one this '
         'session put in front of them are not served again', () async {

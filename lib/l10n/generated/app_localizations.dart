@@ -4376,6 +4376,12 @@ abstract class AppLocalizations {
   /// **'The grading disagreed with the answer key at least once.'**
   String get questions_keyDisagreement;
 
+  /// No description provided for @questions_keyDisputed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The grading called the answer key wrong once.} other{The grading called the answer key wrong {count} times.}}'**
+  String questions_keyDisputed(int count);
+
   /// No description provided for @questions_noKey.
   ///
   /// In en, this message translates to:

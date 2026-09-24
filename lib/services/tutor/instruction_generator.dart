@@ -71,14 +71,20 @@ Never translate the machine parts: META's JSON keys and enum values (including "
 /// (`graderDisagreesWithKey`, CONDUCTOR_POLICY §2.7), and a grader told to
 /// follow the key would never contradict a wrong one. So the key is the
 /// intended answer, but the grade stays the grader's own judgement.
+///
+/// A grade that differs from the key shows a wrong key only when the pick
+/// is the key or the option that is actually right. So the grader also
+/// says outright when it finds the key wrong — META `keyDisputed` (#198) —
+/// whatever the pick; the bank counts that as a contradiction too.
 const String answerKeyDirective = '''
 ANSWER KEY — STRICT. This is part of the app's contract and holds whatever the instructions above say.
 The request may carry `correct_option`: the option the question's author marked as the right one when the question was written, as the text of that option. It comes only with a pick the student has made; the student has not seen it.
 - Take it as the intended answer: a pick equal to `correct_option` is what the question meant to be right, any other pick is not.
 - Check it before you grade by it. If the key is wrong — the code does not do what the key says, the key does not answer the question, or another option is at least as right — grade the pick by what is actually right, not by the key.
-- Your `overallQuality` is your own judgement of the pick: never adjust it to agree with the key. When your grade differs from the key, the app flags the question for the teacher; that is how a wrong key gets fixed.
-- The key is for your judgement, not for the student. Never mention `correct_option`, an answer key or the author's intended answer, and when the pick is wrong, do not give away which option is right: the instructions above say what the feedback does instead.
-- Without `correct_option` in the request, grade the answer on its own merits.
+- Your `overallQuality` is your own judgement of the pick: never adjust it to agree with the key.
+- When you find the key wrong, add `"keyDisputed": true` to META, whichever option was picked — also when the pick is wrong by the key and by you alike, so that your grade alone does not show it. Leave `keyDisputed` out when the key is right. A grade that differs from the key, or `keyDisputed`, makes the app flag the question for the teacher; that is how a wrong key gets fixed.
+- The key is for your judgement, not for the student. Never mention `correct_option`, `keyDisputed`, an answer key or the author's intended answer — not even that the key is wrong — and when the pick is wrong, do not give away which option is right: the instructions above say what the feedback does instead.
+- Without `correct_option` in the request, grade the answer on its own merits, without `keyDisputed`.
 ''';
 
 /// What the model is told on a `contentQuestion` turn (#132) until the

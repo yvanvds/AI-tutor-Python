@@ -332,6 +332,75 @@ void main() {
     expect(find.text('Note: Te vaag: welke haakjes?'), findsOneWidget);
   });
 
+  testWidgets('a key the grading called wrong (#198) is warned about apart '
+      'from a grade against the key and from a missing key', (tester) async {
+    Map<String, dynamic> mcq(
+      String id, {
+      String? key = '2',
+      List<Map<String, String>> feedback = const [],
+      int disputed = 0,
+    }) => {
+      ..._question(
+        id: id,
+        payload: {
+          'type': 'multiple_choice',
+          'prompt': 'Wat drukt dit af? ($id)',
+          'code': 'print(1 + 1)',
+          'options': [
+            {'option': '2'},
+            {'option': '11'},
+            {'option': 'Error'},
+          ],
+          'correct': ?key,
+        },
+        feedback: feedback,
+      ),
+      if (disputed > 0) 'keyDisputedCount': disputed,
+      if (disputed > 0) 'keyDisputedAt': '2026-09-24T10:00:00.000Z',
+    };
+    await mount(
+      tester,
+      questions: [
+        // Every pick graded as the key says, yet the grader called the key
+        // wrong twice: only the dispute shows it.
+        mcq(
+          's1_disputed',
+          feedback: [
+            {'option': 'Error', 'text': 'Nee.', 'quality': 'wrong'},
+          ],
+          disputed: 2,
+        ),
+        mcq('s1_once', disputed: 1),
+        mcq(
+          's1_against',
+          feedback: [
+            {'option': '11', 'text': 'Juist!', 'quality': 'correct'},
+          ],
+        ),
+        mcq('s1_nokey', key: null),
+        mcq('s1_fine'),
+      ],
+    );
+    await open(tester, 's1');
+
+    String warning(String id) =>
+        tester.widget<Text>(find.byKey(Key('questions-warning-$id'))).data!;
+    expect(
+      warning('s1_disputed'),
+      'The grading called the answer key wrong 2 times.',
+    );
+    expect(warning('s1_once'), 'The grading called the answer key wrong once.');
+    expect(
+      warning('s1_against'),
+      'The grading disagreed with the answer key at least once.',
+    );
+    expect(
+      warning('s1_nokey'),
+      'No answer key: the model did not name the correct option.',
+    );
+    expect(find.byKey(const Key('questions-warning-s1_fine')), findsNothing);
+  });
+
   testWidgets('without a `questions` container the page says what to create '
       'instead of failing', (tester) async {
     final missing = UnprovisionedCosmos('questions');
