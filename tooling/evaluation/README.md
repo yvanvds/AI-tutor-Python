@@ -17,7 +17,9 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
 - **Het getal is deterministisch.** `rules.py` is de regel, met een
   versienummer dat op elk voorstel komt (`formulaVersion`). Een leerling kan
   het narekenen; de AI kiest het getal niet (PUNTENFORMULE §3.3).
-- **Diagnostiek raakt het getal niet.** Ze informeert de leerkracht.
+- **Diagnostiek raakt het getal niet.** Ze informeert de leerkracht. Een
+  wijziging die alleen de diagnostiek raakt, krijgt dus geen nieuwe
+  regelversie.
 - **Een aanpassing is een beslissing van de leerkracht**, met een reden
   in `adjustmentNote`. Dat is het bestaande model van #99.
 - **Niets wordt geschreven zonder bespreking.** `draft` en `validate`
@@ -150,7 +152,14 @@ niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 ## Woorden
 
 De leerkracht leest het concept, dus de app-woorden zijn daar vertaald.
-Een turn uit `turn_history` is een **oefening**. Een directe vraag over
+Een turn uit `turn_history` is een **oefening**, behalve een
+**auditrecord**: wat de app schrijft bij lege leerdoelen of een
+doorverwijzing na een verwijderd subdoel (CONDUCTOR_POLICY §8.1). Er werd
+geen vraag gesteld (`questionType` is leeg), en zijn `wrong` en `medium`
+zijn opvulling. De app telt het nergens mee, en het concept laat het
+overal weg (`rules.is_audit`, #201): niet in de tijdlijn, het profiel of
+de fossielen, niet als lesdag of aanwezigheid, niet als niveau, niet in
+de tellingen op het voorstel. Een directe vraag over
 een leerdoel is een **vraag**. Het hoogste niveau waarop een leerdoel
 juist beantwoord werd (`highestPositiveDifficulty`; PUNTENFORMULE §2.5
 noemt dat "ratel", een vertaling van *ratchet* die niemand herkent) is

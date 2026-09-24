@@ -104,7 +104,11 @@ def cmd_draft(args) -> None:
     per_student = []
     all_turns = {}
     for a in students:
-        all_turns[a["uid"]] = cosmos.turns(a["uid"])
+        # An audit record is no oefening (#201): left out here, once, it
+        # counts nowhere — not as a wrong answer in the timeline, profile or
+        # fossils, not as a day at work, not as a level. The replay does not
+        # change: the record carries no signals.
+        all_turns[a["uid"]] = [t for t in cosmos.turns(a["uid"]) if not rules.is_audit(t)]
     # Een klasdag is een dag waarop minstens de helft van de klas (en
     # minstens twee leerlingen) werkte; wie alleen thuis of in het weekend
     # werkt, maakt geen klasdag en dus geen afwezigen.

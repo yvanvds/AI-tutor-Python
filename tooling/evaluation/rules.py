@@ -82,6 +82,16 @@ def parse_at(s: str) -> dt.datetime:
     return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
+def is_audit(turn: dict) -> bool:
+    """An audit record: the stub `TurnHistoryService.appendAudit` writes for
+    an empty-objectives block or a redirect after a deleted subgoal
+    (CONDUCTOR_POLICY §8.1). No question was asked, so `questionType` is
+    empty, and its `wrong` and `medium` are placeholders. It is no
+    oefening: the app counts it nowhere (`listTurnsBetween` tests
+    `questionType.isEmpty`), and neither does the tooling (#171, #201)."""
+    return not turn.get("questionType")
+
+
 @dataclass
 class LoState:
     alpha: float = PRIOR
@@ -401,8 +411,8 @@ def reliability(
     `lastUpdatedAt` test on the belief doc; not the diagnostics' fossils,
     which ask another question). The tally counts the graded oefeningen in
     `[period_start, now]` by `provenance`, a missing one reading as `home`
-    like `EvidenceProvenance.parse`; audit-only records (no `questionType`)
-    are not evidence and not counted (`listTurnsBetween`). No
+    like `EvidenceProvenance.parse`; audit records (`is_audit`) are not
+    evidence and not counted (`listTurnsBetween`). No
     [period_start] counts from the first turn, as the app's 1970 fallback."""
     stale_after = dt.timedelta(days=WARM_UP_STALE_AFTER_DAYS)
     stale = 0
@@ -412,7 +422,7 @@ def reliability(
             stale += 1
     supervised = home = 0
     for t in turns:
-        if not t.get("questionType"):
+        if is_audit(t):
             continue
         at = parse_at(t["turnAt"])
         if (period_start is not None and at < period_start) or at > now:

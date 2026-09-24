@@ -124,6 +124,34 @@ def _turn(at: str, subgoal: str, lo: str, **extra) -> dict:
     return t
 
 
+def _audit(at: str, subgoal: str, uid: str, kind: str = "emptyObjectivesBlock") -> dict:
+    """The stub `TurnHistoryService.appendAudit` writes for an audit event
+    (CONDUCTOR_POLICY §8.1): no question, and `wrong` and `medium` as
+    placeholders. Not an oefening."""
+    return {
+        "id": f"t-{at}",
+        "type": "turn_history",
+        "uid": uid,
+        "turnAt": at,
+        "subgoalId": subgoal,
+        "targetLOIds": [],
+        "questionType": "",
+        "isFollowUp": False,
+        "chainDepth": 0,
+        "overallQuality": "wrong",
+        "loSignals": [],
+        "hadFallback": False,
+        "appliedSignals": [],
+        "provenance": "home",
+        "calibrationBefore": "medium",
+        "calibrationAfter": "medium",
+        "subgoalProgressAfter": 0.0,
+        "loStatusAfter": [],
+        "subgoalAdvanced": False,
+        "signalEvents": [{"kind": kind, "severity": "audit", "details": {"subgoalId": subgoal}}],
+    }
+
+
 _no_provenance = _turn("2026-09-20T09:40:00.000Z", "sg-b", "predict_b1")
 del _no_provenance["provenance"]  # a doc from before the field: reads as home
 
@@ -144,7 +172,7 @@ TURNS = {
         _no_provenance,
         _turn("2026-09-21T09:00:00.000Z", "sg-a", "fix_a3", isRecheck=True, activeSubgoalId="sg-b",
               questionId="q-sg-a-7", fromBank=True),
-        _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", questionType="", loSignals=[]),
+        _audit("2026-09-22T09:00:00.000Z", "sg-b", "u-anna"),
     ],
 }
 
@@ -203,6 +231,44 @@ CAS_STORED = {
     ("sg-b", "predict_b1"): {"alpha": 5.6447, "beta": 1.0, "highestPositiveDifficulty": "hard"},
 }
 
+# #201: a class of three made-up students whose logs carry audit records
+# (an empty-objectives block, a redirect after a deleted subgoal). Each is
+# a `wrong` at `medium` on its day in the raw log; none is an oefening.
+# Eva: two oefeningen on write_a2 (one right, one wrong), then ten right on
+# recall_a1, and four audit records — one on a lesson day, three on 09-17.
+# Fien: works at `hard`, but her first record on the milestone is an
+# empty-objectives block on Deel B from before it had objectives; she also
+# opened the app on 09-17. Gust: on 09-15, while Eva and Fien worked, he
+# only got a redirect. So 09-17 is no class day and 09-15 is one he missed.
+KLAS_AUDIT = "6AUDIT"
+ACCOUNTS += [
+    {"uid": "u-eva", "firstName": "Eva", "lastName": "Monster", "className": KLAS_AUDIT,
+     "updatedAt": "2026-09-17T11:00:00Z", "calibration": {"difficulty": "medium"}},
+    {"uid": "u-fien", "firstName": "Fien", "lastName": "Staal", "className": KLAS_AUDIT,
+     "updatedAt": "2026-09-17T09:00:00Z", "calibration": {"difficulty": "hard"}},
+    {"uid": "u-gust", "firstName": "Gust", "lastName": "Model", "className": KLAS_AUDIT,
+     "updatedAt": "2026-09-15T09:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+_HARD = {"difficulty": "hard", "calibrationBefore": "hard", "calibrationAfter": "hard"}
+TURNS["u-eva"] = [
+    _turn("2026-09-10T09:00:00.000Z", "sg-a", "write_a2", uid="u-eva", loSignals=[_sig("sg-a", "write_a2", "moderate")]),
+    _turn("2026-09-10T09:05:00.000Z", "sg-a", "write_a2", uid="u-eva", overallQuality="wrong",
+          loSignals=[_sig("sg-a", "write_a2", "moderate", "negative")]),
+    *[_turn(f"2026-09-15T09:{i:02d}:00.000Z", "sg-a", "recall_a1", uid="u-eva") for i in range(10)],
+    _audit("2026-09-15T09:30:00.000Z", "sg-weg", "u-eva", "subgoalDeletedRedirect"),
+    *[_audit(f"2026-09-17T{h}:00:00.000Z", "sg-leeg", "u-eva") for h in ("09", "10", "11")],
+]
+TURNS["u-fien"] = [
+    _audit("2026-09-08T09:00:00.000Z", "sg-b", "u-fien"),
+    *[_turn(f"2026-09-{d}T09:0{m}:00.000Z", "sg-a", "recall_a1", uid="u-fien", **_HARD) for d in ("10", "15") for m in (0, 5)],
+    _audit("2026-09-17T09:00:00.000Z", "sg-leeg", "u-fien"),
+]
+TURNS["u-gust"] = [
+    _turn("2026-09-10T09:00:00.000Z", "sg-a", "recall_a1", uid="u-gust"),
+    _turn("2026-09-10T09:05:00.000Z", "sg-a", "recall_a1", uid="u-gust"),
+    _audit("2026-09-15T09:00:00.000Z", "sg-weg", "u-gust", "subgoalDeletedRedirect"),
+]
+
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
 
@@ -234,6 +300,11 @@ class _CommandTest(unittest.TestCase):
 
     def student(self, sidecar: dict, uid: str) -> dict:
         return next(s for s in sidecar["students"] if s["uid"] == uid)
+
+    def section(self, md: str, name: str) -> str:
+        start = md.index(f"## {name}")
+        end = md.find("\n## ", start + 1)
+        return md[start:] if end == -1 else md[start:end]
 
 
 class DraftTest(_CommandTest):
@@ -309,11 +380,6 @@ class OffSubgoalDraftTest(_CommandTest):
 
     COUNTS = ("coreCounted", "extensionMastered", "masteredTotal", "hardCount", "neverProbedCount", "proposal")
 
-    def section(self, md: str, name: str) -> str:
-        start = md.index(f"## {name}")
-        end = md.find("\n## ", start + 1)
-        return md[start:] if end == -1 else md[start:end]
-
     def test_a_recheck_counts_the_active_subgoal_and_not_the_old_one(self):
         md_path, json_path, _ = self.draft(KLAS_OFF)
         cas = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-cas")["computed"]
@@ -341,6 +407,67 @@ class OffSubgoalDraftTest(_CommandTest):
         self.assertEqual(dirk, self.student(sidecar, "u-cas")["computed"])
         dirks = self.section(md_path.read_text(encoding="utf-8"), "Dirk Proef")
         self.assertIn("**Onderdelen afgerond:** Deel B op 09-22 (1 van 2)", dirks)
+
+
+class AuditRecordDraftTest(_CommandTest):
+    """#201: an audit record has no question. The app counts it nowhere
+    (`listTurnsBetween`), and neither does any part of the concept."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, self.stdout = self.draft(KLAS_AUDIT)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+
+    def test_the_timeline_and_profile_count_only_oefeningen(self):
+        eva = self.section(self.md, "Eva Monster")
+
+        self.assertIn("- 2026-09-10: 2 · 50% · medium · 0 · sg-a:2\n", eva)
+        self.assertIn("- 2026-09-15: 10 · 100% · medium · 0 · sg-a:10\n", eva)
+        self.assertNotIn("2026-09-17", eva)  # only audit records that day
+        self.assertIn("**Profiel:** 12 oefeningen · denktijd 60 s · juist 92% / deels 0% / fout 8%", eva)
+        self.assertIn("- per moeilijkheid: gewoon 92% (12)\n", eva)
+        self.assertIn("- per vraagtype: meerkeuze 92% (12)\n", eva)
+
+    def test_recent_work_for_the_fossils_is_oefeningen(self):
+        # 11 of the last 12 oefeningen right: write_a2, two weeks without a
+        # question, is a fossil. Four audit "wrongs" in the window hid it.
+        eva = self.section(self.md, "Eva Monster")
+
+        self.assertIn("**Fossielen**", eva)
+        self.assertIn("Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.50, 14 dagen oud", eva)
+        row = next(line for line in self.md.splitlines() if line.startswith("| Eva Monster |"))
+        self.assertIn("| 1 fossiel,", row)
+
+    def test_a_day_with_only_audit_records_is_no_class_day_and_no_presence(self):
+        # 09-17 (Eva and Fien only opened the app) is no class day; on 09-15
+        # the class worked and Gust only got a redirect.
+        gust_row = next(line for line in self.stdout.splitlines() if line.lstrip().startswith("Gust Model"))
+        self.assertTrue(gust_row.endswith("afwezig: 2026-09-15"), gust_row)
+        self.assertIn("- **Afwezig** terwijl de klas werkte: 2026-09-15\n", self.section(self.md, "Gust Model"))
+        self.assertNotIn("09-17", self.stdout)
+        for name in ("Eva Monster", "Fien Staal"):
+            self.assertNotIn("**Afwezig**", self.section(self.md, name))
+
+    def test_the_level_path_starts_at_the_first_oefening(self):
+        fien = self.section(self.md, "Fien Staal")
+
+        self.assertIn("- **Niveau binnen dit onderdeel:** begon met moeilijke oefeningen, eindigde met moeilijke\n", fien)
+
+    def test_the_tally_on_the_proposal_is_unchanged(self):
+        # `rules.reliability` left them out already (#171); the same test now.
+        counts = {
+            uid: {f: self.student(self.sidecar, uid)["computed"][f] for f in ("supervisedTurns", "homeTurns")}
+            for uid in ("u-eva", "u-fien", "u-gust")
+        }
+        self.assertEqual(
+            counts,
+            {
+                "u-eva": {"supervisedTurns": 0, "homeTurns": 12},
+                "u-fien": {"supervisedTurns": 0, "homeTurns": 4},
+                "u-gust": {"supervisedTurns": 0, "homeTurns": 2},
+            },
+        )
 
 
 class ValidateTest(_CommandTest):
