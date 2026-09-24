@@ -190,15 +190,20 @@ class QuestionFormatter {
     ),
   );
 
+  /// Grading payload for a multiple-choice answer. [correctOption] is the
+  /// question's answer key as option text (#197, LLM_CONTRACT "The answer
+  /// key"); the tutor passes it only for a pick the student has made, and
+  /// `answerKeyDirective` tells the grader how to use it. Omitted when null.
   static String mcqAnswer(
     String answer, {
+    String? correctOption,
     List<LearningObjective> targetLOs = const [],
     String? targetSubgoalId,
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
   }) => _encodeRequest(
     "mcq_answer",
     additionalFields: _gradingFields(
-      {"answer": answer},
+      {"answer": answer, "correct_option": ?correctOption},
       targetLOs: targetLOs,
       targetSubgoalId: targetSubgoalId,
       goalScopeLOs: goalScopeLOs,

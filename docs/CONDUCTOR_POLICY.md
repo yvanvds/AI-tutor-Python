@@ -864,7 +864,11 @@ first time a student picked it, shown in the colour it was written with.
 When the bank has no text for the pick — or one whose verdict does not
 match the key — one `mcqAnswer` grading call fetches it, on the exercise's
 own exchange; the verdict and the signal still come from the key, and the
-bank keeps the text for the next student ("the next time for free"). If
+bank keeps the text for the next student ("the next time for free"). That
+call is told the key (`correct_option`, #197), as the grading call of a
+pick on a fresh question is: the grader takes it as the intended answer
+but judges the pick itself (LLM_CONTRACT "The answer key"), so a wrong key
+can still be contradicted — the check below means something. If
 the grader on that call judges the pick the other way, the key is in doubt:
 the grader's grade stands for this turn, as for a fresh question, and the
 bank records the contradiction, so the question is not served again and

@@ -57,6 +57,19 @@ void main() {
     expect((m['goal_scope_los'] as List).last['subgoalId'], 'sub-2');
   });
 
+  test('mcqAnswer carries the answer key as correct_option when given, and '
+      'nothing of it otherwise (#197)', () {
+    final keyed = jsonDecode(
+      QuestionFormatter.mcqAnswer('11', correctOption: '2'),
+    ) as Map<String, dynamic>;
+    expect(keyed['answer'], '11');
+    expect(keyed['correct_option'], '2');
+
+    final plain =
+        jsonDecode(QuestionFormatter.mcqAnswer('11')) as Map<String, dynamic>;
+    expect(plain.containsKey('correct_option'), isFalse);
+  });
+
   test('grading payloads name the subgoal of the target LOs when told '
       '(#102); question payloads never do', () {
     const lo = LearningObjective(id: 't', statement: 't', kind: LoKind.apply);

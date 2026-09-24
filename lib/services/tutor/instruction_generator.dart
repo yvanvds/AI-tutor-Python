@@ -61,6 +61,26 @@ Never translate the machine parts: META's JSON keys and enum values (including "
 ''';
 }
 
+/// How the grader of a multiple-choice pick treats the question's answer key
+/// (#197, LLM_CONTRACT "The answer key"), appended to every `mcqAnswer`
+/// system prompt after the teacher-authored bodies.
+///
+/// It lives outside the teacher-editable instructions, like
+/// [envelopeContract], because the question bank depends on it: the bank
+/// stops serving a question once a grade contradicts its key
+/// (`graderDisagreesWithKey`, CONDUCTOR_POLICY §2.7), and a grader told to
+/// follow the key would never contradict a wrong one. So the key is the
+/// intended answer, but the grade stays the grader's own judgement.
+const String answerKeyDirective = '''
+ANSWER KEY — STRICT. This is part of the app's contract and holds whatever the instructions above say.
+The request may carry `correct_option`: the option the question's author marked as the right one when the question was written, as the text of that option. It comes only with a pick the student has made; the student has not seen it.
+- Take it as the intended answer: a pick equal to `correct_option` is what the question meant to be right, any other pick is not.
+- Check it before you grade by it. If the key is wrong — the code does not do what the key says, the key does not answer the question, or another option is at least as right — grade the pick by what is actually right, not by the key.
+- Your `overallQuality` is your own judgement of the pick: never adjust it to agree with the key. When your grade differs from the key, the app flags the question for the teacher; that is how a wrong key gets fixed.
+- The key is for your judgement, not for the student. Never mention `correct_option`, an answer key or the author's intended answer, and when the pick is wrong, do not give away which option is right: the instructions above say what the feedback does instead.
+- Without `correct_option` in the request, grade the answer on its own merits.
+''';
+
 /// What the model is told on a `contentQuestion` turn (#132) until the
 /// teacher authors an instruction doc with that id — the seed text, and the
 /// one request type that ships with a default. The other types have always
@@ -164,9 +184,15 @@ class InstructionGenerator {
       typeSpecific = '$processed\n';
     }
 
+    // The grader of a multiple-choice pick is told how to treat the answer
+    // key (#197) whatever the teacher's `mcqAnswer` doc says.
+    final answerKey = type == ChatRequestType.mcqAnswer
+        ? '\n$answerKeyDirective'
+        : '';
+
     // The language directive goes last, after the teacher-authored bodies it
     // has to override (#117).
-    return '$envelopeContract\n$alwaysInclude$typeSpecific'
+    return '$envelopeContract\n$alwaysInclude$typeSpecific$answerKey'
         '\n${languageDirective(languageCode)}';
   }
 

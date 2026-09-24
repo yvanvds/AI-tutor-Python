@@ -1,8 +1,9 @@
 // Issue #185 — the multiple-choice answer key. The `mcQuestion` instructions
 // ask the model for `"correct": "A"` (the positional letter), which the
 // parser used to drop. The question bank stores the key by *content*, since
-// the options are shuffled before a student sees them; the grader's history
-// stays as it was (`toJson` leaves the key out).
+// the options are shuffled before a student sees them. The grading call of a
+// pick carries it as `correct_option` (#197), but the question as it goes on
+// the exercise's history does not (`toJson` leaves the key out).
 
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
@@ -49,8 +50,8 @@ void main() {
     expect(r.correct, '2');
   });
 
-  test('toJson — what the grader reads back in its history — leaves the key '
-      'out', () {
+  test('toJson — the question on the exercise\'s history, which every call '
+      'on the exercise reads, pick or no pick — leaves the key out', () {
     final r = MultipleChoice.fromMap({
       'type': 'multiple_choice',
       'prompt': 'p',

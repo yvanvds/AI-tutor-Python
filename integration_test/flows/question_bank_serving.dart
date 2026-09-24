@@ -303,6 +303,10 @@ void main() {
       reason: 'the grader reads the bank question as its exercise',
     );
     expect(jsonDecode(llm.sentInputs.single)['request_type'], 'mcq_answer');
+    // The grader is told the key it is checked against, and how to treat
+    // it (#197).
+    expect(jsonDecode(llm.sentInputs.single)['correct_option'], _key);
+    expect(llm.sentInstructions.single, contains('ANSWER KEY — STRICT.'));
     // No follow-up on a bank question.
     expect(
       find.textContaining('En zonder haakjes?', findRichText: true),

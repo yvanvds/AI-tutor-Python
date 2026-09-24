@@ -1,6 +1,8 @@
 // Issue #186 — the tutor serves questions from the question bank once it
 // holds enough, mixed with fresh generation, and grades a multiple-choice
-// pick on a bank question from its answer key.
+// pick on a bank question from its answer key. And #197: the grading call of
+// a pick — on a bank question or a fresh one — is told that key, and a
+// grader told it can still overrule it.
 //
 // The real `TutorService` and the real `QuestionBankService` over a filled
 // in-memory `questions` container; the connector replays canned chunks and
@@ -518,7 +520,11 @@ void main() {
       final first = jsonDecode(connector.exerciseHistory.single['content']!);
       expect(first['type'], 'multiple_choice');
       expect(first['prompt'], 'Wat drukt dit af? (older)');
-      expect(first.containsKey('correct'), isFalse, reason: 'key is #197');
+      expect(
+        first.containsKey('correct'),
+        isFalse,
+        reason: 'the key goes only to the grading call of a pick (#197)',
+      );
       expect(history.reads, ['s1']);
     });
 
@@ -575,11 +581,14 @@ void main() {
       // The exchange is on the history a later status report reads.
       final last = connector.allHistory.last;
       expect(jsonDecode(last['content']!)['prompt'], _wrongText);
+      final exchange = jsonDecode(
+        connector.allHistory[connector.allHistory.length - 2]['content']!,
+      );
+      expect(exchange['answer'], _wrong);
       expect(
-        jsonDecode(
-          connector.allHistory[connector.allHistory.length - 2]['content']!,
-        )['answer'],
-        _wrong,
+        exchange['correct_option'],
+        _key,
+        reason: 'as the grading call would have carried it (#197)',
       );
     });
 
@@ -640,6 +649,11 @@ void main() {
         'Wat drukt dit af? (q)',
         reason: 'the grader reads the bank question as the exercise\'s own',
       );
+      expect(
+        jsonDecode(connector.sent.single.input)['correct_option'],
+        _key,
+        reason: 'the grader is told the key it is checked against (#197)',
+      );
       final mcq = pc!.read(activeMcqProvider)!;
       expect(mcq.feedback, _wrongText);
       expect(mcq.feedbackQuality, AnswerQuality.partial, reason: 'its colour');
@@ -689,6 +703,9 @@ void main() {
       await tutor().submitMcqAnswer(_key);
       await bank.idle;
 
+      // The grader saw the key and still judged the other way (#197): the
+      // directive keeps its grade its own, so the contradiction is real.
+      expect(jsonDecode(connector.sent.single.input)['correct_option'], _key);
       final answer = graded.single;
       expect(answer.fromAnswerKey, isFalse);
       expect(answer.overallQuality, AnswerQuality.wrong);
@@ -714,6 +731,111 @@ void main() {
       await tutor().advanceFromMcq();
       expect(connector.sent, hasLength(2));
       expect(pc!.read(activeMcqProvider)!.prompt, 'Vers');
+    });
+  });
+
+  // #197: the key reaches the grader of a pick — on a fresh question too —
+  // and nothing before it. The bank is switched off (p = 0) so every
+  // question here is generated.
+  group('the answer key of a fresh question (#197)', () {
+    MultipleChoice fresh({String? correct = _key, String prompt = 'Vers'}) =>
+        MultipleChoice(
+          type: 'multiple_choice',
+          prompt: prompt,
+          code: 'print(1 + 1)',
+          options: const [_key, _wrong, 'Error'],
+          correct: correct,
+        );
+
+    List<StreamChunk> grade(AnswerQuality quality, String text) => _reply(
+      McqFeedback(type: 'mcq_feedback', quality: quality, prompt: text),
+    );
+
+    Map<String, dynamic> input(int i) =>
+        jsonDecode(connector.sent[i].input) as Map<String, dynamic>;
+
+    test('the grading call of a pick carries it as option text; the question '
+        'on the exercise\'s history, which every call on the exercise reads, '
+        'does not', () async {
+      final bank = await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+
+      final question = jsonDecode(connector.exerciseHistory.single['content']!);
+      expect(question['prompt'], 'Vers');
+      expect(question.containsKey('correct'), isFalse);
+
+      connector.scripts.add(grade(AnswerQuality.wrong, _wrongText));
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      expect(connector.sent, hasLength(2));
+      expect(input(0).containsKey('correct_option'), isFalse);
+      expect(input(1)['request_type'], 'mcq_answer');
+      expect(input(1)['answer'], _wrong);
+      expect(input(1)['correct_option'], _key);
+      final carried = jsonDecode(connector.histories[1].single['content']!);
+      expect(carried.containsKey('correct'), isFalse);
+
+      // A fresh key is unchecked: the grader's grade is the grade.
+      expect(graded.single.fromAnswerKey, isFalse);
+      expect(history.records.single.gradedByKey, isFalse);
+      expect(pc!.read(activeMcqProvider)!.feedback, _wrongText);
+    });
+
+    test('text typed while the exercise is a quiz goes to the grader too, but '
+        'it is no pick: no key', () async {
+      await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+
+      connector.scripts.add(grade(AnswerQuality.wrong, 'Kies een optie.'));
+      await tutor().handleStudentMessage('Welke is het?');
+
+      expect(input(1)['request_type'], 'mcq_answer');
+      expect(input(1)['answer'], 'Welke is het?');
+      expect(input(1).containsKey('correct_option'), isFalse);
+    });
+
+    test('a question without a key sends none — also after one that had '
+        'a key', () async {
+      await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+      connector.scripts.add(grade(AnswerQuality.correct, _rightText));
+      await tutor().submitMcqAnswer(_key);
+      expect(input(1)['correct_option'], _key);
+
+      connector.scripts.add(_reply(fresh(correct: null, prompt: 'Zonder')));
+      await tutor().advanceFromMcq();
+      expect(pc!.read(activeMcqProvider)!.prompt, 'Zonder');
+      connector.scripts.add(grade(AnswerQuality.correct, _rightText));
+      await tutor().submitMcqAnswer(_key);
+
+      expect(connector.sent, hasLength(4));
+      expect(input(3)['request_type'], 'mcq_answer');
+      expect(input(3).containsKey('correct_option'), isFalse);
+    });
+
+    test('a grader that sees the key can still overrule it: its grade stands '
+        'and the bank flags the question', () async {
+      final bank = await boot(share: 0);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(fresh()));
+      await tutor().requestExercise();
+
+      connector.scripts.add(grade(AnswerQuality.wrong, 'Nee, dat klopt niet.'));
+      await tutor().submitMcqAnswer(_key);
+      await bank.idle;
+
+      expect(input(1)['correct_option'], _key);
+      expect(graded.single.overallQuality, AnswerQuality.wrong);
+      final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.correctOption, _key);
+      expect(q.graderDisagreesWithKey, isTrue);
     });
   });
 

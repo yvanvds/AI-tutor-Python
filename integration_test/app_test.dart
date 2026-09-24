@@ -41,6 +41,7 @@ import 'flows/language_switch.dart' as language_switch;
 import 'flows/legacy_ratchet.dart' as legacy_ratchet;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
+import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
 import 'flows/options_panel.dart' as options_panel;
@@ -108,6 +109,7 @@ void main() {
   unconfirmed_recheck.main();
   question_bank.main();
   question_bank_serving.main();
+  mcq_answer_key.main();
   quiz_ligatures.main();
   quiz_verdict_colors.main();
   playground_during_mcq.main();

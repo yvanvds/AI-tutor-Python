@@ -143,6 +143,14 @@ class TutorService extends Notifier<TutorState> {
   /// key. Set and cleared with it, through [_setInFlightQuestion].
   bool _inFlightFromBank = false;
 
+  /// The answer key of the last question put in front of the student, when
+  /// that was a multiple-choice one with a key (#197): the text of an
+  /// option, set when the question comes in — generated or from the bank.
+  /// Never shown: it is not in [ActiveMcq], and not on the exercise's
+  /// history the question opens. Only the grading call of a pick carries
+  /// it ([_keyForPick]).
+  String? _mcqKey;
+
   /// Per subgoal, the bank ids on this student's turn records — the
   /// questions they answered there — read once when the bank is first
   /// considered for that subgoal (#186).
@@ -755,6 +763,7 @@ class TutorService extends Notifier<TutorState> {
         return _RequestInput(
           QuestionFormatter.mcqAnswer(
             prompt,
+            correctOption: _keyForPick(prompt),
             targetLOs: _inFlightPlan?.targetLOs ?? const [],
             targetSubgoalId: targetSubgoalId,
             goalScopeLOs: scope,
@@ -1561,6 +1570,7 @@ class TutorService extends Notifier<TutorState> {
       loId: _inFlightPlan?.targetLOs.firstOrNull?.id,
     );
     if (!isQuestion) return;
+    _mcqKey = response is MultipleChoice ? response.correct : null;
     if (fromBank != null) {
       _askBankQuestion(fromBank);
     } else {
@@ -1755,6 +1765,16 @@ class TutorService extends Notifier<TutorState> {
     }
   }
 
+  /// The answer key an `mcqAnswer` call on [answer] carries (#197): the key
+  /// of the quiz on screen, and only when [answer] is the student's pick on
+  /// it. Text typed in the chat is routed to the grader too while the
+  /// exercise type is still `multiple_choice`, but it is no pick, and the
+  /// key must not reach the model before the student has committed to one.
+  String? _keyForPick(String answer) {
+    final picked = ref.read(activeMcqProvider)?.selected;
+    return picked != null && picked == answer ? _mcqKey : null;
+  }
+
   /// The pick on the bank multiple-choice question in flight and the key's
   /// verdict on it (#186); `null` when the question in flight is not one
   /// from the bank, or nothing was picked (an answer typed in the chat).
@@ -1814,6 +1834,7 @@ class TutorService extends Notifier<TutorState> {
       _connector.addExchange(
         input: QuestionFormatter.mcqAnswer(
           pick.picked,
+          correctOption: _keyForPick(pick.picked),
           targetLOs: plan?.targetLOs ?? const [],
           targetSubgoalId: plan?.targetSubgoalIdOr(
             selection.activeChildGoal?.id,

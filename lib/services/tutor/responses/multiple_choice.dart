@@ -25,8 +25,10 @@ class MultipleChoice implements ChatResponse {
   /// letter, because the options are shuffled before the student sees them.
   /// `null` when the model named none, or named one that is not an option.
   ///
-  /// Read for the question bank only: [toJson] leaves it out, so the
-  /// grader's exercise history is what it was before the bank existed.
+  /// The question bank stores it as the answer key, and the grading call of
+  /// a pick carries it as `correct_option` (#197). [toJson] leaves it out on
+  /// purpose: that is the question as it goes on the exercise's history,
+  /// which every call on the exercise reads, pick or no pick.
   final String? correct;
 
   MultipleChoice({
