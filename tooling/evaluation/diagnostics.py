@@ -39,6 +39,8 @@ NEAR_MISS_MEAN = 0.70
 # moderate answers, or two strong ones. Below this many direct questions the
 # stamp is out of reach whatever the answers were — "not assessed".
 THIN_QUESTIONS = 3
+# How many of an LO's last direct answers the concept shows (#189).
+LAST_ANSWERS = 5
 
 
 def timeline(turns: list[dict]) -> list[dict]:
@@ -88,6 +90,31 @@ def absences(turns: list[dict], class_days: set[str]) -> list[str]:
     return sorted(class_days - mine)
 
 
+def evidence(s: LoState | None) -> dict:
+    """Where an LO's belief came from (#189), read off the replay: the
+    questions and how many were answered right, the follow-ups, the
+    incidental signals that passed the conductor's filter, the transfer
+    credits; and the last direct answers, with the run of right ones at the
+    end. A μ of 0.93 on "2 questions" may be two wrong answers and 27
+    incidental right ones (#188); this says which."""
+    if s is None:
+        return {"n": 0, "n_pos": 0, "follow_up": (0, 0), "incidental": (0, 0), "transfer": 0, "recent": [], "streak": 0}
+    streak = 0
+    for d in reversed(s.direct_signals):
+        if d.signal != "positive":
+            break
+        streak += 1
+    return {
+        "n": s.n_direct,
+        "n_pos": s.n_direct_pos,
+        "follow_up": (s.n_follow_up_pos, s.n_follow_up_neg),
+        "incidental": (s.n_incidental_pos, s.n_incidental_neg),
+        "transfer": s.n_transfer,
+        "recent": s.direct_signals[-LAST_ANSWERS:],
+        "streak": streak,
+    }
+
+
 def near_misses(los: list[MilestoneLo], st: dict, expected: str) -> list[dict]:
     """Milestone LOs not demonstrated, nearest first."""
     exp = DIFF_ORDER[expected]
@@ -97,7 +124,7 @@ def near_misses(los: list[MilestoneLo], st: dict, expected: str) -> list[dict]:
         if s and s.demonstrated and DIFF_ORDER[s.ratchet] >= exp:
             continue
         if s is None:
-            out.append({"lo": lo, "mean": 0.0, "n": 0, "status": "nooit bevraagd", "ratchet": None, "last": None, "thin": True})
+            out.append({"lo": lo, "mean": 0.0, "status": "nooit bevraagd", "ratchet": None, "last": None, "thin": True, **evidence(None)})
             continue
         if s.demonstrated:
             status = "aangetoond, maar hoogste niveau onder het verwachte"
@@ -109,11 +136,11 @@ def near_misses(los: list[MilestoneLo], st: dict, expected: str) -> list[dict]:
             {
                 "lo": lo,
                 "mean": s.mean,
-                "n": s.n_direct,
                 "status": status,
                 "ratchet": s.ratchet,
                 "last": s.last_direct_at.date().isoformat() if s.last_direct_at else None,
                 "thin": s.n_direct < THIN_QUESTIONS,
+                **evidence(s),
             }
         )
     out.sort(key=lambda r: -r["mean"])

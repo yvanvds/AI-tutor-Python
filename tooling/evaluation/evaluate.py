@@ -4,11 +4,14 @@
     python tooling/evaluation/evaluate.py validate --klas 6WEWI
     python tooling/evaluation/evaluate.py backup   --klas 6WEWI [--out DIR]
     python tooling/evaluation/evaluate.py apply    <draft>.json [--force]
+    python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b [--mijlpaal ...]
 
 `draft` writes two files outside the repo (default `C:\\Users\\yvan\\ai-tutor-evaluaties`):
 a Markdown draft to discuss, and a JSON sidecar that `apply` reads. The
 JSON is the source of truth for what gets written; the Markdown is for
-people. Nothing is written to Cosmos by `draft` or `validate`.
+people. `what-if` prints the number `rules.score` gives with the named LOs
+counted as demonstrated: what a teacher's adjustment comes to by the rule.
+Nothing is written to Cosmos by `draft`, `validate` or `what-if`.
 
 `apply` backs up the target `grade_proposals` docs first, then upserts one
 signed-off proposal per student that is not marked `skip`, guarded by
@@ -179,6 +182,8 @@ def cmd_draft(args) -> None:
     print(f"concept : {md_path}")
     print(f"sidecar : {json_path}")
     print(f"regels  : {rules.RULES_VERSION}")
+    exp = milestone["expectedDifficulty"]
+    print(f"verwacht: {exp} (kern telt vanaf hoogste niveau {exp})")
     print("\nOverzicht:")
     for p in sorted(per_student, key=lambda p: -p["score"].proposal):
         sc = p["score"]
@@ -191,6 +196,60 @@ def _lo_label(lo: rules.MilestoneLo) -> str:
     return f"{lo.statement} `{lo.lo_id}`" + ("" if lo.is_core else " (uitbreiding)")
 
 
+LEVELS = ("easy", "medium", "hard")
+SIGNAL_MARK = {"positive": "✓", "negative": "✗", "neutral": "○"}
+LEVEL_LETTER = {"easy": "e", "medium": "m", "hard": "h"}
+ASKED_MARK = {"recheck": "c", "warmup": "o"}
+
+
+def _or(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " of " + items[-1]
+
+
+def _expected_level(exp: str) -> str:
+    """The concept's header line on the milestone's expected level (#189)."""
+    ok = [f"`{d}`" for d in LEVELS if rules.DIFF_ORDER[d] >= rules.DIFF_ORDER[exp]]
+    low = [f"`{d}`" for d in LEVELS if rules.DIFF_ORDER[d] < rules.DIFF_ORDER[exp]]
+    return (
+        f"**Verwacht niveau van de mijlpaal: `{exp}`** ({dx.DIFF_NL.get(exp, exp)}). Kern telt vanaf hoogste niveau `{exp}`:"
+        f" een aangetoond kerndoel met hoogste niveau {_or(ok)} telt mee" + (f", met {_or(low)} niet." if low else ".")
+    )
+
+
+def _herkomst(ev: dict) -> str:
+    """Where μ came from: `dx.evidence`, in the concept's words (#189)."""
+    n = ev["n"]
+    parts = [f"{n} {'vraag' if n == 1 else 'vragen'}" + (f" ({ev['n_pos']} juist)" if n else "")]
+    for label, (pos, neg) in (("vervolgvragen", ev["follow_up"]), ("incidenteel", ev["incidental"])):
+        if pos or neg:
+            parts.append(f"{label} {pos} juist / {neg} fout")
+    if ev["transfer"]:
+        parts.append(f"transfer-krediet {ev['transfer']}")
+    return " · ".join(parts)
+
+
+def _highest(ratchet: str | None) -> str:
+    return ratchet or "nog geen rechtstreeks juist antwoord"
+
+
+def _last_answers(ev: dict) -> str:
+    """The last direct answers per day, e.g. `09-04 ✗h ✗h · 09-11 ✓mc ✓h`."""
+    days: list[tuple[str, list[str]]] = []
+    for d in ev["recent"]:
+        day = d.at.strftime("%m-%d")
+        mark = SIGNAL_MARK.get(d.signal, "?") + LEVEL_LETTER.get(d.difficulty, "?") + ASKED_MARK.get(d.asked_as, "") + ("s" if d.by_key else "")
+        if days and days[-1][0] == day:
+            days[-1][1].append(mark)
+        else:
+            days.append((day, [mark]))
+    if not days:
+        return "geen"
+    text = " · ".join(f"{day} {' '.join(marks)}" for day, marks in days)
+    if ev["streak"] > len(ev["recent"]):
+        text += f" (de laatste {ev['streak']} juist)"
+    return text
+
+
 def _render_md(milestone, klas, per_student, now, json_path, period_start) -> str:
     since = f"sinds {period_start.date().isoformat()}" if period_start else "sinds de eerste oefening (de mijlpaal heeft geen begin van de periode)"
     L = []
@@ -198,11 +257,22 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
     L.append("")
     L.append(f"Opgesteld {now.strftime('%Y-%m-%d %H:%M')} UTC · regels `{rules.RULES_VERSION}` · sidecar `{json_path.name}`")
     L.append("")
+    L.append(_expected_level(milestone["expectedDifficulty"]))
+    L.append("")
     L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.18. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
     L.append("")
     L.append(f"**Mee op het voorstel, naast het getal** (de app toont ze bij het voorstel; ze raken het getal niet): *verouderd* telt de leerdoelen van de mijlpaal waarover de app langer dan {rules.WARM_UP_STALE_AFTER_DAYS} dagen vóór dit concept niets meer noteerde (ook een neutraal oordeel van de grader telt, al is het geen bewijs), of nog nooit iets — de drempel van de app, een andere vraag dan de fossielen in de diagnostiek. *Oefeningen deze periode* telt de beoordeelde oefeningen {since}, onder toezicht of thuis; zolang de app geen toezicht registreert (Anchor), is elke oefening 'thuis' en toont de app die telling niet (#173), maar ze staat wel op het voorstel.")
+    L.append("")
+    L.append(
+        "**Zo lees je de leerdoelen onder *Bijna* en *Ver*.** *herkomst*: waar μ vandaan komt — de vragen over het leerdoel en hoeveel daarvan juist,"
+        " vervolgvragen, wat de grader er *incidenteel* over zei terwijl een ander leerdoel beoordeeld werd (na de filter van de app: hetzelfde doel,"
+        " een eerder subdoel; een incidentele fout weegt niet, #167), en transfer-krediet. Alleen een vraag geeft een hoogste niveau en kan het leerdoel"
+        " aangetoond maken; de rest beweegt alleen μ. *hoogste niveau*: het hoogste niveau waarop een vraag over het leerdoel juist beantwoord werd."
+        f" *laatste vragen*: de laatste {dx.LAST_ANSWERS}, per dag — ✓ juist, ✗ fout, ○ neutraal; e/m/h makkelijk/gewoon/moeilijk; c een controlevraag,"
+        " o een opfrisvraag (allebei gesteld terwijl de leerling aan een ander subdoel werkte); s nagekeken met de sleutel van de vragenbank, niet door de grader."
+    )
     L.append("")
     L.append("**Drie teksten per leerling.** *Diagnostiek* en *Voor de leerkracht* blijven hier. *Tekst voor het rapport* gaat letterlijk naar de leerling en de ouders: je-vorm, gewone taal, twee koppen als gewone regels (de app toont platte tekst). Benoem een leerdoel met zijn eigen zin ('Je kan …'), nooit met de code erachter. De woordregels staan in de skill.")
     L.append("")
@@ -275,13 +345,20 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             L.append("**Bijna / aandacht:**")
             L.append("")
             for r in near:
-                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f}, {r['n']} vragen, hoogste niveau {r['ratchet']}, laatst {r['last']} — {r['status']}{' — te weinig vragen om aan te tonen' if r['thin'] else ''}")
+                thin = " — te weinig vragen om aan te tonen" if r["thin"] else ""
+                if r["status"] == "nooit bevraagd":
+                    L.append(f"- {_lo_label(r['lo'])} — nooit bevraagd{thin}")
+                    continue
+                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f} — {r['status']}{thin}")
+                L.append(f"  - herkomst: {_herkomst(r)}")
+                L.append(f"  - hoogste niveau: {_highest(r['ratchet'])}")
+                L.append(f"  - laatste vragen: {_last_answers(r)}")
             L.append("")
         if far:
             L.append("**Ver:**")
             L.append("")
             for r in far:
-                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f}, {r['n']} vragen{' — te weinig vragen om aan te tonen' if r['thin'] else ''}")
+                L.append(f"- {_lo_label(r['lo'])} — μ {r['mean']:.2f} · herkomst: {_herkomst(r)}{' — te weinig vragen om aan te tonen' if r['thin'] else ''}")
             L.append("")
         pr = p["profile"]
         L.append(f"**Profiel:** {pr['turns']} oefeningen · denktijd {pr['think_time_s']} s · juist {pr['correct_pct']}% / deels {pr['partial_pct']}% / fout {pr['wrong_pct']}% · vervolgvragen {pr['follow_up_pct']}%")
@@ -335,6 +412,8 @@ def _render_json(milestone, klas, per_student, now) -> dict:
         "milestoneId": milestone["id"],
         "milestoneTitle": milestone["title"],
         "periodStart": milestone.get("periodStart"),
+        # Kern counts from this highest level on (#189); `apply` does not read it.
+        "expectedDifficulty": milestone["expectedDifficulty"],
         "students": [
             {
                 "uid": p["uid"],
@@ -521,6 +600,77 @@ def cmd_apply(args) -> None:
     print("Vrijgeven naar de leerlingen gebeurt in de app: Rapporten → Vrijgeven.")
 
 
+# ---- what-if -----------------------------------------------------------------
+
+
+def _full_name(a: dict) -> str:
+    return f"{a.get('firstName', '')} {a.get('lastName', '')}".strip()
+
+
+def _pick_student(students: list[dict], arg: str, klas: str) -> dict:
+    q = arg.strip().lower()
+    hits = [a for a in students if a["uid"] == arg or _full_name(a).lower() == q]
+    if not hits:
+        hits = [a for a in students if q in _full_name(a).lower()]
+    if len(hits) != 1:
+        sys.exit(f"--leerling {arg!r} matcht {len(hits)} leerlingen in {klas}" + ("".join(f"\n  {_full_name(a)}" for a in hits)))
+    return hits[0]
+
+
+def _pick_los(los: list[rules.MilestoneLo], arg: str) -> list[rules.MilestoneLo]:
+    picked = []
+    for name in (x.strip() for x in arg.split(",")):
+        if not name:
+            continue
+        hits = [lo for lo in los if name in (lo.lo_id, f"{lo.subgoal_id}/{lo.lo_id}")]
+        if len(hits) != 1:
+            sys.exit(
+                f"--tel {name!r} matcht {len(hits)} leerdoelen van de mijlpaal (geef subdoel/leerdoel bij twee); de leerdoelen:\n  "
+                + "\n  ".join(f"{lo.subgoal_id}/{lo.lo_id}" for lo in los)
+            )
+        if hits[0] not in picked:
+            picked.append(hits[0])
+    if not picked:
+        sys.exit("--tel: geen leerdoelen")
+    return picked
+
+
+def cmd_what_if(args) -> None:
+    """What the number becomes when the teacher counts LOs as demonstrated
+    (#189): `rules.score_counting` on the replay `draft` grades on, so the
+    number keeps coming from `rules.py` and nobody forces a state by hand.
+    Reads only."""
+    milestone = _pick_milestone(args.mijlpaal)
+    goals = cosmos.goals()
+    los = rules.milestone_los(milestone, goals)
+    exp = milestone["expectedDifficulty"]
+    a = _pick_student(cosmos.accounts(args.klas), args.leerling, args.klas)
+    counted = _pick_los(los, args.tel)
+    st = rules.replay([t for t in cosmos.turns(a["uid"]) if not rules.is_audit(t)], goals)
+    now = rules.score(los, st, exp)
+    then = rules.score_counting(los, st, exp, [lo.key for lo in counted])
+
+    print(f"{_full_name(a)} · {milestone['title']} · verwacht niveau {exp} · regels {rules.RULES_VERSION}")
+    print()
+    print(f"{'':11}{'kern':>6}{'uitbr':>7}{'moeilijk':>10}{'M':>7}{'punt':>6}")
+    for label, sc in (("nu", now), ("meegeteld", then)):
+        print(
+            f"{label:11}{f'{sc.core_counted}/{sc.core_total}':>6}{f'{sc.extension_mastered}/{sc.extension_total}':>7}"
+            f"{f'{sc.hard_count}/{sc.mastered_total}':>10}{sc.m:>7.1f}{sc.proposal:>6}"
+        )
+    print()
+    print(f"Meegeteld als aangetoond, met hoogste niveau minstens {exp}:")
+    for lo in counted:
+        s = st.get(lo.key)
+        state = "nooit bevraagd" if s is None else f"μ {s.mean:.2f} · herkomst: {_herkomst(dx.evidence(s))} · hoogste niveau: {_highest(s.ratchet)}"
+        change = []
+        if not (s and s.demonstrated):
+            change.append("aangetoond")
+        if rules.DIFF_ORDER[s.ratchet if s else None] < rules.DIFF_ORDER[exp]:
+            change.append(f"hoogste niveau {exp}")
+        print(f"- {_lo_label(lo)} — {state} — " + ("telt al mee" if not change else "geteld als " + " en ".join(change)))
+
+
 # ---- main --------------------------------------------------------------------
 
 
@@ -537,8 +687,10 @@ def main() -> None:
     v = sub.add_parser("validate"); v.add_argument("--klas", required=True)
     b = sub.add_parser("backup"); b.add_argument("--klas", required=True); b.add_argument("--out")
     a = sub.add_parser("apply"); a.add_argument("draft"); a.add_argument("--force", action="store_true")
+    w = sub.add_parser("what-if"); w.add_argument("--klas", required=True); w.add_argument("--leerling", required=True)
+    w.add_argument("--tel", required=True, help="leerdoelen, komma-gescheiden: lo_id of subdoel/lo_id"); w.add_argument("--mijlpaal")
     args = ap.parse_args()
-    {"draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply}[args.cmd](args)
+    {"draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply, "what-if": cmd_what_if}[args.cmd](args)
 
 
 if __name__ == "__main__":

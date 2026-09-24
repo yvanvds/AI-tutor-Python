@@ -48,6 +48,15 @@ Bij meerdere mijlpalen vraagt het script om `--mijlpaal`; kies dan met de
 leerkracht. Het script print het overzicht en de paden van het concept
 (`.md`) en de sidecar (`.json`). Lees het concept volledig.
 
+De kop noemt het *verwachte niveau* van de mijlpaal: vanaf welk hoogste
+niveau een aangetoond kerndoel als kern telt (in de sidecar
+`expectedDifficulty`). Onder *Bijna* staan per leerdoel de *herkomst* van
+μ (hoeveel vragen en hoeveel daarvan juist, en wat van elders kwam:
+vervolgvragen, incidentele signalen, transfer-krediet), het *hoogste
+niveau* en de *laatste vragen*; onder *Ver* de herkomst. Hoe je ze leest,
+staat in de kop van het concept en in de README (*Wat de diagnostiek
+kan*).
+
 Draai ook `validate --klas <klas>` en meld kort of de replay de opslag
 reproduceert. Een afwijking wijst op een client op een oude build (kolom
 *laatste build* `oud`) of op documenten die met een oudere herspeling
@@ -77,6 +86,14 @@ Vraag per leerling om zijn **klasobservatie** en zijn **beslissing**:
 *aftekenen*, *uitstellen* (bv. ziek geweest, mag inhalen — niet aftekenen,
 later opnieuw) of *overslaan*, en bij een aanpassing van het punt het getal
 en de reden. Noteer alles in het concept.
+
+Zegt hij welke doelen alsnog meetellen, dan komt het getal uit `what-if`,
+nooit uit eigen rekenwerk. Het rekent met `rules.py`, met die doelen als
+aangetoond en hun hoogste niveau op minstens het verwachte:
+
+```
+python tooling/evaluation/evaluate.py what-if --klas <klas> --leerling <naam> --tel <lo_id>[,<lo_id>...]
+```
 
 **Stop hier** tot je die antwoorden hebt. De rapporttekst schrijf je met de
 observaties erbij, niet ervoor.

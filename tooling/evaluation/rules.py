@@ -69,8 +69,10 @@ with it M_start, is gone from the formula, in the app as here.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 RULES_VERSION = "1.0.18-eval4"
 
@@ -109,6 +111,23 @@ def is_audit(turn: dict) -> bool:
     return not turn.get("questionType")
 
 
+class DirectAnswer(NamedTuple):
+    """One direct question about an LO, as the replay counted it: what the
+    concept shows under *laatste vragen* (#189)."""
+
+    at: dt.datetime
+    signal: str  # positive | negative | neutral
+    strength: str
+    difficulty: str
+    # "recheck" (controlevraag, CONDUCTOR_POLICY §2.6) or "warmup"
+    # (opfrisvraag, §1.5) when this LO was the question's target on such a
+    # turn: asked while the student worked on another subgoal.
+    asked_as: str = ""
+    # The question bank's answer key decided, not the grader (`gradedByKey`,
+    # #186): a multiple-choice pick on a bank question, its target LO only.
+    by_key: bool = False
+
+
 @dataclass
 class LoState:
     """One LO as the conductor stored it. A state exists where the app has
@@ -126,7 +145,17 @@ class LoState:
     # The app's direct-probe clock `lastProbedAt` (#187): what the one-time
     # post-release replay can backfill on docs without it (README).
     last_direct_at: dt.datetime | None = None
-    direct_signals: list[tuple[dt.datetime, str, str, str]] = field(default_factory=list)  # (at, signal, strength, difficulty)
+    direct_signals: list[DirectAnswer] = field(default_factory=list)
+    # Where the rest of the belief came from (#189), counted after the
+    # conductor's filter — only what reached this LO in the replay. A
+    # follow-up (§6.2) and an incidental signal (§2.4) move (α, β) but are
+    # no question. An incidental negative weighs nothing since #167; it is
+    # counted where the app has a doc to flag, and creates none.
+    n_follow_up_pos: int = 0
+    n_follow_up_neg: int = 0
+    n_incidental_pos: int = 0
+    n_incidental_neg: int = 0
+    n_transfer: int = 0  # transfer credits (§3.7)
     # The warm-up review flag `regressedAt` (#112, #167), as the app keeps
     # it: set by an incidental negative on a once-demonstrated LO, kept if
     # already set, cleared by every write that is not incidental (§2.4),
@@ -140,6 +169,11 @@ class LoState:
     @property
     def evidence(self) -> float:
         return self.alpha + self.beta
+
+    @property
+    def n_direct_pos(self) -> int:
+        """The questions answered right."""
+        return sum(1 for d in self.direct_signals if d.signal == "positive")
 
     @property
     def mastered_now(self) -> bool:
@@ -301,6 +335,8 @@ def replay(
                 if flagged is not None and flagged.demonstrated and flagged.regressed_at is None:
                     flagged.regressed_at = now
                 if drop_incidental_negatives:
+                    if flagged is not None:
+                        flagged.n_incidental_neg += 1  # said, not weighed (#189)
                     continue
             lo = st.setdefault(key, LoState())
             a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
@@ -319,11 +355,28 @@ def replay(
             lo.alpha, lo.beta, lo.last_at = a, b, now
             if not incidental:
                 lo.regressed_at = None  # a direct measurement, whichever way it went
+            if incidental:
+                if kind == "positive":
+                    lo.n_incidental_pos += 1
+                elif kind == "negative":
+                    lo.n_incidental_neg += 1  # the old arithmetic's evidence
+            elif follow_up:
+                if kind == "positive":
+                    lo.n_follow_up_pos += 1
+                elif kind == "negative":
+                    lo.n_follow_up_neg += 1
             direct = not follow_up and not incidental
             if direct:
                 lo.n_direct += 1
                 lo.last_direct_at = now
-                lo.direct_signals.append((now, kind, strength, diff))
+                target = sig_sg == scope.probed and s["loId"] == scope.target
+                asked_as = ""
+                if target and t.get("isRecheck"):
+                    asked_as = "recheck"
+                elif target and t.get("isWarmUp"):
+                    asked_as = "warmup"
+                by_key = target and t.get("gradedByKey") is True
+                lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key))
                 if kind == "positive":
                     if DIFF_ORDER[diff] >= DIFF_ORDER[cal]:
                         lo.positive_at_calibrated_at = now
@@ -347,6 +400,7 @@ def replay(
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA, 0.0)
                 lo.last_at = now
+                lo.n_transfer += 1
                 if lo.first_mastered_at is None and lo.mastered_now:
                     lo.first_mastered_at = now
     return st
@@ -431,6 +485,26 @@ def score(los: list[MilestoneLo], st: dict, expected_difficulty: str) -> Score:
     d = 0.0 if mt == 0 else hc / mt
     m = mastery_from_fractions(k, u, d)
     return Score(k, u, d, m, max(0, min(100, round(m))), ct, cc, et, em, mt, hc, never)
+
+
+def score_counting(
+    los: list[MilestoneLo], st: dict, expected_difficulty: str, keys: list[tuple[str, str]]
+) -> Score:
+    """`score` with the LOs in [keys] counted as demonstrated: the number a
+    teacher's adjustment comes to by the rule (`evaluate.py what-if`, #189).
+    Each gets the stamp, and its highest level is raised to the expected one
+    where it is lower or empty — the two things `score` reads of an LO. The
+    replayed states are left alone. `never_probed` reads the forced states,
+    so it is no count to report from here."""
+    forced = dict(st)
+    for key in keys:
+        s = st.get(key) or LoState()
+        ratchet = s.ratchet
+        if DIFF_ORDER[ratchet] < DIFF_ORDER[expected_difficulty]:
+            ratchet = expected_difficulty
+        stamp = s.first_mastered_at or s.last_at or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+        forced[key] = dataclasses.replace(s, first_mastered_at=stamp, ratchet=ratchet)
+    return score(los, forced, expected_difficulty)
 
 
 WARM_UP_STALE_AFTER_DAYS = 30  # PolicyConstants.warmUpStaleAfter

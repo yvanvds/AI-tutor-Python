@@ -22,9 +22,9 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
   regelversie.
 - **Een aanpassing is een beslissing van de leerkracht**, met een reden
   in `adjustmentNote`. Dat is het bestaande model van #99.
-- **Niets wordt geschreven zonder bespreking.** `draft` en `validate`
-  lezen alleen. `apply` maakt eerst een back-up, weigert als de klas nu
-  werkt, weigert zonder verantwoording, en gebruikt `If-Match`.
+- **Niets wordt geschreven zonder bespreking.** `draft`, `validate` en
+  `what-if` lezen alleen. `apply` maakt eerst een back-up, weigert als
+  de klas nu werkt, weigert zonder verantwoording, en gebruikt `If-Match`.
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
   repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek.
 
@@ -35,6 +35,7 @@ python tooling/evaluation/evaluate.py draft    --klas 6WEWI            # concept
 python tooling/evaluation/evaluate.py validate --klas 6WEWI            # replay vs. opslag
 python tooling/evaluation/evaluate.py backup   --klas 6WEWI            # volledige dump
 python tooling/evaluation/evaluate.py apply    ~/ai-tutor-evaluaties/<...>.json
+python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b   # punt als die doelen meetellen
 ```
 
 Alleen standaardbibliotheek; leest `COSMOS_ENDPOINT`/`COSMOS_KEY` uit `.env`.
@@ -48,9 +49,9 @@ volgorde uit en schrijft de verantwoordingen in het concept.
 | | |
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag |
-| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; de signalen die mee op het voorstel gaan |
-| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst, profiel, fossielen, weggegooide signalen |
-| `evaluate.py` | de vier commando's; rendert concept en sidecar |
+| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
+| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen |
+| `evaluate.py` | de vijf commando's; rendert concept en sidecar |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 
 ## Mee op het voorstel
@@ -148,11 +149,30 @@ niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 - **per lesdag**: oefeningen, % juist, kalibratie, afgeronde subdoelen — een
   leerling die van 60% naar 84% ging, zie je hier en nergens anders;
 - **afwezigheid**: dagen waarop de klas werkte en deze leerling niet;
+- **verwacht niveau** (#189): in de kop van het concept en als
+  `expectedDifficulty` in de sidecar, met wat het betekent: een aangetoond
+  kerndoel telt pas als kern vanaf dat hoogste niveau;
 - **bijna-lijst**: welke leerdoelen op 0,70–0,80 staan en hoeveel
   kernstempels nog nodig zijn om te slagen; doelen met te weinig vragen
   om ooit aangetoond te kunnen worden staan gemarkeerd — een laag punt
   door dun bevraagde extra doelen is iets anders dan een laag punt door
-  gemiste kerndoelen;
+  gemiste kerndoelen. Per leerdoel drie regels (#189):
+  - *herkomst*: waar μ vandaan komt — de vragen en hoeveel daarvan
+    juist, vervolgvragen, incidentele signalen (na de filter van de app:
+    hetzelfde doel, een eerder subdoel; een incidentele fout weegt niet,
+    #167) en transfer-krediet, geteld door de herspeling zelf. "μ 0,93,
+    2 vragen" las op 23-09 als twee juiste antwoorden; het waren twee
+    foute en 27 incidentele juiste (#188). Alleen een vraag geeft een
+    hoogste niveau en kan een leerdoel aangetoond maken;
+  - *hoogste niveau*, of "nog geen rechtstreeks juist antwoord";
+  - *laatste vragen*: de laatste vijf uit `direct_signals`, per dag:
+    ✓ juist, ✗ fout, ○ neutraal, met het niveau (e/m/h), `c` voor een
+    controlevraag, `o` voor een opfrisvraag en `s` als de sleutel van de
+    vragenbank besliste (`gradedByKey`). Staan er aan het eind meer
+    juiste op rij dan er getoond worden, dan staat dat erbij ("de laatste
+    8 juist").
+
+  De ver-lijst toont de herkomst op één regel;
 - **profiel**: denktijd, deels-juist-aandeel, score per vraagtype en per
   soort leerdoel (`recall` / `predict` / `write` / `fix`) — "leest code
   maar schrijft ze niet" staat hier in cijfers;
@@ -169,6 +189,26 @@ niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
   deze mijlpaal terwijl de leerling in een ander doel werkte; de app laat
   ze vallen. Let op: hun frequentie verschilt sterk per sessie (vraagtype?
   grader-versie?) — informatief, geen bewijs.
+
+## `what-if`: wat een aanpassing oplevert
+
+Telt de leerkracht een doel mee dat de regel niet telt, dan geeft
+`what-if` het getal: `rules.score` op dezelfde herspeling als `draft`,
+met de genoemde leerdoelen als aangetoond geteld en hun hoogste niveau
+opgetrokken tot het verwachte als het lager of leeg is
+(`rules.score_counting`, #189). Zo komt ook het getal van een aanpassing
+uit `rules.py`, en forceert niemand zelf een toestand.
+
+```
+python tooling/evaluation/evaluate.py what-if --klas 6WEWI --leerling <naam> --tel write_simple_script,sg-id/lo_id
+```
+
+`--leerling` is de volledige naam, een deel ervan of de uid; `--tel` een
+of meer leerdoelen van de mijlpaal, als `lo_id` of `subdoel/lo_id`. Het
+commando toont kern, uitbreiding, moeilijk, M en punt, nu en met die
+doelen meegeteld, en per doel de herkomst en wat er geteld werd. Het
+leest alleen; de aanpassing zelf gaat, met haar reden, als
+`adjustedGrade` en `adjustmentNote` in de sidecar.
 
 ## Woorden
 

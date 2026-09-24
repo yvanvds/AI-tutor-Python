@@ -341,6 +341,46 @@ JENS_STORED = {
     ("sg-b", "predict_b1"): {"alpha": 3.0, "beta": 1.0, "highestPositiveDifficulty": "medium"},
 }
 
+# #189: a class of one made-up student whose near-goals got their belief in
+# three different ways. recall_a1: three right at `easy` on 09-02, which
+# stamps it below the milestone's `medium`, and a transfer credit on 09-15.
+# fix_a3: three wrong at `hard` on 09-04, then eight right in a row, the
+# last one an opfrisvraag on 09-18 — μ 0.74, never stamped. write_a2, as in
+# #188: two wrong at `hard` and a right follow-up on 09-11; then, in Deel B,
+# ten grader remarks about it from the side (eight right, two wrong); on
+# 09-18 a controlevraag from the bank, graded wrong by its key. μ 0.74 with
+# no right answer to a question about it.
+KLAS_HERKOMST = "6HERKOMST"
+ACCOUNTS += [
+    {"uid": "u-lotte", "firstName": "Lotte", "lastName": "Herkomst", "className": KLAS_HERKOMST,
+     "updatedAt": "2026-09-18T10:00:00Z", "calibration": {"difficulty": "hard"}},
+]
+_EASY = {"difficulty": "easy", "calibrationBefore": "easy", "calibrationAfter": "easy"}
+TURNS["u-lotte"] = [
+    *[_turn(f"2026-09-02T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-lotte", **_EASY) for i in range(3)],
+    *[_turn(f"2026-09-04T09:0{i}:00.000Z", "sg-a", "fix_a3", uid="u-lotte", overallQuality="wrong", **_HARD,
+            loSignals=[_sig("sg-a", "fix_a3", signal="negative")]) for i in range(3)],
+    *[_turn(f"2026-09-10T09:0{i}:00.000Z", "sg-a", "fix_a3", uid="u-lotte", **_HARD,
+            loSignals=[_sig("sg-a", "fix_a3", "moderate")]) for i in range(4)],
+    _turn("2026-09-11T09:00:00.000Z", "sg-a", "write_a2", uid="u-lotte", overallQuality="wrong", **_HARD,
+          loSignals=[_sig("sg-a", "write_a2", signal="negative")]),
+    _turn("2026-09-11T09:01:00.000Z", "sg-a", "write_a2", uid="u-lotte", isFollowUp=True, chainDepth=1, **_HARD),
+    _turn("2026-09-11T09:02:00.000Z", "sg-a", "write_a2", uid="u-lotte", overallQuality="wrong", **_HARD,
+          loSignals=[_sig("sg-a", "write_a2", "moderate", "negative")]),
+    *[_turn(f"2026-09-11T09:1{i}:00.000Z", "sg-a", "fix_a3", uid="u-lotte", **_HARD,
+            loSignals=[_sig("sg-a", "fix_a3", "moderate")]) for i in range(3)],
+    *[_turn(f"2026-09-15T09:{i:02d}:00.000Z", "sg-b", "predict_b1", uid="u-lotte", **_HARD,
+            loSignals=[_sig("sg-b", "predict_b1", "moderate"),
+                       _sig("sg-a", "write_a2", "moderate", "negative" if i in (4, 7) else "positive")],
+            **({"transferCredits": [{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.5}]} if i == 0 else {}))
+      for i in range(10)],
+    _turn("2026-09-18T09:00:00.000Z", "sg-a", "write_a2", uid="u-lotte", isRecheck=True, activeSubgoalId="sg-b",
+          overallQuality="wrong", questionId="q-sg-a-2", fromBank=True, gradedByKey=True, **_HARD,
+          loSignals=[_sig("sg-a", "write_a2", "moderate", "negative")]),
+    _turn("2026-09-18T09:05:00.000Z", "sg-a", "fix_a3", uid="u-lotte", isWarmUp=True, activeSubgoalId="sg-b", **_HARD,
+          loSignals=[_sig("sg-a", "fix_a3", "moderate")]),
+]
+
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
 
@@ -466,7 +506,14 @@ class OffSubgoalDraftTest(_CommandTest):
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("| Cas Voorbeeld | 2/2 | 0/2 | 2/2 | **70** |", md)
         mine = self.section(md, "Cas Voorbeeld")
-        self.assertIn("`fix_a3` (uitbreiding) — μ 0.87, 0 vragen", mine)
+        # Its μ came from the side, and the concept says so (#189).
+        self.assertIn(
+            "`fix_a3` (uitbreiding) — μ 0.87 — bijna — te weinig vragen om aan te tonen\n"
+            "  - herkomst: 0 vragen · incidenteel 3 juist / 0 fout\n"
+            "  - hoogste niveau: nog geen rechtstreeks juist antwoord\n"
+            "  - laatste vragen: geen\n",
+            mine,
+        )
         self.assertIn("**Onderdelen afgerond:** Deel B op 09-22 (1 van 2)", mine)
         self.assertNotIn("door de app weggegooid", mine)
 
@@ -572,10 +619,122 @@ class NeutralSignalDraftTest(_CommandTest):
     def test_a_question_answered_neutral_was_asked(self):
         jens = self.section(self.md, "Jens Grijs")
 
-        self.assertIn("Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.50, 1 vragen — te weinig vragen om aan te tonen", jens)
-        self.assertIn("Je kan A3 verbeteren. `fix_a3` (uitbreiding) — μ 0.50, 0 vragen — te weinig vragen om aan te tonen", jens)
+        self.assertIn("Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.50 · herkomst: 1 vraag (0 juist) — te weinig vragen om aan te tonen", jens)
+        self.assertIn("Je kan A3 verbeteren. `fix_a3` (uitbreiding) — μ 0.50 · herkomst: 0 vragen — te weinig vragen om aan te tonen", jens)
+        self.assertIn("  - laatste vragen: 09-22 ✓m\n", jens)  # predict_b1; the side neutral on fix_a3 is none
         self.assertNotIn("— nooit bevraagd", jens)
         self.assertIn(f"regels `{rules.RULES_VERSION}`", self.md)
+
+
+class ProvenanceDraftTest(_CommandTest):
+    """#189: the concept names the expected level, and per near-goal where
+    its μ came from and the last answers to questions about it."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, self.stdout = self.draft(KLAS_HERKOMST)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+        self.lotte = self.section(self.md, "Lotte Herkomst")
+
+    def test_the_header_and_the_sidecar_name_the_expected_level(self):
+        self.assertIn(
+            "**Verwacht niveau van de mijlpaal: `medium`** (gewoon). Kern telt vanaf hoogste niveau `medium`:"
+            " een aangetoond kerndoel met hoogste niveau `medium` of `hard` telt mee, met `easy` niet.",
+            self.md,
+        )
+        self.assertEqual(self.sidecar["expectedDifficulty"], "medium")
+        self.assertIn("verwacht: medium (kern telt vanaf hoogste niveau medium)", self.stdout)
+
+    def test_a_belief_from_the_side_says_so(self):
+        # #188: μ 0.74 and "3 questions" — none of them right.
+        self.assertIn(
+            "- Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.74 — bijna\n"
+            "  - herkomst: 3 vragen (0 juist) · vervolgvragen 1 juist / 0 fout · incidenteel 8 juist / 2 fout\n"
+            "  - hoogste niveau: nog geen rechtstreeks juist antwoord\n"
+            "  - laatste vragen: 09-11 ✗h ✗h · 09-18 ✗hcs\n",
+            self.lotte,
+        )
+        self.assertNotIn("None", self.lotte)
+
+    def test_a_goal_demonstrated_below_the_expected_level(self):
+        self.assertIn(
+            "- Je kan A1 benoemen. `recall_a1` — μ 0.82 — aangetoond, maar hoogste niveau onder het verwachte\n"
+            "  - herkomst: 3 vragen (3 juist) · transfer-krediet 1\n"
+            "  - hoogste niveau: easy\n"
+            "  - laatste vragen: 09-02 ✓e ✓e ✓e\n",
+            self.lotte,
+        )
+
+    def test_the_last_answers_carry_the_run_of_right_ones(self):
+        # Five shown; the eight right in a row since 09-10 is what decides.
+        self.assertIn(
+            "- Je kan A3 verbeteren. `fix_a3` (uitbreiding) — μ 0.74 — bijna\n"
+            "  - herkomst: 11 vragen (8 juist)\n"
+            "  - hoogste niveau: hard\n"
+            "  - laatste vragen: 09-10 ✓h · 09-11 ✓h ✓h ✓h · 09-18 ✓ho (de laatste 8 juist)\n",
+            self.lotte,
+        )
+
+    def test_the_number_does_not_move(self):
+        c = self.student(self.sidecar, "u-lotte")["computed"]
+        self.assertEqual((c["coreCounted"], c["extensionMastered"], c["hardCount"], c["masteredTotal"], c["proposal"]), (1, 0, 1, 2, 30))
+
+
+class WhatIfTest(_CommandTest):
+    """#189: the number an adjustment comes to, from `rules.score`."""
+
+    def rows(self, stdout: str) -> dict[str, list[str]]:
+        """kern · uitbr · moeilijk · M · punt, for "nu" and "meegeteld"."""
+        return {
+            line.split()[0]: line.split()[1:]
+            for line in stdout.splitlines()
+            if line.startswith(("nu ", "meegeteld "))
+        }
+
+    def test_counting_goals_raises_them_to_the_expected_level(self):
+        stdout = self.run_cli("what-if", "--klas", KLAS_HERKOMST, "--leerling", "lotte", "--tel", "recall_a1, sg-a/write_a2")
+
+        # recall_a1 now counts as kern (easy → medium); write_a2 gets the
+        # stamp: k 1, u 1/2, d 1/3, M = 50 + 50·(0.6/2 + 0.4/3).
+        self.assertEqual(
+            self.rows(stdout),
+            {"nu": ["1/2", "0/2", "1/2", "30.0", "30"], "meegeteld": ["2/2", "1/2", "1/3", "71.7", "72"]},
+        )
+        self.assertIn("Lotte Herkomst · Mijlpaal een · verwacht niveau medium", stdout)
+        self.assertIn(
+            "- Je kan A1 benoemen. `recall_a1` — μ 0.82 · herkomst: 3 vragen (3 juist) · transfer-krediet 1"
+            " · hoogste niveau: easy — geteld als hoogste niveau medium\n",
+            stdout,
+        )
+        self.assertIn(
+            "`write_a2` (uitbreiding) — μ 0.74 · herkomst: 3 vragen (0 juist) · vervolgvragen 1 juist / 0 fout"
+            " · incidenteel 8 juist / 2 fout · hoogste niveau: nog geen rechtstreeks juist antwoord"
+            " — geteld als aangetoond en hoogste niveau medium\n",
+            stdout,
+        )
+        self.assertEqual(self.cosmos.upserts, [])
+
+    def test_a_goal_keeps_a_level_above_the_expected_one(self):
+        # fix_a3 was answered right at hard: counted, it counts on hard too.
+        # predict_b1 counts already and changes nothing.
+        stdout = self.run_cli("what-if", "--klas", KLAS_HERKOMST, "--leerling", "Lotte Herkomst", "--tel", "fix_a3,predict_b1")
+
+        self.assertEqual(
+            self.rows(stdout),
+            {"nu": ["1/2", "0/2", "1/2", "30.0", "30"], "meegeteld": ["1/2", "1/2", "2/3", "39.2", "39"]},
+        )
+        self.assertIn("`fix_a3` (uitbreiding) — μ 0.74 · herkomst: 11 vragen (8 juist) · hoogste niveau: hard — geteld als aangetoond\n", stdout)
+        self.assertIn("`predict_b1` — μ 0.94 · herkomst: 10 vragen (10 juist) · hoogste niveau: hard — telt al mee\n", stdout)
+
+    def test_a_name_that_matches_nothing_stops(self):
+        for argv, message in (
+            (("--leerling", "lotte", "--tel", "write_a9"), "--tel 'write_a9' matcht 0 leerdoelen"),
+            (("--leerling", "niemand", "--tel", "write_a2"), "--leerling 'niemand' matcht 0 leerlingen in 6HERKOMST"),
+        ):
+            with self.assertRaises(SystemExit) as stop:
+                self.run_cli("what-if", "--klas", KLAS_HERKOMST, *argv)
+            self.assertIn(message, str(stop.exception.code))
 
 
 class ValidateTest(_CommandTest):
@@ -685,7 +844,8 @@ class NeutralSignalTest(unittest.TestCase):
         a, b = rules._decay(before.alpha, before.beta, before.last_at, NEUTRAL_AT)
         self.assertEqual((recall.alpha, recall.beta), (a, b))  # decayed to its moment, nothing added
         self.assertEqual((recall.n_direct, recall.ratchet), (5, "medium"))
-        self.assertEqual(recall.direct_signals[-1], (NEUTRAL_AT, "neutral", "moderate", "medium"))
+        self.assertEqual(recall.direct_signals[-1], rules.DirectAnswer(NEUTRAL_AT, "neutral", "moderate", "medium"))
+        self.assertEqual((recall.n_direct_pos, recall.n_incidental_pos, recall.n_incidental_neg), (4, 0, 0))
         # A new LO starts at the prior: asked, with nothing to show for it.
         write = st[("sg-a", "write_a2")]
         self.assertEqual((write.alpha, write.beta, write.last_at, write.last_direct_at), (1.0, 1.0, NEUTRAL_AT, NEUTRAL_AT))
