@@ -46,9 +46,29 @@ volgorde uit en schrijft de verantwoordingen in het concept.
 | | |
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag |
-| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P |
+| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; de signalen die mee op het voorstel gaan |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vier commando's; rendert concept en sidecar |
+| `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
+
+## Mee op het voorstel
+
+Naast het getal zet `apply` de betrouwbaarheidssignalen van PUNTENFORMULE
+§3.2 op het voorstel, zoals de app ze telt; `draft` rekent ze uit en toont
+ze in concept en sidecar, dus de leerkracht ziet ze voor het "go":
+
+- **verouderd** (`staleLoCount`): leerdoelen van de mijlpaal die langer dan
+  30 dagen vóór het concept geen nieuw bewijs kregen in de herspeling, plus
+  de nooit bevraagde. Dezelfde drempel als de app
+  (`PolicyConstants.warmUpStaleAfter`), een andere vraag dan de fossielen;
+- **nooit bevraagd** (`neverProbedCount`);
+- **oefeningen deze periode** (`supervisedTurns`, `homeTurns`): de
+  beoordeelde oefeningen sinds `periodStart` van de mijlpaal, per
+  `provenance`; zonder veld telt een oefening als thuis, zoals in de app.
+
+Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
+`supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
+ontbrekend veld is eerlijker dan een verzonnen nul.
 
 ## Regelversie `1.0.16-eval2`
 

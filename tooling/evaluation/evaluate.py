@@ -62,6 +62,20 @@ def _pick_milestone(arg: str | None) -> dict:
     return hits[0]
 
 
+def _period_start(milestone: dict) -> dt.datetime | None:
+    """Where the milestone's grading window opens (`Milestone.periodStart`).
+    Missing or unreadable reads as "from the first turn", as the app's 1970
+    fallback does."""
+    raw = milestone.get("periodStart")
+    if not isinstance(raw, str):
+        return None
+    try:
+        at = rules.parse_at(raw)
+    except ValueError:
+        return None
+    return at if at.tzinfo else at.replace(tzinfo=dt.timezone.utc)
+
+
 def _lesson_in_progress(students: list[dict]) -> list[str]:
     cutoff = _now() - dt.timedelta(minutes=LESSON_QUIET_MINUTES)
     return [
@@ -85,6 +99,7 @@ def cmd_draft(args) -> None:
     if not students:
         sys.exit(f"geen leerlingen met className={args.klas!r}")
     now = _now()
+    period_start = _period_start(milestone)
 
     per_student = []
     all_turns = {}
@@ -132,6 +147,7 @@ def cmd_draft(args) -> None:
                 "name": f"{a.get('firstName', '')} {a.get('lastName', '')}".strip(),
                 "calibration": (a.get("calibration") or {}).get("difficulty"),
                 "score": sc,
+                "reliability": rules.reliability(los, st, turns, period_start, now),
                 "needed": rules.stamps_needed_to_pass(sc),
                 "timeline": tl,
                 "level_start": level_start,
@@ -152,7 +168,7 @@ def cmd_draft(args) -> None:
     base = f"{now.strftime('%Y%m%d')}-{_slug(args.klas)}-{_slug(milestone['title'])}"
     md_path = out_dir / f"{base}.md"
     json_path = out_dir / f"{base}.json"
-    md_path.write_text(_render_md(milestone, args.klas, per_student, now, json_path), encoding="utf-8")
+    md_path.write_text(_render_md(milestone, args.klas, per_student, now, json_path, period_start), encoding="utf-8")
     json_path.write_text(json.dumps(_render_json(milestone, args.klas, per_student, now), ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"concept : {md_path}")
     print(f"sidecar : {json_path}")
@@ -169,7 +185,8 @@ def _lo_label(lo: rules.MilestoneLo) -> str:
     return f"{lo.statement} `{lo.lo_id}`" + ("" if lo.is_core else " (uitbreiding)")
 
 
-def _render_md(milestone, klas, per_student, now, json_path) -> str:
+def _render_md(milestone, klas, per_student, now, json_path, period_start) -> str:
+    since = f"sinds {period_start.date().isoformat()}" if period_start else "sinds de eerste oefening (de mijlpaal heeft geen begin van de periode)"
     L = []
     L.append(f"# Evaluatie — {milestone['title']} — {klas}")
     L.append("")
@@ -178,6 +195,8 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
     L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.16. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
+    L.append("")
+    L.append(f"**Mee op het voorstel, naast het getal** (de app toont ze bij het voorstel; ze raken het getal niet): *verouderd* telt de leerdoelen van de mijlpaal die langer dan {rules.WARM_UP_STALE_AFTER_DAYS} dagen vóór dit concept geen nieuw bewijs kregen, of nooit bevraagd werden — de drempel van de app, een andere vraag dan de fossielen in de diagnostiek. *Oefeningen deze periode* telt de beoordeelde oefeningen {since}, onder toezicht of thuis; zolang de app geen toezicht registreert (Anchor), is elke oefening 'thuis' en toont de app die telling niet (#173), maar ze staat wel op het voorstel.")
     L.append("")
     L.append("**Drie teksten per leerling.** *Diagnostiek* en *Voor de leerkracht* blijven hier. *Tekst voor het rapport* gaat letterlijk naar de leerling en de ouders: je-vorm, gewone taal, twee koppen als gewone regels (de app toont platte tekst). Benoem een leerdoel met zijn eigen zin ('Je kan …'), nooit met de code erachter. De woordregels staan in de skill.")
     L.append("")
@@ -218,6 +237,9 @@ def _render_md(milestone, klas, per_student, now, json_path) -> str:
         L.append(f"**Punt {sc.proposal}** — kern {sc.core_counted}/{sc.core_total} (k = {sc.k:.2f}), uitbreiding {sc.extension_mastered}/{sc.extension_total} (u = {sc.u:.2f}), op moeilijk {sc.hard_count}/{sc.mastered_total} (d = {sc.d:.2f}), M = {sc.m:.1f}. Kalibratie nu: {p['calibration']}.")
         if sc.proposal < rules.PASS_MARK and p["needed"]:
             L.append(f"Nog **+{p['needed'][0]} kernleerdoel(en)** nodig om te slagen (→ {p['needed'][1]}).")
+        L.append("")
+        rel = p["reliability"]
+        L.append(f"**Mee op het voorstel:** verouderd {rel.stale_lo_count} leerdoel(en) (nooit bevraagd: {sc.never_probed}) · oefeningen deze periode: {rel.supervised_turns} onder toezicht, {rel.home_turns} thuis.")
         L.append("")
         L.append("### Diagnostiek")
         L.append("")
@@ -306,6 +328,7 @@ def _render_json(milestone, klas, per_student, now) -> dict:
         "klas": klas,
         "milestoneId": milestone["id"],
         "milestoneTitle": milestone["title"],
+        "periodStart": milestone.get("periodStart"),
         "students": [
             {
                 "uid": p["uid"],
@@ -325,6 +348,9 @@ def _render_json(milestone, klas, per_student, now) -> dict:
                     "masteredTotal": p["score"].mastered_total,
                     "hardCount": p["score"].hard_count,
                     "neverProbedCount": p["score"].never_probed,
+                    "staleLoCount": p["reliability"].stale_lo_count,
+                    "supervisedTurns": p["reliability"].supervised_turns,
+                    "homeTurns": p["reliability"].home_turns,
                 },
                 "justification": None,
                 "justificationSource": "ai",
@@ -391,6 +417,10 @@ def cmd_backup(args) -> None:
 
 # ---- apply -------------------------------------------------------------------
 
+# Counted by `draft` since #171 (`rules.reliability`); `neverProbedCount`
+# comes with the score.
+RELIABILITY_FIELDS = ("staleLoCount", "supervisedTurns", "homeTurns")
+
 
 def cmd_apply(args) -> None:
     data = json.loads(Path(args.draft).read_text(encoding="utf-8"))
@@ -411,6 +441,12 @@ def cmd_apply(args) -> None:
         j = s.get("justification") or ""
         if "Verantwoording van je score" not in j or "\nFeedback" not in j:
             print(f"  let op: {s['name']}: de rapporttekst mist een van de twee koppen")
+    # A sidecar drafted before these were counted has no value for them. A
+    # missing field on the proposal is honest; a 0 the teacher then reads
+    # as "0 thuis" beside 200 oefeningen is not.
+    uncounted = [s["name"] for s in todo if any(f not in s["computed"] for f in RELIABILITY_FIELDS)]
+    if uncounted:
+        print("  let op: dit concept telt verouderde leerdoelen en oefeningen onder toezicht/thuis nog niet; die velden blijven weg in plaats van 0 (maak een nieuw concept om ze te tellen): " + ", ".join(uncounted))
     path = _backup([by_uid[s["uid"]] for s in todo if s["uid"] in by_uid], mid, BACKUP_DIR, f"{_slug(data['klas'])}_apply")
     print(f"back-up: {path}")
 
@@ -431,8 +467,8 @@ def cmd_apply(args) -> None:
             "coreTotal": c["coreTotal"], "coreCounted": c["coreCounted"],
             "extensionTotal": c["extensionTotal"], "extensionMastered": c["extensionMastered"],
             "masteredTotal": c["masteredTotal"], "hardCount": c["hardCount"],
-            "staleLoCount": 0, "neverProbedCount": c["neverProbedCount"],
-            "supervisedTurns": 0, "homeTurns": 0,
+            "neverProbedCount": c["neverProbedCount"],
+            **{f: c[f] for f in RELIABILITY_FIELDS if f in c},
             "justification": s["justification"],
             "justificationAt": now,
             "justificationSource": s.get("justificationSource") or "ai",

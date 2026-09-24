@@ -295,6 +295,55 @@ def score(los: list[MilestoneLo], st: dict, expected_difficulty: str) -> Score:
     return Score(k, u, d, m, max(0, min(100, round(m))), ct, cc, et, em, mt, hc, never)
 
 
+WARM_UP_STALE_AFTER_DAYS = 30  # PolicyConstants.warmUpStaleAfter
+
+
+@dataclass
+class Reliability:
+    """The proposal's reliability signals (PUNTENFORMULE §3.2) that `score`
+    does not already carry, counted as `GradeProposalService.compute` counts
+    them. They sit on the proposal beside the number; they never enter it."""
+
+    stale_lo_count: int
+    supervised_turns: int
+    home_turns: int
+
+
+def reliability(
+    los: list[MilestoneLo],
+    st: dict,
+    turns: list[dict],
+    period_start: dt.datetime | None,
+    now: dt.datetime,
+) -> Reliability:
+    """Stale = a milestone LO whose replayed state got no evidence for more
+    than `WARM_UP_STALE_AFTER_DAYS` before [now], or none at all (the app's
+    `lastUpdatedAt` test on the belief doc; not the diagnostics' fossils,
+    which ask another question). The tally counts the graded oefeningen in
+    `[period_start, now]` by `provenance`, a missing one reading as `home`
+    like `EvidenceProvenance.parse`; audit-only records (no `questionType`)
+    are not evidence and not counted (`listTurnsBetween`). No
+    [period_start] counts from the first turn, as the app's 1970 fallback."""
+    stale_after = dt.timedelta(days=WARM_UP_STALE_AFTER_DAYS)
+    stale = 0
+    for lo in los:
+        s = st.get(lo.key)
+        if s is None or s.last_at is None or now - s.last_at > stale_after:
+            stale += 1
+    supervised = home = 0
+    for t in turns:
+        if not t.get("questionType"):
+            continue
+        at = parse_at(t["turnAt"])
+        if (period_start is not None and at < period_start) or at > now:
+            continue
+        if t.get("provenance") == "supervised":
+            supervised += 1
+        else:
+            home += 1
+    return Reliability(stale, supervised, home)
+
+
 def stamps_needed_to_pass(sc: Score) -> tuple[int, int] | None:
     """(extra core stamps, resulting grade) with u and d held as they are."""
     if sc.core_total == 0:
