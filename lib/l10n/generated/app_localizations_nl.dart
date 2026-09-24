@@ -302,7 +302,7 @@ class AppLocalizationsNl extends AppLocalizations {
     int supervised,
     int home,
   ) {
-    return 'Verouderd: $stale leerdoelen (nooit bevraagd: $never). Beurten deze periode: $supervised onder toezicht, $home thuis.';
+    return 'Verouderd: $stale leerdoelen (nooit bevraagd: $never). Oefeningen deze periode: $supervised onder toezicht, $home thuis.';
   }
 
   @override
