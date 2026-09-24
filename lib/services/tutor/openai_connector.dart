@@ -626,8 +626,24 @@ class OpenaiConnector {
     }
   }
 
+  /// Records an exchange the app answered itself, without a call (#186): a
+  /// multiple-choice pick on a bank question, graded from its answer key.
+  /// It lands where the call it replaces would have left it — the user turn
+  /// under [inputs], then the reply — so the history of the exercise, the
+  /// session and a later status report reads the same either way.
+  void addExchange({
+    required String input,
+    required ChatResponse response,
+    PreviousInputs inputs = PreviousInputs.exercise,
+  }) {
+    _recordUserTurn(input, inputs);
+    addResponse(response);
+  }
+
   /// If you need to manually start a fresh session boundary. A new session
-  /// starts a new exercise too.
+  /// starts a new exercise too. A question put in front of the student
+  /// without a generation call — one from the question bank (#186) — opens
+  /// its exercise with this, as the generation call would have.
   void startNewSession() {
     _sessionHistory.clear();
     _exerciseHistory.clear();

@@ -11,6 +11,8 @@ PersistedTurnRecord _record({
   String? clientVersion,
   TurnUsage? usage,
   String? questionId,
+  bool fromBank = false,
+  bool gradedByKey = false,
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
   List<TurnReviewFlag> reviewFlags = const [],
@@ -22,6 +24,8 @@ PersistedTurnRecord _record({
   clientVersion: clientVersion,
   usage: usage,
   questionId: questionId,
+  fromBank: fromBank,
+  gradedByKey: gradedByKey,
   reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   isRecheck: isRecheck,
@@ -230,6 +234,39 @@ void main() {
       final map = _record(questionId: 's1_abc123').toMap(uid: 'u1');
       expect(map['questionId'], 's1_abc123');
       expect(PersistedTurnRecord.fromCosmos(map).questionId, 's1_abc123');
+    });
+  });
+
+  group('PersistedTurnRecord fromBank / gradedByKey (#186)', () {
+    test('a generated question graded by the model writes neither flag and '
+        'reads back false — as does every doc from before the bank served', () {
+      final map = _record(questionId: 's1_abc').toMap(uid: 'u1');
+      expect(map.containsKey('fromBank'), isFalse);
+      expect(map.containsKey('gradedByKey'), isFalse);
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.fromBank, isFalse);
+      expect(back.gradedByKey, isFalse);
+    });
+
+    test('a bank question, and a pick graded by its key, are written and '
+        'read back', () {
+      final map = _record(
+        questionId: 's1_abc',
+        fromBank: true,
+        gradedByKey: true,
+      ).toMap(uid: 'u1');
+      expect(map['fromBank'], isTrue);
+      expect(map['gradedByKey'], isTrue);
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.fromBank, isTrue);
+      expect(back.gradedByKey, isTrue);
+
+      final byModel = _record(
+        questionId: 's1_abc',
+        fromBank: true,
+      ).toMap(uid: 'u1');
+      expect(byModel['fromBank'], isTrue);
+      expect(byModel.containsKey('gradedByKey'), isFalse);
     });
   });
 

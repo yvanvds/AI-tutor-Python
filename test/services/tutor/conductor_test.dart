@@ -1599,6 +1599,132 @@ void main() {
   });
 
   // ---- §7 mid-flight curriculum / orphans ----------------------------------
+  group("#186 a pick graded from a bank question's answer key", () {
+    const lo = LearningObjective(
+      id: 'lo',
+      statement: 'lo',
+      kind: LoKind.recall,
+    );
+
+    Future<({Conductor c, _Fakes f})> setup() async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 0,
+        objectives: const [lo],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.hard,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    const plan = QuestionPlan(
+      type: ChatRequestType.mcQuestion,
+      difficulty: QuestionDifficulty.hard,
+      targetLOs: [lo],
+      reason: TurnSelectionReason(
+        candidateLOs: [],
+        chosenReason: 'test',
+        notchDropFired: false,
+      ),
+    );
+
+    GradedAnswer byKey({required bool correct}) => GradedAnswer(
+      overallQuality: correct ? AnswerQuality.correct : AnswerQuality.wrong,
+      signals: [
+        GradedSignal(
+          subgoalId: 's',
+          loId: 'lo',
+          kind: correct ? LoSignalKind.positive : LoSignalKind.negative,
+          strength: correct
+              ? LoSignalStrength.strong
+              : LoSignalStrength.moderate,
+        ),
+      ],
+      fromAnswerKey: true,
+    );
+
+    test('is integrated like any direct probe: the level weighs it, both '
+        'ratchets move, the calibration window takes it', () async {
+      final (:c, :f) = await setup();
+      c.notePlannedQuestion(plan);
+
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: byKey(correct: true),
+      );
+
+      final b = f.beliefs.values.single;
+      // strong 2.0 x hard 1.4 on a positive.
+      expect(b.alpha, closeTo(1 + 2.8, 1e-9));
+      expect(b.beta, closeTo(1.0, 1e-9));
+      expect(b.lastPositiveAtCalibratedAt, isNotNull);
+      expect(b.highestPositiveDifficulty, QuestionDifficulty.hard);
+      expect(b.lastQuestionType, 'mcQuestion');
+      expect(f.calibration.recentAnswers, hasLength(1));
+      expect(
+        f.calibration.recentAnswers.single.difficulty,
+        QuestionDifficulty.hard,
+      );
+      expect(outcome.hadFallback, isFalse);
+
+      c.notePlannedQuestion(plan);
+      await c.integrateAnswer(plan: plan, answer: byKey(correct: false));
+      // moderate 1.0 x hard 0.6 on a negative.
+      expect(f.beliefs.values.single.beta, closeTo(1 + 0.6, 1e-9));
+    });
+
+    test('is not a grading call: it stays out of the degraded-mode window, '
+        'which watches the grader', () async {
+      final (:c, :f) = await setup();
+      const fallback = GradedAnswer(
+        overallQuality: AnswerQuality.wrong,
+        signals: [
+          GradedSignal(
+            subgoalId: 's',
+            loId: 'lo',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.weak,
+          ),
+        ],
+        hadFallback: true,
+      );
+      Future<TurnOutcome> grade(GradedAnswer a) {
+        c.notePlannedQuestion(plan);
+        return c.integrateAnswer(plan: plan, answer: a);
+      }
+
+      // Grading calls F . . . F F — three of the last five grading calls
+      // fell back, with three key grades in between. Counted together the
+      // window would read [K, K, K, F, F] and miss it.
+      await grade(fallback);
+      for (var i = 0; i < 3; i++) {
+        expect((await grade(byKey(correct: true))).degraded, isFalse);
+      }
+      expect((await grade(fallback)).degraded, isFalse);
+      final last = await grade(fallback);
+      expect(last.degraded, isTrue);
+      expect(c.isDegraded, isTrue);
+      expect(
+        last.signalEvents.map((e) => e.kind),
+        contains(TurnSignalEventKind.sustainedLlmFailure),
+      );
+      expect(f.beliefs, isNotEmpty);
+    });
+  });
+
   group('§7.5 follow-up grader emits orphan signal', () {
     test('signal on a deleted/orphan LO is dropped via scope check', () async {
       // GradedAnswerBuilder is the validation entry point per LLM_CONTRACT.

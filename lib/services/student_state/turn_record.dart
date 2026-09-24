@@ -316,6 +316,18 @@ class PersistedTurnRecord {
   /// to tell which bank questions a student already had.
   final String? questionId;
 
+  /// Whether the question came out of the question bank instead of a
+  /// generation call (#186, CONDUCTOR_POLICY §2.7). Omitted when false.
+  final bool fromBank;
+
+  /// Whether the verdict and the target LO's signal came from the bank's
+  /// answer key rather than from the grader (#186): a multiple-choice pick
+  /// on a bank question, `positive`/`strong` when it is the key and
+  /// `negative`/`moderate` when it is not. False — and omitted — for every
+  /// grade the grader made, including a bank question's pick the grader
+  /// judged against the key.
+  final bool gradedByKey;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -362,6 +374,8 @@ class PersistedTurnRecord {
     this.clientVersion,
     this.usage,
     this.questionId,
+    this.fromBank = false,
+    this.gradedByKey = false,
   });
 
   bool get hasStrongEvent =>
@@ -390,6 +404,8 @@ class PersistedTurnRecord {
     if (clientVersion != null) 'clientVersion': clientVersion,
     if (usage != null) 'usage': usage!.toJson(),
     if (questionId != null) 'questionId': questionId,
+    if (fromBank) 'fromBank': true,
+    if (gradedByKey) 'gradedByKey': true,
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -470,6 +486,8 @@ class PersistedTurnRecord {
       clientVersion: doc['clientVersion'] as String?,
       usage: TurnUsage.tryFromJson(doc['usage']),
       questionId: doc['questionId'] as String?,
+      fromBank: (doc['fromBank'] as bool?) ?? false,
+      gradedByKey: (doc['gradedByKey'] as bool?) ?? false,
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

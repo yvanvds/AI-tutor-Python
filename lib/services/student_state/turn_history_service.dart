@@ -170,6 +170,32 @@ class TurnHistoryService {
     });
   }
 
+  /// The question bank ids of every question the current student answered
+  /// on [subgoalId] (#186): what the conductor must not serve them again.
+  /// A record's `questionId` names a question of its own `subgoalId` — the
+  /// older one for a warm-up review or a recheck, as in the bank. Empty
+  /// when nobody is signed in. Throws, like the other reads: the tutor
+  /// treats a failure as "unknown" and generates instead.
+  Future<Set<String>> listQuestionIdsFor(String subgoalId) async {
+    final uid = _uid;
+    if (uid == null) return const {};
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.uid, c.subgoalId, c.questionId FROM c '
+        'WHERE c.uid = @uid AND c.subgoalId = @sid '
+        'AND IS_DEFINED(c.questionId)',
+        parameters: {'@uid': uid, '@sid': subgoalId},
+        partitionKey: uid,
+      );
+      return {
+        for (final doc in docs)
+          // Re-applied client-side, as in [listTurnsBetween].
+          if (doc['uid'] == uid && doc['subgoalId'] == subgoalId)
+            if (doc['questionId'] case final String id) id,
+      };
+    });
+  }
+
   /// The token usage of every student's turn records since [from] (#183),
   /// read teacher-side for the usage card on the Students page. Records
   /// without a usage block — audit stubs, docs written before the field

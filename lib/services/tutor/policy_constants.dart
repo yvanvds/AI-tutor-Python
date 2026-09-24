@@ -166,6 +166,27 @@ class PolicyConstants {
   /// slot needs to once per this many questions.
   static const int recheckSpacing = 5;
 
+  // ---- Question bank (CONDUCTOR_POLICY §2.7, #186) -------------------------
+
+  /// How many bank questions must fit a plan — its subgoal, target LO,
+  /// type, difficulty and language, active, and not yet asked of this
+  /// student — before an ordinary question may come from the bank. Below
+  /// it the conductor generates, so the bank keeps growing per level and
+  /// students do not all get the same few. `config/global`'s
+  /// `QuestionBankMinimum` overrides it.
+  static const int bankMinimum = 8;
+
+  /// The chance that an ordinary question the bank could serve is taken
+  /// from it rather than generated: the mix keeps new questions coming.
+  /// `config/global`'s `QuestionBankShare` overrides it; 0 switches serving
+  /// from the bank off.
+  static const double bankShare = 0.5;
+
+  /// A warm-up review (§1.5) or a recheck (§2.6) is taken from the bank
+  /// whenever one question fits — no minimum, no mix: one short question on
+  /// older material, and the bank has it at once and for no tokens.
+  static const int bankMinimumOffSubgoal = 1;
+
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------
 
   /// Recent-answer window size on the account doc.

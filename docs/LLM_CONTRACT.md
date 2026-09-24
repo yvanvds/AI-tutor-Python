@@ -78,6 +78,14 @@ back: the grader's exercise history carries the question without it, as
 before. A letter past the last option, or a value that is neither a letter
 nor an option's text, is no key.
 
+A question served from the bank (#186, conductor policy 2.7) makes no
+generation call at all. A multiple-choice pick on one is graded by its key
+on the student's machine; the one `mcqAnswer` call it can still cost — for
+the feedback text of an option no student picked before — is a grading
+call like any other, on the exercise's own exchange (the bank question is
+its first entry), and its `overallQuality` is compared with the key: if the
+two disagree, its grade stands and the bank stops serving the question.
+
 The conductor may request a question that probes a single LO or
 multiple LOs. The LLM should weight the question to those LOs but is
 not forbidden from incidentally probing others.

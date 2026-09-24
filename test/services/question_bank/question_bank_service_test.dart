@@ -117,6 +117,25 @@ class _SlowContainer implements CosmosContainer {
   }) => _inner.executeBatch(ops, partitionKey: partitionKey);
 }
 
+/// A container whose queries are answered by [answer] — one that hangs, or
+/// one that fails — counting them; everything else goes to [_inner].
+class _QueryContainer extends _SlowContainer {
+  _QueryContainer(super.inner, this.answer);
+  final Future<List<Map<String, dynamic>>> Function() answer;
+  int queries = 0;
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String sql, {
+    Map<String, Object?> parameters = const {},
+    Object? partitionKey,
+    bool crossPartition = false,
+  }) {
+    queries++;
+    return answer();
+  }
+}
+
 void main() {
   late InMemoryCosmos store;
   late DateTime now;
@@ -322,6 +341,24 @@ void main() {
       expect(missing.writes, isEmpty);
     });
 
+    test(
+      'the tutor-side read (#186) says "unknown" instead of throwing, and '
+      'backs off like the writes: neither is tried again for a while',
+      () async {
+        expect(await bank.listServable('s1'), isNull);
+        final afterFirst = missing.requests.length;
+        expect(afterFirst, greaterThan(0));
+
+        expect(await bank.listServable('s1'), isNull);
+        await bank.recordAsked(_mcq());
+        expect(missing.requests.length, afterFirst);
+
+        now = now.add(kQuestionBankRetryAfter);
+        expect(await bank.listServable('s1'), isNull);
+        expect(missing.requests.length, greaterThan(afterFirst));
+      },
+    );
+
     test('the teacher-side reads throw a ContainerNotFound the page can '
         'name', () async {
       await expectLater(
@@ -366,6 +403,53 @@ void main() {
       );
       expect(await bank.get('s2_nothing', subgoalId: 's2'), isNull);
     });
+
+    test('listServable (#186) reads the questions of one subgoal that may '
+        'be served', () async {
+      final shown = _code('Maak x vijf.');
+      final hidden = _code('Maak x tien.');
+      for (final q in [shown, hidden, _mcq(subgoalId: 's2')]) {
+        await bank.recordAsked(q);
+      }
+      await bank.setHidden(hidden, true);
+
+      expect((await bank.listServable('s1'))!.map((q) => q.id), [shown.id]);
+      expect(await bank.listServable('s3'), isEmpty);
+    });
+
+    test(
+      'listServable gives up on a bank that does not answer in time and '
+      'leaves it alone for a while; an ordinary error is only logged',
+      () async {
+        final hanging = _QueryContainer(
+          store.container,
+          () => Completer<List<Map<String, dynamic>>>().future,
+        );
+        final slowBank = QuestionBankService(
+          container: hanging,
+          now: () => now,
+          readTimeout: const Duration(milliseconds: 20),
+        );
+        expect(await slowBank.listServable('s1'), isNull);
+        expect(await slowBank.listServable('s1'), isNull);
+        expect(hanging.queries, 1, reason: 'backed off after the timeout');
+        now = now.add(kQuestionBankRetryAfter);
+        expect(await slowBank.listServable('s1'), isNull);
+        expect(hanging.queries, 2);
+
+        final failing = _QueryContainer(
+          store.container,
+          () async => throw CosmosException(500, 'Internal Server Error'),
+        );
+        final failingBank = QuestionBankService(
+          container: failing,
+          now: () => now,
+        );
+        expect(await failingBank.listServable('s1'), isNull);
+        expect(await failingBank.listServable('s1'), isNull);
+        expect(failing.queries, 2, reason: 'no back-off for a passing error');
+      },
+    );
 
     test('listSummaries names every question with its subgoal, status and '
         'whether it was reviewed', () async {

@@ -162,4 +162,41 @@ void main() {
     expect(c.sessionHistory, isEmpty);
     expect(c.allHistory, hasLength(4));
   });
+
+  test(
+    'a bank question opens its exercise without a call, and a pick the '
+    'app graded itself lands where the grading call would have (#186)',
+    () async {
+      await exercise('print(___)', 'a1');
+
+      // The bank question: a new exercise, the question its first entry.
+      c.startNewSession();
+      final banked = _question('x = ___');
+      c.addResponse(banked);
+      c.addExchange(
+        input: 'antwoord 5',
+        response: Answer(type: 'answer', prompt: 'graded 5'),
+      );
+
+      expect(c.exerciseHistory.map((m) => m['role']), [
+        'assistant',
+        'user',
+        'assistant',
+      ]);
+      expect(c.exerciseHistory.first['content'], _json(banked));
+      expect(c.exerciseHistory[1]['content'], 'antwoord 5');
+      expect(c.sessionHistory, hasLength(3));
+
+      // The status report reads it with the rest.
+      await c.sendRequest(
+        instructions: 'sys',
+        input: 'status',
+        inputs: PreviousInputs.includeAll,
+      );
+      expect(openai.requests, hasLength(3), reason: 'no call of its own');
+      final sent = _sent(openai, 2);
+      expect(sent, contains('user: antwoord 5'));
+      expect(sent, contains('assistant: ${_json(banked)}'));
+    },
+  );
 }

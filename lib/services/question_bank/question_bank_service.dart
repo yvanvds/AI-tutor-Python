@@ -3,13 +3,15 @@
 //
 // Two kinds of caller, two error contracts:
 //
-//   - The tutor, on a student's machine: [recordAsked] when a question is
-//     put in front of the student, [recordAnswer] when the answer to it is
-//     graded. Best-effort, like the turn history: a failure is logged and
-//     swallowed, never thrown, and the tutor does not wait for either — a
-//     bank that is slow, down, or not created yet must not break or delay an
-//     exercise. The writes of one app run are queued, so the answer to a
-//     question can never overtake the write that stores it.
+//   - The tutor, on a student's machine: [listServable] when it considers
+//     serving a question from the bank (#186), [recordAsked] when a question
+//     is put in front of the student, [recordAnswer] when the answer to it
+//     is graded. Best-effort, like the turn history: a failure is logged and
+//     swallowed, never thrown, the tutor does not wait for either write, and
+//     the read gives up after [kQuestionBankReadTimeout] — a bank that is
+//     slow, down, or not created yet must not break or delay an exercise.
+//     The writes of one app run are queued, so the answer to a question can
+//     never overtake the write that stores it.
 //   - The teacher's Questions page: listing and the review actions throw,
 //     so the page can say what went wrong — in particular that the
 //     container does not exist yet ([CosmosException.isContainerNotFound]).
@@ -45,13 +47,25 @@ typedef BankQuestionSummary = ({
   bool reviewed,
 });
 
+/// How long the tutor waits for the bank before it generates the question
+/// instead (#186). A bank read normally takes a fraction of this; one that
+/// takes longer is a bank that does not answer, and the question must not
+/// wait for it.
+const Duration kQuestionBankReadTimeout = Duration(seconds: 2);
+
 class QuestionBankService {
-  QuestionBankService({CosmosContainer? container, DateTime Function()? now})
-    : _containerOverride = container,
-      _now = now ?? (() => DateTime.now().toUtc());
+  QuestionBankService({
+    CosmosContainer? container,
+    DateTime Function()? now,
+    this.readTimeout = kQuestionBankReadTimeout,
+  }) : _containerOverride = container,
+       _now = now ?? (() => DateTime.now().toUtc());
 
   final CosmosContainer? _containerOverride;
   final DateTime Function() _now;
+
+  /// How long [listServable] waits (#186); a test shortens it.
+  final Duration readTimeout;
 
   CosmosContainer get _container =>
       _containerOverride ?? CosmosPaths.questions();
@@ -133,6 +147,35 @@ class QuestionBankService {
     });
   });
 
+  /// The questions of [subgoalId] the tutor may serve (#186): the active
+  /// ones, as [listForSubgoal] reads them — or `null` when the bank cannot
+  /// say. Best-effort like the writes: a missing container, a failure or a
+  /// bank that does not answer within [readTimeout] is logged and swallowed,
+  /// and the tutor generates the question instead. A missing container or
+  /// a read that timed out leaves the bank alone — reads and writes — for
+  /// [kQuestionBankRetryAfter], so the questions of a lesson do not each
+  /// wait for it again.
+  Future<List<BankQuestion>?> listServable(String subgoalId) async {
+    if (!_available) return null;
+    try {
+      return await listForSubgoal(
+        subgoalId,
+        activeOnly: true,
+      ).timeout(readTimeout);
+    } on TimeoutException {
+      _pause('the bank did not answer within ${readTimeout.inMilliseconds} ms');
+    } on CosmosException catch (e) {
+      if (e.isContainerNotFound) {
+        _pause('no `questions` container — create it (README step 3). $e');
+      } else {
+        debugPrint('QuestionBankService: listServable failed: $e');
+      }
+    } catch (e) {
+      debugPrint('QuestionBankService: listServable failed: $e');
+    }
+    return null;
+  }
+
   /// Waits for every write queued so far. For tests.
   @visibleForTesting
   Future<void> get idle => _tail;
@@ -143,19 +186,27 @@ class QuestionBankService {
     return run;
   }
 
-  Future<void> _bestEffort(String what, Future<void> Function() write) async {
+  bool get _available {
     final until = _unavailableUntil;
-    if (until != null && _now().isBefore(until)) return;
+    return until == null || !_now().isBefore(until);
+  }
+
+  /// Leaves the bank alone for [kQuestionBankRetryAfter], and says why.
+  void _pause(String why) {
+    _unavailableUntil = _now().add(kQuestionBankRetryAfter);
+    debugPrint(
+      'QuestionBankService: $why — the question bank is not used for the '
+      'next ${kQuestionBankRetryAfter.inMinutes} minutes.',
+    );
+  }
+
+  Future<void> _bestEffort(String what, Future<void> Function() write) async {
+    if (!_available) return;
     try {
       await safeCosmos(write);
     } on CosmosException catch (e) {
       if (e.isContainerNotFound) {
-        _unavailableUntil = _now().add(kQuestionBankRetryAfter);
-        debugPrint(
-          'QuestionBankService: no `questions` container — questions are '
-          'not stored for the next ${kQuestionBankRetryAfter.inMinutes} '
-          'minutes. Create it (README step 3). $e',
-        );
+        _pause('no `questions` container — create it (README step 3). $e');
         return;
       }
       debugPrint('QuestionBankService: $what failed: $e');

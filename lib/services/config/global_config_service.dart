@@ -61,8 +61,11 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
         model: model,
         apiKey: storedConfig.apiKey,
         // The minimum version (#165) is the portal's to set, like the key;
-        // this writer carries it and never decides it.
+        // this writer carries it and never decides it. So are the question
+        // bank's mix (#186).
         minimumVersion: storedConfig.minimumVersion,
+        questionBankMinimum: storedConfig.questionBankMinimum,
+        questionBankShare: storedConfig.questionBankShare,
       );
       final base = Map<String, dynamic>.from(stored ?? const {})
         // Cosmos owns `_rid`, `_etag`, `_ts`…; echoing them back is at best
