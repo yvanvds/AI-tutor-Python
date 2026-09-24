@@ -20,10 +20,13 @@
 // Run just this flow:
 //   flutter test integration_test/flows/warm_up_review.dart -d windows
 
+import 'dart:convert';
+
 import 'package:ai_tutor_python/features/chat/widgets/chat_system_pill.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
+import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -214,6 +217,22 @@ void main() {
       1.0,
     );
     expect(harness.llm!.remaining, 0);
+
+    // #184: the warm-up's grade read the warm-up question (its exercise,
+    // nothing else), and the next question request named it under the old
+    // LO so the model does not ask it again.
+    final llm = harness.llm!;
+    expect(llm.sentScopes, const [
+      PreviousInputs.newSession,
+      PreviousInputs.exercise,
+      PreviousInputs.newSession,
+    ]);
+    expect(llm.sentHistories[1].single['content'], contains(kWarmUpExercise));
+    expect(
+      (jsonDecode(llm.sentInputs[2])
+          as Map<String, dynamic>)['recent_questions'],
+      ['complete_code | lo-print | Even opwarmen: toon een tekst. `print(___)`'],
+    );
 
     await harness.dispose(tester);
   });

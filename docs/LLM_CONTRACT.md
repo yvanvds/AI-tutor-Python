@@ -55,6 +55,15 @@ Inputs:
   difficulty.
 - `questionType` — `mcQuestion | writeCode | completeCode | explainCode
   | socraticQuestion | guidingQuestion`. Picked by policy.
+- `recentQuestions` (`recent_questions` in the request, #184) — the last
+  12 questions asked this session, oldest first, one line each:
+  `type | loId | core`, where `core` is the question's prompt with its
+  code on one line, cut at 160 characters (`RecentQuestions`). Omitted
+  before the first question. Generation carries no conversation history
+  (see "Conversation history"), so this block is what the model knows
+  about what it asked before; the teacher-authored question instructions
+  point at it for "do not repeat yourself". Kept by the app, dropped on
+  sign-out.
 
 Outputs: same envelope as today, the META payload matches the existing
 per-question-type schema (MCQ options, code snippet, prompt text, etc.).
@@ -99,6 +108,24 @@ LO with its `subgoalId`. Nothing else in the contract changes: the
 grader emits the same shape, `goalScopeLOs` is the same root-wide list,
 and the scope check (below) accepts the signal because the older subgoal
 is in scope.
+
+### Conversation history (#184)
+
+Every call carries the system prompt and its input; what sits between
+them is set per request type (`PreviousInputs`):
+
+- **Question generation** — none (`newSession`). The call opens a new
+  exercise; earlier questions reach the model through `recentQuestions`.
+- **Grading, hints, follow-ups, student and content questions** — the
+  current exercise's own exchange (`exercise`): the question as the
+  generator returned it (its META as JSON), then every turn since — a
+  hint asked for, the answer, the grade. Nothing of earlier exercises:
+  what the grader needs about older subgoals is in `goalScopeLOs`.
+- **Status report** — everything recorded (`includeAll`, capped at 50
+  messages).
+
+A question put in front of the student without a generation call has to
+open the exercise itself, with that question as its first entry.
 
 ### Content question (#132)
 

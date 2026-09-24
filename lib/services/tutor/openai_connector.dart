@@ -14,7 +14,28 @@ import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-enum PreviousInputs { includeAll, includeSession, newSession }
+/// How much of the conversation a call carries in front of its input.
+enum PreviousInputs {
+  /// Every recorded turn, across sessions (capped). The status report.
+  includeAll,
+
+  /// Every turn since the session began: the last call on [newSession].
+  includeSession,
+
+  /// The current exercise's own exchange (#184): every turn since the
+  /// exercise's question was asked. The question generation that opens an
+  /// exercise goes out on [newSession], so its reply — the question itself
+  /// — is the exercise's first entry. A grader, a hint or a follow-up sees
+  /// that question and what was said about it since, and nothing of the
+  /// exercises before. A question put in front of the student without a
+  /// generation call has to open the exercise itself.
+  exercise,
+
+  /// No history at all. The call starts a new session, and with it a new
+  /// exercise. Question generation: what was asked earlier reaches the
+  /// model through the request's `recent_questions` block instead (#184).
+  newSession,
+}
 
 sealed class ConnectorResult {
   const ConnectorResult();
@@ -209,10 +230,12 @@ class OpenaiConnector {
   String? _previousInput;
   PreviousInputs _previousScope = PreviousInputs.includeSession;
 
-  // Full history (spans sessions) and current-session history.
+  // Full history (spans sessions), current-session history and the current
+  // exercise's history (#184).
   // Each entry is `{role: user|assistant, content: ...}`.
   final List<Map<String, String>> _allHistory = [];
   final List<Map<String, String>> _sessionHistory = [];
+  final List<Map<String, String>> _exerciseHistory = [];
 
   Future<ConnectorResult> sendRequest({
     required String instructions,
@@ -223,11 +246,11 @@ class OpenaiConnector {
     _rememberForResend(instructions, input, inputs);
     OpenAI.requestsTimeOut = const Duration(seconds: 60);
 
-    if (inputs == PreviousInputs.newSession) {
-      _sessionHistory.clear();
-    }
-
-    final messages = _buildMessages(instructions, _historyFor(inputs), input);
+    final messages = _buildMessages(
+      instructions,
+      historyForCall(inputs),
+      input,
+    );
 
     try {
       // Inside the try on purpose: an account with no key to call with
@@ -275,11 +298,11 @@ class OpenaiConnector {
     _rememberForResend(instructions, input, inputs);
     OpenAI.requestsTimeOut = const Duration(seconds: 60);
 
-    if (inputs == PreviousInputs.newSession) {
-      _sessionHistory.clear();
-    }
-
-    final messages = _buildMessages(instructions, _historyFor(inputs), input);
+    final messages = _buildMessages(
+      instructions,
+      historyForCall(inputs),
+      input,
+    );
 
     // Opening the stream is deferred into the generator so a synchronous
     // throw from `createStream` (bad key, bad model) — and an account with
@@ -546,15 +569,33 @@ class OpenaiConnector {
   void addResponse(ChatResponse response) {
     if (response is ErrorResponse) return;
     final jsonString = jsonEncode(response.toJson());
-    _allHistory.add({'role': 'assistant', 'content': jsonString});
-    _sessionHistory.add({'role': 'assistant', 'content': jsonString});
-    _trim(_allHistory);
-    _trim(_sessionHistory);
+    for (final list in [_allHistory, _sessionHistory, _exerciseHistory]) {
+      list.add({'role': 'assistant', 'content': jsonString});
+      _trim(list);
+    }
   }
 
-  /// If you need to manually start a fresh session boundary.
+  /// If you need to manually start a fresh session boundary. A new session
+  /// starts a new exercise too.
   void startNewSession() {
     _sessionHistory.clear();
+    _exerciseHistory.clear();
+  }
+
+  /// The history a call on [inputs] goes out with. A call on
+  /// [PreviousInputs.newSession] starts over first: the session and the
+  /// exercise both begin again with it (#184).
+  ///
+  /// Shared by both call shapes, and by stand-ins that replace the
+  /// transport but keep the bookkeeping — the integration harness's
+  /// `ScriptedLlm` records what each scripted call would have carried.
+  @protected
+  List<Map<String, String>> historyForCall(PreviousInputs inputs) {
+    if (inputs == PreviousInputs.newSession) {
+      _sessionHistory.clear();
+      _exerciseHistory.clear();
+    }
+    return _historyFor(inputs);
   }
 
   // ---- Private helpers ------------------------------------------------------
@@ -646,13 +687,21 @@ class OpenaiConnector {
     return content.map((c) => c.text ?? '').join();
   }
 
+  /// A call on [PreviousInputs.newSession] opens a session and an exercise
+  /// with its *reply*: its own input (the question request) stays out of
+  /// both, so an exercise starts with the question the model asked.
   void _recordUserTurn(String input, PreviousInputs inputs) {
-    if (inputs != PreviousInputs.newSession) {
-      _sessionHistory.add({'role': 'user', 'content': input});
-      _trim(_sessionHistory);
+    final lists = [
+      _allHistory,
+      if (inputs != PreviousInputs.newSession) ...[
+        _sessionHistory,
+        _exerciseHistory,
+      ],
+    ];
+    for (final list in lists) {
+      list.add({'role': 'user', 'content': input});
+      _trim(list);
     }
-    _allHistory.add({'role': 'user', 'content': input});
-    _trim(_allHistory);
   }
 
   void _trim(List<Map<String, String>> list) {
@@ -667,6 +716,8 @@ class OpenaiConnector {
         return List<Map<String, String>>.from(_allHistory);
       case PreviousInputs.includeSession:
         return List<Map<String, String>>.from(_sessionHistory);
+      case PreviousInputs.exercise:
+        return List<Map<String, String>>.from(_exerciseHistory);
       case PreviousInputs.newSession:
         return const <Map<String, String>>[];
     }
@@ -676,4 +727,6 @@ class OpenaiConnector {
   List<Map<String, String>> get allHistory => List.unmodifiable(_allHistory);
   List<Map<String, String>> get sessionHistory =>
       List.unmodifiable(_sessionHistory);
+  List<Map<String, String>> get exerciseHistory =>
+      List.unmodifiable(_exerciseHistory);
 }

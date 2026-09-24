@@ -29,6 +29,7 @@ import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
+import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
@@ -92,6 +93,7 @@ void main() {
   editor_gutter_alignment.main();
   practice_complete_code.main();
   garbled_reply_retry.main();
+  exercise_history.main();
   evidence_provenance.main();
   difficulty_ratchet.main();
   difficulty_asymmetry.main();

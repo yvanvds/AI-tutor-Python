@@ -96,6 +96,44 @@ void main() {
     expect(m['difficulty'], 'hard');
   });
 
+  test('every question request carries the recent questions, oldest first, '
+      'and omits the block when there are none (#184)', () {
+    const recent = [
+      'complete_code | lo-print | Vul aan. `print(___)`',
+      'multiple_choice | lo-var | Wat toont dit? `x = 3; print(x)`',
+    ];
+    final builders = <String, String Function(List<String> recentQuestions)>{
+      'socratic_question': (r) => QuestionFormatter.socraticQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'multiple_choice': (r) => QuestionFormatter.mcQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'explain_code': (r) => QuestionFormatter.explainCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'complete_code': (r) => QuestionFormatter.completeCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+      'write_code': (r) => QuestionFormatter.writeCodeQuestion(
+        QuestionDifficulty.easy,
+        recentQuestions: r,
+      ),
+    };
+    for (final MapEntry(key: type, value: build) in builders.entries) {
+      final withRecent = jsonDecode(build(recent)) as Map<String, dynamic>;
+      expect(withRecent['request_type'], type);
+      expect(withRecent['recent_questions'], recent, reason: type);
+
+      final without = jsonDecode(build(const [])) as Map<String, dynamic>;
+      expect(without.containsKey('recent_questions'), isFalse, reason: type);
+    }
+  });
+
   test('contentQuestion carries the question and the page as text, and '
       'nothing a grader would read (#132)', () {
     const page = 'Zo toon je iets op het scherm.\n\n```\nprint(1, 2)\n```';

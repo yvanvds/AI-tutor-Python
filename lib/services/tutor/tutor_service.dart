@@ -45,6 +45,7 @@ import 'package:collection/collection.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
+import 'package:ai_tutor_python/services/tutor/recent_questions.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
@@ -81,9 +82,11 @@ class _FollowUpInFlight {
 }
 
 class _RequestInput {
+  /// Every call but question generation and the status report carries the
+  /// current exercise's own exchange, not the session's (#184).
   const _RequestInput(
     this.input, [
-    this.history = PreviousInputs.includeSession,
+    this.history = PreviousInputs.exercise,
     this.streamable = true,
   ]);
   final String input;
@@ -142,6 +145,12 @@ class TutorService extends Notifier<TutorState> {
   String? _curriculumWatchedRootId;
   Map<String, Set<String>> _lastSubgoalLoIds = const {};
 
+  /// The questions asked this session, for the `recent_questions` block of
+  /// the next question request (#184). Kept across a restart or a goal
+  /// switch — the same student is still at the keyboard — and dropped on
+  /// sign-out.
+  final RecentQuestions _recentQuestions = RecentQuestions();
+
   static const int _maxRetriesPerRequest = 1;
   int _retriesLeft = 0;
 
@@ -167,6 +176,7 @@ class TutorService extends Notifier<TutorState> {
     ref.listen<AccountIdentity?>(authServiceProvider, (prev, next) {
       if (next == null) {
         _initialized = false;
+        _recentQuestions.clear();
         _stopCurriculumWatch();
         return;
       }
@@ -761,29 +771,38 @@ class TutorService extends Notifier<TutorState> {
     return _buildGoalScopeLOs(selection);
   }
 
+  /// A question request goes out without history — it opens a new
+  /// exercise — and names the questions asked recently instead, so the
+  /// model can avoid repeating one (#184).
   _RequestInput _buildQuestionRequest(ChatRequestType type, QuestionPlan plan) {
+    final recent = _recentQuestions.lines;
     final input = switch (type) {
       ChatRequestType.socraticQuestion => QuestionFormatter.socraticQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       ChatRequestType.mcQuestion => QuestionFormatter.mcQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       ChatRequestType.explainCodeQuestion =>
         QuestionFormatter.explainCodeQuestion(
           plan.difficulty,
           targetLOs: plan.targetLOs,
+          recentQuestions: recent,
         ),
       ChatRequestType.completeCodeQuestion =>
         QuestionFormatter.completeCodeQuestion(
           plan.difficulty,
           targetLOs: plan.targetLOs,
+          recentQuestions: recent,
         ),
       ChatRequestType.writeCodeQuestion => QuestionFormatter.writeCodeQuestion(
         plan.difficulty,
         targetLOs: plan.targetLOs,
+        recentQuestions: recent,
       ),
       _ => '',
     };
@@ -817,7 +836,7 @@ class TutorService extends Notifier<TutorState> {
 
     final response =
         completed ?? AIResponseParser.parse(accumulated.toString());
-    _connector.addResponse(response);
+    _recordResponse(response);
     _chat.completeStream(_finalTextFor(response, accumulated));
 
     // Streak counter (issue #10): a successful tutor turn marks the day as
@@ -1369,12 +1388,23 @@ class TutorService extends Notifier<TutorState> {
 
   Future<void> _handleResponse(String output) async {
     final parsed = AIResponseParser.parse(output);
-    _connector.addResponse(parsed);
+    _recordResponse(parsed);
     final dispatched = await dispatchResponse(parsed, _nonStreamingContext());
     if (!dispatched) {
       _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.unknownResponse));
       await _maybeRetry();
     }
+  }
+
+  /// Puts [response] on the connector's history and, when it is a
+  /// question, on the list the next question request names (#184) — under
+  /// the LO of the plan it was asked for, which is still in flight here.
+  void _recordResponse(ChatResponse response) {
+    _connector.addResponse(response);
+    _recentQuestions.add(
+      response,
+      loId: _inFlightPlan?.targetLOs.firstOrNull?.id,
+    );
   }
 
   void _setFollowUp({String? message, String? code}) {
