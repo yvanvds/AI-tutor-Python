@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -151,6 +152,15 @@ class TutorService extends Notifier<TutorState> {
   /// sign-out.
   final RecentQuestions _recentQuestions = RecentQuestions();
 
+  /// What the calls since the last graded turn cost (#183), handed to the
+  /// next turn record. Dropped on sign-out with the rest of the student's
+  /// session.
+  final UsageLedger _usage = UsageLedger();
+
+  /// The kind of call the turn in flight makes — and its automatic re-send
+  /// with it — for the split on the turn record.
+  UsageCallKind _callKind = UsageCallKind.question;
+
   static const int _maxRetriesPerRequest = 1;
   int _retriesLeft = 0;
 
@@ -177,6 +187,7 @@ class TutorService extends Notifier<TutorState> {
       if (next == null) {
         _initialized = false;
         _recentQuestions.clear();
+        _usage.clear();
         _stopCurriculumWatch();
         return;
       }
@@ -523,6 +534,10 @@ class TutorService extends Notifier<TutorState> {
     if (state != TutorState.idle) return;
     state = TutorState.working;
     _retriesLeft = _maxRetriesPerRequest;
+    // A grade's dispatch asks for the next exercise inside this turn; the
+    // grade's kind is back in place after it, for a re-send of the grade.
+    final enclosingKind = _callKind;
+    _callKind = UsageCallKind.of(type);
 
     var turnOpened = false;
     try {
@@ -625,6 +640,7 @@ class TutorService extends Notifier<TutorState> {
       _inFlightPlan = null;
       _followUpInFlight = null;
     } finally {
+      _callKind = enclosingKind;
       if (turnOpened) _debug.endTurn();
       if (state == TutorState.working) state = TutorState.idle;
     }
@@ -820,10 +836,12 @@ class TutorService extends Notifier<TutorState> {
         case StreamTextDelta(:final text):
           accumulated.write(text);
           _chat.updateStream(accumulated.toString());
-        case StreamCompleted(:final response):
+        case StreamCompleted(:final response, :final usage):
           completed = response;
-        case StreamFailed():
+          _noteUsage(usage);
+        case StreamFailed(:final usage):
           failed = chunk;
+          _noteUsage(usage);
       }
     }
 
@@ -991,6 +1009,9 @@ class TutorService extends Notifier<TutorState> {
       // Which build wrote this (#165): the one thing that tells an
       // out-of-date laptop from old seed data.
       clientVersion: ref.read(appVersionProvider),
+      // What the calls since the last record cost (#183). The grading call
+      // that led here was noted when its reply came in.
+      usage: _usage.take(),
     );
     _debug.recordPersistedTurn(record, followUp: followUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
@@ -1196,12 +1217,27 @@ class TutorService extends Notifier<TutorState> {
 
   Future<void> _processNonStreamingResult(ConnectorResult result) async {
     switch (result) {
-      case ConnectorOk(:final output):
+      case ConnectorOk(:final output, :final usage):
+        _noteUsage(usage);
         await _handleResponse(output);
-      case ConnectorFailure(:final notice):
+      case ConnectorFailure(:final notice, :final usage):
+        _noteUsage(usage);
         _chat.addSystemNotice(_tutorFailed(notice));
         if (_worthRetrying(notice)) await _maybeRetry();
     }
+  }
+
+  /// Puts what a call cost on the ledger the next turn record takes (#183),
+  /// under the kind of call in flight. A reply the connector refused cost
+  /// the same as one it kept, and is counted too.
+  void _noteUsage(CallUsage? usage) {
+    if (usage == null) return;
+    _usage.add(_callKind, usage);
+    _debug.recordEvent('tutor.usage', {
+      'call': _callKind.name,
+      'model': usage.model,
+      ...usage.tokens.toJson(),
+    });
   }
 
   /// Whether the automatic retry can help the turn that just failed with

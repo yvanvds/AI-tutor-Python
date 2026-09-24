@@ -618,6 +618,18 @@
   "accounts_status_tooltip_idle": "Geen vooruitgang in de laatste 7 dagen.",
   "accounts_badge_unackTooltip": "Onbevestigde signaaleventjes",
 
+  "accounts_usage_title": "Tokengebruik per klas",
+  "accounts_usage_summary": "{tokens} tokens in de laatste 30 dagen",
+  "accounts_usage_subtitle": "Wat de oproepen van de tutor naar het AI-model verbruikten voor de beoordeelde oefeningen van je leerlingen. Invoer telt de tokens uit de cache niet mee.",
+  "accounts_usage_last7": "Laatste 7 dagen",
+  "accounts_usage_last30": "Laatste 30 dagen",
+  "accounts_usage_class": "KLAS",
+  "accounts_usage_input": "INVOER",
+  "accounts_usage_cached": "GECACHET",
+  "accounts_usage_output": "UITVOER",
+  "accounts_usage_empty": "Geen tokengebruik in de laatste 30 dagen.",
+  "accounts_usage_loadError": "Tokengebruik kon niet geladen worden: {error}",
+
   "drawer_close_tooltip": "Sluiten",
   "drawer_section_goals": "Doelen",
 

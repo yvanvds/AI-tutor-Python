@@ -1,13 +1,15 @@
-// Round trip of the `turn_history` doc fields added by #100.
+// Round trip of the `turn_history` doc fields added by #100 and since.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PersistedTurnRecord _record({
   String? clientVersion,
+  TurnUsage? usage,
   EvidenceProvenance? provenance,
   List<TurnTransferCredit> transferCredits = const [],
   List<TurnReviewFlag> reviewFlags = const [],
@@ -17,6 +19,7 @@ PersistedTurnRecord _record({
   String? activeSubgoalId,
 }) => PersistedTurnRecord(
   clientVersion: clientVersion,
+  usage: usage,
   reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   isRecheck: isRecheck,
@@ -210,6 +213,54 @@ void main() {
       final map = _record(clientVersion: '2.5.0+22').toMap(uid: 'u1');
       expect(map['clientVersion'], '2.5.0+22');
       expect(PersistedTurnRecord.fromCosmos(map).clientVersion, '2.5.0+22');
+    });
+  });
+
+  group('PersistedTurnRecord usage (#183)', () {
+    test('a record whose calls reported nothing writes no field and reads '
+        'back null — as does every doc from before the field', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('usage'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).usage, isNull);
+    });
+
+    test('the sum, the split per call and the model are written and read '
+        'back', () {
+      const usage = TurnUsage(
+        model: 'gpt-5-mini',
+        byCall: {
+          UsageCallKind.question: TokenUsage(
+            promptTokens: 1200,
+            cachedTokens: 1024,
+            completionTokens: 150,
+          ),
+          UsageCallKind.grading: TokenUsage(
+            promptTokens: 1500,
+            cachedTokens: 1024,
+            completionTokens: 300,
+          ),
+        },
+      );
+      final map = _record(usage: usage).toMap(uid: 'u1');
+      expect(map['usage'], {
+        'model': 'gpt-5-mini',
+        'promptTokens': 2700,
+        'cachedTokens': 2048,
+        'completionTokens': 450,
+        'byCall': {
+          'question': {
+            'promptTokens': 1200,
+            'cachedTokens': 1024,
+            'completionTokens': 150,
+          },
+          'grading': {
+            'promptTokens': 1500,
+            'cachedTokens': 1024,
+            'completionTokens': 300,
+          },
+        },
+      });
+      expect(PersistedTurnRecord.fromCosmos(map).usage, usage);
     });
   });
 }

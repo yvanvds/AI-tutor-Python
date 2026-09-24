@@ -14,12 +14,24 @@ import 'package:http/testing.dart';
 /// [answer] decides the response. The default answers every request with
 /// [text], in whichever shape the request asked for: one SSE stream for a
 /// `stream: true` body (the tutor's question turns), a plain completion
-/// otherwise (the grader, the status report, the Test button).
+/// otherwise (the grader, the status report, the Test button). Like
+/// OpenAI, it puts [usage] on a completion, and on a stream only when the
+/// request asked for it (`stream_options.include_usage`, #183).
 class FakeOpenAi {
-  FakeOpenAi({this.text = 'OK'});
+  FakeOpenAi({this.text = 'OK', this.usage = defaultUsage});
 
   /// The assistant text a default [answer] replies with.
   String text;
+
+  /// The `usage` block a default [answer] reports (#183).
+  Map<String, dynamic> usage;
+
+  /// What a reply reports when a test does not say.
+  static const Map<String, dynamic> defaultUsage = {
+    'prompt_tokens': 9,
+    'completion_tokens': 1,
+    'total_tokens': 10,
+  };
 
   /// Every request the app made, in order.
   final List<http.Request> requests = <http.Request>[];
@@ -31,29 +43,66 @@ class FakeOpenAi {
   /// What a request is answered with. Reassign to script a refusal
   /// ([unauthorized], [apiError]) or a transport failure (throw).
   late http.Response Function(http.Request request) answer = (req) =>
-      http.Response(
-        wantsStream(req) ? streamed(text) : completion(text),
-        200,
-        headers: const {'content-type': 'application/json'},
-      );
+      reply(req, text, usage: usage);
 
   late final http.Client client = MockClient((req) async {
     requests.add(req);
     return answer(req);
   });
 
-  /// Whether [req] asked for server-sent events.
-  static bool wantsStream(http.Request req) {
+  /// [content] in whichever shape [req] asked for, reporting [usage] where
+  /// OpenAI would: always on a completion, on a stream only when asked.
+  static http.Response reply(
+    http.Request req,
+    String content, {
+    Map<String, dynamic> usage = defaultUsage,
+  }) => http.Response(
+    wantsStream(req)
+        ? streamed(content, usage: wantsUsage(req) ? usage : null)
+        : completion(content, usage: usage),
+    200,
+    headers: const {'content-type': 'application/json'},
+  );
+
+  /// OpenAI's `usage` block (#183). [cached] adds the
+  /// `prompt_tokens_details` a response of a cached prompt carries.
+  static Map<String, dynamic> usageBlock({
+    required int prompt,
+    required int completion,
+    int? cached,
+  }) => {
+    'prompt_tokens': prompt,
+    'completion_tokens': completion,
+    'total_tokens': prompt + completion,
+    if (cached != null)
+      'prompt_tokens_details': {'cached_tokens': cached, 'audio_tokens': 0},
+    'completion_tokens_details': {'reasoning_tokens': 0},
+  };
+
+  static Map<String, dynamic>? _body(http.Request req) {
     try {
-      return (jsonDecode(req.body) as Map<String, dynamic>)['stream'] == true;
+      final decoded = jsonDecode(req.body);
+      return decoded is Map<String, dynamic> ? decoded : null;
     } on FormatException {
-      return false;
+      return null;
     }
+  }
+
+  /// Whether [req] asked for server-sent events.
+  static bool wantsStream(http.Request req) => _body(req)?['stream'] == true;
+
+  /// Whether [req] asked for the usage chunk at the end of its stream.
+  static bool wantsUsage(http.Request req) {
+    final options = _body(req)?['stream_options'];
+    return options is Map && options['include_usage'] == true;
   }
 
   /// A finished chat completion carrying [content], in the shape
   /// `dart_openai` parses.
-  static String completion(String content) => jsonEncode({
+  static String completion(
+    String content, {
+    Map<String, dynamic> usage = defaultUsage,
+  }) => jsonEncode({
     'id': 'chatcmpl-fake',
     'object': 'chat.completion',
     'created': 1700000000,
@@ -65,12 +114,14 @@ class FakeOpenAi {
         'finish_reason': 'stop',
       },
     ],
-    'usage': {'prompt_tokens': 9, 'completion_tokens': 1, 'total_tokens': 10},
+    'usage': usage,
   });
 
   /// The same reply as one SSE chunk followed by the terminator — what a
-  /// `stream: true` request gets back.
-  static String streamed(String content) {
+  /// `stream: true` request gets back. With [usage], the chunk OpenAI sends
+  /// last for a stream that asked for it goes in front of the terminator:
+  /// no choices, the call's usage.
+  static String streamed(String content, {Map<String, dynamic>? usage}) {
     final chunk = jsonEncode({
       'id': 'chatcmpl-fake',
       'object': 'chat.completion.chunk',
@@ -83,8 +134,12 @@ class FakeOpenAi {
           'finish_reason': null,
         },
       ],
+      if (usage != null) 'usage': null,
     });
-    return 'data: $chunk\n\ndata: [DONE]\n\n';
+    final usageChunk = usage == null
+        ? ''
+        : 'data: ${jsonEncode({'id': 'chatcmpl-fake', 'object': 'chat.completion.chunk', 'created': 1700000000, 'model': 'gpt-4o', 'choices': const <Object>[], 'usage': usage})}\n\n';
+    return 'data: $chunk\n\n${usageChunk}data: [DONE]\n\n';
   }
 
   /// OpenAI's error envelope with [status].

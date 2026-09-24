@@ -3476,6 +3476,72 @@ abstract class AppLocalizations {
   /// **'Unacknowledged signal events'**
   String get accounts_badge_unackTooltip;
 
+  /// No description provided for @accounts_usage_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Token usage per class'**
+  String get accounts_usage_title;
+
+  /// No description provided for @accounts_usage_summary.
+  ///
+  /// In en, this message translates to:
+  /// **'{tokens} tokens in the last 30 days'**
+  String accounts_usage_summary(String tokens);
+
+  /// No description provided for @accounts_usage_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What the tutor\'s calls to the AI model used for your students\' graded exercises. Input leaves out the tokens that came from the cache.'**
+  String get accounts_usage_subtitle;
+
+  /// No description provided for @accounts_usage_last7.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get accounts_usage_last7;
+
+  /// No description provided for @accounts_usage_last30.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get accounts_usage_last30;
+
+  /// No description provided for @accounts_usage_class.
+  ///
+  /// In en, this message translates to:
+  /// **'CLASS'**
+  String get accounts_usage_class;
+
+  /// No description provided for @accounts_usage_input.
+  ///
+  /// In en, this message translates to:
+  /// **'INPUT'**
+  String get accounts_usage_input;
+
+  /// No description provided for @accounts_usage_cached.
+  ///
+  /// In en, this message translates to:
+  /// **'CACHED'**
+  String get accounts_usage_cached;
+
+  /// No description provided for @accounts_usage_output.
+  ///
+  /// In en, this message translates to:
+  /// **'OUTPUT'**
+  String get accounts_usage_output;
+
+  /// No description provided for @accounts_usage_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No token usage recorded in the last 30 days.'**
+  String get accounts_usage_empty;
+
+  /// No description provided for @accounts_usage_loadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load token usage: {error}'**
+  String accounts_usage_loadError(String error);
+
   /// No description provided for @drawer_close_tooltip.
   ///
   /// In en, this message translates to:

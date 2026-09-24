@@ -2055,6 +2055,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accounts_badge_unackTooltip => 'Unacknowledged signal events';
 
   @override
+  String get accounts_usage_title => 'Token usage per class';
+
+  @override
+  String accounts_usage_summary(String tokens) {
+    return '$tokens tokens in the last 30 days';
+  }
+
+  @override
+  String get accounts_usage_subtitle =>
+      'What the tutor\'s calls to the AI model used for your students\' graded exercises. Input leaves out the tokens that came from the cache.';
+
+  @override
+  String get accounts_usage_last7 => 'Last 7 days';
+
+  @override
+  String get accounts_usage_last30 => 'Last 30 days';
+
+  @override
+  String get accounts_usage_class => 'CLASS';
+
+  @override
+  String get accounts_usage_input => 'INPUT';
+
+  @override
+  String get accounts_usage_cached => 'CACHED';
+
+  @override
+  String get accounts_usage_output => 'OUTPUT';
+
+  @override
+  String get accounts_usage_empty =>
+      'No token usage recorded in the last 30 days.';
+
+  @override
+  String accounts_usage_loadError(String error) {
+    return 'Could not load token usage: $error';
+  }
+
+  @override
   String get drawer_close_tooltip => 'Close';
 
   @override

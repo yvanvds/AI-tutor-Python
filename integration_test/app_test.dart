@@ -61,6 +61,7 @@ import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
 import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
+import 'flows/token_usage.dart' as token_usage;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/tutor_language.dart' as tutor_language;
@@ -123,6 +124,7 @@ void main() {
   students_sort.main();
   students_sort_persist.main();
   students_view_prefs_persist.main();
+  token_usage.main();
   grade_proposal.main();
   my_reports_tab.main();
   sidebar_rail.main();

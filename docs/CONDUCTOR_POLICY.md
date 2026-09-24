@@ -2043,6 +2043,21 @@ TurnRecord {
       details: object?               // optional, kind-specific payload
     }
   ]
+
+  // What the LLM calls behind this record cost (#183). Every call made
+  // since the previous record: normally the exercise's question, grading,
+  // hints and follow-up; a status report or a question left ungraded rides
+  // along with the next record. Omitted when no call reported usage, and on
+  // docs written before the field existed.
+  usage: {
+    model: string,                   // the model of the last call
+    promptTokens: int,               // OpenAI's prompt_tokens, cached included
+    cachedTokens: int,               // prompt_tokens_details.cached_tokens
+    completionTokens: int,           // reasoning included
+    byCall: {                        // same three counts per kind of call:
+      question?, grading?, followUp?, hint?, dialogue?, status?
+    }
+  }?
 }
 ```
 

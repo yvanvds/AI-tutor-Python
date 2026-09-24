@@ -7,6 +7,7 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 
 class CandidateLoStat {
   final String loId;
@@ -299,6 +300,13 @@ class PersistedTurnRecord {
   /// before the field existed.
   final String? clientVersion;
 
+  /// What the LLM calls behind this record cost, in tokens (#183): the
+  /// question, the grading, a hint, a follow-up — every call made since the
+  /// previous record, split per kind of call, with the model. `null` — and
+  /// omitted — when none reported a usage block, and on every doc written
+  /// before the field existed.
+  final TurnUsage? usage;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -343,6 +351,7 @@ class PersistedTurnRecord {
     this.isRecheck = false,
     this.activeSubgoalId,
     this.clientVersion,
+    this.usage,
   });
 
   bool get hasStrongEvent =>
@@ -369,6 +378,7 @@ class PersistedTurnRecord {
     'appliedSignals': appliedSignals.map((s) => s.toJson()).toList(),
     'provenance': provenance.name,
     if (clientVersion != null) 'clientVersion': clientVersion,
+    if (usage != null) 'usage': usage!.toJson(),
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -447,6 +457,7 @@ class PersistedTurnRecord {
       appliedSignals: const [],
       provenance: EvidenceProvenance.parse(doc['provenance']),
       clientVersion: doc['clientVersion'] as String?,
+      usage: TurnUsage.tryFromJson(doc['usage']),
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:

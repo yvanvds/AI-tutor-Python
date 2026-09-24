@@ -1154,6 +1154,24 @@
   "accounts_status_tooltip_idle": "No progress in the last 7 days.",
   "accounts_badge_unackTooltip": "Unacknowledged signal events",
 
+  "accounts_usage_title": "Token usage per class",
+  "accounts_usage_summary": "{tokens} tokens in the last 30 days",
+  "@accounts_usage_summary": {
+    "placeholders": { "tokens": { "type": "String" } }
+  },
+  "accounts_usage_subtitle": "What the tutor's calls to the AI model used for your students' graded exercises. Input leaves out the tokens that came from the cache.",
+  "accounts_usage_last7": "Last 7 days",
+  "accounts_usage_last30": "Last 30 days",
+  "accounts_usage_class": "CLASS",
+  "accounts_usage_input": "INPUT",
+  "accounts_usage_cached": "CACHED",
+  "accounts_usage_output": "OUTPUT",
+  "accounts_usage_empty": "No token usage recorded in the last 30 days.",
+  "accounts_usage_loadError": "Could not load token usage: {error}",
+  "@accounts_usage_loadError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
   "drawer_close_tooltip": "Close",
   "drawer_section_goals": "Goals",
 

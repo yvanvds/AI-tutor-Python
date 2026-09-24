@@ -2076,6 +2076,45 @@ class AppLocalizationsNl extends AppLocalizations {
   String get accounts_badge_unackTooltip => 'Onbevestigde signaaleventjes';
 
   @override
+  String get accounts_usage_title => 'Tokengebruik per klas';
+
+  @override
+  String accounts_usage_summary(String tokens) {
+    return '$tokens tokens in de laatste 30 dagen';
+  }
+
+  @override
+  String get accounts_usage_subtitle =>
+      'Wat de oproepen van de tutor naar het AI-model verbruikten voor de beoordeelde oefeningen van je leerlingen. Invoer telt de tokens uit de cache niet mee.';
+
+  @override
+  String get accounts_usage_last7 => 'Laatste 7 dagen';
+
+  @override
+  String get accounts_usage_last30 => 'Laatste 30 dagen';
+
+  @override
+  String get accounts_usage_class => 'KLAS';
+
+  @override
+  String get accounts_usage_input => 'INVOER';
+
+  @override
+  String get accounts_usage_cached => 'GECACHET';
+
+  @override
+  String get accounts_usage_output => 'UITVOER';
+
+  @override
+  String get accounts_usage_empty =>
+      'Geen tokengebruik in de laatste 30 dagen.';
+
+  @override
+  String accounts_usage_loadError(String error) {
+    return 'Tokengebruik kon niet geladen worden: $error';
+  }
+
+  @override
   String get drawer_close_tooltip => 'Sluiten';
 
   @override

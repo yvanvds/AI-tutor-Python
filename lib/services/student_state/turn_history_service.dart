@@ -8,11 +8,16 @@ import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// One turn record's token usage (#183): whose it is, when, and what its
+/// calls cost together.
+typedef TurnUsageEntry = ({String uid, DateTime at, TokenUsage tokens});
 
 class TurnHistoryService {
   TurnHistoryService({
@@ -161,6 +166,33 @@ class TurnHistoryService {
         out.add(record);
       }
       out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
+  /// The token usage of every student's turn records since [from] (#183),
+  /// read teacher-side for the usage card on the Students page. Records
+  /// without a usage block — audit stubs, docs written before the field
+  /// existed — are left out.
+  Future<List<TurnUsageEntry>> listUsageSince(DateTime from) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.uid, c.turnAt, c.usage FROM c '
+        'WHERE c.turnAt >= @from AND IS_DEFINED(c.usage)',
+        parameters: {'@from': from.toUtc().toIso8601String()},
+        crossPartition: true,
+      );
+      final out = <TurnUsageEntry>[];
+      for (final doc in docs) {
+        final uid = doc['uid'];
+        final at = DateTime.tryParse('${doc['turnAt']}');
+        final usage = doc['usage'];
+        // The window is re-applied client-side, as in [listTurnsBetween].
+        if (uid is! String || at == null || usage is! Map) continue;
+        if (at.isBefore(from)) continue;
+        // The record's sum sits at the top of the block.
+        out.add((uid: uid, at: at, tokens: TokenUsage.fromJson(usage)));
+      }
       return out;
     });
   }
