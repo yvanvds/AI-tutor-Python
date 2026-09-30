@@ -42,6 +42,11 @@ const _englishBody = '<p>This is how you show something.</p>';
 
 final _dutch = Content(id: 's1', title: _dutchTitle, body: _dutchBody);
 
+/// How [upload] steps real time while the picked file is read, and how long
+/// it waits in all before it gives up (#213).
+const _uploadStep = Duration(milliseconds: 20);
+const _uploadTimeout = Duration(seconds: 20);
+
 const _staleNotice =
     'Outdated: the Dutch lesson changed after this English translation was '
     'made. Update it and save it again.';
@@ -192,15 +197,37 @@ void main() {
     await settle(tester);
   }
 
-  /// Taps Upload and lets the picked file be read: a real read from disk,
-  /// which the fake clock of a widget test does not advance.
-  Future<void> upload(WidgetTester tester) async {
+  bool warned() =>
+      find.text('This file is in another language').evaluate().isNotEmpty;
+
+  /// Taps Upload and waits until [until] holds: until the page has acted on
+  /// the picked file — the warning is up, or the editor holds the file.
+  ///
+  /// The page reads that file from disk for real, which the fake clock of a
+  /// widget test does not advance, so this lets real time pass in small
+  /// steps. It waits on the outcome, not on a fixed time: under a loaded
+  /// full suite the read can take far longer than a fixed wait allowed
+  /// (#213), and a test that went on before the read was done found no
+  /// warning and left the file open for its tear-down to trip over. Once
+  /// [until] holds the read is over and the file closed. Fails after
+  /// [_uploadTimeout], saying what never happened.
+  Future<void> upload(
+    WidgetTester tester, {
+    required String expecting,
+    required bool Function() until,
+  }) async {
     await tester.tap(find.text('Upload .html'));
-    for (var i = 0; i < 10; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
+    var waited = Duration.zero;
+    while (!until()) {
+      if (waited >= _uploadTimeout) {
+        fail(
+          'Upload: $expecting did not happen within '
+          '${_uploadTimeout.inSeconds} s of real time',
+        );
+      }
+      await tester.runAsync(() => Future<void>.delayed(_uploadStep));
       await tester.pump();
+      waited += _uploadStep;
     }
     await settle(tester);
   }
@@ -337,7 +364,7 @@ void main() {
         '</head>\n<body>\n<p>Nederlands</p>\n</body>\n</html>',
       ),
     ).install();
-    await upload(tester);
+    await upload(tester, expecting: 'the warning', until: warned);
 
     expect(find.text('This file is in another language'), findsOneWidget);
     expect(
@@ -349,11 +376,12 @@ void main() {
     );
     // Cancel leaves the editor as it was.
     await tester.tap(find.text('Cancel'));
-    await settle(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('This file is in another language'), findsNothing);
     expect(editorBody(tester), '');
 
     // Going ahead puts the file's body in the English lesson.
-    await upload(tester);
+    await upload(tester, expecting: 'the warning, again', until: warned);
     await tester.tap(find.text('Upload anyway'));
     await settle(tester);
     expect(editorBody(tester), '<p>Nederlands</p>');
@@ -370,12 +398,20 @@ void main() {
     FakeFilePicker(
       writeHtml('<html lang="en-GB"><body><p>British</p></body></html>'),
     ).install();
-    await upload(tester);
+    await upload(
+      tester,
+      expecting: 'the en-GB file in the editor',
+      until: () => editorBody(tester) == '<p>British</p>',
+    );
     expect(find.text('This file is in another language'), findsNothing);
     expect(editorBody(tester), '<p>British</p>');
 
     FakeFilePicker(writeHtml('<p>Just a fragment</p>')).install();
-    await upload(tester);
+    await upload(
+      tester,
+      expecting: 'the fragment in the editor',
+      until: () => editorBody(tester) == '<p>Just a fragment</p>',
+    );
     expect(find.text('This file is in another language'), findsNothing);
     expect(editorBody(tester), '<p>Just a fragment</p>');
 
@@ -386,7 +422,11 @@ void main() {
     FakeFilePicker(
       writeHtml('<html lang="en"><body><p>English</p></body></html>'),
     ).install();
-    await upload(tester);
+    await upload(
+      tester,
+      expecting: 'the warning for an English file in Dutch',
+      until: warned,
+    );
     expect(find.text('This file is in another language'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await settle(tester);
