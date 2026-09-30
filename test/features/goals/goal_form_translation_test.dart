@@ -3,7 +3,8 @@
 // translation language; in a translation language the fields hold the
 // goal's translation and Save writes `goal_${id}` to `translations`, made
 // from the Dutch text as stored, without touching `goals`. A badge per
-// language says which translations the goal has and which are stale; a
+// language says which translations the goal has and which are stale —
+// keyed apart from the Lesinhoud row's badges for the subgoal's lesson; a
 // notice above the fields says when the chosen language has none, or when
 // its translation is stale. Switching language with unsaved changes asks
 // first.
@@ -16,6 +17,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/goals/editor/edit_goal_panel.dart';
+import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -55,8 +57,8 @@ const Key _descKey = Key('goal-translation-description');
 const Key _saveKey = Key('goal-translation-save');
 const Key _noneKey = Key('goal-translation-none');
 const Key _staleKey = Key('goal-translation-stale');
-const Key _current = Key('translation-status-en-current');
-const Key _stale = Key('translation-status-en-stale');
+const Key _current = Key('goal-text-translation-status-en-current');
+const Key _stale = Key('goal-text-translation-status-en-stale');
 
 void main() {
   late InMemoryCosmos goals;
@@ -89,6 +91,7 @@ void main() {
     WidgetTester tester,
     String goalId, {
     CosmosContainer? translationsContainer,
+    InMemoryCosmos? content,
   }) async {
     container = ProviderContainer(
       overrides: [
@@ -96,7 +99,9 @@ void main() {
           GoalsService(container: goals.container),
         ),
         contentServiceProvider.overrideWith(
-          () => ContentService(container: InMemoryCosmos().container),
+          () => ContentService(
+            container: (content ?? InMemoryCosmos()).container,
+          ),
         ),
         translationServiceProvider.overrideWithValue(
           TranslationService(
@@ -372,6 +377,55 @@ void main() {
     expect(english('s1')!['title'], 'Printen');
     expect(english('s1')!['description'], 'Putting text on the screen.');
     expect(fieldText(tester, find.byKey(_titleKey)), 'Printen');
+
+    await unmount(tester);
+  });
+
+  testWidgets('the goal badge and the Lesinhoud row\'s lesson badge are '
+      'keyed apart: an up-to-date goal translation next to a stale lesson '
+      'translation', (tester) async {
+    final lesson = Content(id: 's1', title: 'Printen', body: '<p>Zo.</p>');
+    final content = InMemoryCosmos([
+      {...lesson.toMap(), 'type': 'content'},
+    ]);
+    goals.upsert({...goals['s1']!, 'contentId': 's1'});
+    translations
+      ..upsert(
+        Translation.goal(
+          language: 'en',
+          goalId: 's1',
+          title: 'Printing',
+          description: 'Putting text on the screen.',
+          sourceHash: goalSourceHash(stored('s1')),
+        ).toMap(),
+        partitionKey: 'en',
+      )
+      ..upsert(
+        Translation.content(
+          language: 'en',
+          contentId: 's1',
+          title: 'Printing',
+          body: '<p>Like this.</p>',
+          // Made from an older Dutch lesson.
+          sourceHash: contentSourceHash(
+            Content(id: 's1', title: 'Printen', body: '<p>Eerder.</p>'),
+          ),
+        ).toMap(),
+        partitionKey: 'en',
+      );
+    await mount(tester, 's1', content: content);
+
+    expect(find.byKey(_current), findsOneWidget);
+    expect(find.byKey(_stale), findsNothing);
+    expect(
+      find.byKey(const Key('translation-status-en-stale')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('translation-status-en-current')),
+      findsNothing,
+      reason: 'the goal badge must not pass for the lesson badge',
+    );
 
     await unmount(tester);
   });

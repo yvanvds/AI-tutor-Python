@@ -50,8 +50,8 @@ const Key kDescription = Key('goal-translation-description');
 const Key kSave = Key('goal-translation-save');
 const Key kNone = Key('goal-translation-none');
 const Key kStaleNotice = Key('goal-translation-stale');
-const Key kCurrent = Key('translation-status-en-current');
-const Key kStale = Key('translation-status-en-stale');
+const Key kCurrent = Key('goal-text-translation-status-en-current');
+const Key kStale = Key('goal-text-translation-status-en-stale');
 
 /// A seeded goal as the app reads it from `goals`.
 Goal seededGoal(String id, String title, {String? parentId}) =>
@@ -93,7 +93,15 @@ void main() {
     await pumpUntilFound(tester, find.byType(GoalsPage));
     await pumpUntilFound(tester, find.text('Print'));
     await tester.tap(find.text('Print').first);
-    await pumpUntilFound(tester, find.byType(GoalForm));
+    // The editor on "Print" — not one still open on another goal, nor the
+    // spinner the panel shows while it loads the goal just picked.
+    await pumpUntil(
+      tester,
+      () =>
+          find.byType(GoalForm).evaluate().isNotEmpty &&
+          tester.widget<GoalForm>(find.byType(GoalForm)).goal.id == 's1',
+      reason: 'the goal editor never opened on "Print"',
+    );
     await pumpUntilFound(tester, inForm(find.text('English')));
     expect(inForm(find.byKey(kCurrent)), findsNothing);
 

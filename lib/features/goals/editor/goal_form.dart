@@ -275,7 +275,11 @@ class GoalFormState extends ConsumerState<GoalForm> {
                 ),
               ),
               const SizedBox(width: AppSpacing.s),
-              TranslationStatusBadges(statuses: statuses),
+              // Keyed apart from the Lesinhoud row's lesson badges below.
+              TranslationStatusBadges(
+                statuses: statuses,
+                keyPrefix: 'goal-text-',
+              ),
             ],
           ),
           const SizedBox(height: 12),

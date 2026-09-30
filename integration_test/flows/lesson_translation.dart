@@ -222,6 +222,36 @@ void main() {
     await pumpUntilFound(tester, find.byType(GoalsPage));
     await pumpUntilFound(tester, find.text('Print'));
     await tester.tap(find.text('Print').first);
+    // The editor on "Print" — not one still open on another goal, nor the
+    // spinner the panel shows while it loads the goal just picked.
+    await pumpUntil(
+      tester,
+      () =>
+          find.byType(GoalForm).evaluate().isNotEmpty &&
+          tester.widget<GoalForm>(find.byType(GoalForm)).goal.id == 's1',
+      reason: 'the goal editor never opened on "Print"',
+    );
+    // The row is at the foot of the editor, below the fold of the runner's
+    // window since the editor gained its language picker (#210) — and a lazy
+    // list does not build it until it is scrolled near: scroll down to it,
+    // as the teacher does.
+    final lesinhoudRow = find.descendant(
+      of: find.byType(GoalForm),
+      matching: find.text('Lesson content'),
+    );
+    await tester.scrollUntilVisible(
+      lesinhoudRow,
+      100,
+      scrollable: find
+          .descendant(
+            of: find.byType(GoalForm),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.ensureVisible(lesinhoudRow);
+    await tester.pump();
+    // The lesson's badge — the goal's own badges are keyed apart (#210).
     await pumpUntilFound(
       tester,
       find.descendant(of: find.byType(GoalForm), matching: find.byKey(kStale)),

@@ -5,7 +5,8 @@
 //     for a toolbar.
 //   - [TranslationStatusBadges]: one small badge per language a doc has a
 //     translation in, marked when it is stale — for a tree row or a status
-//     row.
+//     row. A page that shows two sets (the goal editor: the goal's own text
+//     and its lesson, #210) gives one of them a [keyPrefix].
 
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
@@ -66,11 +67,22 @@ class ContentLanguagePicker extends StatelessWidget {
 /// [kTranslationLanguages] order: the language code, and for a stale one a
 /// warning colour and icon. The tooltip says which it is. Nothing for a
 /// missing translation.
+///
+/// Each badge is keyed `${keyPrefix}translation-status-<language>-<status>`.
 class TranslationStatusBadges extends StatelessWidget {
-  const TranslationStatusBadges({super.key, required this.statuses});
+  const TranslationStatusBadges({
+    super.key,
+    required this.statuses,
+    this.keyPrefix = '',
+  });
 
   /// Language code → status of the doc's translation into it.
   final Map<String, TranslationStatus> statuses;
+
+  /// Put in front of every badge's key, so two sets on one page — the goal
+  /// editor's goal-text badges and its Lesinhoud row's (#210) — can be told
+  /// apart. Empty for the lesson badges.
+  final String keyPrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +99,7 @@ class TranslationStatusBadges extends StatelessWidget {
         for (final (code, status) in shown)
           Padding(
             padding: const EdgeInsets.only(left: AppSpacing.xxs),
-            child: _Badge(language: code, status: status),
+            child: _Badge(language: code, status: status, keyPrefix: keyPrefix),
           ),
       ],
     );
@@ -95,10 +107,15 @@ class TranslationStatusBadges extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.language, required this.status});
+  const _Badge({
+    required this.language,
+    required this.status,
+    required this.keyPrefix,
+  });
 
   final String language;
   final TranslationStatus status;
+  final String keyPrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +128,7 @@ class _Badge extends StatelessWidget {
           ? l.translation_status_stale(name)
           : l.translation_status_current(name),
       child: Container(
-        key: Key('translation-status-$language-${status.name}'),
+        key: Key('${keyPrefix}translation-status-$language-${status.name}'),
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
