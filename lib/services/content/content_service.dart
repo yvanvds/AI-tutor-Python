@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'content.dart';
@@ -36,10 +37,19 @@ class ContentService extends Notifier<List<Content>> {
 
   Future<Content?> getById(String id) => safeCosmos(() => _fetchById(id));
 
+  /// Stores [content] and patches the cached list with it, as [reassign]
+  /// does, so what was just written shows before the next poll — the
+  /// Lesinhoud tree marks a translation stale as soon as the Dutch lesson
+  /// is saved (#208).
   Future<void> upsert(Content content) async {
     await safeCosmos(
       () => _container.upsert(content.toMap(), partitionKey: _pk),
     );
+    final cached = state.any((c) => c.id == content.id);
+    state = List.unmodifiable([
+      for (final c in state) c.id == content.id ? content : c,
+      if (!cached) content,
+    ]);
   }
 
   Future<void> delete(String id) async {
@@ -50,6 +60,10 @@ class ContentService extends Notifier<List<Content>> {
   /// "content id mirrors the subgoal id" invariant: the body is upserted as a
   /// new doc with id == [targetGoalId] (overwriting whatever was there), and
   /// the old doc is deleted when its id differs. Returns the new doc.
+  ///
+  /// The lesson's translations move with it, in every language (#206;
+  /// `TranslationService.moveContent`) — before the old doc is deleted, so
+  /// a failure leaves the orphan in place and the reassign can be retried.
   ///
   /// The caller is responsible for setting `Goal.contentId` on the target;
   /// this service doesn't know about goals. The cached list is patched
@@ -62,6 +76,9 @@ class ContentService extends Notifier<List<Content>> {
     );
     await upsert(moved);
     if (orphan.id != targetGoalId) {
+      await ref
+          .read(translationServiceProvider)
+          .moveContent(orphan.id, targetGoalId);
       await delete(orphan.id);
     }
     state = List.unmodifiable([

@@ -8,6 +8,8 @@ import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
+import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
@@ -16,8 +18,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Uitleg — read-and-understand layout. Reads the active subgoal from
 /// `goalSelectionProvider`, loads the linked `content` doc, and renders its
-/// HTML body in a WebView styled by the shared `assets/lesson/lesson.css`.
-/// The header pill, progress counter, and footer buttons stay native.
+/// HTML body in a WebView styled by the shared `assets/lesson/lesson.css` —
+/// in the app language when the lesson has a translation into it, else in
+/// Dutch under a notice (#207). The header pill, progress counter, and
+/// footer buttons stay native.
 ///
 /// The footer pages back and forth through the theory the student has
 /// already seen (#115): the earlier non-optional sibling subgoals that carry
@@ -195,29 +199,24 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
   }
 }
 
+/// The lesson [contentId] in the app language (#207): its translation when
+/// there is one, else the Dutch text under a notice that says so.
 class _ContentWebView extends ConsumerWidget {
   const _ContentWebView({required this.contentId});
   final String contentId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Scope the watch to this content's body so 5 s content polls that
-    // don't change the body don't rebuild the WebView host. This only stops
-    // rebuilds that originate here; the "flicker on an unchanged fragment"
-    // it was added for came from `LessonHtmlView` re-creating its
-    // `WebViewWidget` on *any* rebuild, which is fixed at the source (#128).
-    final body = ref.watch(
-      contentServiceProvider.select((list) {
-        for (final c in list) {
-          if (c.id == contentId) return c.body;
-        }
-        return null;
-      }),
-    );
+    // Rebuilds only when the text shown changes — the Dutch lesson, its
+    // translation, or the language — so 5 s polls that change none of them
+    // don't rebuild the WebView host. This only stops rebuilds that
+    // originate here; the "flicker on an unchanged fragment" it was added
+    // for came from `LessonHtmlView` re-creating its `WebViewWidget` on
+    // *any* rebuild, which is fixed at the source (#128).
+    final shown = ref.watch(localizedContentProvider(contentId));
+    if (shown != null) return _LessonPage(shown: shown);
 
-    if (body != null) {
-      return LessonHtmlView(fragment: body);
-    }
+    // Not in the content cache yet: fetched on its own.
     return StreamBuilder<Content?>(
       stream: ref.read(contentServiceProvider.notifier).watchById(contentId),
       builder: (context, snap) {
@@ -227,8 +226,75 @@ class _ContentWebView extends ConsumerWidget {
             message: AppLocalizations.of(context).session_explain_loading,
           );
         }
-        return LessonHtmlView(fragment: c.body);
+        // Its own `Consumer`, so a new translation rebuilds the page and
+        // not this widget, which would hand the builder a new stream.
+        return Consumer(
+          builder: (context, ref, _) => _LessonPage(
+            shown: localizedContent(c, ref.watch(translationsProvider)),
+          ),
+        );
       },
+    );
+  }
+}
+
+/// A lesson in the WebView, with the notice above it when the app language
+/// has no translation of it and it is shown in Dutch (#207).
+class _LessonPage extends ConsumerWidget {
+  const _LessonPage({required this.shown});
+  final LocalizedContent shown;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Before the app language's translations have come back every lesson
+    // reads as Dutch; the notice waits until "no translation" is known.
+    final missing =
+        shown.isFallback &&
+        ref.watch(translationsProvider.select((t) => t.loaded));
+    return Column(
+      children: [
+        // Always in the tree, so the notice coming or going never moves the
+        // WebView to another slot and re-mounts it.
+        _TranslationMissingNotice(visible: missing),
+        Expanded(
+          child: LessonHtmlView(fragment: shown.body, language: shown.language),
+        ),
+      ],
+    );
+  }
+}
+
+class _TranslationMissingNotice extends StatelessWidget {
+  const _TranslationMissingNotice({required this.visible});
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return const SizedBox.shrink();
+    return Padding(
+      key: const Key('explain-translation-missing'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xxxl,
+        0,
+        AppSpacing.xxxl,
+        AppSpacing.s,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.translate, size: 14, color: AppColors.fgFaint),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              AppLocalizations.of(context).session_explain_translationMissing,
+              style: TextStyle(
+                color: AppColors.fgMute,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -296,7 +362,9 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-class _ChromeHeader extends StatelessWidget {
+/// The pill with the root goal's title — in the app language when there is
+/// a translation, else in Dutch (#210) — and the page counter.
+class _ChromeHeader extends ConsumerWidget {
   const _ChromeHeader({
     required this.child,
     required this.root,
@@ -307,9 +375,13 @@ class _ChromeHeader extends StatelessWidget {
   final List<Goal> siblings;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final root = this.root;
+    final rootTitle = root == null
+        ? null
+        : ref.watch(localizedGoalOf(root)).title;
     final pill =
-        (root?.title ??
+        (rootTitle ??
                 AppLocalizations.of(context).session_explain_defaultPillLabel)
             .toUpperCase();
     final idx = siblings.indexWhere((g) => g.id == child.id);

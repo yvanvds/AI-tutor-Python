@@ -6,10 +6,15 @@
 // pending question is still graded as before when the student comes back
 // and answers it. Any other situation routes as it always did.
 //
+// The page goes out in the language it is shown in (#207): the translation
+// into the app language when the lesson has one, else the Dutch text the
+// page falls back to.
+//
 // The real `TutorService` over a scripted connector (canned stream chunks)
 // and a mocked conductor; the instruction generator is a stand-in that
 // records what it was asked for, so the subgoal the prompt is written for
-// can be asserted without assembling a prompt.
+// can be asserted without assembling a prompt. Translations come from the
+// real `TranslationService` over an in-memory `translations` container.
 
 import 'dart:convert';
 
@@ -20,6 +25,7 @@ import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -30,17 +36,22 @@ import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart' hide Answer;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/mocks.dart';
 
 /// Replays one canned chunk list per request and keeps every request.
@@ -152,6 +163,16 @@ const String kPrintBody =
     '<p>Zo toon je iets op het scherm.</p>'
     '<pre class="run"><code>print("Hallo", naam)</code></pre>';
 
+const String kPrintBodyEn =
+    '<h2>Printing</h2>'
+    '<p>This is how you show something on the screen.</p>'
+    '<pre class="run"><code>print("Hello", name)</code></pre>';
+
+final _print = Content(id: 's1', title: 'Print', body: kPrintBody);
+
+/// Stands in for the language picked on the Options page.
+final _locale = StateProvider<Locale>((_) => const Locale('nl'));
+
 void main() {
   // The locale the prompt is asked for comes from SharedPreferences.
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -161,6 +182,7 @@ void main() {
   late MockConductor conductor;
   late MockGoalsService goals;
   late ChatService chat;
+  late InMemoryCosmos translations;
   late ProviderContainer pc;
 
   final root = Goal(id: 'r1', title: 'Basics', order: 0);
@@ -210,8 +232,21 @@ void main() {
     when(() => sound.askQuestion()).thenAnswer((_) async {});
 
     chat = ChatService();
+    translations = InMemoryCosmos.partitioned('language', [
+      Translation.content(
+        language: 'en',
+        contentId: 's1',
+        title: 'Printing',
+        body: kPrintBodyEn,
+        sourceHash: contentSourceHash(_print),
+      ).toMap(),
+    ]);
     pc = ProviderContainer(
       overrides: [
+        appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
+        translationServiceProvider.overrideWithValue(
+          TranslationService(container: translations.container),
+        ),
         tutorServiceProvider.overrideWith(
           () => TutorService(
             connectorOverride: connector,
@@ -232,7 +267,7 @@ void main() {
               title: 'Intro',
               body: '<p>Welkom bij Python.</p>',
             ),
-            Content(id: 's1', title: 'Print', body: kPrintBody),
+            _print,
           ]),
         ),
         soundServiceProvider.overrideWithValue(sound),
@@ -264,6 +299,16 @@ void main() {
   void showPage(String? id) {
     pc.read(modeProvider.notifier).state = SessionMode.explain;
     pc.read(viewedContentIdProvider.notifier).show(Object(), id);
+  }
+
+  /// The theory view with page [id] on screen, in [language]: the view
+  /// watches the lesson it draws, which keeps the app language's
+  /// translations fetched, and it is on screen once they have come back.
+  Future<void> viewPage(String id, {required String language}) async {
+    pc.read(_locale.notifier).state = Locale(language);
+    showPage(id);
+    pc.listen(localizedContentProvider(id), (_, _) {});
+    await Future<void>.delayed(Duration.zero);
   }
 
   test('a question typed on the theory page goes out as a content '
@@ -385,5 +430,67 @@ void main() {
     expect(generator.asked.last.override?.id, 's0');
     // And the socratic question is still the one in flight.
     expect(tutor().hasInFlightExercise(), isTrue);
+  });
+
+  group('in the language the page is shown in (#207)', () {
+    test('in English a translated page goes out as the translation: its '
+        'title and its text', () async {
+      await viewPage('s1', language: 'en');
+      expect(pc.read(localizedContentProvider('s1'))!.language, 'en');
+      connector.scripts.add(_answer('The comma separates the two values.'));
+
+      await tutor().handleStudentMessage('Why is there a comma?');
+
+      final sent = request(0);
+      expect(sent['request_type'], 'content_question');
+      expect(sent['question'], 'Why is there a comma?');
+      expect(sent['content_title'], 'Printing');
+      expect(
+        sent['content'],
+        '## Printing\n\nThis is how you show something on the screen.'
+        '\n\n```\nprint("Hello", name)\n```',
+      );
+    });
+
+    test('in English a page without a translation goes out as the Dutch '
+        'text the page shows', () async {
+      await viewPage('s0', language: 'en');
+      expect(pc.read(localizedContentProvider('s0'))!.isFallback, isTrue);
+      connector.scripts.add(_answer('Welcome!'));
+
+      await tutor().handleStudentMessage('What is this about?');
+
+      final sent = request(0);
+      expect(sent['request_type'], 'content_question');
+      expect(sent['content_title'], 'Intro');
+      expect(sent['content'], 'Welkom bij Python.');
+    });
+
+    test('in Dutch the page goes out as written, even when it has a '
+        'translation', () async {
+      await viewPage('s1', language: 'nl');
+      connector.scripts.add(_answer('De komma scheidt de twee waarden.'));
+
+      await tutor().handleStudentMessage('Waarom staat er een komma?');
+
+      final sent = request(0);
+      expect(sent['content_title'], 'Print');
+      expect(sent['content'], contains('Zo toon je iets op het scherm.'));
+      expect(sent['content'], isNot(contains('This is how')));
+    });
+
+    test('switching to English sends the next question with the English '
+        'page', () async {
+      await viewPage('s1', language: 'nl');
+      connector.scripts.add(_answer('ok'));
+      await tutor().handleStudentMessage('Waarom staat er een komma?');
+      expect(request(0)['content_title'], 'Print');
+
+      await viewPage('s1', language: 'en');
+      connector.scripts.add(_answer('ok'));
+      await tutor().handleStudentMessage('Why is there a comma?');
+      expect(request(1)['content_title'], 'Printing');
+      expect(request(1)['content'], contains('This is how you show'));
+    });
   });
 }

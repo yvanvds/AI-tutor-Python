@@ -1085,6 +1085,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No lesson content available for this subgoal yet.';
 
   @override
+  String get session_explain_translationMissing =>
+      'This lesson is not available in English yet, so it is shown in Dutch.';
+
+  @override
   String get session_explain_defaultPillLabel => 'Concept';
 
   @override
@@ -1518,6 +1522,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get goals_editor_lesinhoud_create => 'Create';
 
   @override
+  String goals_editor_translation_none(String language) {
+    return 'This goal has no $language translation yet. Students who use the app in $language see the Dutch title and description.';
+  }
+
+  @override
+  String goals_editor_translation_stale(String language) {
+    return 'Outdated: the Dutch title or description changed after this $language translation was made. Update it and save it again.';
+  }
+
+  @override
+  String get goals_editor_translation_save => 'Save translation';
+
+  @override
+  String goals_editor_translation_saved(String language) {
+    return '$language translation saved';
+  }
+
+  @override
+  String goals_editor_language_discard_message(String language, String target) {
+    return 'The $language title and description have changes that are not saved. Switching to $target discards them.';
+  }
+
+  @override
   String get goals_editor_delete_dialog_title => 'Delete goal';
 
   @override
@@ -1707,6 +1734,101 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get lesson_run_unavailable =>
       'The example can only run inside the app.';
+
+  @override
+  String lesson_translation_none(String language) {
+    return 'This lesson has no $language translation yet. Students who use the app in $language see the Dutch lesson.';
+  }
+
+  @override
+  String lesson_translation_stale(String language) {
+    return 'Outdated: the Dutch lesson changed after this $language translation was made. Update it and save it again.';
+  }
+
+  @override
+  String get lesson_translation_needsSource =>
+      'This subgoal has no Dutch lesson yet. Write and save the Dutch lesson first: translations are made from it.';
+
+  @override
+  String get lesson_translation_containerMissing =>
+      'Translations cannot be saved yet: the Cosmos container `translations` does not exist. Create it with partition key `/language` (README, step 3).';
+
+  @override
+  String lesson_translation_writeFailed(String error) {
+    return 'Could not write the translation: $error';
+  }
+
+  @override
+  String get lesson_editor_button_deleteTranslation => 'Delete translation';
+
+  @override
+  String lesson_deleteTranslation_dialog_title(String language) {
+    return 'Delete the $language translation?';
+  }
+
+  @override
+  String lesson_deleteTranslation_dialog_message(String language) {
+    return 'Only the $language translation is removed; the Dutch lesson stays as it is. Students who use the app in $language see the Dutch lesson until there is a new translation.';
+  }
+
+  @override
+  String get lesson_deleteTranslation_dialog_cancel => 'Cancel';
+
+  @override
+  String get lesson_deleteTranslation_dialog_confirm => 'Delete';
+
+  @override
+  String lesson_snack_translationDeleted(String language) {
+    return '$language translation deleted';
+  }
+
+  @override
+  String get lesson_language_discard_title => 'Discard unsaved changes?';
+
+  @override
+  String lesson_language_discard_message(String language, String target) {
+    return 'The $language lesson has changes that are not saved. Switching to $target discards them.';
+  }
+
+  @override
+  String get lesson_language_discard_cancel => 'Keep editing';
+
+  @override
+  String get lesson_language_discard_confirm => 'Discard and switch';
+
+  @override
+  String get lesson_upload_langMismatch_title =>
+      'This file is in another language';
+
+  @override
+  String lesson_upload_langMismatch_message(
+    String fileLanguage,
+    String code,
+    String language,
+  ) {
+    return 'The file is marked as $fileLanguage (lang=\"$code\"), but you are editing the $language lesson. Put it in this lesson anyway?';
+  }
+
+  @override
+  String get lesson_upload_langMismatch_cancel => 'Cancel';
+
+  @override
+  String get lesson_upload_langMismatch_confirm => 'Upload anyway';
+
+  @override
+  String translation_language_source(String language) {
+    return '$language (source)';
+  }
+
+  @override
+  String translation_status_current(String language) {
+    return '$language translation: up to date';
+  }
+
+  @override
+  String translation_status_stale(String language) {
+    return '$language translation: outdated, the Dutch text changed after it was translated';
+  }
 
   @override
   String get instructions_toolbar_title => 'Instructions';

@@ -2,14 +2,17 @@ import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dar
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Single root goal card on the Leerpad. Active = tinted bg + accent border
 /// + horizontal row of child chips + "Verder" CTA. Completed = check badge,
-/// "voltooid" caption.
-class LeerpadCard extends StatelessWidget {
+/// "voltooid" caption. The root's title and description are in the app
+/// language when there is a translation, else in Dutch (#210).
+class LeerpadCard extends ConsumerWidget {
   const LeerpadCard({
     super.key,
     required this.index,
@@ -28,7 +31,8 @@ class LeerpadCard extends StatelessWidget {
   final VoidCallback onContinue;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shown = ref.watch(localizedGoalOf(root));
     final required = children.where((c) => !c.optional).toList();
     final progress = required.isEmpty
         ? 0.0
@@ -63,8 +67,8 @@ class LeerpadCard extends StatelessWidget {
         children: [
           _CardHeader(
             index: index,
-            title: root.title,
-            description: root.description,
+            title: shown.title,
+            description: shown.description,
             isActive: isActive,
             completed: completed,
           ),

@@ -1849,6 +1849,12 @@ abstract class AppLocalizations {
   /// **'No lesson content available for this subgoal yet.'**
   String get session_explain_missingContent;
 
+  /// Notice above the theory page when the lesson has no translation into the app language and its Dutch text is shown instead. Names the app language itself. Never shown in Dutch, the language lessons are written in.
+  ///
+  /// In en, this message translates to:
+  /// **'This lesson is not available in English yet, so it is shown in Dutch.'**
+  String get session_explain_translationMissing;
+
   /// Fallback label for the explain-view root pill when no root goal is set; displayed uppercase
   ///
   /// In en, this message translates to:
@@ -2591,6 +2597,36 @@ abstract class AppLocalizations {
   /// **'Create'**
   String get goals_editor_lesinhoud_create;
 
+  /// Notice above the goal editor's title field when the chosen translation language has no translation of the goal
+  ///
+  /// In en, this message translates to:
+  /// **'This goal has no {language} translation yet. Students who use the app in {language} see the Dutch title and description.'**
+  String goals_editor_translation_none(String language);
+
+  /// No description provided for @goals_editor_translation_stale.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated: the Dutch title or description changed after this {language} translation was made. Update it and save it again.'**
+  String goals_editor_translation_stale(String language);
+
+  /// No description provided for @goals_editor_translation_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save translation'**
+  String get goals_editor_translation_save;
+
+  /// No description provided for @goals_editor_translation_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'{language} translation saved'**
+  String goals_editor_translation_saved(String language);
+
+  /// No description provided for @goals_editor_language_discard_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The {language} title and description have changes that are not saved. Switching to {target} discards them.'**
+  String goals_editor_language_discard_message(String language, String target);
+
   /// No description provided for @goals_editor_delete_dialog_title.
   ///
   /// In en, this message translates to:
@@ -2905,6 +2941,142 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The example can only run inside the app.'**
   String get lesson_run_unavailable;
+
+  /// Notice above the Lesinhoud editor when the chosen translation language has no translation of the lesson
+  ///
+  /// In en, this message translates to:
+  /// **'This lesson has no {language} translation yet. Students who use the app in {language} see the Dutch lesson.'**
+  String lesson_translation_none(String language);
+
+  /// No description provided for @lesson_translation_stale.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated: the Dutch lesson changed after this {language} translation was made. Update it and save it again.'**
+  String lesson_translation_stale(String language);
+
+  /// No description provided for @lesson_translation_needsSource.
+  ///
+  /// In en, this message translates to:
+  /// **'This subgoal has no Dutch lesson yet. Write and save the Dutch lesson first: translations are made from it.'**
+  String get lesson_translation_needsSource;
+
+  /// No description provided for @lesson_translation_containerMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Translations cannot be saved yet: the Cosmos container `translations` does not exist. Create it with partition key `/language` (README, step 3).'**
+  String get lesson_translation_containerMissing;
+
+  /// No description provided for @lesson_translation_writeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not write the translation: {error}'**
+  String lesson_translation_writeFailed(String error);
+
+  /// No description provided for @lesson_editor_button_deleteTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete translation'**
+  String get lesson_editor_button_deleteTranslation;
+
+  /// No description provided for @lesson_deleteTranslation_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the {language} translation?'**
+  String lesson_deleteTranslation_dialog_title(String language);
+
+  /// No description provided for @lesson_deleteTranslation_dialog_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the {language} translation is removed; the Dutch lesson stays as it is. Students who use the app in {language} see the Dutch lesson until there is a new translation.'**
+  String lesson_deleteTranslation_dialog_message(String language);
+
+  /// No description provided for @lesson_deleteTranslation_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lesson_deleteTranslation_dialog_cancel;
+
+  /// No description provided for @lesson_deleteTranslation_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get lesson_deleteTranslation_dialog_confirm;
+
+  /// No description provided for @lesson_snack_translationDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{language} translation deleted'**
+  String lesson_snack_translationDeleted(String language);
+
+  /// No description provided for @lesson_language_discard_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard unsaved changes?'**
+  String get lesson_language_discard_title;
+
+  /// No description provided for @lesson_language_discard_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The {language} lesson has changes that are not saved. Switching to {target} discards them.'**
+  String lesson_language_discard_message(String language, String target);
+
+  /// No description provided for @lesson_language_discard_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get lesson_language_discard_cancel;
+
+  /// No description provided for @lesson_language_discard_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard and switch'**
+  String get lesson_language_discard_confirm;
+
+  /// No description provided for @lesson_upload_langMismatch_title.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is in another language'**
+  String get lesson_upload_langMismatch_title;
+
+  /// Warning when an uploaded lesson's <html lang> does not match the language chosen in the Lesinhoud toolbar
+  ///
+  /// In en, this message translates to:
+  /// **'The file is marked as {fileLanguage} (lang=\"{code}\"), but you are editing the {language} lesson. Put it in this lesson anyway?'**
+  String lesson_upload_langMismatch_message(
+    String fileLanguage,
+    String code,
+    String language,
+  );
+
+  /// No description provided for @lesson_upload_langMismatch_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lesson_upload_langMismatch_cancel;
+
+  /// No description provided for @lesson_upload_langMismatch_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload anyway'**
+  String get lesson_upload_langMismatch_confirm;
+
+  /// The source language's option in a teacher's language picker: lessons and goals are written in it and translated from it
+  ///
+  /// In en, this message translates to:
+  /// **'{language} (source)'**
+  String translation_language_source(String language);
+
+  /// No description provided for @translation_status_current.
+  ///
+  /// In en, this message translates to:
+  /// **'{language} translation: up to date'**
+  String translation_status_current(String language);
+
+  /// No description provided for @translation_status_stale.
+  ///
+  /// In en, this message translates to:
+  /// **'{language} translation: outdated, the Dutch text changed after it was translated'**
+  String translation_status_stale(String language);
 
   /// No description provided for @instructions_toolbar_title.
   ///

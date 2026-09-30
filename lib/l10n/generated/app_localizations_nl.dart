@@ -1093,6 +1093,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Nog geen lesinhoud beschikbaar voor dit subdoel.';
 
   @override
+  String get session_explain_translationMissing =>
+      'Deze les is nog niet vertaald, dus je ziet de Nederlandse tekst.';
+
+  @override
   String get session_explain_defaultPillLabel => 'Concept';
 
   @override
@@ -1531,6 +1535,29 @@ class AppLocalizationsNl extends AppLocalizations {
   String get goals_editor_lesinhoud_create => 'Maken';
 
   @override
+  String goals_editor_translation_none(String language) {
+    return 'Dit doel heeft nog geen vertaling ($language). Wie de app in die taal gebruikt, ziet de Nederlandse titel en beschrijving.';
+  }
+
+  @override
+  String goals_editor_translation_stale(String language) {
+    return 'Verouderd: de Nederlandse titel of beschrijving is gewijzigd nadat deze vertaling ($language) gemaakt werd. Werk ze bij en sla ze opnieuw op.';
+  }
+
+  @override
+  String get goals_editor_translation_save => 'Vertaling opslaan';
+
+  @override
+  String goals_editor_translation_saved(String language) {
+    return 'Vertaling ($language) opgeslagen';
+  }
+
+  @override
+  String goals_editor_language_discard_message(String language, String target) {
+    return 'De titel en beschrijving ($language) hebben wijzigingen die nog niet opgeslagen zijn. Wisselen naar $target gooit ze weg.';
+  }
+
+  @override
   String get goals_editor_delete_dialog_title => 'Doel verwijderen';
 
   @override
@@ -1722,6 +1749,102 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get lesson_run_unavailable =>
       'Het voorbeeld kan alleen in de app worden uitgevoerd.';
+
+  @override
+  String lesson_translation_none(String language) {
+    return 'Deze les heeft nog geen vertaling ($language). Wie de app in die taal gebruikt, ziet de Nederlandse les.';
+  }
+
+  @override
+  String lesson_translation_stale(String language) {
+    return 'Verouderd: de Nederlandse les is gewijzigd nadat deze vertaling ($language) gemaakt werd. Werk ze bij en sla ze opnieuw op.';
+  }
+
+  @override
+  String get lesson_translation_needsSource =>
+      'Dit subdoel heeft nog geen Nederlandse les. Schrijf de Nederlandse les en sla ze eerst op: vertalingen worden daarvan gemaakt.';
+
+  @override
+  String get lesson_translation_containerMissing =>
+      'Vertalingen kunnen nog niet opgeslagen worden: de Cosmos-container `translations` bestaat niet. Maak hem aan met partitiesleutel `/language` (README, stap 3).';
+
+  @override
+  String lesson_translation_writeFailed(String error) {
+    return 'De vertaling kon niet weggeschreven worden: $error';
+  }
+
+  @override
+  String get lesson_editor_button_deleteTranslation => 'Vertaling verwijderen';
+
+  @override
+  String lesson_deleteTranslation_dialog_title(String language) {
+    return 'Vertaling ($language) verwijderen?';
+  }
+
+  @override
+  String lesson_deleteTranslation_dialog_message(String language) {
+    return 'Alleen de vertaling ($language) wordt verwijderd; de Nederlandse les blijft zoals ze is. Wie de app in die taal gebruikt, ziet de Nederlandse les tot er een nieuwe vertaling is.';
+  }
+
+  @override
+  String get lesson_deleteTranslation_dialog_cancel => 'Annuleren';
+
+  @override
+  String get lesson_deleteTranslation_dialog_confirm => 'Verwijderen';
+
+  @override
+  String lesson_snack_translationDeleted(String language) {
+    return 'Vertaling ($language) verwijderd';
+  }
+
+  @override
+  String get lesson_language_discard_title =>
+      'Niet-opgeslagen wijzigingen weggooien?';
+
+  @override
+  String lesson_language_discard_message(String language, String target) {
+    return 'De les ($language) heeft wijzigingen die nog niet opgeslagen zijn. Wisselen naar $target gooit ze weg.';
+  }
+
+  @override
+  String get lesson_language_discard_cancel => 'Verder bewerken';
+
+  @override
+  String get lesson_language_discard_confirm => 'Weggooien en wisselen';
+
+  @override
+  String get lesson_upload_langMismatch_title =>
+      'Dit bestand is in een andere taal';
+
+  @override
+  String lesson_upload_langMismatch_message(
+    String fileLanguage,
+    String code,
+    String language,
+  ) {
+    return 'Het bestand is gemarkeerd als $fileLanguage (lang=\"$code\"), maar je bewerkt nu de les voor $language. Toch in deze les zetten?';
+  }
+
+  @override
+  String get lesson_upload_langMismatch_cancel => 'Annuleren';
+
+  @override
+  String get lesson_upload_langMismatch_confirm => 'Toch uploaden';
+
+  @override
+  String translation_language_source(String language) {
+    return '$language (brontaal)';
+  }
+
+  @override
+  String translation_status_current(String language) {
+    return 'Vertaling $language: bijgewerkt';
+  }
+
+  @override
+  String translation_status_stale(String language) {
+    return 'Vertaling $language: verouderd, de Nederlandse tekst is gewijzigd na de vertaling';
+  }
 
   @override
   String get instructions_toolbar_title => 'Instructies';

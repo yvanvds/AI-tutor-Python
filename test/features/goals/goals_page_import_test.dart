@@ -17,6 +17,8 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +26,15 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../helpers/fake_file_picker.dart';
 import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/localization.dart';
+
+/// No translations, and nothing polled: the editor panel opens on a goal,
+/// and its language badges (#210) would otherwise poll `translations` past
+/// the end of the test.
+class _NoTranslations extends TranslationService {
+  @override
+  Stream<List<Translation>> watchLanguage(String language) =>
+      Stream.value(const []);
+}
 
 Map<String, dynamic> _goal({
   required String id,
@@ -113,6 +124,7 @@ void main() {
         goalsServiceProvider.overrideWithValue(
           GoalsService(container: goals.container),
         ),
+        translationServiceProvider.overrideWithValue(_NoTranslations()),
       ],
     );
   });

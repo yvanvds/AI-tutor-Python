@@ -12,6 +12,7 @@ import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -162,7 +163,7 @@ class _ChatBody extends ConsumerWidget {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.xs,
               ),
-              child: ChatSystemPill(text: _systemText(context, message)),
+              child: _NoticePill(message: message),
             ),
         customMessageBuilder:
             (
@@ -187,14 +188,32 @@ class _ChatBody extends ConsumerWidget {
       },
     );
   }
+}
 
-  /// System pills carry a [ChatNotice] rather than text (issue #23); resolve
-  /// it against the current locale so a language switch re-renders them.
-  static String _systemText(BuildContext context, SystemMessage message) {
+/// A system pill. It carries a [ChatNotice] rather than text (issue #23),
+/// resolved against the current locale so a language switch re-renders it.
+/// A notice about a goal names that goal in the app language: its
+/// translation when there is one, else the Dutch title, without a notice
+/// (#211).
+class _NoticePill extends ConsumerWidget {
+  const _NoticePill({required this.message});
+
+  final SystemMessage message;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final notice = ChatNotice.fromJson(
       message.metadata?[ChatNotice.metadataKey],
     );
-    if (notice == null) return message.text;
-    return AppLocalizations.of(context).chatNotice(notice);
+    if (notice == null) return ChatSystemPill(text: message.text);
+    final goalId = notice.goalId;
+    final shown = goalId == null || notice.args.isEmpty
+        ? notice
+        : notice.withGoalTitle(
+            ref
+                .watch(localizedGoalByIdOf(goalId, title: notice.args.first))
+                .title,
+          );
+    return ChatSystemPill(text: AppLocalizations.of(context).chatNotice(shown));
   }
 }

@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/widgets/lesson_document.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -23,11 +24,21 @@ import '../theme/tokens.dart';
 /// [lessonCodeRunnerProvider] and pushes the result back into the page.
 /// That is the only Flutter↔JS bridge; the authored HTML stays inert.
 class LessonHtmlView extends ConsumerStatefulWidget {
-  const LessonHtmlView({super.key, required this.fragment});
+  const LessonHtmlView({
+    super.key,
+    required this.fragment,
+    this.language = kSourceLanguage,
+  });
 
   /// Body inner HTML — what goes inside `<body class="lesson">`. Not a full
   /// document; do not include `<html>` / `<head>` / `<body>` tags.
   final String fragment;
+
+  /// The language [fragment] is written in, set as the document's `lang`
+  /// (#207). Dutch unless said otherwise: lessons, and the other documents
+  /// this view shows, are written in Dutch; a translated lesson passes its
+  /// own language.
+  final String language;
 
   @override
   ConsumerState<LessonHtmlView> createState() => _LessonHtmlViewState();
@@ -95,7 +106,8 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
   @override
   void didUpdateWidget(covariant LessonHtmlView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fragment != widget.fragment) {
+    if (oldWidget.fragment != widget.fragment ||
+        oldWidget.language != widget.language) {
       _load();
     }
   }
@@ -115,6 +127,7 @@ class _LessonHtmlViewState extends ConsumerState<LessonHtmlView> {
       fragment: widget.fragment,
       css: css,
       labels: _labels!,
+      language: widget.language,
     );
     await _controller.loadHtmlString(doc);
     if (mounted) setState(() => _ready = true);

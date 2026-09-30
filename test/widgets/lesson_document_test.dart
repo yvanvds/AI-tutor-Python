@@ -19,6 +19,7 @@ void main() {
         fragment: '<p>hi</p><pre class="run"><code>print(1)</code></pre>',
         css: 'body{color:red}',
         labels: _labels,
+        language: 'nl',
       );
 
       expect(doc, startsWith('<!doctype html>'));
@@ -37,7 +38,12 @@ void main() {
     });
 
     test('labels reach the page as a JSON literal', () {
-      final doc = buildLessonDocument(fragment: '', css: '', labels: _labels);
+      final doc = buildLessonDocument(
+        fragment: '',
+        css: '',
+        labels: _labels,
+        language: 'nl',
+      );
       expect(
         doc,
         contains(
@@ -57,9 +63,25 @@ void main() {
           running: 'r',
           unavailable: 'u',
         ),
+        language: 'nl',
       );
       expect(doc, isNot(contains('</script><b>')));
       expect(doc, contains(r'<\/script><b>'));
+    });
+
+    // #207: a translated lesson is shown in its own language, and the page
+    // says which, for hyphenation and screen readers.
+    test('the document is marked with the language of the fragment', () {
+      String docIn(String language) => buildLessonDocument(
+        fragment: '<p>hi</p>',
+        css: '',
+        labels: _labels,
+        language: language,
+      );
+
+      expect(docIn('en'), startsWith('<!doctype html><html lang="en"><head>'));
+      expect(docIn('nl'), contains('<html lang="nl">'));
+      expect(docIn('"><b>'), isNot(contains('"><b>')));
     });
   });
 

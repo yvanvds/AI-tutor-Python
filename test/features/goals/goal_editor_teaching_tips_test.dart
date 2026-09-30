@@ -16,6 +16,7 @@ import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +72,12 @@ void main() {
         ),
         contentServiceProvider.overrideWith(
           () => ContentService(container: content.container),
+        ),
+        // The Lesinhoud row shows the lesson's translations (#208).
+        translationServiceProvider.overrideWithValue(
+          TranslationService(
+            container: InMemoryCosmos.partitioned('language').container,
+          ),
         ),
       ],
     );

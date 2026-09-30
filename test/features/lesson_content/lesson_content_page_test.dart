@@ -1,7 +1,7 @@
 // Issue #4 — the Lesinhoud page must surface content docs orphaned by a goal
 // re-import (Replace mode with new subgoal ids deletes the old subgoals but
 // leaves their content docs in Cosmos) and let the teacher reassign them to a
-// subgoal.
+// subgoal. The lesson's translations go with it (#206).
 //
 // This mounts the real page over the real GoalsService / ContentService /
 // ModuleService, each backed by an in-memory Cosmos fake, so the flow is
@@ -17,6 +17,8 @@ import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/module/module_service.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,6 +59,7 @@ void main() {
   late InMemoryCosmos goals;
   late InMemoryCosmos content;
   late InMemoryCosmos modules;
+  late InMemoryCosmos translations;
 
   setUp(() {
     goals = InMemoryCosmos([
@@ -74,6 +77,15 @@ void main() {
       // Left behind by a Replace import that renamed 's-old' -> 's-new'.
       _content('s-old', 'For loops lesson', '<p>for</p>'),
       _content('s-linked', 'While loops lesson', '<p>while</p>'),
+    ]);
+    translations = InMemoryCosmos.partitioned('language', [
+      Translation.content(
+        language: 'en',
+        contentId: 's-old',
+        title: 'For loops lesson (en)',
+        body: '<p>for (en)</p>',
+        sourceHash: 'h',
+      ).toMap(),
     ]);
     modules = InMemoryCosmos([
       {
@@ -95,6 +107,9 @@ void main() {
       ),
       moduleServiceProvider.overrideWith(
         () => ModuleService(container: modules.container),
+      ),
+      translationServiceProvider.overrideWithValue(
+        TranslationService(container: translations.container),
       ),
     ],
     child: MaterialApp(
@@ -151,6 +166,9 @@ void main() {
     expect(content['s-new']!['title'], 'For loops lesson');
     expect(content['s-old'], isNull);
     expect(goals['s-new']!['contentId'], 's-new');
+    // The English translation followed the lesson (#206).
+    expect(translations['en/content_s-old'], isNull);
+    expect(translations['en/content_s-new']!['body'], '<p>for (en)</p>');
     expect(find.text('Lesson content linked to "For loops".'), findsOneWidget);
 
     // After the next goals poll the tree reflects the link: no orphan

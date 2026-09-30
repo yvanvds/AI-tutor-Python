@@ -17,71 +17,152 @@
 // Pure Dart, no mocktail: `implements` on `CosmosContainer` / `CosmosClient`
 // is enough because nothing outside `cosmos_client.dart` touches their
 // private members.
+//
+// Ids are unique per container, which is what every container but one
+// relies on. `translations` (#206) holds the same id once per language, so
+// it runs [InMemoryCosmos.partitioned]: keyed on (partition, id) the way
+// Cosmos keys it, with single-partition queries kept to their partition.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 
 class InMemoryCosmos {
-  InMemoryCosmos([Iterable<Map<String, dynamic>> seed = const []]) {
+  InMemoryCosmos([Iterable<Map<String, dynamic>> seed = const []])
+    : partitionKeyField = null {
+    _init(seed);
+  }
+
+  /// A container partitioned on the doc field [partitionKeyField] in which
+  /// one id can exist in several partitions (`translations`, #206). Docs are
+  /// kept under `'$partitionKey/$id'` — `cosmos['en/content_s1']` — a write
+  /// whose partition key does not match the doc's field fails as it does in
+  /// Cosmos, and a query sent to one partition sees only that partition.
+  InMemoryCosmos.partitioned(
+    String this.partitionKeyField, [
+    Iterable<Map<String, dynamic>> seed = const [],
+  ]) {
+    _init(seed);
+  }
+
+  void _init(Iterable<Map<String, dynamic>> seed) {
     for (final d in seed) {
-      docs[d['id'] as String] = Map<String, dynamic>.from(d);
+      docs[_keyOf(d)] = Map<String, dynamic>.from(d);
     }
     container = _InMemoryContainer(this);
   }
 
+  /// The doc field holding the partition key, when ids are unique per
+  /// partition rather than per container (see [InMemoryCosmos.partitioned]).
+  final String? partitionKeyField;
+
   late final CosmosContainer container;
+
+  /// Keyed on id, or on `'$partitionKey/$id'` for a partitioned container.
   final Map<String, Map<String, dynamic>> docs = {};
 
-  Map<String, dynamic>? operator [](String id) => docs[id];
+  Map<String, dynamic>? operator [](String key) => docs[key];
 
   static Map<String, dynamic> _copy(Map<String, Object?> d) =>
       Map<String, dynamic>.from(d);
 
-  Map<String, dynamic>? read(String id) {
-    final d = docs[id];
+  String _key(String id, Object? partitionKey) =>
+      partitionKeyField == null ? id : '$partitionKey/$id';
+
+  String _keyOf(Map<String, dynamic> d) => _key(
+    d['id'] as String,
+    partitionKeyField == null ? null : d[partitionKeyField],
+  );
+
+  /// Cosmos rejects a write whose partition-key header is not the doc's own
+  /// partition key; a partitioned fake does too.
+  void _checkPartition(Map<String, dynamic> d, Object? partitionKey) {
+    final field = partitionKeyField;
+    if (field == null || d[field] == partitionKey) return;
+    throw CosmosException(
+      400,
+      'PartitionKey extracted from document (${d[field]}) does not match the '
+      'one specified in the header ($partitionKey)',
+      code: 'BadRequest',
+    );
+  }
+
+  Map<String, dynamic>? read(String id, {Object? partitionKey}) {
+    final d = docs[_key(id, partitionKey)];
     return d == null ? null : _copy(d);
   }
 
-  Map<String, dynamic> create(Map<String, Object?> doc) {
+  Map<String, dynamic> create(
+    Map<String, Object?> doc, {
+    Object? partitionKey,
+  }) {
     final d = _copy(doc);
+    _checkPartition(d, partitionKey);
     final id = d['id'] as String;
-    if (docs.containsKey(id)) {
+    if (docs.containsKey(_keyOf(d))) {
       throw CosmosException(409, 'id $id exists', code: 'Conflict');
     }
-    docs[id] = d;
+    docs[_keyOf(d)] = d;
     return _copy(d);
   }
 
-  Map<String, dynamic> upsert(Map<String, Object?> doc) {
+  Map<String, dynamic> upsert(
+    Map<String, Object?> doc, {
+    Object? partitionKey,
+  }) {
     final d = _copy(doc);
-    docs[d['id'] as String] = d;
+    _checkPartition(d, partitionKey);
+    docs[_keyOf(d)] = d;
     return _copy(d);
   }
 
-  Map<String, dynamic> replace(String id, Map<String, Object?> doc) {
+  Map<String, dynamic> replace(
+    String id,
+    Map<String, Object?> doc, {
+    Object? partitionKey,
+  }) {
     final d = _copy(doc);
-    docs[id] = d;
+    _checkPartition(d, partitionKey);
+    docs[_key(id, partitionKey)] = d;
     return _copy(d);
   }
 
-  void delete(String id) => docs.remove(id);
+  void delete(String id, {Object? partitionKey}) =>
+      docs.remove(_key(id, partitionKey));
 
-  void executeBatch(List<BatchOperation> ops) {
+  void executeBatch(List<BatchOperation> ops, {Object? partitionKey}) {
     for (final op in ops) {
       switch (op.operationType) {
         case 'Delete':
-          docs.remove(op.id);
+          docs.remove(_key(op.id!, partitionKey));
         case 'Create':
         case 'Upsert':
           final d = _copy(op.resourceBody!);
-          docs[d['id'] as String] = d;
+          _checkPartition(d, partitionKey);
+          docs[_keyOf(d)] = d;
         case 'Replace':
-          docs[op.id!] = _copy(op.resourceBody!);
+          final d = _copy(op.resourceBody!);
+          _checkPartition(d, partitionKey);
+          docs[_key(op.id!, partitionKey)] = d;
       }
     }
   }
 
-  List<Map<String, dynamic>> query(String sql, Map<String, Object?> params) {
+  List<Map<String, dynamic>> query(
+    String sql,
+    Map<String, Object?> params, {
+    Object? partitionKey,
+    bool crossPartition = false,
+  }) {
     Iterable<Map<String, dynamic>> rows = docs.values.map(_copy);
+
+    final field = partitionKeyField;
+    if (field != null && !crossPartition && partitionKey != null) {
+      rows = rows.where((d) => d[field] == partitionKey);
+    }
+
+    // Point lookup across partitions (`TranslationService.moveContent`).
+    if (sql.contains('c.id = @id')) {
+      rows = rows.where((d) => d['id'] == params['@id']);
+    }
 
     if (sql.contains('c.parentId = @parentId')) {
       final pid = params['@parentId'];
@@ -144,7 +225,7 @@ class _InMemoryContainer implements CosmosContainer {
   Future<Map<String, dynamic>?> read(
     String id, {
     required Object partitionKey,
-  }) async => _store.read(id);
+  }) async => _store.read(id, partitionKey: partitionKey);
 
   @override
   Future<List<Map<String, dynamic>>> query(
@@ -152,36 +233,41 @@ class _InMemoryContainer implements CosmosContainer {
     Map<String, Object?> parameters = const {},
     Object? partitionKey,
     bool crossPartition = false,
-  }) async => _store.query(sql, parameters);
+  }) async => _store.query(
+    sql,
+    parameters,
+    partitionKey: partitionKey,
+    crossPartition: crossPartition,
+  );
 
   @override
   Future<Map<String, dynamic>> create(
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) async => _store.create(doc);
+  }) async => _store.create(doc, partitionKey: partitionKey);
 
   @override
   Future<Map<String, dynamic>> upsert(
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) async => _store.upsert(doc);
+  }) async => _store.upsert(doc, partitionKey: partitionKey);
 
   @override
   Future<Map<String, dynamic>> replace(
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) async => _store.replace(id, doc);
+  }) async => _store.replace(id, doc, partitionKey: partitionKey);
 
   @override
   Future<void> delete(String id, {required Object partitionKey}) async =>
-      _store.delete(id);
+      _store.delete(id, partitionKey: partitionKey);
 
   @override
   Future<void> executeBatch(
     List<BatchOperation> ops, {
     required Object partitionKey,
-  }) async => _store.executeBatch(ops);
+  }) async => _store.executeBatch(ops, partitionKey: partitionKey);
 }
 
 /// Whole-database fake: one [InMemoryCosmos] per container name, created on
@@ -193,9 +279,20 @@ class InMemoryCosmosClient implements CosmosClient {
   final Map<String, InMemoryCosmos> _containers;
   final Map<String, CosmosContainer> _routed = {};
 
+  /// The containers whose ids are unique per partition rather than per
+  /// container, with the doc field their partition key is read from.
+  static const Map<String, String> _partitionedBy = {
+    'translations': 'language',
+  };
+
   /// The store behind [containerId], e.g. `cosmos['goals'].docs`.
   InMemoryCosmos operator [](String containerId) =>
-      _containers.putIfAbsent(containerId, InMemoryCosmos.new);
+      _containers.putIfAbsent(containerId, () {
+        final field = _partitionedBy[containerId];
+        return field == null
+            ? InMemoryCosmos()
+            : InMemoryCosmos.partitioned(field);
+      });
 
   /// Serves [containerId] from [container] instead of its in-memory store —
   /// e.g. the real REST container of an account where it was never created

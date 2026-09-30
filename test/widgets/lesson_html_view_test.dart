@@ -35,15 +35,22 @@ class _Host extends StatefulWidget {
 class _HostState extends State<_Host> {
   int rebuilds = 0;
   String? _fragment;
+  String? _language;
 
-  void rebuild({String? fragment}) => setState(() {
+  void rebuild({String? fragment, String? language}) => setState(() {
     rebuilds++;
     if (fragment != null) _fragment = fragment;
+    if (language != null) _language = language;
   });
 
   @override
-  Widget build(BuildContext context) =>
-      LessonHtmlView(fragment: _fragment ?? widget.fragment);
+  Widget build(BuildContext context) {
+    final language = _language;
+    final fragment = _fragment ?? widget.fragment;
+    return language == null
+        ? LessonHtmlView(fragment: fragment)
+        : LessonHtmlView(fragment: fragment, language: language);
+  }
 }
 
 void main() {
@@ -120,6 +127,26 @@ void main() {
       tester.widget<WebViewWidget>(find.byType(WebViewWidget)),
       same(before),
     );
+    expect(webviews.widgetsCreated, 1);
+    expect(webviews.widgetBuilds, 1);
+  });
+
+  // #207: the page says which language it is in. Lessons are written in
+  // Dutch; a translated one names its own language, and a page whose
+  // language changes is reloaded in the same WebView.
+  testWidgets('the page is marked Dutch unless the host names its language, '
+      'and a new language reloads the same WebView', (tester) async {
+    await mount(tester);
+    expect(page().currentHtml, contains('<html lang="nl">'));
+
+    host(tester).rebuild(language: 'en');
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+
+    expect(page().loadedHtml, hasLength(2));
+    expect(page().currentHtml, contains('<html lang="en">'));
+    expect(page().currentHtml, contains('<p>one</p>'));
     expect(webviews.widgetsCreated, 1);
     expect(webviews.widgetBuilds, 1);
   });

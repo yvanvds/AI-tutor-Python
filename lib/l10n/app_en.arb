@@ -608,6 +608,10 @@
   "session_explain_placeholder_noSubgoal": "Pick a subgoal in the learning path to see the explanation.",
   "session_explain_loading": "Loading lesson…",
   "session_explain_missingContent": "No lesson content available for this subgoal yet.",
+  "session_explain_translationMissing": "This lesson is not available in English yet, so it is shown in Dutch.",
+  "@session_explain_translationMissing": {
+    "description": "Notice above the theory page when the lesson has no translation into the app language and its Dutch text is shown instead. Names the app language itself. Never shown in Dutch, the language lessons are written in."
+  },
   "session_explain_defaultPillLabel": "Concept",
   "@session_explain_defaultPillLabel": {
     "description": "Fallback label for the explain-view root pill when no root goal is set; displayed uppercase"
@@ -855,6 +859,24 @@
   "goals_editor_lesinhoud_none": "(no lesson content)",
   "goals_editor_lesinhoud_edit": "Edit",
   "goals_editor_lesinhoud_create": "Create",
+  "goals_editor_translation_none": "This goal has no {language} translation yet. Students who use the app in {language} see the Dutch title and description.",
+  "@goals_editor_translation_none": {
+    "description": "Notice above the goal editor's title field when the chosen translation language has no translation of the goal",
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_translation_stale": "Outdated: the Dutch title or description changed after this {language} translation was made. Update it and save it again.",
+  "@goals_editor_translation_stale": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_translation_save": "Save translation",
+  "goals_editor_translation_saved": "{language} translation saved",
+  "@goals_editor_translation_saved": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_language_discard_message": "The {language} title and description have changes that are not saved. Switching to {target} discards them.",
+  "@goals_editor_language_discard_message": {
+    "placeholders": { "language": { "type": "String" }, "target": { "type": "String" } }
+  },
   "goals_editor_delete_dialog_title": "Delete goal",
   "goals_editor_delete_dialog_message_single": "Delete \"{title}\"?",
   "@goals_editor_delete_dialog_message_single": {
@@ -954,6 +976,65 @@
   "lesson_run_button": "Run",
   "lesson_run_running": "Running…",
   "lesson_run_unavailable": "The example can only run inside the app.",
+  "lesson_translation_none": "This lesson has no {language} translation yet. Students who use the app in {language} see the Dutch lesson.",
+  "@lesson_translation_none": {
+    "description": "Notice above the Lesinhoud editor when the chosen translation language has no translation of the lesson",
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "lesson_translation_stale": "Outdated: the Dutch lesson changed after this {language} translation was made. Update it and save it again.",
+  "@lesson_translation_stale": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "lesson_translation_needsSource": "This subgoal has no Dutch lesson yet. Write and save the Dutch lesson first: translations are made from it.",
+  "lesson_translation_containerMissing": "Translations cannot be saved yet: the Cosmos container `translations` does not exist. Create it with partition key `/language` (README, step 3).",
+  "lesson_translation_writeFailed": "Could not write the translation: {error}",
+  "@lesson_translation_writeFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "lesson_editor_button_deleteTranslation": "Delete translation",
+  "lesson_deleteTranslation_dialog_title": "Delete the {language} translation?",
+  "@lesson_deleteTranslation_dialog_title": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "lesson_deleteTranslation_dialog_message": "Only the {language} translation is removed; the Dutch lesson stays as it is. Students who use the app in {language} see the Dutch lesson until there is a new translation.",
+  "@lesson_deleteTranslation_dialog_message": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "lesson_deleteTranslation_dialog_cancel": "Cancel",
+  "lesson_deleteTranslation_dialog_confirm": "Delete",
+  "lesson_snack_translationDeleted": "{language} translation deleted",
+  "@lesson_snack_translationDeleted": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "lesson_language_discard_title": "Discard unsaved changes?",
+  "lesson_language_discard_message": "The {language} lesson has changes that are not saved. Switching to {target} discards them.",
+  "@lesson_language_discard_message": {
+    "placeholders": { "language": { "type": "String" }, "target": { "type": "String" } }
+  },
+  "lesson_language_discard_cancel": "Keep editing",
+  "lesson_language_discard_confirm": "Discard and switch",
+  "lesson_upload_langMismatch_title": "This file is in another language",
+  "lesson_upload_langMismatch_message": "The file is marked as {fileLanguage} (lang=\"{code}\"), but you are editing the {language} lesson. Put it in this lesson anyway?",
+  "@lesson_upload_langMismatch_message": {
+    "description": "Warning when an uploaded lesson's <html lang> does not match the language chosen in the Lesinhoud toolbar",
+    "placeholders": { "fileLanguage": { "type": "String" }, "code": { "type": "String" }, "language": { "type": "String" } }
+  },
+  "lesson_upload_langMismatch_cancel": "Cancel",
+  "lesson_upload_langMismatch_confirm": "Upload anyway",
+
+  "translation_language_source": "{language} (source)",
+  "@translation_language_source": {
+    "description": "The source language's option in a teacher's language picker: lessons and goals are written in it and translated from it",
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "translation_status_current": "{language} translation: up to date",
+  "@translation_status_current": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "translation_status_stale": "{language} translation: outdated, the Dutch text changed after it was translated",
+  "@translation_status_stale": {
+    "placeholders": { "language": { "type": "String" } }
+  },
 
   "instructions_toolbar_title": "Instructions",
   "instructions_toolbar_tooltip_new": "New document",

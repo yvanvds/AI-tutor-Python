@@ -19,8 +19,6 @@ import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
-import 'package:ai_tutor_python/services/content/content.dart';
-import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/content/lesson_html_to_text.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -41,6 +39,7 @@ import 'package:ai_tutor_python/services/student_state/student_calibration.dart'
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
@@ -431,10 +430,17 @@ class TutorService extends Notifier<TutorState> {
   /// (#116) — the XP write the conductor just made reaches that provider on
   /// the next progress poll, which is what the listener in [build] feeds in.
   /// Throttle and crossing check both live on [LevelUpController].
-  void _onConceptMastered(String conceptName) {
+  ///
+  /// The overlay names the concept in the app language (#211): it gets the
+  /// goal's id with its Dutch title.
+  void _onConceptMastered(Goal concept) {
     ref
         .read(levelUpControllerProvider.notifier)
-        .armConceptMastered(conceptName: conceptName, xpAwarded: kXpPerSubgoal);
+        .armConceptMastered(
+          conceptName: concept.title,
+          goalId: concept.id,
+          xpAwarded: kXpPerSubgoal,
+        );
   }
 
   ConductorDeps _buildConductorDeps() {
@@ -464,9 +470,13 @@ class TutorService extends Notifier<TutorState> {
           unawaited(ref.read(soundServiceProvider).correctAnswer()),
       playGoalReached: () =>
           unawaited(ref.read(soundServiceProvider).playGoalReached()),
-      showGoalReached: ({required goalTitle, required description}) => ref
+      showGoalReached: (subgoal) => ref
           .read(splashServiceProvider)
-          .showGoalReached(goalTitle: goalTitle, description: description),
+          .showGoalReached(
+            goalId: subgoal.id,
+            goalTitle: subgoal.title,
+            description: subgoal.description ?? '',
+          ),
       pushConceptMastered: _onConceptMastered,
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
@@ -1427,10 +1437,16 @@ class TutorService extends Notifier<TutorState> {
   /// it (#132): the theory view is the active mode and shows a page, and
   /// that page's doc is in the content cache — where the view itself reads
   /// it from. `null` otherwise, and the message is routed as before.
-  Content? _pageOnScreen() {
+  ///
+  /// In the language the page shows it in (#207): the translation into the
+  /// app language when there is one, else the Dutch text — the same
+  /// [localizedContentProvider] the view draws, so the tutor is sent the
+  /// title and text on the student's screen.
+  LocalizedContent? _pageOnScreen() {
     if (!ref.read(askAboutPageProvider)) return null;
     final id = ref.read(viewedContentIdProvider);
-    return ref.read(contentServiceProvider).firstWhereOrNull((c) => c.id == id);
+    if (id == null) return null;
+    return ref.read(localizedContentProvider(id));
   }
 
   /// The subgoal whose lesson is on screen when that is not the active one
@@ -1530,7 +1546,11 @@ class TutorService extends Notifier<TutorState> {
       // The ritual is announced (#102): the student sees why the first
       // question is about an older topic.
       _chat.addSystemNotice(
-        ChatNotice(ChatNoticeKind.warmUpReview, args: [warmUp.subgoal.title]),
+        ChatNotice(
+          ChatNoticeKind.warmUpReview,
+          args: [warmUp.subgoal.title],
+          goalId: warmUp.subgoal.id,
+        ),
       );
     }
     final recheck = plan.recheck;
@@ -1538,7 +1558,11 @@ class TutorService extends Notifier<TutorState> {
       // So is a recheck (#187): one question on an older topic in the
       // middle of practice needs a reason on screen.
       _chat.addSystemNotice(
-        ChatNotice(ChatNoticeKind.recheck, args: [recheck.subgoal.title]),
+        ChatNotice(
+          ChatNoticeKind.recheck,
+          args: [recheck.subgoal.title],
+          goalId: recheck.subgoal.id,
+        ),
       );
     }
     _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));

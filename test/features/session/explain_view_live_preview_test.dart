@@ -18,11 +18,13 @@ import 'dart:convert';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:ai_tutor_python/services/module/module_service.dart';
 import 'package:ai_tutor_python/widgets/lesson_document.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
@@ -135,6 +137,14 @@ void main() {
       () => ModuleService(container: modules.container),
     ),
     lessonCodeRunnerProvider.overrideWithValue(runner),
+    // The theory page reads lessons in the app language (#207): English,
+    // with no translations.
+    appLocaleProvider.overrideWithValue(const Locale('en')),
+    translationServiceProvider.overrideWithValue(
+      TranslationService(
+        container: InMemoryCosmos.partitioned('language').container,
+      ),
+    ),
   ];
 
   Widget app(Widget home) => ProviderScope(
