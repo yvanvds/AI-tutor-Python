@@ -1,9 +1,12 @@
 // Issue #4 — `ContentService.reassign` moves an orphaned content doc under a
 // new subgoal id (content id mirrors subgoal id), deletes the old doc, and
 // patches the cached list so the tree updates before the next poll.
+// Issue #206 — the lesson's translations move with it, in every language.
 
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,7 +14,17 @@ import '../../helpers/in_memory_cosmos.dart';
 
 void main() {
   late InMemoryCosmos cosmos;
+  late InMemoryCosmos translations;
   late ProviderContainer container;
+
+  Map<String, dynamic> translation(String language, String contentId) =>
+      Translation.content(
+        language: language,
+        contentId: contentId,
+        title: '$contentId ($language)',
+        body: '<p>$language</p>',
+        sourceHash: 'h-$contentId',
+      ).toMap();
 
   setUp(() {
     cosmos = InMemoryCosmos([
@@ -28,10 +41,18 @@ void main() {
         'body': '<p>old</p>',
       },
     ]);
+    translations = InMemoryCosmos.partitioned('language', [
+      translation('en', 's-old'),
+      translation('fr', 's-old'),
+      translation('en', 's-taken'),
+    ]);
     container = ProviderContainer(
       overrides: [
         contentServiceProvider.overrideWith(
           () => ContentService(container: cosmos.container),
+        ),
+        translationServiceProvider.overrideWithValue(
+          TranslationService(container: translations.container),
         ),
       ],
     );
@@ -95,5 +116,38 @@ void main() {
     await svc().reassign(orphan, 's-old');
     expect(cosmos['s-old'], isNotNull);
     expect(cosmos['s-old']!['body'], '<p>loops</p>');
+    expect(translations['en/content_s-old'], isNotNull);
+    expect(translations['fr/content_s-old'], isNotNull);
+  });
+
+  test('the translations move with the lesson, in every language', () async {
+    final orphan = Content(
+      id: 's-old',
+      title: 'Loops lesson',
+      body: '<p>loops</p>',
+    );
+    await svc().reassign(orphan, 's-new');
+
+    expect(translations['en/content_s-old'], isNull);
+    expect(translations['fr/content_s-old'], isNull);
+    expect(translations['en/content_s-new']!['refId'], 's-new');
+    expect(translations['en/content_s-new']!['title'], 's-old (en)');
+    expect(translations['en/content_s-new']!['sourceHash'], 'h-s-old');
+    expect(translations['fr/content_s-new']!['body'], '<p>fr</p>');
+    expect(translations['en/content_s-taken'], isNotNull);
+  });
+
+  test('onto a lesson that has translations, those of the orphan replace them '
+      'language by language', () async {
+    final orphan = Content(
+      id: 's-old',
+      title: 'Loops lesson',
+      body: '<p>loops</p>',
+    );
+    await svc().reassign(orphan, 's-taken');
+
+    expect(translations['en/content_s-taken']!['title'], 's-old (en)');
+    expect(translations['fr/content_s-taken']!['title'], 's-old (fr)');
+    expect(translations['en/content_s-old'], isNull);
   });
 }

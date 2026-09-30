@@ -18,6 +18,7 @@ const String _milestonesContainer = 'milestones';
 const String _gradeProposalsContainer = 'grade_proposals';
 const String _reportsContainer = 'reports';
 const String _questionsContainer = 'questions';
+const String _translationsContainer = 'translations';
 
 /// Constant partition-key values for the single-partition containers
 /// (`goals`, `instructions`, `config`, `content`, `modules`, `milestones`).
@@ -114,4 +115,13 @@ class CosmosPaths {
   /// are point reads or single-partition queries. Only the teacher's
   /// Questions page fans out across partitions.
   static CosmosContainer questions() => _client.container(_questionsContainer);
+
+  /// `/language` partition. Translations of lessons and goal texts (#206):
+  /// doc id `content_${contentId}` (a lesson's `title` + `body`) or
+  /// `goal_${goalId}` (a goal's `title` + `description`), one doc per
+  /// language. Dutch is the source language and has no docs here: it stays
+  /// in `content` and `goals`. Partitioned by language so a student fetches
+  /// only the language they read in — and nothing when that is Dutch.
+  static CosmosContainer translations() =>
+      _client.container(_translationsContainer);
 }

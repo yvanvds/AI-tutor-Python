@@ -1,0 +1,159 @@
+// A lesson or goal text in the language the student reads in (#206), with
+// what a page needs to say about it: that it is the Dutch source because
+// there is no translation yet ([isFallback]), or that the translation was
+// made from Dutch text that has changed since ([isStale]).
+//
+//     final shown = localizedContent(content, ref.watch(translationsProvider));
+//
+// Both value types have `==`, so a widget can `select` on the result and
+// rebuild only when the text it shows changes.
+
+import 'package:ai_tutor_python/services/content/content.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translations_provider.dart';
+import 'package:flutter/foundation.dart';
+
+/// A lesson as it is shown in one language.
+@immutable
+class LocalizedContent {
+  const LocalizedContent({
+    required this.contentId,
+    required this.language,
+    required this.title,
+    required this.body,
+    this.isFallback = false,
+    this.isStale = false,
+  });
+
+  final String contentId;
+
+  /// The language [title] and [body] are in: the app language, or
+  /// [kSourceLanguage] when [isFallback].
+  final String language;
+
+  final String title;
+
+  /// HTML body fragment, as in `Content.body`.
+  final String body;
+
+  /// The app language is not Dutch and the lesson has no translation into
+  /// it, so this is the Dutch source.
+  final bool isFallback;
+
+  /// This is a translation, and the Dutch lesson changed after it was made.
+  final bool isStale;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LocalizedContent &&
+      other.contentId == contentId &&
+      other.language == language &&
+      other.title == title &&
+      other.body == body &&
+      other.isFallback == isFallback &&
+      other.isStale == isStale;
+
+  @override
+  int get hashCode =>
+      Object.hash(contentId, language, title, body, isFallback, isStale);
+}
+
+/// A goal's title and description as they are shown in one language.
+@immutable
+class LocalizedGoal {
+  const LocalizedGoal({
+    required this.goalId,
+    required this.language,
+    required this.title,
+    this.description,
+    this.isFallback = false,
+    this.isStale = false,
+  });
+
+  final String goalId;
+
+  /// The language [title] and [description] are in: the app language, or
+  /// [kSourceLanguage] when [isFallback].
+  final String language;
+
+  final String title;
+
+  /// `null` only when the Dutch goal has none and this is the Dutch text.
+  final String? description;
+
+  /// The app language is not Dutch and the goal has no translation into it,
+  /// so this is the Dutch source.
+  final bool isFallback;
+
+  /// This is a translation, and the Dutch title or description changed
+  /// after it was made.
+  final bool isStale;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LocalizedGoal &&
+      other.goalId == goalId &&
+      other.language == language &&
+      other.title == title &&
+      other.description == description &&
+      other.isFallback == isFallback &&
+      other.isStale == isStale;
+
+  @override
+  int get hashCode =>
+      Object.hash(goalId, language, title, description, isFallback, isStale);
+}
+
+/// [content] in [translations]' language: its translation when there is
+/// one, else the Dutch source with [LocalizedContent.isFallback] set (not
+/// set when the language is Dutch).
+LocalizedContent localizedContent(
+  Content content,
+  LanguageTranslations translations,
+) {
+  final translation = translations.isSource
+      ? null
+      : translations.contentFor(content.id);
+  if (translation == null) {
+    return LocalizedContent(
+      contentId: content.id,
+      language: kSourceLanguage,
+      title: content.title,
+      body: content.body,
+      isFallback: !translations.isSource,
+    );
+  }
+  return LocalizedContent(
+    contentId: content.id,
+    language: translation.language,
+    title: translation.title,
+    body: translation.text,
+    isStale: translation.isStaleFor(contentSourceHash(content)),
+  );
+}
+
+/// [goal]'s title and description in [translations]' language: the
+/// translation when there is one, else the Dutch source with
+/// [LocalizedGoal.isFallback] set (not set when the language is Dutch).
+LocalizedGoal localizedGoal(Goal goal, LanguageTranslations translations) {
+  final translation = translations.isSource
+      ? null
+      : translations.goalFor(goal.id);
+  if (translation == null) {
+    return LocalizedGoal(
+      goalId: goal.id,
+      language: kSourceLanguage,
+      title: goal.title,
+      description: goal.description,
+      isFallback: !translations.isSource,
+    );
+  }
+  return LocalizedGoal(
+    goalId: goal.id,
+    language: translation.language,
+    title: translation.title,
+    description: translation.text,
+    isStale: translation.isStaleFor(goalSourceHash(goal)),
+  );
+}

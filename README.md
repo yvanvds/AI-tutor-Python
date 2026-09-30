@@ -110,6 +110,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `modules`        | `/type`       |
    | `milestones`     | `/type`       |
    | `questions`      | `/subgoalId`  |
+   | `translations`   | `/language`   |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc
@@ -129,6 +130,12 @@ This stores accounts, goals, progress, instructions, and status reports.
    stored or served from it (#186), and the teacher's **Questions** page
    says the container is missing. Its partition key is `/subgoalId`, not
    `/uid` or `/type`.
+
+   `translations` (translated lessons and goal texts, #206) can be missing
+   too: until it exists, every student sees the lessons and goal texts in
+   Dutch, whatever language they picked in Options. Its partition key is
+   `/language`. From the Azure CLI:
+   `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name translations --partition-key-path /language --partition-key-version 2`
 
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and

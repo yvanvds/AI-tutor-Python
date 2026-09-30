@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'content.dart';
@@ -51,6 +52,10 @@ class ContentService extends Notifier<List<Content>> {
   /// new doc with id == [targetGoalId] (overwriting whatever was there), and
   /// the old doc is deleted when its id differs. Returns the new doc.
   ///
+  /// The lesson's translations move with it, in every language (#206;
+  /// `TranslationService.moveContent`) — before the old doc is deleted, so
+  /// a failure leaves the orphan in place and the reassign can be retried.
+  ///
   /// The caller is responsible for setting `Goal.contentId` on the target;
   /// this service doesn't know about goals. The cached list is patched
   /// optimistically so the UI doesn't have to wait for the next poll.
@@ -62,6 +67,9 @@ class ContentService extends Notifier<List<Content>> {
     );
     await upsert(moved);
     if (orphan.id != targetGoalId) {
+      await ref
+          .read(translationServiceProvider)
+          .moveContent(orphan.id, targetGoalId);
       await delete(orphan.id);
     }
     state = List.unmodifiable([
