@@ -362,7 +362,8 @@ class AppHarness {
   /// keyed by container name as `CosmosPaths` names them (#101). A doc whose
   /// id already exists in the seed replaces it, so a flow can start a
   /// student mid-curriculum — beliefs, progress, an edited goal — instead
-  /// of on the first exercise.
+  /// of on the first exercise. Docs for `translations` land in the
+  /// partition their `language` names (#207).
   final Map<String, List<Map<String, dynamic>>> extraDocs;
 
   /// Every URL the app asked the operating system to open (#57).
@@ -405,8 +406,12 @@ class AppHarness {
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
     for (final entry in extraDocs.entries) {
+      final store = cosmos[entry.key];
+      // `translations` is partitioned on a doc field (#206): a write names
+      // the partition, as the app's own writes do.
+      final field = store.partitionKeyField;
       for (final doc in entry.value) {
-        cosmos[entry.key].upsert(doc);
+        store.upsert(doc, partitionKey: field == null ? null : doc[field]);
       }
     }
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');

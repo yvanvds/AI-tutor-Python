@@ -1093,6 +1093,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Nog geen lesinhoud beschikbaar voor dit subdoel.';
 
   @override
+  String get session_explain_translationMissing =>
+      'Deze les is nog niet vertaald, dus je ziet de Nederlandse tekst.';
+
+  @override
   String get session_explain_defaultPillLabel => 'Concept';
 
   @override

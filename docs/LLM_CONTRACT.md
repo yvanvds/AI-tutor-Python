@@ -255,6 +255,9 @@ Inputs (`request_type: content_question`, built by
   (`lessonHtmlToText`): headings and list items on their own lines,
   `<pre>` blocks as fenced code, tags gone, entities decoded, capped at
   12 000 characters.
+- Both are the page as the student sees it (#207): in the app language
+  when the lesson has a translation into it, else the Dutch text the page
+  falls back to (`localizedContentProvider`).
 - The system prompt is the `contentQuestion` instruction doc when the
   teacher has authored one, else the built-in default
   (`defaultContentQuestionInstruction`), plus `alwaysInclude`; `{goal}`,

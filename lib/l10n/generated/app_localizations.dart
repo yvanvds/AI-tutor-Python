@@ -1849,6 +1849,12 @@ abstract class AppLocalizations {
   /// **'No lesson content available for this subgoal yet.'**
   String get session_explain_missingContent;
 
+  /// Notice above the theory page when the lesson has no translation into the app language and its Dutch text is shown instead. Names the app language itself. Never shown in Dutch, the language lessons are written in.
+  ///
+  /// In en, this message translates to:
+  /// **'This lesson is not available in English yet, so it is shown in Dutch.'**
+  String get session_explain_translationMissing;
+
   /// Fallback label for the explain-view root pill when no root goal is set; displayed uppercase
   ///
   /// In en, this message translates to:

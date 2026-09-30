@@ -7,12 +7,18 @@
 //
 // Both value types have `==`, so a widget can `select` on the result and
 // rebuild only when the text it shows changes.
+//
+// A lesson from the content cache has its own provider,
+// [localizedContentProvider] (#207): the theory page shows it, and a
+// question about that page sends it to the tutor, so both use the same text.
 
 import 'package:ai_tutor_python/services/content/content.dart';
+import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// A lesson as it is shown in one language.
 @immutable
@@ -132,6 +138,25 @@ LocalizedContent localizedContent(
     isStale: translation.isStaleFor(contentSourceHash(content)),
   );
 }
+
+/// The lesson [contentId] from the content cache (`contentServiceProvider`)
+/// in the app language, as [localizedContent] gives it. `null` while the
+/// lesson is not in the cache.
+///
+/// It notifies only when the text shown changes: the 5 s polls of `content`
+/// and `translations` hand back fresh objects each time, but
+/// [LocalizedContent] compares by value, so a poll that changes neither the
+/// Dutch lesson nor its translation does not reach a listener.
+final localizedContentProvider = Provider.autoDispose
+    .family<LocalizedContent?, String>((ref, contentId) {
+      final translations = ref.watch(translationsProvider);
+      for (final content in ref.watch(contentServiceProvider)) {
+        if (content.id == contentId) {
+          return localizedContent(content, translations);
+        }
+      }
+      return null;
+    });
 
 /// [goal]'s title and description in [translations]' language: the
 /// translation when there is one, else the Dutch source with

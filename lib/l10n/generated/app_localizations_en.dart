@@ -1085,6 +1085,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No lesson content available for this subgoal yet.';
 
   @override
+  String get session_explain_translationMissing =>
+      'This lesson is not available in English yet, so it is shown in Dutch.';
+
+  @override
   String get session_explain_defaultPillLabel => 'Concept';
 
   @override

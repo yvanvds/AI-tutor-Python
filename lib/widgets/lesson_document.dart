@@ -67,13 +67,19 @@ class LessonRunRequest {
 /// Wraps an authored body [fragment] in the minimal lesson document: the
 /// shared stylesheet inlined, plus the live-preview bootstrap that turns
 /// every `pre.run` block into a code + output pair.
+///
+/// [language] is the language code of [fragment] (`nl`, `en`, …) and goes
+/// on the document as `lang` (#207), so the WebView hyphenates the text and
+/// a screen reader pronounces it in that language.
 String buildLessonDocument({
   required String fragment,
   required String css,
   required LessonRunnerLabels labels,
+  required String language,
 }) {
+  final lang = const HtmlEscape(HtmlEscapeMode.attribute).convert(language);
   return '<!doctype html>'
-      '<html><head>'
+      '<html lang="$lang"><head>'
       '<meta charset="utf-8">'
       '<meta name="viewport" content="width=device-width,initial-scale=1">'
       '<style>$css</style>'

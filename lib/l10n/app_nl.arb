@@ -321,6 +321,7 @@
   "session_explain_placeholder_noSubgoal": "Kies een subdoel in Leerpad om de uitleg te bekijken.",
   "session_explain_loading": "Lesinhoud laden…",
   "session_explain_missingContent": "Nog geen lesinhoud beschikbaar voor dit subdoel.",
+  "session_explain_translationMissing": "Deze les is nog niet vertaald, dus je ziet de Nederlandse tekst.",
   "session_explain_defaultPillLabel": "Concept",
   "session_explain_prev_button": "Vorige",
   "session_explain_next_button": "Volgende",

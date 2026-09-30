@@ -608,6 +608,10 @@
   "session_explain_placeholder_noSubgoal": "Pick a subgoal in the learning path to see the explanation.",
   "session_explain_loading": "Loading lesson…",
   "session_explain_missingContent": "No lesson content available for this subgoal yet.",
+  "session_explain_translationMissing": "This lesson is not available in English yet, so it is shown in Dutch.",
+  "@session_explain_translationMissing": {
+    "description": "Notice above the theory page when the lesson has no translation into the app language and its Dutch text is shown instead. Names the app language itself. Never shown in Dutch, the language lessons are written in."
+  },
   "session_explain_defaultPillLabel": "Concept",
   "@session_explain_defaultPillLabel": {
     "description": "Fallback label for the explain-view root pill when no root goal is set; displayed uppercase"

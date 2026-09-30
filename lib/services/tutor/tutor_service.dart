@@ -19,8 +19,6 @@ import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/config/model_preference.dart';
-import 'package:ai_tutor_python/services/content/content.dart';
-import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/content/lesson_html_to_text.dart';
 import 'package:ai_tutor_python/services/debug/debug_session_recorder.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -41,6 +39,7 @@ import 'package:ai_tutor_python/services/student_state/student_calibration.dart'
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
@@ -1427,10 +1426,16 @@ class TutorService extends Notifier<TutorState> {
   /// it (#132): the theory view is the active mode and shows a page, and
   /// that page's doc is in the content cache — where the view itself reads
   /// it from. `null` otherwise, and the message is routed as before.
-  Content? _pageOnScreen() {
+  ///
+  /// In the language the page shows it in (#207): the translation into the
+  /// app language when there is one, else the Dutch text — the same
+  /// [localizedContentProvider] the view draws, so the tutor is sent the
+  /// title and text on the student's screen.
+  LocalizedContent? _pageOnScreen() {
     if (!ref.read(askAboutPageProvider)) return null;
     final id = ref.read(viewedContentIdProvider);
-    return ref.read(contentServiceProvider).firstWhereOrNull((c) => c.id == id);
+    if (id == null) return null;
+    return ref.read(localizedContentProvider(id));
   }
 
   /// The subgoal whose lesson is on screen when that is not the active one
