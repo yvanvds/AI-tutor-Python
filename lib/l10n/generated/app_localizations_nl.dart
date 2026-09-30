@@ -1535,6 +1535,29 @@ class AppLocalizationsNl extends AppLocalizations {
   String get goals_editor_lesinhoud_create => 'Maken';
 
   @override
+  String goals_editor_translation_none(String language) {
+    return 'Dit doel heeft nog geen vertaling ($language). Wie de app in die taal gebruikt, ziet de Nederlandse titel en beschrijving.';
+  }
+
+  @override
+  String goals_editor_translation_stale(String language) {
+    return 'Verouderd: de Nederlandse titel of beschrijving is gewijzigd nadat deze vertaling ($language) gemaakt werd. Werk ze bij en sla ze opnieuw op.';
+  }
+
+  @override
+  String get goals_editor_translation_save => 'Vertaling opslaan';
+
+  @override
+  String goals_editor_translation_saved(String language) {
+    return 'Vertaling ($language) opgeslagen';
+  }
+
+  @override
+  String goals_editor_language_discard_message(String language, String target) {
+    return 'De titel en beschrijving ($language) hebben wijzigingen die nog niet opgeslagen zijn. Wisselen naar $target gooit ze weg.';
+  }
+
+  @override
   String get goals_editor_delete_dialog_title => 'Doel verwijderen';
 
   @override

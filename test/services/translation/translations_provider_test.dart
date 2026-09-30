@@ -360,5 +360,54 @@ void main() {
         );
       },
     );
+
+    test(
+      'goalTranslationStatuses (#210): current, stale or missing per language',
+      () async {
+        final container = teacherContainer(cosmos.container);
+        container.listen(languageTranslationsProvider('en'), (_, _) {});
+        container.listen(languageTranslationsProvider('fr'), (_, _) {});
+        await settle();
+        final languages = [
+          container.read(languageTranslationsProvider('en')),
+          container.read(languageTranslationsProvider('fr')),
+        ];
+
+        expect(goalTranslationStatuses(_goal, languages), {
+          'en': TranslationStatus.current,
+          'fr': TranslationStatus.missing,
+        });
+        // The title or the description changing makes it stale.
+        for (final changed in [
+          Goal(
+            id: 's1',
+            title: 'Variabelen en waarden',
+            description: _goal.description,
+            parentId: 'r1',
+            order: 1000,
+          ),
+          Goal(
+            id: 's1',
+            title: _goal.title,
+            description: 'Waarden bewaren onder een naam.',
+            parentId: 'r1',
+            order: 1000,
+          ),
+        ]) {
+          expect(goalTranslationStatuses(changed, languages), {
+            'en': TranslationStatus.stale,
+            'fr': TranslationStatus.missing,
+          });
+        }
+        // A goal nobody translated.
+        expect(
+          goalTranslationStatuses(
+            Goal(id: 's2', title: 'Lijsten', order: 2000),
+            languages,
+          ),
+          {'en': TranslationStatus.missing, 'fr': TranslationStatus.missing},
+        );
+      },
+    );
   });
 }

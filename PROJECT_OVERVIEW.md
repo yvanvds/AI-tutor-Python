@@ -114,8 +114,8 @@ lib/
 │   ├── translation/             # NEW (#206) — translations of lessons and goal texts, `translations` container
 │   │   ├── translation.dart              # Translation model (content_/goal_ doc ids), kSourceLanguage 'nl', kTranslationLanguages / kContentLanguages, sourceHash helpers, TranslationStatus (missing / current / stale, #208)
 │   │   ├── translation_service.dart      # watchLanguage / listLanguage (tolerant) + upsert / delete / moveContent (throw)
-│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor); languageTranslationsProvider(language) for the teacher's editors, with put / remove, and contentTranslationStatuses (#208)
-│   │   └── localized_text.dart           # localizedContent / localizedGoal → text + isFallback / isStale; localizedContentProvider(contentId) — the theory page and its content question (#207)
+│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor); languageTranslationsProvider(language) for the teacher's editors, with put / remove, and contentTranslationStatuses (#208) / goalTranslationStatuses (#210)
+│   │   └── localized_text.dart           # localizedContent / localizedGoal → text + isFallback / isStale; localizedContentProvider(contentId) — the theory page and its content question (#207); localizedGoalOf(goal) — what the student-facing goal widgets watch (#210)
 │   │
 │   ├── module/                  # NEW — top-level grouping of root goals (v1: single 'python-basics')
 │   │   ├── module.dart                   # Module model + defaultModuleId constant
@@ -183,7 +183,7 @@ lib/
 │   │   │   ├── quiz_view.dart          # Full MCQ surface: header pill + TutorMarkdown prompt + optional code card + 2-column option grid (badges A–F) + colored feedback panel + "Volgende"
 │   │   │   └── playground_view.dart    # Playground header + file browser + reused PracticeView (no objective)
 │   │   └── widgets/
-│   │       ├── objective_banner.dart   # "Huidig doel" pill + title from goalSelectionProvider
+│   │       ├── objective_banner.dart   # "Huidig doel" pill + title from goalSelectionProvider, in the app language (#210)
 │   │       ├── run_controls.dart       # Run/Stop/Reset/Hint/Send-to-tutor strip
 │   │       └── output_panel.dart       # py_runner-backed runner + log view + interactive input
 │   │
@@ -221,7 +221,7 @@ lib/
 │   │                                   #   DebugDialog, behind developerToolsProvider); About + the
 │   │                                   #   manual update check (#48)
 │   │
-│   ├── goals/                          # Teacher: goal-tree CRUD + reparent + DnD; new export/import buttons (v2 JSON envelope; Add vs Replace; preserves contentId); goal_form has inline _LesinhoudRow that opens Lesinhoud
+│   ├── goals/                          # Teacher: goal-tree CRUD + reparent + DnD; new export/import buttons (v2 JSON envelope; Add vs Replace; preserves contentId); goal_form has inline _LesinhoudRow that opens Lesinhoud, and a language picker for title + description (#210)
 │   ├── instructions/                   # Teacher: doc/section editor over instructions/{id}.sections{}
 │   └── account/
 │       ├── accounts_page.dart          # Teacher: paginated DataTable; status dot + unacknowledged signal-event badge per student; helpers _activeRootTitle / _overallRootProgress
@@ -391,7 +391,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 - **Quiz (sub-mode of Oefenen)** ([quiz_view.dart](lib/features/session/modes/quiz_view.dart)) — full MCQ surface: header pill + `TutorMarkdown` prompt + optional code card (syntax highlighted) + 2-column option grid (badges A–F) + colored feedback panel (green/red, rendered via `TutorMarkdown`) + "Volgende" advance button. Reads/writes `activeMcqProvider`.
 - **Playground** ([playground_view.dart](lib/features/session/modes/playground_view.dart)) — header strip with the file browser (save / open / delete, #19) over a re-used `PracticeView(showObjective: false)`. Saved files mirror to the student's `playground_files` container so they follow them between classroom machines (#31).
 
-[ObjectiveBanner](lib/features/session/widgets/objective_banner.dart) reads the active goal from `goalSelectionProvider`. [RunControls](lib/features/session/widgets/run_controls.dart) renders Run/Stop as a pill button, plus ghost icon buttons for Reset, Hint (`tutorService.requestHint(code)`), and Send-to-tutor (`tutorService.submitCode(code)`).
+[ObjectiveBanner](lib/features/session/widgets/objective_banner.dart) reads the active goal from `goalSelectionProvider` and shows its title and description in the app language (#210). [RunControls](lib/features/session/widgets/run_controls.dart) renders Run/Stop as a pill button, plus ghost icon buttons for Reset, Hint (`tutorService.requestHint(code)`), and Send-to-tutor (`tutorService.submitCode(code)`).
 
 ### Python code panel (editor + execution)
 
@@ -406,7 +406,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 
 ### Lesson content authoring (teacher)
 
-[features/lesson_content/lesson_content_page.dart](lib/features/lesson_content/lesson_content_page.dart) is a teacher-only "Lesinhoud" page with a two-pane layout: a read-only module/goal tree on the left (module headers → root goals → subgoals, grouped by `moduleId`), a markdown editor on the right. On `initState()` it bootstraps the default module (`ModuleService.ensureDefaultModule()`) and runs `GoalsService.backfillModuleIds()` to populate `moduleId` on legacy docs. Selecting a subgoal loads its linked `Content` doc (or creates a blank one keyed by the subgoal id). Save upserts the `Content` doc and sets `Goal.contentId` if needed; a "Disconnect" action clears `Goal.contentId` while preserving the content doc. The subgoal editor in [features/goals/editor/goal_form.dart](lib/features/goals/editor/goal_form.dart) embeds an inline `_LesinhoudRow` showing whether content exists, with a one-click "Bewerk"/"Maak" handoff. The toolbar picks the language the title, editor, preview and Upload work on (#208): Nederlands, the source, saves the `content` doc as before; English saves the lesson's `content_${id}` doc in `translations` with the hash of the Dutch lesson as stored, and never touches `content`. Upload reads `<html lang>` and warns when it is not the language picked; switching language with unsaved changes asks first; "Delete translation" removes only the translation. The tree rows and `_LesinhoudRow` show an EN badge per translation, marked when it is stale (`sourceHash` no longer matches the Dutch text).
+[features/lesson_content/lesson_content_page.dart](lib/features/lesson_content/lesson_content_page.dart) is a teacher-only "Lesinhoud" page with a two-pane layout: a read-only module/goal tree on the left (module headers → root goals → subgoals, grouped by `moduleId`), a markdown editor on the right. On `initState()` it bootstraps the default module (`ModuleService.ensureDefaultModule()`) and runs `GoalsService.backfillModuleIds()` to populate `moduleId` on legacy docs. Selecting a subgoal loads its linked `Content` doc (or creates a blank one keyed by the subgoal id). Save upserts the `Content` doc and sets `Goal.contentId` if needed; a "Disconnect" action clears `Goal.contentId` while preserving the content doc. The subgoal editor in [features/goals/editor/goal_form.dart](lib/features/goals/editor/goal_form.dart) embeds an inline `_LesinhoudRow` showing whether content exists, with a one-click "Bewerk"/"Maak" handoff. The toolbar picks the language the title, editor, preview and Upload work on (#208): Nederlands, the source, saves the `content` doc as before; English saves the lesson's `content_${id}` doc in `translations` with the hash of the Dutch lesson as stored, and never touches `content`. Upload reads `<html lang>` and warns when it is not the language picked; switching language with unsaved changes asks first; "Delete translation" removes only the translation. The tree rows and `_LesinhoudRow` show an EN badge per translation, marked when it is stale (`sourceHash` no longer matches the Dutch text). The goal editor itself has the same language picker for a goal's title and description (#210): Nederlands writes `goals` as before; English fills the fields from the goal's `goal_${id}` translation and "Save translation" writes only that doc, with the hash of the Dutch goal as stored (an empty title falls back on the Dutch one). Next to the picker an EN badge says whether the goal has a translation and whether it is stale; a notice above the fields says when there is none or it is stale; switching language with unsaved translation edits asks first.
 
 ### Student progression / mastery (LO-belief model)
 
@@ -433,7 +433,7 @@ This is the heart of the redesign — the previous three-phase (guiding/warm-up/
 **Persistence model.** `LoBeliefsService` reads/writes `lo_beliefs` (one upsert per affected LO per turn). `AccountService.setCalibration()` writes the embedded calibration substructure. `ProgressService.upsert` writes the derived `progress` cache and a best-effort `progress_history` sample. `TurnHistoryService.append()` writes a full `PersistedTurnRecord` to `turn_history` (best-effort — Cosmos blips don't dead-end the student flow).
 
 **Student-facing surfaces.**
-- [features/progress/leerpad_page.dart](lib/features/progress/leerpad_page.dart) — stack of [LeerpadCard](lib/features/progress/widgets/leerpad_card.dart)s, one per root goal; active card expands to show child chips ([leerpad_child_chip.dart](lib/features/progress/widgets/leerpad_child_chip.dart)) and a "Verder" CTA.
+- [features/progress/leerpad_page.dart](lib/features/progress/leerpad_page.dart) — stack of [LeerpadCard](lib/features/progress/widgets/leerpad_card.dart)s, one per root goal; active card expands to show child chips ([leerpad_child_chip.dart](lib/features/progress/widgets/leerpad_child_chip.dart)) and a "Verder" CTA. Goal titles and descriptions here, in the objective banner, in the theory page's header pill, in the student's own `GoalTile` and in the Options goal picker are in the app language (#210, `localizedGoalOf`): the goal's translation when there is one, else the Dutch text without a notice. Teacher pages (goals, questions, milestones, reports, the student drawer) show the Dutch source; prompts get the Dutch text.
 - [features/progress/student_progress_list.dart](lib/features/progress/student_progress_list.dart) + [goal_tile.dart](lib/features/progress/goal_tile.dart) — older list view, still used inside the teacher detail drawer.
 
 ### Level-up overlay
@@ -536,7 +536,7 @@ Open work is tracked as GitHub issues on `yvanvds/AI-tutor-Python`; there is no 
 - **No sandboxing of student code.** The script runs in a child process via `py_runner` with full filesystem/network access.
 - **`dart_openai` is pinned to a personal fork** (`https://github.com/yvanvds/openai.git`).
 - **Windows-only.** No iOS/Android/macOS/Linux/Web target.
-- **UI text goes through `AppLocalizations`** (#23): English is the base language and Dutch the translation, both under [lib/l10n/](lib/l10n/), with the language picked in the Options panel. Teacher-authored data — goal titles, lesson content, AI instructions — is not part of the ARB files and stays in whatever language it was written in.
+- **UI text goes through `AppLocalizations`** (#23): English is the base language and Dutch the translation, both under [lib/l10n/](lib/l10n/), with the language picked in the Options panel. Teacher-authored data — goal titles, lesson content, AI instructions — is not part of the ARB files and stays in whatever language it was written in; lessons and goal titles/descriptions can have translations of their own in `translations` (#206–#210).
 - **Goal import "Replace" mode preserves contentId but not authored Content docs themselves.** A re-imported tree keeps the link, but if the imported tree omits a subgoal, the link is dropped and the orphaned `Content` doc is left in the container.
 - **`isWarmUp` is a vestigial field** on `progress_history` samples — the new conductor has no warm-up phase but writes `false` for backward compatibility with the existing time-series.
 

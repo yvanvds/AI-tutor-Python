@@ -11,6 +11,9 @@
 // A lesson from the content cache has its own provider,
 // [localizedContentProvider] (#207): the theory page shows it, and a
 // question about that page sends it to the tutor, so both use the same text.
+// A goal's title and description are watched through [localizedGoalOf]
+// (#210): the leerpad, the objective banner, the theory page's header and
+// the goal picker in Options.
 
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
@@ -182,3 +185,17 @@ LocalizedGoal localizedGoal(Goal goal, LanguageTranslations translations) {
     isStale: translation.isStaleFor(goalSourceHash(goal)),
   );
 }
+
+/// [goal]'s title and description in the app language, for a
+/// student-facing widget to watch (#210):
+///
+///     final shown = ref.watch(localizedGoalOf(goal));
+///
+/// It notifies only when the text shown changes, not on every poll of
+/// `translations`. Without a translation it is the Dutch text, which the
+/// student-facing widgets show as it is, without a notice. Teacher pages
+/// show the Dutch source and do not use this.
+ProviderListenable<LocalizedGoal> localizedGoalOf(Goal goal) =>
+    translationsProvider.select(
+      (translations) => localizedGoal(goal, translations),
+    );

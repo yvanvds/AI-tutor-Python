@@ -11,6 +11,7 @@
 
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter/foundation.dart';
@@ -79,6 +80,19 @@ Map<String, TranslationStatus> contentTranslationStatuses(
         language.contentFor(content.id),
         hash,
       ),
+  };
+}
+
+/// Where [goal]'s title and description stand in each language of
+/// [translations], by language code (#210).
+Map<String, TranslationStatus> goalTranslationStatuses(
+  Goal goal,
+  Iterable<LanguageTranslations> translations,
+) {
+  final hash = goalSourceHash(goal);
+  return {
+    for (final language in translations)
+      language.language: translationStatus(language.goalFor(goal.id), hash),
   };
 }
 

@@ -1522,6 +1522,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get goals_editor_lesinhoud_create => 'Create';
 
   @override
+  String goals_editor_translation_none(String language) {
+    return 'This goal has no $language translation yet. Students who use the app in $language see the Dutch title and description.';
+  }
+
+  @override
+  String goals_editor_translation_stale(String language) {
+    return 'Outdated: the Dutch title or description changed after this $language translation was made. Update it and save it again.';
+  }
+
+  @override
+  String get goals_editor_translation_save => 'Save translation';
+
+  @override
+  String goals_editor_translation_saved(String language) {
+    return '$language translation saved';
+  }
+
+  @override
+  String goals_editor_language_discard_message(String language, String target) {
+    return 'The $language title and description have changes that are not saved. Switching to $target discards them.';
+  }
+
+  @override
   String get goals_editor_delete_dialog_title => 'Delete goal';
 
   @override

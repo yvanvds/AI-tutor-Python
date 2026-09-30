@@ -1,12 +1,15 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// "Huidig doel" banner shown at the top of [PracticeView]. Renders nothing
 /// when there is no active goal (e.g. before the conductor has selected one).
+/// The goal's title and description are in the app language when there is
+/// a translation, else in Dutch (#210).
 class ObjectiveBanner extends ConsumerWidget {
   const ObjectiveBanner({super.key});
 
@@ -17,7 +20,8 @@ class ObjectiveBanner extends ConsumerWidget {
     final goal = activeChildGoal ?? selection.activeRootGoal;
     if (goal == null) return const SizedBox.shrink();
 
-    final description = (goal.description ?? '').trim();
+    final shown = ref.watch(localizedGoalOf(goal));
+    final description = (shown.description ?? '').trim();
     final progress = activeChildGoal == null
         ? 0.0
         : ref.watch(ambientProgressProvider).clamp(0.0, 1.0);
@@ -61,7 +65,7 @@ class ObjectiveBanner extends ConsumerWidget {
               const SizedBox(width: AppSpacing.s),
               Expanded(
                 child: Text(
-                  goal.title,
+                  shown.title,
                   style: TextStyle(
                     color: AppColors.fg,
                     fontSize: 14.5,

@@ -1,12 +1,15 @@
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Compact child-goal pill rendered inside an active root card. Two-line:
 /// title + tnum percentage; check icon when the conductor has moved the
-/// student past it.
-class LeerpadChildChip extends StatelessWidget {
+/// student past it. The title is in the app language when there is a
+/// translation, else in Dutch (#210).
+class LeerpadChildChip extends ConsumerWidget {
   const LeerpadChildChip({
     super.key,
     required this.goal,
@@ -25,7 +28,8 @@ class LeerpadChildChip extends StatelessWidget {
   final bool completed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final title = ref.watch(localizedGoalOf(goal)).title;
     final pct = '${(progress.clamp(0.0, 1.0) * 100).round()}%';
 
     return Container(
@@ -48,7 +52,7 @@ class LeerpadChildChip extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  goal.title,
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

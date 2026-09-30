@@ -4,7 +4,8 @@
 // says so; in Dutch, the source language, it is the lesson as written, with
 // no notice and nothing fetched from `translations`. The page follows the
 // Dutch lesson, its translation and the language, and the document says
-// which language it is in (`lang`).
+// which language it is in (`lang`). The header above the page names the
+// root goal in the app language too (#210).
 //
 // Mounts the real `ExplainView` over the real `GoalsService`,
 // `ContentService` and `TranslationService` on in-memory Cosmos containers,
@@ -314,6 +315,33 @@ void main() {
     await poll(tester);
     expect(shown(), contains(revised));
     expect(find.text(_notice), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('the header names the root goal in the app language: the '
+      'Dutch title until it has a translation, then the translation; Dutch '
+      'again in Nederlands (#210)', (tester) async {
+    await mount(tester, const Locale('en'));
+    expect(find.text('BASICS'), findsOneWidget);
+
+    translations.upsert(
+      Translation.goal(
+        language: 'en',
+        goalId: 'r1',
+        title: 'Getting started',
+        description: '',
+        sourceHash: goalSourceHash(root),
+      ).toMap(),
+      partitionKey: 'en',
+    );
+    await poll(tester);
+    expect(find.text('GETTING STARTED'), findsOneWidget);
+    expect(find.text('BASICS'), findsNothing);
+
+    await switchTo(tester, const Locale('nl'));
+    expect(find.text('BASICS'), findsOneWidget);
+    expect(find.text('GETTING STARTED'), findsNothing);
 
     await unmount(tester);
   });

@@ -3,10 +3,15 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// A goal with its progress bar. For the student ([readOnly] off) the title
+/// and description are in the app language when there is a translation,
+/// else in Dutch (#210); the teacher's read-only view shows the Dutch
+/// source, as every teacher page does.
 class GoalTile extends ConsumerWidget {
   final Goal goal;
   final Goal? rootGoal;
@@ -37,6 +42,11 @@ class GoalTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final indent = depth * 16.0;
     final theme = Theme.of(context);
+    final localized = readOnly ? null : ref.watch(localizedGoalOf(goal));
+    final title = localized?.title ?? goal.title;
+    final description = localized == null
+        ? goal.description
+        : localized.description;
 
     return Padding(
       padding: EdgeInsets.only(left: indent, bottom: 12),
@@ -51,7 +61,7 @@ class GoalTile extends ConsumerWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(goal.title, style: theme.textTheme.titleMedium),
+                    child: Text(title, style: theme.textTheme.titleMedium),
                   ),
                   if (!readOnly && isSubgoal && progress < 1.0)
                     ElevatedButton.icon(
@@ -107,14 +117,10 @@ class GoalTile extends ConsumerWidget {
                 ],
               ),
 
-              if (goal.description != null &&
-                  goal.description!.trim().isNotEmpty)
+              if (description != null && description.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                  child: Text(
-                    goal.description!,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  child: Text(description, style: theme.textTheme.bodySmall),
                 ),
 
               Row(

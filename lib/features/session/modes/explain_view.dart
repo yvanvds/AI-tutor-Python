@@ -362,7 +362,9 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-class _ChromeHeader extends StatelessWidget {
+/// The pill with the root goal's title — in the app language when there is
+/// a translation, else in Dutch (#210) — and the page counter.
+class _ChromeHeader extends ConsumerWidget {
   const _ChromeHeader({
     required this.child,
     required this.root,
@@ -373,9 +375,13 @@ class _ChromeHeader extends StatelessWidget {
   final List<Goal> siblings;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final root = this.root;
+    final rootTitle = root == null
+        ? null
+        : ref.watch(localizedGoalOf(root)).title;
     final pill =
-        (root?.title ??
+        (rootTitle ??
                 AppLocalizations.of(context).session_explain_defaultPillLabel)
             .toUpperCase();
     final idx = siblings.indexWhere((g) => g.id == child.id);

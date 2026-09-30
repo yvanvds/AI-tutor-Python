@@ -46,10 +46,13 @@ import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
 import 'package:ai_tutor_python/services/github/github_issue_service.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/version.dart';
@@ -244,6 +247,7 @@ void main() {
   late InMemoryCosmos turns;
   late InMemoryCosmos accounts;
   late InMemoryCosmos config;
+  late InMemoryCosmos translations;
   late DebugSessionRecorder recorder;
   late List<http.Request> githubRequests;
   late _FakeArchiveIo archiveIo;
@@ -274,6 +278,8 @@ void main() {
     turns = InMemoryCosmos([_turn('t1', 's1'), _turn('t2', 's2')]);
     accounts = InMemoryCosmos([_account(mayUseGlobalKey: false)]);
     config = InMemoryCosmos();
+    // The goal picker names goals in the app language (#210).
+    translations = InMemoryCosmos.partitioned('language');
 
     recorder = DebugSessionRecorder()
       ..beginTurn(
@@ -393,6 +399,9 @@ void main() {
       ),
       goalsServiceProvider.overrideWithValue(
         GoalsService(container: goals.container),
+      ),
+      translationServiceProvider.overrideWithValue(
+        TranslationService(container: translations.container),
       ),
       progressServiceProvider.overrideWithValue(
         ProgressService(
@@ -549,6 +558,47 @@ void main() {
       expect(progress['${_uid}_r1']!['progress'], 0.25);
       expect(
         find.text('Progress for "For loops" has been reset.'),
+        findsOneWidget,
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('in English the picker, the question and the confirmation '
+        'name a translated goal in English, and an untranslated one keeps its '
+        'Dutch title (#210)', (tester) async {
+      for (final (id, title) in [('r1', 'Repetition'), ('s1', 'Counting')]) {
+        translations.upsert(
+          Translation.goal(
+            language: 'en',
+            goalId: id,
+            title: title,
+            description: '',
+            sourceHash: goalSourceHash(Goal.fromCosmos(goals[id]!)),
+          ).toMap(),
+          partitionKey: 'en',
+        );
+      }
+      await mount(tester);
+
+      await tester.tap(find.text('Reset one goal…'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ListTile, 'Repetition'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Counting'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'While loops'), findsOneWidget);
+      expect(find.text('Loops'), findsNothing);
+      expect(find.text('For loops'), findsNothing);
+
+      await tester.tap(find.widgetWithText(ListTile, 'Counting'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reset "Counting"?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
+      await tester.pumpAndSettle();
+
+      expect(progress['${_uid}_s1'], isNull);
+      expect(progress['${_uid}_s2']!['progress'], 0.5);
+      expect(
+        find.text('Progress for "Counting" has been reset.'),
         findsOneWidget,
       );
 

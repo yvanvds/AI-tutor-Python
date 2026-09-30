@@ -47,6 +47,8 @@ import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive.dart';
 import 'package:ai_tutor_python/services/progress/progress_archive_io.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
+import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/openai_wiring.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
@@ -805,11 +807,13 @@ class _ProgressCardState extends ConsumerState<_ProgressCard> {
       builder: (_) => _GoalPickerDialog(load: goals.getAllGoalsOnce),
     );
     if (picked == null || !mounted) return;
+    // Named as the picker named it: in the app language (#210).
+    final title = localizedGoal(picked, ref.read(translationsProvider)).title;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l.options_progress_resetGoal_confirm_title(picked.title)),
+        title: Text(l.options_progress_resetGoal_confirm_title(title)),
         content: Text(
           picked.parentId == null
               ? l.options_progress_resetGoal_confirm_message_root
@@ -833,7 +837,7 @@ class _ProgressCardState extends ConsumerState<_ProgressCard> {
     try {
       await ref.read(progressResetProvider).resetGoal(picked);
       if (!mounted) return;
-      _snack(context, l.options_progress_resetGoal_done(picked.title));
+      _snack(context, l.options_progress_resetGoal_done(title));
     } catch (e) {
       if (!mounted) return;
       _snack(context, l.options_progress_resetFailed(e.toString()));
@@ -869,15 +873,26 @@ class _ProgressCardState extends ConsumerState<_ProgressCard> {
 }
 
 /// Lists root goals with their subgoals indented beneath them; tapping a row
-/// returns that goal.
-class _GoalPickerDialog extends StatelessWidget {
+/// returns that goal. Titles are in the app language when there is a
+/// translation, else in Dutch (#210).
+class _GoalPickerDialog extends ConsumerStatefulWidget {
   const _GoalPickerDialog({required this.load});
 
   final Future<List<Goal>> Function() load;
 
   @override
+  ConsumerState<_GoalPickerDialog> createState() => _GoalPickerDialogState();
+}
+
+class _GoalPickerDialogState extends ConsumerState<_GoalPickerDialog> {
+  /// Loaded once: a rebuild — a translation coming in — keeps the list.
+  late final Future<List<Goal>> _goals = widget.load();
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final translations = ref.watch(translationsProvider);
+    String titleOf(Goal goal) => localizedGoal(goal, translations).title;
     return AlertDialog(
       title: Text(l.options_progress_resetGoal_dialog_title),
       content: SizedBox(
@@ -893,7 +908,7 @@ class _GoalPickerDialog extends StatelessWidget {
             const SizedBox(height: AppSpacing.m),
             Expanded(
               child: FutureBuilder<List<Goal>>(
-                future: load(),
+                future: _goals,
                 builder: (ctx, snap) {
                   if (snap.hasError) {
                     return Center(
@@ -921,7 +936,7 @@ class _GoalPickerDialog extends StatelessWidget {
                       ListTile(
                         dense: true,
                         leading: const Icon(Icons.flag_outlined, size: 18),
-                        title: Text(root.title),
+                        title: Text(titleOf(root)),
                         onTap: () => Navigator.of(ctx).pop(root),
                       ),
                     );
@@ -940,7 +955,7 @@ class _GoalPickerDialog extends StatelessWidget {
                             Icons.subdirectory_arrow_right,
                             size: 16,
                           ),
-                          title: Text(child.title),
+                          title: Text(titleOf(child)),
                           onTap: () => Navigator.of(ctx).pop(child),
                         ),
                       );

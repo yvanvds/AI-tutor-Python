@@ -859,6 +859,24 @@
   "goals_editor_lesinhoud_none": "(no lesson content)",
   "goals_editor_lesinhoud_edit": "Edit",
   "goals_editor_lesinhoud_create": "Create",
+  "goals_editor_translation_none": "This goal has no {language} translation yet. Students who use the app in {language} see the Dutch title and description.",
+  "@goals_editor_translation_none": {
+    "description": "Notice above the goal editor's title field when the chosen translation language has no translation of the goal",
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_translation_stale": "Outdated: the Dutch title or description changed after this {language} translation was made. Update it and save it again.",
+  "@goals_editor_translation_stale": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_translation_save": "Save translation",
+  "goals_editor_translation_saved": "{language} translation saved",
+  "@goals_editor_translation_saved": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_language_discard_message": "The {language} title and description have changes that are not saved. Switching to {target} discards them.",
+  "@goals_editor_language_discard_message": {
+    "placeholders": { "language": { "type": "String" }, "target": { "type": "String" } }
+  },
   "goals_editor_delete_dialog_title": "Delete goal",
   "goals_editor_delete_dialog_message_single": "Delete \"{title}\"?",
   "@goals_editor_delete_dialog_message_single": {
