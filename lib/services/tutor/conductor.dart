@@ -2022,10 +2022,13 @@ class Conductor {
           _deps.setSelectedRoot(root);
           _deps.setSelectedChild(targetChild);
           _deps.setCurrentProgress(progressFor(targetChild));
+          // The Dutch title plus the id: the chat pill names the subgoal in
+          // the app language (#212).
           _deps.addSystemNotice(
             ChatNotice(
               ChatNoticeKind.newGoalSelected,
               args: [targetChild.title],
+              goalId: targetChild.id,
             ),
           );
           return true;

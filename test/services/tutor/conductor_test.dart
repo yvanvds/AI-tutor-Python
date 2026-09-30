@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
@@ -37,6 +38,9 @@ class _Fakes {
   /// What the conductor handed to the splash and the level-up (#211).
   final List<Goal> goalsReached = [];
   final List<Goal> conceptsMastered = [];
+
+  /// The chat notices the conductor raised (#212).
+  final List<ChatNotice> notices = [];
 
   String _key(String subgoalId, String loId) => '${subgoalId}__$loId';
 }
@@ -73,7 +77,7 @@ ConductorDeps _buildDeps(_Fakes f) {
     getProgressAll: () async => f.progressById.values.toList(),
     getProgressByGoalId: (id) async => f.progressById[id],
     setCurrentProgress: (v) => f.currentProgress = v,
-    addSystemNotice: (_) {},
+    addSystemNotice: f.notices.add,
     recordDebugEvent: (name, [data]) {},
     playCorrectAnswer: () {},
     playGoalReached: () {},
@@ -3063,6 +3067,94 @@ void main() {
       expect(f.goalsReached.single.id, 's');
       expect(f.conceptsMastered.single.id, 's');
       expect(f.conceptsMastered.single.title, 'Variabelen');
+    });
+  });
+
+  group('#212 the "new goal selected" notice carries the subgoal id', () {
+    test('at session start and after a finished subgoal: the Dutch title '
+        'and the id of the subgoal picked', () async {
+      final f = _Fakes();
+      final r = Goal(id: 'r', title: 'Basis', order: 0);
+      final variabelen = Goal(
+        id: 's1',
+        title: 'Variabelen',
+        parentId: 'r',
+        order: 1000,
+        objectives: const [
+          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+        ],
+      );
+      final lussen = Goal(
+        id: 's2',
+        title: 'Lussen',
+        parentId: 'r',
+        order: 2000,
+        objectives: const [
+          LearningObjective(id: 'lo2', statement: 'lo2', kind: LoKind.apply),
+        ],
+      );
+      f.roots.add(r);
+      f.children[r.id] = [variabelen, lussen];
+      final now = DateTime.now().toUtc();
+      // One strong positive short of mastery.
+      f.beliefs[f._key('s1', 'lo')] = LoBelief(
+        subgoalId: 's1',
+        loId: 'lo',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: now,
+        lastPositiveAtCalibratedAt: now,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+
+      await c.setTarget();
+      expect(f.notices, [
+        const ChatNotice(
+          ChatNoticeKind.newGoalSelected,
+          args: ['Variabelen'],
+          goalId: 's1',
+        ),
+      ]);
+
+      final plan = QuestionPlan(
+        type: ChatRequestType.writeCodeQuestion,
+        difficulty: QuestionDifficulty.medium,
+        targetLOs: const [
+          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+        ],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: const [
+            GradedSignal(
+              subgoalId: 's1',
+              loId: 'lo',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+        ),
+      );
+      expect(outcome.subgoalAdvanced, isTrue);
+      expect(
+        f.notices.where((n) => n.kind == ChatNoticeKind.newGoalSelected).last,
+        const ChatNotice(
+          ChatNoticeKind.newGoalSelected,
+          args: ['Lussen'],
+          goalId: 's2',
+        ),
+      );
     });
   });
 

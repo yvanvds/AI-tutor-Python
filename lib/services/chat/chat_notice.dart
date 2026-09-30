@@ -71,7 +71,9 @@ enum ChatNoticeKind {
   preparingExercise,
   feedbackDegraded,
 
-  /// `args[0]` is the goal title.
+  /// The app picked the subgoal the student practises next (at session
+  /// start and after a finished subgoal). `args[0]` is its Dutch title,
+  /// [ChatNotice.goalId] its id (#212).
   newGoalSelected,
 
   /// The session opens with one review question on an older subgoal
@@ -106,9 +108,10 @@ class ChatNotice {
   final ChatNotice? cause;
 
   /// For a notice about a goal whose `args[0]` is that goal's Dutch title
-  /// ([ChatNoticeKind.warmUpReview], [ChatNoticeKind.recheck]): the goal's
-  /// id, so the chat pill names it in the app language (#211) — and in a
-  /// new language after a switch, like the rest of the pill.
+  /// ([ChatNoticeKind.warmUpReview], [ChatNoticeKind.recheck],
+  /// [ChatNoticeKind.newGoalSelected]): the goal's id, so the chat pill
+  /// names it in the app language (#211, #212) — and in a new language
+  /// after a switch, like the rest of the pill.
   final String? goalId;
 
   static const String metadataKey = 'notice';

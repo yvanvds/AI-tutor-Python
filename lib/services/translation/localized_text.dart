@@ -15,8 +15,8 @@
 // (#210): the leerpad, the objective banner, the theory page's header and
 // the goal picker in Options. A notice that was raised about a goal and
 // kept only its id and Dutch text watches [localizedGoalByIdOf] (#211): the
-// goal-reached splash, the level-up subtitle, and the warm-up and recheck
-// pills in chat.
+// goal-reached splash, the level-up subtitle, and the warm-up, recheck and
+// "new goal selected" (#212) pills in chat.
 
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';

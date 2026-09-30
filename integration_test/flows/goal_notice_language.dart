@@ -1,17 +1,20 @@
-// End-to-end (#211): what the app tells the student about a goal — "Goal
-// reached!", the level-up for a mastered concept, the warm-up and recheck
-// pills in chat — names the goal in the student's language.
+// End-to-end (#211, #212): what the app tells the student about a goal —
+// "Goal reached!", the level-up for a mastered concept, the warm-up,
+// recheck and "new goal selected" pills in chat — names the goal in the
+// student's language.
 //
-// Sam's app runs in English (the harness pins an en-US desktop). Sam
-// finishes "Variabelen", a concept subgoal with an English translation, on
-// the answer that also tips the XP over into level 2: the splash names it
-// "Using variables" with the English description, and the level-up card
-// says "You've mastered Using variables." A session that opens with a
-// warm-up question on "Print" (translated "Printing") announces it in
-// English, and switching to Nederlands in Options turns that pill already
-// on screen back to the Dutch title. A recheck on "Print" is announced in
-// English the same way. The prompts keep the Dutch goal text (#210): only
-// what the student reads is translated.
+// Sam's app runs in English (the harness pins an en-US desktop). The
+// session opens on "Variabelen", a concept subgoal with an English
+// translation, and the pill says "New goal selected: Using variables". Sam
+// finishes it on the answer that also tips the XP over into level 2: the
+// splash names it "Using variables" with the English description, the
+// level-up card says "You've mastered Using variables.", and the pill for
+// the next subgoal, "Lussen", names it "Repeating with loops". A session
+// that opens with a warm-up question on "Print" (translated "Printing")
+// announces it in English, and switching to Nederlands in Options turns
+// that pill already on screen back to the Dutch title. A recheck on
+// "Print" is announced in English the same way. The prompts keep the Dutch
+// goal text (#210): only what the student reads is translated.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → mastery → splash / level-up
@@ -57,6 +60,15 @@ Map<String, dynamic> variabelen() => {
   'description': 'Waarden onthouden onder een naam.',
   'kind': 'concept',
 };
+
+/// "Lussen", the subgoal after "Variabelen" and the extra finished ones.
+Map<String, dynamic> lussen() => goalDoc(
+  id: 's6',
+  title: 'Lussen',
+  parentId: 'r1',
+  order: 6000,
+  objectives: [objective('lo-loop', 'Repeat with a for loop')],
+);
 
 /// "Print" as the standard seed has it.
 Map<String, dynamic> printGoal() => goalDoc(
@@ -122,8 +134,9 @@ void main() {
     );
   }
 
-  testWidgets('in English, finishing a translated concept subgoal: the splash '
-      'and the level-up name it in English', (tester) async {
+  testWidgets('in English, finishing a translated concept subgoal: the splash, '
+      'the level-up and the "new goal selected" pills name the goals in '
+      'English', (tester) async {
     final now = DateTime.now().toUtc();
     final harness = AppHarness(
       llm: ScriptedLlm([
@@ -161,13 +174,7 @@ void main() {
               order: i * 1000,
               objectives: [objective('lo-$i', 'Something already learned')],
             ),
-          goalDoc(
-            id: 's6',
-            title: 'Lussen',
-            parentId: 'r1',
-            order: 6000,
-            objectives: [objective('lo-loop', 'Repeat with a for loop')],
-          ),
+          lussen(),
         ],
         'progress': [
           for (final id in ['s1', 's3', 's4', 's5']) done(id),
@@ -196,10 +203,20 @@ void main() {
             title: 'Using variables',
             description: 'Keeping values under a name.',
           ),
+          english(lussen(), title: 'Repeating with loops'),
         ],
       },
     );
     await openPractice(tester, harness, firstExercise: kVariablesExercise);
+
+    // The app picked "Variabelen" to practise: the pill names it in English
+    // (#212).
+    await pumpUntil(
+      tester,
+      () => pills(tester).contains('New goal selected: Using variables'),
+      reason: 'the "new goal selected" pill never named "Using variables"',
+    );
+    expect(pills(tester), isNot(contains(contains('Variabelen'))));
 
     await tester.tap(find.byTooltip('Send to tutor'));
 
@@ -249,10 +266,18 @@ void main() {
       timeout: const Duration(seconds: 30),
       reason: "the next subgoal's exercise never reached the editor",
     );
+    // The pill about the subgoal the walk picked next names it in English.
+    await pumpUntil(
+      tester,
+      () => pills(tester).contains('New goal selected: Repeating with loops'),
+      reason: 'the "new goal selected" pill never named "Repeating with loops"',
+    );
+    expect(pills(tester), isNot(contains(contains('Lussen'))));
     final llm = harness.llm!;
     for (final sent in [...llm.sentInstructions, ...llm.sentInputs]) {
       expect(sent, isNot(contains('Using variables')));
       expect(sent, isNot(contains('Keeping values under a name.')));
+      expect(sent, isNot(contains('Repeating with loops')));
     }
 
     await harness.dispose(tester);

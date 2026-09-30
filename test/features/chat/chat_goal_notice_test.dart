@@ -1,6 +1,7 @@
 // Issue #211 — the warm-up and recheck pills in chat name the older subgoal
 // in the app language: its English title when the goal has a translation,
-// the Dutch title, without a notice, when it has none. The notice keeps the
+// the Dutch title, without a notice, when it has none. Issue #212 — the
+// "new goal selected" pill does the same for the subgoal the app picked. The notice keeps the
 // goal's id next to its Dutch title, so a translation that arrives on a poll
 // and a language switch both re-render the pills already on screen. In
 // Dutch nothing is fetched from `translations`.
@@ -73,6 +74,13 @@ ChatNotice _recheck() => ChatNotice(
   goalId: _printen.id,
 );
 
+/// As the conductor raises it when it picks the subgoal (#212).
+ChatNotice _newGoal() => ChatNotice(
+  ChatNoticeKind.newGoalSelected,
+  args: [_printen.title],
+  goalId: _printen.id,
+);
+
 /// Stands in for the Options language switch.
 final _locale = StateProvider<Locale>((_) => const Locale('en'));
 
@@ -102,6 +110,7 @@ void main() {
     chat = ChatService();
     chat.addSystemNotice(_warmUp());
     chat.addSystemNotice(_recheck());
+    chat.addSystemNotice(_newGoal());
   });
 
   tearDown(() => chat.dispose());
@@ -152,12 +161,13 @@ void main() {
   const recheckEn =
       "In between: one check question on Printing, so you can show you've "
       'got it now.';
+  const newGoalEn = 'New goal selected: Printing';
 
-  testWidgets('English with a translation: both pills name the goal in '
+  testWidgets('English with a translation: every pill names the goal in '
       'English', (tester) async {
     await mount(tester, const Locale('en'));
 
-    expect(pills(tester), containsAll([warmUpEn, recheckEn]));
+    expect(pills(tester), containsAll([warmUpEn, recheckEn, newGoalEn]));
     expect(pills(tester), everyElement(isNot(contains('Printen'))));
 
     await unmount(tester);
@@ -174,6 +184,7 @@ void main() {
         'Quick warm-up first: one review question on Printen.',
         "In between: one check question on Printen, so you can show you've "
             'got it now.',
+        'New goal selected: Printen',
       ]),
     );
     expect(find.textContaining('translat'), findsNothing);
@@ -183,7 +194,7 @@ void main() {
     await tester.pump(kCosmosPollInterval);
     await settle(tester);
 
-    expect(pills(tester), containsAll([warmUpEn, recheckEn]));
+    expect(pills(tester), containsAll([warmUpEn, recheckEn, newGoalEn]));
 
     await unmount(tester);
   });
@@ -199,6 +210,7 @@ void main() {
         'Eerst even opwarmen: één opfrisvraag over Printen.',
         'Tussendoor: één controlevraag over Printen, om te tonen dat je het '
             'nu kan.',
+        'Nieuw doel geselecteerd: Printen',
       ]),
     );
     expect(service.fetched, isEmpty);
@@ -211,13 +223,16 @@ void main() {
     await mount(tester, const Locale('nl'));
     expect(
       pills(tester),
-      contains('Eerst even opwarmen: één opfrisvraag over Printen.'),
+      containsAll([
+        'Eerst even opwarmen: één opfrisvraag over Printen.',
+        'Nieuw doel geselecteerd: Printen',
+      ]),
     );
 
     container.read(_locale.notifier).state = const Locale('en');
     await settle(tester);
 
-    expect(pills(tester), containsAll([warmUpEn, recheckEn]));
+    expect(pills(tester), containsAll([warmUpEn, recheckEn, newGoalEn]));
 
     await unmount(tester);
   });
