@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
@@ -9,7 +10,11 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/module/module.dart';
 import 'package:ai_tutor_python/services/module/module_service.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translation_service.dart';
+import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/content_language.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -21,10 +26,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// once per navigation event.
 final pendingLessonContentGoalIdProvider = StateProvider<String?>((_) => null);
 
+/// The `lang` of [source]'s `<html>` element (`en`, `en-GB`, …) as written,
+/// or `null` when [source] has no `<html lang>` — a bare body fragment, or
+/// a document that does not say. The lesson-authoring skill writes
+/// `<html lang="nl">`.
+@visibleForTesting
+String? htmlLangAttribute(String source) {
+  final match = RegExp(
+    r'''<html\b[^>]*?\slang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))''',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (match == null) return null;
+  final value = (match.group(1) ?? match.group(2) ?? match.group(3))!.trim();
+  return value.isEmpty ? null : value;
+}
+
+/// The language code a `lang` value names: its primary subtag, lower-cased
+/// (`en` for `en-GB`).
+String _primaryLanguage(String lang) =>
+    lang.split(RegExp('[-_]')).first.toLowerCase();
+
 /// Teacher-only "Lesinhoud" view: a tree of module → root goals → subgoals
 /// rendered from the goal tree, paired with a raw-HTML editor + WebView
 /// preview for the selected subgoal's authored content. The tree is
 /// read-only ordering; reorder still happens in `GoalsPage`.
+///
+/// The toolbar picks the language the editor works on (#208): Dutch, the
+/// source, is the `content` doc; any other language is that lesson's
+/// translation in `translations`, made from the Dutch text as it is stored.
+/// The tree marks which translations a lesson has and which are stale.
 class LessonContentPage extends ConsumerStatefulWidget {
   const LessonContentPage({super.key});
 
@@ -33,15 +63,37 @@ class LessonContentPage extends ConsumerStatefulWidget {
 }
 
 class _LessonContentPageState extends ConsumerState<LessonContentPage> {
-  String? _selectedGoalId;
-  Content? _original;
+  Goal? _selectedGoal;
+
+  /// The language the title, editor, preview and Upload work on.
+  String _language = kSourceLanguage;
+
+  /// The selected subgoal's stored Dutch lesson; `null` when it has none.
+  Content? _dutch;
+
+  /// The stored translation of [_dutch] into [_language]; `null` in Dutch,
+  /// and when the lesson has no translation into [_language] yet.
+  Translation? _translation;
+
   String _workingTitle = '';
   String _workingBody = '';
+
+  /// Bumped by every load of the editor, so a load that finishes after a
+  /// later one started is dropped instead of overwriting it.
+  int _loadGeneration = 0;
 
   late final TextEditingController _bodyCtrl;
   late final TextEditingController _titleCtrl;
   late final Stream<List<Goal>> _goalsStream;
   bool _bootstrapping = true;
+
+  String? get _selectedGoalId => _selectedGoal?.id;
+
+  bool get _isSource => _language == kSourceLanguage;
+
+  /// Whether the editor can hold the chosen language's lesson: Dutch always,
+  /// a translation only once there is a Dutch lesson to translate from.
+  bool get _canEdit => _selectedGoal != null && (_isSource || _dutch != null);
 
   @override
   void initState() {
@@ -84,12 +136,26 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     await _selectGoal(goal);
   }
 
+  /// The title and body stored in the chosen language — what "unsaved" is
+  /// measured against; `null` when nothing is stored in it yet.
+  ({String title, String body})? get _stored {
+    if (_isSource) {
+      final dutch = _dutch;
+      return dutch == null ? null : (title: dutch.title, body: dutch.body);
+    }
+    final translation = _translation;
+    return translation == null
+        ? null
+        : (title: translation.title, body: translation.text);
+  }
+
   bool get _isDirty {
-    if (_selectedGoalId == null) return false;
-    if (_original == null) {
+    if (_selectedGoal == null) return false;
+    final stored = _stored;
+    if (stored == null) {
       return _workingTitle.isNotEmpty || _workingBody.isNotEmpty;
     }
-    return _original!.title != _workingTitle || _original!.body != _workingBody;
+    return stored.title != _workingTitle || stored.body != _workingBody;
   }
 
   void _onEditorChanged() {
@@ -104,33 +170,129 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     setState(() => _workingTitle = text);
   }
 
-  Future<void> _selectGoal(Goal goal) async {
+  /// What the editor starts from in the chosen language: what is stored;
+  /// else, in Dutch, the subgoal's title over an empty body, and in a
+  /// translation nothing.
+  ({String title, String body}) get _baseline =>
+      _stored ??
+      (title: _isSource ? (_selectedGoal?.title ?? '') : '', body: '');
+
+  /// Whether the teacher changed the title or the body since the editor was
+  /// filled — what switching language would throw away. Unlike [_isDirty]
+  /// (which enables Save), an untouched new Dutch lesson has none.
+  bool get _hasEdits {
+    if (_selectedGoal == null) return false;
+    final baseline = _baseline;
+    return baseline.title != _workingTitle || baseline.body != _workingBody;
+  }
+
+  /// Puts [_baseline] in the title and editor. Call inside `setState`.
+  void _fillEditor() {
+    final baseline = _baseline;
+    _workingTitle = baseline.title;
+    _workingBody = baseline.body;
+    _titleCtrl.value = TextEditingValue(
+      text: _workingTitle,
+      selection: TextSelection.collapsed(offset: _workingTitle.length),
+    );
+    _bodyCtrl.text = _workingBody;
+  }
+
+  Future<Content?> _loadDutch(Goal goal) async {
     final cid = goal.contentId;
-    Content? loaded;
-    if (cid != null && cid.isNotEmpty) {
-      // Cache fast-path; fall back to a fetch if not in the latest poll.
-      final cached = ref.read(contentServiceProvider);
-      loaded = cached
-          .where((c) => c.id == cid)
-          .cast<Content?>()
-          .firstWhere((c) => true, orElse: () => null);
-      loaded ??= await ref.read(contentServiceProvider.notifier).getById(cid);
+    if (cid == null || cid.isEmpty) return null;
+    // Cache fast-path; fall back to a fetch if not in the latest poll.
+    final cached = ref.read(contentServiceProvider);
+    for (final c in cached) {
+      if (c.id == cid) return c;
     }
+    return ref.read(contentServiceProvider.notifier).getById(cid);
+  }
+
+  /// The stored translation of the lesson [contentId] into [language],
+  /// fetched now rather than taken from the last poll: the editor starts
+  /// from what is stored.
+  Future<Translation?> _fetchTranslation(
+    String language,
+    String contentId,
+  ) async {
+    final id = Translation.contentDocId(contentId);
+    final all = await ref
+        .read(translationServiceProvider)
+        .listLanguage(language);
+    for (final t in all) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  Future<void> _selectGoal(Goal goal) async {
+    final generation = ++_loadGeneration;
+    final language = _language;
+    final dutch = await _loadDutch(goal);
+    final translation = dutch == null || language == kSourceLanguage
+        ? null
+        : await _fetchTranslation(language, dutch.id);
+    if (!mounted || generation != _loadGeneration) return;
 
     setState(() {
-      _selectedGoalId = goal.id;
-      _original = loaded;
-      _workingTitle = loaded?.title ?? goal.title;
-      _workingBody = loaded?.body ?? '';
-      _titleCtrl.value = TextEditingValue(
-        text: _workingTitle,
-        selection: TextSelection.collapsed(offset: _workingTitle.length),
-      );
-      _bodyCtrl.text = _workingBody;
+      _selectedGoal = goal;
+      _dutch = dutch;
+      _translation = translation;
+      _fillEditor();
     });
   }
 
-  Future<void> _save() async {
+  /// Switches the editor to [language], asking first when that would throw
+  /// away unsaved changes.
+  Future<void> _setLanguage(String language) async {
+    if (language == _language) return;
+    if (_hasEdits && !await _confirmDiscard(language)) return;
+    final generation = ++_loadGeneration;
+    final dutch = _dutch;
+    final translation = dutch == null || language == kSourceLanguage
+        ? null
+        : await _fetchTranslation(language, dutch.id);
+    if (!mounted || generation != _loadGeneration) return;
+    setState(() {
+      _language = language;
+      _translation = translation;
+      if (_selectedGoal != null) _fillEditor();
+    });
+  }
+
+  Future<bool> _confirmDiscard(String target) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.lesson_language_discard_title),
+          content: Text(
+            l.lesson_language_discard_message(
+              contentLanguageName(l, _language),
+              contentLanguageName(l, target),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.lesson_language_discard_cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.lesson_language_discard_confirm),
+            ),
+          ],
+        );
+      },
+    );
+    return ok == true;
+  }
+
+  Future<void> _save() => _isSource ? _saveSource() : _saveTranslation();
+
+  Future<void> _saveSource() async {
     final goalId = _selectedGoalId;
     if (goalId == null) return;
     final goalsSvc = ref.read(goalsServiceProvider);
@@ -153,12 +315,113 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
       await goalsSvc.setContentId(goalId, id);
     }
     if (!mounted) return;
-    setState(() => _original = content);
+    setState(() => _dutch = content);
     _showSnack(AppLocalizations.of(context).lesson_snack_saved);
   }
 
+  /// Stores the editor as the lesson's translation into the chosen language,
+  /// made from the Dutch lesson as it is stored now. `content` is not
+  /// touched.
+  Future<void> _saveTranslation() async {
+    final dutch = _dutch;
+    if (_selectedGoal == null || dutch == null) return;
+    final language = _language;
+    final l = AppLocalizations.of(context);
+    final title = _workingTitle.trim();
+    final Translation stored;
+    try {
+      stored = await ref
+          .read(translationServiceProvider)
+          .upsert(
+            Translation.content(
+              language: language,
+              contentId: dutch.id,
+              // As the Dutch lesson falls back on the subgoal's title.
+              title: title.isEmpty ? dutch.title : title,
+              body: _workingBody,
+              sourceHash: contentSourceHash(dutch),
+            ),
+          );
+    } on CosmosException catch (e) {
+      _showSnack(
+        e.isContainerNotFound
+            ? l.lesson_translation_containerMissing
+            : l.lesson_translation_writeFailed('$e'),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ref.read(languageTranslationsProvider(language).notifier).put(stored);
+    if (_language == language && _dutch?.id == dutch.id) {
+      setState(() {
+        _translation = stored;
+        if (title.isEmpty) _fillEditor();
+      });
+    }
+    _showSnack(l.lesson_snack_saved);
+  }
+
+  /// Removes the lesson's translation into the chosen language — only that
+  /// doc in `translations`; the Dutch lesson stays.
+  Future<void> _deleteTranslation() async {
+    final translation = _translation;
+    if (translation == null) return;
+    final language = translation.language;
+    final l = AppLocalizations.of(context);
+    final name = contentLanguageName(l, language);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.lesson_deleteTranslation_dialog_title(name)),
+          content: Text(l.lesson_deleteTranslation_dialog_message(name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.lesson_deleteTranslation_dialog_cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.lesson_deleteTranslation_dialog_confirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      await ref
+          .read(translationServiceProvider)
+          .delete(
+            language: language,
+            kind: TranslationKind.content,
+            refId: translation.refId,
+          );
+    } on CosmosException catch (e) {
+      _showSnack(
+        e.isContainerNotFound
+            ? l.lesson_translation_containerMissing
+            : l.lesson_translation_writeFailed('$e'),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ref
+        .read(languageTranslationsProvider(language).notifier)
+        .remove(translation.id);
+    if (_translation?.id == translation.id && _language == language) {
+      setState(() {
+        _translation = null;
+        _fillEditor();
+      });
+    }
+    _showSnack(l.lesson_snack_translationDeleted(name));
+  }
+
   Future<void> _uploadHtml() async {
-    if (_selectedGoalId == null) return;
+    if (!_canEdit) return;
     final couldNotReadMessage = AppLocalizations.of(context)
         .lesson_snack_couldNotRead;
     final result = await FilePicker.platform.pickFiles(
@@ -180,11 +443,50 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
       return;
     }
 
+    // A file that says which language it is in must match the lesson it
+    // goes into; one that does not say is taken as it is.
+    final lang = htmlLangAttribute(text);
+    if (lang != null && _primaryLanguage(lang) != _language) {
+      if (!mounted) return;
+      if (!await _confirmLanguageMismatch(lang)) return;
+    }
+    if (!mounted) return;
+
     final fragment = _extractBodyFragment(text);
     setState(() {
       _workingBody = fragment;
       _bodyCtrl.text = fragment;
     });
+  }
+
+  Future<bool> _confirmLanguageMismatch(String lang) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.lesson_upload_langMismatch_title),
+          content: Text(
+            l.lesson_upload_langMismatch_message(
+              contentLanguageName(l, _primaryLanguage(lang)),
+              lang,
+              contentLanguageName(l, _language),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.lesson_upload_langMismatch_cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.lesson_upload_langMismatch_confirm),
+            ),
+          ],
+        );
+      },
+    );
+    return ok == true;
   }
 
   /// If [source] looks like a full HTML document, returns the body's inner
@@ -227,7 +529,8 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
     await ref.read(goalsServiceProvider).setContentId(goalId, null);
     if (!mounted) return;
     setState(() {
-      _original = null;
+      _dutch = null;
+      _translation = null;
       _workingTitle = '';
       _workingBody = '';
       _titleCtrl.clear();
@@ -277,22 +580,26 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
       await goalsSvc.setContentId(target.id, moved.id);
     }
     if (!mounted) return;
-    // If the target was open in the editor, refresh it with the moved doc.
+    final reassigned = AppLocalizations.of(context)
+        .lesson_snack_reassigned(target.title);
+    // If the target was open in the editor, refresh it with the moved doc
+    // — and, in a translation, with the translation that moved along.
     if (_selectedGoalId == target.id) {
-      setState(() {
-        _original = moved;
-        _workingTitle = moved.title;
-        _workingBody = moved.body;
-        _titleCtrl.value = TextEditingValue(
-          text: _workingTitle,
-          selection: TextSelection.collapsed(offset: _workingTitle.length),
-        );
-        _bodyCtrl.text = _workingBody;
-      });
+      final generation = ++_loadGeneration;
+      final language = _language;
+      final translation = language == kSourceLanguage
+          ? null
+          : await _fetchTranslation(language, moved.id);
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _dutch = moved;
+          _translation = translation;
+          _fillEditor();
+        });
+      }
     }
-    _showSnack(
-      AppLocalizations.of(context).lesson_snack_reassigned(target.title),
-    );
+    if (!mounted) return;
+    _showSnack(reassigned);
   }
 
   Future<Goal?> _pickReassignTarget(Content orphan, List<Goal> goals) {
@@ -376,9 +683,11 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
         children: [
           _Toolbar(
             isDirty: _isDirty,
-            hasSelection: _selectedGoalId != null,
-            onSave: _isDirty ? _save : null,
-            onUpload: _selectedGoalId != null ? _uploadHtml : null,
+            hasSelection: _canEdit,
+            language: _language,
+            onLanguageChanged: _setLanguage,
+            onSave: _isDirty && _canEdit ? _save : null,
+            onUpload: _canEdit ? _uploadHtml : null,
           ),
           Divider(height: 1, thickness: 1, color: AppColors.ink2),
           Expanded(
@@ -419,12 +728,19 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                                 final contentList = ref.watch(
                                   contentServiceProvider,
                                 );
+                                final translations = [
+                                  for (final language in kTranslationLanguages)
+                                    ref.watch(
+                                      languageTranslationsProvider(language),
+                                    ),
+                                ];
                                 return _GoalTree(
                                   goals: goals,
                                   modules: modules,
                                   contentById: {
                                     for (final c in contentList) c.id: c,
                                   },
+                                  translations: translations,
                                   selectedGoalId: _selectedGoalId,
                                   onSelect: _selectGoal,
                                   orphans: orphanedContent(goals, contentList),
@@ -456,6 +772,37 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
         ),
       );
     }
+    final dutch = _dutch;
+    if (!_isSource && dutch == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Text(
+            l.lesson_translation_needsSource,
+            key: const Key('lesson-translation-needs-source'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.fgMute),
+          ),
+        ),
+      );
+    }
+    final translation = _translation;
+    final languageName = contentLanguageName(l, _language);
+    final String? notice;
+    final Key? noticeKey;
+    if (_isSource || dutch == null) {
+      notice = null;
+      noticeKey = null;
+    } else if (translation == null) {
+      notice = l.lesson_translation_none(languageName);
+      noticeKey = const Key('lesson-translation-none');
+    } else if (translation.isStaleFor(contentSourceHash(dutch))) {
+      notice = l.lesson_translation_stale(languageName);
+      noticeKey = const Key('lesson-translation-stale');
+    } else {
+      notice = null;
+      noticeKey = null;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -479,15 +826,49 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
                 ),
               ),
               const SizedBox(width: AppSpacing.s),
-              if (_original != null)
+              // Unlinking is about the subgoal and every language, so it
+              // belongs to the Dutch lesson; a translation only goes itself.
+              if (_isSource && dutch != null)
                 TextButton.icon(
                   onPressed: _clearLink,
                   icon: const Icon(Icons.link_off, size: 16),
                   label: Text(l.lesson_editor_button_unlink),
                 ),
+              if (!_isSource && translation != null)
+                TextButton.icon(
+                  key: const Key('lesson-delete-translation'),
+                  onPressed: _deleteTranslation,
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: Text(l.lesson_editor_button_deleteTranslation),
+                ),
             ],
           ),
         ),
+        if (notice != null)
+          Container(
+            key: noticeKey,
+            margin: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.s,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.m,
+              vertical: AppSpacing.s,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.accent2.withValues(alpha: 0.10),
+              border: Border.all(
+                color: AppColors.accent2.withValues(alpha: 0.4),
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.inputSmall),
+            ),
+            child: Text(
+              notice,
+              style: TextStyle(color: AppColors.fg, fontSize: 12),
+            ),
+          ),
         Divider(height: 1, color: AppColors.ink2),
         Expanded(
           child: Row(
@@ -544,7 +925,7 @@ class _LessonContentPageState extends ConsumerState<LessonContentPage> {
         ),
       );
     }
-    return LessonHtmlView(fragment: _workingBody);
+    return LessonHtmlView(fragment: _workingBody, language: _language);
   }
 }
 
@@ -552,12 +933,16 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.isDirty,
     required this.hasSelection,
+    required this.language,
+    required this.onLanguageChanged,
     required this.onSave,
     required this.onUpload,
   });
 
   final bool isDirty;
   final bool hasSelection;
+  final String language;
+  final ValueChanged<String> onLanguageChanged;
   final VoidCallback? onSave;
   final VoidCallback? onUpload;
 
@@ -579,6 +964,11 @@ class _Toolbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          ContentLanguagePicker(
+            language: language,
+            onChanged: onLanguageChanged,
+          ),
+          const SizedBox(width: AppSpacing.m),
           OutlinedButton.icon(
             icon: const Icon(Icons.upload_file, size: 16),
             onPressed: onUpload,
@@ -603,6 +993,7 @@ class _GoalTree extends StatelessWidget {
     required this.goals,
     required this.modules,
     required this.contentById,
+    required this.translations,
     required this.selectedGoalId,
     required this.onSelect,
     required this.orphans,
@@ -612,6 +1003,10 @@ class _GoalTree extends StatelessWidget {
   final List<Goal> goals;
   final List<Module> modules;
   final Map<String, Content> contentById;
+
+  /// The translations in each of [kTranslationLanguages], for the status of
+  /// each lesson's translations (#208).
+  final List<LanguageTranslations> translations;
   final String? selectedGoalId;
   final ValueChanged<Goal> onSelect;
 
@@ -649,6 +1044,20 @@ class _GoalTree extends StatelessWidget {
       );
     }
 
+    Widget subgoalRow(Goal child) {
+      final cid = child.contentId;
+      final content = cid == null ? null : contentById[cid];
+      return _SubgoalRow(
+        goal: child,
+        content: content,
+        translations: content == null
+            ? const {}
+            : contentTranslationStatuses(content, translations),
+        selected: selectedGoalId == child.id,
+        onTap: () => onSelect(child),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
       children: [
@@ -657,14 +1066,7 @@ class _GoalTree extends StatelessWidget {
           for (final root in byModule[m.id] ?? const <Goal>[]) ...[
             _RootRow(goal: root),
             for (final child in (byParent[root.id] ?? const <Goal>[]))
-              _SubgoalRow(
-                goal: child,
-                content: child.contentId == null
-                    ? null
-                    : contentById[child.contentId!],
-                selected: selectedGoalId == child.id,
-                onTap: () => onSelect(child),
-              ),
+              subgoalRow(child),
           ],
         ],
         if (orphans.isNotEmpty) ...[
@@ -790,12 +1192,16 @@ class _SubgoalRow extends StatefulWidget {
   const _SubgoalRow({
     required this.goal,
     required this.content,
+    required this.translations,
     required this.selected,
     required this.onTap,
   });
 
   final Goal goal;
   final Content? content;
+
+  /// Where the lesson's translations stand, by language (#208).
+  final Map<String, TranslationStatus> translations;
   final bool selected;
   final VoidCallback onTap;
 
@@ -873,6 +1279,7 @@ class _SubgoalRowState extends State<_SubgoalRow> {
                   ],
                 ),
               ),
+              TranslationStatusBadges(statuses: widget.translations),
             ],
           ),
         ),

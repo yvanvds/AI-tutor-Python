@@ -27,6 +27,41 @@ import 'package:flutter/foundation.dart';
 /// and `goals`; nothing is stored in or fetched from `translations` for it.
 const String kSourceLanguage = 'nl';
 
+/// The languages lessons and goals are translated into from
+/// [kSourceLanguage]: the app's other UI languages. What the teacher's
+/// editors offer and show a status for (#208).
+const List<String> kTranslationLanguages = ['en'];
+
+/// Every language a lesson or goal can be edited in: the source first.
+const List<String> kContentLanguages = [
+  kSourceLanguage,
+  ...kTranslationLanguages,
+];
+
+/// Where a doc's translation into one language stands (#208).
+enum TranslationStatus {
+  /// There is no translation into that language.
+  missing,
+
+  /// Translated from the Dutch text as it is now.
+  current,
+
+  /// Translated from Dutch text that has changed since.
+  stale,
+}
+
+/// The [TranslationStatus] of [translation] against the Dutch text whose
+/// hash is [currentSourceHash] ([contentSourceHash], [goalSourceHash]).
+TranslationStatus translationStatus(
+  Translation? translation,
+  String currentSourceHash,
+) {
+  if (translation == null) return TranslationStatus.missing;
+  return translation.isStaleFor(currentSourceHash)
+      ? TranslationStatus.stale
+      : TranslationStatus.current;
+}
+
 /// What a [Translation] translates. The name is the doc id prefix and the
 /// stored `kind`.
 enum TranslationKind {

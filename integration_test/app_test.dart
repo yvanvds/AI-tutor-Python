@@ -42,6 +42,7 @@ import 'flows/legacy_ratchet.dart' as legacy_ratchet;
 import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/lesson_language.dart' as lesson_language;
+import 'flows/lesson_translation.dart' as lesson_translation;
 import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
@@ -92,6 +93,7 @@ void main() {
   chat_composer_growth.main();
   content_question.main();
   lesson_language.main();
+  lesson_translation.main();
   language_switch.main();
   tutor_language.main();
   playground_files.main();

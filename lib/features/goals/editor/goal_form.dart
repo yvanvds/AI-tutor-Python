@@ -1,12 +1,16 @@
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
+import 'package:ai_tutor_python/services/translation/translation.dart';
+import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/content_language.dart';
 import 'package:ai_tutor_python/widgets/text_list_editor.dart';
 import 'package:ai_tutor_python/widgets/undo_snackbar.dart';
 import 'package:flutter/material.dart';
@@ -215,7 +219,8 @@ class GoalFormState extends ConsumerState<GoalForm> {
 }
 
 /// Inline status row in the subgoal editor: shows whether the subgoal has
-/// authored content, with a one-click handoff to the Lesinhoud view.
+/// authored content and which translations it has (stale ones marked,
+/// #208), with a one-click handoff to the Lesinhoud view.
 class _LesinhoudRow extends ConsumerWidget {
   const _LesinhoudRow({required this.goal});
   final Goal goal;
@@ -226,13 +231,21 @@ class _LesinhoudRow extends ConsumerWidget {
     final cid = goal.contentId;
     final hasContent = cid != null && cid.isNotEmpty;
     final cached = ref.watch(contentServiceProvider);
-    final title = hasContent
+    final content = hasContent
         ? cached
               .where((c) => c.id == cid)
-              .map((c) => c.title)
-              .cast<String?>()
+              .cast<Content?>()
               .firstWhere((_) => true, orElse: () => null)
         : null;
+    final title = content?.title;
+    // Which translations the lesson has, and which are stale (#208).
+    final translations = [
+      for (final language in kTranslationLanguages)
+        ref.watch(languageTranslationsProvider(language)),
+    ];
+    final statuses = content == null
+        ? const <String, TranslationStatus>{}
+        : contentTranslationStatuses(content, translations);
 
     void openInLesinhoud() {
       ref.read(pendingLessonContentGoalIdProvider.notifier).state = goal.id;
@@ -282,6 +295,8 @@ class _LesinhoudRow extends ConsumerWidget {
               ],
             ),
           ),
+          TranslationStatusBadges(statuses: statuses),
+          const SizedBox(width: AppSpacing.xxs),
           TextButton(
             onPressed: openInLesinhoud,
             child: Text(

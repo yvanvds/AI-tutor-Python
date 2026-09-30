@@ -5,8 +5,12 @@
 // Follows `appLocaleProvider`: switching language in Options drops the old
 // language's translations at once and fetches the new one's. Dutch fetches
 // nothing — it is the source language.
+//
+// The teacher's editors (#208) show and write translations in every
+// language, not only the app's: `languageTranslationsProvider(language)`.
 
 import 'package:ai_tutor_python/services/config/app_locale.dart';
+import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter/foundation.dart';
@@ -62,6 +66,46 @@ class LanguageTranslations {
       Object.hash(language, loaded, Object.hashAllUnordered(_byId.values));
 }
 
+/// Where the lesson [content]'s translation into each language of
+/// [translations] stands, by language code (#208).
+Map<String, TranslationStatus> contentTranslationStatuses(
+  Content content,
+  Iterable<LanguageTranslations> translations,
+) {
+  final hash = contentSourceHash(content);
+  return {
+    for (final language in translations)
+      language.language: translationStatus(
+        language.contentFor(content.id),
+        hash,
+      ),
+  };
+}
+
+/// Follows [language]'s translations for as long as [ref] lives: [update]
+/// gets each fetch as a [LanguageTranslations], and hands it on only when
+/// it differs from [current] — every poll yields a fresh list, and a page
+/// that shows a translation must not rebuild every 5 s.
+void _followLanguage(
+  Ref ref,
+  String language, {
+  required LanguageTranslations Function() current,
+  required void Function(LanguageTranslations) update,
+}) {
+  final sub = ref
+      .watch(translationServiceProvider)
+      .watchLanguage(language)
+      .listen((list) {
+        final next = LanguageTranslations(
+          language: language,
+          loaded: true,
+          byId: {for (final t in list) t.id: t},
+        );
+        if (next != current()) update(next);
+      });
+  ref.onDispose(sub.cancel);
+}
+
 class TranslationsNotifier extends Notifier<LanguageTranslations> {
   @override
   LanguageTranslations build() {
@@ -70,20 +114,12 @@ class TranslationsNotifier extends Notifier<LanguageTranslations> {
     );
     if (language == kSourceLanguage) return const LanguageTranslations.source();
 
-    final sub = ref
-        .watch(translationServiceProvider)
-        .watchLanguage(language)
-        .listen((list) {
-          final next = LanguageTranslations(
-            language: language,
-            loaded: true,
-            byId: {for (final t in list) t.id: t},
-          );
-          // Every poll yields a fresh list: only a real change notifies, so a
-          // page that shows a translation does not rebuild every 5 s.
-          if (next != state) state = next;
-        });
-    ref.onDispose(sub.cancel);
+    _followLanguage(
+      ref,
+      language,
+      current: () => state,
+      update: (next) => state = next,
+    );
     return LanguageTranslations(language: language);
   }
 }
@@ -92,4 +128,51 @@ class TranslationsNotifier extends Notifier<LanguageTranslations> {
 final translationsProvider =
     NotifierProvider<TranslationsNotifier, LanguageTranslations>(
       TranslationsNotifier.new,
+    );
+
+/// The translations into one language, whatever language the app runs in:
+/// what the teacher's editors show a status for and write (#208).
+class LanguageTranslationsNotifier
+    extends AutoDisposeFamilyNotifier<LanguageTranslations, String> {
+  @override
+  LanguageTranslations build(String language) {
+    if (language == kSourceLanguage) return const LanguageTranslations.source();
+    _followLanguage(
+      ref,
+      language,
+      current: () => state,
+      update: (next) => state = next,
+    );
+    return LanguageTranslations(language: language);
+  }
+
+  /// Takes in [translation] as the page just stored it
+  /// (`TranslationService.upsert`), so the status shows it before the next
+  /// poll does.
+  void put(Translation translation) {
+    if (translation.language != arg) return;
+    state = LanguageTranslations(
+      language: arg,
+      loaded: state.loaded,
+      byId: {...state._byId, translation.id: translation},
+    );
+  }
+
+  /// Drops the translation with doc id [id] as the page just deleted it
+  /// (`TranslationService.delete`).
+  void remove(String id) {
+    if (!state._byId.containsKey(id)) return;
+    state = LanguageTranslations(
+      language: arg,
+      loaded: state.loaded,
+      byId: {...state._byId}..remove(id),
+    );
+  }
+}
+
+/// The translations into the language given as the family argument,
+/// polled while a page watches them; Dutch fetches nothing.
+final languageTranslationsProvider = NotifierProvider.autoDispose
+    .family<LanguageTranslationsNotifier, LanguageTranslations, String>(
+      LanguageTranslationsNotifier.new,
     );

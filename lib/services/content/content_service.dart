@@ -37,10 +37,19 @@ class ContentService extends Notifier<List<Content>> {
 
   Future<Content?> getById(String id) => safeCosmos(() => _fetchById(id));
 
+  /// Stores [content] and patches the cached list with it, as [reassign]
+  /// does, so what was just written shows before the next poll — the
+  /// Lesinhoud tree marks a translation stale as soon as the Dutch lesson
+  /// is saved (#208).
   Future<void> upsert(Content content) async {
     await safeCosmos(
       () => _container.upsert(content.toMap(), partitionKey: _pk),
     );
+    final cached = state.any((c) => c.id == content.id);
+    state = List.unmodifiable([
+      for (final c in state) c.id == content.id ? content : c,
+      if (!cached) content,
+    ]);
   }
 
   Future<void> delete(String id) async {

@@ -109,12 +109,12 @@ lib/
 │   │
 │   ├── content/                 # NEW — authored explanation blocks linked from goals
 │   │   ├── content.dart                  # Content model (id mirrors subgoal id)
-│   │   └── content_service.dart          # cachedAll / watchAll / watchById / upsert / delete; reassign moves the lesson's translations too (#206)
+│   │   └── content_service.dart          # cachedAll / watchAll / watchById / upsert / delete; reassign moves the lesson's translations too (#206); upsert patches the cache (#208)
 │   │
 │   ├── translation/             # NEW (#206) — translations of lessons and goal texts, `translations` container
-│   │   ├── translation.dart              # Translation model (content_/goal_ doc ids), kSourceLanguage 'nl', sourceHash helpers
+│   │   ├── translation.dart              # Translation model (content_/goal_ doc ids), kSourceLanguage 'nl', kTranslationLanguages / kContentLanguages, sourceHash helpers, TranslationStatus (missing / current / stale, #208)
 │   │   ├── translation_service.dart      # watchLanguage / listLanguage (tolerant) + upsert / delete / moveContent (throw)
-│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor)
+│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor); languageTranslationsProvider(language) for the teacher's editors, with put / remove, and contentTranslationStatuses (#208)
 │   │   └── localized_text.dart           # localizedContent / localizedGoal → text + isFallback / isStale; localizedContentProvider(contentId) — the theory page and its content question (#207)
 │   │
 │   ├── module/                  # NEW — top-level grouping of root goals (v1: single 'python-basics')
@@ -242,6 +242,7 @@ lib/
     │                                       #   the strip of shell chrome that offers an update instead of
     │                                       #   announcing it; the same state is re-rendered in Options → About
     ├── lesson_document.dart, lesson_html_view.dart   # Embedded HTML lesson blocks (#13, #14)
+    ├── content_language.dart               # NEW (#208) — ContentLanguagePicker (Nederlands (source) | English) and TranslationStatusBadges (EN, stale marked) for the teacher's editors
     ├── add_input.dart, text_list_editor.dart, inline_title.dart
 
 packages/py_runner/                    # Local Flutter package — PyRunner, InstallerPyHostLocator, RunHandle, InputRequest
@@ -405,7 +406,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 
 ### Lesson content authoring (teacher)
 
-[features/lesson_content/lesson_content_page.dart](lib/features/lesson_content/lesson_content_page.dart) is a teacher-only "Lesinhoud" page with a two-pane layout: a read-only module/goal tree on the left (module headers → root goals → subgoals, grouped by `moduleId`), a markdown editor on the right. On `initState()` it bootstraps the default module (`ModuleService.ensureDefaultModule()`) and runs `GoalsService.backfillModuleIds()` to populate `moduleId` on legacy docs. Selecting a subgoal loads its linked `Content` doc (or creates a blank one keyed by the subgoal id). Save upserts the `Content` doc and sets `Goal.contentId` if needed; a "Disconnect" action clears `Goal.contentId` while preserving the content doc. The subgoal editor in [features/goals/editor/goal_form.dart](lib/features/goals/editor/goal_form.dart) embeds an inline `_LesinhoudRow` showing whether content exists, with a one-click "Bewerk"/"Maak" handoff.
+[features/lesson_content/lesson_content_page.dart](lib/features/lesson_content/lesson_content_page.dart) is a teacher-only "Lesinhoud" page with a two-pane layout: a read-only module/goal tree on the left (module headers → root goals → subgoals, grouped by `moduleId`), a markdown editor on the right. On `initState()` it bootstraps the default module (`ModuleService.ensureDefaultModule()`) and runs `GoalsService.backfillModuleIds()` to populate `moduleId` on legacy docs. Selecting a subgoal loads its linked `Content` doc (or creates a blank one keyed by the subgoal id). Save upserts the `Content` doc and sets `Goal.contentId` if needed; a "Disconnect" action clears `Goal.contentId` while preserving the content doc. The subgoal editor in [features/goals/editor/goal_form.dart](lib/features/goals/editor/goal_form.dart) embeds an inline `_LesinhoudRow` showing whether content exists, with a one-click "Bewerk"/"Maak" handoff. The toolbar picks the language the title, editor, preview and Upload work on (#208): Nederlands, the source, saves the `content` doc as before; English saves the lesson's `content_${id}` doc in `translations` with the hash of the Dutch lesson as stored, and never touches `content`. Upload reads `<html lang>` and warns when it is not the language picked; switching language with unsaved changes asks first; "Delete translation" removes only the translation. The tree rows and `_LesinhoudRow` show an EN badge per translation, marked when it is stale (`sourceHash` no longer matches the Dutch text).
 
 ### Student progression / mastery (LO-belief model)
 

@@ -93,6 +93,31 @@ void main() {
     },
   );
 
+  // #208: the Lesinhoud tree marks a translation stale from the cached
+  // Dutch lesson, so a save has to reach the cache before the next poll.
+  test('upsert patches the cache in place, and adds a new lesson', () async {
+    container.listen(contentServiceProvider, (_, _) {});
+    await settle();
+    final before = container.read(contentServiceProvider).map((c) => c.id);
+
+    final edited = Content(
+      id: 's-taken',
+      title: 'Old lesson',
+      body: '<p>new body</p>',
+    );
+    await svc().upsert(edited);
+    final cached = container.read(contentServiceProvider);
+    expect(cached.map((c) => c.id), before, reason: 'same order, no dupes');
+    expect(cached.singleWhere((c) => c.id == 's-taken').body, edited.body);
+    expect(cosmos['s-taken']!['body'], '<p>new body</p>');
+
+    await svc().upsert(Content(id: 's-fresh', title: 'Fresh', body: ''));
+    expect(container.read(contentServiceProvider).map((c) => c.id), [
+      ...before,
+      's-fresh',
+    ]);
+  });
+
   test('overwrites an existing doc at the target id', () async {
     final orphan = Content(
       id: 's-old',

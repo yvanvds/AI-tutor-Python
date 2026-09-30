@@ -4,6 +4,7 @@
 // doc comment), because the tooling that writes the first translations
 // (#209) computes it in Python: the two must agree to the byte.
 
+import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
@@ -144,6 +145,39 @@ void main() {
       expect(
         t.isStaleFor(translationSourceHash('Variabelen', '<p>y</p>')),
         isTrue,
+      );
+    });
+  });
+
+  group('status (#208)', () {
+    final hash = translationSourceHash('Variabelen', '<p>x</p>');
+    Translation made(String from) => Translation.content(
+      language: 'en',
+      contentId: 's1',
+      title: 'Variables',
+      body: '<p>x</p>',
+      sourceHash: from,
+    );
+
+    test('missing, current or stale against the Dutch text as it is now', () {
+      expect(translationStatus(null, hash), TranslationStatus.missing);
+      expect(translationStatus(made(hash), hash), TranslationStatus.current);
+      expect(
+        translationStatus(made(hash), translationSourceHash('Variabelen', '')),
+        TranslationStatus.stale,
+      );
+    });
+
+    test('the content languages are the app languages, the source first', () {
+      expect(kContentLanguages.first, kSourceLanguage);
+      expect(kContentLanguages.skip(1), kTranslationLanguages);
+      expect(kTranslationLanguages, isNot(contains(kSourceLanguage)));
+      expect(
+        kContentLanguages.toSet(),
+        AppLocalizations.supportedLocales.map((l) => l.languageCode).toSet(),
+        reason:
+            'a UI language the editors do not offer, or one they offer '
+            'that the app cannot show',
       );
     });
   });
