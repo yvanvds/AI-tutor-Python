@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>Classic list patterns</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -140,6 +140,68 @@ pre code {
   font-size: inherit;
 }
 
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
 /* Lists */
 
 ul, ol {
@@ -260,77 +322,81 @@ img {
 </style>
 </head>
 <body class="lesson">
+<p>Some tasks with lists come back so often that they have a fixed pattern: finding the largest, counting, searching, swapping. If you can write those patterns yourself, you can adapt them to any question, even when there is no ready-made function for it.</p>
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<h2>Finding the largest element</h2>
 
-<h2>De zeven operatoren</h2>
+<p>You keep a variable with the largest number <em>so far</em>. You start with the first element and then compare every element with it. If the new one is larger, it takes its place.</p>
 
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<pre><code>numbers = [4, 11, 7, 20, 3]
+largest = numbers[0]
+for number in numbers:
+    if number &gt; largest:
+        largest = number
+print(largest)</code></pre>
+<p>Output:</p>
+<pre><code>20</code></pre>
 
-<table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
-<tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
-</tbody>
-</table>
+<p>For the smallest element you only turn the comparison around: <code>&lt;</code> instead of <code>&gt;</code>. <code>max()</code> and <code>min()</code> do the same in one line, but with the pattern you can do more: for example, also remember at which position the largest one was.</p>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<div class="callout warn"><p>Don't start with <code>largest = 0</code>. With <code>[-4, -11, -2]</code> no number is greater than 0, so the result stays 0, a number that isn't even in the list. The first element is always a safe start.</p></div>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<h2>Counting</h2>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<p>Counting is a sum where you add 1 each time, but only if an element meets the condition.</p>
 
-<h2>Delen, gehele deling en rest</h2>
+<pre><code>even_count = 0
+for number in numbers:
+    if number % 2 == 0:
+        even_count = even_count + 1
+print(even_count)</code></pre>
+<p>Output:</p>
+<pre><code>2</code></pre>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<h2>Searching</h2>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<p>With <code>in</code> you know <em>whether</em> a value is in the list. If you also want to know <em>where</em>, or you are looking for an element that meets a condition, you loop over the indexes and remember what you found. A variable <code>found</code> with <code>True</code> or <code>False</code> keeps track of whether it has worked yet.</p>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<pre><code>names = ["Aya", "Bram", "Chloë", "Dries"]
+target = "Chloë"
+found = False
+position = -1
+for i in range(len(names)):
+    if names[i] == target:
+        found = True
+        position = i
+if found:
+    print("Found at position", position)
+else:
+    print("Not found")</code></pre>
+<p>Output:</p>
+<pre><code>Found at position 2</code></pre>
 
-<h2>Volgorde van bewerkingen</h2>
+<div class="callout warn"><p>The conclusion belongs after the loop. If you put <code>print("Not found")</code> in the loop, in an <code>else</code> with the comparison, it appears for every element that doesn't match, even if the name does appear further on.</p></div>
 
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+<h2>Swapping two elements</h2>
 
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
+<p>To swap the contents of two glasses, you need a third glass. With a list, that is a temporary variable.</p>
 
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+<pre><code>colors = ["red", "green", "blue"]
+temp = colors[0]
+colors[0] = colors[2]
+colors[2] = temp
+print(colors)</code></pre>
+<p>Output:</p>
+<pre><code>['blue', 'green', 'red']</code></pre>
 
-<h2>Hele getallen en kommagetallen</h2>
+<p>Without a temporary variable it goes wrong:</p>
 
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
+<pre><code>colors = ["red", "green", "blue"]
+colors[0] = colors[2]
+colors[2] = colors[0]
+print(colors)</code></pre>
+<p>Output:</p>
+<pre><code>['blue', 'green', 'blue']</code></pre>
 
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
+<p>The first line already overwrites <code>"red"</code>. When the second line wants to put the old value back, it is no longer there.</p>
 
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
-
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
-
+<p>With these four patterns you can already solve a large part of the questions you can ask about a list.</p>
 </body>
 </html>

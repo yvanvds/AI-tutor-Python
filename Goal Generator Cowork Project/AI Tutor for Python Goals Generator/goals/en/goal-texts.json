@@ -1,0 +1,282 @@
+{
+  "language": "en",
+  "about": "English title and description of every goal and subgoal (#209), next to the live Dutch text they were translated from. tooling/translations/push_translations.py writes them to the Cosmos container `translations` as `goal_<id>` docs, with the sourceHash of the Dutch text; it refuses an entry whose Dutch text no longer matches the live goal. Glossary: ../../lessons/glossary-en.md.",
+  "goals": [
+    {
+      "id": "eenvoudige-python-scripts",
+      "parentId": null,
+      "nl": {
+        "title": "Eenvoudige Python-scripts schrijven en begrijpen",
+        "description": "Je kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken."
+      },
+      "en": {
+        "title": "Writing and understanding simple Python scripts",
+        "description": "You can write short Python scripts that output numbers and text, use variables to store values, do simple calculations with the standard operators, and process input from the user."
+      }
+    },
+    {
+      "id": "uitvoer-print",
+      "parentId": "eenvoudige-python-scripts",
+      "nl": {
+        "title": "Uitvoer met print",
+        "description": "Je kan met print() strings en getallen op het scherm tonen en herkent het verschil tussen wat in de broncode staat en wat als uitvoer verschijnt."
+      },
+      "en": {
+        "title": "Output with print",
+        "description": "You can use print() to show strings and numbers on the screen, and you recognize the difference between what is in the source code and what appears as output."
+      }
+    },
+    {
+      "id": "variabelen",
+      "parentId": "eenvoudige-python-scripts",
+      "nl": {
+        "title": "Variabelen",
+        "description": "Je kan een waarde toekennen aan een variabele met =, een geldige naam kiezen, de variabele gebruiken in expressies en print, en haar waarde herwijzen."
+      },
+      "en": {
+        "title": "Variables",
+        "description": "You can assign a value to a variable with =, choose a valid name, use the variable in expressions and in print, and reassign its value."
+      }
+    },
+    {
+      "id": "rekenen-getallen",
+      "parentId": "eenvoudige-python-scripts",
+      "nl": {
+        "title": "Rekenen met getallen",
+        "description": "Je kan rekenkundige expressies schrijven en evalueren met de standaardoperatoren (+, -, *, /, //, %, **), de volgorde van bewerkingen toepassen, en het verschil herkennen tussen int en float."
+      },
+      "en": {
+        "title": "Calculating with numbers",
+        "description": "You can write and evaluate arithmetic expressions with the standard operators (+, -, *, /, //, %, **), apply the order of operations, and recognize the difference between int and float."
+      }
+    },
+    {
+      "id": "invoer-input",
+      "parentId": "eenvoudige-python-scripts",
+      "nl": {
+        "title": "Invoer met input",
+        "description": "Je kan met input() een waarde van de gebruiker opvragen met een duidelijke prompt, het resultaat opslaan in een variabele, en de invoer omzetten naar int of float wanneer rekenwerk nodig is."
+      },
+      "en": {
+        "title": "Input with input",
+        "description": "You can use input() to ask the user for a value with a clear prompt, store the result in a variable, and convert the input to int or float when you need to calculate with it."
+      }
+    },
+    {
+      "id": "klein-script",
+      "parentId": "eenvoudige-python-scripts",
+      "nl": {
+        "title": "Een klein script samenstellen",
+        "description": "Je kan de eerder behandelde bouwstenen — input, variabelen, rekenen, print — combineren tot een klein, werkend Python-script dat een probleem in natuurlijke taal oplost, en kan zo'n script lezen, traceren en debuggen."
+      },
+      "en": {
+        "title": "Putting together a small script",
+        "description": "You can combine the building blocks covered so far — input, variables, calculations, print — into a small, working Python script that solves a problem described in plain language, and you can read, trace and debug such a script."
+      }
+    },
+    {
+      "id": "condities",
+      "parentId": null,
+      "nl": {
+        "title": "Beslissingen programmeren met condities",
+        "description": "Je kan vergelijkingen schrijven die True of False opleveren, beslissingen programmeren met if, elif en else, voorwaarden combineren met and, or en not, en met de turtle-module tekeningen maken waarin condities bepalen wat er getekend wordt."
+      },
+      "en": {
+        "title": "Programming decisions with conditions",
+        "description": "You can write comparisons that give True or False, program decisions with if, elif and else, combine conditions with and, or and not, and use the turtle module to make drawings in which conditions decide what gets drawn."
+      }
+    },
+    {
+      "id": "vergelijkingen-booleans",
+      "parentId": "condities",
+      "nl": {
+        "title": "Vergelijkingen en booleans",
+        "description": "Je kan vergelijkingsoperatoren (==, !=, <, >, <=, >=) gebruiken om expressies te schrijven die True of False opleveren, dat resultaat opslaan in een variabele, en voorspellen wat een vergelijking oplevert."
+      },
+      "en": {
+        "title": "Comparisons and booleans",
+        "description": "You can use comparison operators (==, !=, <, >, <=, >=) to write expressions that give True or False, store that result in a variable, and predict what a comparison gives."
+      }
+    },
+    {
+      "id": "beslissingen-if-else",
+      "parentId": "condities",
+      "nl": {
+        "title": "Beslissingen met if en else",
+        "description": "Je kan een if-statement schrijven dat code uitvoert als een voorwaarde waar is, een else-tak toevoegen om tussen twee blokken te kiezen, en voorspellen welke tak uitgevoerd wordt."
+      },
+      "en": {
+        "title": "Decisions with if and else",
+        "description": "You can write an if statement that runs code when a condition is true, add an else branch to choose between two blocks, and predict which branch runs."
+      }
+    },
+    {
+      "id": "elif-samengestelde-voorwaarden",
+      "parentId": "condities",
+      "nl": {
+        "title": "Meer keuzes met elif, and, or en not",
+        "description": "Je kan meerdere gevallen onderscheiden met een if/elif/else-keten en voorwaarden combineren met and, or en not."
+      },
+      "en": {
+        "title": "More choices with elif, and, or and not",
+        "description": "You can tell several cases apart with an if/elif/else chain and combine conditions with and, or and not."
+      }
+    },
+    {
+      "id": "tekenen-turtle",
+      "parentId": "condities",
+      "nl": {
+        "title": "Tekenen met turtle",
+        "description": "Je kan met de turtle-module een tekening programmeren: een turtle aanmaken, hem bewegen en draaien, de pen en kleur instellen, en condities gebruiken om te bepalen wat er getekend wordt."
+      },
+      "en": {
+        "title": "Drawing with turtle",
+        "description": "You can program a drawing with the turtle module: create a turtle, move and turn it, set the pen and the color, and use conditions to decide what gets drawn."
+      }
+    },
+    {
+      "id": "herhaling",
+      "parentId": null,
+      "nl": {
+        "title": "Herhalingen programmeren met lussen",
+        "description": "Je kan herhalingen implementeren met for en while, programma's systematisch testen en debuggen met verschillende testgevallen, en complexere probleemstellingen vertalen naar werkende Python-code, ook met turtle-tekeningen."
+      },
+      "en": {
+        "title": "Programming repetition with loops",
+        "description": "You can implement repetition with for and while, test and debug programs systematically with different test cases, and translate more complex problems into working Python code, including turtle drawings."
+      }
+    },
+    {
+      "id": "herhalen-for",
+      "parentId": "herhaling",
+      "nl": {
+        "title": "Herhalen met for en range",
+        "description": "Je kan een for-lus met range schrijven om een bewerking een vast aantal keer te herhalen, de uitvoer van zo'n lus voorspellen, een resultaat opbouwen in een variabele, en met turtle regelmatige figuren tekenen."
+      },
+      "en": {
+        "title": "Repeating with for and range",
+        "description": "You can write a for loop with range to repeat an operation a fixed number of times, predict the output of such a loop, build up a result in a variable, and draw regular shapes with turtle."
+      }
+    },
+    {
+      "id": "herhalen-while",
+      "parentId": "herhaling",
+      "nl": {
+        "title": "Herhalen met while",
+        "description": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is, voorspellen wanneer zo'n lus stopt, oneindige lussen herkennen, en een lus gebruiken om invoer te valideren."
+      },
+      "en": {
+        "title": "Repeating with while",
+        "description": "You can write a while loop that repeats as long as a condition is true, predict when such a loop stops, recognize infinite loops, and use a loop to validate input."
+      }
+    },
+    {
+      "id": "testen-debuggen",
+      "parentId": "herhaling",
+      "nl": {
+        "title": "Testen en debuggen",
+        "description": "Je kan een programma systematisch testen door verschillende testgevallen uit te proberen, zinvolle testgevallen kiezen inclusief randgevallen, foutmeldingen interpreteren, en fouten opsporen en verbeteren."
+      },
+      "en": {
+        "title": "Testing and debugging",
+        "description": "You can test a program systematically by trying out different test cases, choose meaningful test cases including edge cases, interpret error messages, and find and fix errors."
+      }
+    },
+    {
+      "id": "probleem-naar-programma",
+      "parentId": "herhaling",
+      "nl": {
+        "title": "Van probleem naar programma",
+        "description": "Je kan een complexere probleemstelling opdelen in stappen en vertalen naar een werkend Python-programma dat condities, lussen en eventueel turtle combineert, en logische fouten daarin opsporen en verbeteren."
+      },
+      "en": {
+        "title": "From problem to program",
+        "description": "You can break a more complex problem down into steps and translate it into a working Python program that combines conditions, loops and possibly turtle, and find and fix logic errors in it."
+      }
+    },
+    {
+      "id": "lijsten-tuples",
+      "parentId": null,
+      "nl": {
+        "title": "Lijsten en tuples",
+        "description": "Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen via hun index of met slicing, lijsten en strings doorlopen met lussen, zelf klassieke lijstalgoritmes schrijven, het verschil tussen veranderbare lijsten en onveranderbare tuples benutten, en met geneste lussen werken op paren en rasters."
+      },
+      "en": {
+        "title": "Lists and tuples",
+        "description": "You can store data in lists and tuples: get and change elements by their index or with slicing, loop over lists and strings, write classic list algorithms yourself, make use of the difference between mutable lists and immutable tuples, and work with nested loops on pairs and grids."
+      }
+    },
+    {
+      "id": "lijsten-indexeren",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Lijsten, strings en indexen",
+        "description": "Je kan een lijst aanmaken, elementen opvragen en aanpassen via hun index (ook negatief), een deel eruit halen met slicing, en een string op dezelfde manier indexeren als een reeks tekens."
+      },
+      "en": {
+        "title": "Lists, strings and indexes",
+        "description": "You can create a list, get and change elements by their index (including a negative one), take out a part with slicing, and index a string the same way, as a sequence of characters."
+      }
+    },
+    {
+      "id": "lijsten-aanpassen",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Lijsten aanpassen met methodes",
+        "description": "Je kan een lijst laten groeien en krimpen met append, insert, remove en pop, met in controleren of een waarde erin zit, en sum, min, max en sort gebruiken."
+      },
+      "en": {
+        "title": "Changing lists with methods",
+        "description": "You can make a list grow and shrink with append, insert, remove and pop, check with in whether a value is in it, and use sum, min, max and sort."
+      }
+    },
+    {
+      "id": "lijsten-doorlopen",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Lijsten en strings doorlopen",
+        "description": "Je kan met een for-lus elk element van een lijst of string verwerken, kiezen tussen een lus over de elementen en een lus over de indexen, een nieuwe lijst opbouwen door te filteren of om te zetten, en met turtle tekenen op basis van een lijst."
+      },
+      "en": {
+        "title": "Looping over lists and strings",
+        "description": "You can use a for loop to process every element of a list or string, choose between a loop over the elements and a loop over the indexes, build a new list by filtering or transforming, and draw with turtle based on a list."
+      }
+    },
+    {
+      "id": "lijstpatronen",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Klassieke lijstpatronen",
+        "description": "Je kan zelf veelgebruikte algoritmes over een lijst schrijven: het grootste of kleinste element zoeken zonder max() of min(), tellen wat aan een voorwaarde voldoet, zoeken of en waar een waarde voorkomt, en twee elementen van plaats wisselen."
+      },
+      "en": {
+        "title": "Classic list patterns",
+        "description": "You can write common algorithms over a list yourself: find the largest or smallest element without max() or min(), count what meets a condition, search whether and where a value occurs, and swap two elements."
+      }
+    },
+    {
+      "id": "tuples",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Tuples en onveranderbaarheid",
+        "description": "Je kan tuples aanmaken, indexeren en uitpakken (ook om te wisselen of om een lijst van paren te doorlopen), uitleggen waarom tuples en strings niet aan te passen zijn, en voorspellen wat er gebeurt als twee namen naar dezelfde lijst verwijzen."
+      },
+      "en": {
+        "title": "Tuples and immutability",
+        "description": "You can create, index and unpack tuples (also to swap values or to loop over a list of pairs), explain why tuples and strings can't be changed, and predict what happens when two names refer to the same list."
+      }
+    },
+    {
+      "id": "geneste-lussen",
+      "parentId": "lijsten-tuples",
+      "nl": {
+        "title": "Geneste lussen en lijsten van lijsten",
+        "description": "Je kan een lus in een lus schrijven om paren uit een lijst te overlopen, voorspellen hoe vaak de binnenste lus loopt, en een raster als lijst van lijsten doorlopen en aanpassen met rooster[r][k]."
+      },
+      "en": {
+        "title": "Nested loops and lists of lists",
+        "description": "You can write a loop inside a loop to go through pairs from a list, predict how often the inner loop runs, and loop through and change a grid as a list of lists with grid[r][c]."
+      }
+    }
+  ]
+}

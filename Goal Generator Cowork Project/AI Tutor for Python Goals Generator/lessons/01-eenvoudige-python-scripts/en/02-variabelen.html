@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>Variables</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -261,76 +261,81 @@ img {
 </head>
 <body class="lesson">
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<p>A <em>variable</em> is a name you link to a value, so that you can call up that value later simply by using the name. That way you don't have to type the same text or the same number again every time, and you can keep values during a script.</p>
 
-<h2>De zeven operatoren</h2>
+<h2>Assigning with =</h2>
 
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<p>You link a value to a name with the equals sign. The name goes on the left, the value on the right.</p>
 
-<table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
-<tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
-</tbody>
-</table>
+<pre><code>name = "Mira"
+age = 16
+print(name)
+print(age)</code></pre>
+<p>Output:</p>
+<pre><code>Mira
+16</code></pre>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<p>Read <code>=</code> as "becomes". So it is not a mathematical equality, but an instruction with a direction: from right to left.</p>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<h2>Using the variable</h2>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<p>Once a variable exists, you can use it anywhere you would otherwise type the value itself — in <code>print</code>, or together with other values.</p>
 
-<h2>Delen, gehele deling en rest</h2>
+<pre><code>name = "Mira"
+print("Hello", name)</code></pre>
+<p>Output:</p>
+<pre><code>Hello Mira</code></pre>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<p>Watch the difference between <code>name</code> and <code>"name"</code>. Without quotation marks, <code>name</code> refers to the value you stored. With quotation marks, it is just the text <em>name</em>.</p>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<pre><code>name = "Mira"
+print("name")
+print(name)</code></pre>
+<p>Output:</p>
+<pre><code>name
+Mira</code></pre>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<h2>Overwriting a value</h2>
 
-<h2>Volgorde van bewerkingen</h2>
+<p>A variable can get a new value when you assign something to it again. The old value is then gone.</p>
 
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+<pre><code>x = 10
+x = 20
+print(x)</code></pre>
+<p>Output:</p>
+<pre><code>20</code></pre>
 
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
+<p>The new value can also depend on the old one. Python then first looks at what is on the right, and only then puts the result into the name on the left.</p>
 
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+<pre><code>x = 10
+x = x + 1
+print(x)</code></pre>
+<p>Output:</p>
+<pre><code>11</code></pre>
 
-<h2>Hele getallen en kommagetallen</h2>
+<p>So the line <code>x = x + 1</code> means: take the current value of <code>x</code> (10), add 1 to it, and store that result as the new <code>x</code>.</p>
 
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
+<h2>Rules for names</h2>
 
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
+<p>Not every piece of text works as a variable name. Python has a few rules:</p>
 
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
+<ul>
+<li>A name starts with a letter or an underscore, not with a digit. <code>score</code> and <code>_score</code> are allowed, <code>2score</code> is not.</li>
+<li>A name contains only letters, digits and underscores. No hyphen, no space. <code>my_score</code> is allowed, <code>my-score</code> and <code>my score</code> are not.</li>
+<li>A name can't be a Python keyword, such as <code>for</code> or <code>if</code>.</li>
+<li>Capital letters count: <code>name</code> and <code>Name</code> are two different variables.</li>
+</ul>
 
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
+<h2>Text or number</h2>
+
+<p>The quotation marks decide the type of the value. <code>"16"</code> is text that happens to consist of digits. <code>16</code> without quotation marks is a number you can calculate with.</p>
+
+<pre><code>a = "16"
+b = 16</code></pre>
+
+<p>They look the same on the screen when you print them, but Python treats them differently.</p>
+
+<div class="callout warn"><p>In Belgium you write decimal numbers with a comma, but Python expects a point. <code>pi = 3,14</code> is not a decimal number — Python reads it as two separate values in a row and puts them into <code>pi</code> as a pair. If you want 3,14 as a number, write <code>pi = 3.14</code>.</p></div>
 
 </body>
 </html>

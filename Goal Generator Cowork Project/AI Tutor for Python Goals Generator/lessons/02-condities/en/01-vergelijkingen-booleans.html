@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>Comparisons and booleans</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -140,6 +140,68 @@ pre code {
   font-size: inherit;
 }
 
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
 /* Lists */
 
 ul, ol {
@@ -260,77 +322,72 @@ img {
 </style>
 </head>
 <body class="lesson">
+<p>A program often has to check something: is a number greater than zero? Are two values equal? You ask questions like that in Python with a <em>comparison</em>, and the answer is always <code>True</code> or <code>False</code>.</p>
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<h2>The comparison operators</h2>
 
-<h2>De zeven operatoren</h2>
-
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<p>Python has six operators to compare values:</p>
 
 <table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
+<thead><tr><th>Operator</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
+<tr><td><code>==</code></td><td>is equal to</td></tr>
+<tr><td><code>!=</code></td><td>is not equal to</td></tr>
+<tr><td><code>&lt;</code></td><td>is less than</td></tr>
+<tr><td><code>&gt;</code></td><td>is greater than</td></tr>
+<tr><td><code>&lt;=</code></td><td>is less than or equal to</td></tr>
+<tr><td><code>&gt;=</code></td><td>is greater than or equal to</td></tr>
 </tbody>
 </table>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<p>A comparison is an expression, just like <code>2 + 3</code>. Python works it out to a value — only that value is not a number, but <code>True</code> or <code>False</code>.</p>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<pre><code>print(5 &gt; 3)
+print(5 == 3)
+print(5 != 3)</code></pre>
+<p>Output:</p>
+<pre><code>True
+False
+True</code></pre>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<p>Watch the capital letters: Python only knows <code>True</code> and <code>False</code>. If you write <code>true</code> or <code>false</code>, Python thinks you mean a variable with that name.</p>
 
-<h2>Delen, gehele deling en rest</h2>
+<h2>Storing the answer</h2>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<p>Because a comparison simply produces a value, you can put that answer in a variable. Python first works out the right side, and then stores the result.</p>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<pre><code>age = 17
+can_vote = age &gt;= 18
+print(can_vote)</code></pre>
+<p>Output:</p>
+<pre><code>False</code></pre>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<p>The variable <code>can_vote</code> now holds the value <code>False</code> — not the comparison itself.</p>
 
-<h2>Volgorde van bewerkingen</h2>
+<h2>From sentence to comparison</h2>
 
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+<p>In a task, a condition is usually written in words. Translating it to Python then means choosing the right operator: "at least" becomes <code>&gt;=</code>, "at most" becomes <code>&lt;=</code>, "differs from" becomes <code>!=</code>. The sentence "the temperature is at least 20 degrees" becomes:</p>
 
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
+<pre><code>temperature = 23
+print(temperature &gt;= 20)</code></pre>
+<p>Output:</p>
+<pre><code>True</code></pre>
 
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+<p>Look carefully at the boundary case: with "at least 20", 20 itself is included (<code>&gt;=</code>); with "more than 20", it is not (<code>&gt;</code>). Exactly on the boundary, that makes the difference between <code>True</code> and <code>False</code>.</p>
 
-<h2>Hele getallen en kommagetallen</h2>
+<h2>= or ==</h2>
 
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
+<p>One equals sign and two equals signs do something completely different. <code>x = 5</code> is an instruction: put the value 5 in <code>x</code>. <code>x == 5</code> is a question: is <code>x</code> equal to 5? The instruction stores something, the question produces <code>True</code> or <code>False</code>.</p>
 
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
+<pre><code>x = 5
+print(x == 5)
+print(x == 6)</code></pre>
+<p>Output:</p>
+<pre><code>True
+False</code></pre>
 
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
+<div class="callout warn"><p>A string and a number are never equal, even if they look the same: <code>"5" == 5</code> gives <code>False</code>. Think of <code>input()</code> — it always gives back a string. If you want to compare input with a number, convert it first with <code>int()</code> or <code>float()</code>.</p></div>
 
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
-
+<p>With that, you can turn any condition in words into a comparison, and predict whether Python answers it with <code>True</code> or <code>False</code>.</p>
 </body>
 </html>

@@ -49,6 +49,10 @@ class Conflict(Exception):
     """412: the doc changed since it was read."""
 
 
+class Exists(Exception):
+    """409 on [create]: a doc with that id is already there (and was kept)."""
+
+
 def _auth(verb: str, rtype: str, rlink: str, date: str) -> str:
     payload = f"{verb.lower()}\n{rtype.lower()}\n{rlink}\n{date.lower()}\n\n"
     sig = base64.b64encode(
@@ -143,6 +147,24 @@ def upsert(coll: str, doc: dict, pk, etag: str | None = None) -> dict:
     except urllib.error.HTTPError as e:
         if e.code == 412:
             raise Conflict(doc.get("id"))
+        print("HTTP", e.code, e.read()[:400].decode(errors="replace"), file=sys.stderr)
+        raise
+
+
+def create(coll: str, doc: dict, pk) -> dict:
+    """Creates [doc]. A doc with the same id raises [Exists] and stays as it
+    is: create never overwrites, unlike [upsert]."""
+    rlink = f"dbs/{DB}/colls/{coll}"
+    h = _headers("POST", "docs", rlink, pk)
+    h["Content-Type"] = "application/json"
+    body = json.dumps({k: v for k, v in doc.items() if not k.startswith("_")}).encode()
+    req = urllib.request.Request(f"{ENDPOINT}/{rlink}/docs", data=body, headers=h, method="POST")
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            raise Exists(doc.get("id"))
         print("HTTP", e.code, e.read()[:400].decode(errors="replace"), file=sys.stderr)
         raise
 

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>Output with print</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -261,76 +261,57 @@ img {
 </head>
 <body class="lesson">
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<p>With <code>print()</code> you show something on the screen. Whatever is between the parentheses appears as output when you run the script. You don't see the source code itself — only what <code>print</code> passes on.</p>
 
-<h2>De zeven operatoren</h2>
+<h2>Showing text</h2>
 
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<p>You put text between quotation marks. Python calls a piece of text like that a <em>string</em>. Single and double quotation marks both work, as long as you use the same kind to start and to end.</p>
 
-<table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
-<tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
-</tbody>
-</table>
+<pre><code>print("Hello world")
+print('Goodbye')</code></pre>
+<p>Output:</p>
+<pre><code>Hello world
+Goodbye</code></pre>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<p>Notice: the quotation marks do <strong>not</strong> appear in the output. They belong to the source code and tell Python "this is text".</p>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<h2>Showing numbers</h2>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<p>For numbers you use <strong>no</strong> quotation marks. A number is not text.</p>
 
-<h2>Delen, gehele deling en rest</h2>
+<pre><code>print(42)
+print(3.14)</code></pre>
+<p>Output:</p>
+<pre><code>42
+3.14</code></pre>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<div class="callout warn"><p>If you write <code>print(hello)</code> without quotation marks, Python thinks <code>hello</code> is the name of something you made earlier. If that name doesn't exist, you get a <code>NameError</code>. So quotation marks are not optional decoration — they make the difference between text and a name.</p></div>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<h2>Several values at once</h2>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<p>If you want to show several things on one line, you can separate them with a comma inside one <code>print</code> call. Python then automatically puts a space between the pieces.</p>
 
-<h2>Volgorde van bewerkingen</h2>
+<pre><code>print("Score:", 5)
+print("The sum is", 3, "+", 4)</code></pre>
+<p>Output:</p>
+<pre><code>Score: 5
+The sum is 3 + 4</code></pre>
 
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+<p>You can see that the commas in the source code are not in the output; they are replaced by spaces.</p>
 
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
+<h2>Comma versus plus</h2>
 
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+<p>There is also a way to glue text together with a <code>+</code>. An important difference: <code>+</code> only works between two strings, and it adds <strong>no</strong> space.</p>
 
-<h2>Hele getallen en kommagetallen</h2>
+<pre><code>print("Hello" + "world")
+print("Hello", "world")</code></pre>
+<p>Output:</p>
+<pre><code>Helloworld
+Hello world</code></pre>
 
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
+<div class="callout warn"><p>With <code>+</code> you can't combine text and a number. <code>print("score: " + 5)</code> gives a <code>TypeError</code>, because <code>+</code> between a string and a number doesn't know what to do — add or glue? If you want to show text and a number together, use the comma form: <code>print("score:", 5)</code>.</p></div>
 
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
-
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
-
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
+<p>With that, you can type your first script of your own and see what appears on the screen.</p>
 
 </body>
 </html>

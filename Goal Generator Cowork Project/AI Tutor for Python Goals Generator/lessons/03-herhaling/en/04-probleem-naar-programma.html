@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>From problem to program</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -140,6 +140,68 @@ pre code {
   font-size: inherit;
 }
 
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
 /* Lists */
 
 ul, ol {
@@ -260,77 +322,35 @@ img {
 </style>
 </head>
 <body class="lesson">
+<p>With a bigger task, starting to type right away is rarely a good idea. Translating a problem into a program works better in two steps: first a plan in plain language, and only then code.</p>
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<h2>A plan first</h2>
 
-<h2>De zeven operatoren</h2>
+<p>Almost every program breaks down into three parts: which <strong>input</strong> does it need, what <strong>processing</strong> happens with it — where is there a choice, where a repetition? — and which <strong>output</strong> has to come out. Take this task:</p>
 
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<blockquote>Ask the user for numbers until they type 0. Then show the sum of all the numbers entered.</blockquote>
 
-<table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
-<tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
-</tbody>
-</table>
+<p>The plan, still without code: ask for a number (input); as long as it isn't 0, add it to a running sum and ask for the next one (repetition with while, because the number of times isn't fixed); at the end, show the sum (output). Each piece of the plan points to a building block you already know:</p>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<pre><code>total = 0
+number = int(input("Enter a number (0 to stop): "))
+while number != 0:
+    total = total + number
+    number = int(input("Enter a number (0 to stop): "))
+print("Sum:", total)</code></pre>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<p>The same goes for drawing tasks: "draw a row of five squares, alternately red and blue" becomes a for loop with an if inside it — the building blocks come straight out of the plan.</p>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<h2>Reading someone else's code</h2>
 
-<h2>Delen, gehele deling en rest</h2>
+<p>The translation also works in the other direction: predicting from a given program what it does. Choose a concrete input and go through the lines the way Python would, while keeping track of the value of every variable. For the program above with the input 3, 5, 0: <code>total</code> becomes 0, then 3, then 8; at 0 the loop stops and <code>Sum: 8</code> appears.</p>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<h2>When it is almost right</h2>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<p>A bigger program is rarely right in one go, and the error is usually a logic error: everything runs, but the answer is off. Suppose <code>total</code> above started at 1 instead of 0 — every sum would be exactly one too high. You find an error like that as in the previous lesson: choose a test case, predict the result, compare, and look for the line that causes the difference. Suspect the usual places first: starting values, the boundaries of conditions, and exactly what is and isn't inside a loop or if block.</p>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<div class="callout tip"><p>Stuck while writing? Go back to the plan, not to the code. A program you can't retell in steps is a program you can't fix either.</p></div>
 
-<h2>Volgorde van bewerkingen</h2>
-
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
-
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
-
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
-
-<h2>Hele getallen en kommagetallen</h2>
-
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
-
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
-
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
-
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
-
+<p>With that, you have everything you need to turn a task you have never seen before into a working program.</p>
 </body>
 </html>

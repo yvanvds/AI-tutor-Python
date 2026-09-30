@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rekenen met getallen</title>
+<title>Decisions with if and else</title>
 <style>
 /* Lesson HTML stylesheet — used inside the WebView host that renders
  * authored Content body fragments. Hand-written from the design tokens in
@@ -140,6 +140,68 @@ pre code {
   font-size: inherit;
 }
 
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
 /* Lists */
 
 ul, ol {
@@ -260,77 +322,62 @@ img {
 </style>
 </head>
 <body class="lesson">
+<p>With <code>if</code> you let a program decide: a piece of code only runs if a condition gives <code>True</code>. That way the same script can do something different depending on the values it works with.</p>
 
-<p>Met Python kan je rekenen zoals met een rekenmachine, maar je typt de bewerkingen uit als <em>expressies</em>. Een expressie is een stukje code dat een waarde oplevert — die waarde kan je tonen met <code>print</code> of bewaren in een variabele.</p>
+<h2>The if statement</h2>
 
-<h2>De zeven operatoren</h2>
+<p>After the word <code>if</code> comes a condition — a comparison like the ones you just learned — followed by a colon. Below it is the block that only runs if the condition is true. You recognize that block by its indentation of four spaces.</p>
 
-<p>Python heeft zeven standaard rekenoperatoren:</p>
+<pre><code>number = 7
+if number &gt; 0:
+    print("positive")
+print("done")</code></pre>
+<p>Output:</p>
+<pre><code>positive
+done</code></pre>
 
-<table>
-<thead>
-<tr><th>Operator</th><th>Betekenis</th><th>Voorbeeld</th></tr>
-</thead>
-<tbody>
-<tr><td><code>+</code></td><td>optellen</td><td><code>5 + 3</code> → 8</td></tr>
-<tr><td><code>-</code></td><td>aftrekken</td><td><code>5 - 3</code> → 2</td></tr>
-<tr><td><code>*</code></td><td>vermenigvuldigen</td><td><code>5 * 3</code> → 15</td></tr>
-<tr><td><code>/</code></td><td>delen</td><td><code>10 / 4</code> → 2.5</td></tr>
-<tr><td><code>//</code></td><td>gehele deling</td><td><code>10 // 4</code> → 2</td></tr>
-<tr><td><code>%</code></td><td>rest bij deling (modulo)</td><td><code>10 % 4</code> → 2</td></tr>
-<tr><td><code>**</code></td><td>machtsverheffing</td><td><code>2 ** 3</code> → 8</td></tr>
-</tbody>
-</table>
+<p>If the condition is false, Python simply skips the indented block and carries on with the rest:</p>
 
-<p>Je kan ze gewoon in een <code>print</code> stoppen en Python rekent het uit:</p>
+<pre><code>number = -3
+if number &gt; 0:
+    print("positive")
+print("done")</code></pre>
+<p>Output:</p>
+<pre><code>done</code></pre>
 
-<pre><code>print(5 + 3)
-print(2 ** 10)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>8
-1024</code></pre>
+<h2>The indentation decides what belongs to it</h2>
 
-<div class="callout warn"><p>Voor machtsverheffing gebruik je <code>**</code>, niet <code>^</code>. Het dakje <code>^</code> bestaat wel in Python, maar betekent iets anders dan in de wiskunde. <code>2 ** 3</code> is acht, <code>2 ^ 3</code> is een heel ander getal.</p></div>
+<p>Compare the two examples above: <code>print("done")</code> runs in both. That is because of the indentation. Everything that is indented under the <code>if</code> belongs to the condition; the first line that starts at the front again no longer belongs to it and always runs. Python has no brackets or special words to mark the edges of a block — the indentation <em>is</em> the structure.</p>
 
-<h2>Delen, gehele deling en rest</h2>
+<h2>Two ways with else</h2>
 
-<p>Drie operatoren hebben met delen te maken. Het verschil zit in wat je terugkrijgt.</p>
+<p>If you also want to do something when the condition is false, you add an <code>else</code> block. Exactly one of the two blocks runs, never both.</p>
 
-<pre><code>print(10 / 4)
-print(10 // 4)
-print(10 % 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>2.5
-2
-2</code></pre>
+<pre><code>age = 17
+if age &gt;= 18:
+    print("adult")
+else:
+    print("minor")</code></pre>
+<p>Output:</p>
+<pre><code>minor</code></pre>
 
-<p>De gewone deling <code>/</code> geeft het exacte antwoord, eventueel met decimalen. De gehele deling <code>//</code> gooit het stuk na de komma weg en houdt alleen het hele deel over. De modulo <code>%</code> geeft de rest die overblijft na de gehele deling — 10 gedeeld door 4 is 2 keer, met 2 over.</p>
+<h2>A boolean as the condition</h2>
 
-<h2>Volgorde van bewerkingen</h2>
+<p>The condition doesn't have to be a comparison. Anything that gives <code>True</code> or <code>False</code> works — so also a variable in which you stored such a value earlier.</p>
 
-<p>Python volgt dezelfde regels als de wiskunde: machtsverheffing eerst, dan vermenigvuldigen en delen, dan optellen en aftrekken. Wat aan de linkerkant staat komt eerst aan de beurt als operatoren even sterk zijn.</p>
+<pre><code>age = 17
+can_vote = age &gt;= 18
+if can_vote:
+    print("You can vote.")
+else:
+    print("Not quite yet.")</code></pre>
+<p>Output:</p>
+<pre><code>Not quite yet.</code></pre>
 
-<pre><code>print(2 + 3 * 4)
-print((2 + 3) * 4)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>14
-20</code></pre>
+<p>So don't write <code>if can_vote == True:</code> — that does work, but <code>can_vote</code> is already <code>True</code> or <code>False</code>, so <code>if can_vote:</code> says the same thing.</p>
 
-<p>In de eerste regel wordt <code>3 * 4</code> eerst berekend (12), pas daarna komt de <code>+ 2</code> erbij. Wil je dat het optellen eerst gebeurt, dan zet je haakjes rond dat stuk.</p>
+<div class="callout warn"><p>In a condition you always compare with two equals signs. <code>if number = 5:</code> is a syntax error: <code>=</code> assigns, <code>==</code> compares. Python then refuses to run the script.</p></div>
 
-<h2>Hele getallen en kommagetallen</h2>
-
-<p>Python kent twee soorten getallen: <em>int</em> (een heel getal, zoals <code>7</code>) en <em>float</em> (een kommagetal, zoals <code>2.5</code>). Het verschil hoort bij de waarde, niet bij de operator. Reken je met twee ints en is het resultaat een heel getal, dan blijft het een int. Komt er ergens een float bij kijken, dan wordt het resultaat een float.</p>
-
-<pre><code>print(3 + 4)
-print(3 + 4.0)</code></pre>
-<p>Uitvoer:</p>
-<pre><code>7
-7.0</code></pre>
-
-<div class="callout warn"><p>Eén operator is een uitzondering: de gewone deling <code>/</code> geeft <strong>altijd</strong> een float, ook als je uitkomst niets na de komma bevat. Dus <code>8 / 2</code> levert <code>4.0</code>, niet <code>4</code>. Wil je een int terug bij een nette deling, dan gebruik je <code>//</code>: <code>8 // 2</code> geeft <code>4</code>.</p></div>
-
-<p>Onthoud ook de regel uit de vorige les: kommagetallen schrijf je met een punt, niet met een komma. <code>3.14</code> is een float, <code>3,14</code> is iets anders.</p>
-
+<p>With that, you can write a script that chooses for itself what it does, and predict for every if/else which branch runs.</p>
 </body>
 </html>
