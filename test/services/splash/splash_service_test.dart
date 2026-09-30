@@ -18,10 +18,13 @@ void main() {
 
     test('showGoalReached sets correct state fields', () {
       service.showGoalReached(
+        goalId: 's-loops',
         goalTitle: 'Loops',
         description: 'You understand for loops!',
       );
       expect(tracked, isNotNull);
+      // The id, so the overlay can show the goal in the app language (#211).
+      expect(tracked!.goalId, 's-loops');
       expect(tracked!.goalTitle, 'Loops');
       expect(tracked!.description, 'You understand for loops!');
       // The phrase itself is localized by the overlay (#23); the service
@@ -33,7 +36,7 @@ void main() {
     });
 
     test('hide clears state', () {
-      service.showGoalReached(goalTitle: 'X', description: 'Y');
+      service.showGoalReached(goalId: 'x', goalTitle: 'X', description: 'Y');
       service.hide();
       expect(tracked, isNull);
     });
@@ -50,6 +53,7 @@ void main() {
     test('auto-hides after duration elapses', () {
       fakeAsync((async) {
         service.showGoalReached(
+          goalId: 's-vars',
           goalTitle: 'Vars',
           description: 'Variables!',
           duration: const Duration(seconds: 5),
@@ -63,12 +67,14 @@ void main() {
     test('auto-hide does not clear state when another goal replaced it', () {
       fakeAsync((async) {
         service.showGoalReached(
+          goalId: 'a',
           goalTitle: 'A',
           description: 'desc A',
           duration: const Duration(seconds: 5),
         );
         // Replace with a different goal before first timer fires
         service.showGoalReached(
+          goalId: 'b',
           goalTitle: 'B',
           description: 'desc B',
           duration: const Duration(seconds: 10),

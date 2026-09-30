@@ -34,6 +34,7 @@ import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
 import 'flows/goal_language.dart' as goal_language;
+import 'flows/goal_notice_language.dart' as goal_notice_language;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -96,6 +97,7 @@ void main() {
   lesson_language.main();
   lesson_translation.main();
   goal_language.main();
+  goal_notice_language.main();
   language_switch.main();
   tutor_language.main();
   playground_files.main();

@@ -9,15 +9,22 @@ class LevelUpEvent {
     required this.newLevel,
     required this.xpAwarded,
     required this.conceptName,
+    this.goalId,
   });
 
   final int newLevel;
   final int xpAwarded;
 
   /// Short, lowercase concept name (the subgoal title as authored by the
-  /// teacher) shown in the localized subtitle ("You've mastered {concept}.").
+  /// teacher, in Dutch) shown in the localized subtitle ("You've mastered
+  /// {concept}.") when [goalId] has no translation into the app language.
   /// Examples: `elif-ladder`, `for-lus`, `lijsten`.
   final String conceptName;
+
+  /// The mastered subgoal, so the overlay names it in the app language
+  /// (#211). `null` for a moment that is not about a goal (the debug push):
+  /// then [conceptName] is shown as it is.
+  final String? goalId;
 }
 
 /// A concept mastery waiting for the XP stream to confirm that it actually
@@ -25,11 +32,13 @@ class LevelUpEvent {
 class _PendingMastery {
   _PendingMastery({
     required this.conceptName,
+    required this.goalId,
     required this.xpAwarded,
     required this.baseline,
   });
 
   final String conceptName;
+  final String? goalId;
   final int xpAwarded;
 
   /// Level observed when the mastery was armed. `null` until the first
@@ -66,12 +75,15 @@ class LevelUpController extends Notifier<LevelUpEvent?> {
 
   /// Arms the "a concept just got mastered" signal. The overlay follows only
   /// if the level rises afterwards; if it never does, nothing is shown.
+  /// [conceptName] is the subgoal's Dutch title, [goalId] its id.
   void armConceptMastered({
     required String conceptName,
+    String? goalId,
     required int xpAwarded,
   }) {
     _pending = _PendingMastery(
       conceptName: conceptName,
+      goalId: goalId,
       xpAwarded: xpAwarded,
       baseline: _observedLevel,
     );
@@ -94,6 +106,7 @@ class LevelUpController extends Notifier<LevelUpEvent?> {
         newLevel: level,
         xpAwarded: pending.xpAwarded,
         conceptName: pending.conceptName,
+        goalId: pending.goalId,
       ),
     );
   }

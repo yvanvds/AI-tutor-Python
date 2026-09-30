@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
@@ -37,6 +38,10 @@ String splashPhrase(AppLocalizations l, int index) {
   return phrases[index % phrases.length](l);
 }
 
+/// "Goal reached!" with the goal's title and description in the app
+/// language: its translation when there is one, else the Dutch text,
+/// without a notice (#211). A language switch while it is up applies at
+/// once.
 class GoalSplashOverlay extends ConsumerWidget {
   const GoalSplashOverlay({super.key});
 
@@ -45,6 +50,13 @@ class GoalSplashOverlay extends ConsumerWidget {
     final splash = ref.watch(splashStateProvider);
     if (splash == null) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
+    final goal = ref.watch(
+      localizedGoalByIdOf(
+        splash.goalId,
+        title: splash.goalTitle,
+        description: splash.description,
+      ),
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -95,7 +107,7 @@ class GoalSplashOverlay extends ConsumerWidget {
                           textAlign: TextAlign.center,
                         ),
                         Text(
-                          splash.goalTitle,
+                          goal.title,
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
@@ -104,7 +116,7 @@ class GoalSplashOverlay extends ConsumerWidget {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20.0),
                           child: Text(
-                            splash.description,
+                            goal.description ?? '',
                             style: Theme.of(context).textTheme.bodyMedium,
                             textAlign: TextAlign.center,
                           ),

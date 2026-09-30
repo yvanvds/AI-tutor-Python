@@ -157,6 +157,32 @@ void main() {
     expect(localizedGoal(_goal, translations).isStale, isFalse);
   });
 
+  test('by id and Dutch text (#211): the same as for the goal', () async {
+    final container = containerFor(cosmos.container);
+    await settle();
+    final translations = container.read(translationsProvider);
+
+    LocalizedGoal byId(Goal goal) => localizedGoalById(
+      goal.id,
+      title: goal.title,
+      description: goal.description,
+      translations: translations,
+    );
+    final changedGoal = Goal(
+      id: 's1',
+      title: 'Variabelen en waarden',
+      description: 'Waarden bewaren.',
+      order: 1000,
+    );
+    final untranslated = Goal(id: 's2', title: 'Lijsten', order: 2000);
+    for (final goal in [_goal, changedGoal, untranslated]) {
+      expect(byId(goal), localizedGoal(goal, translations));
+    }
+    expect(byId(_goal).title, 'Variables');
+    expect(byId(untranslated).title, 'Lijsten');
+    expect(byId(untranslated).isFallback, isTrue);
+  });
+
   test('Dutch shows the source, unflagged, and fetches nothing', () async {
     final missing = UnprovisionedCosmos('translations');
     final container = containerFor(

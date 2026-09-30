@@ -34,6 +34,10 @@ class _Fakes {
   GoalSelectionState selection = const GoalSelectionState();
   double currentProgress = 0.0;
 
+  /// What the conductor handed to the splash and the level-up (#211).
+  final List<Goal> goalsReached = [];
+  final List<Goal> conceptsMastered = [];
+
   String _key(String subgoalId, String loId) => '${subgoalId}__$loId';
 }
 
@@ -73,8 +77,8 @@ ConductorDeps _buildDeps(_Fakes f) {
     recordDebugEvent: (name, [data]) {},
     playCorrectAnswer: () {},
     playGoalReached: () {},
-    showGoalReached: ({required goalTitle, required description}) {},
-    pushConceptMastered: (_) {},
+    showGoalReached: f.goalsReached.add,
+    pushConceptMastered: f.conceptsMastered.add,
     getCalibration: () => f.calibration,
     setCalibration: (c) async => f.calibration = c,
     getLoBelief: ({required subgoalId, required loId}) async =>
@@ -2980,6 +2984,88 @@ void main() {
   });
 
   // ---- #161 an honest cache on advance -------------------------------------
+  group('#211 a reached subgoal is handed on as the goal, not its text', () {
+    /// One strong positive that masters the single LO of a subgoal of
+    /// [kind], and so advances it.
+    Future<_Fakes> reach({String? kind}) async {
+      final f = _Fakes();
+      final r = Goal(id: 'r', title: 'Basis', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 'Variabelen',
+        description: 'Waarden onthouden onder een naam.',
+        parentId: 'r',
+        order: 0,
+        kind: kind,
+        objectives: const [
+          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+        ],
+      );
+      f.roots.add(r);
+      f.children[r.id] = [subgoal];
+      f.selection = GoalSelectionState(selectedRoot: r, selectedChild: subgoal);
+      final now = DateTime.now().toUtc();
+      f.beliefs[f._key('s', 'lo')] = LoBelief(
+        subgoalId: 's',
+        loId: 'lo',
+        alpha: 5,
+        beta: 1,
+        lastUpdatedAt: now,
+        lastPositiveAtCalibratedAt: now,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final plan = QuestionPlan(
+        type: ChatRequestType.writeCodeQuestion,
+        difficulty: QuestionDifficulty.medium,
+        targetLOs: const [
+          LearningObjective(id: 'lo', statement: 'lo', kind: LoKind.apply),
+        ],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: const [
+            GradedSignal(
+              subgoalId: 's',
+              loId: 'lo',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+        ),
+      );
+      expect(outcome.subgoalAdvanced, isTrue);
+      return f;
+    }
+
+    test('the splash gets the subgoal itself: its id and Dutch text', () async {
+      final f = await reach();
+      final reached = f.goalsReached.single;
+      expect(reached.id, 's');
+      expect(reached.title, 'Variabelen');
+      expect(reached.description, 'Waarden onthouden onder een naam.');
+      expect(f.conceptsMastered, isEmpty);
+    });
+
+    test('a concept subgoal goes to the level-up as the goal too', () async {
+      final f = await reach(kind: 'concept');
+      expect(f.goalsReached.single.id, 's');
+      expect(f.conceptsMastered.single.id, 's');
+      expect(f.conceptsMastered.single.title, 'Variabelen');
+    });
+  });
+
   group('#161 the cache stays the honest fraction on advance; "finished" is '
       'the advancedAt stamp', () {
     Goal root() => Goal(id: 'r', title: 'r', order: 0);

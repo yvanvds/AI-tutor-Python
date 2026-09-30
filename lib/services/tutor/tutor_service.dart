@@ -430,10 +430,17 @@ class TutorService extends Notifier<TutorState> {
   /// (#116) — the XP write the conductor just made reaches that provider on
   /// the next progress poll, which is what the listener in [build] feeds in.
   /// Throttle and crossing check both live on [LevelUpController].
-  void _onConceptMastered(String conceptName) {
+  ///
+  /// The overlay names the concept in the app language (#211): it gets the
+  /// goal's id with its Dutch title.
+  void _onConceptMastered(Goal concept) {
     ref
         .read(levelUpControllerProvider.notifier)
-        .armConceptMastered(conceptName: conceptName, xpAwarded: kXpPerSubgoal);
+        .armConceptMastered(
+          conceptName: concept.title,
+          goalId: concept.id,
+          xpAwarded: kXpPerSubgoal,
+        );
   }
 
   ConductorDeps _buildConductorDeps() {
@@ -463,9 +470,13 @@ class TutorService extends Notifier<TutorState> {
           unawaited(ref.read(soundServiceProvider).correctAnswer()),
       playGoalReached: () =>
           unawaited(ref.read(soundServiceProvider).playGoalReached()),
-      showGoalReached: ({required goalTitle, required description}) => ref
+      showGoalReached: (subgoal) => ref
           .read(splashServiceProvider)
-          .showGoalReached(goalTitle: goalTitle, description: description),
+          .showGoalReached(
+            goalId: subgoal.id,
+            goalTitle: subgoal.title,
+            description: subgoal.description ?? '',
+          ),
       pushConceptMastered: _onConceptMastered,
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
@@ -1535,7 +1546,11 @@ class TutorService extends Notifier<TutorState> {
       // The ritual is announced (#102): the student sees why the first
       // question is about an older topic.
       _chat.addSystemNotice(
-        ChatNotice(ChatNoticeKind.warmUpReview, args: [warmUp.subgoal.title]),
+        ChatNotice(
+          ChatNoticeKind.warmUpReview,
+          args: [warmUp.subgoal.title],
+          goalId: warmUp.subgoal.id,
+        ),
       );
     }
     final recheck = plan.recheck;
@@ -1543,7 +1558,11 @@ class TutorService extends Notifier<TutorState> {
       // So is a recheck (#187): one question on an older topic in the
       // middle of practice needs a reason on screen.
       _chat.addSystemNotice(
-        ChatNotice(ChatNoticeKind.recheck, args: [recheck.subgoal.title]),
+        ChatNotice(
+          ChatNoticeKind.recheck,
+          args: [recheck.subgoal.title],
+          goalId: recheck.subgoal.id,
+        ),
       );
     }
     _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.preparingExercise));

@@ -36,12 +36,19 @@ void main() {
   test('the overlay follows the level report that crosses', () {
     final c = controller();
     c.observeLevel(1);
-    c.armConceptMastered(conceptName: 'elif-ladder', xpAwarded: 100);
+    c.armConceptMastered(
+      conceptName: 'elif-ladder',
+      goalId: 's-elif',
+      xpAwarded: 100,
+    );
     c.observeLevel(2);
 
     expect(event(), isNotNull);
     expect(event()!.newLevel, 2);
     expect(event()!.conceptName, 'elif-ladder');
+    // #211: the goal's id travels along, so the overlay can name the
+    // concept in the app language.
+    expect(event()!.goalId, 's-elif');
     expect(event()!.xpAwarded, 100);
   });
 

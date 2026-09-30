@@ -13,7 +13,10 @@
 // question about that page sends it to the tutor, so both use the same text.
 // A goal's title and description are watched through [localizedGoalOf]
 // (#210): the leerpad, the objective banner, the theory page's header and
-// the goal picker in Options.
+// the goal picker in Options. A notice that was raised about a goal and
+// kept only its id and Dutch text watches [localizedGoalByIdOf] (#211): the
+// goal-reached splash, the level-up subtitle, and the warm-up and recheck
+// pills in chat.
 
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
@@ -164,25 +167,44 @@ final localizedContentProvider = Provider.autoDispose
 /// [goal]'s title and description in [translations]' language: the
 /// translation when there is one, else the Dutch source with
 /// [LocalizedGoal.isFallback] set (not set when the language is Dutch).
-LocalizedGoal localizedGoal(Goal goal, LanguageTranslations translations) {
-  final translation = translations.isSource
-      ? null
-      : translations.goalFor(goal.id);
-  if (translation == null) {
-    return LocalizedGoal(
-      goalId: goal.id,
-      language: kSourceLanguage,
+LocalizedGoal localizedGoal(Goal goal, LanguageTranslations translations) =>
+    localizedGoalById(
+      goal.id,
       title: goal.title,
       description: goal.description,
+      translations: translations,
+    );
+
+/// [localizedGoal] for a caller that has only the goal's id and its Dutch
+/// [title] and [description] (#211). [LocalizedGoal.isStale] compares the
+/// translation against the Dutch text given here, so it is only meaningful
+/// when that is the goal's full title and description.
+LocalizedGoal localizedGoalById(
+  String goalId, {
+  required String title,
+  String? description,
+  required LanguageTranslations translations,
+}) {
+  final translation = translations.isSource
+      ? null
+      : translations.goalFor(goalId);
+  if (translation == null) {
+    return LocalizedGoal(
+      goalId: goalId,
+      language: kSourceLanguage,
+      title: title,
+      description: description,
       isFallback: !translations.isSource,
     );
   }
   return LocalizedGoal(
-    goalId: goal.id,
+    goalId: goalId,
     language: translation.language,
     title: translation.title,
     description: translation.text,
-    isStale: translation.isStaleFor(goalSourceHash(goal)),
+    isStale: translation.isStaleFor(
+      translationSourceHash(title, description ?? ''),
+    ),
   );
 }
 
@@ -199,3 +221,28 @@ ProviderListenable<LocalizedGoal> localizedGoalOf(Goal goal) =>
     translationsProvider.select(
       (translations) => localizedGoal(goal, translations),
     );
+
+/// The goal [goalId]'s title and description in the app language, for a
+/// student-facing notice that kept only the goal's id and its Dutch [title]
+/// and [description] from when it was raised (#211):
+///
+///     final shown = ref.watch(
+///       localizedGoalByIdOf(splash.goalId, title: splash.goalTitle),
+///     );
+///
+/// Like [localizedGoalOf], it follows a language switch and a translation
+/// arriving on a poll while the notice is on screen, notifies only when the
+/// text shown changes, and without a translation it is the Dutch text,
+/// shown without a notice.
+ProviderListenable<LocalizedGoal> localizedGoalByIdOf(
+  String goalId, {
+  required String title,
+  String? description,
+}) => translationsProvider.select(
+  (translations) => localizedGoalById(
+    goalId,
+    title: title,
+    description: description,
+    translations: translations,
+  ),
+);

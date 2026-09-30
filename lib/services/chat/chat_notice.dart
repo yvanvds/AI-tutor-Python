@@ -75,11 +75,13 @@ enum ChatNoticeKind {
   newGoalSelected,
 
   /// The session opens with one review question on an older subgoal
-  /// (#102, CONDUCTOR_POLICY §1.5). `args[0]` is that subgoal's title.
+  /// (#102, CONDUCTOR_POLICY §1.5). `args[0]` is that subgoal's Dutch
+  /// title, [ChatNotice.goalId] its id.
   warmUpReview,
 
   /// One check question on an earlier subgoal in the middle of practice
-  /// (#187, CONDUCTOR_POLICY §2.6). `args[0]` is that subgoal's title.
+  /// (#187, CONDUCTOR_POLICY §2.6). `args[0]` is that subgoal's Dutch
+  /// title, [ChatNotice.goalId] its id.
   recheck,
 
   /// `args[0]` / `args[1]` are `QuestionDifficulty` names (before / after).
@@ -93,7 +95,7 @@ enum ChatNoticeKind {
 }
 
 class ChatNotice {
-  const ChatNotice(this.kind, {this.args = const [], this.cause});
+  const ChatNotice(this.kind, {this.args = const [], this.cause, this.goalId});
 
   /// Verbatim text that has no localized form.
   factory ChatNotice.raw(String text) =>
@@ -103,12 +105,28 @@ class ChatNotice {
   final List<String> args;
   final ChatNotice? cause;
 
+  /// For a notice about a goal whose `args[0]` is that goal's Dutch title
+  /// ([ChatNoticeKind.warmUpReview], [ChatNoticeKind.recheck]): the goal's
+  /// id, so the chat pill names it in the app language (#211) — and in a
+  /// new language after a switch, like the rest of the pill.
+  final String? goalId;
+
   static const String metadataKey = 'notice';
+
+  /// This notice with `args[0]` replaced by [title]: the goal [goalId]'s
+  /// title in the language the pill is shown in.
+  ChatNotice withGoalTitle(String title) => ChatNotice(
+    kind,
+    args: [title, ...args.skip(1)],
+    cause: cause,
+    goalId: goalId,
+  );
 
   Map<String, dynamic> toJson() => {
     'kind': kind.name,
     if (args.isNotEmpty) 'args': args,
     if (cause != null) 'cause': cause!.toJson(),
+    if (goalId != null) 'goalId': goalId,
   };
 
   /// Inverse of [toJson]; `null` for anything that is not a notice map.
@@ -128,7 +146,13 @@ class ChatNotice {
     final args = rawArgs is List
         ? rawArgs.map((a) => a.toString()).toList(growable: false)
         : const <String>[];
-    return ChatNotice(kind, args: args, cause: fromJson(raw['cause']));
+    final goalId = raw['goalId'];
+    return ChatNotice(
+      kind,
+      args: args,
+      cause: fromJson(raw['cause']),
+      goalId: goalId is String ? goalId : null,
+    );
   }
 
   @override
@@ -136,10 +160,11 @@ class ChatNotice {
       other is ChatNotice &&
       other.kind == kind &&
       other.cause == cause &&
+      other.goalId == goalId &&
       _listEquals(other.args, args);
 
   @override
-  int get hashCode => Object.hash(kind, cause, Object.hashAll(args));
+  int get hashCode => Object.hash(kind, cause, goalId, Object.hashAll(args));
 
   @override
   String toString() => 'ChatNotice(${toJson()})';

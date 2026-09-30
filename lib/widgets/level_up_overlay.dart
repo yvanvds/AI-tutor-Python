@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
+import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -132,7 +133,7 @@ class _LevelUpCardState extends State<_LevelUpCard>
             const SizedBox(height: AppSpacing.s),
             _LevelNumber(level: e.newLevel),
             const SizedBox(height: AppSpacing.m),
-            _Subtitle(conceptName: e.conceptName),
+            _Subtitle(conceptName: e.conceptName, goalId: e.goalId),
             const SizedBox(height: AppSpacing.xl),
             _ContinueButton(onTap: widget.onDismiss),
           ],
@@ -179,14 +180,22 @@ class _LevelNumber extends StatelessWidget {
   }
 }
 
-class _Subtitle extends StatelessWidget {
-  const _Subtitle({required this.conceptName});
+/// "You've mastered {concept}." The concept is the mastered subgoal's title
+/// in the app language: its translation when there is one, else the Dutch
+/// title, without a notice (#211).
+class _Subtitle extends ConsumerWidget {
+  const _Subtitle({required this.conceptName, this.goalId});
   final String conceptName;
+  final String? goalId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final concept = conceptName.trim();
+    final id = goalId;
+    final name = id == null
+        ? conceptName
+        : ref.watch(localizedGoalByIdOf(id, title: conceptName)).title;
+    final concept = name.trim();
     final text = concept.isEmpty
         ? l.levelUp_subtitle_generic
         : l.levelUp_subtitle_concept(concept);

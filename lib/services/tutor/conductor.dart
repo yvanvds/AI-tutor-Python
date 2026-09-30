@@ -359,13 +359,16 @@ class ConductorDeps {
   final void Function(String name, [Map<String, Object?>?]) recordDebugEvent;
   final void Function() playCorrectAnswer;
   final void Function() playGoalReached;
-  final void Function({required String goalTitle, required String description})
-  showGoalReached;
+
+  /// Invoked when [subgoal] is reached. Takes the goal, not its text — the
+  /// splash shows its title and description in the app language (#211).
+  final void Function(Goal subgoal) showGoalReached;
 
   /// Invoked when a subgoal with `kind == 'concept'` masters. The host
   /// (tutor_service) decides whether to show the level-up overlay and what
-  /// numbers to put on it — the conductor only signals the event.
-  final void Function(String conceptName) pushConceptMastered;
+  /// numbers to put on it — the conductor only signals the event. Takes the
+  /// goal, not its title, for the same reason as [showGoalReached].
+  final void Function(Goal concept) pushConceptMastered;
 
   /// Calibration accessors. The current-account calibration substructure is
   /// embedded on `accounts/{uid}` (STUDENT_MODEL).
@@ -1598,13 +1601,10 @@ class Conductor {
       );
       _deps.setCurrentProgress(cached);
       await _recomputeRoot();
-      _deps.showGoalReached(
-        goalTitle: subgoal.title,
-        description: subgoal.description ?? '',
-      );
+      _deps.showGoalReached(subgoal);
       _deps.playGoalReached();
       if (subgoal.kind == 'concept') {
-        _deps.pushConceptMastered(subgoal.title);
+        _deps.pushConceptMastered(subgoal);
       }
       _cascadeDepth = 0;
       await _advanceWithCascadeCap();
