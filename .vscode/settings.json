@@ -2,5 +2,6 @@
     "sonarlint.connectedMode.project": {
         "connectionId": "yvanvds",
         "projectKey": "yvanvds_AI-tutor-Python"
-    }
+    },
+    "cmake.sourceDirectory": "C:/Users/yvan/Github/AI-tutor-Python/windows"
 }
