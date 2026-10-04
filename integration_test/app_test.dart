@@ -48,6 +48,7 @@ import 'flows/lesson_translation.dart' as lesson_translation;
 import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
+import 'flows/oefening_xp.dart' as oefening_xp;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
@@ -130,6 +131,7 @@ void main() {
   status_report_retry.main();
   stuck_advance_progress.main();
   level_up_gate.main();
+  oefening_xp.main();
   bug_report_oauth.main();
   bug_report_file.main();
   goals_import_replace.main();

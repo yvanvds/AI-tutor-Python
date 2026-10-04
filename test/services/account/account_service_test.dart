@@ -9,6 +9,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -189,6 +190,133 @@ void main() {
       expect(captured['createdAt'], existingCreatedAt);
       // updatedAt is fresh, distinct from createdAt.
       expect(captured['updatedAt'], isNot(existingCreatedAt));
+    });
+  });
+
+  group('upsertAccount keeps what it does not set (#217)', () {
+    test('the oefening counter, the calibration, the streak and any field '
+        'it does not know survive a profile rewrite', () async {
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'id': _uid,
+          'uid': _uid,
+          'oefeningCount': 140,
+          'calibration': {'difficulty': 'hard'},
+          'streakDays': 4,
+          'somethingNewer': 'kept',
+        },
+      );
+      when(
+        () => container.upsert(
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+
+      await build().upsertAccount(
+        uid: _uid,
+        firstName: 'Y',
+        lastName: 'V',
+        email: 'y@example.com',
+      );
+
+      final doc =
+          verify(
+                () => container.upsert(
+                  captureAny<Map<String, Object?>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as Map<String, Object?>;
+      expect(doc['oefeningCount'], 140);
+      expect(doc['calibration'], {'difficulty': 'hard'});
+      expect(doc['streakDays'], 4);
+      expect(doc['somethingNewer'], 'kept');
+      expect(doc['firstName'], 'Y');
+    });
+  });
+
+  group('setCalibration — the oefening counter (#217)', () {
+    late Map<String, dynamic> stored;
+
+    setUp(() {
+      stored = {
+        'id': _uid,
+        'uid': _uid,
+        'oefeningCount': 24,
+        'streakDays': 3,
+        'somethingNewer': 'kept',
+      };
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => Map<String, dynamic>.of(stored));
+      when(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((inv) async {
+        stored = Map<String, dynamic>.of(
+          inv.positionalArguments[1] as Map<String, Object?>,
+        );
+        return stored;
+      });
+    });
+
+    Future<AccountService> signedIn() async {
+      final svc = build();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth).set(
+        _identity(),
+      );
+      await Future<void>.delayed(Duration.zero);
+      return svc;
+    }
+
+    test('counting adds one to what is stored, in the calibration write, '
+        'and keeps every other field', () async {
+      final svc = await signedIn();
+
+      await svc.setCalibration(StudentCalibration.fresh(), countOefening: true);
+
+      expect(stored['oefeningCount'], 25);
+      expect(stored['calibration'], StudentCalibration.fresh().toJson());
+      expect(stored['streakDays'], 3);
+      expect(stored['somethingNewer'], 'kept');
+    });
+
+    test('counts from the doc as read, not from the last poll: two answers '
+        'before the poll comes back are two', () async {
+      final svc = await signedIn();
+      final polled = pc.read(accountServiceProvider)?.oefeningCount;
+
+      await svc.setCalibration(StudentCalibration.fresh(), countOefening: true);
+      await svc.setCalibration(StudentCalibration.fresh(), countOefening: true);
+
+      expect(stored['oefeningCount'], 26);
+      expect(pc.read(accountServiceProvider)?.oefeningCount, polled);
+    });
+
+    test('a doc from before the counter starts it at 1', () async {
+      stored.remove('oefeningCount');
+      final svc = await signedIn();
+      await svc.setCalibration(StudentCalibration.fresh(), countOefening: true);
+      expect(stored['oefeningCount'], 1);
+    });
+
+    test('without countOefening — a reset, an archive import, a follow-up — '
+        'the counter stays as it is', () async {
+      final svc = await signedIn();
+      await svc.setCalibration(StudentCalibration.fresh());
+      expect(stored['oefeningCount'], 24);
     });
   });
 

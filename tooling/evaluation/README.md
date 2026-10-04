@@ -52,7 +52,7 @@ tellingen, en pas na een "go" `apply`.
 
 | | |
 |---|---|
-| `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations` en `tooling/question_bank`) |
+| `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`) |
 | `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vijf commando's; rendert concept en sidecar |

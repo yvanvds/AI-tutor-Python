@@ -3972,6 +3972,12 @@ abstract class AppLocalizations {
   /// **'+{xp} XP · CONCEPT UNLOCKED'**
   String levelUp_caption(int xp);
 
+  /// No description provided for @levelUp_caption_oefening.
+  ///
+  /// In en, this message translates to:
+  /// **'+{xp} XP · EXERCISE DONE'**
+  String levelUp_caption_oefening(int xp);
+
   /// No description provided for @levelUp_level.
   ///
   /// In en, this message translates to:
@@ -3989,6 +3995,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'ve mastered {concept}.'**
   String levelUp_subtitle_concept(String concept);
+
+  /// No description provided for @levelUp_subtitle_oefeningen.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You\'ve done 1 exercise so far.} other{You\'ve done {count} exercises so far.}}'**
+  String levelUp_subtitle_oefeningen(int count);
 
   /// No description provided for @levelUp_button_continue.
   ///

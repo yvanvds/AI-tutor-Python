@@ -710,9 +710,11 @@
   "auth_browser_failed_stateMismatch": "State komt niet overeen — mogelijk CSRF, probeer het opnieuw.",
 
   "levelUp_caption": "+{xp} XP · CONCEPT ONTGRENDELD",
+  "levelUp_caption_oefening": "+{xp} XP · OEFENING GEMAAKT",
   "levelUp_level": "Level {level}",
   "levelUp_subtitle_generic": "Je hebt het volgende concept onder de knie.",
   "levelUp_subtitle_concept": "Je hebt {concept} onder de knie.",
+  "levelUp_subtitle_oefeningen": "{count, plural, =1{Je hebt al 1 oefening gemaakt.} other{Je hebt al {count} oefeningen gemaakt.}}",
   "levelUp_button_continue": "Verder leren",
 
   "splash_title": "Doel bereikt!",

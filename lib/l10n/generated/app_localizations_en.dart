@@ -2358,6 +2358,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String levelUp_caption_oefening(int xp) {
+    return '+$xp XP · EXERCISE DONE';
+  }
+
+  @override
   String levelUp_level(int level) {
     return 'Level $level';
   }
@@ -2368,6 +2373,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String levelUp_subtitle_concept(String concept) {
     return 'You\'ve mastered $concept.';
+  }
+
+  @override
+  String levelUp_subtitle_oefeningen(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You\'ve done $count exercises so far.',
+      one: 'You\'ve done 1 exercise so far.',
+    );
+    return '$_temp0';
   }
 
   @override

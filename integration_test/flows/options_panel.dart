@@ -45,11 +45,14 @@ import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
 
-/// One completed subgoal = 100 XP and every level is 500 XP wide
-/// (`shell_state.dart`, #116), so the pill reads "100 / 500" while the seeded
-/// progress is in place and "0 / 500" once it has been wiped.
-const String _xpWithProgress = '100 / 500';
-const String _xpWiped = '0 / 500';
+/// One completed subgoal = 100 XP, every oefening 20 (#217) and every level
+/// is 500 XP wide (`shell_state.dart`, #116). With the [_oefeningen] the
+/// student has made, the pill reads "160 / 500" while the seeded progress is
+/// in place and "60 / 500" once it has been wiped: a reset takes the mastery
+/// away, never the oefeningen that were made.
+const int _oefeningen = 3;
+const String _xpWithProgress = '160 / 500';
+const String _xpWiped = '60 / 500';
 
 /// Brings a card further down the Options list into view. The panel is a real
 /// `ListView` in a real window, so anything below the fold is not built yet —
@@ -480,8 +483,17 @@ void main() {
   ) async {
     final dir = Directory.systemTemp.createTempSync('ai_tutor_archive_');
     final file = File('${dir.path}/progress.json');
-    final harness = AppHarness(archiveFile: file);
+    final harness = AppHarness(
+      archiveFile: file,
+      extraDocs: {
+        'accounts': [
+          {...accountDoc(studentIdentity), 'oefeningCount': _oefeningen},
+        ],
+      },
+    );
     await harness.boot(tester);
+    int? oefeningCount() =>
+        harness.cosmos['accounts'].docs[kStudentUid]!['oefeningCount'] as int?;
 
     // A finished subgoal, written the way the conductor would.
     harness.cosmos['progress'].docs['${kStudentUid}_s1'] = {
@@ -512,6 +524,8 @@ void main() {
     expect(written['kind'], ProgressArchive.kind);
     expect(written['progress'], hasLength(1));
     expect(file.readAsStringSync(), isNot(contains(kStudentUid)));
+    // The oefeningen are the account's, not progress to carry around (#217).
+    expect(file.readAsStringSync(), isNot(contains('oefeningCount')));
 
     // Wipe it the way a student would, and watch the shell agree.
     await _tapRow(tester, 'Reset all progress');
@@ -522,6 +536,7 @@ void main() {
       () => find.text(_xpWiped).evaluate().isNotEmpty,
       reason: 'the reset never reached the XP pill',
     );
+    expect(oefeningCount(), _oefeningen);
 
     await _tapRow(tester, 'Import progress…');
     await pumpUntilFound(tester, find.text('Replace your progress?'));
@@ -533,6 +548,7 @@ void main() {
     );
 
     expect(harness.cosmos['progress']['${kStudentUid}_s1'], isNotNull);
+    expect(oefeningCount(), _oefeningen);
 
     await harness.dispose(tester);
     dir.deleteSync(recursive: true);

@@ -233,6 +233,7 @@ class TutorService extends Notifier<TutorState> {
         _answeredQuestionIds.clear();
         _seenQuestionIds.clear();
         _stopCurriculumWatch();
+        ref.read(levelUpControllerProvider.notifier).reset();
         return;
       }
       if (!_initialized) unawaited(Future.microtask(initializeSession));
@@ -248,12 +249,16 @@ class TutorService extends Notifier<TutorState> {
       }
     }, fireImmediately: true);
 
-    // Feed the derived level to the level-up controller so a mastered
-    // concept can be checked against a real threshold crossing (#116).
+    // Feed the derived XP to the level-up controller so a mastered concept
+    // or a counted oefening can be checked against a real threshold
+    // crossing (#116, #217), and the crossing told apart by which part of
+    // the XP made it.
     ref.listen<AsyncValue<XpState>>(xpStateProvider, (_, next) {
-      final level = next.maybeWhen(data: (s) => s.level, orElse: () => null);
-      if (level == null) return;
-      ref.read(levelUpControllerProvider.notifier).observeLevel(level);
+      final xp = next.maybeWhen(data: (s) => s, orElse: () => null);
+      if (xp == null) return;
+      ref
+          .read(levelUpControllerProvider.notifier)
+          .observeXp(oefeningCount: xp.oefeningCount, masteryXp: xp.masteryXp);
     }, fireImmediately: true);
 
     ref.onDispose(_stopCurriculumWatch);
@@ -482,8 +487,9 @@ class TutorService extends Notifier<TutorState> {
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
           StudentCalibration.fresh(),
-      setCalibration: (cal) =>
-          ref.read(accountServiceProvider.notifier).setCalibration(cal),
+      setCalibration: (cal, {countOefening = false}) => ref
+          .read(accountServiceProvider.notifier)
+          .setCalibration(cal, countOefening: countOefening),
       getLoBelief: ({required subgoalId, required loId}) => ref
           .read(loBeliefsServiceProvider)
           .getOne(subgoalId: subgoalId, loId: loId),
@@ -1121,6 +1127,13 @@ class TutorService extends Notifier<TutorState> {
       provenance: provenance,
       fromAnswerKey: gradedByKey,
     );
+    // The conductor counts this oefening (#217) — a first graded answer,
+    // not a follow-up — and its XP reaches the level on the next account
+    // poll. Armed before the count is written, so that poll cannot come
+    // back first and make the crossing look like no one's.
+    if (!answer.isFollowUp) {
+      ref.read(levelUpControllerProvider.notifier).armOefening();
+    }
     final outcome = await _conductor.integrateAnswer(
       plan: plan,
       answer: answer,

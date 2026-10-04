@@ -129,11 +129,14 @@ class _LevelUpCardState extends State<_LevelUpCard>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _Caption(xpAwarded: e.xpAwarded),
+            _Caption(xpAwarded: e.xpAwarded, fromOefeningen: e.fromOefeningen),
             const SizedBox(height: AppSpacing.s),
             _LevelNumber(level: e.newLevel),
             const SizedBox(height: AppSpacing.m),
-            _Subtitle(conceptName: e.conceptName, goalId: e.goalId),
+            if (e.oefeningCount case final count?)
+              _OefeningenSubtitle(count: count)
+            else
+              _Subtitle(conceptName: e.conceptName, goalId: e.goalId),
             const SizedBox(height: AppSpacing.xl),
             _ContinueButton(onTap: widget.onDismiss),
           ],
@@ -144,13 +147,17 @@ class _LevelUpCardState extends State<_LevelUpCard>
 }
 
 class _Caption extends StatelessWidget {
-  const _Caption({required this.xpAwarded});
+  const _Caption({required this.xpAwarded, required this.fromOefeningen});
   final int xpAwarded;
+  final bool fromOefeningen;
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Text(
-      AppLocalizations.of(context).levelUp_caption(xpAwarded),
+      fromOefeningen
+          ? l.levelUp_caption_oefening(xpAwarded)
+          : l.levelUp_caption(xpAwarded),
       textAlign: TextAlign.center,
       style: TextStyle(
         color: AppColors.accent2,
@@ -201,6 +208,22 @@ class _Subtitle extends ConsumerWidget {
         : l.levelUp_subtitle_concept(concept);
     return Text(
       text,
+      textAlign: TextAlign.center,
+      style: TextStyle(color: AppColors.fgMute, fontSize: 14, height: 1.5),
+    );
+  }
+}
+
+/// "You've done {count} exercises so far." — a level reached by making
+/// oefeningen (#217).
+class _OefeningenSubtitle extends StatelessWidget {
+  const _OefeningenSubtitle({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      AppLocalizations.of(context).levelUp_subtitle_oefeningen(count),
       textAlign: TextAlign.center,
       style: TextStyle(color: AppColors.fgMute, fontSize: 14, height: 1.5),
     );

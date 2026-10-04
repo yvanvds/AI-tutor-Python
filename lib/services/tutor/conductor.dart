@@ -373,7 +373,12 @@ class ConductorDeps {
   /// Calibration accessors. The current-account calibration substructure is
   /// embedded on `accounts/{uid}` (STUDENT_MODEL).
   final StudentCalibration Function() getCalibration;
-  final Future<void> Function(StudentCalibration) setCalibration;
+
+  /// Writes the calibration after a graded answer. With [countOefening] the
+  /// same account write counts one oefening (#217): the first graded answer
+  /// to a question, never a follow-up.
+  final Future<void> Function(StudentCalibration, {bool countOefening})
+  setCalibration;
 
   final Future<LoBelief?> Function({
     required String subgoalId,
@@ -1172,7 +1177,9 @@ class Conductor {
     }
 
     if (subgoal == null) {
-      // Nothing to update.
+      // Nothing to update — not even the oefening counter (#217): with no
+      // active subgoal there is no calibration write for it to ride on.
+      // `tooling/xp/backfill.py` skips these turns the same way.
       return TurnOutcome(
         overallQuality: answer.overallQuality,
         subgoalAdvanced: false,
@@ -1673,7 +1680,10 @@ class Conductor {
         ),
       );
     }
-    await _deps.setCalibration(updatedCal);
+    // XP per oefening (#217): every first graded answer to a question
+    // counts once, right or wrong — a warm-up or recheck question too. A
+    // follow-up is the same oefening continued and does not count again.
+    await _deps.setCalibration(updatedCal, countOefening: !answer.isFollowUp);
 
     // §8.2 repeatedDemotions: counts consecutive demotions across the
     // session. Promotion resets; "no change" leaves the counter alone.

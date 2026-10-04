@@ -1319,6 +1319,10 @@
   "@levelUp_caption": {
     "placeholders": { "xp": { "type": "int" } }
   },
+  "levelUp_caption_oefening": "+{xp} XP · EXERCISE DONE",
+  "@levelUp_caption_oefening": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
   "levelUp_level": "Level {level}",
   "@levelUp_level": {
     "placeholders": { "level": { "type": "int" } }
@@ -1327,6 +1331,10 @@
   "levelUp_subtitle_concept": "You've mastered {concept}.",
   "@levelUp_subtitle_concept": {
     "placeholders": { "concept": { "type": "String" } }
+  },
+  "levelUp_subtitle_oefeningen": "{count, plural, =1{You've done 1 exercise so far.} other{You've done {count} exercises so far.}}",
+  "@levelUp_subtitle_oefeningen": {
+    "placeholders": { "count": { "type": "int" } }
   },
   "levelUp_button_continue": "Keep learning",
 

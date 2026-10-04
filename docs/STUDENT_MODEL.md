@@ -267,6 +267,11 @@ account.calibration {
 Every calibration update rewrites the account doc. Updates happen at
 most once per answer; the doc is small. Acceptable.
 
+The same write carries `oefeningCount` (#217): +1 at the first graded
+answer to a question, whatever the grade, never for a follow-up. It only
+goes up and feeds the XP (`kXpPerOefening` each) — no belief, calibration
+or grade reads it.
+
 ### `progress` container (kept, repurposed as cache)
 
 Existing `progress` doc holds `progress: 0.0..1.0` per subgoal. New

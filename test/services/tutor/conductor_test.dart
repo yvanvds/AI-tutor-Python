@@ -28,6 +28,9 @@ class _Fakes {
   final List<PersistedTurnRecord> turnHistory = [];
   StudentCalibration calibration = StudentCalibration.fresh();
 
+  /// The oefeningen the conductor counted on the account (#217).
+  int oefeningen = 0;
+
   /// How often the conductor read the student's whole belief set — the
   /// warm-up and recheck selections' query (#194).
   int allBeliefReads = 0;
@@ -84,7 +87,10 @@ ConductorDeps _buildDeps(_Fakes f) {
     showGoalReached: f.goalsReached.add,
     pushConceptMastered: f.conceptsMastered.add,
     getCalibration: () => f.calibration,
-    setCalibration: (c) async => f.calibration = c,
+    setCalibration: (c, {countOefening = false}) async {
+      f.calibration = c;
+      if (countOefening) f.oefeningen += 1;
+    },
     getLoBelief: ({required subgoalId, required loId}) async =>
         f.beliefs[f._key(subgoalId, loId)],
     getLoBeliefsForSubgoal: (id) async =>
@@ -1227,6 +1233,136 @@ void main() {
         );
         final b = s.f.beliefs.values.single;
         expect(b.recentNegativesAtCalibrated, 0);
+      },
+    );
+  });
+
+  // ---- #217 XP per oefening -------------------------------------------------
+  group('#217 every oefening is counted once', () {
+    const lo1 = LearningObjective(
+      id: 'lo1',
+      statement: 'one',
+      kind: LoKind.apply,
+    );
+    const lo0 = LearningObjective(
+      id: 'lo0',
+      statement: 'zero',
+      kind: LoKind.recall,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 's0',
+      parentId: 'r',
+      order: 0,
+      objectives: const [lo0],
+    );
+
+    QuestionPlan planFor(LearningObjective lo, {WarmUpReview? warmUp}) =>
+        QuestionPlan(
+          type: ChatRequestType.mcQuestion,
+          difficulty: QuestionDifficulty.medium,
+          targetLOs: [lo],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'test',
+            notchDropFired: false,
+          ),
+          warmUp: warmUp,
+        );
+
+    Future<({Conductor c, _Fakes f})> setup() async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 1000,
+        objectives: const [lo1],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [earlier, subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    GradedAnswer graded(
+      AnswerQuality quality, {
+      bool isFollowUp = false,
+      String subgoalId = 's',
+      String loId = 'lo1',
+    }) => GradedAnswer(
+      overallQuality: quality,
+      signals: [
+        GradedSignal(
+          subgoalId: subgoalId,
+          loId: loId,
+          kind: quality == AnswerQuality.correct
+              ? LoSignalKind.positive
+              : LoSignalKind.negative,
+          strength: LoSignalStrength.moderate,
+        ),
+      ],
+      isFollowUp: isFollowUp,
+      chainDepth: isFollowUp ? 1 : 0,
+    );
+
+    test('a first graded answer counts one, whatever the grade', () async {
+      final s = await setup();
+      for (final quality in AnswerQuality.values) {
+        final plan = planFor(lo1);
+        s.c.notePlannedQuestion(plan);
+        await s.c.integrateAnswer(plan: plan, answer: graded(quality));
+      }
+      expect(s.f.oefeningen, AnswerQuality.values.length);
+    });
+
+    test('a follow-up is the same oefening continued and does not count '
+        'again', () async {
+      final s = await setup();
+      final plan = planFor(lo1);
+      s.c.notePlannedQuestion(plan);
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.wrong),
+      );
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.correct, isFollowUp: true),
+      );
+      expect(s.f.oefeningen, 1);
+    });
+
+    test('a warm-up review question is an oefening too', () async {
+      final s = await setup();
+      final plan = planFor(lo0, warmUp: WarmUpReview(subgoal: earlier));
+      s.c.notePlannedQuestion(plan);
+      final calibration = s.f.calibration;
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.wrong, subgoalId: 's0', loId: 'lo0'),
+      );
+      expect(s.f.oefeningen, 1);
+      // Counted on the write, not by moving the calibration (§1.5).
+      expect(s.f.calibration.recentAnswers, calibration.recentAnswers);
+    });
+
+    test(
+      'with no active subgoal nothing is written, the counter neither',
+      () async {
+        final s = await setup();
+        // The selection went away between the question and its grade.
+        s.f.selection = const GoalSelectionState();
+        await s.c.integrateAnswer(
+          plan: planFor(lo1),
+          answer: graded(AnswerQuality.correct),
+        );
+        expect(s.f.oefeningen, 0);
       },
     );
   });

@@ -143,7 +143,7 @@ lib/
 │   │   ├── progress_service.dart         # Reads/writes `progress`; best-effort `progress_history` sample on change
 │   │   ├── progress_sample.dart          # One row of `progress_history` (time series)
 │   │   └── teacher_signals.dart          # StudentStatus enum (active|idle), kRecentActivityWindow (7 days), computeStudentStatus, mostRecentlyActive, averageProgress
-│   ├── progression/level_up_controller.dart   # NotifierProvider<LevelUpController, LevelUpEvent?> — overlay trigger (still inert)
+│   ├── progression/level_up_controller.dart   # NotifierProvider<LevelUpController, LevelUpEvent?> — overlay trigger: armed concept masteries and counted oefeningen, fired on a real level crossing (#116, #217)
 │   ├── sound/sound_service.dart # Plays goal_reached/note/question/chime mp3s
 │   ├── splash/splash_service.dart # Goal-reached overlay state
 │   ├── status_report/           # StatusReport model + ReportService
@@ -235,7 +235,7 @@ lib/
 │
 └── widgets/                            # Reusable building blocks
     ├── tutor_markdown.dart                 # NEW — GptMarkdown wrapper with custom inline-code pill + fenced-code highlighting; used in chat, MCQ prompt, MCQ feedback
-    ├── level_up_overlay.dart               # Full-screen level-up celebration; listens to levelUpControllerProvider (still inert)
+    ├── level_up_overlay.dart               # Full-screen level-up celebration; listens to levelUpControllerProvider; concept card or oefeningen card (#217)
     ├── goal_splash_overlay.dart            # Subgoal/goal-completion confetti splash
     ├── goal_crumb_in_app_bar.dart          # Crumb (legacy)
     ├── undo_snackbar.dart                  # Generic undo snackbar helper
@@ -284,6 +284,7 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
   - `difficulty: 'easy' | 'medium' | 'hard'` — current difficulty notch (defaults to `medium`)
   - `recentAnswers: CalibrationAnswer[]` — rolling at-calibrated answer window (capped at `PolicyConstants.calibrationWindow` = 10), each `{quality, difficulty, at}`
   - `recentQuestionTypes: string[]` — cross-LO ring buffer for variety rotation (capped at `PolicyConstants.recentQuestionTypesWindow` = 5)
+- `oefeningCount: int` (#217) — oefeningen made: +1 in the conductor's calibration write (`AccountService.setCalibration(countOefening:)`) at the first graded answer to a question, whatever the grade, never for a follow-up. Only goes up — a progress reset or archive import leaves it, and `upsertAccount` keeps every field it does not set. Worth `kXpPerOefening` (20) each in the XP. `tooling/xp/backfill.py` fills it in from `turn_history` for the oefeningen made before #217 (by hand: a dry run per class first, `--apply` writes only that field after a backup)
 
 **`progress`** — *derived cache* of subgoal completion. Doc id `${uid}_${goalId}`, partition key `uid`. Model: [services/progress/progress.dart](lib/services/progress/progress.dart). The previous `recentAnswers`, `difficulty`, and `recentConceptAttributions` fields are **gone** — answer history now lives on `account.calibration` and per-LO beliefs; concept attributions are subsumed by per-LO `TurnSignalEvent`s on `turn_history`.
 - `id: string`, `uid: string`, `goalId: string`
@@ -439,7 +440,7 @@ This is the heart of the redesign — the previous three-phase (guiding/warm-up/
 
 ### Level-up overlay
 
-[services/progression/level_up_controller.dart](lib/services/progression/level_up_controller.dart) holds a nullable `LevelUpEvent`; [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens and fades in a celebration card. As of HEAD, no producer calls `push(...)` — wired but inert.
+[services/progression/level_up_controller.dart](lib/services/progression/level_up_controller.dart) holds a nullable `LevelUpEvent`; [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens and fades in a celebration card. XP ([shell_state.dart](lib/features/shell/shell_state.dart), `xpStateProvider`) = `oefeningCount` × `kXpPerOefening` (20, #217) + mastery XP (`masteryXpProvider`: Σ `progress` × `kXpPerSubgoal` (100) over the non-optional subgoals); every level is `kXpPerLevel` (500) wide (#116). `TutorService` arms the controller — `armOefening()` before every first graded answer, `armConceptMastered` when the conductor reports a mastered concept goal — and feeds it both XP parts from `xpStateProvider`; only a level above the one seen when something was armed pushes an overlay, throttled to one per 10 minutes. The concept's card ("Je hebt {concept} onder de knie.") when a concept is armed and the mastery XP itself crossed; otherwise the oefeningen card ("Je hebt al {count} oefeningen gemaakt.", `LevelUpEvent.oefeningen`).
 
 ### Teacher dashboard
 
@@ -527,7 +528,6 @@ Open work is tracked as GitHub issues on `yvanvds/AI-tutor-Python`; there is no 
 
 - **Lesson content is half-wired.** The Lesinhoud authoring page works end-to-end, but only some subgoals have authored `Content`. `ExplainView` falls back to a placeholder where no content exists, and the markdown renderer is the canvas's only content source — there's no curriculum tree of "lessons" yet.
 - **Module management UI is deferred.** `ModuleService.ensureDefaultModule()` bootstraps `python-basics`; there's no UI to create or rename modules. The Lesinhoud tree groups by `moduleId`, so adding more modules later is structurally cheap.
-- **Level-up overlay is wired but inert.** [LevelUpOverlay](lib/widgets/level_up_overlay.dart) listens to `levelUpControllerProvider`, but no producer calls `push(...)` yet. The `Profile` gamification fields in [shell_state.dart](lib/features/shell/shell_state.dart) are no longer placeholders — `level` / `xp` come from `xpStateProvider` and `streak` from `Account.streakDays` — so only the celebration trigger is still missing.
 - **Cosmos auth is master-key.** [cosmos_client.dart](lib/core/cosmos_client.dart) has an `AadTokenAuth` stub for the eventual swap to per-user AAD RBAC; until then every authenticated student holds the database master key.
 - **No realtime listeners.** All cross-device updates rely on a 5 s `pollingStream` tick.
 - **Local API key not used.** `LocalApiKeyStorage.saveKey(...)` writes to `SharedPreferences`, the gate screen requires it, but `OpenaiConnector._apiKey = Env.apiKey` always uses the build-time obfuscated key.
