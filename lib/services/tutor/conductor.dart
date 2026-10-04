@@ -388,7 +388,6 @@ class ConductorDeps {
     required this.upsertProgress,
     required this.getProgressAll,
     required this.getProgressByGoalId,
-    required this.setCurrentProgress,
     required this.setLoDisplay,
     required this.addSystemNotice,
     required this.recordDebugEvent,
@@ -419,7 +418,6 @@ class ConductorDeps {
   upsertProgress;
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
-  final void Function(double) setCurrentProgress;
 
   /// Publishes the segments of the student's subgoal bar (#230, §4.5): one
   /// per non-optional LO of the active subgoal, held for the session.
@@ -1808,7 +1806,6 @@ class Conductor {
         recordHistory: true,
         advancedAt: DateTime.now().toUtc(),
       );
-      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
       _deps.showGoalReached(subgoal);
       _deps.playGoalReached();
@@ -1850,7 +1847,6 @@ class Conductor {
         quality: answer.overallQuality,
         recordHistory: true,
       );
-      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
     }
 
@@ -2266,7 +2262,6 @@ class Conductor {
         if (targetChild != null) {
           _deps.setSelectedRoot(root);
           _deps.setSelectedChild(targetChild);
-          _deps.setCurrentProgress(progressFor(targetChild));
           // The Dutch title plus the id: the chat pill names the subgoal in
           // the app language (#212).
           _deps.addSystemNotice(
@@ -2280,7 +2275,6 @@ class Conductor {
         }
       }
     }
-    _deps.setCurrentProgress(0.0);
     return false;
   }
 

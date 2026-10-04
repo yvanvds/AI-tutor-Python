@@ -72,9 +72,6 @@ class GoalTile extends ConsumerWidget {
                             .upsert(
                               Progress(goalID: goal.id, progress: newProgress),
                             );
-                        ref
-                            .read(progressServiceProvider)
-                            .setCurrentProgress(newProgress);
                       },
                       icon: const Icon(Icons.fast_forward),
                       label: Text(
@@ -92,13 +89,6 @@ class GoalTile extends ConsumerWidget {
                           await ref
                               .read(progressServiceProvider)
                               .upsert(Progress(goalID: goal.id, progress: 0.5));
-                          ref
-                              .read(progressServiceProvider)
-                              .setCurrentProgress(0.5);
-                        } else {
-                          ref
-                              .read(progressServiceProvider)
-                              .setCurrentProgress(progress);
                         }
 
                         ref

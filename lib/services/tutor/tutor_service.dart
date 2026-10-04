@@ -483,7 +483,6 @@ class TutorService extends Notifier<TutorState> {
           Progress(goalID: activeChild.id, progress: cached),
           recordHistory: false,
         );
-    ref.read(progressServiceProvider).setCurrentProgress(cached);
   }
 
   /// Translates the conductor's "a concept goal just mastered" signal into an
@@ -524,8 +523,6 @@ class TutorService extends Notifier<TutorState> {
       getProgressAll: () => ref.read(progressServiceProvider).getAll(),
       getProgressByGoalId: (id) =>
           ref.read(progressServiceProvider).getByGoalId(id),
-      setCurrentProgress: (v) =>
-          ref.read(progressServiceProvider).setCurrentProgress(v),
       setLoDisplay: (d) =>
           ref.read(subgoalLoDisplayProvider.notifier).state = d,
       addSystemNotice: _chat.addSystemNotice,

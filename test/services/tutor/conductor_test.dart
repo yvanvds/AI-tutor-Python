@@ -39,7 +39,6 @@ class _Fakes {
   int allBeliefReads = 0;
 
   GoalSelectionState selection = const GoalSelectionState();
-  double currentProgress = 0.0;
 
   /// The segments of the student's subgoal bar the conductor last published
   /// (#230).
@@ -89,7 +88,6 @@ ConductorDeps _buildDeps(_Fakes f) {
     },
     getProgressAll: () async => f.progressById.values.toList(),
     getProgressByGoalId: (id) async => f.progressById[id],
-    setCurrentProgress: (v) => f.currentProgress = v,
     setLoDisplay: (d) => f.loDisplay = d,
     addSystemNotice: f.notices.add,
     recordDebugEvent: (name, [data]) => f.debugEvents.add((name, data)),
@@ -2706,7 +2704,6 @@ void main() {
       // re-enrolment. The active subgoal was not touched at all.
       expect(s.f.progressById['s0']!.progress, 1.0);
       expect(s.f.progressById.containsKey('s1'), isFalse);
-      expect(s.f.currentProgress, 0.0);
     });
 
     test('warm-up answers stay out of the calibration window', () async {
@@ -4059,7 +4056,6 @@ void main() {
           ),
         );
         expect(f.selection.activeChildGoal?.id, 's2');
-        expect(f.currentProgress, 0.0);
       });
 
       test(
@@ -4074,7 +4070,6 @@ void main() {
           'lands', () async {
         final f = await walkWith(Progress(goalID: 's', progress: 0.5));
         expect(f.selection.activeChildGoal?.id, 's');
-        expect(f.currentProgress, 0.5);
       });
     });
   });
@@ -5327,7 +5322,6 @@ void main() {
         'lo-b': LoDisplayState.empty,
       });
       expect(f.progressById['s1']!.progress, 0.0);
-      expect(f.currentProgress, 0.0);
     });
 
     test('a negative from the side leaves a half segment half', () async {
