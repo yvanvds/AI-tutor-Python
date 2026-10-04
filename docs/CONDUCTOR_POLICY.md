@@ -264,7 +264,9 @@ graded and are out) whose belief doc:
 
 There is no separate "not naturally recurring" test: any write bumps
 `lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
-later work keeps using never *becomes* stale. Staleness is what keeps
+later work keeps using never *becomes* stale. A neutral from the side is
+no write (2.4, #204): later work that touches the LO without showing
+anything either way does not count as using it. Staleness is what keeps
 the recurring LOs out. The review flag exists because staleness alone
 would never get a suspected gap checked: a fresh, once-mastered LO that
 later work casts doubt on would wait out the full 30 days (and before
@@ -572,9 +574,19 @@ the two are not equally trustworthy:
   `medium`. On a code answer the instructions route "correctly used" to
   `transferLOs`, so in practice this path is rare (an MCQ that shows a
   prerequisite is solid).
-- **A neutral carries no weight** (3.1) but is written like a positive:
-  the doc, at the prior if the LO had none, and `lastUpdatedAt`. Nothing
-  else moves.
+- **A neutral is not written at all (#204).** It carries no weight
+  (3.1), and unlike a direct neutral it is no measurement either: nobody
+  asked this LO, and the grader saw nothing either way. So no doc is
+  created at the prior for an LO never probed (it stays "never probed",
+  `neverProbedCount`), and an existing doc keeps its `lastUpdatedAt` —
+  the clock that decides whether a once-mastered LO is stale enough for
+  the warm-up review (1.5) and that `staleLoCount` on the grade proposal
+  reads. Before #204 the neutral was written like a positive, and an old
+  LO that later work only touched neutrally stayed out of the warm-up
+  review for another 30 days on nothing new. It says even less than a
+  negative, which writes nothing to the belief either. The signal is
+  logged as declined (`conductor.signal_dropped`, reason `incidental
+  neutral`) and stays on record under `loSignals`.
 - **A negative is a prompt, not evidence (#167).** It is the least
   reliable verdict the system produces: inferred from an answer about
   something else, by a probe not designed for this LO. And it lands by
@@ -605,6 +617,8 @@ the two are not equally trustworthy:
   where the warm-up selection and the teacher drawer read it.
 - **Once per LO per answer:** a `transferLOs` nomination on an LO that
   already took a signal — or a review flag — this turn is dropped (3.7).
+  So is one on an LO the grader named neutral this turn (#204): the same
+  answer cannot call the LO inconclusive and credit it.
 - **Forward references are dropped and logged**, per the contract's
   scope check: only the active subgoal and subgoals *before* it in the
   root can receive a signal.
@@ -612,7 +626,8 @@ the two are not equally trustworthy:
 The turn record lists every applied signal with its `subgoalId` and
 every LO flagged for review under `reviewFlags` (8.1), so both are
 visible in the audit trail: a negative on an earlier LO appears in
-`loSignals` and `reviewFlags`, never in `appliedSignals`.
+`loSignals` and `reviewFlags`, never in `appliedSignals`; a neutral on
+one only in `loSignals`.
 
 **Deliberate multi-LO targeting is structurally allowed but not yet
 triggered by any rule.** The `targetLOs` field is a list; nothing
@@ -993,20 +1008,20 @@ means "the answer touched the LO but gave no clear evidence." Adding
 belief — wrong. The LLM still emits `neutral` for grading honesty (per
 part 3), and when grading fails on a `partial` answer the fallback
 signal is `(neutral, weak)` (LLM contract). The conductor adds nothing to `(α, β)`
-(`signalDeltas` returns zero), but the signal goes down the same write
-as any other, so it is a measurement without weight:
+(`signalDeltas` returns zero), but a direct neutral — on the question's
+target or on an LO of the active subgoal, in a follow-up too — goes
+down the same write as any other signal, so it is a measurement without
+weight:
 
 - `(α, β)` are persisted decayed to now and `lastUpdatedAt = now` (3.3).
   Decay composes exactly, so the belief the next signal lands on is the
   same as without the neutral write.
-- An LO without a doc gets one at the prior (3.5), also from the side
-  (2.4).
+- An LO without a doc gets one at the prior (3.5).
 - A direct probe (the question's target, or a signal on an LO of the
   active subgoal; not a follow-up, 6.2) also sets `lastProbedAt = now`,
   the recheck clock (2.6), and `lastQuestionType` when it is the target.
-  Every write that is not from the side, a follow-up's included, clears
-  `regressedAt` (1.5, #112). The question was asked, whichever way the
-  answer went.
+  Every direct write, a follow-up's included, clears `regressedAt` (1.5,
+  #112). The question was asked, whichever way the answer went.
 - Neither ratchet nor the notch-drop counter moves (2.3, 4.3), and the
   mastery stamp cannot be set by it: decay only moves a belief toward
   the prior.
@@ -1017,6 +1032,16 @@ partially was still asked. Without the clock bump the same LO would be
 due again in the next free recheck slot. The evaluation replay
 (`tooling/evaluation/rules.replay`) writes a neutral the same way since
 rule set `eval4` (#202).
+
+**A neutral from the side is not written (#204).** On an LO of an
+earlier subgoal (2.4) nothing was asked, so there is no clock to
+restart, and the grader saw nothing either way: no doc, no
+`lastUpdatedAt`, nothing under `appliedSignals`. It is logged as a
+declined signal (`conductor.signal_dropped`, reason `incidental
+neutral`). Writing it, as the conductor did before #204, created a doc
+for an LO nobody probed and made an old LO read as freshly updated to
+the warm-up review (1.5) and to `staleLoCount` on the grade proposal.
+The replay skips it since rule set `eval5`.
 
 ### 3.2 Difficulty modulation
 
@@ -1159,11 +1184,14 @@ recover from after decay or isolated bad answers.
 - **Signal on an LO with no existing belief doc** (incidental signal
   on an LO the student has never been probed on before). Create the
   belief doc with prior `(α=1, β=1)`, `lastUpdatedAt = now`, then
-  apply the update normally — a neutral too, which leaves the doc at
-  the prior (3.1). Same code path; only the create-or-load
-  step is special. A cross-subgoal *negative* is the exception (2.4,
+  apply the update normally — a direct neutral too, which leaves the
+  doc at the prior (3.1). Same code path; only the create-or-load
+  step is special. A cross-subgoal *negative* is an exception (2.4,
   #167): it writes nothing, so no doc is created — a never-asked LO
-  must not start life in debit on a verdict nobody will re-test.
+  must not start life in debit on a verdict nobody will re-test. A
+  cross-subgoal *neutral* is the other (2.4, #204): it writes nothing
+  either, so an LO only ever named neutral from the side stays never
+  probed. Only a cross-subgoal positive creates a doc from the side.
 
 ### 3.6 Worked example
 

@@ -16,6 +16,12 @@
 // flag: there is nothing to review, and a never-asked LO must not start
 // life in debit.
 //
+// A *neutral* on the earlier LO (#204) says even less: nobody asked it and
+// the grader saw nothing either way. The app writes nothing at all — no
+// doc for an LO never probed, and on a mastered one not even the clock,
+// so the LO keeps its staleness for the warm-up review — while the
+// target's own neutral is still written (a measurement without weight).
+//
 // Before #167 the same negative debited the belief (decayed β plus the
 // weight as medium, clock reset), and it was that debit — never re-tested,
 // because the tutor no longer probes a finished subgoal — that erased
@@ -68,6 +74,31 @@ List<String> script() => [
         'loId': 'lo-print',
         'signal': 'negative',
         'strength': 'moderate',
+      },
+    ],
+  ),
+  completeCodeReply(text: 'Nu de leeftijd.', code: kNextExercise),
+];
+
+/// A partly right answer: the grader names the target and the earlier
+/// `print()` LO, both neutral — touched, nothing shown either way (#204).
+List<String> neutralScript() => [
+  completeCodeReply(text: 'Vul de stad in.', code: kExercise),
+  codeFeedbackReply(
+    text: 'Bijna: de variabele staat er, maar de waarde ontbreekt nog.',
+    quality: 'partial',
+    loSignals: const [
+      {
+        'subgoalId': 's2',
+        'loId': 'lo-var',
+        'signal': 'neutral',
+        'strength': 'weak',
+      },
+      {
+        'subgoalId': 's1',
+        'loId': 'lo-print',
+        'signal': 'neutral',
+        'strength': 'weak',
       },
     ],
   ),
@@ -368,6 +399,72 @@ void main() {
     );
     expect((t['appliedSignals'] as List).cast<Map>().single['loId'], 'lo-var');
     expect(t.containsKey('reviewFlags'), isFalse);
+
+    await harness.dispose(tester);
+  });
+
+  /// What a neutral on the target leaves behind, on [t] and in Cosmos: the
+  /// doc at the prior, both clocks at this turn, a zero-delta applied
+  /// signal — and the earlier LO's neutral on record, never applied.
+  void expectNeutralTurn(AppHarness harness, Map<String, dynamic> t) {
+    expect(t['overallQuality'], 'partial');
+    final signalled = (t['loSignals'] as List).cast<Map>();
+    expect(
+      signalled.singleWhere((s) => s['loId'] == 'lo-print')['signal'],
+      'neutral',
+    );
+    final applied = (t['appliedSignals'] as List).cast<Map>().single;
+    expect(applied['loId'], 'lo-var');
+    expect(applied['alphaDelta'], 0.0);
+    expect(applied['betaDelta'], 0.0);
+    expect(t.containsKey('reviewFlags'), isFalse);
+    final onVar =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
+    expect(onVar['alpha'], 1.0);
+    expect(onVar['beta'], 1.0);
+    expect(onVar['lastProbedAt'], onVar['lastUpdatedAt']);
+  }
+
+  testWidgets('a neutral on an earlier LO writes nothing (#204): a mastered '
+      "LO keeps its belief and its clock, while the target's own neutral "
+      'is still written', (tester) async {
+    final harness = AppHarness(
+      llm: ScriptedLlm(neutralScript()),
+      extraDocs: {
+        'accounts': [hardStudent()],
+        'progress': [printDone()],
+        'lo_beliefs': [printBelief(lastUpdatedAt: weeksAgo)],
+      },
+    );
+    await answerOnce(tester, harness);
+
+    expectNeutralTurn(harness, turn(harness));
+    // Exactly as written three weeks ago: no decay persisted, no clock
+    // bump that would read as fresh to the warm-up review and the grade
+    // proposal's stale count, no flag.
+    final print = storedPrint(harness)!;
+    expect(print, printBelief(lastUpdatedAt: weeksAgo));
+    expect(harness.llm!.remaining, 0);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a neutral on an earlier LO never probed creates no belief '
+      'doc (#204): it stays never probed', (tester) async {
+    final harness = AppHarness(
+      llm: ScriptedLlm(neutralScript()),
+      extraDocs: {
+        'progress': [printDone()],
+      },
+    );
+    await answerOnce(tester, harness);
+
+    expectNeutralTurn(harness, turn(harness));
+    expect(
+      storedPrint(harness),
+      isNull,
+      reason: 'a belief doc was created for lo-print by a neutral alone',
+    );
 
     await harness.dispose(tester);
   });

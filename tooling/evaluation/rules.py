@@ -20,17 +20,24 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.18-eval4` = PUNTENFORMULE v1.0.18, replayed from the turn
-log. `eval4` (#202) replays a `neutral` signal as the conductor writes it
+Rule set `1.0.18-eval5` = PUNTENFORMULE v1.0.18, replayed from the turn
+log. `eval5` (#204) follows the conductor in skipping an *incidental*
+neutral (an LO of an earlier subgoal, CONDUCTOR_POLICY §2.4): nobody asked
+that LO and the grader saw nothing either way, so the app writes nothing
+since #204 — no state at the prior, no clock — and only logs it. `eval4`
+wrote it, as the app did before: a state for an LO that only such a
+neutral reached, and a clock that read an old LO as fresh. M and P do
+not move (a neutral weighs nothing, and decay composes exactly);
+*verouderd* and *nooit bevraagd* on the proposal can.
+
+`eval4` (#202) replays a direct `neutral` signal as the conductor writes it
 (CONDUCTOR_POLICY §3.1): no weight, but a write all the same — the belief
-decayed to that moment, the clock (`last_at`), on a direct probe the probe
-clock (`last_direct_at`, the app's `lastProbedAt`) and the cleared review
-flag (`regressed_at`), and the LO's state created at the prior if it had
-none. `eval3` skipped neutrals: a clock too early where the last write was
-a neutral, and no state — "never probed", stale — for an LO that only
-neutrals reached, where the app has a doc. M and P do not move (decay
-composes exactly); the counts on the proposal (`reliability`,
-`never_probed`) and the diagnostics can. A fidelity fix, like `eval3`.
+decayed to that moment, the clock (`last_at`), the probe clock
+(`last_direct_at`, the app's `lastProbedAt`) and the cleared review flag
+(`regressed_at`), and the LO's state created at the prior if it had none.
+`eval3` skipped neutrals: a clock too early where the last write was a
+neutral, and no state — "never probed", stale — for an LO that only
+neutrals reached, where the app has a doc. A fidelity fix, like `eval3`.
 
 v1.0.17 and v1.0.18 (#187, #188) change nothing in M or P; they add
 the recheck ("controlevraag", CONDUCTOR_POLICY §2.6), a direct question
@@ -74,7 +81,7 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.0.18-eval4"
+RULES_VERSION = "1.0.18-eval5"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -131,11 +138,12 @@ class DirectAnswer(NamedTuple):
 @dataclass
 class LoState:
     """One LO as the conductor stored it. A state exists where the app has
-    a doc in `lo_beliefs` (a neutral signal creates one too, #202)."""
+    a doc in `lo_beliefs` (a direct neutral signal creates one too, #202;
+    an incidental one does not, #204)."""
 
     alpha: float = PRIOR
     beta: float = PRIOR
-    # `lastUpdatedAt`: every write, a neutral one included (#202).
+    # `lastUpdatedAt`: every write, a direct neutral one included (#202).
     last_at: dt.datetime | None = None
     positive_at_calibrated_at: dt.datetime | None = None
     first_mastered_at: dt.datetime | None = None
@@ -150,7 +158,8 @@ class LoState:
     # conductor's filter — only what reached this LO in the replay. A
     # follow-up (§6.2) and an incidental signal (§2.4) move (α, β) but are
     # no question. An incidental negative weighs nothing since #167; it is
-    # counted where the app has a doc to flag, and creates none.
+    # counted where the app has a doc to flag, and creates none. An
+    # incidental neutral is not replayed at all (#204).
     n_follow_up_pos: int = 0
     n_follow_up_neg: int = 0
     n_incidental_pos: int = 0
@@ -303,12 +312,14 @@ def replay(
     `apply_transfer_credits=False` is the `eval1` replay, which skipped the
     credits and under-read every doc that took one.
 
-    A `neutral` signal goes down the same write as the others (#202,
-    CONDUCTOR_POLICY §3.1): no weight, so `(α, β)` only decay to its
-    moment, but the clock moves, the state is created at the prior, and on
-    a direct probe the probe clock moves and the review flag clears.
-    `regressed_at` follows the app since #167 whatever the keyword
-    arguments.
+    A direct `neutral` signal goes down the same write as the others
+    (#202, CONDUCTOR_POLICY §3.1): no weight, so `(α, β)` only decay to its
+    moment, but the clock moves, the state is created at the prior, and
+    (not on a follow-up) the probe clock moves; the review flag clears. An
+    incidental neutral (§2.4) is skipped: the app writes nothing for it
+    since #204. `regressed_at` follows the app since #167, and the
+    incidental neutral since #204, whatever the keyword arguments: the
+    builds before #204 wrote that neutral, but it moves neither M nor P.
     """
     st: dict[tuple[str, str], LoState] = {}
     for t in turns:
@@ -326,6 +337,8 @@ def replay(
             if reading is None:
                 continue  # cross-root or forward: the conductor drops it
             incidental = reading == "incidental"
+            if incidental and kind == "neutral":
+                continue  # #204: nobody asked it, nothing was seen; the app only logs it
             key = (sig_sg, s["loId"])
             if incidental and kind == "negative":
                 # #167: a prompt for the warm-up review, not evidence. It
@@ -350,8 +363,8 @@ def replay(
             elif kind == "negative":
                 factor = NEG_FACTOR if asymmetric else POS_FACTOR
                 a, b = _apply(a, b, 0.0, base * factor[eff_diff])
-            # A neutral adds nothing, and is written all the same: the
-            # decayed values, with the clock at its moment (#202).
+            # A direct neutral adds nothing, and is written all the same:
+            # the decayed values, with the clock at its moment (#202).
             lo.alpha, lo.beta, lo.last_at = a, b, now
             if not incidental:
                 lo.regressed_at = None  # a direct measurement, whichever way it went
@@ -530,9 +543,10 @@ def reliability(
 ) -> Reliability:
     """Stale = a milestone LO whose replayed state was not written for more
     than `WARM_UP_STALE_AFTER_DAYS` before [now], or has no state at all
-    (the app's `lastUpdatedAt` test on the belief doc, which a neutral
-    signal moves too since the app writes it, #202; not the diagnostics'
-    fossils, which ask another question). The tally counts the graded
+    (the app's `lastUpdatedAt` test on the belief doc, which a direct
+    neutral signal moves too since the app writes it, #202 — an incidental
+    one not, #204; not the diagnostics' fossils, which ask another
+    question). The tally counts the graded
     oefeningen in `[period_start, now]` by `provenance`, a missing one reading as `home`
     like `EvidenceProvenance.parse`; audit records (`is_audit`) are not
     evidence and not counted (`listTurnsBetween`). No

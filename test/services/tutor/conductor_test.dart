@@ -45,6 +45,9 @@ class _Fakes {
   /// The chat notices the conductor raised (#212).
   final List<ChatNotice> notices = [];
 
+  /// The debug events the conductor recorded, name and payload (#204).
+  final List<(String, Map<String, Object?>?)> debugEvents = [];
+
   String _key(String subgoalId, String loId) => '${subgoalId}__$loId';
 }
 
@@ -81,7 +84,7 @@ ConductorDeps _buildDeps(_Fakes f) {
     getProgressByGoalId: (id) async => f.progressById[id],
     setCurrentProgress: (v) => f.currentProgress = v,
     addSystemNotice: f.notices.add,
-    recordDebugEvent: (name, [data]) {},
+    recordDebugEvent: (name, [data]) => f.debugEvents.add((name, data)),
     playCorrectAnswer: () {},
     playGoalReached: () {},
     showGoalReached: f.goalsReached.add,
@@ -2403,6 +2406,7 @@ void main() {
       List<GradedTransfer> transferLOs = const [],
       bool isFollowUp = false,
       EvidenceProvenance provenance = EvidenceProvenance.home,
+      LoSignalKind? targetKind,
     }) async {
       final plan = QuestionPlan(
         type: ChatRequestType.writeCodeQuestion,
@@ -2423,9 +2427,11 @@ void main() {
             GradedSignal(
               subgoalId: 's1',
               loId: 'lo-var',
-              kind: quality == AnswerQuality.correct
-                  ? LoSignalKind.positive
-                  : LoSignalKind.negative,
+              kind:
+                  targetKind ??
+                  (quality == AnswerQuality.correct
+                      ? LoSignalKind.positive
+                      : LoSignalKind.negative),
               strength: LoSignalStrength.strong,
             ),
             ...extra,
@@ -2532,6 +2538,109 @@ void main() {
       expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
       expect(outcome.reviewFlags, isEmpty);
       expect(outcome.appliedSignals.single.loId, 'lo-var');
+    });
+
+    const neutralOnPrint = GradedSignal(
+      subgoalId: 's0',
+      loId: 'lo-print',
+      kind: LoSignalKind.neutral,
+      strength: LoSignalStrength.weak,
+    );
+
+    /// The `conductor.signal_dropped` events of this test, as payloads.
+    List<Map<String, Object?>?> dropped(_Fakes f) => [
+      for (final (name, data) in f.debugEvents)
+        if (name == 'conductor.signal_dropped') data,
+    ];
+
+    test('a neutral on an earlier LO never probed is not written (#204): no '
+        'doc at the prior, nothing applied, and the drop is logged', () async {
+      final s = await setup();
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        extra: const [neutralOnPrint],
+      );
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
+      // On record as graded, never as applied.
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+      expect(
+        outcome.loSignals.where((l) => l.loId == 'lo-print').single.signal,
+        'neutral',
+      );
+      expect(outcome.reviewFlags, isEmpty);
+      expect(dropped(s.f), [
+        {'subgoalId': 's0', 'loId': 'lo-print', 'reason': 'incidental neutral'},
+      ]);
+    });
+
+    test('a neutral on a once-mastered earlier LO leaves its doc exactly as '
+        'stored (#204): not the clock, not the review flag', () async {
+      final flaggedAt = DateTime.utc(2026, 4, 20, 12);
+      final s = await setup(
+        printBelief: masteredPrint().copyWith(regressedAt: flaggedAt),
+      );
+      final before = printAfter(s.f);
+      await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        extra: const [neutralOnPrint],
+      );
+      final after = printAfter(s.f);
+      // Not decayed to now and not re-stamped: an untouched doc keeps its
+      // staleness for the warm-up review (§1.5) and the proposal's count.
+      expect(identical(after, before), isTrue);
+      expect(after.lastUpdatedAt, aMinuteAgo);
+      expect(after.regressedAt, flaggedAt);
+    });
+
+    test('a direct neutral is still written (§3.1): the target gets a doc '
+        'at the prior, its clocks, and a zero-delta applied signal', () async {
+      final s = await setup();
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        targetKind: LoSignalKind.neutral,
+        extra: const [neutralOnPrint],
+      );
+      final onVar = s.f.beliefs[s.f._key('s1', 'lo-var')]!;
+      expect(onVar.alpha, PolicyConstants.prior);
+      expect(onVar.beta, PolicyConstants.prior);
+      expect(onVar.lastProbedAt, onVar.lastUpdatedAt);
+      final applied = outcome.appliedSignals.single;
+      expect(applied.loId, 'lo-var');
+      expect(applied.alphaDelta, 0.0);
+      expect(applied.betaDelta, 0.0);
+      // The incidental one beside it is not.
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
+    });
+
+    test('a transfer nomination on an LO the grader named neutral this turn '
+        'is dropped: the answer cannot both leave it open and credit it '
+        '(#204)', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: const [neutralOnPrint],
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      expect(outcome.transferCredits, isEmpty);
+      expect(printAfter(s.f).alpha, 5.0);
+      expect(printAfter(s.f).lastUpdatedAt, aMinuteAgo);
+      expect(
+        [
+          for (final (name, data) in s.f.debugEvents)
+            if (name == 'conductor.transfer_dropped') data,
+        ],
+        [
+          {
+            'subgoalId': 's0',
+            'loId': 'lo-print',
+            'reason': 'incidental neutral',
+          },
+        ],
+      );
     });
 
     test('a positive on an earlier LO never probed gets a belief doc at '

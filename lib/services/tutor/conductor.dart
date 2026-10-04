@@ -1225,15 +1225,19 @@ class Conductor {
     // everything the belief steers (question choice, stuck detection, the
     // progress bar). It writes nothing to the belief and instead flags a
     // once-mastered LO for next session's warm-up review (§1.5); that
-    // direct probe is the measurement that counts, in full. Forward
-    // references (a later subgoal) are dropped per the LLM contract; scope
-    // was otherwise validated upstream.
+    // direct probe is the measurement that counts, in full. A neutral says
+    // even less than a negative and is not written at all (#204): no doc
+    // at the prior, no clock — a bumped `lastUpdatedAt` would keep an old
+    // LO out of the warm-up review (§1.5) on nothing. Forward references
+    // (a later subgoal) are dropped per the LLM contract; scope was
+    // otherwise validated upstream.
     final offSubgoal = plan.offSubgoal;
     final targetSubgoalId = offSubgoal?.id ?? subgoal.id;
     final reviewFlags = <TurnReviewFlag>[];
-    // LOs outside the active subgoal written or flagged this turn,
-    // `subgoalId/loId` → why: a transfer nomination on one of them is
-    // dropped, so the same answer never counts twice on one LO (§3.7).
+    // LOs outside the active subgoal written, flagged or named neutral this
+    // turn, `subgoalId/loId` → why: a transfer nomination on one of them is
+    // dropped, so the same answer never counts twice on one LO (§3.7) — nor
+    // credits an LO the grader just called inconclusive (#204).
     final writtenElsewhere = <String, String>{};
     if (offSubgoal != null && targetLo != null) {
       writtenElsewhere['${offSubgoal.id}/${targetLo.id}'] = plan.isWarmUp
@@ -1272,6 +1276,19 @@ class Conductor {
       }
       if (lo == null) {
         _dropSignal(sig, 'unknown LO');
+        continue;
+      }
+      if (isCrossSubgoal && sig.kind == LoSignalKind.neutral) {
+        // #204: no weight, and no measurement either — nobody asked this
+        // LO, and the grader saw nothing either way. Nothing is written: no
+        // doc at the prior for an LO never probed (§3.5), no `lastUpdatedAt`
+        // that would pass for fresh evidence (§1.5 staleness, the proposal's
+        // `staleLoCount`). Only logged, like any declined signal.
+        _dropSignal(sig, 'incidental neutral');
+        writtenElsewhere.putIfAbsent(
+          '$signalSubgoalId/${sig.loId}',
+          () => 'incidental neutral',
+        );
         continue;
       }
       if (isCrossSubgoal && sig.kind == LoSignalKind.negative) {

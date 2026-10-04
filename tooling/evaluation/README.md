@@ -67,11 +67,13 @@ ze in concept en sidecar, dus de leerkracht ziet ze voor het "go":
 - **verouderd** (`staleLoCount`): leerdoelen van de mijlpaal waarop de
   herspeling langer dan 30 dagen vóór het concept niets meer schreef, plus
   de nooit bevraagde. Zoals in de app telt elke schrijving, ook een
-  neutraal signaal: dat verzet de klok zonder bewijs toe te voegen (#202).
-  Dezelfde drempel als de app (`PolicyConstants.warmUpStaleAfter`), een
-  andere vraag dan de fossielen;
+  rechtstreeks neutraal signaal: dat verzet de klok zonder bewijs toe te
+  voegen (#202). Een neutraal signaal van opzij schrijft niets en verzet
+  dus niets (#204). Dezelfde drempel als de app
+  (`PolicyConstants.warmUpStaleAfter`), een andere vraag dan de fossielen;
 - **nooit bevraagd** (`neverProbedCount`): leerdoelen zonder document in de
-  app. Een neutraal signaal maakt er een, op de prior;
+  app. Een rechtstreeks neutraal signaal maakt er een, op de prior; een
+  neutraal signaal van opzij niet;
 - **oefeningen deze periode** (`supervisedTurns`, `homeTurns`): de
   beoordeelde oefeningen sinds `periodStart` van de mijlpaal, per
   `provenance`; zonder veld telt een oefening als thuis, zoals in de app.
@@ -80,16 +82,29 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.0.18-eval4`
+## Regelversie `1.0.18-eval5`
 
-PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. `eval4`
-(2026-09-24, #202) herspeelt een **neutraal signaal** zoals de app het
-schrijft (CONDUCTOR_POLICY §3.1). Het weegt niets, maar het is wel een
-schrijving: μ en het bewijs vervallen tot dat moment, de klok verspringt,
-en een leerdoel zonder document krijgt er een op de prior. Een
-rechtstreeks neutraal signaal verzet ook de klok van de controlevraag
-(`lastProbedAt`) en wist de markering voor een opfrisvraag
-(`regressedAt`), welke kant het antwoord ook uitging. `eval3` sloeg
+PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. `eval5`
+(2026-10-04, #204) slaat een **neutraal signaal van opzij** over: een
+signaal op een leerdoel van een eerder subdoel (CONDUCTOR_POLICY §2.4)
+dat niets zegt. Niemand vroeg naar dat leerdoel en de grader zag niets,
+dus de app schrijft het sinds #204 niet meer: geen document op de prior,
+geen klok, alleen een regel in het log. `eval4` schreef het, zoals de app
+toen: een leerdoel dat alleen zo'n signaal kreeg, telde als bevraagd, en
+een oud leerdoel als niet verouderd. M en P veranderen niet: een neutraal
+signaal weegt niets, en verval na verval is exact hetzelfde verval. Wel
+kunnen *verouderd* en *nooit bevraagd* op het voorstel veranderen. Een
+telling op de live data (alleen lezen, 2026-09-24): 12 zulke signalen in
+6EWI en 6WEWI samen, en geen leerdoel kreeg er een document door dat het
+anders niet had.
+
+`eval4` (2026-09-24, #202) herspeelt een rechtstreeks **neutraal
+signaal** zoals de app het schrijft (CONDUCTOR_POLICY §3.1). Het weegt
+niets, maar het is wel een schrijving: μ en het bewijs vervallen tot dat
+moment, de klok verspringt, en een leerdoel zonder document krijgt er
+een op de prior. Een rechtstreeks neutraal signaal verzet ook de klok
+van de controlevraag (`lastProbedAt`) en wist de markering voor een
+opfrisvraag (`regressedAt`), welke kant het antwoord ook uitging. `eval3` sloeg
 neutrale signalen over. Het gaf dan een te vroege klok als de laatste
 schrijving neutraal was. Een leerdoel dat alleen neutrale signalen
 kreeg, stond als nooit bevraagd en verouderd, terwijl de app er een
@@ -144,8 +159,9 @@ decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
 doel en alleen naar een eerder subdoel, transfer-krediet zoals gelogd (een
 zwak positief op gemiddeld), opfris- en controlevragen als rechtstreekse
-meting van hun leerdoel (sinds `eval3`), een neutraal signaal als
-schrijving zonder gewicht (sinds `eval4`), kern telt alleen met hoogste
+meting van hun leerdoel (sinds `eval3`), een rechtstreeks neutraal
+signaal als schrijving zonder gewicht (sinds `eval4`) en een neutraal
+signaal van opzij als niets (sinds `eval5`), kern telt alleen met hoogste
 niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 
 ## Wat de diagnostiek kan dat de app niet kan
@@ -281,7 +297,11 @@ afwijking, ook bij een leerling op de huidige build. Tot `eval4` (#202)
 sloeg de herspeling neutrale signalen over. Een document dat de app het
 laatst op een neutraal signaal schreef, week dan af: de app liet μ tot
 dat moment vervallen, de herspeling niet. En een document dat alleen
-neutrale signalen kreeg, werd niet vergeleken.
+neutrale signalen kreeg, werd niet vergeleken. Sinds `eval5` (#204) geldt
+dat weer voor een neutraal signaal **van opzij**, dat een build van vóór
+#204 nog schreef: een document dat alleen zo'n signaal kreeg, staat op de
+prior en wordt niet vergeleken, en een document dat er laatst op
+geschreven werd, kan licht afwijken.
 
 De kolom **laatste build** is de `clientVersion` op de laatste oefening
 (#165). Elke build die dat veld schrijft (vanaf 2.6.0) rekent met #167 en
