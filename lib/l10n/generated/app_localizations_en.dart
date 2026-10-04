@@ -2299,6 +2299,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Subgoal deleted (audit)';
 
   @override
+  String get drawer_signals_kind_targetSignalLost =>
+      'Grade on the asked LO lost (audit)';
+
+  @override
   String get drawer_signals_kind_provenanceGap =>
       'Class work contradicts home work';
 

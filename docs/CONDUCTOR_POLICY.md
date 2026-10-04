@@ -1554,6 +1554,18 @@ Advancement:
   `progress == 1.0`, and still counts).
 - The conductor selects the next unmastered subgoal in curriculum
   order.
+- Any preference the student entered the old subgoal with goes first:
+  the preferred root *and* the preferred child, as soon as either is
+  set (#225). The walk sets the selection, and the active root and
+  subgoal read a preference over it, so one left behind shadows what
+  the walk chose. "Verder" in the leerpad prefers only a root; until
+  #225 only a preferred child cleared both, and after the last subgoal
+  of that root the student landed on the next root's first subgoal
+  with the *old* root still active. The grader's scope (LLM_CONTRACT
+  part 3) and the signal check then stayed on the old root, and every
+  signal on the asked LO was dropped — oefening after oefening, until
+  the app restarted. A signal on the asked LO that still falls outside
+  the scope is recorded as `targetSignalLost` (8.2).
 - The next question targets the new subgoal's first LO using the
   cold-start path (section 1.1) — fresh subgoal has no beliefs yet.
 - The subgoal-completion event fires (existing splash/celebration UI
@@ -2382,6 +2394,18 @@ Each `signalEvents[*].kind` is one of:
   {subgoalId}`. Fires once per (session, subgoal).
 - `subgoalDeletedRedirect` — teacher deleted the active subgoal
   mid-session (section 7.4). `details: {subgoalId}`.
+- `targetSignalLost` — the grader's signal on the LO the question
+  asked about was dropped because its subgoal is not in the grading
+  scope (#225, section 4.5). The app chose that LO, so this is the
+  app's error, not the grader's: the oefening counted for nothing on
+  its own LO, or only through the weak fallback. Also logged as a
+  declined signal (`conductor.signal_dropped`, reason `target out of
+  scope`). `details: {subgoalId, loId, signal, strength, activeRootId,
+  fallback}`; `fallback` is true when every signal dropped and the
+  weak fallback on the target stood in. Audit for now; a run of them
+  as a signal for the teacher during the lesson is #229. An LO missing
+  from a subgoal that *is* in scope is a curriculum edit (7.4) and is
+  not this event.
 
 **Audit, strong when well-evidenced (the event carries its severity):**
 

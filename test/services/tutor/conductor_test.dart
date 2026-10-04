@@ -18,6 +18,8 @@ import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
+import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Fakes {
@@ -4345,4 +4347,222 @@ void main() {
       });
     });
   });
+
+  group(
+    '#225 "Verder" into the last subgoal of a root, then the next root',
+    () {
+      const loVar = LearningObjective(
+        id: 'lo-var',
+        statement: 'var',
+        kind: LoKind.apply,
+      );
+      const loCmp = LearningObjective(
+        id: 'lo-cmp',
+        statement: 'cmp',
+        kind: LoKind.apply,
+      );
+      final basics = Goal(id: 'r1', title: 'Basis', order: 0);
+      final printGoal = Goal(
+        id: 's1',
+        title: 'Print',
+        parentId: 'r1',
+        order: 0,
+      );
+      final variables = Goal(
+        id: 's2',
+        title: 'Variabelen',
+        parentId: 'r1',
+        order: 1,
+        objectives: const [loVar],
+      );
+      final conditions = Goal(id: 'r2', title: 'Condities', order: 1);
+      final comparisons = Goal(
+        id: 'c1',
+        title: 'Vergelijkingen',
+        parentId: 'r2',
+        order: 0,
+        objectives: const [loCmp],
+      );
+
+      /// A student who pressed "Verder" on "Basis" — `preferredRoot` only, as
+      /// `LeerpadPage._continueRoot` sets it — with "Print" done and one
+      /// strong positive short of mastering "Variabelen", the root's last
+      /// subgoal; and the conductor after the session's `setTarget`.
+      Future<(_Fakes, Conductor)> continued() async {
+        final f = _Fakes();
+        f.roots.addAll([basics, conditions]);
+        f.children['r1'] = [printGoal, variables];
+        f.children['r2'] = [comparisons];
+        f.progressById['s1'] = Progress(goalID: 's1', progress: 1.0);
+        final now = DateTime.now().toUtc();
+        f.beliefs[f._key('s2', 'lo-var')] = LoBelief(
+          subgoalId: 's2',
+          loId: 'lo-var',
+          alpha: 3,
+          beta: 1,
+          lastUpdatedAt: now,
+          lastPositiveAtCalibratedAt: now,
+        );
+        f.calibration = const StudentCalibration(
+          difficulty: QuestionDifficulty.medium,
+        );
+        f.selection = GoalSelectionState(preferredRoot: basics);
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        expect(f.selection.activeRootGoal?.id, 'r1');
+        expect(f.selection.activeChildGoal?.id, 's2');
+        return (f, c);
+      }
+
+      /// The grader's answer as the host builds it: validated against the
+      /// subgoals of the root that is active now (`_integrateGradedAnswer`),
+      /// or against [scope] when given.
+      GradedAnswer graded(
+        _Fakes f,
+        QuestionPlan plan,
+        List<LoSignal> signals, {
+        List<Goal>? scope,
+      }) => GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: signals,
+        scopeSubgoals: scope ?? f.children[f.selection.activeRootGoal!.id]!,
+        intendedTargetLO: plan.targetLOs.first,
+        intendedTargetSubgoalId: f.selection.activeChildGoal!.id,
+      );
+
+      const onVar = LoSignal(
+        subgoalId: 's2',
+        loId: 'lo-var',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+      );
+      const onCmp = LoSignal(
+        subgoalId: 'c1',
+        loId: 'lo-cmp',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+      );
+      // The grader also names the old root's LO. Under the old scope that
+      // signal survived, so no fallback stood in for the lost one.
+      const sideOnVar = LoSignal(
+        subgoalId: 's2',
+        loId: 'lo-var',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+
+      Future<void> finishVariables(_Fakes f, Conductor c) async {
+        final plan = _expectQuestion(await c.planNext());
+        expect(plan.targetLOs.single.id, 'lo-var');
+        c.notePlannedQuestion(plan);
+        final outcome = await c.integrateAnswer(
+          plan: plan,
+          answer: graded(f, plan, const [onVar]),
+        );
+        expect(outcome.subgoalAdvanced, isTrue);
+      }
+
+      test('advancing clears the preferred root: the new root is active with '
+          'its first subgoal', () async {
+        final (f, c) = await continued();
+
+        await finishVariables(f, c);
+
+        expect(f.selection.preferredRoot, isNull);
+        expect(f.selection.preferredChild, isNull);
+        expect(f.selection.activeRootGoal?.id, 'r2');
+        expect(f.selection.activeChildGoal?.id, 'c1');
+      });
+
+      test(
+        'the first answer in the new root lands on the LO it asked about',
+        () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          final plan = _expectQuestion(await c.planNext());
+          expect(plan.targetLOs.single.id, 'lo-cmp');
+          c.notePlannedQuestion(plan);
+          final answer = graded(f, plan, const [onCmp, sideOnVar]);
+          final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+          expect(answer.lostTargetSignals, isEmpty);
+          expect(outcome.loSignals.map((s) => '${s.subgoalId}/${s.loId}'), [
+            'c1/lo-cmp',
+          ]);
+          expect(outcome.appliedSignals.single.loId, 'lo-cmp');
+          expect(f.beliefs[f._key('c1', 'lo-cmp')]?.alpha, greaterThan(1.0));
+          expect(
+            outcome.signalEvents.where(
+              (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+            ),
+            isEmpty,
+          );
+        },
+      );
+
+      test('a signal on the asked LO dropped by a stale scope is logged and '
+          'recorded on the turn', () async {
+        final (f, c) = await continued();
+        await finishVariables(f, c);
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        // The scope the host built before the fix: the old root's subgoals.
+        final answer = graded(f, plan, const [
+          onCmp,
+          sideOnVar,
+        ], scope: f.children['r1']);
+        final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+        final lost = outcome.signalEvents.singleWhere(
+          (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+        );
+        expect(lost.severity, TurnSignalEventSeverity.audit);
+        expect(lost.details, {
+          'subgoalId': 'c1',
+          'loId': 'lo-cmp',
+          'signal': 'positive',
+          'strength': 'strong',
+          'activeRootId': 'r2',
+          'fallback': false,
+        });
+        expect(lost.toJson()['kind'], 'targetSignalLost');
+        final dropped = f.debugEvents
+            .where((e) => e.$1 == 'conductor.signal_dropped')
+            .map((e) => e.$2)
+            .toList();
+        expect(
+          dropped.where((d) => d?['reason'] == 'target out of scope').single,
+          {
+            'subgoalId': 'c1',
+            'loId': 'lo-cmp',
+            'reason': 'target out of scope',
+          },
+        );
+        // Nothing reached the asked LO, and no fallback stood in for it.
+        expect(outcome.hadFallback, isFalse);
+        expect(f.beliefs[f._key('c1', 'lo-cmp')], isNull);
+      });
+
+      test('when the fallback stands in, the event still says the grade was '
+          'lost', () async {
+        final (f, c) = await continued();
+        await finishVariables(f, c);
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        final answer = graded(f, plan, const [onCmp], scope: f.children['r1']);
+        final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+        expect(outcome.hadFallback, isTrue);
+        final lost = outcome.signalEvents.singleWhere(
+          (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+        );
+        expect(lost.details['fallback'], isTrue);
+        // The weak fallback did reach the asked LO.
+        expect(f.beliefs[f._key('c1', 'lo-cmp')], isNotNull);
+      });
+    },
+  );
 }

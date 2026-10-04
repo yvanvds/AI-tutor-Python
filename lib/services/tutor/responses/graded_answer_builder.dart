@@ -20,6 +20,13 @@ class GradedAnswerBuilder {
   /// dropped. When every signal drops, a fallback weak signal on the
   /// intended LO is synthesised.
   ///
+  /// A signal on the intended LO itself whose subgoal is not in the scope
+  /// is dropped too, and handed on in `lostTargetSignals` (#225): the app
+  /// chose that LO, so it falling outside the scope is the app's error —
+  /// a stale root, not a grader that strayed. The conductor logs it and
+  /// records it on the turn. (An LO missing from a subgoal that *is* in
+  /// scope is a curriculum edit, and drops like any unresolved id.)
+  ///
   /// [rawTransferLOs] (#101) get the same scope check and are de-duplicated;
   /// they never count toward "every signal dropped" — transfer credit is
   /// not a substitute for a graded signal on the target.
@@ -41,9 +48,24 @@ class GradedAnswerBuilder {
     }
 
     final accepted = <GradedSignal>[];
+    final lostTarget = <GradedSignal>[];
     for (final sig in rawSignals) {
       final loIds = scopeIndex[sig.subgoalId];
-      if (loIds == null) continue;
+      if (loIds == null) {
+        if (intendedTargetLO != null &&
+            sig.subgoalId == intendedTargetSubgoalId &&
+            sig.loId == intendedTargetLO.id) {
+          lostTarget.add(
+            GradedSignal(
+              subgoalId: sig.subgoalId,
+              loId: sig.loId,
+              kind: sig.kind,
+              strength: sig.strength,
+            ),
+          );
+        }
+        continue;
+      }
       if (!loIds.contains(sig.loId)) continue;
       accepted.add(
         GradedSignal(
@@ -75,6 +97,7 @@ class GradedAnswerBuilder {
         provenance: provenance,
         transferLOs: transfers,
         fromAnswerKey: fromAnswerKey,
+        lostTargetSignals: lostTarget,
       );
     }
 
@@ -89,6 +112,7 @@ class GradedAnswerBuilder {
         provenance: provenance,
         transferLOs: transfers,
         fromAnswerKey: fromAnswerKey,
+        lostTargetSignals: lostTarget,
       );
     }
     final fallbackKind = switch (overallQuality) {
@@ -112,6 +136,7 @@ class GradedAnswerBuilder {
       provenance: provenance,
       transferLOs: transfers,
       fromAnswerKey: fromAnswerKey,
+      lostTargetSignals: lostTarget,
     );
   }
 }

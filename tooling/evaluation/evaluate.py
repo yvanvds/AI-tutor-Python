@@ -173,6 +173,7 @@ def cmd_draft(args) -> None:
                 "profile": dx.profile(turns),
                 "fossils": dx.fossils(los, st, turns, now),
                 "cross_root": dx.discarded_cross_root(turns, goals, ms_subgoals),
+                "lost": dx.lost_oefeningen(turns, goals, ms_subgoals),
                 "has_data": any(lo.key in st for lo in los),
             }
         )
@@ -299,6 +300,8 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             sig.append(f"{thin} doelen te weinig bevraagd")
         if p["cross_root"]["positive"] >= 10:
             sig.append(f"{p['cross_root']['positive']} weggegooide positieven")
+        if p["lost"]["total"]:
+            sig.append(f"{p['lost']['total']} oefeningen telden niet voor hun leerdoel")
         L.append(f"| {p['name']} | {sc.core_counted}/{sc.core_total} | {sc.extension_mastered}/{sc.extension_total} | {sc.hard_count}/{sc.mastered_total} | **{sc.proposal}** | {need_s} | {', '.join(sig)} |")
     L.append("")
     for p in sorted(per_student, key=lambda p: p["name"]):
@@ -381,6 +384,19 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             L.append(f"**Signalen vanuit ander doel, door de app weggegooid:** {cr['positive']} positief, {cr['negative']} negatief.")
             for r in cr["top"][:4]:
                 L.append(f"- {r['lo']} +{r['pos']}/−{r['neg']} ({', '.join(r['days'])})")
+            L.append("")
+        lost = p["lost"]
+        if lost["total"]:
+            L.append(
+                f"**Oefeningen die niet telden voor hun eigen leerdoel:** {lost['total']}, waarvan {lost['correct']} juist"
+                f" ({lost['in_milestone']} over deze mijlpaal). Rechtstreekse vragen zonder oordeel op het gevraagde leerdoel:"
+                " de app gooide het weg (#225) of de grader gaf het niet. Wat weg is, komt niet terug; alleen juist of fout bleef bewaard."
+            )
+            for r in lost["per"]:
+                ms = " — mijlpaal" if r["in_milestone"] else ""
+                L.append(
+                    f"- {r['statement']} `{r['lo']}` ({r['subgoal_title']}) ×{r['n']}, {r['correct']} juist ({', '.join(r['days'])}){ms}"
+                )
             L.append("")
         L.append("### Voor de leerkracht (concept)")
         L.append("")

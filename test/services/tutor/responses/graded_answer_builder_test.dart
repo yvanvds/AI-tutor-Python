@@ -149,4 +149,115 @@ void main() {
     expect(a.signals, isEmpty);
     expect(a.provenance, EvidenceProvenance.supervised);
   });
+
+  group('a signal on the asked LO outside the scope (#225)', () {
+    // The student is on the first subgoal of a new root ("cond"), while the
+    // scope is still the old root's subgoals: the grader's signal on the
+    // asked LO is dropped, and its side signal on the old root is not.
+    const asked = LearningObjective(
+      id: 'lo-cmp',
+      statement: 'compare',
+      kind: LoKind.apply,
+    );
+    const onAsked = LoSignal(
+      subgoalId: 'cond',
+      loId: 'lo-cmp',
+      kind: LoSignalKind.positive,
+      strength: LoSignalStrength.strong,
+    );
+    const onOldRoot = LoSignal(
+      subgoalId: 's1',
+      loId: 'lo1',
+      kind: LoSignalKind.positive,
+      strength: LoSignalStrength.weak,
+    );
+
+    test('is handed on as lost, and no fallback stands in for it', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [onAsked, onOldRoot],
+        scopeSubgoals: _scope,
+        intendedTargetLO: asked,
+        intendedTargetSubgoalId: 'cond',
+      );
+      expect(a.hadFallback, isFalse);
+      expect(a.signals.map((s) => '${s.subgoalId}/${s.loId}'), ['s1/lo1']);
+      final lost = a.lostTargetSignals.single;
+      expect(lost.subgoalId, 'cond');
+      expect(lost.loId, 'lo-cmp');
+      expect(lost.kind, LoSignalKind.positive);
+      expect(lost.strength, LoSignalStrength.strong);
+    });
+
+    test('is handed on as lost when the fallback does stand in', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [onAsked],
+        scopeSubgoals: _scope,
+        intendedTargetLO: asked,
+        intendedTargetSubgoalId: 'cond',
+      );
+      expect(a.hadFallback, isTrue);
+      expect(a.signals.single.loId, 'lo-cmp');
+      expect(a.signals.single.strength, LoSignalStrength.weak);
+      expect(a.lostTargetSignals.single.strength, LoSignalStrength.strong);
+    });
+
+    test('in scope, it is no loss', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [onAsked],
+        scopeSubgoals: [
+          ..._scope,
+          Goal(
+            id: 'cond',
+            title: 'c',
+            parentId: 'r',
+            order: 1,
+            objectives: const [asked],
+          ),
+        ],
+        intendedTargetLO: asked,
+        intendedTargetSubgoalId: 'cond',
+      );
+      expect(a.signals.single.loId, 'lo-cmp');
+      expect(a.lostTargetSignals, isEmpty);
+    });
+
+    test('a dropped signal on another LO is no loss of the target', () {
+      // `_outOfScope` names lo1 under a subgoal outside the scope: dropped,
+      // but the question asked about lo1 in s1.
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [_inScope, _outOfScope],
+        scopeSubgoals: _scope,
+        intendedTargetLO: _lo,
+        intendedTargetSubgoalId: 's1',
+      );
+      expect(a.lostTargetSignals, isEmpty);
+    });
+
+    test('an LO removed from a subgoal in scope is a curriculum edit, not a '
+        'loss', () {
+      final a = GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: const [
+          LoSignal(
+            subgoalId: 's1',
+            loId: 'lo-gone',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+        scopeSubgoals: _scope,
+        intendedTargetLO: const LearningObjective(
+          id: 'lo-gone',
+          statement: 'gone',
+          kind: LoKind.apply,
+        ),
+        intendedTargetSubgoalId: 's1',
+      );
+      expect(a.lostTargetSignals, isEmpty);
+    });
+  });
 }

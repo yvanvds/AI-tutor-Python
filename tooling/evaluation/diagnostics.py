@@ -11,7 +11,7 @@ import datetime as dt
 import statistics
 from collections import Counter, defaultdict
 
-from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, parse_at, turn_scope
+from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, is_audit, parse_at, turn_scope
 
 # Plain-Dutch labels for the report text; the raw names are app vocabulary.
 DIFF_NL = {"easy": "makkelijk", "medium": "gewoon", "hard": "moeilijk"}
@@ -265,4 +265,55 @@ def discarded_cross_root(turns: list[dict], goals: dict, milestone_subgoals: set
             {"lo": k[1], "subgoal": k[0], "pos": v[0], "neg": v[1], "days": sorted(days[k])}
             for k, v in top
         ],
+    }
+
+
+def lost_oefeningen(turns: list[dict], goals: dict, milestone_subgoals: set[str]) -> dict:
+    """Direct questions whose grade left no signal on the LO they asked
+    about (#225): the oefening counted for nothing on its own LO. A direct
+    question here is a first answer (no follow-up) on the active subgoal (no
+    warm-up or recheck), and no audit record. Its own LO is the turn's
+    target (`targetLOIds`) under its `subgoalId`.
+
+    What is gone does not come back: the record keeps `overallQuality` and
+    the signals that survived, nothing of the one that was dropped. The
+    cause is the app's (a stale grading scope dropped the signal, #225) or
+    the grader's (it judged other LOs and not the asked one). Grouped per
+    LO, most first."""
+    total = correct = in_ms = 0
+    per: dict[tuple[str, str], dict] = {}
+    for t in turns:
+        if is_audit(t) or t.get("isFollowUp") or t.get("isWarmUp") or t.get("isRecheck"):
+            continue
+        sg = t["subgoalId"]
+        targets = set(t.get("targetLOIds") or [])
+        if not targets:
+            continue
+        if any(s.get("subgoalId") == sg and s.get("loId") in targets for s in t.get("loSignals") or []):
+            continue
+        lo = (t.get("targetLOIds") or [])[0]
+        right = t.get("overallQuality") == "correct"
+        total += 1
+        correct += right
+        in_ms += sg in milestone_subgoals
+        row = per.setdefault(
+            (sg, lo),
+            {"subgoal": sg, "lo": lo, "n": 0, "correct": 0, "days": [], "in_milestone": sg in milestone_subgoals},
+        )
+        row["n"] += 1
+        row["correct"] += right
+        day = t["turnAt"][5:10]
+        if day not in row["days"]:
+            row["days"].append(day)
+    for row in per.values():
+        g = goals.get(row["subgoal"]) or {}
+        row["subgoal_title"] = g.get("title") or row["subgoal"]
+        row["statement"] = next(
+            (o.get("statement") for o in g.get("objectives") or [] if o.get("id") == row["lo"]), None
+        ) or row["lo"]
+    return {
+        "total": total,
+        "correct": correct,
+        "in_milestone": in_ms,
+        "per": sorted(per.values(), key=lambda r: (-r["n"], r["days"][0])),
     }

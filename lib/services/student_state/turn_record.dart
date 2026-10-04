@@ -197,6 +197,9 @@ enum TurnSignalEventKind {
   cascadeHalt,
   emptyObjectivesBlock,
   subgoalDeletedRedirect,
+  // The grader's signal on the LO the question asked about fell outside the
+  // grading scope (#225): the app's error, not the grader's.
+  targetSignalLost,
   // Audit by default, strong when well-evidenced — the event carries its
   // own severity (#107, `ProvenanceGap`):
   provenanceGap,
@@ -227,6 +230,7 @@ class TurnSignalEvent {
       case TurnSignalEventKind.cascadeHalt:
       case TurnSignalEventKind.emptyObjectivesBlock:
       case TurnSignalEventKind.subgoalDeletedRedirect:
+      case TurnSignalEventKind.targetSignalLost:
       // The default; a well-evidenced gap is emitted as strong explicitly.
       case TurnSignalEventKind.provenanceGap:
         return TurnSignalEventSeverity.audit;

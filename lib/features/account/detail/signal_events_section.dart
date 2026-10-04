@@ -176,6 +176,8 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
         return l.drawer_signals_kind_emptyObjectivesBlock;
       case TurnSignalEventKind.subgoalDeletedRedirect:
         return l.drawer_signals_kind_subgoalDeletedRedirect;
+      case TurnSignalEventKind.targetSignalLost:
+        return l.drawer_signals_kind_targetSignalLost;
       case TurnSignalEventKind.provenanceGap:
         return l.drawer_signals_kind_provenanceGap;
     }

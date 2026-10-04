@@ -1294,6 +1294,10 @@
   "drawer_signals_kind_cascadeHalt": "Cascade halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subgoal without LOs (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subgoal deleted (audit)",
+  "drawer_signals_kind_targetSignalLost": "Grade on the asked LO lost (audit)",
+  "@drawer_signals_kind_targetSignalLost": {
+    "description": "Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO."
+  },
   "drawer_signals_kind_provenanceGap": "Class work contradicts home work",
   "drawer_signals_provenanceGap_detail": "{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)",
   "@drawer_signals_provenanceGap_detail": {

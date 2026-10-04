@@ -54,6 +54,7 @@ def _fake_cosmos() -> types.ModuleType:
 
 sys.modules.setdefault("cosmos", _fake_cosmos())
 
+import diagnostics as dx  # noqa: E402
 import evaluate  # noqa: E402
 import rules  # noqa: E402
 
@@ -419,6 +420,42 @@ TOM_STORED = {
     ("sg-b", "predict_b1"): {"alpha": 3.4999, "beta": 1.0, "highestPositiveDifficulty": "medium"},
     ("sg-a", "recall_a1"): {"alpha": 1.5, "beta": 1.0, "highestPositiveDifficulty": "medium"},
 }
+
+# #225: a class of one made-up student who lost oefeningen. Nora pressed
+# "Verder" and finished Deel A; on 09-22, on Deel B, the grader's signal on
+# the asked predict_b1 was dropped (the scope was still the old one) while a
+# side remark on recall_a1 survived: three questions, two of them right,
+# and no signal on their own LO. On 09-23, in the next goal (Deel C), the
+# same twice. Not lost: a follow-up and a recheck without a signal on the
+# asked LO (neither is a first direct question), and a bank pick whose
+# weak fallback signal did land on predict_b1.
+GOALS["g-next"] = {"id": "g-next", "title": "Volgend doel", "order": 2}
+GOALS["sg-c"] = {
+    "id": "sg-c",
+    "parentId": "g-next",
+    "order": 1,
+    "title": "Deel C",
+    "objectives": [{"id": "cmp_c1", "statement": "Je kan C1 vergelijken."}],
+}
+KLAS_LOST = "6VERLOREN"
+ACCOUNTS += [
+    {"uid": "u-nora", "firstName": "Nora", "lastName": "Verloren", "className": KLAS_LOST,
+     "updatedAt": "2026-09-23T10:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+_SIDE = [_sig("sg-a", "recall_a1", "weak")]
+TURNS["u-nora"] = [
+    *[_turn(f"2026-09-20T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-nora") for i in range(2)],
+    _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE),
+    _turn("2026-09-22T09:05:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE, overallQuality="wrong"),
+    _turn("2026-09-22T09:06:00.000Z", "sg-b", "predict_b1", uid="u-nora", isFollowUp=True, chainDepth=1, loSignals=[]),
+    _turn("2026-09-22T09:10:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE),
+    _turn("2026-09-22T09:15:00.000Z", "sg-a", "fix_a3", uid="u-nora", isRecheck=True, activeSubgoalId="sg-b",
+          loSignals=[_sig("sg-b", "predict_b1")]),
+    _turn("2026-09-23T09:00:00.000Z", "sg-b", "predict_b1", uid="u-nora", questionId="q-sg-b-3", fromBank=True,
+          gradedByKey=True, hadFallback=True, loSignals=[_sig("sg-b", "predict_b1", "weak")]),
+    *[_turn(f"2026-09-23T09:1{i}:00.000Z", "sg-c", "cmp_c1", uid="u-nora", loSignals=[_sig("sg-b", "predict_b1", "weak")])
+      for i in range(2)],
+]
 
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
@@ -1218,6 +1255,79 @@ class ReliabilityTest(unittest.TestCase):
 
         everything = rules.reliability([], {}, turns, None, NOW)
         self.assertEqual((everything.supervised_turns, everything.home_turns), (2, 2))
+
+
+class LostOefeningenDraftTest(_CommandTest):
+    """#225: the direct questions whose grade left no signal on their own
+    LO, per student in the concept — they counted for nothing there."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, _ = self.draft(KLAS_LOST)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+        self.nora = self.section(self.md, "Nora Verloren")
+
+    def test_the_concept_lists_them_per_lo(self):
+        self.assertIn(
+            "**Oefeningen die niet telden voor hun eigen leerdoel:** 5, waarvan 4 juist (3 over deze mijlpaal).",
+            self.nora,
+        )
+        self.assertIn(
+            "- Je kan B1 voorspellen. `predict_b1` (Deel B) ×3, 2 juist (09-22) — mijlpaal\n"
+            "- Je kan C1 vergelijken. `cmp_c1` (Deel C) ×2, 2 juist (09-23)\n",
+            self.nora,
+        )
+
+    def test_the_overview_flags_them(self):
+        row = next(line for line in self.md.splitlines() if line.startswith("| Nora Verloren |"))
+        self.assertIn("5 oefeningen telden niet voor hun leerdoel", row)
+
+    def test_a_student_without_them_gets_no_line(self):
+        md_path, _, _ = self.draft(KLAS_OFF)
+        md = md_path.read_text(encoding="utf-8")
+        self.assertNotIn("telden niet", md)
+
+    def test_the_sidecar_and_the_number_do_not_change(self):
+        # Diagnostics only: nothing of it goes on the proposal.
+        nora = self.student(self.sidecar, "u-nora")
+        self.assertNotIn("lost", nora)
+        self.assertNotIn("lostOefeningen", nora["computed"])
+        self.assertEqual(self.sidecar["rulesVersion"], rules.RULES_VERSION)
+
+
+class LostOefeningenTest(unittest.TestCase):
+    """Which turns `diagnostics.lost_oefeningen` counts (#225)."""
+
+    def lost(self, *turns: dict) -> dict:
+        return dx.lost_oefeningen(list(turns), GOALS, {"sg-a", "sg-b"})
+
+    def test_a_first_direct_question_without_a_signal_on_its_lo(self):
+        r = self.lost(_turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", loSignals=[_sig("sg-a", "recall_a1")]))
+        self.assertEqual((r["total"], r["correct"], r["in_milestone"]), (1, 1, 1))
+
+    def test_its_lo_under_another_subgoal_is_no_signal_on_it(self):
+        r = self.lost(_turn("2026-09-22T09:00:00.000Z", "sg-c", "cmp_c1", loSignals=[_sig("sg-b", "cmp_c1")]))
+        self.assertEqual((r["total"], r["in_milestone"]), (1, 0))
+        self.assertEqual(r["per"][0]["subgoal_title"], "Deel C")
+
+    def test_not_counted(self):
+        at = "2026-09-22T09:00:00.000Z"
+        r = self.lost(
+            # A signal on its own LO, also the weak fallback one.
+            _turn(at, "sg-b", "predict_b1"),
+            _turn(at, "sg-b", "predict_b1", hadFallback=True, loSignals=[_sig("sg-b", "predict_b1", "weak")]),
+            # A neutral is a signal too.
+            _turn(at, "sg-b", "predict_b1", loSignals=[_sig("sg-b", "predict_b1", signal="neutral")]),
+            # Not a first direct question: a follow-up, a warm-up, a recheck.
+            _turn(at, "sg-b", "predict_b1", isFollowUp=True, chainDepth=1, loSignals=[]),
+            _turn(at, "sg-a", "recall_a1", isWarmUp=True, activeSubgoalId="sg-b", loSignals=[]),
+            _turn(at, "sg-a", "fix_a3", isRecheck=True, activeSubgoalId="sg-b", loSignals=[]),
+            # No question at all: an audit record; and a turn without a target.
+            _audit(at, "sg-b", "u-anna"),
+            _turn(at, "sg-b", "predict_b1", targetLOIds=[], loSignals=[]),
+        )
+        self.assertEqual(r, {"total": 0, "correct": 0, "in_milestone": 0, "per": []})
 
 
 if __name__ == "__main__":

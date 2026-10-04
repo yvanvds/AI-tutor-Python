@@ -298,6 +298,13 @@ class GradedAnswer {
   /// which watches the grader.
   final bool fromAnswerKey;
 
+  /// The grader's signals on the LO the question asked about that the scope
+  /// check dropped because their subgoal is not in the grading scope (#225).
+  /// The app picked that LO, so the grader filing a signal on it is never
+  /// the error: the scope is. Not in [signals]; the conductor logs each and
+  /// records a `targetSignalLost` event (CONDUCTOR_POLICY §8.2).
+  final List<GradedSignal> lostTargetSignals;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
@@ -307,6 +314,7 @@ class GradedAnswer {
     this.provenance = EvidenceProvenance.home,
     this.transferLOs = const [],
     this.fromAnswerKey = false,
+    this.lostTargetSignals = const [],
   });
 }
 
@@ -1176,6 +1184,34 @@ class Conductor {
       }
     }
 
+    // #225: the grader's signal on the asked LO fell outside the grading
+    // scope. The app chose that LO, so the scope was wrong, not the grader:
+    // logged like any declined signal, and put on the turn, so that an
+    // oefening that counted for nothing on its own LO shows in
+    // `turn_history` (§8.2). `fallback` says whether the weak fallback
+    // signal on the target stood in for it (every signal dropped) or the
+    // target got nothing at all.
+    if (answer.lostTargetSignals.isNotEmpty) {
+      for (final sig in answer.lostTargetSignals) {
+        _dropSignal(sig, 'target out of scope');
+      }
+      final lost = answer.lostTargetSignals.first;
+      final rootId = selection.activeRootGoal?.id;
+      events.add(
+        TurnSignalEvent.of(
+          TurnSignalEventKind.targetSignalLost,
+          details: {
+            'subgoalId': lost.subgoalId,
+            'loId': lost.loId,
+            'signal': lost.kind.name,
+            'strength': lost.strength.name,
+            if (rootId != null) 'activeRootId': rootId,
+            'fallback': answer.hadFallback,
+          },
+        ),
+      );
+    }
+
     if (subgoal == null) {
       // Nothing to update — not even the oefening counter (#217): with no
       // active subgoal there is no calibration write for it to ride on.
@@ -1963,8 +1999,17 @@ class Conductor {
   /// Walk forward through subgoals; cap consecutive auto-skips at
   /// `cascadeSkipCap` (CONDUCTOR_POLICY §4.5). When the cascade halts the
   /// student lands on the subgoal that would have been skipped.
+  ///
+  /// The walk below sets the selection, so a preference — root or child —
+  /// would outlive the subgoal it chose and shadow it. Both go as soon as
+  /// either is set (#225): "Verder" in the leerpad prefers only a root, and
+  /// a root left behind after the last subgoal of that root kept the old
+  /// root active over the new root's first subgoal — the grader's scope and
+  /// the signal check stayed on the old root, and dropped every signal on
+  /// the LO the student was asked about.
   Future<void> _advanceWithCascadeCap() async {
-    if (_deps.getGoalSelection().preferredChild != null) {
+    final selection = _deps.getGoalSelection();
+    if (selection.preferredRoot != null || selection.preferredChild != null) {
       _deps.clearPreferred();
     }
     while (true) {

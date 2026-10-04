@@ -3858,6 +3858,12 @@ abstract class AppLocalizations {
   /// **'Subgoal deleted (audit)'**
   String get drawer_signals_kind_subgoalDeletedRedirect;
 
+  /// Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade on the asked LO lost (audit)'**
+  String get drawer_signals_kind_targetSignalLost;
+
   /// No description provided for @drawer_signals_kind_provenanceGap.
   ///
   /// In en, this message translates to:

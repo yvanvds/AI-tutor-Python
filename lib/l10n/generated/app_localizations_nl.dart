@@ -2323,6 +2323,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Subdoel verwijderd (audit)';
 
   @override
+  String get drawer_signals_kind_targetSignalLost =>
+      'Oordeel op het gevraagde leerdoel verloren (audit)';
+
+  @override
   String get drawer_signals_kind_provenanceGap =>
       'De les spreekt het thuiswerk tegen';
 

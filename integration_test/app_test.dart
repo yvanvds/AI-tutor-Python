@@ -51,6 +51,7 @@ import 'flows/lesson_translation.dart' as lesson_translation;
 import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
+import 'flows/next_root_signal.dart' as next_root_signal;
 import 'flows/oefening_xp.dart' as oefening_xp;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
@@ -136,6 +137,7 @@ void main() {
   own_key.main();
   status_report_retry.main();
   stuck_advance_progress.main();
+  next_root_signal.main();
   level_up_gate.main();
   oefening_xp.main();
   badges.main();

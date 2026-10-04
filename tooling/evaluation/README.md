@@ -54,7 +54,7 @@ tellingen, en pas na een "go" `apply`.
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`) |
 | `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
-| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen |
+| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel |
 | `evaluate.py` | de vijf commando's; rendert concept en sidecar |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 
@@ -244,7 +244,22 @@ niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 - **weggegooide signalen**: oordelen van de grader over de leerdoelen van
   deze mijlpaal terwijl de leerling in een ander doel werkte; de app laat
   ze vallen. Let op: hun frequentie verschilt sterk per sessie (vraagtype?
-  grader-versie?) — informatief, geen bewijs.
+  grader-versie?) — informatief, geen bewijs;
+- **oefeningen die niet telden voor hun leerdoel** (#225): rechtstreekse
+  vragen zonder signaal op het eigen leerdoel (`targetLOIds` onder
+  `subgoalId`) in `loSignals`. Rechtstreeks: geen vervolgvraag, geen
+  opfris- of controlevraag, geen auditrecord. Per leerdoel: hoeveel,
+  hoeveel juist, op welke dagen, en of het een leerdoel van de mijlpaal
+  is; in het overzicht als signaal. De oorzaak is de app of de grader:
+  tot #225 bleef na *Verder* en het laatste subdoel van een doel het
+  oude doel actief, en gooide de app elk oordeel op het nieuwe subdoel
+  weg (sinds #225 staat dat ook als `targetSignalLost` op de oefening);
+  een grader kan het gevraagde leerdoel ook gewoon overslaan. Wat weg
+  is, komt niet terug: de oefening bewaart alleen `overallQuality` en
+  de signalen die bleven. Viel elk signaal weg, dan landde het zwakke
+  terugvalsignaal op het eigen leerdoel, en staat de oefening er niet
+  bij. De herspeling verandert niet (geen nieuwe regelversie): wat de
+  leerkracht met zo'n reeks doet, is een aanpassing met een reden.
 
 ## `what-if`: wat een aanpassing oplevert
 
