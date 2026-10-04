@@ -43,6 +43,7 @@ import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/classes/classes_service.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
@@ -699,7 +700,12 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     }
     final student = students[index];
     final theme = Theme.of(context);
-    final supervisionWired = ref.watch(supervisionSourceProvider).isWired;
+    // The timetable source answers from the polled class list (#219):
+    // watching it redraws the pane when a lesson is added to the class.
+    ref.watch(classesServiceProvider);
+    final supervisionWired = ref
+        .watch(supervisionSourceProvider)
+        .isWiredFor(student.className);
     final p = _proposals[student.uid];
     final error = _errors[student.uid];
     final signed = p?.isSignedOff ?? false;
@@ -829,13 +835,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           ),
           const SizedBox(height: 4),
           // The staleness half of this line is a measurement and always
-          // shows. The supervised/home tally is one only while a supervision
-          // registry is bound (#173, the same inert split #160 took out of
-          // the justification prompt): until Anchor lands every turn is
-          // `home` by construction, and "0 supervised" against every name in
-          // the class says nothing about anyone. The counts stay on the doc;
-          // only what the pane shows changes, and the tally comes back on
-          // its own once `isWired` does.
+          // shows. The supervised/home tally is one only while the
+          // supervision source is wired for the student's class (#173, the
+          // same inert split #160 took out of the justification prompt):
+          // for a class without lessons every turn is `home` by
+          // construction (#219), and "0 supervised" says nothing about
+          // anyone. The counts stay on the doc; only what the pane shows
+          // changes, and the tally comes back on its own once the class has
+          // lessons.
           Text(
             supervisionWired
                 ? l.reports_grade_reliability(

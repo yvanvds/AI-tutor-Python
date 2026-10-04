@@ -20,8 +20,22 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.18-eval5` = PUNTENFORMULE v1.0.18, replayed from the turn
-log. `eval5` (#204) follows the conductor in skipping an *incidental*
+Rule set `1.0.19-eval6` = PUNTENFORMULE v1.0.19, replayed from the turn
+log. `eval6` (#219) weighs supervised evidence ×1.25, as the app does
+(`PolicyConstants.supervisedWeightFactor`): every signal of an oefening in
+the lesson time of the student's class, 10 minutes before and after each
+lesson included, and its transfer credits. Supervision used to wait on
+Anchor and the factor never bit; since #219 the app reads it from the
+timetable (`config/classes`, #218). The turns from before that are all
+`home` on the record, so `draft` and `what-if` replay them by the
+timetable too (`by_timetable`): `turnAt`, in Belgian local time, against
+the lessons of the class as the doc has them now. An oefening the app
+recorded as `supervised` stays supervised. That makes the weight and the
+tally on the proposal the same over the whole year, without rewriting
+`turn_history`. M and P can move: a supervised answer weighs more, both
+ways. `validate` keeps the recorded provenance — what the app weighed.
+
+`eval5` (#204) follows the conductor in skipping an *incidental*
 neutral (an LO of an earlier subgoal, CONDUCTOR_POLICY §2.4): nobody asked
 that LO and the grader saw nothing either way, so the app writes nothing
 since #204 — no state at the prior, no clock — and only logs it. `eval4`
@@ -78,10 +92,12 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.0.18-eval5"
+RULES_VERSION = "1.0.19-eval6"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -91,8 +107,16 @@ WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
 POS_FACTOR = {"easy": 0.6, "medium": 1.0, "hard": 1.4}
 NEG_FACTOR = {"easy": 1.4, "medium": 1.0, "hard": 0.6}  # #169; symmetric would equal POS_FACTOR
 # A transfer credit is a weak positive at `medium` (`belief_math.transferCreditDeltas`,
-# CONDUCTOR_POLICY §3.7); provenance weighting is a no-op until Anchor ships.
+# CONDUCTOR_POLICY §3.7), times the provenance factor like every other signal.
 TRANSFER_CREDIT_ALPHA = WEIGHT["weak"] * POS_FACTOR["medium"]
+# `PolicyConstants.supervisedWeightFactor` (PUNTENFORMULE §2.7): a supervised
+# oefening's signals weigh ×1.25, a home one's ×1.0. Since #219 supervised
+# means "in the lesson time of the class" (`by_timetable`), so the factor bites
+# on most oefeningen; the teacher kept it at 1.25 (2026-10-04).
+SUPERVISED_WEIGHT_FACTOR = 1.25
+# `ScheduleSupervisionSource.margin`: a lesson counts from 10 minutes before
+# its start to 10 minutes after its end.
+LESSON_MARGIN_MINUTES = 10
 
 MASTERY_MEAN = 0.80
 MASTERY_EVIDENCE = 4.0
@@ -106,6 +130,119 @@ DIFF_ORDER = {None: -1, "easy": 0, "medium": 1, "hard": 2}
 
 def parse_at(s: str) -> dt.datetime:
     return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+# ---- lesson time (#219) -------------------------------------------------------
+
+
+def _last_sunday(year: int, month: int) -> dt.date:
+    last = dt.date(year, month, 31)  # March and October both have 31 days
+    return last - dt.timedelta(days=(last.weekday() + 1) % 7)
+
+
+def belgian_time(at: dt.datetime) -> dt.datetime:
+    """[at] on a Belgian wall clock: CET (UTC+1), and CEST (UTC+2) from the
+    last Sunday of March to the last Sunday of October, both at 01:00 UTC —
+    the EU rule. The laptops run on Belgian time and the app compares a
+    lesson in local time (`LessonSlot.contains`); `zoneinfo` would do this,
+    but it has no time zone data on Windows without the `tzdata` package, and
+    the tooling uses the standard library only. A naive [at] is UTC."""
+    utc = at.replace(tzinfo=dt.timezone.utc) if at.tzinfo is None else at.astimezone(dt.timezone.utc)
+    summer_from = dt.datetime.combine(_last_sunday(utc.year, 3), dt.time(1), tzinfo=dt.timezone.utc)
+    summer_until = dt.datetime.combine(_last_sunday(utc.year, 10), dt.time(1), tzinfo=dt.timezone.utc)
+    hours = 2 if summer_from <= utc < summer_until else 1
+    return utc.astimezone(dt.timezone(dt.timedelta(hours=hours)))
+
+
+def _clock_minute(text) -> int | None:
+    """`HH:MM` (or `H:MM`) as minutes after midnight; None for anything
+    else, `24:00` included — `parseClockMinute` in the app."""
+    if not isinstance(text, str):
+        return None
+    m = re.fullmatch(r"\s*([0-9]{1,2}):([0-9]{2})\s*", text)
+    if not m:
+        return None
+    hour, minute = int(m.group(1)), int(m.group(2))
+    if hour > 23 or minute > 59:
+        return None
+    return hour * 60 + minute
+
+
+class Lesson(NamedTuple):
+    """One weekly lesson of a class (`LessonSlot`), in local wall-clock
+    time: ISO weekday (Monday 1 … Sunday 7), start and end in minutes after
+    midnight."""
+
+    weekday: int
+    start: int
+    end: int
+
+
+def lessons_of(classes_doc: dict | None, class_name: str) -> list[Lesson]:
+    """The lessons of [class_name] in the `config/classes` doc (#218), read
+    as the app reads them (`ClassList.fromDoc`): a name matches exactly,
+    spaces around it aside, the first entry of a name counts, and a lesson
+    that cannot be one — a weekday outside 1–7, a time that is not `HH:MM`,
+    an end not after the start — is left out. No doc, no class or no lessons:
+    none."""
+    key = (class_name or "").strip()
+    if not key or not isinstance(classes_doc, dict):
+        return []
+    for entry in classes_doc.get("classes") or []:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or not name.strip() or name.strip() != key:
+            continue
+        out = []
+        for raw in entry.get("lessons") or []:
+            if not isinstance(raw, dict):
+                continue
+            day = raw.get("weekday")
+            start, end = _clock_minute(raw.get("start")), _clock_minute(raw.get("end"))
+            if isinstance(day, bool) or not isinstance(day, (int, float)):
+                continue
+            if isinstance(day, float) and not day.is_integer():
+                continue
+            if not 1 <= int(day) <= 7 or start is None or end is None or end <= start:
+                continue
+            out.append(Lesson(int(day), start, end))
+        return sorted(out)
+    return []
+
+
+def during_lesson(lessons: list[Lesson], at: dt.datetime, margin_minutes: int = LESSON_MARGIN_MINUTES) -> bool:
+    """Whether [at], on a Belgian wall clock, falls in one of [lessons],
+    [margin_minutes] before the start and after the end included, both ends
+    included, to the second (`LessonSlot.contains`). The margin stays within
+    the lesson's own day."""
+    local = belgian_time(at)
+    second = local.hour * 3600 + local.minute * 60 + local.second
+    margin = margin_minutes * 60
+    return any(
+        local.isoweekday() == lesson.weekday and lesson.start * 60 - margin <= second <= lesson.end * 60 + margin
+        for lesson in lessons
+    )
+
+
+def recorded_supervised(turn: dict) -> bool:
+    """The provenance the app recorded and weighed the turn with; a missing
+    field reads as `home` (`EvidenceProvenance.parse`)."""
+    return turn.get("provenance") == "supervised"
+
+
+def by_timetable(lessons: list[Lesson]) -> Callable[[dict], bool]:
+    """Whether a turn counts as supervised by the rule since #219: the app
+    recorded it as `supervised`, or its `turnAt` falls in one of [lessons]
+    (`during_lesson`). The turns from before #219 are all `home` on the
+    record; this reads them as the app reads a new one. An oefening the app
+    recorded as `supervised` stays so even when its lesson has since moved:
+    the record is what the app weighed."""
+
+    def supervised(turn: dict) -> bool:
+        return recorded_supervised(turn) or during_lesson(lessons, parse_at(turn["turnAt"]))
+
+    return supervised
 
 
 def is_audit(turn: dict) -> bool:
@@ -302,8 +439,14 @@ def replay(
     asymmetric: bool = True,
     drop_incidental_negatives: bool = True,
     apply_transfer_credits: bool = True,
+    supervised: Callable[[dict], bool] = recorded_supervised,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
+
+    [supervised] says which turns weigh ×`SUPERVISED_WEIGHT_FACTOR`, every
+    signal and transfer credit of the turn (PUNTENFORMULE §2.7). The default
+    is the provenance the app recorded — what it weighed, so what `validate`
+    compares to; `draft` and `what-if` pass `by_timetable` (#219).
 
     The defaults are the app's own arithmetic since #167 and #169: what
     `draft` grades on and what `validate` compares `lo_beliefs` to (#203).
@@ -328,6 +471,7 @@ def replay(
         diff = t.get("difficulty") or "medium"
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
+        s_factor = SUPERVISED_WEIGHT_FACTOR if supervised(t) else 1.0
         for s in t.get("loSignals") or []:
             kind = s.get("signal")
             if kind not in ("positive", "negative", "neutral"):
@@ -357,7 +501,7 @@ def replay(
             if follow_up and WEIGHT.get(strength, 1.0) > WEIGHT["weak"]:
                 strength = "weak"  # §6.2
             eff_diff = "medium" if (follow_up or incidental) else diff
-            base = WEIGHT.get(strength, 1.0)
+            base = WEIGHT.get(strength, 1.0) * s_factor
             if kind == "positive":
                 a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
             elif kind == "negative":
@@ -411,7 +555,7 @@ def replay(
             for c in t.get("transferCredits") or []:
                 lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
-                lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA, 0.0)
+                lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1
                 if lo.first_mastered_at is None and lo.mastered_now:
@@ -540,6 +684,7 @@ def reliability(
     turns: list[dict],
     period_start: dt.datetime | None,
     now: dt.datetime,
+    supervised: Callable[[dict], bool] = recorded_supervised,
 ) -> Reliability:
     """Stale = a milestone LO whose replayed state was not written for more
     than `WARM_UP_STALE_AFTER_DAYS` before [now], or has no state at all
@@ -547,9 +692,11 @@ def reliability(
     neutral signal moves too since the app writes it, #202 — an incidental
     one not, #204; not the diagnostics' fossils, which ask another
     question). The tally counts the graded
-    oefeningen in `[period_start, now]` by `provenance`, a missing one reading as `home`
-    like `EvidenceProvenance.parse`; audit records (`is_audit`) are not
-    evidence and not counted (`listTurnsBetween`). No
+    oefeningen in `[period_start, now]` by [supervised] — the recorded
+    `provenance` by default, a missing one reading as `home` like
+    `EvidenceProvenance.parse`; `by_timetable` as `draft` passes it, the rule
+    `GradeProposalService.compute` tallies with since #219. Audit records
+    (`is_audit`) are not evidence and not counted (`listTurnsBetween`). No
     [period_start] counts from the first turn, as the app's 1970 fallback."""
     stale_after = dt.timedelta(days=WARM_UP_STALE_AFTER_DAYS)
     stale = 0
@@ -557,18 +704,18 @@ def reliability(
         s = st.get(lo.key)
         if s is None or s.last_at is None or now - s.last_at > stale_after:
             stale += 1
-    supervised = home = 0
+    n_supervised = home = 0
     for t in turns:
         if is_audit(t):
             continue
         at = parse_at(t["turnAt"])
         if (period_start is not None and at < period_start) or at > now:
             continue
-        if t.get("provenance") == "supervised":
-            supervised += 1
+        if supervised(t):
+            n_supervised += 1
         else:
             home += 1
-    return Reliability(stale, supervised, home)
+    return Reliability(stale, n_supervised, home)
 
 
 def stamps_needed_to_pass(sc: Score) -> tuple[int, int] | None:

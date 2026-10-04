@@ -1,4 +1,5 @@
-// End-to-end (#99, #148, #149, #150, #160, #166, #168, #170, #173, #200): the
+// End-to-end (#99, #148, #149, #150, #160, #166, #168, #170, #173, #200,
+// #219): the
 // periodic grade proposal, teacher side, now as a class-wide workflow that
 // ends in a published report.
 //
@@ -19,16 +20,18 @@
 //      `firstMasteredAt` stamp, not the live belief (#168): an LO whose
 //      (α, β) later signals pushed under the bar still counts, a doc
 //      without the stamp does not, and no later evidence can lower the
-//      number. With no supervision registry
-//      bound — the shipped app until Anchor lands — the prompt carries no
-//      supervised/home split and no hint to name one, since a split that
-//      reads "0 supervised" for everyone is not a measurement (#160); with
-//      a registry bound it is back. The detail pane's reliability line
-//      follows the same rule (#173): the staleness counts always, the turn
-//      tally only with a registry bound — counted as oefeningen, the
-//      teacher's word, in Dutch as in English (#200). The teacher then
-//      walks the class in the detail pane, adjusts a grade with a note and
-//      signs off.
+//      number. Supervision comes from the timetable (#219): while the
+//      student's class has no lessons, every oefening is home by
+//      construction, so the prompt carries no supervised/home split and no
+//      hint to name one — a split that reads "0 supervised" is not a
+//      measurement (#160). Once the class has lessons it is back, and it
+//      counts an oefening in lesson time as supervised also where the
+//      record, written before the timetable was the source, says home. The
+//      detail pane's reliability line follows the same rule (#173): the
+//      staleness counts always, the turn tally only for a class with
+//      lessons — counted as oefeningen, the teacher's word, in Dutch as in
+//      English (#200). The teacher then walks the class in the detail pane,
+//      adjusts a grade with a note and signs off.
 //   3. The justification is the teacher's to rewrite (#149), before signing
 //      and after: a recompute that moves the number drops AI prose but
 //      keeps theirs, flagged stale, and PUNTENFORMULE §5 freezes the grade,
@@ -78,14 +81,14 @@ const String kJustification =
 /// A classmate of Sam's who never worked on the milestone's objectives.
 const String kQuietUid = 'it-quiet';
 
-/// A registry with Anchor behind it — the binding the shipped app gets once
-/// Anchor lands. No turn is graded in these flows, so what it answers per
-/// turn never matters here; that it is *wired* does (#160).
-class _AnchorBound implements SupervisionSource {
-  const _AnchorBound();
+/// A source wired for every class. No turn is graded in these flows and
+/// none is seeded where it is used, so what it answers per turn never
+/// matters here; that it is *wired* does (#160).
+class _Wired extends SupervisionSource {
+  const _Wired();
 
   @override
-  bool get isWired => true;
+  bool isWiredFor(String className) => true;
 
   @override
   Future<EvidenceProvenance> provenanceFor({
@@ -403,10 +406,11 @@ void main() {
     expect(find.text('Core at level: 1 / 1'), findsOneWidget);
     expect(find.text('Extension mastered: 1 / 1'), findsOneWidget);
     expect(find.text('Demonstrated at hard: 1 / 2 mastered'), findsOneWidget);
-    // The reliability line stops at the staleness counts: with no registry
-    // bound the turn tally would read "0 supervised" against every name in
-    // the class, which is not a measurement (#173). It comes back with the
-    // registry — the wired flow below. The counts stay on the doc.
+    // The reliability line stops at the staleness counts: class 5A has no
+    // lessons, so the turn tally would read "0 supervised" against every
+    // name in the class, which is not a measurement (#173). It comes back
+    // once the class has lessons — the timetable flow below. The counts
+    // stay on the doc.
     final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
     expect(
       tester
@@ -426,10 +430,10 @@ void main() {
     expect(prompt, isNot(contains('"growth"')));
     expect(prompt, contains('Werkt vlot met variabelen.'));
     expect(prompt, isNot(contains('OUD RAPPORT')));
-    // No supervision registry is bound — the shipped app's own binding — so
-    // the supervised/home split is not a measurement: it stays out of the
-    // facts, and the contract does not ask the model to name it (#160). The
-    // uncertainty signals that are real stay.
+    // The shipped app's own binding, the timetable, with no lessons for
+    // 5A: the supervised/home split is not a measurement, so it stays out
+    // of the facts, and the contract does not ask the model to name it
+    // (#160). The uncertainty signals that are real stay.
     expect(prompt, contains('"staleLearningObjectives"'));
     expect(prompt, isNot(contains('supervisedTurnsInPeriod')));
     expect(prompt, isNot(contains('homeTurnsInPeriod')));
@@ -657,16 +661,47 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('with a supervision registry bound, the justification prompt '
-      'and the detail pane carry the supervised/home split again', (
-    tester,
-  ) async {
+  testWidgets('once the class has lessons, the justification prompt and the '
+      'detail pane carry the supervised/home split again, with the '
+      'oefeningen in lesson time counted as supervised (#219)', (tester) async {
+    // Three days ago, in local time: a lesson of 5A from 10:50 to 11:40.
+    // Sam answered once in it and once that evening; both records say home,
+    // as every turn did before the timetable was the source.
+    final day = DateTime.now().subtract(const Duration(days: 3));
+    DateTime at(int hour, int minute) =>
+        DateTime(day.year, day.month, day.day, hour, minute).toUtc();
+    Map<String, dynamic> turn(DateTime when) => {
+      'id': '${when.toIso8601String()}_seed',
+      'type': 'turn_history',
+      'uid': kStudentUid,
+      'turnAt': when.toIso8601String(),
+      'subgoalId': 's1',
+      'questionType': 'completeCodeQuestion',
+      'overallQuality': 'correct',
+      'provenance': 'home',
+    };
     final llm = ScriptedLlm([kJustification]);
     final harness = AppHarness(
       identity: teacherIdentity,
       llm: llm,
-      extraDocs: _gradedClass(),
-      supervision: const _AnchorBound(),
+      extraDocs: {
+        ..._gradedClass(),
+        'turn_history': [turn(at(11, 0)), turn(at(20, 0))],
+        'config': [
+          {
+            'id': 'classes',
+            'type': 'config',
+            'classes': [
+              {
+                'name': '5A',
+                'lessons': [
+                  {'weekday': day.weekday, 'start': '10:50', 'end': '11:40'},
+                ],
+              },
+            ],
+          },
+        ],
+      },
     );
     await harness.boot(tester);
 
@@ -678,24 +713,27 @@ void main() {
     await pumpUntilFound(tester, find.text(kJustification));
     expect(llm.sends, 1);
 
-    // The pane shows the tally again, after the staleness counts: the line
-    // the shipped app cuts short (#173) is whole once a registry is bound.
+    // The oefening in the lesson counts as supervised, the one that
+    // evening as home: the timetable reads the old records too.
     final stored = harness.cosmos['grade_proposals'].docs['${kStudentUid}_m1']!;
+    expect(stored['supervisedTurns'], 1);
+    expect(stored['homeTurns'], 1);
+    // The pane shows the tally again, after the staleness counts: the line
+    // cut short for a class without lessons (#173) is whole.
     expect(
       tester
           .widget<Text>(find.byKey(const Key('reports-detail-reliability')))
           .data,
       'Stale: ${stored['staleLoCount']} LOs '
       '(never probed: ${stored['neverProbedCount']}). '
-      'Exercises this period: ${stored['supervisedTurns']} supervised, '
-      '${stored['homeTurns']} at home.',
+      'Exercises this period: 1 supervised, 1 at home.',
     );
 
     // Now the split is a measurement, so the model gets it and is asked to
     // weigh it (#160 — the same prompt that leaves it out unwired).
     final prompt = llm.sentInputs.single;
-    expect(prompt, contains('"supervisedTurnsInPeriod":'));
-    expect(prompt, contains('"homeTurnsInPeriod":'));
+    expect(prompt, contains('"supervisedTurnsInPeriod":1'));
+    expect(prompt, contains('"homeTurnsInPeriod":1'));
     expect(llm.sentInstructions.single, contains('no supervised work'));
 
     await harness.dispose(tester);
@@ -708,7 +746,7 @@ void main() {
       identity: teacherIdentity,
       llm: llm,
       extraDocs: _gradedClass(),
-      supervision: const _AnchorBound(),
+      supervision: const _Wired(),
       // The language the teacher picked on the Options page last time.
       prefs: {'app_locale': 'nl'},
     );

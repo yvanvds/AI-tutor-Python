@@ -1,15 +1,18 @@
-// End-to-end (#100): the weight a graded answer adds to a belief depends on
-// where the student was when they answered. With a supervision registry that
-// says "in an Anchor session", a strong-positive at medium moves α by
-// 2.0 × s (PUNTENFORMULE §2.7); with the app's own binding — no registry —
-// it moves α by 2.0, exactly as before, and the turn is recorded as home
+// End-to-end (#100, #219): the weight a graded answer adds to a belief
+// depends on when the student answered. The app's own binding is the
+// timetable: an answer in a lesson of the student's class (#218), 10 minutes
+// before and after included, is supervised, and a strong-positive at medium
+// moves α by 2.0 × s (PUNTENFORMULE §2.7); outside the lessons, or for a
+// class without lessons, it moves α by 2.0 and the turn is recorded as home
 // work. Both facts land in Cosmos: the `turn_history` doc names the
 // provenance and the `lo_beliefs` doc carries the weighted α.
 //
 // Real app, real navigation, real practice view and editor, real
-// TutorService → conductor → belief math → Cosmos services. Only the model is
-// scripted (`ScriptedLlm`, raw assistant text through the production
-// parser) and, in the first test, the registry Anchor will one day back.
+// TutorService → conductor → belief math → Cosmos services, and the real
+// timetable source over the seeded `config/classes` doc and the student's
+// account. Only the model is scripted (`ScriptedLlm`, raw assistant text
+// through the production parser) and, in the first test, a registry that
+// has every student in session — the seam itself.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -20,6 +23,7 @@ import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/services/classes/school_class.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
@@ -30,13 +34,13 @@ import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
 
-/// A registry that has every student in a clean, active session, and
-/// remembers who it was asked about.
-class _InSession implements SupervisionSource {
+/// A registry that has every student in session, and remembers who it was
+/// asked about.
+class _InSession extends SupervisionSource {
   final List<({String uid, DateTime at})> asked = [];
 
   @override
-  bool get isWired => true;
+  bool isWiredFor(String className) => true;
 
   @override
   Future<EvidenceProvenance> provenanceFor({
@@ -50,6 +54,38 @@ class _InSession implements SupervisionSource {
 
 const String kExercise = 'naam = ___\nprint("Hallo, " + naam)';
 const String kNextExercise = 'stad = ___\nprint("Welkom in " + stad)';
+
+/// The student in class 6TEST, and the class's lessons: one on [weekday]
+/// from [start] to [end] minutes after local midnight.
+Map<String, List<Map<String, dynamic>>> classWithLesson({
+  required int weekday,
+  required int start,
+  required int end,
+}) {
+  return {
+    'accounts': [
+      {...accountDoc(studentIdentity), 'className': '6TEST'},
+    ],
+    'config': [
+      {
+        'id': 'classes',
+        'type': 'config',
+        'classes': [
+          {
+            'name': '6TEST',
+            'lessons': [
+              {
+                'weekday': weekday,
+                'start': formatClockMinute(start),
+                'end': formatClockMinute(end),
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
 
 /// One graded turn: the exercise on mount, the grade for the submitted code
 /// (a clean strong positive on the seeded LO), and the exercise the app asks
@@ -151,9 +187,62 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('without a supervision registry the same answer is home work '
-      'at the unit weight', (tester) async {
+  testWidgets('without lessons for the student\'s class the same answer is '
+      'home work at the unit weight', (tester) async {
     final harness = AppHarness(llm: ScriptedLlm(gradedTurnScript()));
+    await answerOnce(tester, harness);
+
+    final turn = singleTurn(harness);
+    expect(turn['provenance'], 'home');
+    expect(appliedAlpha(turn), closeTo(2.0, 1e-9));
+
+    final belief = singleBelief(harness);
+    expect(belief['alpha'], closeTo(PolicyConstants.prior + 2.0, 1e-9));
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('the timetable: an answer during a lesson of the student\'s '
+      'class is supervised and weighted by the supervised factor (#219)', (
+    tester,
+  ) async {
+    // A lesson of the class around this very moment, in local time.
+    final now = DateTime.now();
+    final minute = now.hour * 60 + now.minute;
+    final harness = AppHarness(
+      llm: ScriptedLlm(gradedTurnScript()),
+      extraDocs: classWithLesson(
+        weekday: now.weekday,
+        start: minute < 60 ? 0 : minute - 60,
+        end: minute > 23 * 60 - 1 ? 23 * 60 + 59 : minute + 60,
+      ),
+    );
+    await answerOnce(tester, harness);
+
+    const s = PolicyConstants.supervisedWeightFactor;
+    final turn = singleTurn(harness);
+    expect(turn['provenance'], 'supervised');
+    expect(appliedAlpha(turn), closeTo(2.0 * s, 1e-9));
+
+    final belief = singleBelief(harness);
+    expect(belief['alpha'], closeTo(PolicyConstants.prior + 2.0 * s, 1e-9));
+    expect(belief['beta'], closeTo(PolicyConstants.prior, 1e-9));
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('the timetable: an answer outside the lessons of the class is '
+      'home work at the unit weight (#219)', (tester) async {
+    // The class's one lesson is the day after tomorrow, all day.
+    final dayAfterTomorrow = (DateTime.now().weekday + 1) % 7 + 1;
+    final harness = AppHarness(
+      llm: ScriptedLlm(gradedTurnScript()),
+      extraDocs: classWithLesson(
+        weekday: dayAfterTomorrow,
+        start: 0,
+        end: 23 * 60 + 59,
+      ),
+    );
     await answerOnce(tester, harness);
 
     final turn = singleTurn(harness);

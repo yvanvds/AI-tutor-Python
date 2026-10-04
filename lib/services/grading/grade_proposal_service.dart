@@ -212,10 +212,21 @@ class GradeProposalService {
       from: milestone.periodStart,
       to: now,
     );
+    // An oefening counts as supervised when it was graded so, or when it
+    // falls in the lesson time of the student's class (#219): the turns
+    // graded before the timetable was the source are all `home` on the
+    // record, and the window of the first milestone after it straddles
+    // both. The same rule `tooling/evaluation` tallies with, so the app and
+    // the evaluation agree on the line under the number.
+    final byTimetable = await _supervision.provenancesFor(
+      uid: uid,
+      ats: [for (final t in turns) t.turnAt],
+    );
     var supervised = 0;
     var home = 0;
-    for (final t in turns) {
-      if (t.provenance == EvidenceProvenance.supervised) {
+    for (var i = 0; i < turns.length; i++) {
+      if (turns[i].provenance == EvidenceProvenance.supervised ||
+          byTimetable[i] == EvidenceProvenance.supervised) {
         supervised += 1;
       } else {
         home += 1;
@@ -269,19 +280,22 @@ class GradeProposalService {
   // ---- 2. the narrative --------------------------------------------------------
 
   /// Asks the model for the justification of [proposal] and stores it on
-  /// the doc. [studentName] and [calibrationLevel] come from the account
-  /// the teacher is looking at; [languageCode] is the UI language.
+  /// the doc. [studentName], [calibrationLevel] and [className] come from
+  /// the account the teacher is looking at; [languageCode] is the UI
+  /// language.
   ///
   /// The supervised/home turn tally on the doc reaches the model only while
-  /// a supervision registry is bound (#160): unwired, it is "0 supervised"
-  /// for the whole class and would only feed the model a paragraph about
-  /// oversight that is true of nobody in particular.
+  /// the supervision source is wired for the student's class (#160, #219):
+  /// unwired — a class without lessons, a student without a class — it is
+  /// "0 supervised" by construction and would only feed the model a
+  /// paragraph about oversight that is true of nobody in particular.
   Future<GradeProposal> writeJustification({
     required GradeProposal proposal,
     required Milestone milestone,
     required String studentName,
     required String calibrationLevel,
     required String languageCode,
+    required String className,
   }) async {
     final now = _now();
     final goals = await _goals.getAllGoalsOnce();
@@ -323,7 +337,7 @@ class GradeProposalService {
       reports: reports,
       trajectory: trajectory,
       languageCode: languageCode,
-      supervisionWired: _supervision.isWired,
+      supervisionWired: _supervision.isWiredFor(className),
     );
     final result = await _connector().sendRequest(
       instructions: prompt.instructions,

@@ -193,8 +193,18 @@ class ClassesService extends Notifier<ClassList?> {
     });
   }
 
-  Future<ClassList> _fetchOnce() async {
-    final doc = await _container.read(_docId, partitionKey: _pk);
+  Future<ClassList> _fetchOnce() => readOnce(container: _container);
+
+  /// One read of the list, without a service and without its poll: what
+  /// supervision from the timetable asks once per graded answer (#219) on a
+  /// student's laptop, where nothing else watches the list. [container]
+  /// defaults to `CosmosPaths.config()`. Not wrapped in `safeCosmos`; the
+  /// caller decides.
+  static Future<ClassList> readOnce({CosmosContainer? container}) async {
+    final doc = await (container ?? CosmosPaths.config()).read(
+      _docId,
+      partitionKey: _pk,
+    );
     return doc == null ? ClassList.empty : ClassList.fromDoc(doc);
   }
 }

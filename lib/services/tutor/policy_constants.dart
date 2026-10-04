@@ -70,10 +70,14 @@ class PolicyConstants {
   }
 
   /// Provenance multiplier `s` on the base weight (PUNTENFORMULE §2.7, #100).
-  /// Evidence produced under Anchor supervision is *more reliable*, not
-  /// certain, so the factor is modest. Provisional until the period-1 shadow
-  /// run fixes it (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never
-  /// discounted, it is confirmed or contradicted by later supervised work.
+  /// Evidence produced in the lesson time of the student's class (#219,
+  /// `ScheduleSupervisionSource`) is *more reliable*, not certain, so the
+  /// factor is modest. Provisional until the period-1 shadow run fixes it
+  /// (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never discounted,
+  /// it is confirmed or contradicted by later supervised work. The teacher
+  /// kept it at 1.25 with home at 1.0 when the timetable made it bite on
+  /// most oefeningen (#219, 2026-10-04), rather than renormalising to
+  /// supervised 1.0 and home 0.8.
   static const double supervisedWeightFactor = 1.25;
 
   /// Multiplier for a signal's provenance. `home` is the unit weight.

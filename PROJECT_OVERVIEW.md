@@ -103,6 +103,8 @@ lib/
 │   │                            #   ModelPreference — per-device model override (#32)
 │   ├── classes/                 # NEW (#218) — SchoolClass / LessonSlot / ClassList (the config/classes
 │   │                            #   doc), ClassesService + classesServiceProvider, classLessonsProvider
+│   ├── supervision/             # SupervisionSource (#100): supervised = in the lesson time of the
+│   │                            #   student's class, 10 min margin (ScheduleSupervisionSource, #219)
 │   ├── github/                  # NEW (#57) — GitHubDeviceFlow (OAuth device flow, scope public_repo),
 │   │                            #   GitHubIssueService, GitHubOAuthConfig (envied GITHUB_OAUTH_CLIENT_ID)
 │   ├── playground/              # NEW — PlaygroundFileStore (#19) + PlaygroundFilesService and
@@ -359,6 +361,7 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
 - `classes: [{name, lessons: [{weekday, start, end}]}]` — `weekday` ISO (1 = Monday … 7), `start` / `end` `"HH:MM"` in **local wall-clock time**, never UTC (a lesson must not move by an hour when the clock changes). Sorted by name; lessons in week order; an entry that cannot be a lesson is skipped on read.
 - Written only by the teacher's Klassen page (`Section.classes`), always read-modify-write of the stored doc (unknown fields kept, `global` untouched); created on the first write. Names are unique up to case. Renaming a class first moves its students (one `AccountService.setClassName` per account, like the bulk assignment of #91), then the list entry; deleting is offered only for a class without students.
 - Read through `classesServiceProvider` (`ClassList?`, polled; `null` until the first read, `ClassList.empty` without the doc) and `classLessonsProvider(className)`; `ClassList.isDuringLesson(className, at, margin:)` / `LessonSlot.contains` answer whether a moment, compared in local time, falls in a lesson — for supervision from the timetable (#219) and the lesson badges (#220).
+- Supervision (#219): [services/supervision/supervision_source.dart](lib/services/supervision/supervision_source.dart) `ScheduleSupervisionSource` is the `supervisionSourceProvider` binding. A graded answer is `supervised` (signals × `PolicyConstants.supervisedWeightFactor` 1.25) when it falls in a lesson of the class on the student's account, 10 minutes before and after included; else `home` (also: no class, a class without lessons, a read failure). It reads the class list once per graded answer (`ClassesService.readOnce`, no poll on a student's laptop). `isWiredFor(className)` — a class with lessons — gates the supervised/home tally in the justification prompt and the Reports pane (#160, #173); `GradeProposalService.compute` tallies the turns from before #219 (all `home` on the record) by the timetable too, as `tooling/evaluation` does.
 
 ### Identity & roles
 

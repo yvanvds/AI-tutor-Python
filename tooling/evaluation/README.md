@@ -53,7 +53,7 @@ tellingen, en pas na een "go" `apply`.
 | | |
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`) |
-| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
+| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen |
 | `evaluate.py` | de vijf commando's; rendert concept en sidecar |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
@@ -75,16 +75,51 @@ ze in concept en sidecar, dus de leerkracht ziet ze voor het "go":
   app. Een rechtstreeks neutraal signaal maakt er een, op de prior; een
   neutraal signaal van opzij niet;
 - **oefeningen deze periode** (`supervisedTurns`, `homeTurns`): de
-  beoordeelde oefeningen sinds `periodStart` van de mijlpaal, per
-  `provenance`; zonder veld telt een oefening als thuis, zoals in de app.
+  beoordeelde oefeningen sinds `periodStart` van de mijlpaal, onder toezicht
+  of thuis, met de regel van de app sinds #219 (`rules.by_timetable`): onder
+  toezicht is wat de app zo bewaarde, of wat binnen de lestijd van de klas
+  viel (hieronder). Zonder veld en buiten de lestijd telt een oefening als
+  thuis, zoals in de app.
 
 Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.0.18-eval5`
+## Regelversie `1.0.19-eval6`
 
-PUNTENFORMULE v1.0.18, herspeeld uit `turn_history`. `eval5`
+PUNTENFORMULE v1.0.19, herspeeld uit `turn_history`. `eval6`
+(2026-10-04, #219) weegt een **oefening onder toezicht ×1,25**, zoals de
+app (`PolicyConstants.supervisedWeightFactor`): elk signaal van die
+oefening en haar transfer-krediet, juist en fout. Een oefening thuis weegt
+×1,0. De leerkracht besliste op 2026-10-04 om de factor te houden zoals hij
+was, in plaats van de les op ×1,0 en thuis op ×0,8 te zetten: thuiswerk
+wordt nooit afgewaardeerd.
+
+Onder toezicht betekent sinds #219: **binnen de lestijd van de klas**. De
+lessen staan per klas in het doc `classes` in de container `config`
+(#218, de tab Klassen); een oefening telt vanaf 10 minuten voor het begin
+van een les tot 10 minuten na het einde. Waar de leerling zat, speelt geen
+rol: wie ziek thuis op het lesuur oefent, telt ook. Tot #219 wachtte de app
+op Anchor, en stond elke oefening op `home`. De herspeling leest die oudere
+oefeningen met dezelfde regel (`rules.by_timetable`): `turnAt` in Belgische
+tijd tegen de lessen van de klas zoals het doc ze nu heeft. Een oefening
+die de app als `supervised` bewaarde, blijft onder toezicht, ook als haar
+les sindsdien verschoof. Zo zijn de weging en de telling op het voorstel
+hetzelfde over het hele jaar, zonder `turn_history` te herschrijven. M en P
+kunnen bewegen: een antwoord in de les weegt zwaarder, in beide
+richtingen.
+
+De Belgische tijd komt uit de standaardbibliotheek
+(`rules.belgian_time`): UTC+1, en UTC+2 van de laatste zondag van maart tot
+de laatste zondag van oktober, telkens om 01:00 UTC. `zoneinfo` zou het
+ook kunnen, maar heeft op Windows geen tijdzonegegevens zonder het pakket
+`tzdata`. Een test vergelijkt de twee waar die gegevens er wel zijn.
+
+`validate` weegt anders dan `draft`: een oefening telt daar alleen als
+onder toezicht als de app ze zo bewaarde. Dat woog de app toen ze het
+document in `lo_beliefs` schreef, en dat vergelijkt `validate`.
+
+`eval5`
 (2026-10-04, #204) slaat een **neutraal signaal van opzij** over: een
 signaal op een leerdoel van een eerder subdoel (CONDUCTOR_POLICY §2.4)
 dat niets zegt. Niemand vroeg naar dat leerdoel en de grader zag niets,
@@ -155,6 +190,7 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
    in de app net zo.
 
 Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
+de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
 doel en alleen naar een eerder subdoel, transfer-krediet zoals gelogd (een
@@ -271,6 +307,12 @@ release, die de gebruiker zelf draait (#195). `evaluate.py` krijgt er geen
 commando voor: deze tooling schrijft alleen naar `grade_proposals`, en
 alleen na een "go". Voor die herspeling geldt:
 
+- kies de weging van de oefeningen van vóór #219. `rules.replay` weegt
+  standaard zoals de app ze bewaarde (alles thuis, ×1,0), zoals
+  `validate`. Met `supervised=rules.by_timetable(...)` weegt het ze
+  volgens het lesrooster, zoals het concept. Dan leest de tutor dezelfde
+  overtuigingen als de evaluatie, maar `validate` toont die documenten
+  daarna als afwijking;
 - herspeel met `eval4` of later. `eval2` gaf de andere leerdoelen van
   het subdoel van een opfris- of controlevraag een te late klok, en een
   leerdoel van het actieve subdoel een te vroege of geen klok. `eval3`

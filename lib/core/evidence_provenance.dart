@@ -1,14 +1,19 @@
 // Where a piece of belief evidence was produced (#100, PUNTENFORMULE §2.7).
 //
-// `supervised` means the student was in an active, alert-free Anchor
-// classroom session at the moment the answer was graded; everything else —
-// home work, a sick student during the lesson, a session with an escape
-// alert on record for this student — is `home`. There is no manual toggle:
-// the session registration decides, per student, per turn.
+// `supervised` means the answer was graded in the lesson time of the
+// student's class, 10 minutes before and after each lesson included (#219,
+// `ScheduleSupervisionSource`) — wherever the student sat, so a sick
+// student practising at home during the lesson counts too. Everything else
+// — the evening, the weekend, a student without a class, a class without
+// lessons, a timetable that could not be read — is `home`. There is no
+// manual toggle: the timetable decides, per student, per turn.
 //
-// Until Anchor ships every turn is `home`, so the weighting in
-// `belief_math.signalDeltas` is a no-op and older `turn_history` docs need
-// no backfill: a missing field reads as `home`.
+// Turns graded before #219 are all `home` on the record (nothing answered
+// `supervised` then), and older `turn_history` docs need no backfill: a
+// missing field reads as `home`. Where a count has to be right over the
+// whole year, it reads them by the timetable instead: the grade proposal's
+// supervised/home tally (`GradeProposalService.compute`) and the
+// evaluation tooling's replay (`tooling/evaluation/rules.py`).
 enum EvidenceProvenance {
   home,
   supervised;

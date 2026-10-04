@@ -1096,17 +1096,28 @@ produced:
 | `home` | 1.0 |
 | `supervised` | `s` = 1.25 (`PolicyConstants.supervisedWeightFactor`) |
 
-`supervised` means the student was in an active, alert-free Anchor
-classroom session at grading time, as answered per student, per turn,
-by the `SupervisionSource` the host consults before building the
-`GradedAnswer`. There is no manual toggle. The factor is symmetric in
+`supervised` means the answer was graded in the lesson time of the
+student's class (#219): the moment, in the laptop's local time, falls in
+one of the weekly lessons of the class on the student's account
+(`config/classes`, #218), from 10 minutes before the lesson starts to 10
+minutes after it ends. It is answered per student, per turn, by the
+`SupervisionSource` the host consults before building the `GradedAnswer`
+(`ScheduleSupervisionSource`). Where the student sits does not matter — no
+network check, and a sick student practising at home during the lesson
+counts as lesson time. Everything else is `home`: outside the lessons, a
+student without a class, a class without lessons, or a timetable that
+cannot be read (fail-safe: no extra weight). There is no manual toggle.
+The factor is symmetric in
 positive and negative (unlike difficulty since #169: provenance changes
 how *hard* the evidence is, not which way it points), applies to follow-up signals
 as well, and never drops below 1 — home evidence keeps full weight and
 is confirmed or contradicted by later supervised work on the same LO.
-Until Anchor is wired up every turn resolves to `home`, so the
-multiplier is inert and no backfill is needed. The value is provisional
-until the period-1 shadow run (PUNTENFORMULE §4).
+Before #219 the signal was to come from Anchor and every turn resolved to
+`home`; no backfill is done, the grade proposal's supervised/home tally
+and the evaluation tooling read those turns by the timetable instead. With
+the timetable the factor bites on most oefeningen; the teacher kept it at
+1.25 with home at 1.0 (2026-10-04) rather than renormalising. The value is
+provisional until the period-1 shadow run (PUNTENFORMULE §4).
 
 ### 3.3 Decay
 

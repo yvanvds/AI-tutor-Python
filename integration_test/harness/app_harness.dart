@@ -351,11 +351,12 @@ class AppHarness {
 
   /// The classroom-supervision registry the tutor consults when it grades an
   /// answer (#100). `null` (the default) leaves the app's own binding in
-  /// place — no registry, every turn is home work — which is also what the
-  /// shipped app does until Anchor is wired up. A flow about the supervised
-  /// weight passes a stand-in that says "in session"; a flow about what the
-  /// grade justification prompt may claim passes one that is merely wired
-  /// (#160).
+  /// place: the timetable (#219), which reads the student's class from the
+  /// account and its lessons from `config/classes` — with neither seeded,
+  /// every turn is home work. A flow about the supervised weight seeds a
+  /// lesson or passes a stand-in that says "in session"; a flow about what
+  /// the grade justification prompt may claim passes one that is merely
+  /// wired (#160).
   final SupervisionSource? supervision;
 
   /// Cosmos docs upserted on top of the standard seed before the app boots,
