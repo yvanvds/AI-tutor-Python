@@ -1,13 +1,16 @@
-// Teacher-only "Vragen" page (#185): the question bank — every question the
-// tutor generated — per root goal and subgoal, for the teacher to weed out.
+// Teacher-only "Vragen" page (#185): the question bank per root goal and
+// subgoal. The students do the weeding (#215): a generated question is only
+// stored when its first answer is correct, and hides itself when too few
+// answers to it are correct. This page is for what is still off.
 //
 // Left: the curriculum, each subgoal with how many questions it has and how
-// many of those the teacher has not reviewed yet. Right: the selected
-// subgoal's questions, each with its type, level, target LO, how often it
-// was asked and what share of the answers was correct, rendered the way the
-// student sees it. Per question: mark it reviewed, hide it (never deleted:
-// turn records point at it) or show it again, and a note. A filter keeps to
-// the questions not reviewed yet; the list sorts on the share correct,
+// many of those are hidden. Right: the selected subgoal's questions, each
+// with its type, level, target LO, how often it was asked and what share of
+// the answers was correct, rendered the way the student sees it, and whether
+// the teacher or the bank itself hid it. Per question: hide it or show it
+// again, and delete it (with a confirmation) — safe, as nothing reads a
+// question through the turn records that keep its id. A filter keeps to the
+// hidden questions, to clear them out; the list sorts on the share correct,
 // because an extreme share — very low or very high — points at a bad or a
 // too easy question.
 //
@@ -26,6 +29,7 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/services/question_bank/question_bank_service.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -74,7 +78,7 @@ List<BankQuestion> sortQuestions(
 }
 
 /// Counts per subgoal for the tree.
-typedef _SubgoalCounts = ({int total, int unreviewed});
+typedef _SubgoalCounts = ({int total, int hidden});
 
 class _Overview {
   const _Overview({required this.goals, required this.counts});
@@ -100,7 +104,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
   /// an action replaces its question in here without a reload.
   List<BankQuestion>? _items;
 
-  bool _unreviewedOnly = false;
+  bool _hiddenOnly = false;
   QuestionSort _sort = QuestionSort.newest;
 
   /// Ids of the questions with an action in flight.
@@ -119,10 +123,10 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     final goals = await ref.read(goalsServiceProvider).getAllGoalsOnce();
     final counts = <String, _SubgoalCounts>{};
     for (final s in summaries) {
-      final c = counts[s.subgoalId] ?? (total: 0, unreviewed: 0);
+      final c = counts[s.subgoalId] ?? (total: 0, hidden: 0);
       counts[s.subgoalId] = (
         total: c.total + 1,
-        unreviewed: c.unreviewed + (s.reviewed ? 0 : 1),
+        hidden: c.hidden + (s.hidden ? 1 : 0),
       );
     }
     return _Overview(goals: goals, counts: counts);
@@ -153,9 +157,11 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     }, onError: (_) {});
   }
 
+  /// Runs [action] on [question]: it returns the question as it now
+  /// stands, or `null` when it deleted it.
   Future<void> _act(
     BankQuestion question,
-    Future<BankQuestion> Function() action,
+    Future<BankQuestion?> Function() action,
   ) async {
     setState(() => _busy.add(question.id));
     try {
@@ -164,9 +170,9 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
       setState(() {
         _items = [
           for (final q in _items ?? const <BankQuestion>[])
-            q.id == updated.id ? updated : q,
+            if (q.id != question.id) q else if (updated != null) updated,
         ];
-        // The tree's "new" count follows without a round trip.
+        // The tree's counts follow without a round trip.
         _overview = _overview.then(
           (o) => _Overview(
             goals: o.goals,
@@ -188,30 +194,54 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     }
   }
 
+  /// [counts] after [before] became [after] — `null`: deleted.
   static Map<String, _SubgoalCounts> _recount(
     Map<String, _SubgoalCounts> counts,
     BankQuestion before,
-    BankQuestion after,
+    BankQuestion? after,
   ) {
-    if (before.isReviewed == after.isReviewed) return counts;
     final c = counts[before.subgoalId];
     if (c == null) return counts;
+    int hidden(BankQuestion? q) => q != null && !q.isActive ? 1 : 0;
     return {
       ...counts,
       before.subgoalId: (
-        total: c.total,
-        unreviewed: c.unreviewed + (after.isReviewed ? -1 : 1),
+        total: c.total - (after == null ? 1 : 0),
+        hidden: c.hidden - hidden(before) + hidden(after),
       ),
     };
   }
 
-  Future<void> _editNote(BankQuestion question) async {
-    final note = await showDialog<String>(
+  Future<void> _delete(BankQuestion question) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => _NoteDialog(initial: question.teacherNote ?? ''),
+      builder: (context) => AlertDialog(
+        title: Text(l.questions_delete_dialog_title),
+        content: SizedBox(
+          width: 420,
+          child: Text(l.questions_delete_dialog_body),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('questions-delete-cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.questions_delete_dialog_cancel),
+          ),
+          FilledButton(
+            key: const Key('questions-delete-confirm'),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.questions_delete_dialog_confirm),
+          ),
+        ],
+      ),
     );
-    if (note == null || !mounted) return;
-    await _act(question, () => _bank.setNote(question, note));
+    if (confirmed != true || !mounted) return;
+    await _act(question, () async {
+      await _bank.delete(question);
+      return null;
+    });
   }
 
   @override
@@ -347,7 +377,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     _SubgoalCounts? counts,
   ) {
     final total = counts?.total ?? 0;
-    final unreviewed = counts?.unreviewed ?? 0;
+    final hidden = counts?.hidden ?? 0;
     return ListTile(
       key: Key('questions-subgoal-$id'),
       dense: true,
@@ -357,7 +387,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
       subtitle: Text(
         [
           l.questions_tree_count(total),
-          if (unreviewed > 0) l.questions_tree_unreviewed(unreviewed),
+          if (hidden > 0) l.questions_tree_hidden(hidden),
         ].join(' · '),
         key: Key('questions-subgoal-count-$id'),
       ),
@@ -389,7 +419,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
           );
         }
         final shown = sortQuestions(
-          _unreviewedOnly ? items.where((q) => !q.isReviewed) : items,
+          _hiddenOnly ? items.where((q) => !q.isActive) : items,
           _sort,
         );
         final goalsById = {for (final g in overview.goals) g.id: g};
@@ -403,7 +433,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                   ? Text(
                       items.isEmpty
                           ? l.questions_list_empty
-                          : l.questions_list_allReviewed,
+                          : l.questions_list_noneHidden,
                       key: const Key('questions-list-empty'),
                       style: TextStyle(color: AppColors.fgFaint),
                     )
@@ -419,11 +449,9 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                           question: q,
                           subgoal: goalsById[q.subgoalId],
                           busy: _busy.contains(q.id),
-                          onMarkReviewed: () =>
-                              _act(q, () => _bank.markReviewed(q)),
                           onToggleHidden: () =>
                               _act(q, () => _bank.setHidden(q, q.isActive)),
-                          onNote: () => _editNote(q),
+                          onDelete: () => _delete(q),
                         );
                       },
                     ),
@@ -447,10 +475,10 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         FilterChip(
-          key: const Key('questions-filter-unreviewed'),
-          label: Text(l.questions_filter_unreviewed),
-          selected: _unreviewedOnly,
-          onSelected: (v) => setState(() => _unreviewedOnly = v),
+          key: const Key('questions-filter-hidden'),
+          label: Text(l.questions_filter_hidden),
+          selected: _hiddenOnly,
+          onSelected: (v) => setState(() => _hiddenOnly = v),
         ),
         const SizedBox(width: AppSpacing.m),
         for (final s in QuestionSort.values)
@@ -460,60 +488,6 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
             selected: _sort == s,
             onSelected: (_) => setState(() => _sort = s),
           ),
-      ],
-    );
-  }
-}
-
-/// The note editor. Its own state, so the text controller lives exactly as
-/// long as the dialog — disposing it when `showDialog` returns would pull it
-/// out from under the closing animation.
-class _NoteDialog extends StatefulWidget {
-  const _NoteDialog({required this.initial});
-  final String initial;
-
-  @override
-  State<_NoteDialog> createState() => _NoteDialogState();
-}
-
-class _NoteDialogState extends State<_NoteDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initial,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l.questions_note_dialog_title),
-      content: SizedBox(
-        width: 420,
-        child: TextField(
-          key: const Key('questions-note-field'),
-          controller: _controller,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 5,
-          decoration: InputDecoration(hintText: l.questions_note_dialog_hint),
-        ),
-      ),
-      actions: [
-        TextButton(
-          key: const Key('questions-note-cancel'),
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.questions_note_dialog_cancel),
-        ),
-        FilledButton(
-          key: const Key('questions-note-save'),
-          onPressed: () => Navigator.pop(context, _controller.text),
-          child: Text(l.questions_note_dialog_save),
-        ),
       ],
     );
   }
@@ -634,9 +608,8 @@ class _QuestionCard extends StatelessWidget {
     required this.question,
     required this.subgoal,
     required this.busy,
-    required this.onMarkReviewed,
     required this.onToggleHidden,
-    required this.onNote,
+    required this.onDelete,
   });
 
   final BankQuestion question;
@@ -645,9 +618,8 @@ class _QuestionCard extends StatelessWidget {
   /// when that subgoal is gone.
   final Goal? subgoal;
   final bool busy;
-  final VoidCallback onMarkReviewed;
   final VoidCallback onToggleHidden;
-  final VoidCallback onNote;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -659,7 +631,6 @@ class _QuestionCard extends StatelessWidget {
       for (final lo in subgoal?.objectives ?? const []) lo.id: lo.statement,
     };
     final targets = q.targetLOIds.join(', ');
-    final note = q.teacherNote;
 
     return Opacity(
       opacity: q.isActive ? 1 : 0.6,
@@ -712,17 +683,22 @@ class _QuestionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (!q.isActive)
+                if (q.isAutoHidden)
+                  Tooltip(
+                    message: l.questions_badge_autoHidden_tooltip(
+                      PolicyConstants.bankAutoHideMinAnswers,
+                    ),
+                    child: _Pill(
+                      key: Key('questions-hidden-${q.id}'),
+                      text: l.questions_badge_autoHidden,
+                      color: AppColors.danger,
+                    ),
+                  )
+                else if (!q.isActive)
                   _Pill(
                     key: Key('questions-hidden-${q.id}'),
                     text: l.questions_badge_hidden,
                     color: AppColors.danger,
-                  )
-                else if (q.isReviewed)
-                  _Pill(
-                    key: Key('questions-reviewed-${q.id}'),
-                    text: l.questions_badge_reviewed,
-                    color: AppColors.accent,
                   ),
               ],
             ),
@@ -758,29 +734,10 @@ class _QuestionCard extends StatelessWidget {
             ],
             const SizedBox(height: AppSpacing.m),
             QuestionPreview(question: q),
-            if (note != null && note.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.m),
-              Text(
-                l.questions_note(note),
-                key: Key('questions-note-text-${q.id}'),
-                style: TextStyle(
-                  color: AppColors.fgMute,
-                  fontStyle: FontStyle.italic,
-                  height: 1.4,
-                ),
-              ),
-            ],
             const SizedBox(height: AppSpacing.m),
             Wrap(
               spacing: AppSpacing.s,
               children: [
-                if (!q.isReviewed)
-                  OutlinedButton.icon(
-                    key: Key('questions-review-${q.id}'),
-                    onPressed: busy ? null : onMarkReviewed,
-                    icon: const Icon(Icons.check, size: 16),
-                    label: Text(l.questions_action_markReviewed),
-                  ),
                 OutlinedButton.icon(
                   key: q.isActive
                       ? Key('questions-hide-${q.id}')
@@ -799,10 +756,13 @@ class _QuestionCard extends StatelessWidget {
                   ),
                 ),
                 OutlinedButton.icon(
-                  key: Key('questions-note-${q.id}'),
-                  onPressed: busy ? null : onNote,
-                  icon: const Icon(Icons.edit_note, size: 16),
-                  label: Text(l.questions_action_note),
+                  key: Key('questions-delete-${q.id}'),
+                  onPressed: busy ? null : onDelete,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: Text(l.questions_action_delete),
                 ),
               ],
             ),

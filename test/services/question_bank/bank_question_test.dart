@@ -73,7 +73,21 @@ void main() {
       expect(q.correctOption, "'Python'");
       expect(q.askedCount, 0);
       expect(q.isActive, isTrue);
-      expect(q.isReviewed, isFalse);
+      expect(q.hiddenBy, isNull);
+      expect(q.keptByTeacher, isFalse);
+      // Nothing of the teacher's: no hide, no review stamp, no note (#215).
+      expect(
+        q.toMap().keys,
+        isNot(
+          anyOf(
+            contains('hiddenBy'),
+            contains('hiddenAt'),
+            contains('keptByTeacher'),
+            contains('reviewedAt'),
+            contains('teacherNote'),
+          ),
+        ),
+      );
     });
 
     test('the question type is what the model returned', () {
@@ -159,11 +173,15 @@ void main() {
           {'option': 'Error', 'text': 'Nee, dit werkt.', 'quality': 'wrong'},
         ],
         'status': 'hidden',
-        'teacherNote': 'Te makkelijk',
-        'reviewedAt': '2026-09-24T10:00:00.000Z',
-        // Cosmos system fields and a field of a newer build are ignored.
+        'hiddenBy': 'auto',
+        'hiddenAt': '2026-09-24T10:00:00.000Z',
+        'keptByTeacher': true,
+        // Cosmos system fields, a field of a newer build, and the review
+        // stamp and note of a doc from before #215 are ignored.
         '_etag': '"0"',
         'futureField': true,
+        'teacherNote': 'Te makkelijk',
+        'reviewedAt': '2026-09-24T10:00:00.000Z',
       };
       final back = BankQuestion.tryFromCosmos(stored)!;
 
@@ -177,14 +195,36 @@ void main() {
           {'option': 'Error', 'text': 'Nee, dit werkt.', 'quality': 'wrong'},
         ],
         'status': 'hidden',
-        'teacherNote': 'Te makkelijk',
-        'reviewedAt': '2026-09-24T10:00:00.000Z',
+        'hiddenBy': 'auto',
+        'hiddenAt': '2026-09-24T10:00:00.000Z',
+        'keptByTeacher': true,
       });
       expect(back.shareCorrect, 0.25);
       expect(back.isActive, isFalse);
-      expect(back.isReviewed, isTrue);
+      expect(back.isAutoHidden, isTrue);
+      expect(back.hiddenAt, DateTime.utc(2026, 9, 24, 10));
+      expect(back.keptByTeacher, isTrue);
       expect(back.feedbackFor('Error')!.quality, AnswerQuality.wrong);
       expect(back.feedbackFor('Python'), isNull);
+    });
+
+    test('a question hidden before #215 carries no hiddenBy: the teacher hid '
+        'it', () {
+      final q = BankQuestion.tryFromCosmos({
+        ..._bank(_mcq())!.toMap(),
+        'status': 'hidden',
+      })!;
+      expect(q.isActive, isFalse);
+      expect(q.hiddenBy, isNull);
+      expect(q.isAutoHidden, isFalse);
+      expect(
+        BankQuestion.tryFromCosmos({
+          ..._bank(_mcq())!.toMap(),
+          'status': 'hidden',
+          'hiddenBy': 'teacher',
+        })!.isAutoHidden,
+        isFalse,
+      );
     });
 
     test('a doc a reader cannot use is skipped, not guessed at', () {

@@ -786,14 +786,54 @@ they are.
 ### 2.7 Where the question comes from: the question bank (#186)
 
 2.1–2.3 (or 1.5, 2.6) decide *what* to ask: one target LO, of a subgoal,
-with a type and a difficulty. Every question the tutor generates is kept
-in the question bank (the `questions` container, #185), where the teacher
-hides the bad ones on the Questions page. Once the bank holds enough
-questions that fit a plan, the question can come from there instead of a
-generation call: no wait, a question the teacher can have seen, and — for
-multiple choice — no tokens at all. The rule lives in `BankChoice`
+with a type and a difficulty. A question the tutor generates is kept in
+the question bank (the `questions` container, #185) when its first answer
+is correct (below). Once the bank holds enough questions that fit a plan,
+the question can come from there instead of a generation call: no wait, a
+question that passed its first test, and — for multiple choice — no
+tokens at all. The rule lives in `BankChoice`
 (`lib/services/tutor/bank_choice.dart`); the tutor does the reads and
 hands it what it found.
+
+**What the bank keeps (#215).** The students do the weeding; the bank is
+too big to review by hand, and how a question is answered says enough
+about it:
+
+- *A new question goes in only when its first answer is correct.* A
+  generated question is stored at the first graded answer to it, not when
+  it is asked, and only when that answer is `correct` — `partial` is not
+  (as in `correctCount`; on a code question a partial answer often points
+  at a question that is not clear-cut). A question left unanswered is not
+  stored either. It is stored with its ask and that answer counted
+  (`askedCount`, `answeredCount`, `correctCount` 1, `lastAskedAt` when it
+  was asked, the feedback on a multiple-choice pick). When the bank already
+  has the same generation — another student's correct answer stored it,
+  also in the same instant (a 409 on the create) — the ask and the answer
+  count on that doc, whatever the answer. Socratic questions are never
+  stored: the bank does not serve them. The turn record names the
+  question (`questionId`) either way: the id is a content hash, fixed once
+  the question exists.
+- *A question hides itself when too few answers are correct.* After an
+  answer is counted, a question with at least
+  `PolicyConstants.bankAutoHideMinAnswers` (10) graded answers —
+  `answeredCount`, not `askedCount`: a question left unanswered says
+  nothing about it — and less than `bankAutoHideMaxShare` (0.5) of them
+  correct gets `status: hidden`, `hiddenBy: auto` and `hiddenAt`. Exactly
+  half stays. A question the teacher shows again after that gets
+  `keptByTeacher` and does not hide itself again; otherwise the next answer
+  would hide it at once.
+- *The teacher hides, shows again or deletes the rest* on the Questions
+  page. Delete removes the doc: turn records keep its id, but nothing reads
+  a question through them (the tutor uses the ids only to not ask a
+  student the same question twice, `tooling/evaluation` only the turn
+  record's own fields). The same generation, asked again later, gets the
+  same id and has to pass its first answer again. There is no review step:
+  a question in the bank is approved by being there.
+
+Builds from before #215 store a question when it is asked and do not hide
+one; once `MinimumVersion` keeps them out, every client follows the rules.
+`tooling/question_bank/cleanup.py` brings the questions stored before in
+line (a dry run first; it writes only with `--apply`, after a backup).
 
 **What fits a plan.** A bank question that is active (not hidden), filed
 under the plan's target subgoal — the active one, or the older one of a
@@ -822,10 +862,11 @@ nothing was graded on it.
 **N** questions fit, may be served and are new (`QuestionBankMinimum` in
 `config/global`, default `PolicyConstants.bankMinimum` = 8), and then with
 chance **p** (`QuestionBankShare`, default `bankShare` = 0.5); otherwise it
-is generated, and the bank grows. So the bank fills per level, a level with
-fewer than N keeps generating, and students do not all get the same few
-questions. Both knobs are set from the Cosmos portal and can change per
-period without a build; p = 0 switches serving off (the bank still fills).
+is generated, and the bank grows with every one answered right first time.
+So the bank fills per level, a level with fewer than N keeps generating,
+and students do not all get the same few questions. Both knobs are set
+from the Cosmos portal and can change per period without a build; p = 0
+switches serving off (the bank still fills).
 The dice are rolled before the bank is read — the same odds as rolling
 after the count, and a plan the roll gives to generation costs no read.
 
@@ -851,7 +892,7 @@ and the warm-up slot move exactly as for a generated question), the same
 `recent_questions` line (#184). A generation call opens the exercise its
 reply starts; a bank question opens its exercise itself, so a later grading
 or hint call reads it as the exercise's own. The ask is counted on the bank
-doc.
+doc, and so is the graded answer — which can hide the question (above).
 
 **A multiple-choice pick is graded from the key.** Right or wrong is known.
 The target LO's signal is fixed — the key: `positive`/`strong`; any other
@@ -889,10 +930,11 @@ first entry is the bank question; follow-ups as usual.
 missing `questions` container, an error, or a bank or turn history that
 does not answer within `kQuestionBankReadTimeout` (2 s) means the question
 is generated as before; a missing container or a bank read that timed out
-leaves the bank alone — reads and writes — for 10 minutes. A question the teacher hides
-while it is open at a student runs out that exercise; after it, it is not
-chosen again (the bank is read afresh for every question that may come
-from it).
+leaves the bank alone — reads and writes — for 10 minutes. A question
+hidden or deleted while it is open at a student runs out that exercise;
+after it, it is not chosen again (the bank is read afresh for every
+question that may come from it), and the counts of a deleted one are not
+written back.
 
 **Audit.** The turn record (8.1) carries `questionId` as for any question,
 `fromBank: true` for a served one and `gradedByKey: true` when the key
@@ -2211,7 +2253,9 @@ TurnRecord {
   // docs written before the field existed.
   // The question bank (2.7). `questionId`: the bank doc of the question
   // this turn graded (#185) — set on the grade of the question itself, not
-  // a follow-up's; a content hash, so set even when the bank write failed.
+  // a follow-up's; a content hash, so set whether or not the bank keeps
+  // the question (#215: a generated one only when this grade is correct, a
+  // socratic one never) and even when the bank write failed.
   // `fromBank`: the question was served from the bank, not generated
   // (#186). `gradedByKey`: the verdict and the target signal came from the
   // bank question's answer key, not the grader (#186). Each omitted when

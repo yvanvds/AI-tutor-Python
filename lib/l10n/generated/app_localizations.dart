@@ -4365,7 +4365,7 @@ abstract class AppLocalizations {
   /// No description provided for @questions_page_subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.'**
+  /// **'A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.'**
   String get questions_page_subtitle;
 
   /// No description provided for @questions_refresh_tooltip.
@@ -4401,7 +4401,7 @@ abstract class AppLocalizations {
   /// No description provided for @questions_tree_empty.
   ///
   /// In en, this message translates to:
-  /// **'No questions stored yet. They appear here as students practise.'**
+  /// **'No questions stored yet. They appear here once a student answers a new question correctly.'**
   String get questions_tree_empty;
 
   /// No description provided for @questions_tree_count.
@@ -4410,11 +4410,11 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 question} other{{count} questions}}'**
   String questions_tree_count(int count);
 
-  /// Questions of a subgoal the teacher has not reviewed yet
+  /// Questions of a subgoal that are hidden, by the teacher or automatically
   ///
   /// In en, this message translates to:
-  /// **'{count} new'**
-  String questions_tree_unreviewed(int count);
+  /// **'{count} hidden'**
+  String questions_tree_hidden(int count);
 
   /// No description provided for @questions_tree_unknownSubgoal.
   ///
@@ -4434,11 +4434,11 @@ abstract class AppLocalizations {
   /// **'Pick a subgoal on the left.'**
   String get questions_placeholder;
 
-  /// No description provided for @questions_filter_unreviewed.
+  /// No description provided for @questions_filter_hidden.
   ///
   /// In en, this message translates to:
-  /// **'Not reviewed yet'**
-  String get questions_filter_unreviewed;
+  /// **'Hidden only'**
+  String get questions_filter_hidden;
 
   /// No description provided for @questions_sort_newest.
   ///
@@ -4470,11 +4470,11 @@ abstract class AppLocalizations {
   /// **'No questions for this subgoal.'**
   String get questions_list_empty;
 
-  /// No description provided for @questions_list_allReviewed.
+  /// No description provided for @questions_list_noneHidden.
   ///
   /// In en, this message translates to:
-  /// **'Every question of this subgoal has been reviewed.'**
-  String get questions_list_allReviewed;
+  /// **'No hidden questions for this subgoal.'**
+  String get questions_list_noneHidden;
 
   /// No description provided for @questions_type_mcQuestion.
   ///
@@ -4536,11 +4536,17 @@ abstract class AppLocalizations {
   /// **'Hidden'**
   String get questions_badge_hidden;
 
-  /// No description provided for @questions_badge_reviewed.
+  /// No description provided for @questions_badge_autoHidden.
   ///
   /// In en, this message translates to:
-  /// **'Reviewed'**
-  String get questions_badge_reviewed;
+  /// **'Hidden automatically'**
+  String get questions_badge_autoHidden;
+
+  /// No description provided for @questions_badge_autoHidden_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Less than half correct on {count} or more answers. Show it again and the app no longer hides it by itself.'**
+  String questions_badge_autoHidden_tooltip(int count);
 
   /// No description provided for @questions_keyDisagreement.
   ///
@@ -4566,18 +4572,6 @@ abstract class AppLocalizations {
   /// **'Answer key'**
   String get questions_answerKey_tooltip;
 
-  /// No description provided for @questions_note.
-  ///
-  /// In en, this message translates to:
-  /// **'Note: {note}'**
-  String questions_note(String note);
-
-  /// No description provided for @questions_action_markReviewed.
-  ///
-  /// In en, this message translates to:
-  /// **'Mark reviewed'**
-  String get questions_action_markReviewed;
-
   /// No description provided for @questions_action_hide.
   ///
   /// In en, this message translates to:
@@ -4590,35 +4584,35 @@ abstract class AppLocalizations {
   /// **'Show again'**
   String get questions_action_unhide;
 
-  /// No description provided for @questions_action_note.
+  /// No description provided for @questions_action_delete.
   ///
   /// In en, this message translates to:
-  /// **'Note'**
-  String get questions_action_note;
+  /// **'Delete'**
+  String get questions_action_delete;
 
-  /// No description provided for @questions_note_dialog_title.
+  /// No description provided for @questions_delete_dialog_title.
   ///
   /// In en, this message translates to:
-  /// **'Note on this question'**
-  String get questions_note_dialog_title;
+  /// **'Delete this question?'**
+  String get questions_delete_dialog_title;
 
-  /// No description provided for @questions_note_dialog_hint.
+  /// No description provided for @questions_delete_dialog_body.
   ///
   /// In en, this message translates to:
-  /// **'What is wrong with it, or what to remember'**
-  String get questions_note_dialog_hint;
+  /// **'The question is removed from the question bank. If the tutor generates the same question later, it only comes back when the first student answers it correctly.'**
+  String get questions_delete_dialog_body;
 
-  /// No description provided for @questions_note_dialog_cancel.
+  /// No description provided for @questions_delete_dialog_cancel.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get questions_note_dialog_cancel;
+  String get questions_delete_dialog_cancel;
 
-  /// No description provided for @questions_note_dialog_save.
+  /// No description provided for @questions_delete_dialog_confirm.
   ///
   /// In en, this message translates to:
-  /// **'Save'**
-  String get questions_note_dialog_save;
+  /// **'Delete'**
+  String get questions_delete_dialog_confirm;
 
   /// No description provided for @questions_actionFailed.
   ///

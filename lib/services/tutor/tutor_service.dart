@@ -1165,6 +1165,7 @@ class TutorService extends Notifier<TutorState> {
     if (bankQuestion != null) {
       _bankAnswer(
         bankQuestion,
+        fromBank: fromBank,
         quality: outcome.overallQuality,
         keyDisputed: disputed,
       );
@@ -1609,8 +1610,8 @@ class TutorService extends Notifier<TutorState> {
   /// Puts [response] on the connector's history and, when it is a
   /// question, on the list the next question request names (#184) — under
   /// the LO of the plan it was asked for, which is still in flight here —
-  /// and in the bank: stored when it was generated, counted when it came
-  /// [fromBank] (#186).
+  /// and in flight for the bank: counted when it came [fromBank] (#186), a
+  /// generated one kept for its first answer (#215).
   void _recordResponse(ChatResponse response, {BankQuestion? fromBank}) {
     _connector.addResponse(response);
     final isQuestion = _recentQuestions.add(
@@ -1628,13 +1629,18 @@ class TutorService extends Notifier<TutorState> {
 
   // ---- Question bank (#185) -------------------------------------------------
   //
-  // Every generated question goes into the bank, and every graded answer to
-  // one is counted there. Neither is waited for: the bank is best-effort
-  // and a failed or slow write — a container not created yet, a Cosmos
-  // blip — never reaches the student (`QuestionBankService`).
+  // A generated question goes into the bank at the first graded answer to
+  // it, and only when that answer is correct (#215); a socratic one never,
+  // as the bank does not serve those (`BankChoice.servedTypes`). Every
+  // graded answer to a bank question is counted there. Nothing is waited
+  // for: the bank is best-effort and a failed or slow write — a container
+  // not created yet, a Cosmos blip — never reaches the student
+  // (`QuestionBankService`).
 
-  /// Stores [response], a question that just came in for the plan in
-  /// flight, and remembers it for the turn record of its answer.
+  /// Remembers [response], a question that just came in for the plan in
+  /// flight, as the bank entry it would be — for the turn record of its
+  /// answer, which names it whether or not the bank keeps it, and for the
+  /// bank, which stores it only when that answer is correct.
   void _bankQuestion(ChatResponse response) {
     _setInFlightQuestion(null);
     final plan = _inFlightPlan;
@@ -1662,8 +1668,6 @@ class TutorService extends Notifier<TutorState> {
     // The student has seen it: an identical question in the bank is not
     // served to them later (#186).
     _seenQuestionIds.add(question.id);
-    _debug.recordEvent('tutor.question_banked', {'questionId': question.id});
-    unawaited(ref.read(questionBankServiceProvider).recordAsked(question));
   }
 
   /// Remembers [question], just put in front of the student from the bank
@@ -1927,27 +1931,48 @@ class TutorService extends Notifier<TutorState> {
     return true;
   }
 
-  /// Counts the graded answer to [question]; for a multiple-choice pick,
-  /// with the feedback the student got on it, and whether the grader said
-  /// its answer key is wrong ([keyDisputed], #198).
+  /// Counts the graded answer to [question] — served [fromBank], or just
+  /// generated, which the bank then keeps only when the answer is correct
+  /// (#215: `partial` is not) and only for a type it serves; for a
+  /// multiple-choice pick, with the feedback the student got on it, and
+  /// whether the grader said its answer key is wrong ([keyDisputed], #198).
   void _bankAnswer(
     BankQuestion question, {
+    required bool fromBank,
     required AnswerQuality quality,
     bool keyDisputed = false,
   }) {
+    final bank = ref.read(questionBankServiceProvider);
+    final correct = quality == AnswerQuality.correct;
     final mcq = question.isMultipleChoice ? ref.read(activeMcqProvider) : null;
+    if (fromBank) {
+      unawaited(
+        bank.recordAnswer(
+          questionId: question.id,
+          subgoalId: question.subgoalId,
+          correct: correct,
+          pickedOption: mcq?.selected,
+          feedback: mcq?.feedback,
+          quality: mcq?.feedbackQuality,
+          keyDisputed: keyDisputed,
+        ),
+      );
+      return;
+    }
+    if (!BankChoice.servedTypes.contains(question.questionType)) return;
+    _debug.recordEvent('tutor.question_banked', {
+      'questionId': question.id,
+      'firstAnswerCorrect': correct,
+    });
     unawaited(
-      ref
-          .read(questionBankServiceProvider)
-          .recordAnswer(
-            questionId: question.id,
-            subgoalId: question.subgoalId,
-            correct: quality == AnswerQuality.correct,
-            pickedOption: mcq?.selected,
-            feedback: mcq?.feedback,
-            quality: mcq?.feedbackQuality,
-            keyDisputed: keyDisputed,
-          ),
+      bank.recordFirstAnswer(
+        question,
+        correct: correct,
+        pickedOption: mcq?.selected,
+        feedback: mcq?.feedback,
+        quality: mcq?.feedbackQuality,
+        keyDisputed: keyDisputed,
+      ),
     );
   }
 

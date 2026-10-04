@@ -1,14 +1,17 @@
-// End-to-end (#185): the question bank.
+// End-to-end (#185, #215): the question bank.
 //
-// Every question the tutor generated used to be thrown away once asked;
-// only the turn record remained. Now each one is stored in the `questions`
-// container — deduplicated on its content, with what it was asked for —
-// and the graded answer to it is counted there, a multiple-choice pick with
-// the feedback the student got on it. The turn record names the question.
-// The teacher gets a Questions page to weed the bank out: per subgoal, each
-// question as the student saw it, how often it was asked and how often
-// answered right, sorted on that share, with hide and a note — and a
-// warning on a question whose key a grading called wrong (#198).
+// A generated question is stored in the `questions` container —
+// deduplicated on its content, with what it was asked for — at the first
+// graded answer to it, and only when that answer is correct (#215): a
+// question answered wrong first, or left unanswered, never enters it. The
+// answer is counted there, a multiple-choice pick with the feedback the
+// student got on it, and the turn record names the question either way.
+// The teacher gets a Questions page for what the students' answers did not
+// weed out: per subgoal, each question as the student saw it, how often it
+// was asked and how often answered right, sorted on that share, who hid it
+// (the teacher, or the bank itself below half correct), with hide / show
+// again and delete — and a warning on a question whose key a grading
+// called wrong (#198). No "reviewed", no notes.
 //
 // And the bank is the one container the app runs without: until it is
 // created (README step 3), a student practises as before and the teacher's
@@ -67,12 +70,32 @@ String _mcqReply() => llmEnvelope(
   }),
 );
 
-String _gradeReply() => llmEnvelope(
-  text: _feedback,
+String _gradeReply({String text = _feedback, String quality = 'wrong'}) =>
+    llmEnvelope(
+      text: text,
+      meta: jsonEncode({
+        'type': 'mcq_feedback',
+        'overallQuality': quality,
+        'loSignals': <Object>[],
+      }),
+    );
+
+const String _prompt2 = 'Wat drukt print("a" * 3) af?';
+const String _right2 = 'aaa';
+const String _feedback2 = 'Juist: * herhaalt de tekst.';
+
+/// A second multiple-choice turn, answered right.
+String _mcqReply2() => llmEnvelope(
+  text: _prompt2,
   meta: jsonEncode({
-    'type': 'mcq_feedback',
-    'overallQuality': 'wrong',
-    'loSignals': <Object>[],
+    'type': 'multiple_choice',
+    'code': 'print("a" * 3)',
+    'options': [
+      {'option': _right2},
+      {'option': 'a3'},
+      {'option': 'Error'},
+    ],
+    'correct': 'A',
   }),
 );
 
@@ -110,28 +133,40 @@ void main() {
       (tester.widget<CodeField>(find.byType(CodeField)).controller).text;
 
   /// Leerpad → theory → "Try it yourself": the exercise request plays the
-  /// scripted multiple-choice turn and opens the quiz.
-  Future<void> openQuiz(WidgetTester tester) async {
+  /// scripted multiple-choice turn and opens the quiz, with [option] on it.
+  Future<void> openQuiz(WidgetTester tester, {String option = _wrong}) async {
     await tester.tap(find.byTooltip('Learning path'));
     await pumpUntilFound(tester, find.byType(LeerpadPage));
     await tester.tap(find.text('Continue'));
     await pumpUntilFound(tester, find.byType(ExplainView));
     await tester.tap(find.text('Try it yourself'));
     await pumpUntilFound(tester, find.byType(QuizView));
-    await pumpUntilFound(tester, find.text(_wrong));
+    await pumpUntilFound(tester, find.text(option));
   }
 
-  /// The wrong pick, its feedback, then "Next" to the complete-code turn.
-  Future<void> answerAndMoveOn(WidgetTester tester, AppHarness harness) async {
-    await tester.tap(find.text(_wrong));
+  Future<void> waitForIdle(WidgetTester tester, AppHarness harness) =>
+      pumpUntil(
+        tester,
+        () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+      );
+
+  /// Picks [option] on the quiz on screen and waits for [feedback].
+  Future<void> pick(
+    WidgetTester tester,
+    AppHarness harness,
+    String option,
+    String feedback,
+  ) async {
+    await tester.tap(find.text(option));
     await pumpUntilFound(
       tester,
-      find.textContaining('1 + 1 is een som', findRichText: true),
+      find.textContaining(feedback, findRichText: true),
     );
-    await pumpUntil(
-      tester,
-      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
-    );
+    await waitForIdle(tester, harness);
+  }
+
+  /// "Next" to the complete-code turn, until it is in the editor.
+  Future<void> nextToCode(WidgetTester tester) async {
     await tester.tap(find.text('Next →'));
     await pumpUntil(
       tester,
@@ -143,31 +178,51 @@ void main() {
     );
   }
 
-  testWidgets('a generated question lands in the bank with what it was asked '
-      'for, and the pick on it is counted with the feedback the student got', (
-    tester,
-  ) async {
+  testWidgets('a generated question enters the bank only when its first '
+      'answer is correct — with what it was asked for, and the pick counted '
+      'with the feedback the student got; one answered wrong or left '
+      'unanswered never does, and the turn record names the question either '
+      'way', (tester) async {
     final llm = ScriptedLlm([
       _mcqReply(),
       _gradeReply(),
+      _mcqReply2(),
+      _gradeReply(text: _feedback2, quality: 'correct'),
       completeCodeReply(text: 'Geef naam een waarde.', code: _next),
     ]);
     final harness = AppHarness(llm: llm);
     await harness.boot(tester);
     final bank = harness.cosmos['questions'];
+    List<Map<String, dynamic>> turns() =>
+        harness.cosmos['turn_history'].docs.values.toList();
 
+    // Answered wrong first: not stored.
     await openQuiz(tester);
-    await answerAndMoveOn(tester, harness);
+    await pick(tester, harness, _wrong, '1 + 1 is een som');
+    await pumpUntil(tester, () => turns().length == 1);
+    final wrongId = turns().single['questionId'] as String;
+    expect(wrongId, startsWith('s1_'));
+
+    // Answered right first: stored.
+    await tester.tap(find.text('Next →'));
+    await pumpUntilFound(tester, find.text(_right2));
+    await waitForIdle(tester, harness);
+    await pick(tester, harness, _right2, '* herhaalt de tekst');
     await pumpUntil(
       tester,
-      () => bank.docs.length == 2,
-      reason: 'the next exercise was not stored',
+      () => bank.docs.isNotEmpty,
+      reason: 'the question answered right was not stored',
     );
 
-    final mcq = bank.docs.values.firstWhere(
-      (d) => d['questionType'] == 'mcQuestion',
-    );
+    // Asked and left unanswered: not stored.
+    await nextToCode(tester);
+    expect(llm.remaining, 0);
+
+    expect(bank.docs, hasLength(1));
+    expect(bank[wrongId], isNull, reason: 'answered wrong first');
+    final mcq = bank.docs.values.single;
     expect(mcq['id'], startsWith('s1_'));
+    expect(mcq['questionType'], 'mcQuestion');
     expect(mcq['subgoalId'], 's1');
     expect(mcq['rootGoalId'], 'r1');
     expect(mcq['targetLOIds'], ['lo-print']);
@@ -178,32 +233,26 @@ void main() {
     // The question as the student got it, unshuffled, the key by content.
     expect(mcq['payload'], {
       'type': 'multiple_choice',
-      'prompt': _prompt,
-      'code': 'print(1 + 1)',
+      'prompt': _prompt2,
+      'code': 'print("a" * 3)',
       'options': [
-        {'option': _right},
-        {'option': _wrong},
+        {'option': _right2},
+        {'option': 'a3'},
         {'option': 'Error'},
       ],
-      'correct': _right,
+      'correct': _right2,
     });
     expect(mcq['askedCount'], 1);
     expect(mcq['answeredCount'], 1);
-    expect(mcq['correctCount'], 0);
+    expect(mcq['correctCount'], 1);
+    expect(mcq['lastAskedAt'], mcq['createdAt'], reason: 'asked, then stored');
     expect(mcq['optionFeedback'], [
-      {'option': _wrong, 'text': _feedback, 'quality': 'wrong'},
+      {'option': _right2, 'text': _feedback2, 'quality': 'correct'},
     ]);
+    expect(mcq.containsKey('reviewedAt'), isFalse);
 
-    // The turn record names the question it graded.
-    final turns = harness.cosmos['turn_history'].docs.values.toList();
-    expect(turns, hasLength(1));
-    expect(turns.single['questionId'], mcq['id']);
-
-    final next = bank.docs.values.firstWhere(
-      (d) => d['questionType'] == 'completeCodeQuestion',
-    );
-    expect(next['payload']['code'], _next);
-    expect(next['answeredCount'], 0);
+    // The turn records name the questions they graded, stored or not.
+    expect(turns().map((t) => t['questionId']), [wrongId, mcq['id']]);
 
     await harness.dispose(tester);
   });
@@ -211,8 +260,8 @@ void main() {
   testWidgets('without a `questions` container the student practises as '
       'before, and nothing is stored', (tester) async {
     final llm = ScriptedLlm([
-      _mcqReply(),
-      _gradeReply(),
+      _mcqReply2(),
+      _gradeReply(text: _feedback2, quality: 'correct'),
       completeCodeReply(text: 'Geef naam een waarde.', code: _next),
     ]);
     final harness = AppHarness(llm: llm);
@@ -222,8 +271,10 @@ void main() {
     final missing = UnprovisionedCosmos('questions');
     harness.cosmos.route('questions', missing.container);
 
-    await openQuiz(tester);
-    await answerAndMoveOn(tester, harness);
+    // Answered right: the bank is asked to store it, and is not there.
+    await openQuiz(tester, option: _right2);
+    await pick(tester, harness, _right2, '* herhaalt de tekst');
+    await nextToCode(tester);
     expect(llm.remaining, 0);
 
     // Nothing about the bank reaches the student.
@@ -241,9 +292,10 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('the teacher reviews the bank: a count per subgoal, each '
-      'question as the student saw it, sorted on the share correct, hidden '
-      'and noted', (tester) async {
+  testWidgets('the teacher weeds out the bank: a count and a hidden count per '
+      'subgoal, each question as the student saw it, sorted on the share '
+      'correct, who hid it; hide, show again a question that hid itself, and '
+      'delete after a confirmation', (tester) async {
     final hard = _stored(
       MultipleChoice(
         type: 'multiple_choice',
@@ -274,7 +326,13 @@ void main() {
         'questions': [
           _bankDoc(hard, asked: 6, answered: 5, correct: 1),
           _bankDoc(easy, asked: 4, answered: 4, correct: 4),
-          _bankDoc(other),
+          // Hidden by the bank itself: 3 of 10 correct.
+          {
+            ..._bankDoc(other, asked: 10, answered: 10, correct: 3),
+            'status': 'hidden',
+            'hiddenBy': 'auto',
+            'hiddenAt': '2026-09-26T10:00:00.000Z',
+          },
         ],
       },
     );
@@ -287,8 +345,16 @@ void main() {
     String subtitle(String subgoalId) => tester
         .widget<Text>(find.byKey(Key('questions-subgoal-count-$subgoalId')))
         .data!;
-    expect(subtitle('s1'), '2 questions · 2 new');
-    expect(subtitle('s2'), '1 question · 1 new');
+    String badge(BankQuestion q) => tester
+        .widget<Text>(
+          find.descendant(
+            of: find.byKey(Key('questions-hidden-${q.id}')),
+            matching: find.byType(Text),
+          ),
+        )
+        .data!;
+    expect(subtitle('s1'), '2 questions');
+    expect(subtitle('s2'), '1 question · 1 hidden');
 
     await tester.tap(find.byKey(const Key('questions-subgoal-s1')));
     await pumpUntilFound(tester, find.byKey(Key('questions-card-${hard.id}')));
@@ -315,41 +381,62 @@ void main() {
     await tester.tap(find.byKey(const Key('questions-sort-shareDesc')));
     await pumpUntil(tester, () => top(easy) < top(hard));
 
+    // No review step and no notes any more (#215).
+    expect(find.text('Mark reviewed'), findsNothing);
+    expect(find.text('Note'), findsNothing);
+
     // Hide the one that is too hard to be fair.
     await tester.tap(find.byKey(Key('questions-hide-${hard.id}')));
     await pumpUntilFound(
       tester,
       find.byKey(Key('questions-hidden-${hard.id}')),
     );
+    expect(badge(hard), 'HIDDEN');
     final stored = harness.cosmos['questions'][hard.id]!;
     expect(stored['status'], 'hidden');
-    expect(stored['reviewedAt'], isA<String>());
+    expect(stored['hiddenBy'], 'teacher');
+    expect(stored.containsKey('reviewedAt'), isFalse);
     expect(harness.cosmos['questions'].docs, hasLength(3));
-    await pumpUntil(tester, () => subtitle('s1') == '2 questions · 1 new');
+    await pumpUntil(tester, () => subtitle('s1') == '2 questions · 1 hidden');
 
-    // A note on the easy one.
-    await tester.tap(find.byKey(Key('questions-note-${easy.id}')));
-    await pumpUntilFound(tester, find.byKey(const Key('questions-note-field')));
-    await tester.enterText(
-      find.byKey(const Key('questions-note-field')),
-      'Te makkelijk voor medium.',
-    );
-    await tester.tap(find.byKey(const Key('questions-note-save')));
+    // "Hidden only" keeps to it, to clear it out: delete, after a
+    // confirmation.
+    await tester.tap(find.byKey(const Key('questions-filter-hidden')));
+    await pumpUntilGone(tester, find.byKey(Key('questions-card-${easy.id}')));
+    expect(find.byKey(Key('questions-card-${hard.id}')), findsOneWidget);
+    await tester.tap(find.byKey(Key('questions-delete-${hard.id}')));
+    await pumpUntilFound(tester, find.text('Delete this question?'));
+    await tester.tap(find.byKey(const Key('questions-delete-confirm')));
     await pumpUntilGone(tester, find.byType(AlertDialog));
-    await pumpUntilFound(
-      tester,
-      find.byKey(Key('questions-note-text-${easy.id}')),
-    );
-    expect(
-      harness.cosmos['questions'][easy.id]!['teacherNote'],
-      'Te makkelijk voor medium.',
-    );
-
-    // Both are reviewed now: the filter leaves nothing of this subgoal.
-    await tester.tap(find.byKey(const Key('questions-filter-unreviewed')));
     await pumpUntilFound(tester, find.byKey(const Key('questions-list-empty')));
-    expect(find.byKey(Key('questions-card-${hard.id}')), findsNothing);
-    expect(subtitle('s1'), '2 questions');
+    expect(
+      tester.widget<Text>(find.byKey(const Key('questions-list-empty'))).data,
+      'No hidden questions for this subgoal.',
+    );
+    expect(harness.cosmos['questions'][hard.id], isNull);
+    expect(harness.cosmos['questions'].docs, hasLength(2));
+    expect(subtitle('s1'), '1 question');
+
+    // The question that hid itself, shown again: kept, so it does not hide
+    // itself at the next answer.
+    await tester.tap(find.byKey(const Key('questions-subgoal-s2')));
+    await pumpUntilFound(tester, find.byKey(Key('questions-card-${other.id}')));
+    expect(badge(other), 'HIDDEN AUTOMATICALLY');
+    expect(
+      find.descendant(
+        of: find.byKey(Key('questions-card-${other.id}')),
+        matching: find.text('30% correct (3/10)'),
+      ),
+      findsOneWidget,
+    );
+    // ("Hidden only" is still on: shown again, it leaves the list.)
+    await tester.tap(find.byKey(Key('questions-unhide-${other.id}')));
+    await pumpUntilGone(tester, find.byKey(Key('questions-card-${other.id}')));
+    final kept = harness.cosmos['questions'][other.id]!;
+    expect(kept['status'], 'active');
+    expect(kept['keptByTeacher'], isTrue);
+    expect(kept.containsKey('hiddenBy'), isFalse);
+    await pumpUntil(tester, () => subtitle('s2') == '1 question');
 
     await harness.dispose(tester);
   });

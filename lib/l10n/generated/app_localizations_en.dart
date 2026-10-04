@@ -2601,7 +2601,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get questions_page_subtitle =>
-      'Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.';
+      'A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.';
 
   @override
   String get questions_refresh_tooltip => 'Refresh';
@@ -2624,7 +2624,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get questions_tree_empty =>
-      'No questions stored yet. They appear here as students practise.';
+      'No questions stored yet. They appear here once a student answers a new question correctly.';
 
   @override
   String questions_tree_count(int count) {
@@ -2638,8 +2638,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String questions_tree_unreviewed(int count) {
-    return '$count new';
+  String questions_tree_hidden(int count) {
+    return '$count hidden';
   }
 
   @override
@@ -2654,7 +2654,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get questions_placeholder => 'Pick a subgoal on the left.';
 
   @override
-  String get questions_filter_unreviewed => 'Not reviewed yet';
+  String get questions_filter_hidden => 'Hidden only';
 
   @override
   String get questions_sort_newest => 'Newest';
@@ -2672,8 +2672,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get questions_list_empty => 'No questions for this subgoal.';
 
   @override
-  String get questions_list_allReviewed =>
-      'Every question of this subgoal has been reviewed.';
+  String get questions_list_noneHidden =>
+      'No hidden questions for this subgoal.';
 
   @override
   String get questions_type_mcQuestion => 'Multiple choice';
@@ -2712,7 +2712,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get questions_badge_hidden => 'Hidden';
 
   @override
-  String get questions_badge_reviewed => 'Reviewed';
+  String get questions_badge_autoHidden => 'Hidden automatically';
+
+  @override
+  String questions_badge_autoHidden_tooltip(int count) {
+    return 'Less than half correct on $count or more answers. Show it again and the app no longer hides it by itself.';
+  }
 
   @override
   String get questions_keyDisagreement =>
@@ -2737,34 +2742,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get questions_answerKey_tooltip => 'Answer key';
 
   @override
-  String questions_note(String note) {
-    return 'Note: $note';
-  }
-
-  @override
-  String get questions_action_markReviewed => 'Mark reviewed';
-
-  @override
   String get questions_action_hide => 'Hide';
 
   @override
   String get questions_action_unhide => 'Show again';
 
   @override
-  String get questions_action_note => 'Note';
+  String get questions_action_delete => 'Delete';
 
   @override
-  String get questions_note_dialog_title => 'Note on this question';
+  String get questions_delete_dialog_title => 'Delete this question?';
 
   @override
-  String get questions_note_dialog_hint =>
-      'What is wrong with it, or what to remember';
+  String get questions_delete_dialog_body =>
+      'The question is removed from the question bank. If the tutor generates the same question later, it only comes back when the first student answers it correctly.';
 
   @override
-  String get questions_note_dialog_cancel => 'Cancel';
+  String get questions_delete_dialog_cancel => 'Cancel';
 
   @override
-  String get questions_note_dialog_save => 'Save';
+  String get questions_delete_dialog_confirm => 'Delete';
 
   @override
   String questions_actionFailed(String error) {

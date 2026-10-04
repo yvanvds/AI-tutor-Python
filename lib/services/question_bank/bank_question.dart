@@ -1,6 +1,13 @@
 // One question of the question bank (#185): a question the tutor generated
-// for a student, kept so the teacher can weed out the bad ones and — #186 —
-// so the conductor can ask it again without generating it.
+// for a student, kept so the conductor can ask it again without generating
+// it (#186).
+//
+// The students do the weeding (#215): a generated question is stored only
+// when the first answer to it is graded correct, and a stored one hides
+// itself once too few answers to it are correct
+// (`PolicyConstants.bankAutoHideMinAnswers` / `bankAutoHideMaxShare`). A
+// question in the bank is approved by being there; the teacher hides, shows
+// again or deletes what is still off.
 //
 // A doc in the `questions` container (`/subgoalId` partition):
 //
@@ -20,12 +27,18 @@
 //     feedback text the grader gave and the verdict it came with;
 //   - `keyDisputedCount`, `keyDisputedAt`: how often the grader of a pick
 //     said the answer key itself is wrong, and the last time (#198);
-//   - the teacher's: `status` (`active` | `hidden`), `teacherNote`,
-//     `reviewedAt`.
+//   - `status` (`active` | `hidden`); for a hidden one `hiddenBy` (`teacher`
+//     | `auto`, #215 — absent on a question hidden before #215, which was
+//     the teacher) and `hiddenAt`; `keptByTeacher`: the teacher showed it
+//     again after it hid itself, so it does not hide itself again.
 //
 // The doc id is `${subgoalId}_${contentHash}` — the same generation for the
 // same subgoal is the same doc, and the id alone names the question, which
-// is what a turn record's `questionId` holds.
+// is what a turn record's `questionId` holds. Nothing reads a question doc
+// through a turn record — the tutor uses the ids only to not give a student
+// the same question twice, the evaluation tooling only the turn record's own
+// fields — so the teacher can delete a question; the same generation later
+// gets the same id and has to pass its first answer again.
 
 import 'dart:convert';
 
@@ -41,9 +54,13 @@ import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 
-/// `status` of a bank question. A hidden one stays in the container — turn
-/// records point at it — but is never served again (#186).
+/// `status` of a bank question. A hidden one stays in the container until
+/// the teacher deletes it, but is not served (#186).
 enum BankQuestionStatus { active, hidden }
+
+/// Who hid a hidden bank question (#215): the teacher on the Questions
+/// page, or the bank itself when too few answers to it were correct.
+enum BankHiddenBy { teacher, auto }
 
 /// The grader's feedback on one multiple-choice option, kept the first time
 /// a student picks it (#185) so a later pick of the same option can be
@@ -108,8 +125,9 @@ class BankQuestion {
     this.keyDisputedCount = 0,
     this.keyDisputedAt,
     this.status = BankQuestionStatus.active,
-    this.teacherNote,
-    this.reviewedAt,
+    this.hiddenBy,
+    this.hiddenAt,
+    this.keptByTeacher = false,
   });
 
   /// `type` discriminator on every doc, like the other containers carry.
@@ -141,14 +159,22 @@ class BankQuestion {
   /// The last time one did; `null` when none ever has.
   final DateTime? keyDisputedAt;
   final BankQuestionStatus status;
-  final String? teacherNote;
 
-  /// When the teacher last looked at it and acted: marked it reviewed, hid
-  /// or showed it, or wrote a note. `null` is "not reviewed yet".
-  final DateTime? reviewedAt;
+  /// Who hid it, as the doc says; `null` on an active question and on one
+  /// hidden before #215 (the teacher then).
+  final BankHiddenBy? hiddenBy;
+
+  /// When it was hidden; `null` on an active question.
+  final DateTime? hiddenAt;
+
+  /// The teacher showed it again after it hid itself (#215): it does not
+  /// hide itself again.
+  final bool keptByTeacher;
 
   bool get isActive => status == BankQuestionStatus.active;
-  bool get isReviewed => reviewedAt != null;
+
+  /// Hidden by the bank itself (#215), not by the teacher.
+  bool get isAutoHidden => !isActive && hiddenBy == BankHiddenBy.auto;
 
   /// Correct answers per graded answer; `null` before the first one.
   double? get shareCorrect =>
@@ -265,9 +291,10 @@ class BankQuestion {
   static String idFor({required String subgoalId, required String hash}) =>
       '${subgoalId}_$hash';
 
-  /// The bank entry for [response], asked on [subgoalId] — or `null` when
-  /// [response] is not a question. Counters start at zero: storing it
-  /// counts the ask (`QuestionBankService.recordAsked`).
+  /// The bank entry for [response], asked on [subgoalId] at [createdAt] —
+  /// or `null` when [response] is not a question. Counters start at zero:
+  /// the bank stores it, ask and answer counted, only when the first answer
+  /// to it is correct (`QuestionBankService.recordFirstAnswer`, #215).
   static BankQuestion? fromResponse(
     ChatResponse response, {
     required String subgoalId,
@@ -332,8 +359,9 @@ class BankQuestion {
     if (keyDisputedAt != null)
       'keyDisputedAt': keyDisputedAt!.toUtc().toIso8601String(),
     'status': status.name,
-    if (teacherNote != null) 'teacherNote': teacherNote,
-    if (reviewedAt != null) 'reviewedAt': reviewedAt!.toUtc().toIso8601String(),
+    if (hiddenBy != null) 'hiddenBy': hiddenBy!.name,
+    if (hiddenAt != null) 'hiddenAt': hiddenAt!.toUtc().toIso8601String(),
+    if (keptByTeacher) 'keptByTeacher': true,
   };
 
   /// A doc as `toMap` wrote it, or `null` when it is not one a later reader
@@ -386,8 +414,11 @@ class BankQuestion {
       status: doc['status'] == BankQuestionStatus.hidden.name
           ? BankQuestionStatus.hidden
           : BankQuestionStatus.active,
-      teacherNote: doc['teacherNote'] as String?,
-      reviewedAt: date(doc['reviewedAt']),
+      hiddenBy: BankHiddenBy.values.firstWhereOrNull(
+        (b) => b.name == doc['hiddenBy'],
+      ),
+      hiddenAt: date(doc['hiddenAt']),
+      keptByTeacher: doc['keptByTeacher'] == true,
     );
   }
 }
