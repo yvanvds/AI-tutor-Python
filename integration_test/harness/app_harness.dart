@@ -671,6 +671,26 @@ Future<void> pumpUntilFound(
   reason: 'nothing matched ${finder.toString(describeSelf: true)}',
 );
 
+/// Pumps until the end drawer [drawer] has slid all the way in: its right
+/// edge on the window's right edge.
+///
+/// A drawer is in the tree from the first frame of its opening slide, so
+/// [pumpUntilFound] on it — or on something inside it — can return a few
+/// frames in, with the drawer still partly beyond the window. A tap then
+/// aims where the button is at that moment: on the 1280 px runner window of
+/// CI that was past its right edge, and the tap went nowhere (#221: the
+/// student drawer's "Acknowledge" and "Award badge" at x 1294 and 1288,
+/// with the drawer at 704–1280 once open). Wait for this before tapping in
+/// a drawer.
+Future<void> pumpUntilEndDrawerOpen(
+  WidgetTester tester,
+  Finder drawer,
+) => pumpUntil(tester, () {
+  if (drawer.evaluate().isEmpty) return false;
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  return (tester.getRect(drawer).right - width).abs() < 0.5;
+}, reason: 'never slid all the way in: ${drawer.toString(describeSelf: true)}');
+
 /// Pumps until [finder] matches nothing — e.g. a dialog route that is still
 /// animating out after its result has already been acted on.
 Future<void> pumpUntilGone(

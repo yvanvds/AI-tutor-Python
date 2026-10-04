@@ -77,12 +77,22 @@ void main() {
     await pumpUntilFound(tester, find.byType(AccountsPage));
     await pumpUntilFound(tester, find.text('Sam Student'));
     await tester.tap(find.text('Sam Student'));
-    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    final drawer = find.byType(StudentDetailDrawer);
+    // All the way in before the tap: a few frames into its slide the
+    // drawer still reaches past the window.
+    await pumpUntilEndDrawerOpen(tester, drawer);
 
     final award = find.descendant(
-      of: find.byType(StudentDetailDrawer),
+      of: drawer,
       matching: find.byKey(const ValueKey('drawer-award-badge')),
     );
+    // The button fits in the drawer's header, inside the 1280 x 720 window.
+    final header = tester.getRect(drawer);
+    final button = tester.getRect(award);
+    expect(button.left, greaterThanOrEqualTo(header.left));
+    expect(button.right, lessThanOrEqualTo(header.right));
+    expect(header.right, lessThanOrEqualTo(kRunnerWindowSize.width));
+    expect(button.bottom, lessThanOrEqualTo(kRunnerWindowSize.height));
     expect(
       find.descendant(of: award, matching: find.text('Award badge')),
       findsOneWidget,

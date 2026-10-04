@@ -299,7 +299,7 @@ void main() {
     expect(badge, findsNothing);
 
     await tester.tap(find.text('Sam Student'));
-    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    await pumpUntilEndDrawerOpen(tester, find.byType(StudentDetailDrawer));
     await pumpUntilFound(tester, gapLabel);
     expect(
       find.textContaining(
@@ -328,7 +328,9 @@ void main() {
     );
 
     await tester.tap(find.text('Sam Student'));
-    await pumpUntilFound(tester, find.byType(StudentDetailDrawer));
+    // All the way in before the tap on "Acknowledge" below: a few frames
+    // into its slide the drawer still reaches past the window.
+    await pumpUntilEndDrawerOpen(tester, find.byType(StudentDetailDrawer));
     await pumpUntilFound(tester, gapLabel);
     expect(
       find.textContaining(
