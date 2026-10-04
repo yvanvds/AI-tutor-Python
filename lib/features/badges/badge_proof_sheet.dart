@@ -4,6 +4,10 @@
 // app after the review (the teacher's decision of 2026-10-04), under
 // Options for a teacher or a developer build: tweaking the look is a change
 // to `theme/badge_style.dart`, and this page shows the result.
+//
+// #221: the whole set ends with a medal of the class podium and the
+// teacher's badges, the example trophy case holds one of each, and the
+// notices include both.
 
 import 'package:ai_tutor_python/features/badges/badge_text.dart';
 import 'package:ai_tutor_python/features/badges/prijzenkast_page.dart';
@@ -55,8 +59,18 @@ String _stateLabel(AppLocalizations l, _Sample s) {
     BadgeGroup.fun =>
       s.badge.secret ? l.badges_proof_state_found : l.badges_proof_state_fun,
     BadgeGroup.tiers => l.badges_proof_state_tier(s.tier, s.badge.maxTier),
+    BadgeGroup.podium => l.badges_proof_state_podium,
+    BadgeGroup.teacher => l.badges_proof_state_teacher,
   };
 }
+
+/// The whole set as the sheet shows it: every badge the rules count, then a
+/// medal of the class podium and the teacher's badges (#221).
+List<BadgeDefinition> badgeProofSheetSet() => [
+  ...BadgeCatalog.all(expertGoalIds: [_demoRoot.id]),
+  BadgeCatalog.podium(_demoSubgoal.id),
+  ...BadgeCatalog.teacher,
+];
 
 class BadgeProofSheetPage extends StatelessWidget {
   const BadgeProofSheetPage({super.key});
@@ -208,9 +222,7 @@ class _PalettePanel extends StatelessWidget {
             spacing: AppSpacing.m,
             runSpacing: AppSpacing.m,
             children: [
-              for (final badge in BadgeCatalog.all(
-                expertGoalIds: [_demoRoot.id],
-              ))
+              for (final badge in badgeProofSheetSet())
                 SizedBox(
                   width: 88,
                   child: Column(
@@ -223,7 +235,14 @@ class _PalettePanel extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Text(
-                        badgeName(l, badge, goalTitle: _demoRoot.title),
+                        badgeName(
+                          l,
+                          badge,
+                          goalTitle: badge.group == BadgeGroup.podium
+                              ? _demoSubgoal.title
+                              : _demoRoot.title,
+                          tier: badge.maxTier >= 3 ? 3 : badge.maxTier,
+                        ),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -249,6 +268,14 @@ class _PalettePanel extends StatelessWidget {
 
 /// The hoofddoel the examples' "Kenner van …" badge is about.
 final Goal _demoRoot = Goal(id: 'proof-sheet-root', title: 'Python', order: 0);
+
+/// The subgoal the examples' medal of the class podium is for (#221).
+final Goal _demoSubgoal = Goal(
+  id: 'proof-sheet-subgoal',
+  title: 'Variabelen',
+  parentId: 'proof-sheet-root',
+  order: 1000,
+);
 
 /// A made-up student a month into the year, for the example trophy case:
 /// about the median of the September numbers, some single badges found.
@@ -278,13 +305,28 @@ BadgeBoard demoBadgeBoard() {
     earlyBird: 1,
     ownQuestions: 1,
   );
-  final snapshot = BadgeSnapshot(facts: facts, roots: [_demoRoot]);
+  final snapshot = BadgeSnapshot(
+    facts: facts,
+    roots: [_demoRoot],
+    goals: [_demoRoot, _demoSubgoal],
+  );
   final reached = {
     for (final b in BadgeCatalog.all(expertGoalIds: [_demoRoot.id]))
       if (b.tierFor(b.valueIn(facts)) > 0)
         b.id: EarnedBadge(tier: b.tierFor(b.valueIn(facts))),
+    // Second of the class on one subgoal, and helped a classmate twice.
+    podiumBadgeId(_demoSubgoal.id): const EarnedBadge(
+      tier: 2,
+      awardedBy: kAwardedByPodium,
+      extra: {'place': 2},
+    ),
+    'teacher:helpingHand': const EarnedBadge(
+      tier: 1,
+      awardedBy: kAwardedByTeacher,
+      extra: {'count': 2, 'seen': 2},
+    ),
   };
-  return BadgeBoard.from(snapshot, EarnedBadges(reached));
+  return BadgeBoard.from(snapshot, EarnedBadges(reached), inClass: true);
 }
 
 List<BadgeAnnouncement> _demoAnnouncements() {
@@ -300,6 +342,24 @@ List<BadgeAnnouncement> _demoAnnouncements() {
         notice('helloWorld', 1),
       ],
       first: true,
+    ),
+    BadgeAnnouncement(
+      badges: [
+        EarnedBadgeNotice(
+          badge: BadgeCatalog.podium(_demoSubgoal.id),
+          tier: 3,
+          goalTitle: _demoSubgoal.title,
+        ),
+      ],
+    ),
+    BadgeAnnouncement(
+      badges: [
+        EarnedBadgeNotice(
+          badge: BadgeCatalog.byId('teacher:helpingHand')!,
+          tier: 1,
+          count: 2,
+        ),
+      ],
     ),
   ];
 }

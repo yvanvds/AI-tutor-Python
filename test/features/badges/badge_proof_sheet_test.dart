@@ -56,7 +56,14 @@ void main() {
   testWidgets('ten states at 32, 64 and 128 px, and the whole set, on each '
       'palette', (tester) async {
     await mount(tester);
-    final setSize = BadgeCatalog.all(expertGoalIds: ['x']).length;
+    // Every badge the rules count, a medal and the teacher's three (#221).
+    final setSize = badgeProofSheetSet().length;
+    expect(
+      setSize,
+      BadgeCatalog.all(expertGoalIds: ['x']).length +
+          1 +
+          BadgeCatalog.teacher.length,
+    );
     for (final (panel, palette) in [
       ('dark', AppPalette.dark),
       ('light', AppPalette.light),
@@ -101,8 +108,14 @@ void main() {
 
   testWidgets('the notice, for one badge and as a summary', (tester) async {
     await mount(tester);
-    expect(find.byType(BadgeToast), findsNWidgets(2));
+    expect(find.byType(BadgeToast), findsNWidgets(4));
     expect(find.text("You've already earned 4 badges!"), findsOneWidget);
+    // #221: a medal and a badge from the teacher.
+    expect(find.text('Gold: Variabelen'), findsWidgets);
+    expect(
+      find.text('From your teacher, 2× now · You helped a classmate.'),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

@@ -3390,4 +3390,143 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get badge_rome_description =>
       'Right after more than 5 minutes on one question.';
+
+  @override
+  String get badges_section_podium => 'Class podium';
+
+  @override
+  String get badges_section_podium_hint =>
+      'The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.';
+
+  @override
+  String get badges_podium_none =>
+      'No medal yet. Finish a topic as one of the first three in your class.';
+
+  @override
+  String get badges_podium_noClass =>
+      'You\'re not in a class yet, so you don\'t take part yet.';
+
+  @override
+  String get badges_section_teacher => 'From your teacher';
+
+  @override
+  String get badges_section_teacher_hint =>
+      'For things the app can\'t see. Your teacher can give you each of them more than once.';
+
+  @override
+  String badges_tile_count(int count) {
+    return 'Received $count×';
+  }
+
+  @override
+  String get badges_toast_fromTeacher => 'From your teacher';
+
+  @override
+  String badges_toast_fromTeacherCount(int count) {
+    return 'From your teacher, $count× now';
+  }
+
+  @override
+  String get badges_proof_state_podium => 'class podium';
+
+  @override
+  String get badges_proof_state_teacher => 'from the teacher';
+
+  @override
+  String badge_podium_name(String medal, String subgoal) {
+    return '$medal: $subgoal';
+  }
+
+  @override
+  String get badge_podium_gold => 'Gold';
+
+  @override
+  String get badge_podium_silver => 'Silver';
+
+  @override
+  String get badge_podium_bronze => 'Bronze';
+
+  @override
+  String get badge_podium_unknownSubgoal => 'a topic';
+
+  @override
+  String get badge_podium_first_description =>
+      'You were the first in your class to finish this topic.';
+
+  @override
+  String get badge_podium_second_description =>
+      'You were the second in your class to finish this topic.';
+
+  @override
+  String get badge_podium_third_description =>
+      'You were the third in your class to finish this topic.';
+
+  @override
+  String get badge_faultFinder_name => 'Fault finder';
+
+  @override
+  String get badge_faultFinder_description =>
+      'You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.';
+
+  @override
+  String get badge_helpingHand_name => 'Helping hand';
+
+  @override
+  String get badge_helpingHand_description => 'You helped a classmate.';
+
+  @override
+  String get badge_goodQuestion_name => 'Good question!';
+
+  @override
+  String get badge_goodQuestion_description =>
+      'You asked a question in class that deserved it.';
+
+  @override
+  String get awardBadge_button => 'Award badge';
+
+  @override
+  String awardBadge_title(String name) {
+    return 'Award a badge to $name';
+  }
+
+  @override
+  String awardBadge_intro(String name) {
+    return 'For things the app can\'t see. $name gets a notice the next time the app starts, or within seconds if it is open.';
+  }
+
+  @override
+  String get awardBadge_faultFinder_hint =>
+      'Reported a wrong question, by the ID at the top of the exercise.';
+
+  @override
+  String get awardBadge_helpingHand_hint => 'Helped a classmate.';
+
+  @override
+  String get awardBadge_goodQuestion_hint =>
+      'Asked a question in class that deserved it.';
+
+  @override
+  String awardBadge_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Given $count× so far',
+      zero: 'Not given yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get awardBadge_cancel => 'Cancel';
+
+  @override
+  String get awardBadge_confirm => 'Award';
+
+  @override
+  String awardBadge_done(String badge, int count) {
+    return '$badge awarded ($count×).';
+  }
+
+  @override
+  String get awardBadge_failed => 'The badge could not be awarded. Try again.';
 }

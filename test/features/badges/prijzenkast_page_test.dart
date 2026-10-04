@@ -2,7 +2,9 @@
 // the next one ("152/250"), the ones not earned yet in grey, a secret as a
 // "?" without its name or rule until it is found, a "Kenner van …" per
 // hoofddoel with its LOs counted, the lesson badges waiting for lesson
-// times, and the credits of the icons.
+// times, and the credits of the icons. #221: the student's own medals of
+// the class podium (nobody else's), and the teacher's badges with how often
+// each was given.
 
 import 'package:ai_tutor_python/features/badges/badge_proof_sheet.dart';
 import 'package:ai_tutor_python/features/badges/prijzenkast_page.dart';
@@ -14,6 +16,7 @@ import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
+import 'package:ai_tutor_python/theme/badge_style.dart';
 import 'package:ai_tutor_python/widgets/badges/badge_frame.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,7 +92,8 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('5 of 34 badges earned'), findsOneWidget);
+    // 19 in tiers, a "Kenner van …", 14 single ones and the teacher's 3.
+    expect(find.text('5 of 37 badges earned'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -232,8 +236,186 @@ void main() {
     await mount(tester, PrijzenkastView(board: demoBadgeBoard()));
     expect(
       find.byType(BadgeTileCard),
-      findsNWidgets(BadgeCatalog.all(expertGoalIds: ['x']).length),
+      findsNWidgets(
+        BadgeCatalog.all(expertGoalIds: ['x']).length +
+            1 + // its one medal
+            BadgeCatalog.teacher.length,
+      ),
     );
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  group('the class podium and the teacher\'s badges (#221)', () {
+    final variables = Goal(
+      id: 's2',
+      title: 'Variabelen',
+      parentId: 'r1',
+      order: 1000,
+    );
+
+    BadgeBoard board({
+      Map<String, EarnedBadge> earned = const {},
+      bool inClass = true,
+    }) => BadgeBoard.from(
+      BadgeSnapshot(
+        facts: const BadgeFacts(oefeningen: 3),
+        roots: [_root],
+        goals: [_root, variables],
+      ),
+      EarnedBadges(earned),
+      inClass: inClass,
+    );
+
+    testWidgets('a medal names its metal and its subgoal, and only the '
+        'student\'s own are there, gold first', (tester) async {
+      await mount(
+        tester,
+        PrijzenkastView(
+          board: board(
+            earned: {
+              podiumBadgeId('gone'): EarnedBadge(
+                tier: 1,
+                earnedAt: DateTime.utc(2026, 9, 2),
+                awardedBy: kAwardedByPodium,
+              ),
+              podiumBadgeId('s2'): EarnedBadge(
+                tier: 3,
+                earnedAt: DateTime.utc(2026, 9, 9),
+                awardedBy: kAwardedByPodium,
+              ),
+            },
+          ),
+        ),
+      );
+      final section = find.byKey(const ValueKey('badges-section-podium'));
+      expect(
+        find.descendant(of: section, matching: find.text('Class podium')),
+        findsOneWidget,
+      );
+      expect(
+        inTile('podium:s2', find.text('Gold: Variabelen')),
+        findsOneWidget,
+      );
+      expect(
+        inTile(
+          'podium:s2',
+          find.text('You were the first in your class to finish this topic.'),
+        ),
+        findsOneWidget,
+      );
+      expect(inTile('podium:s2', find.text('Earned')), findsOneWidget);
+      // A subgoal the goals no longer have still shows its medal.
+      expect(
+        inTile('podium:gone', find.text('Bronze: a topic')),
+        findsOneWidget,
+      );
+      final frames = tester
+          .widgetList<BadgeFrame>(
+            find.descendant(of: section, matching: find.byType(BadgeFrame)),
+          )
+          .toList();
+      expect(frames.map((f) => f.tone), [BadgeTone.gold, BadgeTone.bronze]);
+      expect(frames.every((f) => f.pips == 0), isTrue);
+      // No progress bar, no "waits for lesson times": nothing counts it.
+      expect(
+        find.descendant(
+          of: section,
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: section,
+          matching: find.text(
+            'Your class has no lesson times yet, so this one waits.',
+          ),
+        ),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('in a class without a medal yet: how to get one; without a '
+        'class: that the student does not take part', (tester) async {
+      await mount(tester, PrijzenkastView(board: board()));
+      expect(
+        find.text(
+          'No medal yet. Finish a topic as one of the first three in your '
+          'class.',
+        ),
+        findsOneWidget,
+      );
+      await mount(tester, PrijzenkastView(board: board(inClass: false)));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('badges-section-podium')),
+          matching: find.text(
+            "You're not in a class yet, so you don't take part yet.",
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('the teacher\'s badges: all three, how often each was given, '
+        'grey when not', (tester) async {
+      await mount(
+        tester,
+        PrijzenkastView(
+          board: board(
+            earned: {
+              'teacher:helpingHand': const EarnedBadge(
+                tier: 1,
+                awardedBy: kAwardedByTeacher,
+                extra: {'count': 3, 'seen': 3},
+              ),
+            },
+          ),
+        ),
+      );
+      final section = find.byKey(const ValueKey('badges-section-teacher'));
+      expect(
+        find.descendant(of: section, matching: find.byType(BadgeTileCard)),
+        findsNWidgets(3),
+      );
+      expect(
+        inTile('teacher:helpingHand', find.text('Helping hand')),
+        findsOneWidget,
+      );
+      expect(
+        inTile('teacher:helpingHand', find.text('Received 3×')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<BadgeFrame>(
+              inTile('teacher:helpingHand', find.byType(BadgeFrame)),
+            )
+            .tone,
+        BadgeTone.teacher,
+      );
+      expect(
+        inTile('teacher:faultFinder', find.text('Not earned yet')),
+        findsOneWidget,
+      );
+      expect(
+        inTile(
+          'teacher:faultFinder',
+          find.textContaining('the ID at the top of the exercise'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<BadgeFrame>(
+              inTile('teacher:goodQuestion', find.byType(BadgeFrame)),
+            )
+            .tone,
+        BadgeTone.locked,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 }

@@ -13,7 +13,9 @@
 //     the dark theme and near-white in the light one;
 //   - bronze, silver and gold are the first three tiers; past the third,
 //     dots under the glyph count the tiers ([pipColors]);
-//   - a badge not earned is grey; a secret one not found is a grey "?".
+//   - a badge not earned is grey; a secret one not found is a grey "?";
+//   - a medal of the class podium (#221) is bronze, silver or gold for its
+//     place, and a badge the teacher gives has a muted plum of its own.
 //
 // Every colour is worked out from an [AppPalette], so the same badge reads
 // in both themes and the proof sheet can put the two side by side.
@@ -37,6 +39,10 @@ enum BadgeTone {
 
   /// The single, not so serious badges: a muted blue.
   fun,
+
+  /// A badge the teacher gave (#221): a muted plum, from the palette's
+  /// keyword pink.
+  teacher,
 }
 
 /// The colours one frame is painted with.
@@ -81,7 +87,9 @@ class BadgeStyle {
     return switch (group) {
       BadgeGroup.experts => BadgeTone.expert,
       BadgeGroup.fun => BadgeTone.fun,
-      BadgeGroup.tiers => switch (tier) {
+      BadgeGroup.teacher => BadgeTone.teacher,
+      // A medal's tier is its place backwards: gold is 3 (`podiumTierOf`).
+      BadgeGroup.tiers || BadgeGroup.podium => switch (tier) {
         1 => BadgeTone.bronze,
         2 => BadgeTone.silver,
         _ => BadgeTone.gold,
@@ -109,6 +117,7 @@ class BadgeStyle {
     BadgeTone.gold => p.accent2,
     BadgeTone.expert => Color.lerp(p.accent, p.fgMute, 0.3)!,
     BadgeTone.fun => Color.lerp(p.accent3, p.fgMute, 0.3)!,
+    BadgeTone.teacher => Color.lerp(p.syntaxKw, p.fgMute, 0.3)!,
   };
 
   /// The colours of a frame of [tone] in [p].

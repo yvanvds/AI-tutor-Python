@@ -146,4 +146,146 @@ void main() {
       );
     });
   });
+
+  group('the class podium and the teacher\'s badges (#221)', () {
+    final medal = EarnedBadge(
+      tier: 3,
+      earnedAt: earlier,
+      awardedBy: kAwardedByPodium,
+      extra: const {'place': 1, 'className': '6EWI'},
+    );
+
+    test('a medal is stored whole, with when it was won, and announced with '
+        'the rest of the first look', () {
+      final award = mergeBadgeTiers(
+        null,
+        {'effort': 1},
+        now: now,
+        granted: {'podium:s1': medal},
+      );
+      expect(award.first, isTrue);
+      expect(award.raised, {'effort': 1, 'podium:s1': 3});
+      expect(award.badges['podium:s1'], {
+        'place': 1,
+        'className': '6EWI',
+        'tier': 3,
+        'earnedAt': '2026-10-01T10:00:00.000Z',
+        'awardedBy': 'podium',
+      });
+    });
+
+    test('a medal stored already is not raised again; a better one is', () {
+      final stored = {'podium:s1': medal.toJson()};
+      expect(
+        mergeBadgeTiers(
+          stored,
+          const {},
+          now: now,
+          granted: {'podium:s1': medal},
+        ).changed,
+        isFalse,
+      );
+      final silverStored = {
+        'podium:s1': {'tier': 2, 'awardedBy': 'podium', 'place': 2},
+      };
+      final better = mergeBadgeTiers(
+        silverStored,
+        const {},
+        now: now,
+        granted: {'podium:s1': medal},
+      );
+      expect(better.raised, {'podium:s1': 3});
+      expect(
+        EarnedBadge.fromJson(better.badges['podium:s1'])!.extra['place'],
+        1,
+      );
+    });
+
+    test('a teacher\'s badge stored before the first look leaves it the first '
+        'look: one summary, not "new badges"', () {
+      final stored = {
+        'teacher:helpingHand': {'tier': 1, 'awardedBy': 'teacher', 'count': 1},
+      };
+      final award = mergeBadgeTiers(stored, {'effort': 1}, now: now);
+      expect(award.first, isTrue);
+      expect(
+        award.badges['teacher:helpingHand'],
+        stored['teacher:helpingHand'],
+      );
+      // Nothing the rules reach: nothing to write, whatever it says.
+      expect(mergeBadgeTiers(stored, const {}, now: now).changed, isFalse);
+      // An empty map is the rules' look that found nothing.
+      expect(mergeBadgeTiers({}, {'helloWorld': 1}, now: now).first, isFalse);
+    });
+
+    test(
+      'giving a teacher\'s badge counts it up and keeps everything else',
+      () {
+        final first = addTeacherAward(
+          {
+            'effort': {'tier': 2},
+          },
+          'teacher:faultFinder',
+          now: now,
+        );
+        expect(first.count, 1);
+        expect(first.badges['effort'], {'tier': 2});
+        expect(first.badges['teacher:faultFinder'], {
+          'count': 1,
+          'tier': 1,
+          'earnedAt': '2026-10-05T09:30:00.000Z',
+          'awardedBy': 'teacher',
+        });
+        final seen = withTeacherBadgesSeen(first.badges, {
+          'teacher:faultFinder': 1,
+        })!;
+        final again = addTeacherAward(
+          seen,
+          'teacher:faultFinder',
+          now: now.add(const Duration(days: 1)),
+        );
+        expect(again.count, 2);
+        final entry = EarnedBadge.fromJson(
+          again.badges['teacher:faultFinder'],
+        )!;
+        expect((entry.count, entry.seen), (2, 1));
+        expect(entry.earnedAt, now.add(const Duration(days: 1)));
+        // A first award on a doc without badges makes the map.
+        expect(
+          addTeacherAward(null, 'teacher:goodQuestion', now: now).count,
+          1,
+        );
+      },
+    );
+
+    test('seen only goes up, and never past the count', () {
+      final stored = {
+        'teacher:helpingHand': {
+          'tier': 1,
+          'awardedBy': 'teacher',
+          'count': 3,
+          'seen': 2,
+        },
+      };
+      expect(withTeacherBadgesSeen(stored, {'teacher:helpingHand': 1}), isNull);
+      expect(withTeacherBadgesSeen(stored, {'teacher:missing': 1}), isNull);
+      expect(withTeacherBadgesSeen(null, {'teacher:helpingHand': 1}), isNull);
+      final out = withTeacherBadgesSeen(stored, {'teacher:helpingHand': 9})!;
+      expect((out['teacher:helpingHand'] as Map)['seen'], 3);
+    });
+
+    test('count and seen read tolerantly', () {
+      expect(const EarnedBadge(tier: 1).count, 1);
+      expect(const EarnedBadge(tier: 1).seen, 0);
+      expect(
+        EarnedBadge.fromJson({'tier': 1, 'count': 4.0, 'seen': 'x'})!.count,
+        4,
+      );
+      expect(
+        EarnedBadge.fromJson({'tier': 1, 'count': 4, 'seen': 'x'})!.seen,
+        0,
+      );
+      expect(EarnedBadge.fromJson({'tier': 1, 'count': -2})!.count, 1);
+    });
+  });
 }

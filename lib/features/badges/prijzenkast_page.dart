@@ -2,11 +2,16 @@
 // ones in the colour of their tier with the progress to the next, the ones
 // not earned yet in grey, and a secret not found yet as a "?".
 //
+// #221 adds the student's own medals of the class podium — only theirs: no
+// ranking, nobody else's place — and the teacher's badges with how often
+// each was given.
+//
 // Badges give no XP and never touch a grade; the page says so at the top.
 
 import 'package:ai_tutor_python/features/badges/badge_credits.dart';
 import 'package:ai_tutor_python/features/badges/badge_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/badges/badge_catalog.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -88,6 +93,23 @@ class PrijzenkastView extends StatelessWidget {
                     hint: l.badges_section_experts_hint,
                     tiles: board.experts,
                   ),
+                // A student without a class does not take part, and is told
+                // so; one who moved out of a class keeps their medals.
+                _Section(
+                  key: const ValueKey('badges-section-podium'),
+                  title: l.badges_section_podium,
+                  hint: l.badges_section_podium_hint,
+                  tiles: board.podium,
+                  empty: board.inClass
+                      ? l.badges_podium_none
+                      : l.badges_podium_noClass,
+                ),
+                _Section(
+                  key: const ValueKey('badges-section-teacher'),
+                  title: l.badges_section_teacher,
+                  hint: l.badges_section_teacher_hint,
+                  tiles: board.teacher,
+                ),
                 _Section(
                   title: l.badges_section_fun,
                   hint: l.badges_section_fun_hint,
@@ -113,14 +135,19 @@ class PrijzenkastView extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   const _Section({
+    super.key,
     required this.title,
     required this.hint,
     required this.tiles,
+    this.empty,
   });
 
   final String title;
   final String hint;
   final List<BadgeTile> tiles;
+
+  /// Said instead of the tiles when there are none.
+  final String? empty;
 
   @override
   Widget build(BuildContext context) {
@@ -134,11 +161,17 @@ class _Section extends StatelessWidget {
           const SizedBox(height: AppSpacing.xxs),
           Text(hint, style: text.bodySmall),
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.m,
-            runSpacing: AppSpacing.m,
-            children: [for (final tile in tiles) BadgeTileCard(tile: tile)],
-          ),
+          if (tiles.isEmpty && empty != null)
+            Text(
+              empty!,
+              style: TextStyle(color: AppColors.fgFaint, fontSize: 12.5),
+            )
+          else
+            Wrap(
+              spacing: AppSpacing.m,
+              runSpacing: AppSpacing.m,
+              children: [for (final tile in tiles) BadgeTileCard(tile: tile)],
+            ),
         ],
       ),
     );
@@ -164,14 +197,18 @@ class BadgeTileCard extends ConsumerWidget {
     final hidden = tile.isHidden;
     final name = hidden
         ? l.badges_secret_name
-        : badgeName(l, badge, goalTitle: goalTitle);
+        : badgeName(l, badge, goalTitle: goalTitle, tier: tile.tier);
     final description = hidden
         ? l.badges_secret_description
-        : badgeDescription(l, badge, goalTitle: goalTitle);
+        : badgeDescription(l, badge, goalTitle: goalTitle, tier: tile.tier);
 
     final String status;
     if (!tile.isEarned) {
       status = l.badges_tile_locked;
+    } else if (badge.group == BadgeGroup.teacher) {
+      status = l.badges_tile_count(tile.count);
+    } else if (badge.group == BadgeGroup.podium) {
+      status = l.badges_tile_earned;
     } else if (badge.maxTier > 1) {
       status = tile.tier >= badge.maxTier
           ? l.badges_tile_top
@@ -247,6 +284,10 @@ class BadgeTileCard extends ConsumerWidget {
         expert.total == 0 ? 0 : expert.mastered / expert.total,
         '${expert.mastered}/${expert.total}',
       );
+    }
+    // No rule counts a medal or a teacher's badge (#221): nothing to come.
+    if (badge.group == BadgeGroup.podium || badge.group == BadgeGroup.teacher) {
+      return const [];
     }
     if (badge.maxTier <= 1) return const [];
     final value = tile.value;

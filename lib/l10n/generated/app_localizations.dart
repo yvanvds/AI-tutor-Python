@@ -5634,6 +5634,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Right after more than 5 minutes on one question.'**
   String get badge_rome_description;
+
+  /// No description provided for @badges_section_podium.
+  ///
+  /// In en, this message translates to:
+  /// **'Class podium'**
+  String get badges_section_podium;
+
+  /// No description provided for @badges_section_podium_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.'**
+  String get badges_section_podium_hint;
+
+  /// No description provided for @badges_podium_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No medal yet. Finish a topic as one of the first three in your class.'**
+  String get badges_podium_none;
+
+  /// No description provided for @badges_podium_noClass.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re not in a class yet, so you don\'t take part yet.'**
+  String get badges_podium_noClass;
+
+  /// No description provided for @badges_section_teacher.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher'**
+  String get badges_section_teacher;
+
+  /// No description provided for @badges_section_teacher_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'For things the app can\'t see. Your teacher can give you each of them more than once.'**
+  String get badges_section_teacher_hint;
+
+  /// No description provided for @badges_tile_count.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {count}×'**
+  String badges_tile_count(int count);
+
+  /// No description provided for @badges_toast_fromTeacher.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher'**
+  String get badges_toast_fromTeacher;
+
+  /// No description provided for @badges_toast_fromTeacherCount.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher, {count}× now'**
+  String badges_toast_fromTeacherCount(int count);
+
+  /// No description provided for @badges_proof_state_podium.
+  ///
+  /// In en, this message translates to:
+  /// **'class podium'**
+  String get badges_proof_state_podium;
+
+  /// No description provided for @badges_proof_state_teacher.
+  ///
+  /// In en, this message translates to:
+  /// **'from the teacher'**
+  String get badges_proof_state_teacher;
+
+  /// No description provided for @badge_podium_name.
+  ///
+  /// In en, this message translates to:
+  /// **'{medal}: {subgoal}'**
+  String badge_podium_name(String medal, String subgoal);
+
+  /// No description provided for @badge_podium_gold.
+  ///
+  /// In en, this message translates to:
+  /// **'Gold'**
+  String get badge_podium_gold;
+
+  /// No description provided for @badge_podium_silver.
+  ///
+  /// In en, this message translates to:
+  /// **'Silver'**
+  String get badge_podium_silver;
+
+  /// No description provided for @badge_podium_bronze.
+  ///
+  /// In en, this message translates to:
+  /// **'Bronze'**
+  String get badge_podium_bronze;
+
+  /// No description provided for @badge_podium_unknownSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'a topic'**
+  String get badge_podium_unknownSubgoal;
+
+  /// No description provided for @badge_podium_first_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the first in your class to finish this topic.'**
+  String get badge_podium_first_description;
+
+  /// No description provided for @badge_podium_second_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the second in your class to finish this topic.'**
+  String get badge_podium_second_description;
+
+  /// No description provided for @badge_podium_third_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the third in your class to finish this topic.'**
+  String get badge_podium_third_description;
+
+  /// No description provided for @badge_faultFinder_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Fault finder'**
+  String get badge_faultFinder_name;
+
+  /// No description provided for @badge_faultFinder_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.'**
+  String get badge_faultFinder_description;
+
+  /// No description provided for @badge_helpingHand_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Helping hand'**
+  String get badge_helpingHand_name;
+
+  /// No description provided for @badge_helpingHand_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You helped a classmate.'**
+  String get badge_helpingHand_description;
+
+  /// No description provided for @badge_goodQuestion_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Good question!'**
+  String get badge_goodQuestion_name;
+
+  /// No description provided for @badge_goodQuestion_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You asked a question in class that deserved it.'**
+  String get badge_goodQuestion_description;
+
+  /// No description provided for @awardBadge_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Award badge'**
+  String get awardBadge_button;
+
+  /// No description provided for @awardBadge_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Award a badge to {name}'**
+  String awardBadge_title(String name);
+
+  /// No description provided for @awardBadge_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'For things the app can\'t see. {name} gets a notice the next time the app starts, or within seconds if it is open.'**
+  String awardBadge_intro(String name);
+
+  /// No description provided for @awardBadge_faultFinder_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported a wrong question, by the ID at the top of the exercise.'**
+  String get awardBadge_faultFinder_hint;
+
+  /// No description provided for @awardBadge_helpingHand_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Helped a classmate.'**
+  String get awardBadge_helpingHand_hint;
+
+  /// No description provided for @awardBadge_goodQuestion_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Asked a question in class that deserved it.'**
+  String get awardBadge_goodQuestion_hint;
+
+  /// No description provided for @awardBadge_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not given yet} other{Given {count}× so far}}'**
+  String awardBadge_count(int count);
+
+  /// No description provided for @awardBadge_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get awardBadge_cancel;
+
+  /// No description provided for @awardBadge_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Award'**
+  String get awardBadge_confirm;
+
+  /// No description provided for @awardBadge_done.
+  ///
+  /// In en, this message translates to:
+  /// **'{badge} awarded ({count}×).'**
+  String awardBadge_done(String badge, int count);
+
+  /// No description provided for @awardBadge_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge could not be awarded. Try again.'**
+  String get awardBadge_failed;
 }
 
 class _AppLocalizationsDelegate

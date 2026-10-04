@@ -3417,4 +3417,144 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get badge_rome_description =>
       'Juist na meer dan 5 minuten op één vraag.';
+
+  @override
+  String get badges_section_podium => 'Klaspodium';
+
+  @override
+  String get badges_section_podium_hint =>
+      'De eerste drie van je klas die een onderwerp afronden, krijgen er goud, zilver of brons voor. Alleen jij ziet je medailles.';
+
+  @override
+  String get badges_podium_none =>
+      'Nog geen medaille. Rond een onderwerp af als een van de eerste drie van je klas.';
+
+  @override
+  String get badges_podium_noClass =>
+      'Je zit nog niet in een klas, dus je doet nog niet mee.';
+
+  @override
+  String get badges_section_teacher => 'Van je leerkracht';
+
+  @override
+  String get badges_section_teacher_hint =>
+      'Voor wat de app niet ziet. Je leerkracht kan je elke badge meer dan eens geven.';
+
+  @override
+  String badges_tile_count(int count) {
+    return '$count× gekregen';
+  }
+
+  @override
+  String get badges_toast_fromTeacher => 'Van je leerkracht';
+
+  @override
+  String badges_toast_fromTeacherCount(int count) {
+    return 'Van je leerkracht, nu $count×';
+  }
+
+  @override
+  String get badges_proof_state_podium => 'klaspodium';
+
+  @override
+  String get badges_proof_state_teacher => 'van de leerkracht';
+
+  @override
+  String badge_podium_name(String medal, String subgoal) {
+    return '$medal: $subgoal';
+  }
+
+  @override
+  String get badge_podium_gold => 'Goud';
+
+  @override
+  String get badge_podium_silver => 'Zilver';
+
+  @override
+  String get badge_podium_bronze => 'Brons';
+
+  @override
+  String get badge_podium_unknownSubgoal => 'een onderwerp';
+
+  @override
+  String get badge_podium_first_description =>
+      'Je rondde dit onderwerp als eerste van je klas af.';
+
+  @override
+  String get badge_podium_second_description =>
+      'Je rondde dit onderwerp als tweede van je klas af.';
+
+  @override
+  String get badge_podium_third_description =>
+      'Je rondde dit onderwerp als derde van je klas af.';
+
+  @override
+  String get badge_faultFinder_name => 'Foutenjager';
+
+  @override
+  String get badge_faultFinder_description =>
+      'Je meldde een vraag die niet klopte. Zie je er een? Geef je leerkracht de ID bovenaan de oefening, zoals #3fa91c.';
+
+  @override
+  String get badge_helpingHand_name => 'Helpende hand';
+
+  @override
+  String get badge_helpingHand_description => 'Je hielp een klasgenoot.';
+
+  @override
+  String get badge_goodQuestion_name => 'Goede vraag!';
+
+  @override
+  String get badge_goodQuestion_description =>
+      'Je stelde in de les een vraag die het verdiende.';
+
+  @override
+  String get awardBadge_button => 'Badge toekennen';
+
+  @override
+  String awardBadge_title(String name) {
+    return 'Badge toekennen aan $name';
+  }
+
+  @override
+  String awardBadge_intro(String name) {
+    return 'Voor wat de app niet ziet. $name krijgt een melding bij de volgende start, of binnen enkele seconden als de app openstaat.';
+  }
+
+  @override
+  String get awardBadge_faultFinder_hint =>
+      'Meldde een foute vraag, met de ID bovenaan de oefening.';
+
+  @override
+  String get awardBadge_helpingHand_hint => 'Hielp een klasgenoot.';
+
+  @override
+  String get awardBadge_goodQuestion_hint =>
+      'Stelde in de les een vraag die het verdiende.';
+
+  @override
+  String awardBadge_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Al $count× gekregen',
+      zero: 'Nog niet gekregen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get awardBadge_cancel => 'Annuleren';
+
+  @override
+  String get awardBadge_confirm => 'Toekennen';
+
+  @override
+  String awardBadge_done(String badge, int count) {
+    return '$badge toegekend ($count×).';
+  }
+
+  @override
+  String get awardBadge_failed =>
+      'De badge kon niet toegekend worden. Probeer het opnieuw.';
 }

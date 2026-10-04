@@ -1759,5 +1759,62 @@
   "badge_bugHunter_name": "Bug hunter",
   "badge_bugHunter_description": "You were right, the computer wasn't.",
   "badge_rome_name": "Rome wasn't built in a day",
-  "badge_rome_description": "Right after more than 5 minutes on one question."
+  "badge_rome_description": "Right after more than 5 minutes on one question.",
+  "badges_section_podium": "Class podium",
+  "badges_section_podium_hint": "The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.",
+  "badges_podium_none": "No medal yet. Finish a topic as one of the first three in your class.",
+  "badges_podium_noClass": "You're not in a class yet, so you don't take part yet.",
+  "badges_section_teacher": "From your teacher",
+  "badges_section_teacher_hint": "For things the app can't see. Your teacher can give you each of them more than once.",
+  "badges_tile_count": "Received {count}×",
+  "@badges_tile_count": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_toast_fromTeacher": "From your teacher",
+  "badges_toast_fromTeacherCount": "From your teacher, {count}× now",
+  "@badges_toast_fromTeacherCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_proof_state_podium": "class podium",
+  "badges_proof_state_teacher": "from the teacher",
+  "badge_podium_name": "{medal}: {subgoal}",
+  "@badge_podium_name": {
+    "placeholders": { "medal": { "type": "String" }, "subgoal": { "type": "String" } }
+  },
+  "badge_podium_gold": "Gold",
+  "badge_podium_silver": "Silver",
+  "badge_podium_bronze": "Bronze",
+  "badge_podium_unknownSubgoal": "a topic",
+  "badge_podium_first_description": "You were the first in your class to finish this topic.",
+  "badge_podium_second_description": "You were the second in your class to finish this topic.",
+  "badge_podium_third_description": "You were the third in your class to finish this topic.",
+  "badge_faultFinder_name": "Fault finder",
+  "badge_faultFinder_description": "You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.",
+  "badge_helpingHand_name": "Helping hand",
+  "badge_helpingHand_description": "You helped a classmate.",
+  "badge_goodQuestion_name": "Good question!",
+  "badge_goodQuestion_description": "You asked a question in class that deserved it.",
+  "awardBadge_button": "Award badge",
+  "awardBadge_title": "Award a badge to {name}",
+  "@awardBadge_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "awardBadge_intro": "For things the app can't see. {name} gets a notice the next time the app starts, or within seconds if it is open.",
+  "@awardBadge_intro": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "awardBadge_faultFinder_hint": "Reported a wrong question, by the ID at the top of the exercise.",
+  "awardBadge_helpingHand_hint": "Helped a classmate.",
+  "awardBadge_goodQuestion_hint": "Asked a question in class that deserved it.",
+  "awardBadge_count": "{count, plural, =0{Not given yet} other{Given {count}× so far}}",
+  "@awardBadge_count": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "awardBadge_cancel": "Cancel",
+  "awardBadge_confirm": "Award",
+  "awardBadge_done": "{badge} awarded ({count}×).",
+  "@awardBadge_done": {
+    "placeholders": { "badge": { "type": "String" }, "count": { "type": "int" } }
+  },
+  "awardBadge_failed": "The badge could not be awarded. Try again."
 }

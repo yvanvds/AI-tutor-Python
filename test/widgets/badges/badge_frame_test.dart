@@ -58,6 +58,18 @@ void main() {
         BadgeTone.locked,
       );
     });
+
+    test('a medal of the class podium (#221) is the metal of its place, '
+        'without dots; a teacher\'s badge has its own tone', () {
+      final medal = BadgeCatalog.podium('s1');
+      expect(BadgeFrame.of(medal, tier: 3).tone, BadgeTone.gold);
+      expect(BadgeFrame.of(medal, tier: 2).tone, BadgeTone.silver);
+      expect(BadgeFrame.of(medal, tier: 1).tone, BadgeTone.bronze);
+      expect(BadgeFrame.of(medal, tier: 3).pips, 0);
+      final helper = BadgeCatalog.byId('teacher:helpingHand')!;
+      expect(BadgeFrame.of(helper, tier: 1).tone, BadgeTone.teacher);
+      expect(BadgeFrame.of(helper, tier: 0).tone, BadgeTone.locked);
+    });
   });
 
   group('the colours, in both themes', () {
@@ -67,6 +79,7 @@ void main() {
       BadgeTone.gold,
       BadgeTone.expert,
       BadgeTone.fun,
+      BadgeTone.teacher,
     ];
 
     for (final palette in const [AppPalette.dark, AppPalette.light]) {

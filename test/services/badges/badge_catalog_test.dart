@@ -158,6 +158,22 @@ void main() {
       }
     });
 
+    test('the class podium and the teacher\'s badges (#221) have glyphs by '
+        'Delapouite, in the credits', () {
+      final icons = BadgeCatalog.icons;
+      for (final d in [BadgeCatalog.podium('s1'), ...BadgeCatalog.teacher]) {
+        expect(d.icon.author, BadgeIcon.delapouite, reason: d.id);
+        expect(icons, contains(d.icon), reason: d.id);
+        expect(File(d.icon.asset).existsSync(), isTrue, reason: d.id);
+      }
+      expect(BadgeCatalog.podiumIcon.slug, 'sport-medal');
+      expect(BadgeCatalog.teacher.map((d) => d.icon.slug), [
+        'sherlock-holmes',
+        'life-buoy',
+        'think',
+      ]);
+    });
+
     test('every glyph names its author, for the credits', () {
       final authors = BadgeCatalog.icons.map((i) => i.author).toSet();
       expect(authors, {BadgeIcon.delapouite, BadgeIcon.lorc});
@@ -167,6 +183,84 @@ void main() {
       expect(owl.title, 'Owl');
       expect(owl.sourceUrl, 'https://game-icons.net/1x1/lorc/owl.html');
       expect(BadgeCatalog.byId('effort')!.icon.title, 'Weight lifting up');
+    });
+  });
+
+  group('the class podium and the teacher\'s badges (#221)', () {
+    test('found by the id they are stored under; no rule counts them', () {
+      final medal = BadgeCatalog.byId('podium:s1')!;
+      expect(medal.group, BadgeGroup.podium);
+      expect(medal.goalId, 's1');
+      expect(medal.tiers, [1, 2, 3]);
+      expect(medal.valueIn(BadgeFacts.empty), isNull);
+      expect(medal.tierFor(medal.valueIn(BadgeFacts.empty)), 0);
+      expect(BadgeCatalog.byId('podium:'), isNull);
+      expect(BadgeCatalog.teacher.map((d) => d.id), [
+        'teacher:faultFinder',
+        'teacher:helpingHand',
+        'teacher:goodQuestion',
+      ]);
+      for (final d in BadgeCatalog.teacher) {
+        expect(BadgeCatalog.byId(d.id), d);
+        expect(d.group, BadgeGroup.teacher);
+        expect(d.secret, isFalse, reason: 'a student may know what it is for');
+        expect(d.valueIn(BadgeFacts.empty), isNull);
+      }
+      expect(BadgeCatalog.byId('teacher:unknown'), isNull);
+      // The rules never count them.
+      final ruled = BadgeCatalog.all(expertGoalIds: ['r1']).map((d) => d.group);
+      expect(ruled, isNot(contains(BadgeGroup.podium)));
+      expect(ruled, isNot(contains(BadgeGroup.teacher)));
+    });
+
+    test('a medal says its metal and its subgoal; a teacher\'s badge its '
+        'name, in Dutch and in English', () {
+      final nl = lookupAppLocalizations(const Locale('nl'));
+      final en = lookupAppLocalizations(const Locale('en'));
+      final medal = BadgeCatalog.podium('s1');
+      expect(
+        badgeName(nl, medal, goalTitle: 'Variabelen', tier: 3),
+        'Goud: Variabelen',
+      );
+      expect(
+        badgeName(nl, medal, goalTitle: 'Variabelen', tier: 2),
+        'Zilver: Variabelen',
+      );
+      expect(badgeName(nl, medal, tier: 1), 'Brons: een onderwerp');
+      expect(
+        badgeDescription(nl, medal, tier: 3),
+        'Je rondde dit onderwerp als eerste van je klas af.',
+      );
+      expect(
+        badgeDescription(en, medal, tier: 1),
+        'You were the third in your class to finish this topic.',
+      );
+      expect(
+        badgeName(nl, BadgeCatalog.byId('teacher:faultFinder')!),
+        'Foutenjager',
+      );
+      expect(
+        badgeName(nl, BadgeCatalog.byId('teacher:helpingHand')!),
+        'Helpende hand',
+      );
+      expect(
+        badgeName(nl, BadgeCatalog.byId('teacher:goodQuestion')!),
+        'Goede vraag!',
+      );
+      expect(
+        badgeDescription(nl, BadgeCatalog.byId('teacher:faultFinder')!),
+        contains('#3fa91c'),
+      );
+      for (final l in [nl, en]) {
+        final names = <String>{
+          for (final d in BadgeCatalog.all(expertGoalIds: ['r1']))
+            badgeName(l, d, goalTitle: 'Python'),
+        };
+        for (final d in BadgeCatalog.teacher) {
+          expect(names.add(badgeName(l, d)), isTrue, reason: d.id);
+          expect(badgeDescription(l, d).trim(), isNotEmpty, reason: d.id);
+        }
+      }
     });
   });
 

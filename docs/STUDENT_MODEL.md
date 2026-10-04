@@ -284,11 +284,32 @@ account.badges {                   // absent: badges never counted yet
     earnedAt: string               // when that tier was reached
     awardedBy: string?             // #221: "teacher" / "podium"; absent = the app's rules
   }
+  "podium:<subgoalId>": {          // #221: a medal of the class podium
+    tier: 3 | 2 | 1                // gold, silver, bronze
+    place: 1 | 2 | 3
+    className: string
+    earnedAt: string               // when the subgoal was finished
+    awardedBy: "podium"
+  }
+  "teacher:<key>": {               // #221: faultFinder, helpingHand, goodQuestion
+    tier: 1
+    count: int                     // +1 per award, from the teacher's app
+    seen: int?                     // the count the student's app announced
+    earnedAt: string               // the last award
+    awardedBy: "teacher"
+  }
 }
 ```
 
 A tier only ever goes up, also when a threshold changes later or the
 history is reset. No belief, calibration, XP or grade reads it.
+
+The medals come from the class podium (#221): per class and subgoal three
+docs in the `podium` partition of the `config` container
+(`podium_{class}_{subgoal}_{place}`, with the student's uid), claimed with a
+`create` that never overwrites on the graded turn that first moves the
+student past the subgoal (`subgoalAdvanced`). The student's own app copies
+the places it holds onto the account doc; only that student ever sees them.
 
 ### `progress` container (kept, repurposed as cache)
 

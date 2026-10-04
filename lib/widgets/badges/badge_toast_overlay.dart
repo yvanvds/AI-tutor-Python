@@ -14,6 +14,7 @@ import 'package:ai_tutor_python/features/badges/badge_text.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/badges/badge_catalog.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/progression/level_up_controller.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
@@ -242,15 +243,17 @@ class _Words extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final a = announcement;
-    String nameOf(EarnedBadgeNotice n) {
+    String? goalTitleOf(EarnedBadgeNotice n) {
       final goal = n.badge.goalId;
-      final title = goal == null
+      return goal == null
           ? null
           : ref
                 .watch(localizedGoalByIdOf(goal, title: n.goalTitle ?? ''))
                 .title;
-      return badgeName(l, n.badge, goalTitle: title);
     }
+
+    String nameOf(EarnedBadgeNotice n) =>
+        badgeName(l, n.badge, goalTitle: goalTitleOf(n), tier: n.tier);
 
     final String title;
     final String body;
@@ -262,19 +265,20 @@ class _Words extends ConsumerWidget {
     } else {
       final n = a.badges.single;
       title = nameOf(n);
-      final goal = n.badge.goalId;
       final description = badgeDescription(
         l,
         n.badge,
-        goalTitle: goal == null
-            ? null
-            : ref
-                  .watch(localizedGoalByIdOf(goal, title: n.goalTitle ?? ''))
-                  .title,
+        goalTitle: goalTitleOf(n),
+        tier: n.tier,
       );
-      body = n.badge.maxTier > 1
-          ? '${l.badges_toast_tier(n.tier)} · $description'
-          : description;
+      body = switch (n.badge.group) {
+        // From the teacher (#221), and how often by now.
+        BadgeGroup.teacher =>
+          '${n.count > 1 ? l.badges_toast_fromTeacherCount(n.count) : l.badges_toast_fromTeacher} · $description',
+        BadgeGroup.tiers when n.badge.maxTier > 1 =>
+          '${l.badges_toast_tier(n.tier)} · $description',
+        _ => description,
+      };
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

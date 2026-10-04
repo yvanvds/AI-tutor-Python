@@ -217,9 +217,13 @@ class AccountService extends Notifier<Account?> {
   /// exactly what this write raised, also when another laptop got there
   /// first. Nothing is written when nothing goes up; `null` without a
   /// signed-in user or an account doc.
+  ///
+  /// [granted]: the medals of the class podium the student holds (#221),
+  /// stored in the same write when they are new or better.
   Future<BadgeAward?> awardBadges(
     Map<String, int> tiers, {
     DateTime? now,
+    Map<String, EarnedBadge> granted = const {},
   }) async {
     final uid = currentUid;
     if (uid == null) return null;
@@ -229,11 +233,48 @@ class AccountService extends Notifier<Account?> {
         doc['badges'],
         tiers,
         now: now ?? DateTime.now().toUtc(),
+        granted: granted,
       );
       award = merged;
       return merged.changed ? {'badges': merged.badges} : const {};
     });
     return award;
+  }
+
+  /// The teacher gives student [uid] the badge [badgeId] once more (#221):
+  /// its `count` goes up by one on the student's account doc, with `earnedAt`
+  /// now and `awardedBy: teacher`; every other badge and field stays
+  /// (`addTeacherAward`). The student's app announces it on its next poll.
+  /// Returns the new count; `null` when the student has no account doc.
+  /// Throws when Cosmos does not answer.
+  Future<int?> awardTeacherBadge({
+    required String uid,
+    required String badgeId,
+    DateTime? now,
+  }) async {
+    int? count;
+    await _patchWith(uid, (doc) {
+      final next = addTeacherAward(
+        doc['badges'],
+        badgeId,
+        now: now ?? DateTime.now().toUtc(),
+      );
+      count = next.count;
+      return {'badges': next.badges};
+    });
+    return count;
+  }
+
+  /// Records on the current user's account doc that the teacher's badges in
+  /// [seen] (badge id → count) were announced (#221), so no other laptop of
+  /// the student announces them again. Never lowers what is stored.
+  Future<void> markTeacherBadgesSeen(Map<String, int> seen) async {
+    final uid = currentUid;
+    if (uid == null || seen.isEmpty) return;
+    await _patchWith(uid, (doc) {
+      final next = withTeacherBadgesSeen(doc['badges'], seen);
+      return next == null ? const {} : {'badges': next};
+    });
   }
 
   /// Records that the current user had a successful tutor turn "today".

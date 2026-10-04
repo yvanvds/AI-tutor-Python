@@ -3,16 +3,25 @@
 // summary for the first look and a notice per badge after a graded turn, no
 // lesson badge without lesson times, nothing for a teacher, and a failed
 // read that leaves the stored badges standing and is tried again.
+//
+// #221: a first advance past a subgoal claims a place on the class podium
+// and the medal is stored and announced like the other badges; finishing
+// again, or without a class, claims nothing; the places the backfill handed
+// out are picked up at start; a claim Cosmos cannot answer waits for the
+// next graded turn. A badge from the teacher is announced once, with how
+// often, and marked seen on the doc.
 
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/badges/badge_catalog.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
+import 'package:ai_tutor_python/services/badges/class_podium.dart';
 import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/classes/school_class.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -51,6 +60,7 @@ DateTime _at(int minutes) =>
 PersistedTurnRecord _turn(
   int i, {
   AnswerQuality quality = AnswerQuality.correct,
+  bool advanced = false,
 }) => PersistedTurnRecord(
   id: 't${i.toString().padLeft(3, '0')}',
   turnAt: _at(i).toUtc(),
@@ -69,8 +79,54 @@ PersistedTurnRecord _turn(
   calibrationAfter: QuestionDifficulty.medium,
   subgoalProgressAfter: 0,
   loStatusAfter: const [],
-  subgoalAdvanced: false,
+  subgoalAdvanced: advanced,
 );
+
+/// The account service, with a way to hand the badge service the doc as the
+/// next 5 s poll would (#221).
+class _Accounts221 extends AccountService {
+  _Accounts221({super.container});
+
+  void poll(Map<String, dynamic> doc) => state = Account.fromMap(doc);
+}
+
+/// The podium's config container, whose creates can be made to fail.
+class _Config implements CosmosContainer {
+  _Config(this.inner);
+  final CosmosContainer inner;
+  bool down = false;
+
+  @override
+  Future<Map<String, dynamic>> create(
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+  }) {
+    if (down) throw CosmosException(503, 'unavailable');
+    return inner.create(doc, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> read(
+    String id, {
+    required Object partitionKey,
+  }) => inner.read(id, partitionKey: partitionKey);
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String sql, {
+    Map<String, Object?> parameters = const {},
+    Object? partitionKey,
+    bool crossPartition = false,
+  }) => inner.query(
+    sql,
+    parameters: parameters,
+    partitionKey: partitionKey,
+    crossPartition: crossPartition,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 /// Reads the history from the in-memory container, or fails, or waits.
 class _History extends TurnHistoryService {
@@ -126,6 +182,8 @@ void main() {
   late _History history;
   late ProviderContainer pc;
   var classes = ClassList.empty;
+  late InMemoryCosmos config;
+  late _Config configContainer;
 
   void seedAccount({String className = '', Map<String, dynamic>? badges}) {
     accounts = InMemoryCosmos([
@@ -153,9 +211,12 @@ void main() {
           () => _Auth(_identity(teacher: teacher)),
         ),
         accountServiceProvider.overrideWith(
-          () => AccountService(container: accountsContainer),
+          () => _Accounts221(container: accountsContainer),
         ),
         turnHistoryServiceProvider.overrideWithValue(history),
+        classPodiumProvider.overrideWithValue(
+          ClassPodium(container: configContainer),
+        ),
         goalsServiceProvider.overrideWithValue(
           GoalsService(container: goals.container),
         ),
@@ -185,6 +246,10 @@ void main() {
   setUp(() {
     classes = ClassList.empty;
     goals = InMemoryCosmos();
+    config = InMemoryCosmos.partitioned('type', [
+      {'id': 'global', 'type': 'config'},
+    ]);
+    configContainer = _Config(config.container);
     seedAccount();
     seedTurns(const []);
   });
@@ -382,6 +447,254 @@ void main() {
     (pc.read(authServiceProvider.notifier) as _Auth).set(null);
     await until(() => pc.read(badgeServiceProvider) == null);
     expect(announced(), isEmpty);
+  });
+
+  group('the class podium (#221)', () {
+    const earnedAlready = {
+      'effort': {'tier': 1},
+      'helloWorld': {'tier': 1},
+    };
+
+    Map<String, dynamic>? podiumDoc(int place) =>
+        config['podium/podium_6EWI_s1_$place'];
+
+    void seedVariables() => goals = InMemoryCosmos([
+      {'id': 'r1', 'type': 'goal', 'title': 'Basis', 'order': 0},
+      {
+        'id': 's1',
+        'type': 'goal',
+        'title': 'Variabelen',
+        'parentId': 'r1',
+        'order': 1000,
+      },
+    ]);
+
+    test('a first advance claims the first free place; the medal is stored '
+        'and announced with its subgoal', () async {
+      seedVariables();
+      seedAccount(className: '6EWI', badges: earnedAlready);
+      seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
+      // Someone else was first.
+      config.create({
+        ...PodiumPlace(
+          className: '6EWI',
+          subgoalId: 's1',
+          place: 1,
+          uid: 'someone-else',
+        ).toDoc(),
+      }, partitionKey: 'podium');
+      start();
+      await until(() => pc.read(badgeServiceProvider)?.facts != null);
+
+      await pc
+          .read(badgeServiceProvider.notifier)
+          .afterTurn(_turn(10, advanced: true));
+
+      expect(podiumDoc(2)!['uid'], _uid);
+      expect(podiumDoc(2)!['awardedAt'], _at(10).toUtc().toIso8601String());
+      final medal = EarnedBadges.fromDoc(accounts.docs[_uid]!)!
+          .byId['podium:s1']!;
+      expect(medal.tier, 2, reason: 'silver');
+      expect(medal.awardedBy, kAwardedByPodium);
+      expect(medal.extra['place'], 2);
+      final notice = announced()
+          .expand((a) => a.badges)
+          .singleWhere((n) => n.badge.id == 'podium:s1');
+      expect(notice.tier, 2);
+      expect(notice.goalTitle, 'Variabelen');
+      // Nobody else's place is anywhere in what the student has.
+      expect(accounts.docs[_uid].toString(), isNot(contains('someone-else')));
+    });
+
+    test('finishing the subgoal again does not count again', () async {
+      seedAccount(className: '6EWI', badges: earnedAlready);
+      seedTurns([for (var i = 0; i < 10; i++) _turn(i, advanced: i == 3)]);
+      start();
+      await until(() => pc.read(badgeServiceProvider)?.facts != null);
+      await pc
+          .read(badgeServiceProvider.notifier)
+          .afterTurn(_turn(10, advanced: true));
+      expect(podiumDoc(1), isNull);
+      expect(storedBadges()!.containsKey('podium:s1'), isFalse);
+    });
+
+    test('a student without a class does not take part', () async {
+      seedAccount(badges: earnedAlready);
+      seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
+      start();
+      await until(() => pc.read(badgeServiceProvider)?.facts != null);
+      await pc
+          .read(badgeServiceProvider.notifier)
+          .afterTurn(_turn(10, advanced: true));
+      expect(podiumDoc(1), isNull);
+      expect(storedBadges()!.containsKey('podium:s1'), isFalse);
+    });
+
+    test('the start picks up the places the backfill handed out: in the '
+        'summary of the first look', () async {
+      seedAccount(className: '6EWI');
+      seedTurns([for (var i = 0; i < 12; i++) _turn(i, advanced: i == 5)]);
+      config.create(
+        PodiumPlace(
+          className: '6EWI',
+          subgoalId: 's1',
+          place: 1,
+          uid: _uid,
+          awardedAt: _at(5).toUtc(),
+        ).toDoc(),
+        partitionKey: 'podium',
+      );
+      start();
+      await until(() => announced().isNotEmpty);
+      final summary = announced().single;
+      expect(summary.first, isTrue);
+      expect(summary.badges.map((n) => n.badge.id), contains('podium:s1'));
+      final medal = EarnedBadges.fromDoc(accounts.docs[_uid]!)!
+          .byId['podium:s1']!;
+      expect(medal.tier, 3);
+      expect(medal.earnedAt, _at(5).toUtc());
+      // Its doc was the backfill's: nothing claimed again.
+      expect(podiumDoc(2), isNull);
+    });
+
+    test(
+      'a claim Cosmos cannot answer waits for the next graded turn',
+      () async {
+        seedAccount(className: '6EWI', badges: earnedAlready);
+        seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
+        start();
+        await until(() => pc.read(badgeServiceProvider)?.facts != null);
+        configContainer.down = true;
+        await pc
+            .read(badgeServiceProvider.notifier)
+            .afterTurn(_turn(10, advanced: true));
+        expect(podiumDoc(1), isNull);
+        expect(storedBadges()!.containsKey('podium:s1'), isFalse);
+
+        configContainer.down = false;
+        await pc.read(badgeServiceProvider.notifier).afterTurn(_turn(11));
+        expect(podiumDoc(1)!['uid'], _uid);
+        expect(
+          podiumDoc(1)!['awardedAt'],
+          _at(10).toUtc().toIso8601String(),
+          reason: 'when the subgoal was finished, not when the claim got in',
+        );
+        expect(
+          EarnedBadges.fromDoc(accounts.docs[_uid]!)!.tierOf('podium:s1'),
+          3,
+        );
+      },
+    );
+
+    test('an advance while the history is still loading is claimed once it '
+        'is in', () async {
+      seedAccount(className: '6EWI', badges: earnedAlready);
+      seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
+      history.gate = Completer<void>();
+      start();
+      await until(() => history.reads == 1);
+      await pc
+          .read(badgeServiceProvider.notifier)
+          .afterTurn(_turn(10, advanced: true));
+      expect(podiumDoc(1), isNull);
+      history.gate!.complete();
+      await until(() => podiumDoc(1) != null);
+      await until(() => storedBadges()!.containsKey('podium:s1'));
+    });
+  });
+
+  group('the teacher\'s badges (#221)', () {
+    Map<String, dynamic> given(int count, {int? seen}) => {
+      'tier': 1,
+      'awardedBy': 'teacher',
+      'earnedAt': '2026-10-05T10:00:00.000Z',
+      'count': count,
+      'seen': ?seen,
+    };
+
+    _Accounts221 accountService() =>
+        pc.read(accountServiceProvider.notifier) as _Accounts221;
+
+    test('a badge given is announced once, with how often, and marked seen '
+        'on the doc', () async {
+      seedAccount(
+        badges: {
+          'helloWorld': {'tier': 1},
+          'teacher:helpingHand': given(2, seen: 1),
+          'teacher:goodQuestion': given(1, seen: 1),
+        },
+      );
+      seedTurns([_turn(0)]);
+      start();
+      await until(() => announced().isNotEmpty);
+      final notice = announced().single.badges.single;
+      expect(notice.badge.id, 'teacher:helpingHand');
+      expect(notice.count, 2);
+      await until(
+        () => (storedBadges()!['teacher:helpingHand'] as Map)['seen'] == 2,
+      );
+
+      // The next poll, with it seen: nothing new.
+      pc.read(badgeAnnouncementsProvider.notifier).dismissCurrent();
+      accountService().poll(accounts.docs[_uid]!);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(announced(), isEmpty);
+
+      // The teacher gives it again while the app is open.
+      final doc = accounts.docs[_uid]!;
+      (doc['badges'] as Map)['teacher:helpingHand'] = given(3, seen: 2);
+      accountService().poll(doc);
+      await until(() => announced().isNotEmpty);
+      expect(announced().single.badges.single.count, 3);
+      await until(
+        () => (storedBadges()!['teacher:helpingHand'] as Map)['seen'] == 3,
+      );
+    });
+
+    test(
+      'a poll before the seen write is in does not announce it twice',
+      () async {
+        seedAccount(badges: {'teacher:faultFinder': given(1)});
+        accountsContainer.failWrites = true;
+        start();
+        await until(() => announced().isNotEmpty);
+        pc.read(badgeAnnouncementsProvider.notifier).dismissCurrent();
+        accountService().poll(accounts.docs[_uid]!);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(announced(), isEmpty);
+        // The write is tried again on a later poll.
+        accountsContainer.failWrites = false;
+        accountService().poll(accounts.docs[_uid]!);
+        await until(
+          () => (storedBadges()!['teacher:faultFinder'] as Map)['seen'] == 1,
+        );
+        expect(announced(), isEmpty);
+      },
+    );
+
+    test('a badge given before the student ever opened the release: the '
+        'history\'s badges are still the first look\'s summary', () async {
+      seedAccount(badges: {'teacher:goodQuestion': given(1)});
+      seedTurns([for (var i = 0; i < 12; i++) _turn(i)]);
+      start();
+      await until(() => announced().length == 2);
+      final queue = announced();
+      expect(queue.first.badges.single.badge.id, 'teacher:goodQuestion');
+      expect(queue.last.first, isTrue);
+      expect(queue.last.badges.map((n) => n.badge.id), [
+        'effort',
+        'streak',
+        'helloWorld',
+      ]);
+    });
+
+    test('a teacher\'s app announces nothing', () async {
+      seedAccount(badges: {'teacher:goodQuestion': given(1)});
+      start(teacher: true);
+      await until(() => pc.read(accountServiceProvider) != null);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(announced(), isEmpty);
+    });
   });
 
   group('announcing', () {

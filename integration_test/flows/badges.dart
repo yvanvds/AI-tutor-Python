@@ -137,7 +137,8 @@ void main() {
     await tester.tap(_inToast(find.text('See your trophy case')));
     await pumpUntilFound(tester, find.byType(PrijzenkastPage));
     await pumpUntilGone(tester, _toast());
-    expect(find.text('3 of 34 badges earned'), findsOneWidget);
+    // The teacher's three badges (#221) count too, not given yet.
+    expect(find.text('3 of 37 badges earned'), findsOneWidget);
     expect(_inTile('effort', find.text('Tier 1 of 6')), findsOneWidget);
     expect(_inTile('effort', find.text('12/100')), findsOneWidget);
     expect(_inTile('streak', find.text('Tier 1 of 4')), findsOneWidget);

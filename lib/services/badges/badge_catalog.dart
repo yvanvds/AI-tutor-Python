@@ -19,6 +19,11 @@
 // background square and the white fill taken out, so the frame can colour
 // the glyph (`badge_style.dart`). Delapouite's where there is a fitting one
 // — the cleanest style — and Lorc's for the owl and the pie.
+//
+// #221 adds two kinds that no rule counts: the medals of the class podium,
+// one per subgoal a student finished among the first three of their class
+// (`class_podium.dart`), and the badges the teacher gives for what the app
+// cannot see ([BadgeCatalog.teacher]), each as often as the teacher likes.
 
 import 'package:ai_tutor_python/services/badges/badge_facts.dart';
 import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
@@ -74,6 +79,13 @@ enum BadgeGroup {
 
   /// The single, not so serious ones — most of them secret.
   fun,
+
+  /// A medal of the class podium (#221): gold, silver or bronze for one
+  /// subgoal. Only the student who holds it ever sees it.
+  podium,
+
+  /// Given by the teacher (#221), as often as the teacher likes.
+  teacher,
 }
 
 /// One badge.
@@ -101,13 +113,15 @@ class BadgeDefinition {
 
   /// The number in [BadgeFacts] this badge counts; `null` when it cannot be
   /// known (the lesson badges without lesson times). Unused for a "Kenner
-  /// van …" badge, which reads [goalId]'s progress.
+  /// van …" badge, which reads [goalId]'s progress. Always `null` for a
+  /// medal or a teacher's badge (#221): no rule counts those.
   final int? Function(BadgeFacts facts)? valueOf;
 
   /// Shown as a "?" until it is earned.
   final bool secret;
 
-  /// The hoofddoel of a "Kenner van …" badge.
+  /// The hoofddoel of a "Kenner van …" badge; the subgoal of a medal of the
+  /// class podium (#221).
   final String? goalId;
 
   int get maxTier => tiers.length;
@@ -116,7 +130,9 @@ class BadgeDefinition {
   /// known.
   int? valueIn(BadgeFacts facts) {
     final goal = goalId;
-    if (goal == null) return valueOf!(facts);
+    if (group != BadgeGroup.experts || goal == null) {
+      return valueOf?.call(facts);
+    }
     final experts = facts.experts;
     if (experts == null) return null;
     final progress = experts[goal];
@@ -147,6 +163,9 @@ class BadgeDefinition {
 
 /// The id of hoofddoel [goalId]'s "Kenner van …" badge.
 String expertBadgeId(String goalId) => 'expert:$goalId';
+
+/// The id of the medal of the class podium for [subgoalId] (#221).
+String podiumBadgeId(String subgoalId) => 'podium:$subgoalId';
 
 // The numbers the badges count. Top-level so the catalog stays `const`.
 int? _oefeningen(BadgeFacts f) => f.oefeningen;
@@ -181,12 +200,17 @@ int? _ownQuestions(BadgeFacts f) => f.ownQuestions;
 int? _backToFinished(BadgeFacts f) => f.backToFinished;
 int? _keyDisputes(BadgeFacts f) => f.keyDisputes;
 int? _slowCorrect(BadgeFacts f) => f.slowCorrect;
+int? _noRule(BadgeFacts f) => null;
 
 class BadgeCatalog {
   BadgeCatalog._();
 
   /// The glyph of every "Kenner van …" badge.
   static const BadgeIcon expertIcon = BadgeIcon('graduate-cap');
+
+  /// The glyph of every medal of the class podium (#221); the metal says
+  /// the place.
+  static const BadgeIcon podiumIcon = BadgeIcon('sport-medal');
 
   /// The badges in tiers, in the order the trophy case shows them.
   static const List<BadgeDefinition> tiered = [
@@ -441,6 +465,49 @@ class BadgeCatalog {
     ),
   ];
 
+  /// The badges the teacher gives (#221), in the order the trophy case and
+  /// the teacher's dialog show them. None is secret: a student may know
+  /// what they are for.
+  static const List<BadgeDefinition> teacher = [
+    // Reported a question that was wrong: the question ID of #216 at the
+    // top of the exercise lets the student name it.
+    BadgeDefinition(
+      id: 'teacher:faultFinder',
+      group: BadgeGroup.teacher,
+      tiers: [1],
+      icon: BadgeIcon('sherlock-holmes'),
+      valueOf: _noRule,
+    ),
+    // Helped a classmate.
+    BadgeDefinition(
+      id: 'teacher:helpingHand',
+      group: BadgeGroup.teacher,
+      tiers: [1],
+      icon: BadgeIcon('life-buoy'),
+      valueOf: _noRule,
+    ),
+    // Asked a question in class that deserved it.
+    BadgeDefinition(
+      id: 'teacher:goodQuestion',
+      group: BadgeGroup.teacher,
+      tiers: [1],
+      icon: BadgeIcon('think'),
+      valueOf: _noRule,
+    ),
+  ];
+
+  /// The medal of the class podium for subgoal [subgoalId] (#221). Its
+  /// tiers are the places backwards: bronze 1, silver 2, gold 3
+  /// (`podiumTierOf`).
+  static BadgeDefinition podium(String subgoalId) => BadgeDefinition(
+    id: podiumBadgeId(subgoalId),
+    group: BadgeGroup.podium,
+    tiers: const [1, 2, 3],
+    icon: podiumIcon,
+    valueOf: _noRule,
+    goalId: subgoalId,
+  );
+
   /// The "Kenner van …" badge of hoofddoel [goalId].
   static BadgeDefinition expert(String goalId) => BadgeDefinition(
     id: expertBadgeId(goalId),
@@ -450,8 +517,10 @@ class BadgeCatalog {
     goalId: goalId,
   );
 
-  /// Every badge, with a "Kenner van …" one per hoofddoel in [expertGoalIds]
-  /// (in that order), between the tiers and the single ones.
+  /// Every badge the app's rules count, with a "Kenner van …" one per
+  /// hoofddoel in [expertGoalIds] (in that order), between the tiers and the
+  /// single ones. Not the podium's medals or the teacher's badges (#221):
+  /// no rule counts those.
   static List<BadgeDefinition> all({
     Iterable<String> expertGoalIds = const [],
   }) => [...tiered, for (final id in expertGoalIds) expert(id), ...fun];
@@ -459,6 +528,12 @@ class BadgeCatalog {
   /// The badge stored under [id]; `null` for one this build does not know.
   static BadgeDefinition? byId(String id) {
     if (id.startsWith('expert:')) return expert(id.substring(7));
+    if (id.startsWith('podium:') && id.length > 7) {
+      return podium(id.substring(7));
+    }
+    for (final d in teacher) {
+      if (d.id == id) return d;
+    }
     for (final d in tiered) {
       if (d.id == id) return d;
     }
@@ -472,7 +547,7 @@ class BadgeCatalog {
   static List<BadgeIcon> get icons {
     final seen = <BadgeIcon>{};
     return [
-      for (final d in [...tiered, expert(''), ...fun])
+      for (final d in [...tiered, expert(''), ...fun, podium(''), ...teacher])
         if (seen.add(d.icon)) d.icon,
     ];
   }
