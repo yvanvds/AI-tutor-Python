@@ -687,7 +687,11 @@
   "drawer_signals_kind_cascadeHalt": "Cascade-halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subdoel zonder LO's (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subdoel verwijderd (audit)",
-  "drawer_signals_kind_targetSignalLost": "Oordeel op het gevraagde leerdoel verloren (audit)",
+  "drawer_signals_kind_targetSignalLost": "Oordeel op het gevraagde leerdoel verloren",
+  "drawer_signals_targetSignalLost_run_detail": "{count} vragen op rij zonder oordeel op het leerdoel dat ze vroegen, de laatste op {lo}",
+  "drawer_signals_kind_noProgress": "Loopt vast",
+  "drawer_signals_noProgress_detail": "{subgoal} sinds {since} ({minutes} min): {notRight} van de laatste {answers} antwoorden niet juist",
+  "drawer_signals_noProgress_mostAsked": "meest gevraagd: {lo} (μ {mean})",
   "drawer_signals_kind_provenanceGap": "De les spreekt het thuiswerk tegen",
   "drawer_signals_provenanceGap_detail": "{lo}: thuis {homePositive} van {homeSignals} positief, in de les daarna {supervisedPositive} van {supervisedSignals} (laatste {days} dagen)",
 

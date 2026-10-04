@@ -2460,6 +2460,12 @@ Each `signalEvents[*].kind` is one of:
   `degradedWindow` grading calls fell back; the conductor flips
   into degraded mode (section 7.3). `details: {fallbackCount,
   window}`. Fires once per session.
+- `noProgress` — the student has worked long on the active subgoal
+  without progress, with mostly wrong answers (#229; see "No
+  progress" below). `details: {subgoalId, since, minutes, oefeningen,
+  answers, notRight, loId, mean, calibration}`. Written on an audit
+  stub record (8.1) on the subgoal, not on the graded turn. Fires once
+  per (session, subgoal).
 
 **Audit-only (no badge, drawer-only):**
 
@@ -2479,10 +2485,19 @@ Each `signalEvents[*].kind` is one of:
   declined signal (`conductor.signal_dropped`, reason `target out of
   scope`). `details: {subgoalId, loId, signal, strength, activeRootId,
   fallback}`; `fallback` is true when every signal dropped and the
-  weak fallback on the target stood in. Audit for now; a run of them
-  as a signal for the teacher during the lesson is #229. An LO missing
-  from a subgoal that *is* in scope is a curriculum edit (7.4) and is
-  not this event.
+  weak fallback on the target stood in. An LO missing from a subgoal
+  that *is* in scope is a curriculum edit (7.4) and is not this event.
+  **Strong on a run** (#229): the direct question — no follow-up, no
+  warm-up review, no recheck — that makes
+  `targetSignalLostStrongRun` (3) in a row whose grade on the asked LO
+  was lost carries the event at `severity: strong`, with `run: 3` in
+  `details`; the ones before and after it in the run stay audit, so a
+  run raises the badge once. A direct question whose grade on its LO
+  arrived ends the run; follow-ups, warm-up reviews and rechecks
+  neither lengthen nor end it. The count is the conductor's,
+  per session (reset on `setTarget`). Oefeningen that count for
+  nothing while mostly right are what `noProgress` does not catch;
+  with #225 fixed this is the watch for the next bug of its kind.
 
 **Audit, strong when well-evidenced (the event carries its severity):**
 
@@ -2554,6 +2569,74 @@ strong is. Acknowledgment is the usual per-student one.
 **In the drawer** the line names the LO by its statement and gives the
 two counts in words ("at home 3 of 3 positive, in class afterwards 0 of
 3 (last 42 days)").
+
+#### No progress (#229)
+
+The teacher's "this student is stuck" during the lesson. Long work on a
+subgoal without a newly mastered LO is ordinary; long work with mostly
+wrong answers is not, and the student should not have to say so. It
+changes no belief, no weight and no grade, and the student never sees
+it.
+
+**When it runs.** Like the provenance gap: after every graded turn, on
+the student's laptop, off the student's path, alongside the write of
+the turn's record (which it takes as it has it), and silent when it
+fails. It reads the student's records of the last `noProgressLookback`
+(4 hours) on every subgoal (`TurnHistoryService.listSince`). A warm-up
+review or a recheck is not checked; the next answer on the active
+subgoal is.
+
+**What it reads.** The answers on the subgoal the student practised:
+graded turns, follow-ups included, not audit records, warm-up reviews
+or rechecks (those are about another subgoal; they neither count nor
+end the work on this one). In order, the clock starts again:
+
+- on the first answer on a subgoal after an answer on another one —
+  the start of the work on this subgoal in this session;
+- after a pause of more than `noProgressSessionGap` (30 minutes)
+  between two answers — a new session; a session longer than the read
+  counts from its start;
+- on progress: an answer that advanced the subgoal, or after which an
+  LO of the subgoal is mastered (`loStatusAfter`) that no earlier
+  answer read left mastered. That answer is progress, not one of the
+  answers since. An LO that slips under the bar and comes back is not
+  new; the first answer read on a subgoal is the baseline.
+
+**When it fires** (`PolicyConstants.noProgress*`), on the subgoal of
+the answer just graded: at least `noProgressMinMinutes` (25) since the
+clock started, and at least `noProgressMinBadShare` (half) of the last
+answers since then not right — wrong or partly right — over at most
+`noProgressWindow` (10) and at least `noProgressMinAnswers` (6) of
+them. Always **strong**: it drives the "needs attention" badge, which
+the Students page polls, so the teacher sees it in the lesson.
+
+**Once per (session, subgoal).** An alert on the subgoal whose clock
+started in the current session is not raised again, whatever happened
+since — read from the `since` in its details, so a second laptop or a
+restarted app does not raise it twice. A new session, or another
+subgoal, may.
+
+**What it says** (`details`): the subgoal; `since`, the moment the
+clock started; `minutes` since then; `oefeningen`, the questions since
+then (follow-ups left out); `answers` and `notRight`, the last answers
+read and how many were not right; `loId`, the LO asked most since the
+clock started (of two asked as often, the one asked last) and `mean`,
+its μ after the answer; `calibration`, the level after it. **In the
+drawer**: "Print since 11:20 (33 min): 7 of the last 10 answers not
+right, most asked: Use print() to show text (μ 0.69)" — the subgoal by
+its title, the LO by its statement. The oefeningen themselves are in
+`turn_content` (8.1, #228); the drawer does not open them yet.
+
+**Calibration.** Replayed over `turn_history` of 6EWI and 6WEWI up to
+2026-10-04 (five two-hour lessons in 6WEWI, about ten lesson hours in
+6EWI), read only: 25 minutes and half not right gave 20 alerts — about
+3 to 4 per two-hour lesson in a class of 17 — among them the two
+students who said in class on 2026-10-02 that they got nowhere, 14 and
+59 minutes before the end of the lesson. 20 minutes gave 28, 30
+minutes 14, 25 minutes with 60% not right 13. A threshold on the
+number of questions without a newly mastered LO alone gave 45 (twelve
+questions) or 61 (ten). The thresholds are the teacher's choice, to be
+adjusted after a few lessons.
 
 #### Strong signals — needs attention
 

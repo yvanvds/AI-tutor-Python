@@ -462,7 +462,8 @@ model:
    only fail this check when the scope itself is wrong — the conductor
    chose that LO — so it is dropped and logged like the rest, and also
    recorded on the turn as a `targetSignalLost` event (conductor
-   policy 8.2, #225). Every dropped signal is also kept, with its
+   policy 8.2, #225; strong on the third direct question in a row,
+   #229). Every dropped signal is also kept, with its
    reason, on the turn's `turn_content` doc next to the grader's raw
    signals (conductor policy 8.1, #228).
 4. **Self-consistency.** If `overallQuality = correct` but every

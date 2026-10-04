@@ -1300,9 +1300,40 @@
   "drawer_signals_kind_cascadeHalt": "Cascade halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subgoal without LOs (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subgoal deleted (audit)",
-  "drawer_signals_kind_targetSignalLost": "Grade on the asked LO lost (audit)",
+  "drawer_signals_kind_targetSignalLost": "Grade on the asked LO lost",
   "@drawer_signals_kind_targetSignalLost": {
-    "description": "Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO."
+    "description": "Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO. Audit (amber dot) for one; strong (red dot) on the third question in a row (#229)."
+  },
+  "drawer_signals_targetSignalLost_run_detail": "{count} questions in a row without a grade on the LO they asked about, the last on {lo}",
+  "@drawer_signals_targetSignalLost_run_detail": {
+    "description": "The detail line of a strong grade-lost signal event (#229): how many questions in a row lost the grade on the learning objective they asked about, and that LO for the last of them.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "lo": { "type": "String" }
+    }
+  },
+  "drawer_signals_kind_noProgress": "Stuck without progress",
+  "@drawer_signals_kind_noProgress": {
+    "description": "Signal event (#229): the student worked long on one subgoal without newly mastering a learning objective, and most of the last answers were not right."
+  },
+  "drawer_signals_noProgress_detail": "{subgoal} since {since} ({minutes} min): {notRight} of the last {answers} answers not right",
+  "@drawer_signals_noProgress_detail": {
+    "description": "The detail line of a no-progress signal event (#229): the subgoal, the clock time of the last progress, the minutes since, and how many of the last answers were not right.",
+    "placeholders": {
+      "subgoal": { "type": "String" },
+      "since": { "type": "String" },
+      "minutes": { "type": "int" },
+      "notRight": { "type": "int" },
+      "answers": { "type": "int" }
+    }
+  },
+  "drawer_signals_noProgress_mostAsked": "most asked: {lo} (μ {mean})",
+  "@drawer_signals_noProgress_mostAsked": {
+    "description": "Follows the no-progress detail line after a comma (#229): the learning objective asked most often since the last progress, and its belief mean, already formatted with two decimals.",
+    "placeholders": {
+      "lo": { "type": "String" },
+      "mean": { "type": "String" }
+    }
   },
   "drawer_signals_kind_provenanceGap": "Class work contradicts home work",
   "drawer_signals_provenanceGap_detail": "{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)",

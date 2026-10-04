@@ -41,6 +41,7 @@ import 'package:ai_tutor_python/services/student_state/turn_content.dart';
 import 'package:ai_tutor_python/services/student_state/turn_content_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/no_progress.dart';
 import 'package:ai_tutor_python/services/supervision/provenance_gap.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
@@ -1301,14 +1302,20 @@ class TutorService extends Notifier<TutorState> {
     // path, and silent when it fails; never XP, never a grade.
     unawaited(ref.read(badgeServiceProvider.notifier).afterTurn(record));
     // #107: whether the class work on this LO now contradicts the home work
-    // before it. A teacher-only event; off the student's path, and silent
-    // when it fails.
-    final gapUid = ref.read(authServiceProvider)?.oid;
-    if (gapUid != null) {
+    // before it. #229: whether the student is stuck on the subgoal — long
+    // without progress, mostly not right. Teacher-only events; off the
+    // student's path, and silent when they fail.
+    final checkUid = ref.read(authServiceProvider)?.oid;
+    if (checkUid != null) {
       unawaited(
         ref
             .read(provenanceGapServiceProvider)
-            .checkAfter(uid: gapUid, turn: record),
+            .checkAfter(uid: checkUid, turn: record),
+      );
+      unawaited(
+        ref
+            .read(noProgressServiceProvider)
+            .checkAfter(uid: checkUid, turn: record),
       );
     }
     if (bankQuestion != null) {

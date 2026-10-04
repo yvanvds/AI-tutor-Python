@@ -2307,7 +2307,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get drawer_signals_kind_targetSignalLost =>
-      'Grade on the asked LO lost (audit)';
+      'Grade on the asked LO lost';
+
+  @override
+  String drawer_signals_targetSignalLost_run_detail(int count, String lo) {
+    return '$count questions in a row without a grade on the LO they asked about, the last on $lo';
+  }
+
+  @override
+  String get drawer_signals_kind_noProgress => 'Stuck without progress';
+
+  @override
+  String drawer_signals_noProgress_detail(
+    String subgoal,
+    String since,
+    int minutes,
+    int notRight,
+    int answers,
+  ) {
+    return '$subgoal since $since ($minutes min): $notRight of the last $answers answers not right';
+  }
+
+  @override
+  String drawer_signals_noProgress_mostAsked(String lo, String mean) {
+    return 'most asked: $lo (μ $mean)';
+  }
 
   @override
   String get drawer_signals_kind_provenanceGap =>

@@ -52,6 +52,7 @@ import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
 import 'flows/next_root_signal.dart' as next_root_signal;
+import 'flows/no_progress.dart' as no_progress;
 import 'flows/oefening_xp.dart' as oefening_xp;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
@@ -117,6 +118,7 @@ void main() {
   exercise_history.main();
   evidence_provenance.main();
   provenance_gap.main();
+  no_progress.main();
   difficulty_ratchet.main();
   difficulty_asymmetry.main();
   legacy_ratchet.main();

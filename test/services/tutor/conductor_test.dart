@@ -4630,6 +4630,111 @@ void main() {
         // The weak fallback did reach the asked LO.
         expect(f.beliefs[f._key('c1', 'lo-cmp')], isNotNull);
       });
+
+      group('#229 a run of lost grades', () {
+        /// One answer in "Vergelijkingen": its grade on the asked LO lost
+        /// to the old root's scope ([lost]) or arriving in the new one's.
+        /// Returns the turn's `targetSignalLost` event, if any.
+        Future<TurnSignalEvent?> answer(
+          _Fakes f,
+          Conductor c, {
+          bool lost = true,
+          bool followUp = false,
+        }) async {
+          final plan = _expectQuestion(await c.planNext());
+          expect(plan.targetLOs.single.id, 'lo-cmp');
+          // A follow-up answers the grader's own question: nothing fired.
+          if (!followUp) c.notePlannedQuestion(plan);
+          final graded = GradedAnswerBuilder.build(
+            overallQuality: AnswerQuality.correct,
+            rawSignals: const [onCmp, sideOnVar],
+            scopeSubgoals: f.children[lost ? 'r1' : 'r2']!,
+            intendedTargetLO: plan.targetLOs.first,
+            intendedTargetSubgoalId: 'c1',
+            isFollowUp: followUp,
+            chainDepth: followUp ? 1 : 0,
+          );
+          expect(graded.lostTargetSignals.isNotEmpty, lost);
+          final outcome = await c.integrateAnswer(plan: plan, answer: graded);
+          return outcome.signalEvents
+              .where((e) => e.kind == TurnSignalEventKind.targetSignalLost)
+              .firstOrNull;
+        }
+
+        test('the third direct question in a row is strong, with the run; '
+            'the ones before and after it are audit', () async {
+          expect(PolicyConstants.targetSignalLostStrongRun, 3);
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          final events = [for (var i = 0; i < 4; i++) await answer(f, c)];
+
+          expect(events.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+            TurnSignalEventSeverity.audit,
+          ]);
+          expect(events[2]!.details, {
+            'subgoalId': 'c1',
+            'loId': 'lo-cmp',
+            'signal': 'positive',
+            'strength': 'strong',
+            'activeRootId': 'r2',
+            'fallback': false,
+            'run': 3,
+          });
+          expect(events[3]!.details.containsKey('run'), isFalse);
+          // Strong rides on the turn record: the badge counts it.
+          expect(events[2]!.toJson(), containsPair('severity', 'strong'));
+        });
+
+        test('a direct question whose grade arrived ends the run', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          expect(await answer(f, c, lost: false), isNull);
+          final after = [for (var i = 0; i < 3; i++) await answer(f, c)];
+
+          expect(after.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+          ]);
+        });
+
+        test('a follow-up neither lengthens nor ends the run', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          final followUp = await answer(f, c, followUp: true);
+          expect(followUp!.severity, TurnSignalEventSeverity.audit);
+          expect(await answer(f, c, followUp: true, lost: false), isNull);
+          final third = await answer(f, c);
+          expect(third!.severity, TurnSignalEventSeverity.strong);
+          expect(third.details['run'], 3);
+        });
+
+        test('a new session counts from zero', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          await c.setTarget();
+          final events = [for (var i = 0; i < 3; i++) await answer(f, c)];
+
+          expect(events.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+          ]);
+        });
+      });
     },
   );
 }

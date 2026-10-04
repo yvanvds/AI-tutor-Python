@@ -15,7 +15,12 @@
 //
 // A signal on the asked LO that still falls outside the scope is the app's
 // error, not the grader's: the turn carries a `targetSignalLost` event, an
-// audit line in the teacher's drawer for that student.
+// audit line in the teacher's drawer for that student. The third direct
+// question in a row that loses it carries a strong one (#229): the Students
+// page badges the student, and the drawer says how many in a row. With
+// #225 fixed the app has no way left to lose them, so the teacher's side
+// reads the event as the conductor writes it (the run itself: conductor
+// tests).
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → advance → Cosmos → leerpad.
@@ -142,9 +147,10 @@ Map<String, dynamic> varBelief(DateTime at) => {
 /// A turn in "Comparisons" whose strong positive on the asked `lo-cmp` was
 /// dropped by a grading scope still on "Basics", while a side remark on
 /// `lo-var` survived — what the conductor records since #225. The event is
-/// the app's own, serialised as the conductor writes it.
-Map<String, dynamic> lostTurn() => {
-  'id': 'lost-1',
+/// the app's own, serialised as the conductor writes it: audit, or with
+/// [run] the strong one of the third in a row (#229).
+Map<String, dynamic> lostTurn({int? run}) => {
+  'id': 'lost-${run ?? 1}',
   'type': 'turn_history',
   'uid': kStudentUid,
   'turnAt': DateTime.now().toUtc().toIso8601String(),
@@ -172,8 +178,11 @@ Map<String, dynamic> lostTurn() => {
   'loStatusAfter': const [],
   'subgoalAdvanced': false,
   'signalEvents': [
-    TurnSignalEvent.of(
-      TurnSignalEventKind.targetSignalLost,
+    TurnSignalEvent(
+      kind: TurnSignalEventKind.targetSignalLost,
+      severity: run == null
+          ? TurnSignalEventSeverity.audit
+          : TurnSignalEventSeverity.strong,
       details: {
         'subgoalId': 's3',
         'loId': 'lo-cmp',
@@ -181,6 +190,7 @@ Map<String, dynamic> lostTurn() => {
         'strength': 'strong',
         'activeRootId': 'r1',
         'fallback': false,
+        'run': ?run,
       },
     ).toJson(),
   ],
@@ -356,13 +366,58 @@ void main() {
 
     await tester.tap(find.text('Sam Student'));
     await pumpUntilEndDrawerOpen(tester, find.byType(StudentDetailDrawer));
-    await pumpUntilFound(
-      tester,
-      find.text('Grade on the asked LO lost (audit)'),
-    );
+    await pumpUntilFound(tester, find.text('Grade on the asked LO lost'));
     expect(find.textContaining('subgoalId: s3 · loId: lo-cmp'), findsOneWidget);
     // Nothing to acknowledge: an audit line is not a badge.
     expect(find.text('Acknowledge (0)'), findsOneWidget);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('the third grade in a row lost on the asked LO is strong: the '
+      'Students page badges the student, and the drawer says how many in a '
+      'row and on which LO', (tester) async {
+    final harness = AppHarness(
+      identity: teacherIdentity,
+      extraDocs: {
+        'accounts': [accountDoc(studentIdentity)],
+        'goals': nextGoal(),
+        'turn_history': [lostTurn(run: 3)],
+      },
+    );
+    await harness.boot(tester);
+    await tester.tap(find.byTooltip('Students'));
+    await pumpUntilFound(tester, find.byType(AccountsPage));
+    await pumpUntilFound(tester, find.text('Sam Student'));
+    final badge = find.byTooltip('Unacknowledged signal events');
+    await pumpUntilFound(tester, badge);
+    expect(
+      find.descendant(of: badge, matching: find.text('1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Sam Student'));
+    // All the way in before the tap on "Acknowledge" below.
+    await pumpUntilEndDrawerOpen(tester, find.byType(StudentDetailDrawer));
+    await pumpUntilFound(tester, find.text('Grade on the asked LO lost'));
+    expect(
+      find.textContaining(
+        '3 questions in a row without a grade on the LO they asked about, '
+        'the last on Compare two values',
+      ),
+      findsOneWidget,
+    );
+    await pumpUntilFound(tester, find.text('Acknowledge (1)'));
+    await tester.tap(find.text('Acknowledge (1)'));
+    await pumpUntilFound(tester, find.text('Acknowledge (0)'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(StudentDetailDrawer),
+        matching: find.byTooltip('Close'),
+      ),
+    );
+    await pumpUntilGone(tester, find.byType(StudentDetailDrawer));
+    await pumpUntilGone(tester, badge);
 
     await harness.dispose(tester);
   });

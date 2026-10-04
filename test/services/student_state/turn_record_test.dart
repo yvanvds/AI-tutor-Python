@@ -184,6 +184,32 @@ void main() {
     });
   });
 
+  group('TurnSignalEvent noProgress and targetSignalLost (#229)', () {
+    test('noProgress is strong: it drives the badge', () {
+      final e = TurnSignalEvent.of(TurnSignalEventKind.noProgress);
+      expect(e.severity, TurnSignalEventSeverity.strong);
+      final back = TurnSignalEvent.tryFromJson(e.toJson())!;
+      expect(back.kind, TurnSignalEventKind.noProgress);
+      expect(back.severity, TurnSignalEventSeverity.strong);
+    });
+
+    test('targetSignalLost is audit by default; a strong one keeps its '
+        'severity through the doc', () {
+      expect(
+        TurnSignalEvent.of(TurnSignalEventKind.targetSignalLost).severity,
+        TurnSignalEventSeverity.audit,
+      );
+      const strong = TurnSignalEvent(
+        kind: TurnSignalEventKind.targetSignalLost,
+        severity: TurnSignalEventSeverity.strong,
+        details: {'loId': 'lo1', 'run': 3},
+      );
+      final back = TurnSignalEvent.tryFromJson(strong.toJson())!;
+      expect(back.severity, TurnSignalEventSeverity.strong);
+      expect(back.details, {'loId': 'lo1', 'run': 3});
+    });
+  });
+
   group('PersistedTurnRecord transferCredits (#101)', () {
     test('an ordinary turn writes no field at all', () {
       expect(

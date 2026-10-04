@@ -2331,7 +2331,31 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get drawer_signals_kind_targetSignalLost =>
-      'Oordeel op het gevraagde leerdoel verloren (audit)';
+      'Oordeel op het gevraagde leerdoel verloren';
+
+  @override
+  String drawer_signals_targetSignalLost_run_detail(int count, String lo) {
+    return '$count vragen op rij zonder oordeel op het leerdoel dat ze vroegen, de laatste op $lo';
+  }
+
+  @override
+  String get drawer_signals_kind_noProgress => 'Loopt vast';
+
+  @override
+  String drawer_signals_noProgress_detail(
+    String subgoal,
+    String since,
+    int minutes,
+    int notRight,
+    int answers,
+  ) {
+    return '$subgoal sinds $since ($minutes min): $notRight van de laatste $answers antwoorden niet juist';
+  }
+
+  @override
+  String drawer_signals_noProgress_mostAsked(String lo, String mean) {
+    return 'meest gevraagd: $lo (μ $mean)';
+  }
 
   @override
   String get drawer_signals_kind_provenanceGap =>

@@ -193,12 +193,17 @@ enum TurnSignalEventKind {
   singleLoDeadlock,
   repeatedDemotions,
   sustainedLlmFailure,
+  // Long work on the active subgoal without progress and with mostly wrong
+  // answers (#229, `NoProgress`):
+  noProgress,
   // Audit-only:
   cascadeHalt,
   emptyObjectivesBlock,
   subgoalDeletedRedirect,
   // The grader's signal on the LO the question asked about fell outside the
-  // grading scope (#225): the app's error, not the grader's.
+  // grading scope (#225): the app's error, not the grader's. Audit, strong
+  // on the third direct question in a row (#229) — the conductor emits that
+  // one as strong explicitly.
   targetSignalLost,
   // Audit by default, strong when well-evidenced — the event carries its
   // own severity (#107, `ProvenanceGap`):
@@ -226,10 +231,12 @@ class TurnSignalEvent {
       case TurnSignalEventKind.singleLoDeadlock:
       case TurnSignalEventKind.repeatedDemotions:
       case TurnSignalEventKind.sustainedLlmFailure:
+      case TurnSignalEventKind.noProgress:
         return TurnSignalEventSeverity.strong;
       case TurnSignalEventKind.cascadeHalt:
       case TurnSignalEventKind.emptyObjectivesBlock:
       case TurnSignalEventKind.subgoalDeletedRedirect:
+      // The default; a run of three is emitted as strong explicitly.
       case TurnSignalEventKind.targetSignalLost:
       // The default; a well-evidenced gap is emitted as strong explicitly.
       case TurnSignalEventKind.provenanceGap:

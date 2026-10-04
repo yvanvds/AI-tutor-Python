@@ -3870,11 +3870,41 @@ abstract class AppLocalizations {
   /// **'Subgoal deleted (audit)'**
   String get drawer_signals_kind_subgoalDeletedRedirect;
 
-  /// Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO.
+  /// Signal event (#225): the grader judged the learning objective the question asked about, and the app dropped that judgment because the LO fell outside its grading scope. The oefening did not count for its own LO. Audit (amber dot) for one; strong (red dot) on the third question in a row (#229).
   ///
   /// In en, this message translates to:
-  /// **'Grade on the asked LO lost (audit)'**
+  /// **'Grade on the asked LO lost'**
   String get drawer_signals_kind_targetSignalLost;
+
+  /// The detail line of a strong grade-lost signal event (#229): how many questions in a row lost the grade on the learning objective they asked about, and that LO for the last of them.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} questions in a row without a grade on the LO they asked about, the last on {lo}'**
+  String drawer_signals_targetSignalLost_run_detail(int count, String lo);
+
+  /// Signal event (#229): the student worked long on one subgoal without newly mastering a learning objective, and most of the last answers were not right.
+  ///
+  /// In en, this message translates to:
+  /// **'Stuck without progress'**
+  String get drawer_signals_kind_noProgress;
+
+  /// The detail line of a no-progress signal event (#229): the subgoal, the clock time of the last progress, the minutes since, and how many of the last answers were not right.
+  ///
+  /// In en, this message translates to:
+  /// **'{subgoal} since {since} ({minutes} min): {notRight} of the last {answers} answers not right'**
+  String drawer_signals_noProgress_detail(
+    String subgoal,
+    String since,
+    int minutes,
+    int notRight,
+    int answers,
+  );
+
+  /// Follows the no-progress detail line after a comma (#229): the learning objective asked most often since the last progress, and its belief mean, already formatted with two decimals.
+  ///
+  /// In en, this message translates to:
+  /// **'most asked: {lo} (μ {mean})'**
+  String drawer_signals_noProgress_mostAsked(String lo, String mean);
 
   /// No description provided for @drawer_signals_kind_provenanceGap.
   ///

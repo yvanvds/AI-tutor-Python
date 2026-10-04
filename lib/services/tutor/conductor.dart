@@ -503,6 +503,12 @@ class Conductor {
   /// Idempotency guard so the event fires once per (session, subgoal).
   String? _singleLoDeadlockSubgoalId;
 
+  /// Direct questions in a row (no follow-up, no warm-up review, no
+  /// recheck) whose grade on the asked LO was lost (#229). The one that
+  /// makes `targetSignalLostStrongRun` carries a strong `targetSignalLost`;
+  /// a direct question whose grade arrived ends the run.
+  int _lostTargetRun = 0;
+
   /// Pending audit event — populated when `_advanceWithCascadeCap` halts.
   /// Consumed by the next call to `integrateAnswer` so the cascade-halt
   /// rides on the same persisted turn that caused the advance.
@@ -542,6 +548,7 @@ class Conductor {
     _repeatedDemotionsFired = false;
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
+    _lostTargetRun = 0;
     _pendingCascadeHaltEvent = null;
     _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
@@ -1250,6 +1257,19 @@ class Conductor {
     // `turn_history` (§8.2). `fallback` says whether the weak fallback
     // signal on the target stood in for it (every signal dropped) or the
     // target got nothing at all.
+    //
+    // #229: one is an audit line; the direct question that makes
+    // `targetSignalLostStrongRun` in a row is the teacher's business during
+    // the lesson — strong, with the length of the run. Oefeningen that
+    // count for nothing while mostly right are what `noProgress` misses.
+    // Follow-ups, warm-up reviews and rechecks neither lengthen nor end
+    // the run.
+    final direct = !answer.isFollowUp && !plan.isOffSubgoal;
+    if (direct) {
+      _lostTargetRun = answer.lostTargetSignals.isEmpty
+          ? 0
+          : _lostTargetRun + 1;
+    }
     if (answer.lostTargetSignals.isNotEmpty) {
       // Already among the scope check's drops: logged here, not added.
       for (final sig in answer.lostTargetSignals) {
@@ -1257,9 +1277,14 @@ class Conductor {
       }
       final lost = answer.lostTargetSignals.first;
       final rootId = selection.activeRootGoal?.id;
+      final strong =
+          direct && _lostTargetRun == PolicyConstants.targetSignalLostStrongRun;
       events.add(
-        TurnSignalEvent.of(
-          TurnSignalEventKind.targetSignalLost,
+        TurnSignalEvent(
+          kind: TurnSignalEventKind.targetSignalLost,
+          severity: strong
+              ? TurnSignalEventSeverity.strong
+              : TurnSignalEventSeverity.audit,
           details: {
             'subgoalId': lost.subgoalId,
             'loId': lost.loId,
@@ -1267,6 +1292,7 @@ class Conductor {
             'strength': lost.strength.name,
             if (rootId != null) 'activeRootId': rootId,
             'fallback': answer.hadFallback,
+            if (strong) 'run': _lostTargetRun,
           },
         ),
       );
