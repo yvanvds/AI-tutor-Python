@@ -14,8 +14,10 @@
 //   - bug reports, saved as a file for the teacher or posted to GitHub,
 //     with a recent tutor turn's debug payload (#127)
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
-//   - about / version, with the manual update check (#48) and the
-//     "What's new" button that brings the release notes back (#130)
+//   - the badge proof sheet (#220), for a teacher or a developer build
+//   - about / version, with the manual update check (#48), the
+//     "What's new" button that brings the release notes back (#130) and
+//     the credits of the badge icons (#220)
 
 import 'dart:async';
 import 'dart:convert';
@@ -25,6 +27,8 @@ import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
+import 'package:ai_tutor_python/features/badges/badge_credits.dart';
+import 'package:ai_tutor_python/features/badges/badge_proof_sheet.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -129,6 +133,13 @@ class OptionsPage extends ConsumerWidget {
               if (devTools) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _DeveloperCard(),
+              ],
+              // The proof sheet stays after the teacher's review of the
+              // badges (#220): the look is tweaked in badge_style.dart and
+              // checked here. A student has the trophy case instead.
+              if (devTools || isTeacher) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const _BadgesCard(),
               ],
               const SizedBox(height: AppSpacing.lg),
               const _AboutCard(),
@@ -2007,6 +2018,32 @@ class _RecentTurnsList extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Badges (#220)
+// ---------------------------------------------------------------------------
+
+class _BadgesCard extends StatelessWidget {
+  const _BadgesCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _OptionsCard(
+      title: l.options_badges_title,
+      subtitle: l.options_badges_subtitle,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.tonalIcon(
+          key: const ValueKey('options-badge-proof-sheet'),
+          onPressed: () => openBadgeProofSheet(context),
+          icon: const Icon(Icons.emoji_events_outlined, size: 18),
+          label: Text(l.options_badges_open),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // About
 // ---------------------------------------------------------------------------
 
@@ -2060,6 +2097,14 @@ class _AboutCard extends ConsumerWidget {
                 label: Text(l.update_action_check),
               ),
               const _WhatsNewButton(),
+              // The game-icons.net licence (CC BY 3.0) asks for every
+              // badge icon's author (#220).
+              OutlinedButton.icon(
+                key: const ValueKey('about-badge-credits'),
+                onPressed: () => showBadgeCredits(context),
+                icon: const Icon(Icons.emoji_events_outlined, size: 18),
+                label: Text(l.options_about_credits),
+              ),
               // Offered only when there is genuinely something to apply. With
               // the shell's Update button this is the whole consent gate: no
               // other code path reaches `apply()`.

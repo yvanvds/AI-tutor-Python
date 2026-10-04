@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const double sidebarWidth = 72;
 
-/// The 44 px touch target of one rail entry, and the margin around it.
+/// The 40 px touch target of one rail entry, and the margin around it.
 ///
 /// 48 until #185: the Questions entry took the one entry of slack #156 had
-/// put back, and 44 — with the logo's gaps below trimmed — buys it back. The
-/// entry stays square: its highlight is inset to the same 44 px across.
-const double _itemHeight = 44;
+/// put back, and 44 — with the logo's gaps below trimmed — bought it back.
+/// 44 until #218: the Classes entry took that slack in turn, and 40 buys it
+/// back again. The entry stays square: its highlight is inset to the same
+/// width across as it is tall.
+const double _itemHeight = 40;
 const double _itemMargin = 1;
 
 /// The highlight's inset from the rail's edges, so it is as wide as it is
@@ -42,6 +44,9 @@ class Sidebar extends ConsumerWidget {
   static const _studentSections = [
     Section.session,
     Section.map,
+    // The student's badges (#220), next to the learning path. Student-only,
+    // like "My reports".
+    Section.trophies,
     Section.puntenformule,
     Section.myReports,
   ];
@@ -53,6 +58,8 @@ class Sidebar extends ConsumerWidget {
     Section.questions,
     Section.instructions,
     Section.students,
+    // Next to the students, whose class is picked from it (#218).
+    Section.classes,
     Section.milestones,
     Section.reports,
   ];
@@ -156,6 +163,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.terminal_outlined;
       case Section.map:
         return Icons.insights_outlined;
+      case Section.trophies:
+        return Icons.emoji_events_outlined;
       case Section.puntenformule:
         return Icons.calculate_outlined;
       case Section.myReports:
@@ -170,6 +179,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.integration_instructions_outlined;
       case Section.students:
         return Icons.people_outline;
+      case Section.classes:
+        return Icons.class_outlined;
       case Section.milestones:
         return Icons.event_available_outlined;
       case Section.reports:

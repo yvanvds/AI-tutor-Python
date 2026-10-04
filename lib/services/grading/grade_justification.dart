@@ -41,11 +41,12 @@ String _languageName(String languageCode) {
 /// draw on is in [input]; [instructions] carries the contract.
 ///
 /// [supervisionWired] is whether the supervised/home turn split is a
-/// measurement (`SupervisionSource.isWired`). Until Anchor lands every turn
-/// is `home` by construction, and a split that reads "0 supervised" for the
-/// whole class says nothing about anyone — so it stays out of the facts and
-/// the contract does not name it as an uncertainty signal (#160). Staleness
-/// is real either way and stays.
+/// measurement for this student (`SupervisionSource.isWiredFor` their
+/// class). For a student whose class has no lessons (#219) every turn is
+/// `home` by construction, and a split that reads "0 supervised" says
+/// nothing about them — so it stays out of the facts and the contract does
+/// not name it as an uncertainty signal (#160). Staleness is real either way
+/// and stays.
 JustificationPrompt buildJustificationPrompt({
   required GradeProposal proposal,
   required Milestone milestone,

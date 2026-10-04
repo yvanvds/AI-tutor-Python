@@ -7,6 +7,7 @@
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
+import 'package:ai_tutor_python/services/classes/school_class.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal_service.dart';
@@ -46,19 +47,50 @@ class _FakeConnector extends OpenaiConnector {
   }
 }
 
-/// A registry with Anchor behind it. Nothing here grades a turn, so what
-/// it answers never matters; that it is wired does (#160).
-class _WiredRegistry implements SupervisionSource {
+/// A source wired for every class that reads every moment as `home`: the
+/// tally stays what the turn records say, and that it is wired is what
+/// these tests are about (#160).
+class _WiredRegistry extends SupervisionSource {
   const _WiredRegistry();
 
   @override
-  bool get isWired => true;
+  bool isWiredFor(String className) => true;
 
   @override
   Future<EvidenceProvenance> provenanceFor({
     required String uid,
     required DateTime at,
-  }) async => EvidenceProvenance.supervised;
+  }) async => EvidenceProvenance.home;
+}
+
+/// Tuesday 10:50–11:40, local time: the one lesson of class 5A.
+const _tuesday = LessonSlot(
+  weekday: DateTime.tuesday,
+  startMinute: 10 * 60 + 50,
+  endMinute: 11 * 60 + 40,
+);
+
+/// The timetable source (#219) over a fixed class list, counting how often
+/// it looked the student's class up.
+class _Timetable {
+  _Timetable({this.classOf = const {_student: '5A'}});
+
+  final Map<String, String> classOf;
+  int lookups = 0;
+
+  final ClassList classes = ClassList.sorted([
+    const SchoolClass(name: '5A', lessons: [_tuesday]),
+    const SchoolClass(name: '5B'),
+  ]);
+
+  late final ScheduleSupervisionSource source = ScheduleSupervisionSource(
+    classNameOf: (uid) async {
+      lookups += 1;
+      return classOf[uid] ?? '';
+    },
+    readClasses: () async => classes,
+    cachedClasses: () => classes,
+  );
 }
 
 final DateTime _now = DateTime.utc(2026, 10, 15, 12);
@@ -178,7 +210,8 @@ class _Fixture {
   final InMemoryCosmos proposals;
   final _FakeConnector connector;
 
-  /// The app's own binding unless a test says otherwise (#160).
+  /// No registry unless a test says otherwise: the tally is the record's
+  /// (#160).
   final SupervisionSource supervision;
 
   GradeProposalService service({DateTime? now}) => GradeProposalService(
@@ -266,7 +299,7 @@ void main() {
       expect(p.supervisedTurns, 1);
       expect(p.homeTurns, 1);
       expect(p.isSignedOff, isFalse);
-      expect(p.formulaVersion, '1.0.18');
+      expect(p.formulaVersion, '1.0.19');
 
       final stored = f.proposals.docs['${_student}_m1'];
       expect(stored, isNotNull);
@@ -468,6 +501,63 @@ void main() {
       },
     );
 
+    test('the tally reads an oefening in the lesson time of the student\'s '
+        'class as supervised, also one the record calls home (#219)', () async {
+      // Local wall-clock moments: the lesson is Tuesday 10:50–11:40 wherever
+      // the test runs, and the records carry them in UTC as the app does.
+      DateTime local(int day, int hour, int minute) =>
+          DateTime(2026, 10, day, hour, minute).toUtc();
+      final timetable = _Timetable();
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+        turns: [
+          // Graded before the timetable was the source: home on the record,
+          // in the lesson by the clock.
+          _turn(local(6, 11, 0)),
+          // Ten minutes after the bell: still the lesson.
+          _turn(local(6, 11, 50)),
+          // Graded as supervised: counted once.
+          _turn(local(13, 10, 55), provenance: 'supervised'),
+          // Supervised on the record, outside today's timetable (the lesson
+          // moved since): the record stands.
+          _turn(local(8, 9, 0), provenance: 'supervised'),
+          // The evening, and a minute past the margin: home.
+          _turn(local(6, 20, 0)),
+          _turn(local(13, 11, 51)),
+        ],
+        supervision: timetable.source,
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      expect(p.supervisedTurns, 4);
+      expect(p.homeTurns, 2);
+      // One lookup of the student's class for the whole window.
+      expect(timetable.lookups, 1);
+    });
+
+    test('a student without a class tallies the record as it is', () async {
+      final timetable = _Timetable(classOf: const {});
+      final f = _Fixture(
+        beliefs: [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)],
+        turns: [
+          _turn(DateTime(2026, 10, 6, 11, 0).toUtc()),
+          _turn(
+            _now.subtract(const Duration(days: 9)),
+            provenance: 'supervised',
+          ),
+        ],
+        supervision: timetable.source,
+      );
+      final p = await f.service().compute(
+        uid: _student,
+        milestone: _milestone(),
+      );
+      expect(p.supervisedTurns, 1);
+      expect(p.homeTurns, 1);
+    });
+
     test('recomputing a draft keeps the teacher\'s adjustment and drops a '
         'justification written for another number', () async {
       final f = _Fixture(
@@ -481,6 +571,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'medium',
         languageCode: 'en',
+        className: '5A',
       );
       expect(justified.justification, 'Sam did well.');
       // Teacher typed an adjustment but did not sign yet.
@@ -566,6 +657,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'hard',
         languageCode: 'nl',
+        className: '5A',
       );
 
       expect(f.connector.lastScope, PreviousInputs.newSession);
@@ -594,9 +686,9 @@ void main() {
       ];
       final beliefs = [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)];
 
-      // The app's own binding: the tally is "0 supervised" for everyone and
-      // says nothing about this student, so neither the facts nor the
-      // contract carry it. The counts still land on the doc (§2.7 stands).
+      // No registry: the tally is "0 supervised" by construction and says
+      // nothing about this student, so neither the facts nor the contract
+      // carry it. The counts still land on the doc (§2.7 stands).
       final unwired = _Fixture(beliefs: beliefs, turns: turns);
       var svc = unwired.service();
       var draft = await svc.compute(uid: _student, milestone: _milestone());
@@ -608,6 +700,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'hard',
         languageCode: 'nl',
+        className: '5A',
       );
       expect(
         unwired.connector.lastInput,
@@ -623,7 +716,7 @@ void main() {
         isNot(contains('no supervised work')),
       );
 
-      // Anchor bound: the same tally is a measurement, and it is back.
+      // Wired: the same tally is a measurement, and it is back.
       final wired = _Fixture(
         beliefs: beliefs,
         turns: turns,
@@ -637,6 +730,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'hard',
         languageCode: 'nl',
+        className: '5A',
       );
       expect(
         wired.connector.lastInput,
@@ -644,6 +738,40 @@ void main() {
       );
       expect(wired.connector.lastInput, contains('"homeTurnsInPeriod":1'));
       expect(wired.connector.lastInstructions, contains('no supervised work'));
+    });
+
+    test('with the timetable the tally reaches the model for a class with '
+        'lessons, and not for one without (#219)', () async {
+      final beliefs = [_belief('s1', 'a', alpha: 5, beta: 1, at: fresh)];
+      final turns = [_turn(DateTime(2026, 10, 6, 11, 0).toUtc())];
+
+      Future<String> promptFor(String className) async {
+        final f = _Fixture(
+          beliefs: beliefs,
+          turns: turns,
+          supervision: _Timetable(classOf: {_student: className}).source,
+        );
+        final svc = f.service();
+        final draft = await svc.compute(uid: _student, milestone: _milestone());
+        await svc.writeJustification(
+          proposal: draft,
+          milestone: _milestone(),
+          studentName: 'Sam',
+          calibrationLevel: 'hard',
+          languageCode: 'nl',
+          className: className,
+        );
+        return f.connector.lastInput!;
+      }
+
+      final withLessons = await promptFor('5A');
+      expect(withLessons, contains('"supervisedTurnsInPeriod":1'));
+      expect(withLessons, contains('"homeTurnsInPeriod":0'));
+
+      // 5B has no lessons yet: every oefening is home by construction.
+      final withoutLessons = await promptFor('5B');
+      expect(withoutLessons, isNot(contains('supervisedTurnsInPeriod')));
+      expect(withoutLessons, isNot(contains('homeTurnsInPeriod')));
     });
 
     test('a transport failure surfaces as GradeJustificationException and '
@@ -665,6 +793,7 @@ void main() {
           studentName: 'Sam',
           calibrationLevel: 'medium',
           languageCode: 'en',
+          className: '5A',
         ),
         throwsA(isA<GradeJustificationException>()),
       );
@@ -692,6 +821,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'medium',
         languageCode: 'en',
+        className: '5A',
       );
       expect(rewritten.justification, 'Sam did well.');
       expect(rewritten.justificationSource, JustificationSource.ai);
@@ -716,6 +846,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'medium',
         languageCode: 'en',
+        className: '5A',
       );
 
       final edited = await svc.editJustification(
@@ -768,6 +899,7 @@ void main() {
         studentName: 'Sam',
         calibrationLevel: 'medium',
         languageCode: 'en',
+        className: '5A',
       );
       final signed = await svc.signOff(
         proposal: written,

@@ -9,7 +9,9 @@
 // The bulk action reuses AccountService.setClassName (one patch per
 // account) and leaves the filter → search → sort → paginate pipeline
 // untouched; the flow checks that the class filter's options and counts
-// follow the bulk writes.
+// follow the bulk writes. Since #218 the dialog offers the classes of the
+// class list instead of a text field, so the classes the flow assigns are
+// in that list.
 //
 // Driven against the real app — shell navigation, the real AccountsPage over
 // the harness's in-memory Cosmos, real 5 s polling streams.
@@ -44,6 +46,15 @@ Map<String, dynamic> _studentDoc(
   if (className != null) 'className': className,
 };
 
+/// The class list (#218): the classes a student's class is chosen from.
+Map<String, dynamic> _classesDoc(List<String> names) => {
+  'id': 'classes',
+  'type': 'config',
+  'classes': [
+    for (final name in names) {'name': name, 'lessons': <Object>[]},
+  ],
+};
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -56,6 +67,7 @@ void main() {
     accounts.upsert(_studentDoc('it-ben', 'Ben', className: '5A'));
     accounts.upsert(_studentDoc('it-cara', 'Cara', className: '5B'));
     accounts.upsert(_studentDoc('it-dave', 'Dave'));
+    harness.cosmos['config'].upsert(_classesDoc(['5A', '5B', '6C', '7A']));
 
     await tester.tap(find.byTooltip('Students'));
     await pumpUntilFound(tester, find.byType(AccountsPage));
@@ -75,12 +87,8 @@ void main() {
     expect(find.text('2 selected'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('bulk-assign-class')));
-    await pumpUntilFound(
-      tester,
-      find.text('Class name (leave empty to clear)'),
-    );
-    await tester.enterText(classNameField(), '6C');
-    await tester.tap(find.text('Save'));
+    await pumpUntilFound(tester, classChoiceField());
+    await chooseClassAndSave(tester, '6C');
     await pumpUntil(
       tester,
       () =>
@@ -120,12 +128,8 @@ void main() {
     expect(find.text('2 selected'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('bulk-assign-class')));
-    await pumpUntilFound(
-      tester,
-      find.text('Class name (leave empty to clear)'),
-    );
-    await tester.enterText(classNameField(), '7A');
-    await tester.tap(find.text('Save'));
+    await pumpUntilFound(tester, classChoiceField());
+    await chooseClassAndSave(tester, '7A');
     await pumpUntil(
       tester,
       () =>

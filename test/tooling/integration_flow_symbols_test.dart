@@ -315,7 +315,7 @@ void main() {
             'That is #156 (a Scrollable the shell added) and #158 (a TextField '
             'the Students page adds) in one shape.\n'
             'The fix: give the widget a key in lib/ and ask for it by key — '
-            '`studentsSearchField()` and `classNameField()` in '
+            '`studentsSearchField()` and `classChoiceField()` in '
             'integration_test/harness/app_harness.dart are the two from #158 '
             '— or scope the ordinal to a subtree you name, '
             '`find.descendant(of: find.byType(<the page>), matching: '

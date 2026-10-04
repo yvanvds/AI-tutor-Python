@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/account/detail/award_badge_dialog.dart';
 import 'package:ai_tutor_python/features/account/detail/progress_history_charts.dart';
 import 'package:ai_tutor_python/features/account/detail/signal_events_section.dart';
 import 'package:ai_tutor_python/features/account/detail/status_reports_section.dart';
@@ -13,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Right-hand peek panel for one student: continuous progress, status
-/// reports, signal events.
+/// reports, signal events, and "Badge toekennen" (#221) in the header.
 ///
 /// Grading is deliberately *not* here (#148). The grade proposal lived at
 /// the bottom of this list while it was a per-student action, which meant a
@@ -64,7 +65,7 @@ class StudentDetailDrawer extends ConsumerWidget {
                               goals: goals,
                             ),
                           const Divider(height: 1),
-                          SignalEventsSection(uid: account.uid),
+                          SignalEventsSection(uid: account.uid, goals: goals),
                           const Divider(height: 1),
                           _SectionTitle(
                             theme: theme,
@@ -120,6 +121,13 @@ class _Header extends StatelessWidget {
                   Text(account.email, style: theme.textTheme.bodySmall),
               ],
             ),
+          ),
+          // #221: a badge for what the app cannot see.
+          TextButton.icon(
+            key: const ValueKey('drawer-award-badge'),
+            onPressed: () => showAwardBadgeDialog(context, account),
+            icon: const Icon(Icons.military_tech_outlined, size: 18),
+            label: Text(AppLocalizations.of(context).awardBadge_button),
           ),
           IconButton(
             tooltip: AppLocalizations.of(context).drawer_close_tooltip,

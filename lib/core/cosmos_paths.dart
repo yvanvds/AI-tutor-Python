@@ -20,10 +20,9 @@ const String _reportsContainer = 'reports';
 const String _questionsContainer = 'questions';
 const String _translationsContainer = 'translations';
 
-/// Constant partition-key values for the single-partition containers
-/// (`goals`, `instructions`, `config`, `content`, `modules`, `milestones`).
-/// Each doc in those containers carries a `type` field with this exact
-/// value.
+/// Constant partition-key values for the `/type` containers (`goals`,
+/// `instructions`, `config`, `content`, `modules`, `milestones`). Each doc in
+/// those containers carries a `type` field with this exact value.
 class CosmosPartitions {
   static const String goal = 'goal';
   static const String instruction = 'instruction';
@@ -31,6 +30,9 @@ class CosmosPartitions {
   static const String content = 'content';
   static const String module = 'module';
   static const String milestone = 'milestone';
+
+  /// The class podium (#221), the second partition of `config`.
+  static const String podium = 'podium';
 }
 
 class CosmosPaths {
@@ -61,7 +63,16 @@ class CosmosPaths {
   static CosmosContainer instructions() =>
       _client.container(_instructionsContainer);
 
-  /// `/type` partition (always `"config"`). Single doc with id `global`.
+  /// `/type` partition. Two partitions:
+  ///
+  ///   - `"config"`: two docs, `global` (the school settings) and `classes`
+  ///     (the classes and their lessons, #218);
+  ///   - `"podium"`: the class podium (#221), three docs per class and
+  ///     subgoal at most, `podium_{class}_{subgoal}_{1|2|3}`
+  ///     (`CosmosDocId.podium`), each claimed with a `create` that never
+  ///     overwrites. Its own partition so the podium never shares one with
+  ///     the settings every app polls; no container of its own, so no step
+  ///     in the README.
   static CosmosContainer config() => _client.container(_configContainer);
 
   /// `/type` partition (always `"content"`). One doc per authored

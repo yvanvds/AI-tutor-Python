@@ -351,11 +351,12 @@ class AppHarness {
 
   /// The classroom-supervision registry the tutor consults when it grades an
   /// answer (#100). `null` (the default) leaves the app's own binding in
-  /// place — no registry, every turn is home work — which is also what the
-  /// shipped app does until Anchor is wired up. A flow about the supervised
-  /// weight passes a stand-in that says "in session"; a flow about what the
-  /// grade justification prompt may claim passes one that is merely wired
-  /// (#160).
+  /// place: the timetable (#219), which reads the student's class from the
+  /// account and its lessons from `config/classes` — with neither seeded,
+  /// every turn is home work. A flow about the supervised weight seeds a
+  /// lesson or passes a stand-in that says "in session"; a flow about what
+  /// the grade justification prompt may claim passes one that is merely
+  /// wired (#160).
   final SupervisionSource? supervision;
 
   /// Cosmos docs upserted on top of the standard seed before the app boots,
@@ -592,22 +593,44 @@ Finder optionsScrollable() => find
     .descendant(of: find.byType(OptionsPage), matching: find.byType(Scrollable))
     .first;
 
-/// The Students page's free-text search box, and the class-name field of the
-/// "Assign class" dialog it opens (#158).
+/// The Students page's free-text search box, and the class choice of the
+/// "Assign class" dialog it opens (#158, #218).
 ///
 /// Same rule as [optionsScrollable], one level in: these two were
 /// `find.byType(TextField).first` and `.last`, which only worked because the
 /// page happens to lay its fields out in that order. Add one field above the
 /// search box, or leave a dialog open that keeps a field of its own, and the
 /// ordinal re-points at a different widget — the flow then fails somewhere
-/// unrelated, with nothing static to warn anyone. Both keys come from
-/// `lib/features/account/accounts_page.dart`, so the key guard in
+/// unrelated, with nothing static to warn anyone. Both keys come from lib/
+/// (`accounts_page.dart`, `class_choice_dialog.dart`), so the key guard in
 /// `test/tooling/integration_flow_symbols_test.dart` keeps them honest.
 Finder studentsSearchField() => find.byKey(const Key('students-search-field'));
 
-/// The class-name field of the "Assign class" dialog — the per-row one and
-/// the bulk one are the same widget. See [studentsSearchField].
-Finder classNameField() => find.byKey(const Key('class-name-field'));
+/// The class choice of the "Assign class" dialog — the per-row one and the
+/// bulk one are the same widget. Until #218 a typed class name; now a list
+/// of the classes on the Classes page, plus "No class". See
+/// [studentsSearchField].
+Finder classChoiceField() => find.byKey(const Key('class-choice'));
+
+/// Picks [className] — `''` for "No class" — in the open "Assign class"
+/// dialog, and saves (#218).
+///
+/// The menu's entry is the *last* copy of the label: the dialog's button may
+/// show the same text, and so may a class badge on the page behind it, but
+/// the menu is the route on top. Each tap gets the menu's open or close
+/// animation pumped through before the next, the way the Reports flow
+/// drives its class filter — the menu's barrier would otherwise take the
+/// tap meant for Save.
+Future<void> chooseClassAndSave(WidgetTester tester, String className) async {
+  await tester.tap(classChoiceField());
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.tap(find.text(className.isEmpty ? 'No class' : className).last);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.tap(find.byKey(const Key('class-choice-save')));
+  await tester.pump();
+}
 
 /// Pumps real frames until [condition] holds. Preferred over
 /// `pumpAndSettle` here: the code editor's cursor blink and the 5 s Cosmos
@@ -647,6 +670,26 @@ Future<void> pumpUntilFound(
   timeout: timeout,
   reason: 'nothing matched ${finder.toString(describeSelf: true)}',
 );
+
+/// Pumps until the end drawer [drawer] has slid all the way in: its right
+/// edge on the window's right edge.
+///
+/// A drawer is in the tree from the first frame of its opening slide, so
+/// [pumpUntilFound] on it — or on something inside it — can return a few
+/// frames in, with the drawer still partly beyond the window. A tap then
+/// aims where the button is at that moment: on the 1280 px runner window of
+/// CI that was past its right edge, and the tap went nowhere (#221: the
+/// student drawer's "Acknowledge" and "Award badge" at x 1294 and 1288,
+/// with the drawer at 704–1280 once open). Wait for this before tapping in
+/// a drawer.
+Future<void> pumpUntilEndDrawerOpen(
+  WidgetTester tester,
+  Finder drawer,
+) => pumpUntil(tester, () {
+  if (drawer.evaluate().isEmpty) return false;
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  return (tester.getRect(drawer).right - width).abs() < 0.5;
+}, reason: 'never slid all the way in: ${drawer.toString(describeSelf: true)}');
 
 /// Pumps until [finder] matches nothing — e.g. a dialog route that is still
 /// animating out after its result has already been acted on.

@@ -10,7 +10,8 @@
 //
 // #185 added the eleventh entry this fix left room for — the teacher's
 // Questions page — and tightened the rail (44 px entries, trimmed logo
-// gaps) to put the entry of slack back.
+// gaps) to put the entry of slack back. #218 added the twelfth, the
+// teacher's Classes page, and 40 px entries put it back again.
 //
 // What only a full-app run can pin — and what a widget test structurally
 // cannot:
@@ -63,6 +64,7 @@ const List<String> _entries = [
   'Questions',
   'Instructions',
   'Students',
+  'Classes',
   'Milestones',
   'Reports',
 ];

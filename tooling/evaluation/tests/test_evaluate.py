@@ -40,6 +40,7 @@ def _fake_cosmos() -> types.ModuleType:
     m.accounts = lambda klas: [a for a in ACCOUNTS if a["className"] == klas]
     m.turns = lambda uid: sorted(TURNS.get(uid, []), key=lambda t: t["turnAt"])
     m.beliefs = lambda uid: {}
+    m.classes = lambda: CLASSES_DOC
     m.read = lambda coll, doc_id, pk: None
     m.query = lambda *a, **k: []
 
@@ -58,6 +59,9 @@ import rules  # noqa: E402
 
 NOW = dt.datetime(2026, 9, 24, 12, 0, tzinfo=dt.timezone.utc)
 KLAS = "6TEST"
+
+# `config/classes` (#218): no class list unless a test sets one.
+CLASSES_DOC = None
 
 GOALS = {
     "g-root": {"id": "g-root", "title": "Hoofddoel", "order": 1},
@@ -384,6 +388,37 @@ TURNS["u-lotte"] = [
     _turn("2026-09-18T09:05:00.000Z", "sg-a", "fix_a3", uid="u-lotte", isWarmUp=True, activeSubgoalId="sg-b", **_HARD,
           loSignals=[_sig("sg-a", "fix_a3", "moderate")]),
 ]
+
+# #219: a class of one made-up student with lessons on Tuesday 10:50–11:40,
+# Belgian time. On Tuesday 22 September (summer time, UTC+2) Tom answers
+# five weak questions on predict_b1 in the lesson, all `home` on the record
+# as every turn was before the timetable was the source, and one on
+# recall_a1 that evening. At ×1.0 the five leave predict_b1 at μ 0.78, at
+# ×1.25 they take it to 0.80: demonstrated, and the core goal counts.
+KLAS_LES = "6LESTIJD"
+ACCOUNTS += [
+    {"uid": "u-tom", "firstName": "Tom", "lastName": "Rooster", "className": KLAS_LES,
+     "updatedAt": "2026-09-22T19:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+TURNS["u-tom"] = [
+    *[_turn(f"2026-09-22T09:0{i}:00.000Z", "sg-b", "predict_b1", uid="u-tom", clientVersion="2.7.0+24",
+            loSignals=[_sig("sg-b", "predict_b1", "weak")]) for i in range(5)],
+    _turn("2026-09-22T18:00:00.000Z", "sg-a", "recall_a1", uid="u-tom", clientVersion="2.7.0+24",
+          loSignals=[_sig("sg-a", "recall_a1", "weak")]),
+]
+LES_CLASSES = {
+    "id": "classes",
+    "type": "config",
+    "classes": [
+        {"name": KLAS_LES, "lessons": [{"weekday": 2, "start": "10:50", "end": "11:40"}]},
+        {"name": KLAS, "lessons": []},
+    ],
+}
+# What the app stored for Tom: every turn `home`, so ×1.0 (μ 3.5 / 4.5).
+TOM_STORED = {
+    ("sg-b", "predict_b1"): {"alpha": 3.4999, "beta": 1.0, "highestPositiveDifficulty": "medium"},
+    ("sg-a", "recall_a1"): {"alpha": 1.5, "beta": 1.0, "highestPositiveDifficulty": "medium"},
+}
 
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
@@ -808,6 +843,184 @@ class ValidateTest(_CommandTest):
             self.assertAlmostEqual(now[key].beta, b["beta"], places=9)
 
 
+class TimetableDraftTest(_CommandTest):
+    """#219: `draft` and `what-if` read supervision from the timetable, also
+    for the oefeningen from before it; `validate` keeps what the app stored."""
+
+    def test_without_lessons_the_turns_stay_home_and_weigh_one(self):
+        _, json_path, _ = self.draft(KLAS_LES)
+        c = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-tom")["computed"]
+        self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (0, 6))
+        self.assertEqual(c["coreCounted"], 0)
+
+    def test_the_lessons_of_the_class_make_them_supervised_and_weigh_them(self):
+        self.cosmos.classes = lambda: LES_CLASSES
+        md_path, json_path, stdout = self.draft(KLAS_LES)
+        c = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-tom")["computed"]
+        # The five in the lesson, not the one that evening.
+        self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
+        # ×1.25 takes predict_b1 over the bar: the core goal counts.
+        self.assertEqual(c["coreCounted"], 1)
+        self.assertIn("1.0.19-eval6", stdout)
+        md = md_path.read_text(encoding="utf-8")
+        self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
+        self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
+
+    def test_what_if_replays_as_the_draft_does(self):
+        self.cosmos.classes = lambda: LES_CLASSES
+        stdout = self.run_cli("what-if", "--klas", KLAS_LES, "--leerling", "Tom", "--tel", "recall_a1")
+        now = next(line.split()[1:] for line in stdout.splitlines() if line.startswith("nu "))
+        self.assertEqual(now[0], "1/2")  # predict_b1 is demonstrated already
+
+    def test_validate_compares_with_the_weight_the_app_stored(self):
+        # The app weighed these turns as home; the timetable says lesson.
+        # `validate` checks the app's arithmetic, so it uses the record.
+        self.cosmos.classes = lambda: LES_CLASSES
+        self.cosmos.beliefs = lambda uid: TOM_STORED if uid == "u-tom" else {}
+
+        stdout = self.run_cli("validate", "--klas", KLAS_LES)
+
+        line = next(line for line in stdout.splitlines() if line.startswith("Tom Rooster"))
+        self.assertEqual(line.split()[-5:], ["2", "2", "0", "0", "2.7.0+24"])
+        self.assertIn("volgens het lesrooster", stdout)
+
+
+class LessonTimeTest(unittest.TestCase):
+    """#219: Belgian local time from the standard library, and the lesson
+    rule of `ScheduleSupervisionSource`."""
+
+    UTC = dt.timezone.utc
+    TUESDAY = [rules.Lesson(2, 10 * 60 + 50, 11 * 60 + 40)]
+
+    def at(self, s: str) -> dt.datetime:
+        return rules.parse_at(s)
+
+    def test_summer_time_starts_and_ends_at_one_utc_on_the_last_sunday(self):
+        cases = {
+            "2026-03-29T00:59:59Z": "2026-03-29T01:59:59+01:00",
+            "2026-03-29T01:00:00Z": "2026-03-29T03:00:00+02:00",
+            "2026-10-25T00:59:59Z": "2026-10-25T02:59:59+02:00",
+            "2026-10-25T01:00:00Z": "2026-10-25T02:00:00+01:00",
+            "2027-03-28T01:00:00Z": "2027-03-28T03:00:00+02:00",  # last Sunday of March 2027
+            "2027-10-31T00:59:59Z": "2027-10-31T02:59:59+02:00",  # a Sunday on the 31st
+            "2026-07-01T12:00:00Z": "2026-07-01T14:00:00+02:00",
+            "2026-12-01T12:00:00Z": "2026-12-01T13:00:00+01:00",
+        }
+        for utc, local in cases.items():
+            self.assertEqual(rules.belgian_time(self.at(utc)).isoformat(), local, utc)
+        # A naive moment is UTC.
+        self.assertEqual(rules.belgian_time(dt.datetime(2026, 12, 1, 12)).hour, 13)
+
+    def test_it_agrees_with_the_time_zone_database_where_there_is_one(self):
+        try:
+            from zoneinfo import ZoneInfo
+
+            brussels = ZoneInfo("Europe/Brussels")
+        except Exception:  # no tzdata on this machine (Windows): nothing to compare with
+            self.skipTest("no time zone data")
+        at = dt.datetime(2025, 1, 1, tzinfo=self.UTC)
+        while at.year < 2029:
+            self.assertEqual(rules.belgian_time(at).utcoffset(), at.astimezone(brussels).utcoffset(), at)
+            at += dt.timedelta(minutes=30)
+
+    def test_a_lesson_counts_from_ten_minutes_before_to_ten_after_in_local_time(self):
+        # Tuesday 6 October 2026, summer time: 10:50 local is 08:50 UTC.
+        self.assertTrue(rules.during_lesson(self.TUESDAY, self.at("2026-10-06T08:40:00Z")))
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-10-06T08:39:59Z")))
+        self.assertTrue(rules.during_lesson(self.TUESDAY, self.at("2026-10-06T09:50:00Z")))
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-10-06T09:50:01Z")))
+        # Another day at the same hour, and the evening.
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-10-07T09:00:00Z")))
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-10-06T18:00:00Z")))
+
+    def test_in_winter_time_the_same_lesson_is_an_hour_later_in_utc(self):
+        # Tuesday 3 November 2026: 10:50 local is 09:50 UTC.
+        self.assertTrue(rules.during_lesson(self.TUESDAY, self.at("2026-11-03T09:50:00Z")))
+        self.assertTrue(rules.during_lesson(self.TUESDAY, self.at("2026-11-03T10:50:00Z")))
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-11-03T08:39:00Z")))
+        self.assertFalse(rules.during_lesson(self.TUESDAY, self.at("2026-11-03T10:51:00Z")))
+
+    def test_the_lessons_are_read_as_the_app_reads_them(self):
+        doc = {
+            "classes": [
+                {"name": " 6EWI ", "lessons": [
+                    {"weekday": 3, "start": "8:25", "end": "09:15"},
+                    {"weekday": 2, "start": "10:50", "end": "11:40"},
+                    {"weekday": 8, "start": "10:00", "end": "11:00"},  # no such weekday
+                    {"weekday": 2.5, "start": "10:00", "end": "11:00"},
+                    {"weekday": True, "start": "10:00", "end": "11:00"},
+                    {"weekday": 4, "start": "24:00", "end": "11:00"},  # not a time of day
+                    {"weekday": 4, "start": "11:00", "end": "11:00"},  # ends where it starts
+                    "Tuesday",
+                ]},
+                {"name": "6EWI", "lessons": [{"weekday": 5, "start": "10:00", "end": "12:00"}]},
+                {"name": "6WEWI"},
+            ]
+        }
+        self.assertEqual(
+            rules.lessons_of(doc, "6EWI"),
+            [rules.Lesson(2, 650, 700), rules.Lesson(3, 505, 555)],
+        )
+        self.assertEqual(rules.lessons_of(doc, "6WEWI"), [])
+        self.assertEqual(rules.lessons_of(doc, "6ewi"), [])  # the name is the key, exactly
+        self.assertEqual(rules.lessons_of(doc, ""), [])
+        self.assertEqual(rules.lessons_of(None, "6EWI"), [])
+
+
+class SupervisedWeightTest(unittest.TestCase):
+    """#219: a supervised oefening weighs ×1.25 in the replay, as in the app
+    (`PolicyConstants.supervisedWeightFactor`); which turns are supervised
+    is the record's by default, the timetable's with `by_timetable`."""
+
+    KEY = ("sg-b", "predict_b1")
+    LESSON = [rules.Lesson(2, 10 * 60 + 50, 11 * 60 + 40)]
+
+    def one(self, at: str, **extra) -> dict:
+        return _turn(at, "sg-b", "predict_b1", uid="u-x", **extra)
+
+    def alpha(self, turns: list[dict], **kwargs) -> float:
+        return rules.replay(turns, GOALS, **kwargs)[self.KEY].alpha
+
+    def test_a_recorded_supervised_turn_weighs_one_and_a_quarter(self):
+        # A strong positive at medium: 2.0, or 2.0 × 1.25.
+        self.assertAlmostEqual(self.alpha([self.one("2026-10-06T09:00:00Z")]), 3.0)
+        self.assertAlmostEqual(self.alpha([self.one("2026-10-06T09:00:00Z", provenance="supervised")]), 3.5)
+        self.assertEqual(rules.SUPERVISED_WEIGHT_FACTOR, 1.25)
+
+    def test_so_does_a_negative_and_a_transfer_credit(self):
+        wrong = self.one("2026-10-06T09:00:00Z", provenance="supervised",
+                         loSignals=[_sig("sg-b", "predict_b1", "moderate", "negative")])
+        self.assertAlmostEqual(rules.replay([wrong], GOALS)[self.KEY].beta, 1 + 1.25)
+        credit = self.one("2026-10-06T09:05:00Z", provenance="supervised", loSignals=[],
+                          transferCredits=[{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.625}])
+        state = rules.replay([credit], GOALS)[("sg-a", "recall_a1")]
+        self.assertAlmostEqual(state.alpha, 1 + 0.5 * 1.25)
+
+    def test_the_timetable_reads_a_home_record_in_the_lesson_as_supervised(self):
+        by_timetable = rules.by_timetable(self.LESSON)
+        in_lesson = self.one("2026-10-06T09:00:00Z")  # 11:00 Belgian time, recorded home
+        evening = self.one("2026-10-06T18:00:00Z")
+        moved = self.one("2026-10-07T09:00:00Z", provenance="supervised")  # the lesson moved since
+        self.assertAlmostEqual(self.alpha([in_lesson], supervised=by_timetable), 3.5)
+        self.assertAlmostEqual(self.alpha([evening], supervised=by_timetable), 3.0)
+        self.assertAlmostEqual(self.alpha([moved], supervised=by_timetable), 3.5)
+        # The default is the record: what the app weighed.
+        self.assertAlmostEqual(self.alpha([in_lesson]), 3.0)
+
+    def test_the_tally_follows_the_same_rule(self):
+        turns = [
+            self.one("2026-10-06T09:00:00Z"),
+            self.one("2026-10-06T18:00:00Z"),
+            self.one("2026-10-07T09:00:00Z", provenance="supervised"),
+        ]
+        start = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+        end = dt.datetime(2026, 10, 8, tzinfo=dt.timezone.utc)
+        recorded = rules.reliability([], {}, turns, start, end)
+        timetable = rules.reliability([], {}, turns, start, end, supervised=rules.by_timetable(self.LESSON))
+        self.assertEqual((recorded.supervised_turns, recorded.home_turns), (1, 2))
+        self.assertEqual((timetable.supervised_turns, timetable.home_turns), (2, 1))
+
+
 class TurnScopeTest(unittest.TestCase):
     """The conductor's reading of a warm-up or recheck, at its edges."""
 
@@ -847,6 +1060,31 @@ class TurnScopeTest(unittest.TestCase):
                   difficulty="hard", calibrationBefore="hard")
         s = rules.replay([t], GOALS)[("sg-b", "predict_b1")]
         self.assertEqual((s.n_direct, s.ratchet), (1, "hard"))
+
+
+class BadgeFieldsTest(unittest.TestCase):
+    """#220 put two fields on the turn record for the badges: `keyDisputed`
+    (the grader called the answer key wrong, #198) and `askedAt` (when the
+    question went up). Neither is evidence: a record carrying them replays
+    and counts exactly as one without."""
+
+    def _log(self, **extra) -> list[dict]:
+        return [
+            _turn("2026-10-05T09:00:00.000Z", "sg-a", "recall_a1", **extra),
+            _turn("2026-10-05T09:04:00.000Z", "sg-a", "recall_a1", overallQuality="wrong",
+                  loSignals=[_sig("sg-a", "recall_a1", signal="negative")], **extra),
+        ]
+
+    def test_the_replay_is_the_same(self):
+        plain = rules.replay(self._log(), GOALS)
+        marked = rules.replay(self._log(keyDisputed=True, askedAt="2026-10-05T08:58:30.000Z"), GOALS)
+        self.assertEqual(plain.keys(), marked.keys())
+        for key in plain:
+            self.assertEqual(plain[key], marked[key], key)
+
+    def test_they_are_oefeningen_like_any_other(self):
+        for turn in self._log(keyDisputed=True, askedAt="2026-10-05T08:58:30.000Z"):
+            self.assertFalse(rules.is_audit(turn))
 
 
 class NeutralSignalTest(unittest.TestCase):

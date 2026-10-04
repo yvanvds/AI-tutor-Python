@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-09-24.
+schaduwperiode (zie §4). Laatste wijziging: 2026-10-04.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -363,12 +363,16 @@ het rapportpunt; aan het getal verandert een herschreven tekst niets
 
 ### 2.7 Herkomst van bewijs: klas en thuis
 
-Niet al het bewijs is even hard. Werk in de klas onder actief toezicht
-(via de Anchor-klassenomgeving geregistreerd) krijgt een **bescheiden
+Niet al het bewijs is even hard. Werk in de les krijgt een **bescheiden
 hoger bewijsgewicht** dan werk thuis: het gewicht van §1.2 wordt met een
-factor **s ≥ 1** vermenigvuldigd voor antwoorden binnen een
-toezichtsessie (waarde van s: §4). Er is geen knop per antwoord; de
-sessie-registratie bepaalt het automatisch.
+factor **s ≥ 1** vermenigvuldigd voor antwoorden onder toezicht (waarde
+van s: §4). Onder toezicht betekent: **binnen de lestijd van je klas**,
+vanaf 10 minuten voor het begin van een les tot 10 minuten na het einde.
+Je leerkracht houdt de lesuren van elke klas bij in de app. Er is geen
+knop per antwoord; het tijdstip van je antwoord bepaalt het automatisch.
+Waar je zit, speelt geen rol: oefen je ziek thuis op het lesuur, dan telt
+dat ook als lestijd. Al het andere is thuiswerk: 's avonds, in het
+weekend, of zolang je klas in de app geen lesuren heeft.
 
 Thuiskrediet is daarbij **voorlopig in de goede zin**: het telt meteen
 volledig mee (thuis doorwerken loont), maar het wordt bevestigd — of
@@ -377,6 +381,20 @@ leerdoelen. Wie thuis "briljant" presteert maar dat in de klas nooit kan
 tonen, ziet die overtuigingen door de klasantwoorden vanzelf terugzakken.
 Dit is geen geheim controlemechanisme maar open beleid: het maakt eerlijk
 thuiswerk waardevol en oneerlijk thuiswerk zinloos.
+
+**Wat je leerkracht daarvan ziet.** Antwoord je op één leerdoel thuis
+vooral juist en in de les daarna vooral fout, dan krijgt je leerkracht
+daar een melding van. De app kijkt daarvoor naar de vragen over dat
+leerdoel in de laatste zes weken, en meldt het pas als het duidelijk is:
+minstens drie antwoorden thuis en minstens drie in de les daarna, thuis
+meer dan de helft juist, in de les minder dan de helft, en een flink
+verschil tussen de twee. Lessen van vóór je thuiswerk tellen niet mee:
+wie in de les nog fouten maakte en het daarna thuis onder de knie kreeg,
+doet precies wat de bedoeling is. Er is erg weinig thuiswerk, dus de app
+meldt dit zuinig; een melding is voor je leerkracht een reden om eens te
+kijken, geen oordeel. Ze verandert niets aan je overtuigingen, aan het
+gewicht van je antwoorden of aan je punt, en je ziet ze zelf niet in de
+app.
 
 ### 2.8 Oude leerstof: opfrissen en transfer
 
@@ -562,6 +580,8 @@ opgevangen door §2.8) en *waar* het vandaan komt (toezicht, §2.7).
 - **Thuis laten voorzeggen (ChatGPT, klasgenoot).** Thuiskrediet is
   voorlopig; de eerstvolgende klassessie op dezelfde leerdoelen spreekt
   het tegen, en overtuigingen bewegen altijd mee met nieuw bewijs (§1.4).
+  Een duidelijk verschil tussen thuis en de les ziet je leerkracht ook
+  (§2.7).
 - **De AI ompraten.** De verantwoordingstekst is geen input voor het
   getal: het punt komt uit de formule, en de leerkracht leest de
   verantwoording zelf na.
@@ -623,6 +643,8 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.15 | 2026-09-23 | Geen structuurwijziging aan M of P. §1.7: het voortgangsbalkje van een subdoel blijft ook na het doorschuiven de echte fractie beheerste leerdoelen tonen. Voorheen zette de app de opgeslagen fractie hard op 1,0 zodra een subdoel doorschoof, ook wanneer dat met een vastgelopen leerdoel gebeurde: het balkje stond dan op 100% terwijl het punt, dat per leerdoel meet, het gat wél zag. "Afgerond" is nu een eigen stempel op het voortgangsdocument (`advancedAt`), waarop de tutor de keuze van het volgende subdoel en de app het vinkje baseren; de fractie zelf beweegt er niet door. Gevolg voor §2.4: de overgangsregel van v1.0.5 leest diezelfde fractie uit de voortgangshistoriek en kende zo aan élk leerdoel van een doorgeschoven subdoel 1,0 toe, het vastgelopen inbegrepen, waardoor M_start te hoog uitkwam en de groei G op 0 viel; vanaf nu staat in de historiek de echte fractie. Eerder opgeslagen historiek wordt niet herschreven (#161). |
 | 1.0.17 | 2026-09-24 | Geen structuurwijziging aan M of P. §2.8: nieuw mechanisme, de **controlevraag**. Een leerdoel uit een eerder subdoel dat je nog niet aantoonde, dat net onder de grens staat (μ vanaf 0,70 en onder 0,80) en dat al een week niet meer rechtstreeks bevraagd is, krijgt af en toe één vraag midden in het oefenen, zolang je recente werk op je niveau goed gaat (niveaugewogen ≥ 0,75 over je laatste tien antwoorden), met minstens vijf gewone oefeningen tussen twee vragen over een ander subdoel. Het antwoord telt als gewone meting van dat leerdoel, dus een juist antwoord kan de stempel van §2.2 alsnog opleveren; het telt niet voor je kalibratieniveau en raakt de voortgangsbalkjes niet. Reden: in de eerste rapportronde paste de leerkracht tien van de vijftien rapporten aan voor precies zulke leerdoelen (μ 0,74–0,80, op moeilijk bevraagd, daarna 12 tot 19 dagen niet meer terwijl de leerling later werk goed deed); de tutor vroeg er nooit meer naar, en decay trekt een overtuiging nooit over de grens, dus de leerling kon de stempel niet meer zelf verdienen (#187). §4 en bijlage A: de voorlopige waarden en de klok `lastProbedAt`. |
 | 1.0.18 | 2026-09-24 | Geen structuurwijziging aan M of P. §2.8: de controlevraag krijgt een tweede geval, **boven de grens**. Een leerdoel uit een eerder subdoel met μ vanaf 0,80 en genoeg bewijs, waarop je nooit rechtstreeks een juist antwoord gaf op je niveau (of waarvan oude data het niveau niet bijhield, §2.5), krijgt één controlevraag: minstens 7 dagen na de laatste rechtstreekse vraag, of meteen als het nooit rechtstreeks bevraagd werd, zonder voorwaarde op je recente werk. Een juist antwoord vervult voorwaarde 3 van §1.5 en geeft zo de stempel van §2.2 en het niveau in de ratel; een fout antwoord verlaagt de overtuiging. Reden: in de eerste rapportronde stond een leerdoel op μ 0,93 met bewijs op het plafond en toch niet aangetoond — de twee rechtstreekse vragen erover waren fout beantwoord, en de overtuiging kwam van 27 positieve signalen van opzij uit scripts in het volgende subdoel. Zulke signalen bewegen de ratel niet, en de tutor vroeg er niet meer naar, dus de leerling kon het niet meer zelf aantonen; de leerkracht moest het met de hand meetellen (#188). §4 en bijlage A: de voorlopige waarden. |
+| 1.0.19 | 2026-10-04 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de toezichtfactor s van §2.7 (× 1,25) weegt nu echt mee. "Onder toezicht" kwam tot nu van de Anchor-klassenomgeving, die nooit gekoppeld werd, dus telde elk antwoord als thuis en veranderde s niets. Vanaf nu is een antwoord onder toezicht als het binnen de lestijd van je klas valt, 10 minuten voor en na de les inbegrepen; de lesuren staan per klas in de app. Waar je zit, speelt geen rol: wie ziek thuis op het lesuur oefent, telt ook. In de eerste maand viel 94 à 97% van de oefeningen binnen de lesuren, dus een antwoord in de les telt voortaan 25% zwaarder dan voorheen, in beide richtingen: een leerdoel raakt sneller beheerst en zakt ook sneller terug. Thuiswerk blijft × 1,0 en wordt nooit afgewaardeerd: de leerkracht verkoos dat boven de les op × 1,0 en thuis op × 0,8 te zetten. Bijlage A: de nieuwe bron. De telling onder toezicht/thuis op het voorstel en de evaluatie buiten de app lezen de beurten van vóór deze versie met hetzelfde lesrooster; de opgeslagen beurten zelf worden niet herschreven (#219). |
+| 1.0.20 | 2026-10-04 | Geen wijziging aan M, P of de metingen eronder. §2.7: de bevestiging of tegenspraak van thuiswerk door het latere werk in de les wordt nu ook zichtbaar voor de leerkracht. Antwoord je op één leerdoel thuis vooral juist en in de les daarna vooral fout, dan krijgt je leerkracht een melding — pas met minstens drie antwoorden aan elke kant over de laatste zes weken, en alleen met lessen ná het thuiswerk. De melding verandert niets aan je overtuigingen, aan het gewicht van je antwoorden of aan je punt, en je ziet ze zelf niet. §3.3 en bijlage A volgen. Zuinig omdat er erg weinig thuiswerk is: in september zou ze niet één keer gegeven zijn (#107). |
 | 1.0.16 | 2026-09-23 | **Structuurwijziging aan P.** §2.6: het puntvoorstel is de beheersingsscore, P = M; de groeiscore G (§2.4) vervalt, en daarmee M_start, de momentopname bij de periodestart (v1.0.7) en de overgangsregel uit de voortgangshistoriek (v1.0.5). §4: de open parameter w_M / w_G vervalt; bijlage A en B volgen. §2.9: "Mijn rapporten" toont M, k, u en d, geen beginscore of groei meer. §3.1 en §3.3 steunen niet langer op G: een trage start laat in M geen spoor na omdat de stempel van §2.2 niet vraagt wanneer je iets aantoonde. Reden: de app rekende 60/40 met G, terwijl de evaluatie buiten de app (regelset `1.0.10-eval1`, kader 4) al P = M schreef in dezelfde puntvoorstellen — wie in de app op "Opnieuw berekenen" drukte, kreeg een ander getal dan wat er stond; en G hing af van een momentopname die het ene keer exact en het andere keer een schatting was. De container `period_start_snapshots` wordt niet meer geschreven of gelezen; oude voorstellen en rapporten met `mStart` en `g` blijven leesbaar en worden niet herschreven (#191). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
@@ -644,7 +666,8 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | moeilijkheidsfactor, positief signaal | 0,6 / 1,0 / 1,4 | makkelijk / gemiddeld / moeilijk (§1.2) |
 | moeilijkheidsfactor, negatief signaal | 1,4 / 1,0 / 0,6 | makkelijk / gemiddeld / moeilijk — het spiegelbeeld, sinds v1.0.14 (§1.2) |
 | vervolgvraag-cap | 0,5, als "gemiddeld" | maximumgewicht vervolgvragen (§1.2) |
-| toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen een Anchor-sessie; thuis × 1,0 (§2.7) |
+| toezichtfactor s | × 1,25 (voorlopig, §4) | bewijs binnen de lestijd van de klas, 10 minuten marge; thuis × 1,0 (§2.7) |
+| verschil thuis/les | 42 dagen; ≥ 3 antwoorden thuis en ≥ 3 in de les daarna; thuis meer dan de helft juist, in de les minder; aandeel juist ≥ 0,4 uit elkaar — met ≥ 6 per kant en ≥ 0,6 uit elkaar ook een badge | melding voor de leerkracht, niets aan het getal (§2.7, sinds v1.0.20) |
 | transfer-krediet | 0,5 (zwak, als gemiddeld) × s, alleen op α (voorlopig, §4) | eerder beheerst leerdoel uit een ander subdoel, correct gebruikt in een juiste oplossing (§2.8) |
 | opfrisdrempel | 30 dagen zonder schrijving (voorlopig, §4) | wanneer een eerder beheerst leerdoel uit een ander subdoel een opfrisvraag krijgt — een leerdoel dat voor controle gemarkeerd is (`regressedAt`, zie onder) komt eerder aan de beurt; hoogstens één per sessie (§2.8) |
 | controlevraag: klok | 7 dagen zonder rechtstreekse vraag (`lastProbedAt`; voorlopig, §4) | wanneer een nog niet aangetoond leerdoel uit een eerder subdoel een controlevraag kan krijgen (§2.8) |
@@ -788,8 +811,19 @@ De leerling leest die kopie — en alleen de eigen kopie — in
 verantwoording overschrijft ze (`updatedAt` beweegt, `publishedAt` niet)
 zonder het punt te raken. Van §2.7 staat de weging in de code
 (elke beurt krijgt een herkomst *thuis* of *onder toezicht*, en de factor
-s weegt mee), maar de koppeling met de Anchor-sessieregistratie nog niet:
-tot die er is, telt elke beurt als thuis en verandert s niets.
+s weegt mee), en sinds v1.0.19 ook de bron: de lesuren per klas
+(`config/classes`, de tab Klassen) en de klas op je account
+(`ScheduleSupervisionSource` in
+`lib/services/supervision/supervision_source.dart`). Tot dan telde elke
+beurt als thuis en veranderde s niets; de telling *onder toezicht / thuis*
+op het voorstel leest die oudere beurten met hetzelfde lesrooster. De
+melding aan de leerkracht van §2.7 staat sinds v1.0.20 in
+`lib/services/supervision/provenance_gap.dart`: ze telt per leerdoel de
+signalen op de vragen erover (de richting van elke wijziging aan de
+overtuiging, niet de grootte), leest oudere oefeningen met hetzelfde
+lesrooster, en schrijft een gebeurtenis `provenanceGap` in de
+beurthistoriek die alleen de leerkracht te zien krijgt; de drempels staan
+in de constantenmodule (`provenanceGap…`, de tabel hierboven).
 
 ## Bijlage B — rekenvoorbeeld
 
@@ -823,7 +857,7 @@ moeilijk.
 ---
 
 *Voor de implementatie: dit document is de spec voor de issues #99
-(puntvoorstel + verantwoording), #100 (bewijsherkomst/Anchor), #101
+(puntvoorstel + verantwoording), #100 (bewijsherkomst; sinds #219 uit de lesuren), #101
 (transfer-krediet), #102 (opfrisvragen) en #103 (drietraps-ratel). Bij
 tegenspraak tussen code en dit document wordt de afwijking gemeld en
 beslist de leerkracht welke kant aangepast wordt — stilzwijgend afwijken

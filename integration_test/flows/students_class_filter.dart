@@ -3,7 +3,9 @@
 // (filter → search → paginate), so the flow checks that it composes with the
 // free-text search and that the "Showing X–Y of Z" counts always describe
 // the filtered set. Assignment itself is driven through the UI: the class
-// cell opens a dialog whose save lands on the account doc in Cosmos.
+// cell opens a dialog whose save lands on the account doc in Cosmos. Since
+// #218 the dialog offers the classes of the class list instead of a text
+// field, so the class the flow assigns is in that list.
 //
 // Driven against the real app — shell navigation, the real AccountsPage over
 // the harness's in-memory Cosmos, real 5 s polling streams.
@@ -38,6 +40,15 @@ Map<String, dynamic> _studentDoc(
   if (className != null) 'className': className,
 };
 
+/// The class list (#218): the classes a student's class is chosen from.
+Map<String, dynamic> _classesDoc(List<String> names) => {
+  'id': 'classes',
+  'type': 'config',
+  'classes': [
+    for (final name in names) {'name': name, 'lessons': <Object>[]},
+  ],
+};
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -50,6 +61,7 @@ void main() {
     accounts.upsert(_studentDoc('it-ben', 'Ben', className: '5A'));
     accounts.upsert(_studentDoc('it-cara', 'Cara', className: '5B'));
     accounts.upsert(_studentDoc('it-dave', 'Dave'));
+    harness.cosmos['config'].upsert(_classesDoc(['5A', '5B', '6C']));
 
     await tester.tap(find.byTooltip('Students'));
     await pumpUntilFound(tester, find.byType(AccountsPage));
@@ -87,11 +99,11 @@ void main() {
     expect(find.text('yvan@example.com'), findsOneWidget);
     expect(find.text('it-anna@example.com'), findsNothing);
 
-    // Assign Dave to a brand-new class through the row's class cell.
+    // Assign Dave, through the row's class cell, to a class of the class
+    // list that nobody is in yet.
     await tester.tap(find.byKey(const Key('class-cell-it-dave')));
-    await pumpUntilFound(tester, find.text('Assign class'));
-    await tester.enterText(classNameField(), '6C');
-    await tester.tap(find.text('Save'));
+    await pumpUntilFound(tester, classChoiceField());
+    await chooseClassAndSave(tester, '6C');
     await pumpUntil(
       tester,
       () => accounts['it-dave']?['className'] == '6C',

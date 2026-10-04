@@ -170,6 +170,69 @@ class TurnHistoryService {
     });
   }
 
+  /// Every record of [uid] on [subgoalId] from [from] on — graded turns and
+  /// audit records alike, oldest first — for the provenance-gap check
+  /// (#107): the graded turns are its evidence, the audit records say
+  /// whether it already raised a gap. Only the fields the check reads are
+  /// fetched; the rest of each record comes back as `fromCosmos` defaults.
+  Future<List<PersistedTurnRecord>> listSubgoalSince(
+    String uid,
+    String subgoalId, {
+    required DateTime from,
+  }) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.id, c.uid, c.turnAt, c.subgoalId, c.questionType, '
+        'c.targetLOIds, c.appliedSignals, c.provenance, c.signalEvents '
+        'FROM c WHERE c.uid = @uid AND c.subgoalId = @sid '
+        'AND c.turnAt >= @from',
+        parameters: {
+          '@uid': uid,
+          '@sid': subgoalId,
+          '@from': from.toUtc().toIso8601String(),
+        },
+        partitionKey: uid,
+      );
+      final out = <PersistedTurnRecord>[];
+      for (final doc in docs) {
+        // Re-applied client-side, as in [listTurnsBetween].
+        if (doc['uid'] != uid || doc['subgoalId'] != subgoalId) continue;
+        final record = PersistedTurnRecord.fromCosmos(doc);
+        if (record.turnAt.isBefore(from)) continue;
+        out.add(record);
+      }
+      out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
+  /// Every graded turn record of [uid], oldest first: what the badges are
+  /// computed from (#220), read once when the app starts — one query on the
+  /// student's own partition. Only the fields the badges read are fetched;
+  /// the rest of each record comes back as `fromCosmos` defaults. Audit
+  /// stubs (no question asked) are left out. Throws, like the other reads.
+  Future<List<PersistedTurnRecord>> listForBadges(String uid) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.id, c.uid, c.turnAt, c.askedAt, c.subgoalId, '
+        'c.activeSubgoalId, c.targetLOIds, c.questionType, c.difficulty, '
+        'c.isFollowUp, c.isWarmUp, c.isRecheck, c.overallQuality, '
+        'c.provenance, c.usage, c.keyDisputed, c.transferCredits, '
+        'c.loStatusAfter, c.subgoalAdvanced '
+        'FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      final out = <PersistedTurnRecord>[
+        for (final doc in docs)
+          // Re-applied client-side, as in [listTurnsBetween].
+          if (doc['uid'] == uid) PersistedTurnRecord.fromCosmos(doc),
+      ]..removeWhere((r) => r.questionType.isEmpty);
+      out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
   /// The question bank ids of every question the current student answered
   /// on [subgoalId] (#186): what the conductor must not serve them again.
   /// A record's `questionId` names a question of its own `subgoalId` — the

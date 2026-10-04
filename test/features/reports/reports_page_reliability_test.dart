@@ -1,13 +1,14 @@
 // The reliability line of the Reports detail pane (#173).
 //
 // "Stale: X LOs (never probed: Y). Exercises this period: 0 supervised, N at
-// home." stood against every student while no supervision registry is
-// bound — the shipped app until Anchor lands, where every turn is `home`
-// by construction. The staleness half is a measurement and stays; the turn
-// tally is one only once `SupervisionSource.isWired` says a registry stands
-// behind it, and the pane shows it only then. Same rule #160 applied to the
-// justification prompt; here it is the line the teacher reads. The counts
-// themselves stay on the `grade_proposals` doc either way.
+// home." stood against every student while no supervision registry was
+// bound, where every turn is `home` by construction. The staleness half is
+// a measurement and stays; the turn tally is one only once
+// `SupervisionSource.isWiredFor` the student's class says so, and the pane
+// shows it only then. With the timetable as the source (#219) that is a
+// class with lessons. Same rule #160 applied to the justification prompt;
+// here it is the line the teacher reads. The counts themselves stay on the
+// `grade_proposals` doc either way.
 //
 // The tally counts oefeningen, the teacher's word for them, and says so in
 // both languages (#200): "Oefeningen deze periode", not "Beurten".
@@ -41,14 +42,13 @@ class _SignedInTeacher extends AuthService {
   AccountIdentity? build() => _teacher;
 }
 
-/// The binding the shipped app gets once Anchor lands: a registry stands
-/// behind it. What it answers per turn never matters here — that it is
-/// *wired* does.
-class _AnchorBound implements SupervisionSource {
-  const _AnchorBound();
+/// A source wired for every class. What it answers per turn never matters
+/// here — that it is *wired* does.
+class _Wired extends SupervisionSource {
+  const _Wired();
 
   @override
-  bool get isWired => true;
+  bool isWiredFor(String className) => true;
 
   @override
   Future<EvidenceProvenance> provenanceFor({
@@ -127,6 +127,7 @@ void main() {
     WidgetTester tester, {
     SupervisionSource? supervision,
     Locale locale = const Locale('en'),
+    List<Map<String, dynamic>> config = const [],
   }) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
@@ -135,6 +136,7 @@ void main() {
       'accounts': InMemoryCosmos([_student()]),
       'milestones': InMemoryCosmos([_milestone()]),
       'grade_proposals': InMemoryCosmos([_proposal()]),
+      'config': InMemoryCosmos(config),
     }).install();
     await tester.pumpWidget(
       ProviderScope(
@@ -166,7 +168,8 @@ void main() {
 
   testWidgets('with no supervision registry bound the reliability line '
       'stops at the staleness counts', (tester) async {
-    // The production binding: `NoSupervisionSource`, `isWired == false`.
+    // The production binding, the timetable (#219), with no lessons for
+    // the class: not wired.
     await mount(tester);
 
     expect(reliability(tester), 'Stale: 2 LOs (never probed: 1).');
@@ -177,7 +180,34 @@ void main() {
 
   testWidgets('with a supervision registry bound the turn tally is back on '
       'the line', (tester) async {
-    await mount(tester, supervision: const _AnchorBound());
+    await mount(tester, supervision: const _Wired());
+
+    expect(
+      reliability(tester),
+      'Stale: 2 LOs (never probed: 1). '
+      'Exercises this period: 0 supervised, 14 at home.',
+    );
+  });
+
+  testWidgets('with the timetable, the tally is on the line once the '
+      'student\'s class has lessons (#219)', (tester) async {
+    await mount(
+      tester,
+      config: [
+        {
+          'id': 'classes',
+          'type': 'config',
+          'classes': [
+            {
+              'name': '5A',
+              'lessons': [
+                {'weekday': 2, 'start': '10:50', 'end': '11:40'},
+              ],
+            },
+          ],
+        },
+      ],
+    );
 
     expect(
       reliability(tester),
@@ -197,7 +227,7 @@ void main() {
       '(#200)', (tester) async {
     await mount(
       tester,
-      supervision: const _AnchorBound(),
+      supervision: const _Wired(),
       locale: const Locale('nl'),
     );
 

@@ -1096,17 +1096,30 @@ produced:
 | `home` | 1.0 |
 | `supervised` | `s` = 1.25 (`PolicyConstants.supervisedWeightFactor`) |
 
-`supervised` means the student was in an active, alert-free Anchor
-classroom session at grading time, as answered per student, per turn,
-by the `SupervisionSource` the host consults before building the
-`GradedAnswer`. There is no manual toggle. The factor is symmetric in
+`supervised` means the answer was graded in the lesson time of the
+student's class (#219): the moment, in the laptop's local time, falls in
+one of the weekly lessons of the class on the student's account
+(`config/classes`, #218), from 10 minutes before the lesson starts to 10
+minutes after it ends. It is answered per student, per turn, by the
+`SupervisionSource` the host consults before building the `GradedAnswer`
+(`ScheduleSupervisionSource`). Where the student sits does not matter — no
+network check, and a sick student practising at home during the lesson
+counts as lesson time. Everything else is `home`: outside the lessons, a
+student without a class, a class without lessons, or a timetable that
+cannot be read (fail-safe: no extra weight). There is no manual toggle.
+The factor is symmetric in
 positive and negative (unlike difficulty since #169: provenance changes
 how *hard* the evidence is, not which way it points), applies to follow-up signals
 as well, and never drops below 1 — home evidence keeps full weight and
 is confirmed or contradicted by later supervised work on the same LO.
-Until Anchor is wired up every turn resolves to `home`, so the
-multiplier is inert and no backfill is needed. The value is provisional
-until the period-1 shadow run (PUNTENFORMULE §4).
+Where it is clearly contradicted, the teacher sees a `provenanceGap`
+event (8.2, #107); nothing about the weighting changes.
+Before #219 the signal was to come from Anchor and every turn resolved to
+`home`; no backfill is done, the grade proposal's supervised/home tally
+and the evaluation tooling read those turns by the timetable instead. With
+the timetable the factor bites on most oefeningen; the teacher kept it at
+1.25 with home at 1.0 (2026-10-04) rather than renormalising. The value is
+provisional until the period-1 shadow run (PUNTENFORMULE §4).
 
 ### 3.3 Decay
 
@@ -2292,6 +2305,16 @@ TurnRecord {
   fromBank: bool?
   gradedByKey: bool?
 
+  // For the badges (#220); neither is evidence, nothing in the conductor
+  // or a replay reads them. `keyDisputed`: the grader of a multiple-choice
+  // pick said the answer key is wrong (#198) — the bank counts it on the
+  // question, this on the student's own record ("Bugjager"); omitted when
+  // false. `askedAt`: when the question this turn grades went up — the
+  // question's arrival, or the follow-up's for a follow-up ("Rome …");
+  // omitted when unknown, and on docs written before the field.
+  keyDisputed: bool?
+  askedAt: string?
+
   usage: {
     model: string,                   // the model of the last call
     promptTokens: int,               // OpenAI's prompt_tokens, cached included
@@ -2304,9 +2327,9 @@ TurnRecord {
 }
 ```
 
-**Audit-only events outside graded turns** (empty-objectives blocks,
-subgoal-deleted redirects) are written to the same `turn_history`
-container as a stub record: `targetLOIds: []`, `questionType: ''`,
+**Events outside graded turns** (empty-objectives blocks,
+subgoal-deleted redirects, provenance gaps — 8.2) are written to the
+same `turn_history` container as a stub record: `targetLOIds: []`, `questionType: ''`,
 `overallQuality: "wrong"` (sentinel), `loSignals/appliedSignals/
 loStatusAfter: []`, `subgoalAdvanced: false`, with exactly one entry
 in `signalEvents`. This keeps the dashboard query path uniform — a
@@ -2359,6 +2382,77 @@ Each `signalEvents[*].kind` is one of:
   {subgoalId}`. Fires once per (session, subgoal).
 - `subgoalDeletedRedirect` — teacher deleted the active subgoal
   mid-session (section 7.4). `details: {subgoalId}`.
+
+**Audit, strong when well-evidenced (the event carries its severity):**
+
+- `provenanceGap` — on one LO, home credit that the supervised work
+  after it contradicts (#107, PUNTENFORMULE §2.7; see "Provenance gap"
+  below). `details: {subgoalId, loId, homeSignals, homePositive,
+  supervisedSignals, supervisedPositive, windowDays}`. Written on an
+  audit stub record (8.1) on the LO's subgoal, not on the graded turn.
+
+#### Provenance gap (#107)
+
+A passive check for the teacher, replacing routine spot-check tests:
+home credit counts in full at once (3.2) and is confirmed or
+contradicted by later supervised work on the same LO, and a structural
+gap — home answers mostly right, the class answers after them mostly
+wrong — is what help from a chatbot at home looks like. It changes no
+belief, no weight and no grade, and the student never sees it.
+
+**When it runs.** After every graded turn, on the student's laptop,
+off the student's path: alongside the write of the turn's record, which
+it takes as it has it, and silent when it fails. For each of the turn's target LOs with a direct applied
+signal it reads the student's records on that LO's subgoal over the
+last `provenanceGapWindow` (42 days, six weeks — long enough to hold
+the warm-up review (1.5) that is often the first supervised answer on
+an LO finished at home).
+
+**What it compares.** The *direct* signals on the LO: the entries of
+`appliedSignals` on a turn whose `targetLOIds` hold the LO — an
+ordinary question, a follow-up, a warm-up review or a recheck — not
+incidental signals on other LOs and not transfer credits. Each counts
+by the sign of its belief delta (`alphaDelta − betaDelta`); the size
+is left out, because at the evidence cap (3.4) a delta is mostly the
+shrink toward the prior, and the supervised factor would make class
+answers look heavier. A turn is supervised when it was recorded so or
+falls in a lesson of the student's class (#219) — the turns graded
+before the timetable was the source are all `home` on the record, and
+the grade proposal's tally reads them the same way.
+
+- The **home side** is the home signals that some supervised signal
+  came after: home credit not yet confronted with class work can still
+  be confirmed.
+- The **supervised side** is the supervised signals after the first of
+  those. Class work from *before* the home work is left out: failing in
+  class and then getting it at home is the system working.
+
+**When it fires** (`PolicyConstants.provenanceGap*`): each side has at
+least 3 signals (`provenanceGapMinSignals`), the share of positive home
+signals is above one half and the share of positive supervised signals
+below it, and the two shares lie at least 0.4 apart
+(`provenanceGapMinShareGap`) — with three a side, 3 of 3 against at
+most 1 of 3, or 2 of 3 against 0 of 3. That is **audit** severity: a
+line in the drawer, no badge. It is **strong** only with at least 6
+signals on each side (`provenanceGapStrongMinSignals`) and the shares
+at least 0.6 apart (`provenanceGapStrongMinShareGap`).
+
+Frugal on purpose: there is very little home work (a median of 0 home
+oefeningen per student in September 2026), so a handful of answers is
+all the check ever has, and a handful is noisy — for a student who is
+right 60% of the time anywhere, chance alone gives an audit gap on
+about 1 in 10 of the LOs that reach three a side, a strong one on fewer
+than 1 in 50 of those that reach six. Replayed over the September
+turns, read by the lesson times those turns show, it does not fire
+once; with two signals a side it would have fired three times.
+
+**Once per LO per window.** A gap already raised in the window, at the
+same severity or strong, is not raised again; an audit gap that grows
+strong is. Acknowledgment is the usual per-student one.
+
+**In the drawer** the line names the LO by its statement and gives the
+two counts in words ("at home 3 of 3 positive, in class afterwards 0 of
+3 (last 42 days)").
 
 #### Strong signals — needs attention
 

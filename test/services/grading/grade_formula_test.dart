@@ -161,8 +161,9 @@ void main() {
         expect(proposalScore(mEnd: m), m);
       }
       // v1.0.17 (#187) and v1.0.18 (#188) changed when evidence is asked
-      // for, not the formula.
-      expect(GradingConstants.formulaVersion, '1.0.18');
+      // for, v1.0.19 (#219) where the supervised weight comes from — not
+      // the formula.
+      expect(GradingConstants.formulaVersion, '1.0.19');
     });
     test('the proposal is a whole point on 100', () {
       expect(roundedProposal(72.1), 72);

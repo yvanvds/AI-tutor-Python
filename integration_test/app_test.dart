@@ -18,10 +18,13 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/badges.dart' as badges;
 import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/chat_collapse.dart' as chat_collapse;
 import 'flows/chat_composer_growth.dart' as chat_composer_growth;
+import 'flows/class_podium.dart' as class_podium;
+import 'flows/classes_tab.dart' as classes_tab;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
@@ -54,6 +57,7 @@ import 'flows/own_key.dart' as own_key;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
+import 'flows/provenance_gap.dart' as provenance_gap;
 import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/question_bank.dart' as question_bank;
 import 'flows/question_bank_serving.dart' as question_bank_serving;
@@ -70,6 +74,7 @@ import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
 import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
+import 'flows/teacher_badges.dart' as teacher_badges;
 import 'flows/token_usage.dart' as token_usage;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
@@ -109,6 +114,7 @@ void main() {
   garbled_reply_retry.main();
   exercise_history.main();
   evidence_provenance.main();
+  provenance_gap.main();
   difficulty_ratchet.main();
   difficulty_asymmetry.main();
   legacy_ratchet.main();
@@ -132,11 +138,15 @@ void main() {
   stuck_advance_progress.main();
   level_up_gate.main();
   oefening_xp.main();
+  badges.main();
+  class_podium.main();
+  teacher_badges.main();
   bug_report_oauth.main();
   bug_report_file.main();
   goals_import_replace.main();
   students_class_filter.main();
   students_bulk_class.main();
+  classes_tab.main();
   students_current_goal.main();
   students_progress_column.main();
   students_sort.main();

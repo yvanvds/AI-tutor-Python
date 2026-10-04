@@ -2,7 +2,8 @@
 // services (GoalsService, ContentService, ModuleService, AccountService, ...)
 // can run unmodified against a map of docs. Interprets just enough of the
 // SQL the services emit: parentId filters, root filter, uid / goalId /
-// subgoalId filters, ORDER BY title / order, and the `TOP 1 ... AS o`
+// subgoalId filters, the signal-event and acknowledgement filters of
+// `turn_history`, ORDER BY title / order, and the `TOP 1 ... AS o`
 // next-order query.
 //
 // Two ways to use it:
@@ -185,6 +186,20 @@ class InMemoryCosmos {
     // Cross-partition: one milestone, every student (#148).
     if (sql.contains('c.milestoneId = @milestoneId')) {
       rows = rows.where((d) => d['milestoneId'] == params['@milestoneId']);
+    }
+    // The teacher's signal events (CONDUCTOR_POLICY §8.2): records that
+    // carry events, and of those the ones not yet acknowledged — what the
+    // "needs attention" badge counts and the acknowledge action clears.
+    if (sql.contains('ARRAY_LENGTH(c.signalEvents) > 0')) {
+      rows = rows.where(
+        (d) =>
+            d['signalEvents'] is List && (d['signalEvents'] as List).isNotEmpty,
+      );
+    }
+    if (sql.contains(
+      '(NOT IS_DEFINED(c.acknowledgedAt) OR IS_NULL(c.acknowledgedAt))',
+    )) {
+      rows = rows.where((d) => d['acknowledgedAt'] == null);
     }
 
     var list = rows.toList();

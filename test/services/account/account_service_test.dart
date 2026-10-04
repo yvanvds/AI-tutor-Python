@@ -9,6 +9,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -317,6 +318,222 @@ void main() {
       final svc = await signedIn();
       await svc.setCalibration(StudentCalibration.fresh());
       expect(stored['oefeningCount'], 24);
+    });
+  });
+
+  group('awardBadges (#220)', () {
+    late Map<String, dynamic> stored;
+    var replaces = 0;
+
+    setUp(() {
+      replaces = 0;
+      stored = {
+        'id': _uid,
+        'uid': _uid,
+        'oefeningCount': 24,
+        'somethingNewer': 'kept',
+      };
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async {
+        // A real round trip: the doc as it was when the read went out, back
+        // a little later — so two writes in flight could interleave.
+        final snapshot = Map<String, dynamic>.of(stored);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        return snapshot;
+      });
+      when(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((inv) async {
+        replaces++;
+        stored = Map<String, dynamic>.of(
+          inv.positionalArguments[1] as Map<String, Object?>,
+        );
+        return stored;
+      });
+    });
+
+    Future<AccountService> signedIn() async {
+      final svc = build();
+      (pc.read(authServiceProvider.notifier) as _ControlledAuth).set(
+        _identity(),
+      );
+      await Future<void>.delayed(Duration.zero);
+      return svc;
+    }
+
+    test('the first look writes the map and says so; every other field '
+        'stays', () async {
+      final svc = await signedIn();
+      final award = await svc.awardBadges({
+        'effort': 1,
+        'helloWorld': 1,
+      }, now: DateTime.utc(2026, 10, 5));
+      expect(award!.first, isTrue);
+      expect(award.raised, {'effort': 1, 'helloWorld': 1});
+      expect(stored['badges'], {
+        'effort': {'tier': 1, 'earnedAt': '2026-10-05T00:00:00.000Z'},
+        'helloWorld': {'tier': 1, 'earnedAt': '2026-10-05T00:00:00.000Z'},
+      });
+      expect(stored['oefeningCount'], 24);
+      expect(stored['somethingNewer'], 'kept');
+    });
+
+    test('raises against the doc as stored — what another laptop already '
+        'wrote is not raised again — and writes nothing when nothing goes '
+        'up', () async {
+      stored['badges'] = {
+        'effort': {'tier': 1, 'earnedAt': '2026-10-01T00:00:00.000Z'},
+      };
+      final svc = await signedIn();
+
+      final same = await svc.awardBadges({'effort': 1});
+      expect(same!.raised, isEmpty);
+      expect(replaces, 0);
+
+      final higher = await svc.awardBadges({'effort': 2, 'streak': 1});
+      expect(higher!.first, isFalse);
+      expect(higher.raised, {'effort': 2, 'streak': 1});
+      expect(replaces, 1);
+      expect((stored['badges'] as Map)['effort']['tier'], 2);
+    });
+
+    test(
+      'a badge write right behind the calibration write of the same '
+      'answer waits for it: the oefening counted is not written back',
+      () async {
+        final svc = await signedIn();
+        // Not awaited one by one: the tutor fires the badge write while the
+        // calibration write may still be on its way.
+        await Future.wait([
+          svc.setCalibration(StudentCalibration.fresh(), countOefening: true),
+          svc.awardBadges({'effort': 3}),
+        ]);
+        expect(stored['oefeningCount'], 25);
+        expect((stored['badges'] as Map)['effort']['tier'], 3);
+      },
+    );
+
+    test('a write that fails does not hold up the next', () async {
+      final svc = await signedIn();
+      var fail = true;
+      when(
+        () => container.replace(
+          any<String>(),
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((inv) async {
+        if (fail) {
+          fail = false;
+          throw CosmosException(503, 'unavailable');
+        }
+        stored = Map<String, dynamic>.of(
+          inv.positionalArguments[1] as Map<String, Object?>,
+        );
+        return stored;
+      });
+      await expectLater(
+        svc.awardBadges({'effort': 1}),
+        throwsA(isA<CosmosException>()),
+      );
+      await svc.awardBadges({'effort': 1});
+      expect((stored['badges'] as Map)['effort']['tier'], 1);
+    });
+
+    test('a medal of the class podium (#221) goes in the same write, with '
+        'when it was won', () async {
+      final svc = await signedIn();
+      final award = await svc.awardBadges(
+        {'effort': 1},
+        now: DateTime.utc(2026, 10, 5),
+        granted: {
+          'podium:s1': EarnedBadge(
+            tier: 2,
+            earnedAt: DateTime.utc(2026, 9, 30),
+            awardedBy: kAwardedByPodium,
+            extra: const {'place': 2, 'className': '6EWI'},
+          ),
+        },
+      );
+      expect(award!.raised, {'effort': 1, 'podium:s1': 2});
+      expect(replaces, 1);
+      expect((stored['badges'] as Map)['podium:s1'], {
+        'place': 2,
+        'className': '6EWI',
+        'tier': 2,
+        'earnedAt': '2026-09-30T00:00:00.000Z',
+        'awardedBy': 'podium',
+      });
+    });
+
+    test('the teacher gives a badge (#221): its count goes up on the '
+        'student\'s doc, every other field and badge stays', () async {
+      stored['badges'] = {
+        'effort': {'tier': 2, 'earnedAt': '2026-10-01T00:00:00.000Z'},
+      };
+      // Signed in as someone else: the teacher writes the student's doc.
+      final svc = build();
+      final first = await svc.awardTeacherBadge(
+        uid: _uid,
+        badgeId: 'teacher:helpingHand',
+        now: DateTime.utc(2026, 10, 5, 10),
+      );
+      expect(first, 1);
+      final second = await svc.awardTeacherBadge(
+        uid: _uid,
+        badgeId: 'teacher:helpingHand',
+        now: DateTime.utc(2026, 10, 6, 10),
+      );
+      expect(second, 2);
+      final badges = stored['badges'] as Map;
+      expect(badges['teacher:helpingHand'], {
+        'count': 2,
+        'tier': 1,
+        'earnedAt': '2026-10-06T10:00:00.000Z',
+        'awardedBy': 'teacher',
+      });
+      expect(badges['effort'], {
+        'tier': 2,
+        'earnedAt': '2026-10-01T00:00:00.000Z',
+      });
+      expect(stored['oefeningCount'], 24);
+      expect(stored['somethingNewer'], 'kept');
+    });
+
+    test('a student without an account doc gets nothing: null', () async {
+      when(
+        () => container.read(
+          any<String>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => null);
+      final svc = build();
+      expect(
+        await svc.awardTeacherBadge(uid: 'nobody', badgeId: 'teacher:x'),
+        isNull,
+      );
+      expect(replaces, 0);
+    });
+
+    test('the student\'s app marks a teacher\'s badge seen; nothing to mark: '
+        'nothing written', () async {
+      stored['badges'] = {
+        'teacher:goodQuestion': {'tier': 1, 'awardedBy': 'teacher', 'count': 2},
+      };
+      final svc = await signedIn();
+      await svc.markTeacherBadgesSeen({'teacher:goodQuestion': 2});
+      expect(replaces, 1);
+      expect((stored['badges'] as Map)['teacher:goodQuestion']['seen'], 2);
+      await svc.markTeacherBadgesSeen({'teacher:goodQuestion': 2});
+      expect(replaces, 1);
     });
   });
 

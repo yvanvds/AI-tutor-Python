@@ -262,6 +262,7 @@ class ReportBatchService {
             : student.firstName,
         calibrationLevel: student.calibration.difficulty.name,
         languageCode: languageCode,
+        className: student.className,
       );
       return ReportBatchResult(proposal: written);
     } catch (error) {

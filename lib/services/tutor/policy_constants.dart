@@ -70,10 +70,14 @@ class PolicyConstants {
   }
 
   /// Provenance multiplier `s` on the base weight (PUNTENFORMULE §2.7, #100).
-  /// Evidence produced under Anchor supervision is *more reliable*, not
-  /// certain, so the factor is modest. Provisional until the period-1 shadow
-  /// run fixes it (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never
-  /// discounted, it is confirmed or contradicted by later supervised work.
+  /// Evidence produced in the lesson time of the student's class (#219,
+  /// `ScheduleSupervisionSource`) is *more reliable*, not certain, so the
+  /// factor is modest. Provisional until the period-1 shadow run fixes it
+  /// (PUNTENFORMULE §4); must stay ≥ 1 — home evidence is never discounted,
+  /// it is confirmed or contradicted by later supervised work. The teacher
+  /// kept it at 1.25 with home at 1.0 when the timetable made it bite on
+  /// most oefeningen (#219, 2026-10-04), rather than renormalising to
+  /// supervised 1.0 and home 0.8.
   static const double supervisedWeightFactor = 1.25;
 
   /// Multiplier for a signal's provenance. `home` is the unit weight.
@@ -229,6 +233,56 @@ class PolicyConstants {
   /// (no intervening promotion) on the same student fires
   /// `repeatedDemotions`. The doc says "tunable; suggest 3."
   static const int repeatedDemotionsThreshold = 3;
+
+  // ---- Provenance gap (CONDUCTOR_POLICY §8.2, PUNTENFORMULE §2.7, #107) ---
+  //
+  // Home credit is confirmed or contradicted by later supervised work on the
+  // same LO. The `provenanceGap` event tells the teacher where it was clearly
+  // contradicted: on one LO, the direct signals of the home oefeningen were
+  // mostly positive and those of the supervised oefeningen after them mostly
+  // negative. It is a passive check for the teacher only: it changes no
+  // belief, no weight and no grade, and the student never sees it.
+  //
+  // Frugal on purpose. There is very little home work — a median of 0 home
+  // oefeningen per student in September 2026 — so a handful of answers is
+  // all the check ever has, and a handful is noisy. Replayed over the
+  // September turns, read by the lesson times those turns show, these
+  // values do not fire once; two signals a side instead of three would
+  // have fired three times.
+
+  /// How far back from the oefening it runs after the check looks: six
+  /// weeks. Long enough to hold the warm-up review (§1.5, [warmUpStaleAfter]
+  /// after the last write) that is often the first supervised answer on an
+  /// LO finished at home; short enough not to hold this week's student
+  /// against last month's.
+  static const Duration provenanceGapWindow = Duration(days: 42);
+
+  /// The fewest direct home signals — and the fewest direct supervised
+  /// signals after the first of them — on one LO before the check can fire.
+  /// A home signal counts only when supervised work on the LO came after it:
+  /// the comparison is between home credit and the class work that could
+  /// confirm it, not with the class work that came before (a student who
+  /// struggled in class and then learned it at home is the system working).
+  static const int provenanceGapMinSignals = 3;
+
+  /// The share of positive home signals minus the share of positive later
+  /// supervised signals must reach this, and the two shares must lie on
+  /// either side of one half — at home mostly positive, in class mostly
+  /// negative. With three a side: 3 of 3 against at most 1 of 3, or 2 of 3
+  /// against 0 of 3. For a student who is right 60% of the time anywhere,
+  /// chance alone does that on about 1 in 10 of the LOs that reach three a
+  /// side — which is why it is audit severity: a line in the student's
+  /// detail drawer, a reason to look, no badge.
+  static const double provenanceGapMinShareGap = 0.4;
+
+  /// A gap is strong — it drives the "needs attention" badge — only with at
+  /// least this many signals on each side …
+  static const int provenanceGapStrongMinSignals = 6;
+
+  /// … and a share gap of at least this: e.g. 6 of 6 at home against at most
+  /// 2 of 6 in class. For the same student, chance alone does that on fewer
+  /// than 1 in 50 of the LOs that reach six a side.
+  static const double provenanceGapStrongMinShareGap = 0.6;
 
   // ---- Follow-up chains (CONDUCTOR_POLICY §6.4) --------------------------
 

@@ -31,6 +31,9 @@
 // buy it back (44 px entries, trimmed logo gaps), as the height test below
 // demands.
 //
+// Issue #218 — the twelfth: the teacher's Classes page, right after
+// Students. It took the slack again, and 40 px entries buy it back.
+//
 // This mounts the real Sidebar over the real providers, overriding only the
 // derived profile and the developer-tools flag, so the assertions are about
 // what a signed-in user actually sees in the navigation rail.
@@ -127,6 +130,26 @@ void main() {
     expect(containerOf(tester).read(sectionProvider), Section.questions);
   });
 
+  testWidgets('a teacher gets the Classes entry right after Students, and '
+      'tapping it routes to the class list (#218)', (tester) async {
+    await mount(tester, profile: _teacher, devTools: false);
+
+    final entry = find.byTooltip('Classes');
+    expect(entry, findsOneWidget);
+    expect(
+      tester.getTopLeft(entry).dy,
+      greaterThan(tester.getTopLeft(find.byTooltip('Students')).dy),
+    );
+    expect(
+      tester.getTopLeft(entry).dy,
+      lessThan(tester.getTopLeft(find.byTooltip('Milestones')).dy),
+    );
+
+    await tester.tap(entry);
+    await tester.pump();
+    expect(containerOf(tester).read(sectionProvider), Section.classes);
+  });
+
   testWidgets('teacher with developer tools sees the instructions entry', (
     tester,
   ) async {
@@ -142,6 +165,7 @@ void main() {
     expect(find.byTooltip('Instructions'), findsNothing);
     expect(find.byTooltip('Goals'), findsNothing);
     expect(find.byTooltip('Questions'), findsNothing);
+    expect(find.byTooltip('Classes'), findsNothing);
   });
 
   testWidgets('bottom strip is Options + sign out for a student; the old '
@@ -231,6 +255,33 @@ void main() {
     expect(container.read(sectionProvider), Section.myReports);
   });
 
+  testWidgets('a student has the trophy case right under the learning path, '
+      'and tapping it routes to the section (#220)', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+
+    final entry = find.byTooltip('Trophy case');
+    expect(entry, findsOneWidget);
+    expect(
+      tester.getTopLeft(entry).dy,
+      greaterThan(tester.getTopLeft(find.byTooltip('Learning path')).dy),
+    );
+    expect(
+      tester.getTopLeft(entry).dy,
+      lessThan(tester.getTopLeft(find.byTooltip('Grade formula')).dy),
+    );
+
+    await tester.tap(entry);
+    await tester.pump();
+    expect(containerOf(tester).read(sectionProvider), Section.trophies);
+  });
+
+  testWidgets('a teacher has no trophy case entry: no badges, and the rail '
+      'keeps its slack (#220)', (tester) async {
+    await mount(tester, profile: _teacher, devTools: true);
+
+    expect(find.byTooltip('Trophy case'), findsNothing);
+  });
+
   testWidgets('a teacher gets the class-wide Reports and not My reports', (
     tester,
   ) async {
@@ -272,6 +323,7 @@ void main() {
     'Questions',
     'Instructions',
     'Students',
+    'Classes',
     'Milestones',
     'Reports',
   ];
@@ -370,8 +422,14 @@ void main() {
     });
   }
 
-  test('Section.myReports is the one student-only section', () {
-    expect(Section.values.where((s) => s.isStudentOnly), [Section.myReports]);
+  test('the student-only sections are My reports and the trophy case '
+      '(#151, #220)', () {
+    expect(Section.values.where((s) => s.isStudentOnly), [
+      Section.trophies,
+      Section.myReports,
+    ]);
+    expect(Section.trophies.isTeacherOnly, isFalse);
+    expect(Section.trophies.isDeveloperOnly, isFalse);
     expect(Section.myReports.isTeacherOnly, isFalse);
     expect(Section.myReports.isDeveloperOnly, isFalse);
     expect(Section.reports.isTeacherOnly, isTrue);
@@ -394,6 +452,12 @@ void main() {
     expect(Section.questions.isTeacherOnly, isTrue);
     expect(Section.questions.isDeveloperOnly, isFalse);
     expect(Section.questions.isStudentOnly, isFalse);
+  });
+
+  test('Section.classes is teacher-only, not developer-only (#218)', () {
+    expect(Section.classes.isTeacherOnly, isTrue);
+    expect(Section.classes.isDeveloperOnly, isFalse);
+    expect(Section.classes.isStudentOnly, isFalse);
   });
 
   test('Section.options is reachable by students', () {

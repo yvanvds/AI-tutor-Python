@@ -42,6 +42,8 @@ dependencies:
   flutter_riverpod: ^2.6.1
   provider: ^6.1.5+1
   lottie: ^3.2.0
+  # Badge glyphs from game-icons.net, drawn as SVG paths (#220).
+  flutter_svg: ^2.2.1
   audioplayers: ^6.5.1
   file_picker: ^8.1.6
   url_launcher: ^6.3.0
@@ -80,6 +82,9 @@ flutter:
   assets:
     - google_fonts/
     - assets/images/Confetti.json
+    # Badge glyphs (#220): game-icons.net, CC BY 3.0 — authors per icon in
+    # lib/services/badges/badge_catalog.dart, listed under Options → About.
+    - assets/badges/
     - assets/sounds/goal_reached.mp3
     - assets/sounds/note.mp3
     - assets/sounds/question.mp3

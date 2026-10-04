@@ -194,6 +194,12 @@ abstract class AppLocalizations {
   /// **'Students'**
   String get sidebar_section_students;
 
+  /// Teacher section listing the classes with their weekly lessons (#218)
+  ///
+  /// In en, this message translates to:
+  /// **'Classes'**
+  String get sidebar_section_classes;
+
   /// No description provided for @sidebar_section_milestones.
   ///
   /// In en, this message translates to:
@@ -3594,11 +3600,35 @@ abstract class AppLocalizations {
   /// **'Assign class'**
   String get accounts_class_dialog_title;
 
-  /// No description provided for @accounts_class_dialog_hint.
+  /// No description provided for @accounts_class_choice_hint.
   ///
   /// In en, this message translates to:
-  /// **'Class name (leave empty to clear)'**
-  String get accounts_class_dialog_hint;
+  /// **'Choose a class'**
+  String get accounts_class_choice_hint;
+
+  /// No description provided for @accounts_class_choice_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No class'**
+  String get accounts_class_choice_none;
+
+  /// No description provided for @accounts_class_choice_noClasses.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no classes yet. Add them on the Classes page.'**
+  String get accounts_class_choice_noClasses;
+
+  /// No description provided for @accounts_class_choice_unlisted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in the class list.'**
+  String get accounts_class_choice_unlisted;
+
+  /// No description provided for @accounts_class_unlisted_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'This class is not in the class list. Add it on the Classes page, or choose a class from the list.'**
+  String get accounts_class_unlisted_tooltip;
 
   /// No description provided for @accounts_class_dialog_cancel.
   ///
@@ -3827,6 +3857,25 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subgoal deleted (audit)'**
   String get drawer_signals_kind_subgoalDeletedRedirect;
+
+  /// No description provided for @drawer_signals_kind_provenanceGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Class work contradicts home work'**
+  String get drawer_signals_kind_provenanceGap;
+
+  /// The detail line of a provenance-gap signal event (#107): the learning objective, and how many of its direct signals were positive at home and in the lessons after that home work.
+  ///
+  /// In en, this message translates to:
+  /// **'{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)'**
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  );
 
   /// No description provided for @drawer_statusReports_title.
   ///
@@ -4685,6 +4734,1122 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Found'**
   String get questions_badge_found;
+
+  /// No description provided for @classes_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Classes'**
+  String get classes_page_title;
+
+  /// No description provided for @classes_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every class with its students and its lessons each week. A student\'s class is chosen on the Students page.'**
+  String get classes_page_subtitle;
+
+  /// No description provided for @classes_button_new.
+  ///
+  /// In en, this message translates to:
+  /// **'New class'**
+  String get classes_button_new;
+
+  /// No description provided for @classes_list_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No classes yet.'**
+  String get classes_list_empty;
+
+  /// No description provided for @classes_studentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{no students} =1{1 student} other{{count} students}}'**
+  String classes_studentCount(int count);
+
+  /// Above the class names that students' accounts carry but the class list does not have, each with an Add button
+  ///
+  /// In en, this message translates to:
+  /// **'On accounts, not in the list'**
+  String get classes_unlisted_header;
+
+  /// No description provided for @classes_unlisted_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get classes_unlisted_add;
+
+  /// No description provided for @classes_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a class, or add one.'**
+  String get classes_placeholder;
+
+  /// No description provided for @classes_rename_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get classes_rename_tooltip;
+
+  /// No description provided for @classes_delete_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get classes_delete_tooltip;
+
+  /// No description provided for @classes_delete_blocked_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a class without students can be deleted'**
+  String get classes_delete_blocked_tooltip;
+
+  /// No description provided for @classes_lessons_header.
+  ///
+  /// In en, this message translates to:
+  /// **'Lessons'**
+  String get classes_lessons_header;
+
+  /// No description provided for @classes_lessons_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No lessons yet.'**
+  String get classes_lessons_empty;
+
+  /// No description provided for @classes_lesson_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add lesson'**
+  String get classes_lesson_add;
+
+  /// No description provided for @classes_lesson_weekday_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get classes_lesson_weekday_tooltip;
+
+  /// No description provided for @classes_lesson_start_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get classes_lesson_start_tooltip;
+
+  /// No description provided for @classes_lesson_end_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get classes_lesson_end_tooltip;
+
+  /// No description provided for @classes_lesson_delete_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete lesson'**
+  String get classes_lesson_delete_tooltip;
+
+  /// No description provided for @classes_lesson_endBeforeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'A lesson has to end after it starts.'**
+  String get classes_lesson_endBeforeStart;
+
+  /// No description provided for @classes_dialog_new_title.
+  ///
+  /// In en, this message translates to:
+  /// **'New class'**
+  String get classes_dialog_new_title;
+
+  /// No description provided for @classes_dialog_rename_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename class'**
+  String get classes_dialog_rename_title;
+
+  /// No description provided for @classes_dialog_name_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Class name'**
+  String get classes_dialog_name_label;
+
+  /// No description provided for @classes_dialog_rename_note.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{There are no students in this class.} =1{The student in this class moves along.} other{The {count} students in this class move along.}}'**
+  String classes_dialog_rename_note(int count);
+
+  /// No description provided for @classes_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get classes_dialog_cancel;
+
+  /// No description provided for @classes_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get classes_dialog_save;
+
+  /// No description provided for @classes_validation_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the class a name.'**
+  String get classes_validation_empty;
+
+  /// No description provided for @classes_validation_taken.
+  ///
+  /// In en, this message translates to:
+  /// **'There already is a class {name}.'**
+  String classes_validation_taken(String name);
+
+  /// No description provided for @classes_delete_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String classes_delete_dialog_title(String name);
+
+  /// No description provided for @classes_delete_dialog_body.
+  ///
+  /// In en, this message translates to:
+  /// **'The class and its lessons are removed from the list.'**
+  String get classes_delete_dialog_body;
+
+  /// No description provided for @classes_delete_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get classes_delete_dialog_cancel;
+
+  /// No description provided for @classes_delete_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get classes_delete_dialog_confirm;
+
+  /// No description provided for @classes_delete_hasStudents.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} still has students. Put them in another class first.'**
+  String classes_delete_hasStudents(String name);
+
+  /// No description provided for @classes_actionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not work: {error}'**
+  String classes_actionFailed(String error);
+
+  /// No description provided for @sidebar_section_trophies.
+  ///
+  /// In en, this message translates to:
+  /// **'Trophy case'**
+  String get sidebar_section_trophies;
+
+  /// No description provided for @badges_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Trophy case'**
+  String get badges_page_title;
+
+  /// No description provided for @badges_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Badges for what you\'ve done. They give no XP and don\'t count towards your grade.'**
+  String get badges_page_subtitle;
+
+  /// No description provided for @badges_page_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{earned} of {total} badges earned'**
+  String badges_page_count(int earned, int total);
+
+  /// No description provided for @badges_page_loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Counting your badges…'**
+  String get badges_page_loading;
+
+  /// No description provided for @badges_page_noProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress could not be loaded. You see the badges you already have.'**
+  String get badges_page_noProgress;
+
+  /// No description provided for @badges_section_tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'In tiers'**
+  String get badges_section_tiers;
+
+  /// No description provided for @badges_section_tiers_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bronze, silver, gold, and a dot for every tier after that.'**
+  String get badges_section_tiers_hint;
+
+  /// No description provided for @badges_section_experts.
+  ///
+  /// In en, this message translates to:
+  /// **'Experts'**
+  String get badges_section_experts;
+
+  /// No description provided for @badges_section_experts_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'One per main goal: every learning objective of it mastered.'**
+  String get badges_section_experts_hint;
+
+  /// No description provided for @badges_section_fun.
+  ///
+  /// In en, this message translates to:
+  /// **'Just for fun'**
+  String get badges_section_fun;
+
+  /// No description provided for @badges_section_fun_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Most of them are secret. Find out yourself how to get them.'**
+  String get badges_section_fun_hint;
+
+  /// No description provided for @badges_tile_tier.
+  ///
+  /// In en, this message translates to:
+  /// **'Tier {tier} of {max}'**
+  String badges_tile_tier(int tier, int max);
+
+  /// No description provided for @badges_tile_top.
+  ///
+  /// In en, this message translates to:
+  /// **'Top tier!'**
+  String get badges_tile_top;
+
+  /// No description provided for @badges_tile_locked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not earned yet'**
+  String get badges_tile_locked;
+
+  /// No description provided for @badges_tile_earned.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned'**
+  String get badges_tile_earned;
+
+  /// No description provided for @badges_tile_noLessons.
+  ///
+  /// In en, this message translates to:
+  /// **'Your class has no lesson times yet, so this one waits.'**
+  String get badges_tile_noLessons;
+
+  /// No description provided for @badges_secret_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret badge'**
+  String get badges_secret_name;
+
+  /// No description provided for @badges_secret_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Find out yourself how to get this one.'**
+  String get badges_secret_description;
+
+  /// No description provided for @badges_credits_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Icons: game-icons.net (CC BY 3.0)'**
+  String get badges_credits_button;
+
+  /// No description provided for @badges_credits_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Badge icons'**
+  String get badges_credits_title;
+
+  /// No description provided for @badges_credits_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge icons come from game-icons.net, under the Creative Commons Attribution 3.0 licence (CC BY 3.0). Their background was left out and their colour adapted.'**
+  String get badges_credits_intro;
+
+  /// No description provided for @badges_credits_line.
+  ///
+  /// In en, this message translates to:
+  /// **'{icon} by {author}'**
+  String badges_credits_line(String icon, String author);
+
+  /// No description provided for @badges_credits_close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get badges_credits_close;
+
+  /// No description provided for @badges_toast_caption.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW BADGE'**
+  String get badges_toast_caption;
+
+  /// No description provided for @badges_toast_tier.
+  ///
+  /// In en, this message translates to:
+  /// **'Tier {tier}'**
+  String badges_toast_tier(int tier);
+
+  /// No description provided for @badges_toast_summary_first.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You\'ve already earned 1 badge!} other{You\'ve already earned {count} badges!}}'**
+  String badges_toast_summary_first(int count);
+
+  /// No description provided for @badges_toast_summary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new badge!} other{{count} new badges!}}'**
+  String badges_toast_summary(int count);
+
+  /// No description provided for @badges_toast_open.
+  ///
+  /// In en, this message translates to:
+  /// **'See your trophy case'**
+  String get badges_toast_open;
+
+  /// No description provided for @badges_toast_close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get badges_toast_close;
+
+  /// No description provided for @options_badges_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Badges'**
+  String get options_badges_title;
+
+  /// No description provided for @options_badges_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The proof sheet: the badges in both themes, at 32, 64 and 128 pixels.'**
+  String get options_badges_subtitle;
+
+  /// No description provided for @options_badges_open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the proof sheet'**
+  String get options_badges_open;
+
+  /// No description provided for @options_about_credits.
+  ///
+  /// In en, this message translates to:
+  /// **'Badge icon credits'**
+  String get options_about_credits;
+
+  /// No description provided for @badges_proof_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Badge proof sheet'**
+  String get badges_proof_title;
+
+  /// No description provided for @badges_proof_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'The frame\'s shape, the tier colours and the glyph\'s size are set in one place: lib/theme/badge_style.dart.'**
+  String get badges_proof_intro;
+
+  /// No description provided for @badges_proof_dark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark theme'**
+  String get badges_proof_dark;
+
+  /// No description provided for @badges_proof_light.
+  ///
+  /// In en, this message translates to:
+  /// **'Light theme'**
+  String get badges_proof_light;
+
+  /// No description provided for @badges_proof_states.
+  ///
+  /// In en, this message translates to:
+  /// **'Ten badges, each in another state'**
+  String get badges_proof_states;
+
+  /// No description provided for @badges_proof_set.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole set'**
+  String get badges_proof_set;
+
+  /// No description provided for @badges_proof_previewCase.
+  ///
+  /// In en, this message translates to:
+  /// **'Trophy case preview'**
+  String get badges_proof_previewCase;
+
+  /// No description provided for @badges_proof_previewToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a notice'**
+  String get badges_proof_previewToast;
+
+  /// No description provided for @badges_proof_previewSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a summary'**
+  String get badges_proof_previewSummary;
+
+  /// No description provided for @badges_proof_state_locked.
+  ///
+  /// In en, this message translates to:
+  /// **'not earned'**
+  String get badges_proof_state_locked;
+
+  /// No description provided for @badges_proof_state_tier.
+  ///
+  /// In en, this message translates to:
+  /// **'tier {tier} of {max}'**
+  String badges_proof_state_tier(int tier, int max);
+
+  /// No description provided for @badges_proof_state_secret.
+  ///
+  /// In en, this message translates to:
+  /// **'secret'**
+  String get badges_proof_state_secret;
+
+  /// No description provided for @badges_proof_state_found.
+  ///
+  /// In en, this message translates to:
+  /// **'secret, found'**
+  String get badges_proof_state_found;
+
+  /// No description provided for @badges_proof_state_expert.
+  ///
+  /// In en, this message translates to:
+  /// **'expert'**
+  String get badges_proof_state_expert;
+
+  /// No description provided for @badges_proof_state_fun.
+  ///
+  /// In en, this message translates to:
+  /// **'single'**
+  String get badges_proof_state_fun;
+
+  /// No description provided for @badge_expert_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Expert in {goal}'**
+  String badge_expert_name(String goal);
+
+  /// No description provided for @badge_expert_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Every learning objective of {goal} mastered.'**
+  String badge_expert_description(String goal);
+
+  /// No description provided for @badge_effort_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Effort'**
+  String get badge_effort_name;
+
+  /// No description provided for @badge_effort_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercises done, right or wrong.'**
+  String get badge_effort_description;
+
+  /// No description provided for @badge_homeWork_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Home worker'**
+  String get badge_homeWork_name;
+
+  /// No description provided for @badge_homeWork_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercises outside lesson time.'**
+  String get badge_homeWork_description;
+
+  /// No description provided for @badge_lessonWeeks_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson weeks'**
+  String get badge_lessonWeeks_name;
+
+  /// No description provided for @badge_lessonWeeks_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Weeks with at least one exercise in class.'**
+  String get badge_lessonWeeks_description;
+
+  /// No description provided for @badge_hardCorrect_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard is my middle name'**
+  String get badge_hardCorrect_name;
+
+  /// No description provided for @badge_hardCorrect_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Right answers to hard questions.'**
+  String get badge_hardCorrect_description;
+
+  /// No description provided for @badge_streak_name.
+  ///
+  /// In en, this message translates to:
+  /// **'On a roll'**
+  String get badge_streak_name;
+
+  /// No description provided for @badge_streak_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Right answers in a row, without a mistake in between.'**
+  String get badge_streak_description;
+
+  /// No description provided for @badge_gapFiller_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap filler'**
+  String get badge_gapFiller_name;
+
+  /// No description provided for @badge_gapFiller_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Code completed correctly.'**
+  String get badge_gapFiller_description;
+
+  /// No description provided for @badge_fluentPython_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Fluent in Python'**
+  String get badge_fluentPython_name;
+
+  /// No description provided for @badge_fluentPython_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Code explained correctly.'**
+  String get badge_fluentPython_description;
+
+  /// No description provided for @badge_writer_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Writer'**
+  String get badge_writer_name;
+
+  /// No description provided for @badge_writer_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Code written yourself, correctly.'**
+  String get badge_writer_description;
+
+  /// No description provided for @badge_allRounder_name.
+  ///
+  /// In en, this message translates to:
+  /// **'All-rounder'**
+  String get badge_allRounder_name;
+
+  /// No description provided for @badge_allRounder_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Right on every kind of question: multiple choice, completing, explaining and writing code. Your weakest kind counts.'**
+  String get badge_allRounder_description;
+
+  /// No description provided for @badge_knowledge_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Knowledge'**
+  String get badge_knowledge_name;
+
+  /// No description provided for @badge_knowledge_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning objectives you have mastered.'**
+  String get badge_knowledge_description;
+
+  /// No description provided for @badge_milestones_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestones'**
+  String get badge_milestones_name;
+
+  /// No description provided for @badge_milestones_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics you have finished.'**
+  String get badge_milestones_description;
+
+  /// No description provided for @badge_elephantMemory_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory like an elephant'**
+  String get badge_elephantMemory_name;
+
+  /// No description provided for @badge_elephantMemory_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm-up questions answered right.'**
+  String get badge_elephantMemory_description;
+
+  /// No description provided for @badge_stillSharp_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Still sharp'**
+  String get badge_stillSharp_name;
+
+  /// No description provided for @badge_stillSharp_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-up questions answered right.'**
+  String get badge_stillSharp_description;
+
+  /// No description provided for @badge_oldFriend_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Old friend'**
+  String get badge_oldFriend_name;
+
+  /// No description provided for @badge_oldFriend_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Times you used something from before correctly in new code.'**
+  String get badge_oldFriend_description;
+
+  /// No description provided for @badge_comeback_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Comeback'**
+  String get badge_comeback_name;
+
+  /// No description provided for @badge_comeback_description.
+  ///
+  /// In en, this message translates to:
+  /// **'A right answer after three wrong ones in a row. Not giving up pays off!'**
+  String get badge_comeback_description;
+
+  /// No description provided for @badge_wrongToRight_name.
+  ///
+  /// In en, this message translates to:
+  /// **'From wrong to right'**
+  String get badge_wrongToRight_name;
+
+  /// No description provided for @badge_wrongToRight_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up questions answered right after a wrong answer.'**
+  String get badge_wrongToRight_description;
+
+  /// No description provided for @badge_hintHit_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Took the hint, hit the mark'**
+  String get badge_hintHit_name;
+
+  /// No description provided for @badge_hintHit_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Right after a hint in the same exercise.'**
+  String get badge_hintHit_description;
+
+  /// No description provided for @badge_persevere_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Persistent'**
+  String get badge_persevere_name;
+
+  /// No description provided for @badge_persevere_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning objectives you were stuck on and mastered anyway.'**
+  String get badge_persevere_description;
+
+  /// No description provided for @badge_tough_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Tough nut'**
+  String get badge_tough_name;
+
+  /// No description provided for @badge_tough_description.
+  ///
+  /// In en, this message translates to:
+  /// **'The most exercises on one learning objective before you mastered it. Struggling is part of learning.'**
+  String get badge_tough_description;
+
+  /// No description provided for @badge_helloWorld_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello, World!'**
+  String get badge_helloWorld_name;
+
+  /// No description provided for @badge_helloWorld_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Your first exercise.'**
+  String get badge_helloWorld_description;
+
+  /// No description provided for @badge_fortyTwo_name.
+  ///
+  /// In en, this message translates to:
+  /// **'42'**
+  String get badge_fortyTwo_name;
+
+  /// No description provided for @badge_fortyTwo_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Your 42nd exercise: the answer to everything.'**
+  String get badge_fortyTwo_description;
+
+  /// No description provided for @badge_offByOne_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Off by one'**
+  String get badge_offByOne_name;
+
+  /// No description provided for @badge_offByOne_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Your 99th right answer. Just short of 100.'**
+  String get badge_offByOne_description;
+
+  /// No description provided for @badge_earlyBird_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Early bird'**
+  String get badge_earlyBird_name;
+
+  /// No description provided for @badge_earlyBird_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise before 8 in the morning.'**
+  String get badge_earlyBird_description;
+
+  /// No description provided for @badge_nightOwl_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Night owl'**
+  String get badge_nightOwl_name;
+
+  /// No description provided for @badge_nightOwl_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise after 10 at night.'**
+  String get badge_nightOwl_description;
+
+  /// No description provided for @badge_weekendWarrior_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekend warrior'**
+  String get badge_weekendWarrior_name;
+
+  /// No description provided for @badge_weekendWarrior_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise on a Saturday or a Sunday.'**
+  String get badge_weekendWarrior_description;
+
+  /// No description provided for @badge_fridayHero_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Friday afternoon hero'**
+  String get badge_fridayHero_name;
+
+  /// No description provided for @badge_fridayHero_description.
+  ///
+  /// In en, this message translates to:
+  /// **'A right answer on a Friday after 3 pm.'**
+  String get badge_fridayHero_description;
+
+  /// No description provided for @badge_piHour_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Pi hour'**
+  String get badge_piHour_name;
+
+  /// No description provided for @badge_piHour_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise at 15:14.'**
+  String get badge_piHour_description;
+
+  /// No description provided for @badge_piDay_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Pi day'**
+  String get badge_piDay_name;
+
+  /// No description provided for @badge_piDay_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise on 14 March.'**
+  String get badge_piDay_description;
+
+  /// No description provided for @badge_spookyCode_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Spooky code'**
+  String get badge_spookyCode_name;
+
+  /// No description provided for @badge_spookyCode_description.
+  ///
+  /// In en, this message translates to:
+  /// **'An exercise on 31 October.'**
+  String get badge_spookyCode_description;
+
+  /// No description provided for @badge_rubberDuck_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Rubber duck'**
+  String get badge_rubberDuck_name;
+
+  /// No description provided for @badge_rubberDuck_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You asked the tutor a question yourself.'**
+  String get badge_rubberDuck_description;
+
+  /// No description provided for @badge_ctrlZ_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl+Z'**
+  String get badge_ctrlZ_name;
+
+  /// No description provided for @badge_ctrlZ_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You went back to a topic you had already finished.'**
+  String get badge_ctrlZ_description;
+
+  /// No description provided for @badge_bugHunter_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug hunter'**
+  String get badge_bugHunter_name;
+
+  /// No description provided for @badge_bugHunter_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were right, the computer wasn\'t.'**
+  String get badge_bugHunter_description;
+
+  /// No description provided for @badge_rome_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Rome wasn\'t built in a day'**
+  String get badge_rome_name;
+
+  /// No description provided for @badge_rome_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Right after more than 5 minutes on one question.'**
+  String get badge_rome_description;
+
+  /// No description provided for @badges_section_podium.
+  ///
+  /// In en, this message translates to:
+  /// **'Class podium'**
+  String get badges_section_podium;
+
+  /// No description provided for @badges_section_podium_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.'**
+  String get badges_section_podium_hint;
+
+  /// No description provided for @badges_podium_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No medal yet. Finish a topic as one of the first three in your class.'**
+  String get badges_podium_none;
+
+  /// No description provided for @badges_podium_noClass.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re not in a class yet, so you don\'t take part yet.'**
+  String get badges_podium_noClass;
+
+  /// No description provided for @badges_section_teacher.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher'**
+  String get badges_section_teacher;
+
+  /// No description provided for @badges_section_teacher_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'For things the app can\'t see. Your teacher can give you each of them more than once.'**
+  String get badges_section_teacher_hint;
+
+  /// No description provided for @badges_tile_count.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {count}×'**
+  String badges_tile_count(int count);
+
+  /// No description provided for @badges_toast_fromTeacher.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher'**
+  String get badges_toast_fromTeacher;
+
+  /// No description provided for @badges_toast_fromTeacherCount.
+  ///
+  /// In en, this message translates to:
+  /// **'From your teacher, {count}× now'**
+  String badges_toast_fromTeacherCount(int count);
+
+  /// No description provided for @badges_proof_state_podium.
+  ///
+  /// In en, this message translates to:
+  /// **'class podium'**
+  String get badges_proof_state_podium;
+
+  /// No description provided for @badges_proof_state_teacher.
+  ///
+  /// In en, this message translates to:
+  /// **'from the teacher'**
+  String get badges_proof_state_teacher;
+
+  /// No description provided for @badge_podium_name.
+  ///
+  /// In en, this message translates to:
+  /// **'{medal}: {subgoal}'**
+  String badge_podium_name(String medal, String subgoal);
+
+  /// No description provided for @badge_podium_gold.
+  ///
+  /// In en, this message translates to:
+  /// **'Gold'**
+  String get badge_podium_gold;
+
+  /// No description provided for @badge_podium_silver.
+  ///
+  /// In en, this message translates to:
+  /// **'Silver'**
+  String get badge_podium_silver;
+
+  /// No description provided for @badge_podium_bronze.
+  ///
+  /// In en, this message translates to:
+  /// **'Bronze'**
+  String get badge_podium_bronze;
+
+  /// No description provided for @badge_podium_unknownSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'a topic'**
+  String get badge_podium_unknownSubgoal;
+
+  /// No description provided for @badge_podium_first_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the first in your class to finish this topic.'**
+  String get badge_podium_first_description;
+
+  /// No description provided for @badge_podium_second_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the second in your class to finish this topic.'**
+  String get badge_podium_second_description;
+
+  /// No description provided for @badge_podium_third_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You were the third in your class to finish this topic.'**
+  String get badge_podium_third_description;
+
+  /// No description provided for @badge_faultFinder_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Fault finder'**
+  String get badge_faultFinder_name;
+
+  /// No description provided for @badge_faultFinder_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.'**
+  String get badge_faultFinder_description;
+
+  /// No description provided for @badge_helpingHand_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Helping hand'**
+  String get badge_helpingHand_name;
+
+  /// No description provided for @badge_helpingHand_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You helped a classmate.'**
+  String get badge_helpingHand_description;
+
+  /// No description provided for @badge_goodQuestion_name.
+  ///
+  /// In en, this message translates to:
+  /// **'Good question!'**
+  String get badge_goodQuestion_name;
+
+  /// No description provided for @badge_goodQuestion_description.
+  ///
+  /// In en, this message translates to:
+  /// **'You asked a question in class that deserved it.'**
+  String get badge_goodQuestion_description;
+
+  /// No description provided for @awardBadge_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Award badge'**
+  String get awardBadge_button;
+
+  /// No description provided for @awardBadge_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Award a badge to {name}'**
+  String awardBadge_title(String name);
+
+  /// No description provided for @awardBadge_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'For things the app can\'t see. {name} gets a notice the next time the app starts, or within seconds if it is open.'**
+  String awardBadge_intro(String name);
+
+  /// No description provided for @awardBadge_faultFinder_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported a wrong question, by the ID at the top of the exercise.'**
+  String get awardBadge_faultFinder_hint;
+
+  /// No description provided for @awardBadge_helpingHand_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Helped a classmate.'**
+  String get awardBadge_helpingHand_hint;
+
+  /// No description provided for @awardBadge_goodQuestion_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Asked a question in class that deserved it.'**
+  String get awardBadge_goodQuestion_hint;
+
+  /// No description provided for @awardBadge_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not given yet} other{Given {count}× so far}}'**
+  String awardBadge_count(int count);
+
+  /// No description provided for @awardBadge_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get awardBadge_cancel;
+
+  /// No description provided for @awardBadge_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Award'**
+  String get awardBadge_confirm;
+
+  /// No description provided for @awardBadge_done.
+  ///
+  /// In en, this message translates to:
+  /// **'{badge} awarded ({count}×).'**
+  String awardBadge_done(String badge, int count);
+
+  /// No description provided for @awardBadge_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge could not be awarded. Try again.'**
+  String get awardBadge_failed;
 }
 
 class _AppLocalizationsDelegate

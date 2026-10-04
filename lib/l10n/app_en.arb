@@ -29,6 +29,10 @@
   "sidebar_section_questions": "Questions",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
+  "sidebar_section_classes": "Classes",
+  "@sidebar_section_classes": {
+    "description": "Teacher section listing the classes with their weekly lessons (#218)"
+  },
   "sidebar_section_milestones": "Milestones",
   "sidebar_section_reports": "Reports",
   "sidebar_section_options": "Options",
@@ -1217,7 +1221,11 @@
   },
 
   "accounts_class_dialog_title": "Assign class",
-  "accounts_class_dialog_hint": "Class name (leave empty to clear)",
+  "accounts_class_choice_hint": "Choose a class",
+  "accounts_class_choice_none": "No class",
+  "accounts_class_choice_noClasses": "There are no classes yet. Add them on the Classes page.",
+  "accounts_class_choice_unlisted": "Not in the class list.",
+  "accounts_class_unlisted_tooltip": "This class is not in the class list. Add it on the Classes page, or choose a class from the list.",
   "accounts_class_dialog_cancel": "Cancel",
   "accounts_class_dialog_save": "Save",
   "accounts_class_saveFailed": "Could not save class: {error}",
@@ -1286,6 +1294,19 @@
   "drawer_signals_kind_cascadeHalt": "Cascade halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subgoal without LOs (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subgoal deleted (audit)",
+  "drawer_signals_kind_provenanceGap": "Class work contradicts home work",
+  "drawer_signals_provenanceGap_detail": "{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)",
+  "@drawer_signals_provenanceGap_detail": {
+    "description": "The detail line of a provenance-gap signal event (#107): the learning objective, and how many of its direct signals were positive at home and in the lessons after that home work.",
+    "placeholders": {
+      "lo": { "type": "String" },
+      "homePositive": { "type": "int" },
+      "homeSignals": { "type": "int" },
+      "supervisedPositive": { "type": "int" },
+      "supervisedSignals": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
 
   "drawer_statusReports_title": "Status reports",
   "drawer_statusReports_loadError": "Could not load status reports.",
@@ -1539,5 +1560,261 @@
   "questions_badge_found": "Found",
   "@questions_badge_found": {
     "description": "Badge on the card a lookup by ID found — displayed uppercase"
-  }
+  },
+  "classes_page_title": "Classes",
+  "classes_page_subtitle": "Every class with its students and its lessons each week. A student's class is chosen on the Students page.",
+  "classes_button_new": "New class",
+  "classes_list_empty": "No classes yet.",
+  "classes_studentCount": "{count, plural, =0{no students} =1{1 student} other{{count} students}}",
+  "@classes_studentCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "classes_unlisted_header": "On accounts, not in the list",
+  "@classes_unlisted_header": {
+    "description": "Above the class names that students' accounts carry but the class list does not have, each with an Add button"
+  },
+  "classes_unlisted_add": "Add",
+  "classes_placeholder": "Choose a class, or add one.",
+  "classes_rename_tooltip": "Rename",
+  "classes_delete_tooltip": "Delete",
+  "classes_delete_blocked_tooltip": "Only a class without students can be deleted",
+  "classes_lessons_header": "Lessons",
+  "classes_lessons_empty": "No lessons yet.",
+  "classes_lesson_add": "Add lesson",
+  "classes_lesson_weekday_tooltip": "Day",
+  "classes_lesson_start_tooltip": "Start",
+  "classes_lesson_end_tooltip": "End",
+  "classes_lesson_delete_tooltip": "Delete lesson",
+  "classes_lesson_endBeforeStart": "A lesson has to end after it starts.",
+  "classes_dialog_new_title": "New class",
+  "classes_dialog_rename_title": "Rename class",
+  "classes_dialog_name_label": "Class name",
+  "classes_dialog_rename_note": "{count, plural, =0{There are no students in this class.} =1{The student in this class moves along.} other{The {count} students in this class move along.}}",
+  "@classes_dialog_rename_note": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "classes_dialog_cancel": "Cancel",
+  "classes_dialog_save": "Save",
+  "classes_validation_empty": "Give the class a name.",
+  "classes_validation_taken": "There already is a class {name}.",
+  "@classes_validation_taken": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_delete_dialog_title": "Delete {name}?",
+  "@classes_delete_dialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_delete_dialog_body": "The class and its lessons are removed from the list.",
+  "classes_delete_dialog_cancel": "Cancel",
+  "classes_delete_dialog_confirm": "Delete",
+  "classes_delete_hasStudents": "{name} still has students. Put them in another class first.",
+  "@classes_delete_hasStudents": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_actionFailed": "That did not work: {error}",
+  "@classes_actionFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "sidebar_section_trophies": "Trophy case",
+  "badges_page_title": "Trophy case",
+  "badges_page_subtitle": "Badges for what you've done. They give no XP and don't count towards your grade.",
+  "badges_page_count": "{earned} of {total} badges earned",
+  "@badges_page_count": {
+    "placeholders": { "earned": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "badges_page_loading": "Counting your badges…",
+  "badges_page_noProgress": "Your progress could not be loaded. You see the badges you already have.",
+  "badges_section_tiers": "In tiers",
+  "badges_section_tiers_hint": "Bronze, silver, gold, and a dot for every tier after that.",
+  "badges_section_experts": "Experts",
+  "badges_section_experts_hint": "One per main goal: every learning objective of it mastered.",
+  "badges_section_fun": "Just for fun",
+  "badges_section_fun_hint": "Most of them are secret. Find out yourself how to get them.",
+  "badges_tile_tier": "Tier {tier} of {max}",
+  "@badges_tile_tier": {
+    "placeholders": { "tier": { "type": "int" }, "max": { "type": "int" } }
+  },
+  "badges_tile_top": "Top tier!",
+  "badges_tile_locked": "Not earned yet",
+  "badges_tile_earned": "Earned",
+  "badges_tile_noLessons": "Your class has no lesson times yet, so this one waits.",
+  "badges_secret_name": "Secret badge",
+  "badges_secret_description": "Find out yourself how to get this one.",
+  "badges_credits_button": "Icons: game-icons.net (CC BY 3.0)",
+  "badges_credits_title": "Badge icons",
+  "badges_credits_intro": "The badge icons come from game-icons.net, under the Creative Commons Attribution 3.0 licence (CC BY 3.0). Their background was left out and their colour adapted.",
+  "badges_credits_line": "{icon} by {author}",
+  "@badges_credits_line": {
+    "placeholders": { "icon": { "type": "String" }, "author": { "type": "String" } }
+  },
+  "badges_credits_close": "Close",
+  "badges_toast_caption": "NEW BADGE",
+  "badges_toast_tier": "Tier {tier}",
+  "@badges_toast_tier": {
+    "placeholders": { "tier": { "type": "int" } }
+  },
+  "badges_toast_summary_first": "{count, plural, =1{You've already earned 1 badge!} other{You've already earned {count} badges!}}",
+  "@badges_toast_summary_first": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_toast_summary": "{count, plural, =1{1 new badge!} other{{count} new badges!}}",
+  "@badges_toast_summary": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_toast_open": "See your trophy case",
+  "badges_toast_close": "Close",
+  "options_badges_title": "Badges",
+  "options_badges_subtitle": "The proof sheet: the badges in both themes, at 32, 64 and 128 pixels.",
+  "options_badges_open": "Open the proof sheet",
+  "options_about_credits": "Badge icon credits",
+  "badges_proof_title": "Badge proof sheet",
+  "badges_proof_intro": "The frame's shape, the tier colours and the glyph's size are set in one place: lib/theme/badge_style.dart.",
+  "badges_proof_dark": "Dark theme",
+  "badges_proof_light": "Light theme",
+  "badges_proof_states": "Ten badges, each in another state",
+  "badges_proof_set": "The whole set",
+  "badges_proof_previewCase": "Trophy case preview",
+  "badges_proof_previewToast": "Show a notice",
+  "badges_proof_previewSummary": "Show a summary",
+  "badges_proof_state_locked": "not earned",
+  "badges_proof_state_tier": "tier {tier} of {max}",
+  "@badges_proof_state_tier": {
+    "placeholders": { "tier": { "type": "int" }, "max": { "type": "int" } }
+  },
+  "badges_proof_state_secret": "secret",
+  "badges_proof_state_found": "secret, found",
+  "badges_proof_state_expert": "expert",
+  "badges_proof_state_fun": "single",
+  "badge_expert_name": "Expert in {goal}",
+  "@badge_expert_name": {
+    "placeholders": { "goal": { "type": "String" } }
+  },
+  "badge_expert_description": "Every learning objective of {goal} mastered.",
+  "@badge_expert_description": {
+    "placeholders": { "goal": { "type": "String" } }
+  },
+  "badge_effort_name": "Effort",
+  "badge_effort_description": "Exercises done, right or wrong.",
+  "badge_homeWork_name": "Home worker",
+  "badge_homeWork_description": "Exercises outside lesson time.",
+  "badge_lessonWeeks_name": "Lesson weeks",
+  "badge_lessonWeeks_description": "Weeks with at least one exercise in class.",
+  "badge_hardCorrect_name": "Hard is my middle name",
+  "badge_hardCorrect_description": "Right answers to hard questions.",
+  "badge_streak_name": "On a roll",
+  "badge_streak_description": "Right answers in a row, without a mistake in between.",
+  "badge_gapFiller_name": "Gap filler",
+  "badge_gapFiller_description": "Code completed correctly.",
+  "badge_fluentPython_name": "Fluent in Python",
+  "badge_fluentPython_description": "Code explained correctly.",
+  "badge_writer_name": "Writer",
+  "badge_writer_description": "Code written yourself, correctly.",
+  "badge_allRounder_name": "All-rounder",
+  "badge_allRounder_description": "Right on every kind of question: multiple choice, completing, explaining and writing code. Your weakest kind counts.",
+  "badge_knowledge_name": "Knowledge",
+  "badge_knowledge_description": "Learning objectives you have mastered.",
+  "badge_milestones_name": "Milestones",
+  "badge_milestones_description": "Topics you have finished.",
+  "badge_elephantMemory_name": "Memory like an elephant",
+  "badge_elephantMemory_description": "Warm-up questions answered right.",
+  "badge_stillSharp_name": "Still sharp",
+  "badge_stillSharp_description": "Check-up questions answered right.",
+  "badge_oldFriend_name": "Old friend",
+  "badge_oldFriend_description": "Times you used something from before correctly in new code.",
+  "badge_comeback_name": "Comeback",
+  "badge_comeback_description": "A right answer after three wrong ones in a row. Not giving up pays off!",
+  "badge_wrongToRight_name": "From wrong to right",
+  "badge_wrongToRight_description": "Follow-up questions answered right after a wrong answer.",
+  "badge_hintHit_name": "Took the hint, hit the mark",
+  "badge_hintHit_description": "Right after a hint in the same exercise.",
+  "badge_persevere_name": "Persistent",
+  "badge_persevere_description": "Learning objectives you were stuck on and mastered anyway.",
+  "badge_tough_name": "Tough nut",
+  "badge_tough_description": "The most exercises on one learning objective before you mastered it. Struggling is part of learning.",
+  "badge_helloWorld_name": "Hello, World!",
+  "badge_helloWorld_description": "Your first exercise.",
+  "badge_fortyTwo_name": "42",
+  "badge_fortyTwo_description": "Your 42nd exercise: the answer to everything.",
+  "badge_offByOne_name": "Off by one",
+  "badge_offByOne_description": "Your 99th right answer. Just short of 100.",
+  "badge_earlyBird_name": "Early bird",
+  "badge_earlyBird_description": "An exercise before 8 in the morning.",
+  "badge_nightOwl_name": "Night owl",
+  "badge_nightOwl_description": "An exercise after 10 at night.",
+  "badge_weekendWarrior_name": "Weekend warrior",
+  "badge_weekendWarrior_description": "An exercise on a Saturday or a Sunday.",
+  "badge_fridayHero_name": "Friday afternoon hero",
+  "badge_fridayHero_description": "A right answer on a Friday after 3 pm.",
+  "badge_piHour_name": "Pi hour",
+  "badge_piHour_description": "An exercise at 15:14.",
+  "badge_piDay_name": "Pi day",
+  "badge_piDay_description": "An exercise on 14 March.",
+  "badge_spookyCode_name": "Spooky code",
+  "badge_spookyCode_description": "An exercise on 31 October.",
+  "badge_rubberDuck_name": "Rubber duck",
+  "badge_rubberDuck_description": "You asked the tutor a question yourself.",
+  "badge_ctrlZ_name": "Ctrl+Z",
+  "badge_ctrlZ_description": "You went back to a topic you had already finished.",
+  "badge_bugHunter_name": "Bug hunter",
+  "badge_bugHunter_description": "You were right, the computer wasn't.",
+  "badge_rome_name": "Rome wasn't built in a day",
+  "badge_rome_description": "Right after more than 5 minutes on one question.",
+  "badges_section_podium": "Class podium",
+  "badges_section_podium_hint": "The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.",
+  "badges_podium_none": "No medal yet. Finish a topic as one of the first three in your class.",
+  "badges_podium_noClass": "You're not in a class yet, so you don't take part yet.",
+  "badges_section_teacher": "From your teacher",
+  "badges_section_teacher_hint": "For things the app can't see. Your teacher can give you each of them more than once.",
+  "badges_tile_count": "Received {count}×",
+  "@badges_tile_count": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_toast_fromTeacher": "From your teacher",
+  "badges_toast_fromTeacherCount": "From your teacher, {count}× now",
+  "@badges_toast_fromTeacherCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "badges_proof_state_podium": "class podium",
+  "badges_proof_state_teacher": "from the teacher",
+  "badge_podium_name": "{medal}: {subgoal}",
+  "@badge_podium_name": {
+    "placeholders": { "medal": { "type": "String" }, "subgoal": { "type": "String" } }
+  },
+  "badge_podium_gold": "Gold",
+  "badge_podium_silver": "Silver",
+  "badge_podium_bronze": "Bronze",
+  "badge_podium_unknownSubgoal": "a topic",
+  "badge_podium_first_description": "You were the first in your class to finish this topic.",
+  "badge_podium_second_description": "You were the second in your class to finish this topic.",
+  "badge_podium_third_description": "You were the third in your class to finish this topic.",
+  "badge_faultFinder_name": "Fault finder",
+  "badge_faultFinder_description": "You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.",
+  "badge_helpingHand_name": "Helping hand",
+  "badge_helpingHand_description": "You helped a classmate.",
+  "badge_goodQuestion_name": "Good question!",
+  "badge_goodQuestion_description": "You asked a question in class that deserved it.",
+  "awardBadge_button": "Award badge",
+  "awardBadge_title": "Award a badge to {name}",
+  "@awardBadge_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "awardBadge_intro": "For things the app can't see. {name} gets a notice the next time the app starts, or within seconds if it is open.",
+  "@awardBadge_intro": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "awardBadge_faultFinder_hint": "Reported a wrong question, by the ID at the top of the exercise.",
+  "awardBadge_helpingHand_hint": "Helped a classmate.",
+  "awardBadge_goodQuestion_hint": "Asked a question in class that deserved it.",
+  "awardBadge_count": "{count, plural, =0{Not given yet} other{Given {count}× so far}}",
+  "@awardBadge_count": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "awardBadge_cancel": "Cancel",
+  "awardBadge_confirm": "Award",
+  "awardBadge_done": "{badge} awarded ({count}×).",
+  "@awardBadge_done": {
+    "placeholders": { "badge": { "type": "String" }, "count": { "type": "int" } }
+  },
+  "awardBadge_failed": "The badge could not be awarded. Try again."
 }

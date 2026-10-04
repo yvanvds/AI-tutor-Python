@@ -5,15 +5,26 @@
 
 import 'package:ai_tutor_python/core/date_format.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/provenance_gap.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SignalEventsSection extends ConsumerStatefulWidget {
-  const SignalEventsSection({super.key, required this.uid});
+  const SignalEventsSection({
+    super.key,
+    required this.uid,
+    this.goals = const [],
+  });
 
   final String uid;
+
+  /// The curriculum, to name an event's LO by its statement rather than its
+  /// id (#107). An LO it does not hold is shown by its id.
+  final List<Goal> goals;
 
   @override
   ConsumerState<SignalEventsSection> createState() =>
@@ -138,7 +149,7 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
                   ),
                 ),
                 Text(
-                  '$ts${_detailSummary(row.event.details)}',
+                  '$ts${_detailLine(l, row.event)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
@@ -165,7 +176,41 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
         return l.drawer_signals_kind_emptyObjectivesBlock;
       case TurnSignalEventKind.subgoalDeletedRedirect:
         return l.drawer_signals_kind_subgoalDeletedRedirect;
+      case TurnSignalEventKind.provenanceGap:
+        return l.drawer_signals_kind_provenanceGap;
     }
+  }
+
+  /// What follows the timestamp: for a provenance gap (#107) the LO and the
+  /// two counts in words, for every other kind the first details.
+  String _detailLine(AppLocalizations l, TurnSignalEvent event) {
+    final gap = ProvenanceGap.fromEvent(event);
+    if (gap == null) return _detailSummary(event.details);
+    final days = switch (event.details['windowDays']) {
+      final num n => n.toInt(),
+      _ => PolicyConstants.provenanceGapWindow.inDays,
+    };
+    final text = l.drawer_signals_provenanceGap_detail(
+      _loStatement(gap.subgoalId, gap.loId),
+      gap.homePositive,
+      gap.homeSignals,
+      gap.supervisedPositive,
+      gap.supervisedSignals,
+      days,
+    );
+    return ' — $text';
+  }
+
+  String _loStatement(String subgoalId, String loId) {
+    for (final g in widget.goals) {
+      if (g.id != subgoalId) continue;
+      for (final lo in g.objectives) {
+        if (lo.id == loId && lo.statement.trim().isNotEmpty) {
+          return lo.statement.trim();
+        }
+      }
+    }
+    return loId;
   }
 
   String _detailSummary(Map<String, Object?> details) {

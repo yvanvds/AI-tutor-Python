@@ -58,6 +58,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_students => 'Studenten';
 
   @override
+  String get sidebar_section_classes => 'Klassen';
+
+  @override
   String get sidebar_section_milestones => 'Mijlpalen';
 
   @override
@@ -2166,7 +2169,22 @@ class AppLocalizationsNl extends AppLocalizations {
   String get accounts_class_dialog_title => 'Klas toewijzen';
 
   @override
-  String get accounts_class_dialog_hint => 'Klasnaam (leeg laten om te wissen)';
+  String get accounts_class_choice_hint => 'Kies een klas';
+
+  @override
+  String get accounts_class_choice_none => 'Geen klas';
+
+  @override
+  String get accounts_class_choice_noClasses =>
+      'Er zijn nog geen klassen. Voeg ze toe bij Klassen.';
+
+  @override
+  String get accounts_class_choice_unlisted =>
+      'Staat niet in de lijst met klassen.';
+
+  @override
+  String get accounts_class_unlisted_tooltip =>
+      'Deze klas staat niet in de lijst met klassen. Voeg ze toe bij Klassen, of kies een klas uit de lijst.';
 
   @override
   String get accounts_class_dialog_cancel => 'Annuleer';
@@ -2303,6 +2321,22 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get drawer_signals_kind_subgoalDeletedRedirect =>
       'Subdoel verwijderd (audit)';
+
+  @override
+  String get drawer_signals_kind_provenanceGap =>
+      'De les spreekt het thuiswerk tegen';
+
+  @override
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  ) {
+    return '$lo: thuis $homePositive van $homeSignals positief, in de les daarna $supervisedPositive van $supervisedSignals (laatste $days dagen)';
+  }
 
   @override
   String get drawer_statusReports_title => 'Statusrapporten';
@@ -2844,4 +2878,683 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get questions_badge_found => 'Gevonden';
+
+  @override
+  String get classes_page_title => 'Klassen';
+
+  @override
+  String get classes_page_subtitle =>
+      'Elke klas met haar leerlingen en haar lessen per week. De klas van een leerling kies je bij Studenten.';
+
+  @override
+  String get classes_button_new => 'Nieuwe klas';
+
+  @override
+  String get classes_list_empty => 'Nog geen klassen.';
+
+  @override
+  String classes_studentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count leerlingen',
+      one: '1 leerling',
+      zero: 'geen leerlingen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_unlisted_header => 'Op accounts, nog niet in de lijst';
+
+  @override
+  String get classes_unlisted_add => 'Toevoegen';
+
+  @override
+  String get classes_placeholder => 'Kies een klas, of voeg er een toe.';
+
+  @override
+  String get classes_rename_tooltip => 'Hernoemen';
+
+  @override
+  String get classes_delete_tooltip => 'Verwijderen';
+
+  @override
+  String get classes_delete_blocked_tooltip =>
+      'Alleen een klas zonder leerlingen kan verwijderd worden';
+
+  @override
+  String get classes_lessons_header => 'Lessen';
+
+  @override
+  String get classes_lessons_empty => 'Nog geen lessen.';
+
+  @override
+  String get classes_lesson_add => 'Les toevoegen';
+
+  @override
+  String get classes_lesson_weekday_tooltip => 'Dag';
+
+  @override
+  String get classes_lesson_start_tooltip => 'Begin';
+
+  @override
+  String get classes_lesson_end_tooltip => 'Einde';
+
+  @override
+  String get classes_lesson_delete_tooltip => 'Les verwijderen';
+
+  @override
+  String get classes_lesson_endBeforeStart =>
+      'Een les moet eindigen na haar begin.';
+
+  @override
+  String get classes_dialog_new_title => 'Nieuwe klas';
+
+  @override
+  String get classes_dialog_rename_title => 'Klas hernoemen';
+
+  @override
+  String get classes_dialog_name_label => 'Klasnaam';
+
+  @override
+  String classes_dialog_rename_note(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'De $count leerlingen van deze klas verhuizen mee.',
+      one: 'De leerling van deze klas verhuist mee.',
+      zero: 'Er zitten geen leerlingen in deze klas.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_dialog_cancel => 'Annuleer';
+
+  @override
+  String get classes_dialog_save => 'Opslaan';
+
+  @override
+  String get classes_validation_empty => 'Geef de klas een naam.';
+
+  @override
+  String classes_validation_taken(String name) {
+    return 'Er is al een klas $name.';
+  }
+
+  @override
+  String classes_delete_dialog_title(String name) {
+    return '$name verwijderen?';
+  }
+
+  @override
+  String get classes_delete_dialog_body =>
+      'De klas en haar lessen verdwijnen uit de lijst.';
+
+  @override
+  String get classes_delete_dialog_cancel => 'Annuleer';
+
+  @override
+  String get classes_delete_dialog_confirm => 'Verwijderen';
+
+  @override
+  String classes_delete_hasStudents(String name) {
+    return 'In $name zitten nog leerlingen. Zet ze eerst in een andere klas.';
+  }
+
+  @override
+  String classes_actionFailed(String error) {
+    return 'Dat lukte niet: $error';
+  }
+
+  @override
+  String get sidebar_section_trophies => 'Prijzenkast';
+
+  @override
+  String get badges_page_title => 'Prijzenkast';
+
+  @override
+  String get badges_page_subtitle =>
+      'Badges voor wat je gedaan hebt. Ze leveren geen XP op en tellen niet mee voor je punten.';
+
+  @override
+  String badges_page_count(int earned, int total) {
+    return '$earned van de $total badges verdiend';
+  }
+
+  @override
+  String get badges_page_loading => 'Je badges worden geteld…';
+
+  @override
+  String get badges_page_noProgress =>
+      'Je voortgang kon niet geladen worden. Je ziet de badges die je al hebt.';
+
+  @override
+  String get badges_section_tiers => 'In trappen';
+
+  @override
+  String get badges_section_tiers_hint =>
+      'Brons, zilver, goud, en daarna een bolletje per trap.';
+
+  @override
+  String get badges_section_experts => 'Kenners';
+
+  @override
+  String get badges_section_experts_hint =>
+      'Eén per hoofddoel: alle leerdoelen ervan beheerst.';
+
+  @override
+  String get badges_section_fun => 'Losse badges';
+
+  @override
+  String get badges_section_fun_hint =>
+      'De meeste zijn geheim. Ontdek zelf hoe je ze haalt.';
+
+  @override
+  String badges_tile_tier(int tier, int max) {
+    return 'Trap $tier van $max';
+  }
+
+  @override
+  String get badges_tile_top => 'Hoogste trap!';
+
+  @override
+  String get badges_tile_locked => 'Nog niet behaald';
+
+  @override
+  String get badges_tile_earned => 'Behaald';
+
+  @override
+  String get badges_tile_noLessons =>
+      'Je klas heeft nog geen lestijden, dus deze wacht nog even.';
+
+  @override
+  String get badges_secret_name => 'Geheime badge';
+
+  @override
+  String get badges_secret_description => 'Ontdek zelf hoe je deze haalt.';
+
+  @override
+  String get badges_credits_button => 'Iconen: game-icons.net (CC BY 3.0)';
+
+  @override
+  String get badges_credits_title => 'Iconen van de badges';
+
+  @override
+  String get badges_credits_intro =>
+      'De iconen van de badges komen van game-icons.net, onder de licentie Creative Commons Naamsvermelding 3.0 (CC BY 3.0). Hun achtergrond is weggelaten en hun kleur aangepast.';
+
+  @override
+  String badges_credits_line(String icon, String author) {
+    return '$icon door $author';
+  }
+
+  @override
+  String get badges_credits_close => 'Sluiten';
+
+  @override
+  String get badges_toast_caption => 'NIEUWE BADGE';
+
+  @override
+  String badges_toast_tier(int tier) {
+    return 'Trap $tier';
+  }
+
+  @override
+  String badges_toast_summary_first(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Je hebt al $count badges verdiend!',
+      one: 'Je hebt al 1 badge verdiend!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String badges_toast_summary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nieuwe badges!',
+      one: '1 nieuwe badge!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get badges_toast_open => 'Bekijk je prijzenkast';
+
+  @override
+  String get badges_toast_close => 'Sluiten';
+
+  @override
+  String get options_badges_title => 'Badges';
+
+  @override
+  String get options_badges_subtitle =>
+      'Het proefblad: de badges in beide thema\'s, op 32, 64 en 128 pixels.';
+
+  @override
+  String get options_badges_open => 'Proefblad openen';
+
+  @override
+  String get options_about_credits => 'Credits van de badge-iconen';
+
+  @override
+  String get badges_proof_title => 'Proefblad badges';
+
+  @override
+  String get badges_proof_intro =>
+      'De vorm van het kader, de kleuren van de trappen en de grootte van het symbool staan op één plek: lib/theme/badge_style.dart.';
+
+  @override
+  String get badges_proof_dark => 'Donker thema';
+
+  @override
+  String get badges_proof_light => 'Licht thema';
+
+  @override
+  String get badges_proof_states => 'Tien badges, elk in een andere toestand';
+
+  @override
+  String get badges_proof_set => 'De hele set';
+
+  @override
+  String get badges_proof_previewCase => 'Voorbeeld van de prijzenkast';
+
+  @override
+  String get badges_proof_previewToast => 'Melding tonen';
+
+  @override
+  String get badges_proof_previewSummary => 'Samenvatting tonen';
+
+  @override
+  String get badges_proof_state_locked => 'niet behaald';
+
+  @override
+  String badges_proof_state_tier(int tier, int max) {
+    return 'trap $tier van $max';
+  }
+
+  @override
+  String get badges_proof_state_secret => 'geheim';
+
+  @override
+  String get badges_proof_state_found => 'geheim, gevonden';
+
+  @override
+  String get badges_proof_state_expert => 'kenner';
+
+  @override
+  String get badges_proof_state_fun => 'los';
+
+  @override
+  String badge_expert_name(String goal) {
+    return 'Kenner van $goal';
+  }
+
+  @override
+  String badge_expert_description(String goal) {
+    return 'Alle leerdoelen van $goal beheerst.';
+  }
+
+  @override
+  String get badge_effort_name => 'Inzet';
+
+  @override
+  String get badge_effort_description => 'Oefeningen gemaakt, juist of fout.';
+
+  @override
+  String get badge_homeWork_name => 'Thuiswerker';
+
+  @override
+  String get badge_homeWork_description => 'Oefeningen buiten de lestijd.';
+
+  @override
+  String get badge_lessonWeeks_name => 'Lesweken';
+
+  @override
+  String get badge_lessonWeeks_description =>
+      'Weken met minstens één oefening in de les.';
+
+  @override
+  String get badge_hardCorrect_name => 'Moeilijk is mijn tweede naam';
+
+  @override
+  String get badge_hardCorrect_description =>
+      'Juiste antwoorden op moeilijke vragen.';
+
+  @override
+  String get badge_streak_name => 'Op dreef';
+
+  @override
+  String get badge_streak_description =>
+      'Juiste antwoorden na elkaar, zonder fout ertussen.';
+
+  @override
+  String get badge_gapFiller_name => 'Gatenvuller';
+
+  @override
+  String get badge_gapFiller_description => 'Code juist aangevuld.';
+
+  @override
+  String get badge_fluentPython_name => 'Vloeiend Python';
+
+  @override
+  String get badge_fluentPython_description => 'Code juist uitgelegd.';
+
+  @override
+  String get badge_writer_name => 'Schrijver';
+
+  @override
+  String get badge_writer_description => 'Code zelf juist geschreven.';
+
+  @override
+  String get badge_allRounder_name => 'Allrounder';
+
+  @override
+  String get badge_allRounder_description =>
+      'Juist op elk soort vraag: meerkeuze, code aanvullen, uitleggen en schrijven. Je zwakste soort telt.';
+
+  @override
+  String get badge_knowledge_name => 'Kennis';
+
+  @override
+  String get badge_knowledge_description => 'Leerdoelen die je beheerst.';
+
+  @override
+  String get badge_milestones_name => 'Mijlpalen';
+
+  @override
+  String get badge_milestones_description =>
+      'Onderwerpen die je afgerond hebt.';
+
+  @override
+  String get badge_elephantMemory_name => 'Olifantengeheugen';
+
+  @override
+  String get badge_elephantMemory_description =>
+      'Opfrisvragen juist beantwoord.';
+
+  @override
+  String get badge_stillSharp_name => 'Nog altijd paraat';
+
+  @override
+  String get badge_stillSharp_description => 'Controlevragen juist beantwoord.';
+
+  @override
+  String get badge_oldFriend_name => 'Oude bekende';
+
+  @override
+  String get badge_oldFriend_description =>
+      'Keren dat je iets van vroeger juist gebruikte in nieuwe code.';
+
+  @override
+  String get badge_comeback_name => 'Comeback';
+
+  @override
+  String get badge_comeback_description =>
+      'Een juist antwoord na drie foute op rij. Niet opgeven loont!';
+
+  @override
+  String get badge_wrongToRight_name => 'Van fout naar juist';
+
+  @override
+  String get badge_wrongToRight_description =>
+      'Vervolgvragen juist beantwoord na een fout antwoord.';
+
+  @override
+  String get badge_hintHit_name => 'Hint genomen, raak geschoten';
+
+  @override
+  String get badge_hintHit_description =>
+      'Juist na een hint in dezelfde oefening.';
+
+  @override
+  String get badge_persevere_name => 'Doorzetter';
+
+  @override
+  String get badge_persevere_description =>
+      'Leerdoelen waar je vastzat en die je toch onder de knie kreeg.';
+
+  @override
+  String get badge_tough_name => 'Taaie';
+
+  @override
+  String get badge_tough_description =>
+      'De meeste oefeningen op één leerdoel voor je het beheerste. Worstelen hoort erbij.';
+
+  @override
+  String get badge_helloWorld_name => 'Hello, World!';
+
+  @override
+  String get badge_helloWorld_description => 'Je eerste oefening.';
+
+  @override
+  String get badge_fortyTwo_name => '42';
+
+  @override
+  String get badge_fortyTwo_description =>
+      'Je 42e oefening: het antwoord op alles.';
+
+  @override
+  String get badge_offByOne_name => 'Off by one';
+
+  @override
+  String get badge_offByOne_description =>
+      'Je 99e juiste antwoord. Net geen 100.';
+
+  @override
+  String get badge_earlyBird_name => 'Vroege vogel';
+
+  @override
+  String get badge_earlyBird_description =>
+      'Een oefening voor 8 uur \'s ochtends.';
+
+  @override
+  String get badge_nightOwl_name => 'Nachtuil';
+
+  @override
+  String get badge_nightOwl_description => 'Een oefening na 22 uur.';
+
+  @override
+  String get badge_weekendWarrior_name => 'Weekendkrijger';
+
+  @override
+  String get badge_weekendWarrior_description =>
+      'Een oefening op zaterdag of zondag.';
+
+  @override
+  String get badge_fridayHero_name => 'Vrijdagmiddagheld';
+
+  @override
+  String get badge_fridayHero_description =>
+      'Een juist antwoord op vrijdag na 15 uur.';
+
+  @override
+  String get badge_piHour_name => 'Pi-uur';
+
+  @override
+  String get badge_piHour_description => 'Een oefening om 15:14.';
+
+  @override
+  String get badge_piDay_name => 'Pi-dag';
+
+  @override
+  String get badge_piDay_description => 'Een oefening op 14 maart.';
+
+  @override
+  String get badge_spookyCode_name => 'Spookcode';
+
+  @override
+  String get badge_spookyCode_description => 'Een oefening op 31 oktober.';
+
+  @override
+  String get badge_rubberDuck_name => 'Rubber duck';
+
+  @override
+  String get badge_rubberDuck_description =>
+      'Je stelde de tutor zelf een vraag.';
+
+  @override
+  String get badge_ctrlZ_name => 'Ctrl+Z';
+
+  @override
+  String get badge_ctrlZ_description =>
+      'Je ging zelf terug naar een onderwerp dat al af was.';
+
+  @override
+  String get badge_bugHunter_name => 'Bugjager';
+
+  @override
+  String get badge_bugHunter_description => 'Jij had gelijk, de computer niet.';
+
+  @override
+  String get badge_rome_name => 'Rome is ook niet op één dag gebouwd';
+
+  @override
+  String get badge_rome_description =>
+      'Juist na meer dan 5 minuten op één vraag.';
+
+  @override
+  String get badges_section_podium => 'Klaspodium';
+
+  @override
+  String get badges_section_podium_hint =>
+      'De eerste drie van je klas die een onderwerp afronden, krijgen er goud, zilver of brons voor. Alleen jij ziet je medailles.';
+
+  @override
+  String get badges_podium_none =>
+      'Nog geen medaille. Rond een onderwerp af als een van de eerste drie van je klas.';
+
+  @override
+  String get badges_podium_noClass =>
+      'Je zit nog niet in een klas, dus je doet nog niet mee.';
+
+  @override
+  String get badges_section_teacher => 'Van je leerkracht';
+
+  @override
+  String get badges_section_teacher_hint =>
+      'Voor wat de app niet ziet. Je leerkracht kan je elke badge meer dan eens geven.';
+
+  @override
+  String badges_tile_count(int count) {
+    return '$count× gekregen';
+  }
+
+  @override
+  String get badges_toast_fromTeacher => 'Van je leerkracht';
+
+  @override
+  String badges_toast_fromTeacherCount(int count) {
+    return 'Van je leerkracht, nu $count×';
+  }
+
+  @override
+  String get badges_proof_state_podium => 'klaspodium';
+
+  @override
+  String get badges_proof_state_teacher => 'van de leerkracht';
+
+  @override
+  String badge_podium_name(String medal, String subgoal) {
+    return '$medal: $subgoal';
+  }
+
+  @override
+  String get badge_podium_gold => 'Goud';
+
+  @override
+  String get badge_podium_silver => 'Zilver';
+
+  @override
+  String get badge_podium_bronze => 'Brons';
+
+  @override
+  String get badge_podium_unknownSubgoal => 'een onderwerp';
+
+  @override
+  String get badge_podium_first_description =>
+      'Je rondde dit onderwerp als eerste van je klas af.';
+
+  @override
+  String get badge_podium_second_description =>
+      'Je rondde dit onderwerp als tweede van je klas af.';
+
+  @override
+  String get badge_podium_third_description =>
+      'Je rondde dit onderwerp als derde van je klas af.';
+
+  @override
+  String get badge_faultFinder_name => 'Foutenjager';
+
+  @override
+  String get badge_faultFinder_description =>
+      'Je meldde een vraag die niet klopte. Zie je er een? Geef je leerkracht de ID bovenaan de oefening, zoals #3fa91c.';
+
+  @override
+  String get badge_helpingHand_name => 'Helpende hand';
+
+  @override
+  String get badge_helpingHand_description => 'Je hielp een klasgenoot.';
+
+  @override
+  String get badge_goodQuestion_name => 'Goede vraag!';
+
+  @override
+  String get badge_goodQuestion_description =>
+      'Je stelde in de les een vraag die het verdiende.';
+
+  @override
+  String get awardBadge_button => 'Badge toekennen';
+
+  @override
+  String awardBadge_title(String name) {
+    return 'Badge toekennen aan $name';
+  }
+
+  @override
+  String awardBadge_intro(String name) {
+    return 'Voor wat de app niet ziet. $name krijgt een melding bij de volgende start, of binnen enkele seconden als de app openstaat.';
+  }
+
+  @override
+  String get awardBadge_faultFinder_hint =>
+      'Meldde een foute vraag, met de ID bovenaan de oefening.';
+
+  @override
+  String get awardBadge_helpingHand_hint => 'Hielp een klasgenoot.';
+
+  @override
+  String get awardBadge_goodQuestion_hint =>
+      'Stelde in de les een vraag die het verdiende.';
+
+  @override
+  String awardBadge_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Al $count× gekregen',
+      zero: 'Nog niet gekregen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get awardBadge_cancel => 'Annuleren';
+
+  @override
+  String get awardBadge_confirm => 'Toekennen';
+
+  @override
+  String awardBadge_done(String badge, int count) {
+    return '$badge toegekend ($count×).';
+  }
+
+  @override
+  String get awardBadge_failed =>
+      'De badge kon niet toegekend worden. Probeer het opnieuw.';
 }

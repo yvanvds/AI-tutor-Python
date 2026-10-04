@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 
 /// One row of the `accounts` Cosmos container. Doc id == uid (the Entra
@@ -39,6 +40,12 @@ class Account {
   /// `0` when the field is absent on disk.
   final int oefeningCount;
 
+  /// The badges the student earned (#220): per badge the tier and when it
+  /// was reached. `null` when the doc has no `badges` field — the app never
+  /// looked at this student's badges yet. Written only by
+  /// `AccountService.awardBadges`, which never lowers a tier.
+  final EarnedBadges? badges;
+
   const Account({
     required this.uid,
     required this.email,
@@ -55,6 +62,7 @@ class Account {
     this.streakLastAt,
     this.className = '',
     this.oefeningCount = 0,
+    this.badges,
   });
 
   String get displayFirstName => firstName;
@@ -82,6 +90,11 @@ class Account {
       'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
     'className': className,
     'oefeningCount': oefeningCount,
+    if (badges != null)
+      'badges': {
+        for (final entry in badges!.byId.entries)
+          entry.key: entry.value.toJson(),
+      },
   };
 
   factory Account.fromMap(Map<String, dynamic> data) {
@@ -107,6 +120,7 @@ class Account {
           : null,
       className: data['className'] as String? ?? '',
       oefeningCount: oefeningCountOf(data),
+      badges: EarnedBadges.fromDoc(data),
     );
   }
 }

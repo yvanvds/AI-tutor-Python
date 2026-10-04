@@ -58,6 +58,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_students => 'Students';
 
   @override
+  String get sidebar_section_classes => 'Classes';
+
+  @override
   String get sidebar_section_milestones => 'Milestones';
 
   @override
@@ -2145,7 +2148,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accounts_class_dialog_title => 'Assign class';
 
   @override
-  String get accounts_class_dialog_hint => 'Class name (leave empty to clear)';
+  String get accounts_class_choice_hint => 'Choose a class';
+
+  @override
+  String get accounts_class_choice_none => 'No class';
+
+  @override
+  String get accounts_class_choice_noClasses =>
+      'There are no classes yet. Add them on the Classes page.';
+
+  @override
+  String get accounts_class_choice_unlisted => 'Not in the class list.';
+
+  @override
+  String get accounts_class_unlisted_tooltip =>
+      'This class is not in the class list. Add it on the Classes page, or choose a class from the list.';
 
   @override
   String get accounts_class_dialog_cancel => 'Cancel';
@@ -2280,6 +2297,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get drawer_signals_kind_subgoalDeletedRedirect =>
       'Subgoal deleted (audit)';
+
+  @override
+  String get drawer_signals_kind_provenanceGap =>
+      'Class work contradicts home work';
+
+  @override
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  ) {
+    return '$lo: at home $homePositive of $homeSignals positive, in class afterwards $supervisedPositive of $supervisedSignals (last $days days)';
+  }
 
   @override
   String get drawer_statusReports_title => 'Status reports';
@@ -2815,4 +2848,685 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get questions_badge_found => 'Found';
+
+  @override
+  String get classes_page_title => 'Classes';
+
+  @override
+  String get classes_page_subtitle =>
+      'Every class with its students and its lessons each week. A student\'s class is chosen on the Students page.';
+
+  @override
+  String get classes_button_new => 'New class';
+
+  @override
+  String get classes_list_empty => 'No classes yet.';
+
+  @override
+  String classes_studentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count students',
+      one: '1 student',
+      zero: 'no students',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_unlisted_header => 'On accounts, not in the list';
+
+  @override
+  String get classes_unlisted_add => 'Add';
+
+  @override
+  String get classes_placeholder => 'Choose a class, or add one.';
+
+  @override
+  String get classes_rename_tooltip => 'Rename';
+
+  @override
+  String get classes_delete_tooltip => 'Delete';
+
+  @override
+  String get classes_delete_blocked_tooltip =>
+      'Only a class without students can be deleted';
+
+  @override
+  String get classes_lessons_header => 'Lessons';
+
+  @override
+  String get classes_lessons_empty => 'No lessons yet.';
+
+  @override
+  String get classes_lesson_add => 'Add lesson';
+
+  @override
+  String get classes_lesson_weekday_tooltip => 'Day';
+
+  @override
+  String get classes_lesson_start_tooltip => 'Start';
+
+  @override
+  String get classes_lesson_end_tooltip => 'End';
+
+  @override
+  String get classes_lesson_delete_tooltip => 'Delete lesson';
+
+  @override
+  String get classes_lesson_endBeforeStart =>
+      'A lesson has to end after it starts.';
+
+  @override
+  String get classes_dialog_new_title => 'New class';
+
+  @override
+  String get classes_dialog_rename_title => 'Rename class';
+
+  @override
+  String get classes_dialog_name_label => 'Class name';
+
+  @override
+  String classes_dialog_rename_note(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count students in this class move along.',
+      one: 'The student in this class moves along.',
+      zero: 'There are no students in this class.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_dialog_cancel => 'Cancel';
+
+  @override
+  String get classes_dialog_save => 'Save';
+
+  @override
+  String get classes_validation_empty => 'Give the class a name.';
+
+  @override
+  String classes_validation_taken(String name) {
+    return 'There already is a class $name.';
+  }
+
+  @override
+  String classes_delete_dialog_title(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get classes_delete_dialog_body =>
+      'The class and its lessons are removed from the list.';
+
+  @override
+  String get classes_delete_dialog_cancel => 'Cancel';
+
+  @override
+  String get classes_delete_dialog_confirm => 'Delete';
+
+  @override
+  String classes_delete_hasStudents(String name) {
+    return '$name still has students. Put them in another class first.';
+  }
+
+  @override
+  String classes_actionFailed(String error) {
+    return 'That did not work: $error';
+  }
+
+  @override
+  String get sidebar_section_trophies => 'Trophy case';
+
+  @override
+  String get badges_page_title => 'Trophy case';
+
+  @override
+  String get badges_page_subtitle =>
+      'Badges for what you\'ve done. They give no XP and don\'t count towards your grade.';
+
+  @override
+  String badges_page_count(int earned, int total) {
+    return '$earned of $total badges earned';
+  }
+
+  @override
+  String get badges_page_loading => 'Counting your badges…';
+
+  @override
+  String get badges_page_noProgress =>
+      'Your progress could not be loaded. You see the badges you already have.';
+
+  @override
+  String get badges_section_tiers => 'In tiers';
+
+  @override
+  String get badges_section_tiers_hint =>
+      'Bronze, silver, gold, and a dot for every tier after that.';
+
+  @override
+  String get badges_section_experts => 'Experts';
+
+  @override
+  String get badges_section_experts_hint =>
+      'One per main goal: every learning objective of it mastered.';
+
+  @override
+  String get badges_section_fun => 'Just for fun';
+
+  @override
+  String get badges_section_fun_hint =>
+      'Most of them are secret. Find out yourself how to get them.';
+
+  @override
+  String badges_tile_tier(int tier, int max) {
+    return 'Tier $tier of $max';
+  }
+
+  @override
+  String get badges_tile_top => 'Top tier!';
+
+  @override
+  String get badges_tile_locked => 'Not earned yet';
+
+  @override
+  String get badges_tile_earned => 'Earned';
+
+  @override
+  String get badges_tile_noLessons =>
+      'Your class has no lesson times yet, so this one waits.';
+
+  @override
+  String get badges_secret_name => 'Secret badge';
+
+  @override
+  String get badges_secret_description =>
+      'Find out yourself how to get this one.';
+
+  @override
+  String get badges_credits_button => 'Icons: game-icons.net (CC BY 3.0)';
+
+  @override
+  String get badges_credits_title => 'Badge icons';
+
+  @override
+  String get badges_credits_intro =>
+      'The badge icons come from game-icons.net, under the Creative Commons Attribution 3.0 licence (CC BY 3.0). Their background was left out and their colour adapted.';
+
+  @override
+  String badges_credits_line(String icon, String author) {
+    return '$icon by $author';
+  }
+
+  @override
+  String get badges_credits_close => 'Close';
+
+  @override
+  String get badges_toast_caption => 'NEW BADGE';
+
+  @override
+  String badges_toast_tier(int tier) {
+    return 'Tier $tier';
+  }
+
+  @override
+  String badges_toast_summary_first(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You\'ve already earned $count badges!',
+      one: 'You\'ve already earned 1 badge!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String badges_toast_summary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new badges!',
+      one: '1 new badge!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get badges_toast_open => 'See your trophy case';
+
+  @override
+  String get badges_toast_close => 'Close';
+
+  @override
+  String get options_badges_title => 'Badges';
+
+  @override
+  String get options_badges_subtitle =>
+      'The proof sheet: the badges in both themes, at 32, 64 and 128 pixels.';
+
+  @override
+  String get options_badges_open => 'Open the proof sheet';
+
+  @override
+  String get options_about_credits => 'Badge icon credits';
+
+  @override
+  String get badges_proof_title => 'Badge proof sheet';
+
+  @override
+  String get badges_proof_intro =>
+      'The frame\'s shape, the tier colours and the glyph\'s size are set in one place: lib/theme/badge_style.dart.';
+
+  @override
+  String get badges_proof_dark => 'Dark theme';
+
+  @override
+  String get badges_proof_light => 'Light theme';
+
+  @override
+  String get badges_proof_states => 'Ten badges, each in another state';
+
+  @override
+  String get badges_proof_set => 'The whole set';
+
+  @override
+  String get badges_proof_previewCase => 'Trophy case preview';
+
+  @override
+  String get badges_proof_previewToast => 'Show a notice';
+
+  @override
+  String get badges_proof_previewSummary => 'Show a summary';
+
+  @override
+  String get badges_proof_state_locked => 'not earned';
+
+  @override
+  String badges_proof_state_tier(int tier, int max) {
+    return 'tier $tier of $max';
+  }
+
+  @override
+  String get badges_proof_state_secret => 'secret';
+
+  @override
+  String get badges_proof_state_found => 'secret, found';
+
+  @override
+  String get badges_proof_state_expert => 'expert';
+
+  @override
+  String get badges_proof_state_fun => 'single';
+
+  @override
+  String badge_expert_name(String goal) {
+    return 'Expert in $goal';
+  }
+
+  @override
+  String badge_expert_description(String goal) {
+    return 'Every learning objective of $goal mastered.';
+  }
+
+  @override
+  String get badge_effort_name => 'Effort';
+
+  @override
+  String get badge_effort_description => 'Exercises done, right or wrong.';
+
+  @override
+  String get badge_homeWork_name => 'Home worker';
+
+  @override
+  String get badge_homeWork_description => 'Exercises outside lesson time.';
+
+  @override
+  String get badge_lessonWeeks_name => 'Lesson weeks';
+
+  @override
+  String get badge_lessonWeeks_description =>
+      'Weeks with at least one exercise in class.';
+
+  @override
+  String get badge_hardCorrect_name => 'Hard is my middle name';
+
+  @override
+  String get badge_hardCorrect_description =>
+      'Right answers to hard questions.';
+
+  @override
+  String get badge_streak_name => 'On a roll';
+
+  @override
+  String get badge_streak_description =>
+      'Right answers in a row, without a mistake in between.';
+
+  @override
+  String get badge_gapFiller_name => 'Gap filler';
+
+  @override
+  String get badge_gapFiller_description => 'Code completed correctly.';
+
+  @override
+  String get badge_fluentPython_name => 'Fluent in Python';
+
+  @override
+  String get badge_fluentPython_description => 'Code explained correctly.';
+
+  @override
+  String get badge_writer_name => 'Writer';
+
+  @override
+  String get badge_writer_description => 'Code written yourself, correctly.';
+
+  @override
+  String get badge_allRounder_name => 'All-rounder';
+
+  @override
+  String get badge_allRounder_description =>
+      'Right on every kind of question: multiple choice, completing, explaining and writing code. Your weakest kind counts.';
+
+  @override
+  String get badge_knowledge_name => 'Knowledge';
+
+  @override
+  String get badge_knowledge_description =>
+      'Learning objectives you have mastered.';
+
+  @override
+  String get badge_milestones_name => 'Milestones';
+
+  @override
+  String get badge_milestones_description => 'Topics you have finished.';
+
+  @override
+  String get badge_elephantMemory_name => 'Memory like an elephant';
+
+  @override
+  String get badge_elephantMemory_description =>
+      'Warm-up questions answered right.';
+
+  @override
+  String get badge_stillSharp_name => 'Still sharp';
+
+  @override
+  String get badge_stillSharp_description =>
+      'Check-up questions answered right.';
+
+  @override
+  String get badge_oldFriend_name => 'Old friend';
+
+  @override
+  String get badge_oldFriend_description =>
+      'Times you used something from before correctly in new code.';
+
+  @override
+  String get badge_comeback_name => 'Comeback';
+
+  @override
+  String get badge_comeback_description =>
+      'A right answer after three wrong ones in a row. Not giving up pays off!';
+
+  @override
+  String get badge_wrongToRight_name => 'From wrong to right';
+
+  @override
+  String get badge_wrongToRight_description =>
+      'Follow-up questions answered right after a wrong answer.';
+
+  @override
+  String get badge_hintHit_name => 'Took the hint, hit the mark';
+
+  @override
+  String get badge_hintHit_description =>
+      'Right after a hint in the same exercise.';
+
+  @override
+  String get badge_persevere_name => 'Persistent';
+
+  @override
+  String get badge_persevere_description =>
+      'Learning objectives you were stuck on and mastered anyway.';
+
+  @override
+  String get badge_tough_name => 'Tough nut';
+
+  @override
+  String get badge_tough_description =>
+      'The most exercises on one learning objective before you mastered it. Struggling is part of learning.';
+
+  @override
+  String get badge_helloWorld_name => 'Hello, World!';
+
+  @override
+  String get badge_helloWorld_description => 'Your first exercise.';
+
+  @override
+  String get badge_fortyTwo_name => '42';
+
+  @override
+  String get badge_fortyTwo_description =>
+      'Your 42nd exercise: the answer to everything.';
+
+  @override
+  String get badge_offByOne_name => 'Off by one';
+
+  @override
+  String get badge_offByOne_description =>
+      'Your 99th right answer. Just short of 100.';
+
+  @override
+  String get badge_earlyBird_name => 'Early bird';
+
+  @override
+  String get badge_earlyBird_description =>
+      'An exercise before 8 in the morning.';
+
+  @override
+  String get badge_nightOwl_name => 'Night owl';
+
+  @override
+  String get badge_nightOwl_description => 'An exercise after 10 at night.';
+
+  @override
+  String get badge_weekendWarrior_name => 'Weekend warrior';
+
+  @override
+  String get badge_weekendWarrior_description =>
+      'An exercise on a Saturday or a Sunday.';
+
+  @override
+  String get badge_fridayHero_name => 'Friday afternoon hero';
+
+  @override
+  String get badge_fridayHero_description =>
+      'A right answer on a Friday after 3 pm.';
+
+  @override
+  String get badge_piHour_name => 'Pi hour';
+
+  @override
+  String get badge_piHour_description => 'An exercise at 15:14.';
+
+  @override
+  String get badge_piDay_name => 'Pi day';
+
+  @override
+  String get badge_piDay_description => 'An exercise on 14 March.';
+
+  @override
+  String get badge_spookyCode_name => 'Spooky code';
+
+  @override
+  String get badge_spookyCode_description => 'An exercise on 31 October.';
+
+  @override
+  String get badge_rubberDuck_name => 'Rubber duck';
+
+  @override
+  String get badge_rubberDuck_description =>
+      'You asked the tutor a question yourself.';
+
+  @override
+  String get badge_ctrlZ_name => 'Ctrl+Z';
+
+  @override
+  String get badge_ctrlZ_description =>
+      'You went back to a topic you had already finished.';
+
+  @override
+  String get badge_bugHunter_name => 'Bug hunter';
+
+  @override
+  String get badge_bugHunter_description =>
+      'You were right, the computer wasn\'t.';
+
+  @override
+  String get badge_rome_name => 'Rome wasn\'t built in a day';
+
+  @override
+  String get badge_rome_description =>
+      'Right after more than 5 minutes on one question.';
+
+  @override
+  String get badges_section_podium => 'Class podium';
+
+  @override
+  String get badges_section_podium_hint =>
+      'The first three in your class to finish a topic get gold, silver or bronze for it. Only you see your medals.';
+
+  @override
+  String get badges_podium_none =>
+      'No medal yet. Finish a topic as one of the first three in your class.';
+
+  @override
+  String get badges_podium_noClass =>
+      'You\'re not in a class yet, so you don\'t take part yet.';
+
+  @override
+  String get badges_section_teacher => 'From your teacher';
+
+  @override
+  String get badges_section_teacher_hint =>
+      'For things the app can\'t see. Your teacher can give you each of them more than once.';
+
+  @override
+  String badges_tile_count(int count) {
+    return 'Received $count×';
+  }
+
+  @override
+  String get badges_toast_fromTeacher => 'From your teacher';
+
+  @override
+  String badges_toast_fromTeacherCount(int count) {
+    return 'From your teacher, $count× now';
+  }
+
+  @override
+  String get badges_proof_state_podium => 'class podium';
+
+  @override
+  String get badges_proof_state_teacher => 'from the teacher';
+
+  @override
+  String badge_podium_name(String medal, String subgoal) {
+    return '$medal: $subgoal';
+  }
+
+  @override
+  String get badge_podium_gold => 'Gold';
+
+  @override
+  String get badge_podium_silver => 'Silver';
+
+  @override
+  String get badge_podium_bronze => 'Bronze';
+
+  @override
+  String get badge_podium_unknownSubgoal => 'a topic';
+
+  @override
+  String get badge_podium_first_description =>
+      'You were the first in your class to finish this topic.';
+
+  @override
+  String get badge_podium_second_description =>
+      'You were the second in your class to finish this topic.';
+
+  @override
+  String get badge_podium_third_description =>
+      'You were the third in your class to finish this topic.';
+
+  @override
+  String get badge_faultFinder_name => 'Fault finder';
+
+  @override
+  String get badge_faultFinder_description =>
+      'You reported a question that was wrong. Spot one? Tell your teacher the ID at the top of the exercise, like #3fa91c.';
+
+  @override
+  String get badge_helpingHand_name => 'Helping hand';
+
+  @override
+  String get badge_helpingHand_description => 'You helped a classmate.';
+
+  @override
+  String get badge_goodQuestion_name => 'Good question!';
+
+  @override
+  String get badge_goodQuestion_description =>
+      'You asked a question in class that deserved it.';
+
+  @override
+  String get awardBadge_button => 'Award badge';
+
+  @override
+  String awardBadge_title(String name) {
+    return 'Award a badge to $name';
+  }
+
+  @override
+  String awardBadge_intro(String name) {
+    return 'For things the app can\'t see. $name gets a notice the next time the app starts, or within seconds if it is open.';
+  }
+
+  @override
+  String get awardBadge_faultFinder_hint =>
+      'Reported a wrong question, by the ID at the top of the exercise.';
+
+  @override
+  String get awardBadge_helpingHand_hint => 'Helped a classmate.';
+
+  @override
+  String get awardBadge_goodQuestion_hint =>
+      'Asked a question in class that deserved it.';
+
+  @override
+  String awardBadge_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Given $count× so far',
+      zero: 'Not given yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get awardBadge_cancel => 'Cancel';
+
+  @override
+  String get awardBadge_confirm => 'Award';
+
+  @override
+  String awardBadge_done(String badge, int count) {
+    return '$badge awarded ($count×).';
+  }
+
+  @override
+  String get awardBadge_failed => 'The badge could not be awarded. Try again.';
 }

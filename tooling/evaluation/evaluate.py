@@ -103,6 +103,9 @@ def cmd_draft(args) -> None:
         sys.exit(f"geen leerlingen met className={args.klas!r}")
     now = _now()
     period_start = _period_start(milestone)
+    # Supervised = in the lesson time of the class (#219), also for the
+    # oefeningen from before the app read it so: one rule over the year.
+    supervised = rules.by_timetable(rules.lessons_of(cosmos.classes(), args.klas))
 
     per_student = []
     all_turns = {}
@@ -125,7 +128,7 @@ def cmd_draft(args) -> None:
     for a in students:
         uid = a["uid"]
         turns = all_turns[uid]
-        st = rules.replay(turns, goals)
+        st = rules.replay(turns, goals, supervised=supervised)
         sc = rules.score(los, st, milestone["expectedDifficulty"])
         tl = dx.timeline(turns)
         # Accuracy is not a growth measure here: later subgoals are harder and
@@ -156,7 +159,7 @@ def cmd_draft(args) -> None:
                 "name": f"{a.get('firstName', '')} {a.get('lastName', '')}".strip(),
                 "calibration": (a.get("calibration") or {}).get("difficulty"),
                 "score": sc,
-                "reliability": rules.reliability(los, st, turns, period_start, now),
+                "reliability": rules.reliability(los, st, turns, period_start, now, supervised=supervised),
                 "needed": rules.stamps_needed_to_pass(sc),
                 "timeline": tl,
                 "level_start": level_start,
@@ -259,11 +262,11 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
     L.append("")
     L.append(_expected_level(milestone["expectedDifficulty"]))
     L.append("")
-    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.18. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
+    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.0.19. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een oefening onder toezicht — in de lestijd van de klas, 10 minuten ervoor en erna inbegrepen, ook van vóór de app dat zo bijhield (#219) — weegt ×1,25, een oefening thuis ×1,0. Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
     L.append("")
-    L.append(f"**Mee op het voorstel, naast het getal** (de app toont ze bij het voorstel; ze raken het getal niet): *verouderd* telt de leerdoelen van de mijlpaal waarover de app langer dan {rules.WARM_UP_STALE_AFTER_DAYS} dagen vóór dit concept niets meer noteerde (ook een neutraal oordeel op een rechtstreekse vraag telt, al is het geen bewijs; een neutraal oordeel van opzij niet), of nog nooit iets — de drempel van de app, een andere vraag dan de fossielen in de diagnostiek. *Oefeningen deze periode* telt de beoordeelde oefeningen {since}, onder toezicht of thuis; zolang de app geen toezicht registreert (Anchor), is elke oefening 'thuis' en toont de app die telling niet (#173), maar ze staat wel op het voorstel.")
+    L.append(f"**Mee op het voorstel, naast het getal** (de app toont ze bij het voorstel; ze raken het getal niet): *verouderd* telt de leerdoelen van de mijlpaal waarover de app langer dan {rules.WARM_UP_STALE_AFTER_DAYS} dagen vóór dit concept niets meer noteerde (ook een neutraal oordeel op een rechtstreekse vraag telt, al is het geen bewijs; een neutraal oordeel van opzij niet), of nog nooit iets — de drempel van de app, een andere vraag dan de fossielen in de diagnostiek. *Oefeningen deze periode* telt de beoordeelde oefeningen {since}, onder toezicht (in de lestijd van de klas, 10 minuten marge) of thuis, met dezelfde regel als de app (#219); heeft de klas geen lessen in de app, dan is elke oefening 'thuis' en toont de app die telling niet (#173), maar ze staat wel op het voorstel.")
     L.append("")
     L.append(
         "**Zo lees je de leerdoelen onder *Bijna* en *Ver*.** *herkomst*: waar μ vandaan komt — de vragen over het leerdoel en hoeveel daarvan juist,"
@@ -466,7 +469,12 @@ def cmd_validate(args) -> None:
     every student on a client since #108 from the whole log, with the
     arithmetic of #167 and #169. The old arithmetic lives on in storage only
     where an old build wrote after that, or on a doc the rewrite left alone,
-    and that is the deviation this command is for (README, *validate*)."""
+    and that is the deviation this command is for (README, *validate*).
+
+    Unlike `draft`, it weighs a turn as supervised only where the app
+    recorded it so (#219): that is what the app weighed when it wrote the
+    doc. The turns from before #219, which `draft` reads by the timetable,
+    are all `home` here, as they are in `lo_beliefs`."""
     goals = cosmos.goals()
     students = cosmos.accounts(args.klas)
     print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}{'laatste build':>16}")
@@ -492,6 +500,9 @@ def cmd_validate(args) -> None:
         " kwam van een build zonder clientVersion, die nog met de oude rekenregels werkt), of op een document"
         " dat met een oudere herspeling herschreven werd."
         " Ze raken het concept niet, dat leest alleen turn_history."
+        " Anders dan in het concept weegt een oefening hier alleen als 'onder toezicht' (×1,25) als de app ze zo"
+        " bewaarde, want zo schreef de app het document; het concept leest ook de oefeningen van vóór #219 volgens"
+        " het lesrooster van de klas."
     )
 
 
@@ -646,7 +657,8 @@ def cmd_what_if(args) -> None:
     exp = milestone["expectedDifficulty"]
     a = _pick_student(cosmos.accounts(args.klas), args.leerling, args.klas)
     counted = _pick_los(los, args.tel)
-    st = rules.replay([t for t in cosmos.turns(a["uid"]) if not rules.is_audit(t)], goals)
+    supervised = rules.by_timetable(rules.lessons_of(cosmos.classes(), args.klas))
+    st = rules.replay([t for t in cosmos.turns(a["uid"]) if not rules.is_audit(t)], goals, supervised=supervised)
     now = rules.score(los, st, exp)
     then = rules.score_counting(los, st, exp, [lo.key for lo in counted])
 

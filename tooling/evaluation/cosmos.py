@@ -205,6 +205,12 @@ def milestones() -> list[dict]:
     return query("milestones", "SELECT * FROM c")
 
 
+def classes() -> dict | None:
+    """The `config/classes` doc (#218): every class and its weekly lessons.
+    None when the teacher made no class list yet."""
+    return read("config", "classes", "config")
+
+
 def turns(uid: str) -> list[dict]:
     rows = query("turn_history", "SELECT * FROM c WHERE c.uid = @u", {"@u": uid}, pk=uid, cross=False)
     return sorted(rows, key=lambda t: t["turnAt"])

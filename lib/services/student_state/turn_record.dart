@@ -69,6 +69,27 @@ class TurnAppliedSignal {
     'alphaDelta': alphaDelta,
     'betaDelta': betaDelta,
   };
+
+  /// One entry of a stored `appliedSignals` list, or `null` when it is not
+  /// one. An entry from before #108 has no `subgoalId`: it was always the
+  /// record's own subgoal, which the caller passes as [recordSubgoalId].
+  static TurnAppliedSignal? tryFromJson(
+    Object? raw, {
+    required String recordSubgoalId,
+  }) {
+    if (raw is! Map) return null;
+    final loId = raw['loId'];
+    if (loId is! String || loId.isEmpty) return null;
+    final subgoalId = raw['subgoalId'];
+    return TurnAppliedSignal(
+      subgoalId: subgoalId is String && subgoalId.isNotEmpty
+          ? subgoalId
+          : recordSubgoalId,
+      loId: loId,
+      alphaDelta: (raw['alphaDelta'] as num?)?.toDouble() ?? 0.0,
+      betaDelta: (raw['betaDelta'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 /// One LO an incidental cross-subgoal negative put — or kept — in line for
@@ -104,6 +125,20 @@ class TurnTransferCredit {
     'loId': loId,
     'alphaDelta': alphaDelta,
   };
+
+  /// One entry of a stored `transferCredits` list, or `null` when it is not
+  /// one. Read back for the "Oude bekende" badge (#220).
+  static TurnTransferCredit? tryFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final subgoalId = raw['subgoalId'];
+    final loId = raw['loId'];
+    if (subgoalId is! String || loId is! String || loId.isEmpty) return null;
+    return TurnTransferCredit(
+      subgoalId: subgoalId,
+      loId: loId,
+      alphaDelta: (raw['alphaDelta'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 class TurnLoStatus {
@@ -127,6 +162,21 @@ class TurnLoStatus {
     'mastered': mastered,
     'stuck': stuck,
   };
+
+  /// One entry of a stored `loStatusAfter` list, or `null` when it is not
+  /// one. Read back for the badges that follow mastery (#220).
+  static TurnLoStatus? tryFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final loId = raw['loId'];
+    if (loId is! String || loId.isEmpty) return null;
+    return TurnLoStatus(
+      loId: loId,
+      mean: (raw['mean'] as num?)?.toDouble() ?? 0.0,
+      evidence: (raw['evidence'] as num?)?.toDouble() ?? 0.0,
+      mastered: raw['mastered'] == true,
+      stuck: raw['stuck'] == true,
+    );
+  }
 }
 
 /// One observability event captured on a `turn_history` doc per
@@ -147,6 +197,9 @@ enum TurnSignalEventKind {
   cascadeHalt,
   emptyObjectivesBlock,
   subgoalDeletedRedirect,
+  // Audit by default, strong when well-evidenced — the event carries its
+  // own severity (#107, `ProvenanceGap`):
+  provenanceGap,
 }
 
 enum TurnSignalEventSeverity { strong, audit }
@@ -174,6 +227,8 @@ class TurnSignalEvent {
       case TurnSignalEventKind.cascadeHalt:
       case TurnSignalEventKind.emptyObjectivesBlock:
       case TurnSignalEventKind.subgoalDeletedRedirect:
+      // The default; a well-evidenced gap is emitted as strong explicitly.
+      case TurnSignalEventKind.provenanceGap:
         return TurnSignalEventSeverity.audit;
     }
   }
@@ -328,6 +383,19 @@ class PersistedTurnRecord {
   /// judged against the key.
   final bool gradedByKey;
 
+  /// Whether the grader of a multiple-choice pick said the answer key itself
+  /// is wrong (#198) — what the bank counts as `keyDisputedCount` on the
+  /// question, here on the student's own record for the "Bugjager" badge
+  /// (#220). Omitted when false, and on every doc written before the field.
+  final bool keyDisputed;
+
+  /// When the question this turn graded an answer to was put in front of
+  /// the student (#220): the moment a question came in — generated or from
+  /// the bank — or, for a follow-up, the moment the follow-up was asked.
+  /// `turnAt` minus this is how long the student worked on it. `null` — and
+  /// omitted — when unknown, and on every doc written before the field.
+  final DateTime? askedAt;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -376,6 +444,8 @@ class PersistedTurnRecord {
     this.questionId,
     this.fromBank = false,
     this.gradedByKey = false,
+    this.keyDisputed = false,
+    this.askedAt,
   });
 
   bool get hasStrongEvent =>
@@ -406,6 +476,8 @@ class PersistedTurnRecord {
     if (questionId != null) 'questionId': questionId,
     if (fromBank) 'fromBank': true,
     if (gradedByKey) 'gradedByKey': true,
+    if (keyDisputed) 'keyDisputed': true,
+    if (askedAt != null) 'askedAt': askedAt!.toUtc().toIso8601String(),
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -461,10 +533,20 @@ class PersistedTurnRecord {
       }
     }
 
+    final subgoalId = (doc['subgoalId'] as String?) ?? '';
+    final askedAtRaw = doc['askedAt'];
+    // Read back for the provenance-gap check (#107), which compares the
+    // direct belief deltas of home and supervised oefeningen.
+    final applied = <TurnAppliedSignal>[
+      if (doc['appliedSignals'] case final List raw)
+        for (final entry in raw)
+          ?TurnAppliedSignal.tryFromJson(entry, recordSubgoalId: subgoalId),
+    ];
+
     return PersistedTurnRecord(
       id: (doc['id'] as String?) ?? '',
       turnAt: parseDate(doc['turnAt']),
-      subgoalId: (doc['subgoalId'] as String?) ?? '',
+      subgoalId: subgoalId,
       targetLOIds:
           (doc['targetLOIds'] as List?)?.whereType<String>().toList(
             growable: false,
@@ -481,18 +563,29 @@ class PersistedTurnRecord {
       overallQuality: parseQuality(doc['overallQuality']),
       loSignals: const [],
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
-      appliedSignals: const [],
+      appliedSignals: applied,
       provenance: EvidenceProvenance.parse(doc['provenance']),
       clientVersion: doc['clientVersion'] as String?,
       usage: TurnUsage.tryFromJson(doc['usage']),
       questionId: doc['questionId'] as String?,
       fromBank: (doc['fromBank'] as bool?) ?? false,
       gradedByKey: (doc['gradedByKey'] as bool?) ?? false,
+      keyDisputed: doc['keyDisputed'] == true,
+      askedAt: askedAtRaw is String ? DateTime.tryParse(askedAtRaw) : null,
+      // Read back for the badges (#220): transfer credits ("Oude bekende")
+      // and the LO statuses (mastery, stuck).
+      transferCredits: [
+        if (doc['transferCredits'] case final List raw)
+          for (final entry in raw) ?TurnTransferCredit.tryFromJson(entry),
+      ],
       calibrationBefore: parseDifficultyOr(doc['calibrationBefore']),
       calibrationAfter: parseDifficultyOr(doc['calibrationAfter']),
       subgoalProgressAfter:
           (doc['subgoalProgressAfter'] as num?)?.toDouble() ?? 0.0,
-      loStatusAfter: const [],
+      loStatusAfter: [
+        if (doc['loStatusAfter'] case final List raw)
+          for (final entry in raw) ?TurnLoStatus.tryFromJson(entry),
+      ],
       subgoalAdvanced: (doc['subgoalAdvanced'] as bool?) ?? false,
       acknowledgedAt: doc['acknowledgedAt'] is String
           ? DateTime.tryParse(doc['acknowledgedAt'] as String)
