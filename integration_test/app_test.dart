@@ -55,6 +55,7 @@ import 'flows/own_key.dart' as own_key;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
+import 'flows/provenance_gap.dart' as provenance_gap;
 import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/question_bank.dart' as question_bank;
 import 'flows/question_bank_serving.dart' as question_bank_serving;
@@ -110,6 +111,7 @@ void main() {
   garbled_reply_retry.main();
   exercise_history.main();
   evidence_provenance.main();
+  provenance_gap.main();
   difficulty_ratchet.main();
   difficulty_asymmetry.main();
   legacy_ratchet.main();

@@ -38,6 +38,7 @@ import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/provenance_gap.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
@@ -1179,6 +1180,17 @@ class TutorService extends Notifier<TutorState> {
     );
     _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
+    // #107: whether the class work on this LO now contradicts the home work
+    // before it. A teacher-only event; off the student's path, and silent
+    // when it fails.
+    final gapUid = ref.read(authServiceProvider)?.oid;
+    if (gapUid != null) {
+      unawaited(
+        ref
+            .read(provenanceGapServiceProvider)
+            .checkAfter(uid: gapUid, turn: record),
+      );
+    }
     if (bankQuestion != null) {
       _bankAnswer(
         bankQuestion,

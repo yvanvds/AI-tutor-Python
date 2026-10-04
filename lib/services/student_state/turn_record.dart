@@ -69,6 +69,27 @@ class TurnAppliedSignal {
     'alphaDelta': alphaDelta,
     'betaDelta': betaDelta,
   };
+
+  /// One entry of a stored `appliedSignals` list, or `null` when it is not
+  /// one. An entry from before #108 has no `subgoalId`: it was always the
+  /// record's own subgoal, which the caller passes as [recordSubgoalId].
+  static TurnAppliedSignal? tryFromJson(
+    Object? raw, {
+    required String recordSubgoalId,
+  }) {
+    if (raw is! Map) return null;
+    final loId = raw['loId'];
+    if (loId is! String || loId.isEmpty) return null;
+    final subgoalId = raw['subgoalId'];
+    return TurnAppliedSignal(
+      subgoalId: subgoalId is String && subgoalId.isNotEmpty
+          ? subgoalId
+          : recordSubgoalId,
+      loId: loId,
+      alphaDelta: (raw['alphaDelta'] as num?)?.toDouble() ?? 0.0,
+      betaDelta: (raw['betaDelta'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 /// One LO an incidental cross-subgoal negative put — or kept — in line for
@@ -147,6 +168,9 @@ enum TurnSignalEventKind {
   cascadeHalt,
   emptyObjectivesBlock,
   subgoalDeletedRedirect,
+  // Audit by default, strong when well-evidenced — the event carries its
+  // own severity (#107, `ProvenanceGap`):
+  provenanceGap,
 }
 
 enum TurnSignalEventSeverity { strong, audit }
@@ -174,6 +198,8 @@ class TurnSignalEvent {
       case TurnSignalEventKind.cascadeHalt:
       case TurnSignalEventKind.emptyObjectivesBlock:
       case TurnSignalEventKind.subgoalDeletedRedirect:
+      // The default; a well-evidenced gap is emitted as strong explicitly.
+      case TurnSignalEventKind.provenanceGap:
         return TurnSignalEventSeverity.audit;
     }
   }
@@ -461,10 +487,19 @@ class PersistedTurnRecord {
       }
     }
 
+    final subgoalId = (doc['subgoalId'] as String?) ?? '';
+    // Read back for the provenance-gap check (#107), which compares the
+    // direct belief deltas of home and supervised oefeningen.
+    final applied = <TurnAppliedSignal>[
+      if (doc['appliedSignals'] case final List raw)
+        for (final entry in raw)
+          ?TurnAppliedSignal.tryFromJson(entry, recordSubgoalId: subgoalId),
+    ];
+
     return PersistedTurnRecord(
       id: (doc['id'] as String?) ?? '',
       turnAt: parseDate(doc['turnAt']),
-      subgoalId: (doc['subgoalId'] as String?) ?? '',
+      subgoalId: subgoalId,
       targetLOIds:
           (doc['targetLOIds'] as List?)?.whereType<String>().toList(
             growable: false,
@@ -481,7 +516,7 @@ class PersistedTurnRecord {
       overallQuality: parseQuality(doc['overallQuality']),
       loSignals: const [],
       hadFallback: (doc['hadFallback'] as bool?) ?? false,
-      appliedSignals: const [],
+      appliedSignals: applied,
       provenance: EvidenceProvenance.parse(doc['provenance']),
       clientVersion: doc['clientVersion'] as String?,
       usage: TurnUsage.tryFromJson(doc['usage']),

@@ -114,4 +114,44 @@ void main() {
     );
     expect(await signedOut.listQuestionIdsFor('s1'), isEmpty);
   });
+
+  test('listSubgoalSince reads one student\'s records on one subgoal from a '
+      'moment on, audit records included, oldest first (#107)', () async {
+    Map<String, dynamic> doc(
+      String id,
+      String turnAt, {
+      String uid = 'u1',
+      String subgoalId = 's1',
+      String questionType = 'mcQuestion',
+    }) => {
+      'id': id,
+      'type': 'turn_history',
+      'uid': uid,
+      'subgoalId': subgoalId,
+      'turnAt': turnAt,
+      'questionType': questionType,
+      'targetLOIds': ['lo1'],
+      'appliedSignals': [
+        {'subgoalId': subgoalId, 'loId': 'lo1', 'alphaDelta': 2.0},
+      ],
+    };
+    store = InMemoryCosmos([
+      doc('late', '2026-10-03T09:00:00.000Z'),
+      doc('early', '2026-10-01T09:00:00.000Z'),
+      doc('audit', '2026-10-02T09:00:00.000Z', questionType: ''),
+      doc('before', '2026-09-01T09:00:00.000Z'),
+      doc('other-student', '2026-10-02T09:00:00.000Z', uid: 'u2'),
+      doc('other-subgoal', '2026-10-02T09:00:00.000Z', subgoalId: 's0'),
+    ]);
+
+    final records = await service().listSubgoalSince(
+      'u1',
+      's1',
+      from: DateTime.utc(2026, 9, 15),
+    );
+
+    expect(records.map((r) => r.id), ['early', 'audit', 'late']);
+    expect(records.first.appliedSignals.single.alphaDelta, 2.0);
+    expect(records.first.targetLOIds, ['lo1']);
+  });
 }

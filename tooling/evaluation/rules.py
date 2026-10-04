@@ -247,8 +247,8 @@ def by_timetable(lessons: list[Lesson]) -> Callable[[dict], bool]:
 
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
-    an empty-objectives block or a redirect after a deleted subgoal
-    (CONDUCTOR_POLICY §8.1). No question was asked, so `questionType` is
+    an empty-objectives block, a redirect after a deleted subgoal or a
+    provenance gap (#107) (CONDUCTOR_POLICY §8.1). No question was asked, so `questionType` is
     empty, and its `wrong` and `medium` are placeholders. It is no
     oefening: the app counts it nowhere (`listTurnsBetween` tests
     `questionType.isEmpty`), and neither does the tooling (#171, #201)."""

@@ -1294,6 +1294,19 @@
   "drawer_signals_kind_cascadeHalt": "Cascade halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subgoal without LOs (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subgoal deleted (audit)",
+  "drawer_signals_kind_provenanceGap": "Class work contradicts home work",
+  "drawer_signals_provenanceGap_detail": "{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)",
+  "@drawer_signals_provenanceGap_detail": {
+    "description": "The detail line of a provenance-gap signal event (#107): the learning objective, and how many of its direct signals were positive at home and in the lessons after that home work.",
+    "placeholders": {
+      "lo": { "type": "String" },
+      "homePositive": { "type": "int" },
+      "homeSignals": { "type": "int" },
+      "supervisedPositive": { "type": "int" },
+      "supervisedSignals": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
 
   "drawer_statusReports_title": "Status reports",
   "drawer_statusReports_loadError": "Could not load status reports.",

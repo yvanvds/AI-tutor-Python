@@ -122,6 +122,61 @@ void main() {
         },
       ]);
     });
+
+    test('they are read back (#107)', () {
+      final back = PersistedTurnRecord.fromCosmos(
+        _record(
+          appliedSignals: const [
+            TurnAppliedSignal(
+              subgoalId: 's0',
+              loId: 'lo-print',
+              alphaDelta: -0.2,
+              betaDelta: 1.4,
+            ),
+          ],
+        ).toMap(uid: 'u1'),
+      );
+      final s = back.appliedSignals.single;
+      expect(s.subgoalId, 's0');
+      expect(s.loId, 'lo-print');
+      expect(s.alphaDelta, -0.2);
+      expect(s.betaDelta, 1.4);
+    });
+
+    test('an entry from before #108 lands on the record\'s own subgoal; one '
+        'without an LO is skipped', () {
+      final back = PersistedTurnRecord.fromCosmos({
+        ..._record().toMap(uid: 'u1'),
+        'appliedSignals': [
+          {'loId': 'lo1', 'alphaDelta': 2, 'betaDelta': 0},
+          {'alphaDelta': 1.0, 'betaDelta': 0.0},
+          'garbage',
+        ],
+      });
+      final s = back.appliedSignals.single;
+      expect(s.subgoalId, 's1');
+      expect(s.loId, 'lo1');
+      expect(s.alphaDelta, 2.0);
+    });
+  });
+
+  group('TurnSignalEvent provenanceGap (#107)', () {
+    test('audit by default; a strong one keeps its severity through the '
+        'doc', () {
+      expect(
+        TurnSignalEvent.of(TurnSignalEventKind.provenanceGap).severity,
+        TurnSignalEventSeverity.audit,
+      );
+      const strong = TurnSignalEvent(
+        kind: TurnSignalEventKind.provenanceGap,
+        severity: TurnSignalEventSeverity.strong,
+        details: {'loId': 'lo1'},
+      );
+      final back = TurnSignalEvent.tryFromJson(strong.toJson())!;
+      expect(back.kind, TurnSignalEventKind.provenanceGap);
+      expect(back.severity, TurnSignalEventSeverity.strong);
+      expect(back.details, {'loId': 'lo1'});
+    });
   });
 
   group('PersistedTurnRecord transferCredits (#101)', () {

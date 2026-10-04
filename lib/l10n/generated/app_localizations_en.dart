@@ -2299,6 +2299,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Subgoal deleted (audit)';
 
   @override
+  String get drawer_signals_kind_provenanceGap =>
+      'Class work contradicts home work';
+
+  @override
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  ) {
+    return '$lo: at home $homePositive of $homeSignals positive, in class afterwards $supervisedPositive of $supervisedSignals (last $days days)';
+  }
+
+  @override
   String get drawer_statusReports_title => 'Status reports';
 
   @override

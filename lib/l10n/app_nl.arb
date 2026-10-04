@@ -685,6 +685,8 @@
   "drawer_signals_kind_cascadeHalt": "Cascade-halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subdoel zonder LO's (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subdoel verwijderd (audit)",
+  "drawer_signals_kind_provenanceGap": "De les spreekt het thuiswerk tegen",
+  "drawer_signals_provenanceGap_detail": "{lo}: thuis {homePositive} van {homeSignals} positief, in de les daarna {supervisedPositive} van {supervisedSignals} (laatste {days} dagen)",
 
   "drawer_statusReports_title": "Statusrapporten",
   "drawer_statusReports_loadError": "Kon de statusrapporten niet laden.",

@@ -2323,6 +2323,22 @@ class AppLocalizationsNl extends AppLocalizations {
       'Subdoel verwijderd (audit)';
 
   @override
+  String get drawer_signals_kind_provenanceGap =>
+      'De les spreekt het thuiswerk tegen';
+
+  @override
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  ) {
+    return '$lo: thuis $homePositive van $homeSignals positief, in de les daarna $supervisedPositive van $supervisedSignals (laatste $days dagen)';
+  }
+
+  @override
   String get drawer_statusReports_title => 'Statusrapporten';
 
   @override

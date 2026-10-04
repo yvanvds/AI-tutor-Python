@@ -64,7 +64,7 @@ class StudentDetailDrawer extends ConsumerWidget {
                               goals: goals,
                             ),
                           const Divider(height: 1),
-                          SignalEventsSection(uid: account.uid),
+                          SignalEventsSection(uid: account.uid, goals: goals),
                           const Divider(height: 1),
                           _SectionTitle(
                             theme: theme,

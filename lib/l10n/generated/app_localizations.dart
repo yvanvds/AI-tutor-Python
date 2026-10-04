@@ -3858,6 +3858,25 @@ abstract class AppLocalizations {
   /// **'Subgoal deleted (audit)'**
   String get drawer_signals_kind_subgoalDeletedRedirect;
 
+  /// No description provided for @drawer_signals_kind_provenanceGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Class work contradicts home work'**
+  String get drawer_signals_kind_provenanceGap;
+
+  /// The detail line of a provenance-gap signal event (#107): the learning objective, and how many of its direct signals were positive at home and in the lessons after that home work.
+  ///
+  /// In en, this message translates to:
+  /// **'{lo}: at home {homePositive} of {homeSignals} positive, in class afterwards {supervisedPositive} of {supervisedSignals} (last {days} days)'**
+  String drawer_signals_provenanceGap_detail(
+    String lo,
+    int homePositive,
+    int homeSignals,
+    int supervisedPositive,
+    int supervisedSignals,
+    int days,
+  );
+
   /// No description provided for @drawer_statusReports_title.
   ///
   /// In en, this message translates to:
