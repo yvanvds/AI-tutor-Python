@@ -904,6 +904,13 @@ class AppLocalizationsNl extends AppLocalizations {
   String get options_developer_turnDetail_close => 'Sluiten';
 
   @override
+  String get options_answersKept_title => 'Je antwoorden';
+
+  @override
+  String get options_answersKept_text =>
+      'Je vragen en antwoorden worden bewaard tot het einde van het schooljaar, zodat je leerkracht kan zien waar het vastloopt.';
+
+  @override
   String get options_about_title => 'Over';
 
   @override

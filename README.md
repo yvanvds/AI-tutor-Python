@@ -111,6 +111,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `milestones`     | `/type`       |
    | `questions`      | `/subgoalId`  |
    | `translations`   | `/language`   |
+   | `turn_content`   | `/uid`        |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc
@@ -136,6 +137,15 @@ This stores accounts, goals, progress, instructions, and status reports.
    Dutch, whatever language they picked in Options. Its partition key is
    `/language`. From the Azure CLI:
    `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name translations --partition-key-path /language --partition-key-version 2`
+
+   `turn_content` (the question, answer and feedback of each oefening,
+   #228) can be missing too: until it exists, nothing of it is stored and
+   the students practise as before. Create it with **Time to Live on, no
+   default** (`defaultTtl: -1`; in the Data Explorer: *Time to Live* → *On
+   (no default)*): every doc sets its own `ttl` and expires at the end of
+   the school year, but only in a container with TTL on — without it the
+   docs are kept forever. From the Azure CLI:
+   `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name turn_content --partition-key-path /uid --partition-key-version 2 --ttl -1`
 
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and
@@ -228,7 +238,7 @@ When you start the app for the first time:
 
    You can use `{goal}`, `{subgoal}`, `{suggestions}`, and `{known concepts}` as placeholders in any section. They get filled in at runtime from the active goal.
 4. Go to **Goals** and build your goal tree. Roots are top-level themes ("Variables", "Loops", …); children are concrete subgoals. The tutor walks the tree in order.
-5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7.
+5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
 
 Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
 

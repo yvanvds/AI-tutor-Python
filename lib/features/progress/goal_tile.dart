@@ -103,7 +103,7 @@ class GoalTile extends ConsumerWidget {
 
                         ref
                             .read(tutorServiceProvider.notifier)
-                            .initializeSession(force: true);
+                            .startSession(SessionStart.workOnGoal);
                       },
                       label: Text(
                         AppLocalizations.of(context).goalTile_button_workOn,

@@ -896,6 +896,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get options_developer_turnDetail_close => 'Close';
 
   @override
+  String get options_answersKept_title => 'Your answers';
+
+  @override
+  String get options_answersKept_text =>
+      'Your questions and answers are kept until the end of the school year, so your teacher can see where you get stuck.';
+
+  @override
   String get options_about_title => 'About';
 
   @override

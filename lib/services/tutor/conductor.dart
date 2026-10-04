@@ -211,6 +211,12 @@ class TurnOutcome {
   /// Those negatives are in [loSignals] but never in [appliedSignals].
   final List<TurnReviewFlag> reviewFlags;
 
+  /// Every grader signal of this turn that did not count as evidence, with
+  /// why (#228): the scope check's ([GradedAnswer.droppedSignals]) first,
+  /// then the conductor's own. For the turn's content doc; nothing decides
+  /// on it.
+  final List<DroppedSignal> droppedSignals;
+
   const TurnOutcome({
     required this.overallQuality,
     required this.subgoalAdvanced,
@@ -225,6 +231,7 @@ class TurnOutcome {
     this.signalEvents = const [],
     this.transferCredits = const [],
     this.reviewFlags = const [],
+    this.droppedSignals = const [],
   });
 }
 
@@ -241,6 +248,48 @@ class GradedSignal {
     required this.kind,
     required this.strength,
   });
+}
+
+/// Why a grader signal did not count as evidence (#228). The scope check
+/// (`GradedAnswerBuilder`) decides the first three, the conductor the rest
+/// (CONDUCTOR_POLICY §2.4, §3.5). [label] is what the debug log has always
+/// called it (`conductor.signal_dropped`); the content doc stores [name].
+enum SignalDropReason {
+  /// Its subgoal is not in the grading scope (the active root's subgoals).
+  outOfScope('out of scope'),
+
+  /// The asked LO itself, its subgoal outside the scope (#225): the app's
+  /// error, not the grader's.
+  targetOutOfScope('target out of scope'),
+
+  /// Its subgoal is in the scope but has no such LO.
+  unknownLo('unknown LO'),
+
+  /// A subgoal after the active one: a forward reference (§2.4).
+  laterSubgoal('forward reference'),
+
+  /// Its subgoal is not under the active root, though the scope check let
+  /// it through.
+  outsideActiveRoot('outside the active root'),
+
+  /// A negative on an earlier subgoal's LO: a prompt for the warm-up
+  /// review, never a debit (#167).
+  incidentalNegative('incidental negative'),
+
+  /// A neutral on an earlier subgoal's LO: not written at all (#204).
+  incidentalNeutral('incidental neutral');
+
+  const SignalDropReason(this.label);
+
+  final String label;
+}
+
+/// A grader signal that did not count, and why (#228).
+class DroppedSignal {
+  const DroppedSignal(this.signal, this.reason);
+
+  final GradedSignal signal;
+  final SignalDropReason reason;
 }
 
 /// One LO the grader saw correctly used in service of the task (#101),
@@ -305,6 +354,12 @@ class GradedAnswer {
   /// records a `targetSignalLost` event (CONDUCTOR_POLICY §8.2).
   final List<GradedSignal> lostTargetSignals;
 
+  /// Every signal the scope check dropped, with why (#228): out of scope,
+  /// the asked LO out of scope (also in [lostTargetSignals]), or an LO its
+  /// subgoal does not have. Not in [signals]. The conductor adds its own
+  /// drops and hands them all on in [TurnOutcome.droppedSignals].
+  final List<DroppedSignal> droppedSignals;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
@@ -315,6 +370,7 @@ class GradedAnswer {
     this.transferLOs = const [],
     this.fromAnswerKey = false,
     this.lostTargetSignals = const [],
+    this.droppedSignals = const [],
   });
 }
 
@@ -1148,6 +1204,9 @@ class Conductor {
     final targetLo = plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
 
     final events = <TurnSignalEvent>[];
+    // Every signal of this turn that does not count, with why (#228): the
+    // scope check's, then the conductor's own below.
+    final dropped = <DroppedSignal>[...answer.droppedSignals];
 
     // Track sustained-failure (degraded mode rule §7.3). Grading calls
     // only: a pick graded from a bank question's answer key (§2.7) says
@@ -1192,8 +1251,9 @@ class Conductor {
     // signal on the target stood in for it (every signal dropped) or the
     // target got nothing at all.
     if (answer.lostTargetSignals.isNotEmpty) {
+      // Already among the scope check's drops: logged here, not added.
       for (final sig in answer.lostTargetSignals) {
-        _dropSignal(sig, 'target out of scope');
+        _dropSignal(sig, SignalDropReason.targetOutOfScope);
       }
       final lost = answer.lostTargetSignals.first;
       final rootId = selection.activeRootGoal?.id;
@@ -1228,6 +1288,7 @@ class Conductor {
         calibrationAfter: _deps.getCalibration().difficulty,
         hadFallback: answer.hadFallback,
         signalEvents: events,
+        droppedSignals: List.unmodifiable(dropped),
       );
     }
 
@@ -1299,11 +1360,11 @@ class Conductor {
         siblings ??= await _rootSubgoals(selection);
         final other = siblings.firstWhereOrNull((g) => g.id == sig.subgoalId);
         if (other == null) {
-          _dropSignal(sig, 'outside the active root');
+          _dropSignal(sig, SignalDropReason.outsideActiveRoot, dropped);
           continue;
         }
         if (other.order > subgoal.order) {
-          _dropSignal(sig, 'forward reference');
+          _dropSignal(sig, SignalDropReason.laterSubgoal, dropped);
           continue;
         }
         signalSubgoalId = other.id;
@@ -1311,7 +1372,7 @@ class Conductor {
         isCrossSubgoal = true;
       }
       if (lo == null) {
-        _dropSignal(sig, 'unknown LO');
+        _dropSignal(sig, SignalDropReason.unknownLo, dropped);
         continue;
       }
       if (isCrossSubgoal && sig.kind == LoSignalKind.neutral) {
@@ -1320,7 +1381,7 @@ class Conductor {
         // doc at the prior for an LO never probed (§3.5), no `lastUpdatedAt`
         // that would pass for fresh evidence (§1.5 staleness, the proposal's
         // `staleLoCount`). Only logged, like any declined signal.
-        _dropSignal(sig, 'incidental neutral');
+        _dropSignal(sig, SignalDropReason.incidentalNeutral, dropped);
         writtenElsewhere.putIfAbsent(
           '$signalSubgoalId/${sig.loId}',
           () => 'incidental neutral',
@@ -1374,6 +1435,9 @@ class Conductor {
         // Still "this answer is on record for this LO": a transfer
         // nomination on it is dropped (§3.7).
         writtenElsewhere.putIfAbsent(key, () => 'flagged for review');
+        // Not evidence (#228): on the turn's content doc with the drops —
+        // its own debug event above, not `signal_dropped`.
+        dropped.add(DroppedSignal(sig, SignalDropReason.incidentalNegative));
         continue;
       }
       final isTarget =
@@ -1783,6 +1847,7 @@ class Conductor {
       signalEvents: List.unmodifiable(events),
       transferCredits: transferCredits,
       reviewFlags: reviewFlags,
+      droppedSignals: List.unmodifiable(dropped),
     );
   }
 
@@ -1929,13 +1994,19 @@ class Conductor {
   }
 
   /// A validated signal the conductor still declines (§3.5 "drop the
-  /// signal, log"): the reason goes to the debug recorder.
-  void _dropSignal(GradedSignal sig, String reason) {
+  /// signal, log"): the reason goes to the debug recorder, and with
+  /// [into] onto the turn's list of drops (#228).
+  void _dropSignal(
+    GradedSignal sig,
+    SignalDropReason reason, [
+    List<DroppedSignal>? into,
+  ]) {
     _deps.recordDebugEvent('conductor.signal_dropped', {
       'subgoalId': sig.subgoalId,
       'loId': sig.loId,
-      'reason': reason,
+      'reason': reason.label,
     });
+    into?.add(DroppedSignal(sig, reason));
   }
 
   bool _difficultyAtLeast(QuestionDifficulty asked, QuestionDifficulty calib) {

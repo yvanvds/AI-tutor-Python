@@ -27,6 +27,10 @@ class GradedAnswerBuilder {
   /// records it on the turn. (An LO missing from a subgoal that *is* in
   /// scope is a curriculum edit, and drops like any unresolved id.)
   ///
+  /// Every signal the check drops is handed on in `droppedSignals` with
+  /// its reason (#228) — out of scope, the asked LO out of scope, or an LO
+  /// its subgoal does not have — for the turn's content doc.
+  ///
   /// [rawTransferLOs] (#101) get the same scope check and are de-duplicated;
   /// they never count toward "every signal dropped" — transfer credit is
   /// not a substitute for a graded signal on the target.
@@ -49,32 +53,36 @@ class GradedAnswerBuilder {
 
     final accepted = <GradedSignal>[];
     final lostTarget = <GradedSignal>[];
-    for (final sig in rawSignals) {
+    final dropped = <DroppedSignal>[];
+    for (final raw in rawSignals) {
+      final sig = GradedSignal(
+        subgoalId: raw.subgoalId,
+        loId: raw.loId,
+        kind: raw.kind,
+        strength: raw.strength,
+      );
       final loIds = scopeIndex[sig.subgoalId];
       if (loIds == null) {
-        if (intendedTargetLO != null &&
+        final isTarget =
+            intendedTargetLO != null &&
             sig.subgoalId == intendedTargetSubgoalId &&
-            sig.loId == intendedTargetLO.id) {
-          lostTarget.add(
-            GradedSignal(
-              subgoalId: sig.subgoalId,
-              loId: sig.loId,
-              kind: sig.kind,
-              strength: sig.strength,
-            ),
-          );
-        }
+            sig.loId == intendedTargetLO.id;
+        if (isTarget) lostTarget.add(sig);
+        dropped.add(
+          DroppedSignal(
+            sig,
+            isTarget
+                ? SignalDropReason.targetOutOfScope
+                : SignalDropReason.outOfScope,
+          ),
+        );
         continue;
       }
-      if (!loIds.contains(sig.loId)) continue;
-      accepted.add(
-        GradedSignal(
-          subgoalId: sig.subgoalId,
-          loId: sig.loId,
-          kind: sig.kind,
-          strength: sig.strength,
-        ),
-      );
+      if (!loIds.contains(sig.loId)) {
+        dropped.add(DroppedSignal(sig, SignalDropReason.unknownLo));
+        continue;
+      }
+      accepted.add(sig);
     }
 
     final transfers = <GradedTransfer>[];
@@ -98,6 +106,7 @@ class GradedAnswerBuilder {
         transferLOs: transfers,
         fromAnswerKey: fromAnswerKey,
         lostTargetSignals: lostTarget,
+        droppedSignals: dropped,
       );
     }
 
@@ -113,6 +122,7 @@ class GradedAnswerBuilder {
         transferLOs: transfers,
         fromAnswerKey: fromAnswerKey,
         lostTargetSignals: lostTarget,
+        droppedSignals: dropped,
       );
     }
     final fallbackKind = switch (overallQuality) {
@@ -137,6 +147,7 @@ class GradedAnswerBuilder {
       transferLOs: transfers,
       fromAnswerKey: fromAnswerKey,
       lostTargetSignals: lostTarget,
+      droppedSignals: dropped,
     );
   }
 }

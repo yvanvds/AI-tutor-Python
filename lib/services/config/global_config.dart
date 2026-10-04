@@ -1,3 +1,5 @@
+import 'package:ai_tutor_python/core/keep_until.dart';
+
 class GlobalConfig {
   final String model;
   final String apiKey;
@@ -24,12 +26,21 @@ class GlobalConfig {
   /// bank off altogether; the bank still fills. Set from the Cosmos portal.
   final double? questionBankShare;
 
+  /// The day the content of an oefening — question, answer, feedback — is
+  /// kept until (#228), as `TurnContentKeepUntil: "07-01"` on the doc
+  /// (`MM-DD`, midnight Belgian time). `null` when the school sets none or
+  /// a value that is not a day: `KeepUntil.schoolYearEnd` (1 July) then.
+  /// Set from the Cosmos portal; read at every write, so a change reaches
+  /// the docs written after it.
+  final KeepUntil? turnContentKeepUntil;
+
   const GlobalConfig({
     required this.model,
     required this.apiKey,
     this.minimumVersion,
     this.questionBankMinimum,
     this.questionBankShare,
+    this.turnContentKeepUntil,
   });
 
   factory GlobalConfig.fromMap(Map<String, dynamic> map) {
@@ -47,6 +58,7 @@ class GlobalConfig {
       questionBankShare: bankShare is num && !bankShare.isNaN
           ? bankShare.toDouble().clamp(0.0, 1.0)
           : null,
+      turnContentKeepUntil: KeepUntil.tryParse(map['TurnContentKeepUntil']),
     );
   }
 
@@ -62,5 +74,7 @@ class GlobalConfig {
     if (minimumVersion != null) 'MinimumVersion': minimumVersion,
     if (questionBankMinimum != null) 'QuestionBankMinimum': questionBankMinimum,
     if (questionBankShare != null) 'QuestionBankShare': questionBankShare,
+    if (turnContentKeepUntil != null)
+      'TurnContentKeepUntil': turnContentKeepUntil.toString(),
   };
 }

@@ -66,6 +66,8 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
         minimumVersion: storedConfig.minimumVersion,
         questionBankMinimum: storedConfig.questionBankMinimum,
         questionBankShare: storedConfig.questionBankShare,
+        // And how long the content of an oefening is kept (#228).
+        turnContentKeepUntil: storedConfig.turnContentKeepUntil,
       );
       final base = Map<String, dynamic>.from(stored ?? const {})
         // Cosmos owns `_rid`, `_etag`, `_ts`…; echoing them back is at best

@@ -2351,14 +2351,91 @@ turns and audit events.
 **Storage estimate.** ~500 bytes per turn × ~50 turns/student/week
 × ~30 students ≈ 750 KB/week. Negligible for Cosmos.
 
-**Deliberately not captured:**
+**Deliberately not captured in `turn_history`:**
 
 - Full LLM response text (redundant with `loSignals` + `feedbackText`).
-- Rendered question prompt text (regenerable from inputs).
-- Student's literal answer text (privacy, bulk).
+- Rendered question prompt text — kept, until the end of the school
+  year, in `turn_content` (below).
+- Student's literal answer text — the same.
 - Time-on-question or engagement signals.
 
-If a future debug need requires full text, it can be added later.
+#### The content of an oefening: `turn_content` (#228)
+
+`turn_history` says *that* an oefening went wrong and how the rules
+reacted. It cannot say *why*: whether a "partial" was fair, which
+misconception was behind nine wrong answers on one LO, or that the app
+threw away the grader's signal on the asked LO (#225 was visible only by
+what was missing). And a question enters the bank only when its first
+answer was right (#215), so the questions where it goes wrong are the ones
+the bank does not have. A second container, `turn_content`, holds that
+part: one doc per graded turn — follow-ups included — with the id of its
+`turn_history` doc, partition `/uid`.
+
+```
+TurnContent {
+  id: string                  // the turn_history doc's id
+  uid: string                 // partition key
+  type: "turn_content"
+  turnAt: string              // as on the turn record
+  subgoalId: string           // as on the turn record
+  questionType: string        // as on the turn record
+  isFollowUp: bool
+
+  question: {                 // as the student saw it; the follow-up
+    text: string              //   question itself for a follow-up
+    code: string?             // complete-code skeleton, code to explain,
+                              //   or the code of a multiple-choice question
+    options: string[]?        // multiple choice, in the order on screen
+    correctOption: string?    // its key, as option text
+    questionId: string?       // the bank id (2.7), as on the turn record
+  }?                          // null when the app restarted in between
+  answer: { code? | picked? | text? }?   // the code handed in, the option
+                              //   picked, or the text typed
+  feedback: string            // the grade's <TEXT>, as shown
+  rawSignals: [{subgoalId, loId, signal, strength}]
+                              // the grader's own, before any check; on a
+                              //   pick graded by its key (2.7) the key's
+                              //   signal is what was checked
+  droppedSignals: [{subgoalId, loId, signal, strength, reason}]
+                              // every signal that did not count, reason
+                              //   outOfScope | targetOutOfScope (#225) |
+                              //   unknownLo (the scope check), then
+                              //   laterSubgoal | outsideActiveRoot |
+                              //   unknownLo | incidentalNeutral (#204) |
+                              //   incidentalNegative (#167) (the conductor)
+  context: {
+    activeRootId, activeSubgoalId,        // when the answer was graded
+    selectedRootId, selectedChildId,
+    preferredRootId, preferredChildId,
+    sessionStart: startup | continueLearningPath | workOnGoal | restart
+  }
+  hintCount: int              // hints since the question (or the last
+                              //   graded answer) went up
+  clientVersion: string?
+  keepUntil: string           // when it expires (8.4)
+  ttl: int                    // seconds from this write until keepUntil
+}
+```
+
+The drops come from where they are decided: `GradedAnswerBuilder` hands
+on its own with their reason (`GradedAnswer.droppedSignals`, of which
+`lostTargetSignals` is the asked-LO part), the conductor adds its own and
+returns them all on the turn (`TurnOutcome.droppedSignals`). Nothing reads
+them back to decide anything. Not in it: the full prompts (the instructions
+are in `instructions`) and the model's raw output. About 1–3 KB a doc.
+
+**Written like the question bank (2.7): best-effort.** `TutorService`
+assembles the doc once the turn record is built and hands it to
+`TurnContentService` unawaited: the oefening never waits for it, a failure
+is logged and swallowed, and a missing container leaves the service alone
+for 10 minutes. The writes of one app run are queued in order.
+
+**Read by the teacher only**, in the tooling first: `evaluate.py trace
+--leerling <naam> --dag <datum> [--subdoel <id>]` prints a student's day
+per oefening (`tooling/evaluation`). Seeing an oefening in the student's
+drawer in the app is later work (#229). As for `turn_history`, "teacher
+only" is a boundary in the app, not access control: the app holds the
+account key.
 
 ### 8.2 Teacher-facing surfaces
 
@@ -2587,6 +2664,19 @@ happen is sufficient.
 `turn_history` accumulates indefinitely by default. No automatic
 pruning.
 
+`turn_content` (8.1, #228) does not: it is kept **until the end of the
+school year**, then Cosmos removes it. The container has `defaultTtl: -1`
+(TTL on, no default), and every doc carries `ttl`: the seconds from that
+write until midnight Belgian time on the day `config/global` names
+(`TurnContentKeepUntil: "MM-DD"`, default `07-01` — after the
+deliberations at the end of June) that comes after the turn
+(`KeepUntil`). Cosmos counts the ttl from the doc's last write (`_ts`), so
+it is computed at every write. A doc without `ttl` would be kept forever;
+a container created without TTL ignores the field altogether (README
+step 3). A progress reset deletes `turn_history`, not `turn_content`: those
+docs run out with the rest (whether a reset should take them along is
+#232).
+
 **Manual clean action (deferred admin feature).** A teacher-only
 action to purge `turn_history` (and optionally `progress_history`)
 for a configurable date range or specific students. Use case: end
@@ -2614,6 +2704,12 @@ different button, not part of the year-end-archive flow.
   keystrokes, or attention proxies in `turn_history`.
 - **No literal student answer text** in `turn_history`. The LLM's
   extracted `loSignals` and `overallQuality` are what's stored.
+- **`turn_content` (#228) does hold it**: the answers of minors, and a
+  free text field can hold anything. Nothing is filtered; the expiry at
+  the end of the school year (8.4) is the limit. Students are told in
+  Options, in one sentence: their questions and answers are kept until
+  the end of the school year, so their teacher can see where they get
+  stuck. None of it goes into the repo, an issue or a PR (#190).
 
 ### 8.6 What this section deliberately does not address
 

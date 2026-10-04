@@ -2409,6 +2409,7 @@ void main() {
       bool isFollowUp = false,
       EvidenceProvenance provenance = EvidenceProvenance.home,
       LoSignalKind? targetKind,
+      List<DroppedSignal> scopeDrops = const [],
     }) async {
       final plan = QuestionPlan(
         type: ChatRequestType.writeCodeQuestion,
@@ -2442,6 +2443,7 @@ void main() {
           isFollowUp: isFollowUp,
           chainDepth: isFollowUp ? 1 : 0,
           provenance: provenance,
+          droppedSignals: scopeDrops,
         ),
       );
     }
@@ -2699,6 +2701,71 @@ void main() {
       expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-gone')), isFalse);
       expect(printAfter(s.f).beta, 1);
     });
+
+    test('#228: every signal that does not count is on the outcome with why '
+        '— the scope check\'s first, then a later subgoal, an unknown LO, '
+        'an incidental neutral and an incidental negative; what counts is '
+        'not among them', () async {
+      final s = await setup(printBelief: masteredPrint());
+      const offScope = GradedSignal(
+        subgoalId: 'elsewhere',
+        loId: 'lo-x',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+      final outcome = await grade(
+        s.c,
+        scopeDrops: const [
+          DroppedSignal(offScope, SignalDropReason.outOfScope),
+        ],
+        extra: const [
+          GradedSignal(
+            subgoalId: 's2',
+            loId: 'lo-loop',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-gone',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.weak,
+          ),
+          neutralOnPrint,
+          negativeOnPrint,
+        ],
+      );
+      expect(
+        outcome.droppedSignals.map(
+          (d) =>
+              '${d.signal.subgoalId}/${d.signal.loId} '
+              '${d.signal.kind.name} ${d.reason.name}',
+        ),
+        [
+          'elsewhere/lo-x positive outOfScope',
+          's2/lo-loop negative laterSubgoal',
+          's0/lo-gone positive unknownLo',
+          's0/lo-print neutral incidentalNeutral',
+          's0/lo-print negative incidentalNegative',
+        ],
+      );
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+      // The debug log keeps its own words for the conductor's drops.
+      expect(dropped(s.f).map((d) => d!['reason']), [
+        'forward reference',
+        'unknown LO',
+        'incidental neutral',
+      ]);
+    });
+
+    test(
+      '#228: a turn with nothing dropped has no drops on its outcome',
+      () async {
+        final s = await setup(printBelief: masteredPrint());
+        final outcome = await grade(s.c, extra: const []);
+        expect(outcome.droppedSignals, isEmpty);
+      },
+    );
 
     test('follow-up grading caps a cross-subgoal positive at weak', () async {
       final s = await setup(printBelief: masteredPrint());

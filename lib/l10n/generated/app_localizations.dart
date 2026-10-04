@@ -1543,6 +1543,18 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get options_developer_turnDetail_close;
 
+  /// No description provided for @options_answersKept_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answers'**
+  String get options_answersKept_title;
+
+  /// #228: the one sentence that tells a student the content of their oefeningen is stored, and until when.
+  ///
+  /// In en, this message translates to:
+  /// **'Your questions and answers are kept until the end of the school year, so your teacher can see where you get stuck.'**
+  String get options_answersKept_text;
+
   /// No description provided for @options_about_title.
   ///
   /// In en, this message translates to:

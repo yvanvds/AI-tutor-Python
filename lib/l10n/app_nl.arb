@@ -263,6 +263,8 @@
   "options_developer_turnDetail_title": "Beurt #{id}",
   "options_developer_turnDetail_close": "Sluiten",
 
+  "options_answersKept_title": "Je antwoorden",
+  "options_answersKept_text": "Je vragen en antwoorden worden bewaard tot het einde van het schooljaar, zodat je leerkracht kan zien waar het vastloopt.",
   "options_about_title": "Over",
   "options_about_version": "Versie {version}",
   "options_about_whatsNew": "Wat is er nieuw",

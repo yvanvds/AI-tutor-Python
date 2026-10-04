@@ -100,13 +100,15 @@ class TutorContext {
   ///
   /// `keyDisputed` is the grader of a multiple-choice pick saying the
   /// answer key itself is wrong (#198) — for the question bank, never for
-  /// the student.
+  /// the student. `feedback` is the text the student got with the grade,
+  /// for the content of the oefening (#228).
   final Future<IntegrateOutcome> Function({
     required AnswerQuality overallQuality,
     required List<LoSignal> loSignals,
     required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
     bool keyDisputed,
+    String feedback,
   })
   integrateGradedAnswer;
 
@@ -223,6 +225,7 @@ class CodeFeedbackHandler extends ResponseHandler<CodeFeedback> {
       loSignals: r.loSignals,
       transferLOs: r.transferLOs,
       followUp: r.followUp,
+      feedback: r.prompt,
     );
     if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();
@@ -243,6 +246,7 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
       transferLOs: r.transferLOs,
       followUp: r.followUp,
       keyDisputed: r.keyDisputed,
+      feedback: r.prompt,
     );
     // Advance is deferred until the student clicks "Volgende" inside the
     // MCQ render — see TutorService.advanceFromMcq. A follow-up presented
@@ -263,6 +267,7 @@ class ExplainFeedbackHandler extends ResponseHandler<ExplainFeedback> {
       loSignals: r.loSignals,
       transferLOs: r.transferLOs,
       followUp: r.followUp,
+      feedback: r.prompt,
     );
     if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();
@@ -282,6 +287,7 @@ class SocraticFeedbackHandler extends ResponseHandler<SocraticFeedback> {
       loSignals: r.loSignals,
       transferLOs: r.transferLOs,
       followUp: r.followUp,
+      feedback: r.prompt,
     );
     if (outcome != IntegrateOutcome.continuing) return;
     await ctx.requestExercise();

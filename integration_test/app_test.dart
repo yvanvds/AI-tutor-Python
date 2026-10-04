@@ -78,6 +78,7 @@ import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/teacher_badges.dart' as teacher_badges;
 import 'flows/token_usage.dart' as token_usage;
 import 'flows/transfer_credit.dart' as transfer_credit;
+import 'flows/turn_content.dart' as turn_content;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
 import 'flows/tutor_language.dart' as tutor_language;
 import 'flows/unconfirmed_recheck.dart' as unconfirmed_recheck;
@@ -138,6 +139,7 @@ void main() {
   status_report_retry.main();
   stuck_advance_progress.main();
   next_root_signal.main();
+  turn_content.main();
   level_up_gate.main();
   oefening_xp.main();
   badges.main();

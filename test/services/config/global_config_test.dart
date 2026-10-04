@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/keep_until.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -132,6 +133,35 @@ void main() {
       final back = GlobalConfig.fromMap(set.toMap());
       expect(back.questionBankMinimum, 4);
       expect(back.questionBankShare, 0.25);
+    });
+  });
+
+  group('TurnContentKeepUntil (#228)', () {
+    test('is a day of the year, MM-DD; absent or not a day reads as none', () {
+      KeepUntil? day(Object? raw) =>
+          GlobalConfig.fromMap({'TurnContentKeepUntil': raw})
+              .turnContentKeepUntil;
+      expect(day('07-01'), const KeepUntil(7, 1));
+      expect(day('6-30'), const KeepUntil(6, 30));
+      expect(day('31-12'), isNull);
+      expect(day(701), isNull);
+      expect(GlobalConfig.fromMap({}).turnContentKeepUntil, isNull);
+    });
+
+    test('is written only when set, as MM-DD, and survives a round trip', () {
+      final plain = const GlobalConfig(model: 'gpt-4o', apiKey: 'k').toMap();
+      expect(plain.containsKey('TurnContentKeepUntil'), isFalse);
+
+      const set = GlobalConfig(
+        model: 'gpt-4o',
+        apiKey: 'k',
+        turnContentKeepUntil: KeepUntil(6, 30),
+      );
+      expect(set.toMap()['TurnContentKeepUntil'], '06-30');
+      expect(
+        GlobalConfig.fromMap(set.toMap()).turnContentKeepUntil,
+        const KeepUntil(6, 30),
+      );
     });
   });
 }
