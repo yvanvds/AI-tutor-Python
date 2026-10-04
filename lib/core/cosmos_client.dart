@@ -30,7 +30,10 @@ const Duration _maxThrottleBackoff = Duration(seconds: 5);
 /// doesn't lose the student's answer. Cosmos' own guidance is to retry
 /// 449 ("RetryWith") and 503 immediately; 5xx in general is safe to retry
 /// because every write we do is an idempotent upsert / replace / delete
-/// or a batch that either commits or doesn't.
+/// or a batch that either commits or doesn't. One exception: a replace with
+/// `If-Match` (#223) whose first attempt did land answers its replay with a
+/// 412 — the caller has to tell its own write from someone else's
+/// (`AccountService._patchWith` does).
 const int _maxTransientRetries = 3;
 const Duration _kTransientRetryBaseDelay = Duration(milliseconds: 200);
 
@@ -72,6 +75,11 @@ class CosmosException implements Exception {
   bool get isAuthError => statusCode == 401 || statusCode == 403;
   bool get isThrottled => statusCode == 429;
   bool get isNotFound => statusCode == 404;
+
+  /// 412: a conditional write (`If-Match`, see [CosmosContainer.replace])
+  /// found the doc changed since it was read (#223). Nothing was written;
+  /// the caller reads again and decides anew.
+  bool get isPreconditionFailed => statusCode == 412;
 
   /// The container this call went to does not exist (#170) — see
   /// [kCosmosContainerNotFound].
@@ -454,17 +462,26 @@ class CosmosContainer {
   }
 
   /// Replaces an existing doc. Fails with 404 if the id is missing.
+  ///
+  /// With [ifMatch] — the `_etag` of the doc as it was read — the replace
+  /// lands only when nobody wrote the doc since (#223); otherwise Cosmos
+  /// answers 412, which surfaces as a [CosmosException] with
+  /// [CosmosException.isPreconditionFailed] and nothing is written.
   Future<Map<String, dynamic>> replace(
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
+    String? ifMatch,
   }) async {
     final response = await _client._send(
       verb: 'PUT',
       resourceType: 'docs',
       resourceLink: _docLink(id),
       pathSegment: _docPath(id),
-      extraHeaders: _pkHeader(partitionKey),
+      extraHeaders: {
+        ..._pkHeader(partitionKey),
+        if (ifMatch != null) 'If-Match': ifMatch,
+      },
       body: doc,
     );
     await _ensureOk(response);

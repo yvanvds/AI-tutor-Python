@@ -108,7 +108,8 @@ class _SlowContainer implements CosmosContainer {
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) => _inner.replace(id, doc, partitionKey: partitionKey);
+    String? ifMatch,
+  }) => _inner.replace(id, doc, partitionKey: partitionKey, ifMatch: ifMatch);
 
   @override
   Future<void> delete(String id, {required Object partitionKey}) =>

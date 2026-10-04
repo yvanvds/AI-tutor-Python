@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/mocks.dart';
 
 const _uid = 'oid-abc';
@@ -34,6 +35,42 @@ class _ControlledAuth extends AuthService {
   @override
   AccountIdentity? build() => null;
   void set(AccountIdentity? v) => state = v;
+}
+
+/// An accounts container whose first replace lands but whose answer is lost
+/// on the way back: the REST client replays the PUT, and the replay — with
+/// the same `If-Match` — meets the etag of the write it repeats (#223).
+class _LostAnswer implements CosmosContainer {
+  _LostAnswer(this.inner);
+  final CosmosContainer inner;
+  var lose = true;
+
+  @override
+  Future<Map<String, dynamic>> replace(
+    String id,
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+    String? ifMatch,
+  }) async {
+    final written = await inner.replace(
+      id,
+      doc,
+      partitionKey: partitionKey,
+      ifMatch: ifMatch,
+    );
+    if (!lose) return written;
+    lose = false;
+    return inner.replace(id, doc, partitionKey: partitionKey, ifMatch: ifMatch);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> read(
+    String id, {
+    required Object partitionKey,
+  }) => inner.read(id, partitionKey: partitionKey);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -991,6 +1028,186 @@ void main() {
       expect(pc.read(accountServiceProvider), isNull);
       // Also verify via the notifier's state alias for clarity.
       expect(svc.state, isNull);
+    });
+  });
+
+  group('two apps on one account doc (#223)', () {
+    late InMemoryCosmos accounts;
+
+    setUp(() {
+      accounts = InMemoryCosmos([
+        {
+          'id': _uid,
+          'uid': _uid,
+          'oefeningCount': 24,
+          'badges': {
+            'effort': {'tier': 1, 'earnedAt': '2026-10-01T00:00:00.000Z'},
+          },
+          'somethingNewer': 'kept',
+        },
+      ]);
+    });
+
+    /// An app of its own — its own provider container and write queue — on
+    /// the shared account docs; signed in as [who], or as nobody the doc
+    /// belongs to (the teacher's app).
+    Future<AccountService> app({
+      AccountIdentity? who,
+      CosmosContainer? container,
+    }) async {
+      final app = ProviderContainer(
+        overrides: [
+          authServiceProvider.overrideWith(_ControlledAuth.new),
+          accountServiceProvider.overrideWith(
+            () => AccountService(container: container ?? accounts.container),
+          ),
+        ],
+      );
+      addTearDown(app.dispose);
+      final svc = app.read(accountServiceProvider.notifier);
+      if (who != null) {
+        (app.read(authServiceProvider.notifier) as _ControlledAuth).set(who);
+        await Future<void>.delayed(Duration.zero);
+      }
+      return svc;
+    }
+
+    Map<String, dynamic> stored() => accounts[_uid]!;
+    Map<dynamic, dynamic> badges() => stored()['badges'] as Map;
+
+    const helpingHand = {
+      'count': 1,
+      'tier': 1,
+      'earnedAt': '2026-10-05T10:00:00.000Z',
+      'awardedBy': 'teacher',
+    };
+
+    test(
+      'the teacher gives a badge between the read and the replace of the '
+      "student's answer: neither the badge nor the oefening is lost",
+      () async {
+        final student = await app(who: _identity());
+        final teacher = await app();
+        int? given;
+        accounts.beforeReplace = (id, doc) async {
+          accounts.beforeReplace = null;
+          given = await teacher.awardTeacherBadge(
+            uid: _uid,
+            badgeId: 'teacher:helpingHand',
+            now: DateTime.utc(2026, 10, 5, 10),
+          );
+        };
+
+        await student.setCalibration(
+          StudentCalibration.fresh(),
+          countOefening: true,
+        );
+
+        expect(given, 1);
+        expect(badges()['teacher:helpingHand'], helpingHand);
+        expect(stored()['oefeningCount'], 25);
+        expect(stored()['calibration'], StudentCalibration.fresh().toJson());
+        expect(badges()['effort'], {
+          'tier': 1,
+          'earnedAt': '2026-10-01T00:00:00.000Z',
+        });
+        expect(stored()['somethingNewer'], 'kept');
+      },
+    );
+
+    test("the student's answer lands between the read and the replace of the "
+        "teacher's badge: neither is lost, and the count the teacher sees is "
+        'the one stored', () async {
+      final student = await app(who: _identity());
+      final teacher = await app();
+      accounts.beforeReplace = (id, doc) async {
+        accounts.beforeReplace = null;
+        await student.setCalibration(
+          StudentCalibration.fresh(),
+          countOefening: true,
+        );
+      };
+
+      final given = await teacher.awardTeacherBadge(
+        uid: _uid,
+        badgeId: 'teacher:helpingHand',
+        now: DateTime.utc(2026, 10, 5, 10),
+      );
+
+      expect(given, 1);
+      expect(badges()['teacher:helpingHand'], helpingHand);
+      expect(stored()['oefeningCount'], 25);
+      expect(stored()['calibration'], StudentCalibration.fresh().toJson());
+    });
+
+    test('a badge another laptop raised in between is raised there, not '
+        'announced again here', () async {
+      final here = await app(who: _identity());
+      final there = await app(who: _identity());
+      BadgeAward? raisedThere;
+      accounts.beforeReplace = (id, doc) async {
+        accounts.beforeReplace = null;
+        raisedThere = await there.awardBadges({
+          'effort': 2,
+        }, now: DateTime.utc(2026, 10, 5, 10));
+      };
+
+      final raisedHere = await here.awardBadges({
+        'effort': 2,
+      }, now: DateTime.utc(2026, 10, 5, 11));
+
+      expect(raisedThere!.raised, {'effort': 2});
+      expect(raisedHere!.raised, isEmpty);
+      expect(badges()['effort'], {
+        'tier': 2,
+        'earnedAt': '2026-10-05T10:00:00.000Z',
+      });
+    });
+
+    test('when others keep writing, it gives up after a few attempts with '
+        'the 412, like any failed write, and the next write still '
+        'goes', () async {
+      final student = await app(who: _identity());
+      var between = 0;
+      accounts.beforeReplace = (id, doc) async {
+        between++;
+        accounts.upsert(stored(), partitionKey: _uid);
+      };
+
+      await expectLater(
+        student.setCalibration(StudentCalibration.fresh(), countOefening: true),
+        throwsA(
+          isA<CosmosException>().having(
+            (e) => e.isPreconditionFailed,
+            'isPreconditionFailed',
+            isTrue,
+          ),
+        ),
+      );
+      expect(between, AccountService.maxPatchAttempts);
+      expect(stored()['oefeningCount'], 24);
+
+      accounts.beforeReplace = null;
+      await student.setCalibration(
+        StudentCalibration.fresh(),
+        countOefening: true,
+      );
+      expect(stored()['oefeningCount'], 25);
+    });
+
+    test("a write whose answer got lost is not applied twice: the replay's "
+        '412 is its own write', () async {
+      final student = await app(
+        who: _identity(),
+        container: _LostAnswer(accounts.container),
+      );
+
+      await student.setCalibration(
+        StudentCalibration.fresh(),
+        countOefening: true,
+      );
+
+      expect(stored()['oefeningCount'], 25);
     });
   });
 }

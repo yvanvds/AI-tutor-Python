@@ -231,7 +231,8 @@ class _CountingContainer implements CosmosContainer {
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) => inner.replace(id, doc, partitionKey: partitionKey);
+    String? ifMatch,
+  }) => inner.replace(id, doc, partitionKey: partitionKey, ifMatch: ifMatch);
 }
 
 /// A `questions` container whose queries never answer.
