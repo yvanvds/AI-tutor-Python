@@ -29,6 +29,10 @@
   "sidebar_section_questions": "Questions",
   "sidebar_section_instructions": "Instructions",
   "sidebar_section_students": "Students",
+  "sidebar_section_classes": "Classes",
+  "@sidebar_section_classes": {
+    "description": "Teacher section listing the classes with their weekly lessons (#218)"
+  },
   "sidebar_section_milestones": "Milestones",
   "sidebar_section_reports": "Reports",
   "sidebar_section_options": "Options",
@@ -1217,7 +1221,11 @@
   },
 
   "accounts_class_dialog_title": "Assign class",
-  "accounts_class_dialog_hint": "Class name (leave empty to clear)",
+  "accounts_class_choice_hint": "Choose a class",
+  "accounts_class_choice_none": "No class",
+  "accounts_class_choice_noClasses": "There are no classes yet. Add them on the Classes page.",
+  "accounts_class_choice_unlisted": "Not in the class list.",
+  "accounts_class_unlisted_tooltip": "This class is not in the class list. Add it on the Classes page, or choose a class from the list.",
   "accounts_class_dialog_cancel": "Cancel",
   "accounts_class_dialog_save": "Save",
   "accounts_class_saveFailed": "Could not save class: {error}",
@@ -1539,5 +1547,59 @@
   "questions_badge_found": "Found",
   "@questions_badge_found": {
     "description": "Badge on the card a lookup by ID found — displayed uppercase"
+  },
+  "classes_page_title": "Classes",
+  "classes_page_subtitle": "Every class with its students and its lessons each week. A student's class is chosen on the Students page.",
+  "classes_button_new": "New class",
+  "classes_list_empty": "No classes yet.",
+  "classes_studentCount": "{count, plural, =0{no students} =1{1 student} other{{count} students}}",
+  "@classes_studentCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "classes_unlisted_header": "On accounts, not in the list",
+  "@classes_unlisted_header": {
+    "description": "Above the class names that students' accounts carry but the class list does not have, each with an Add button"
+  },
+  "classes_unlisted_add": "Add",
+  "classes_placeholder": "Choose a class, or add one.",
+  "classes_rename_tooltip": "Rename",
+  "classes_delete_tooltip": "Delete",
+  "classes_delete_blocked_tooltip": "Only a class without students can be deleted",
+  "classes_lessons_header": "Lessons",
+  "classes_lessons_empty": "No lessons yet.",
+  "classes_lesson_add": "Add lesson",
+  "classes_lesson_weekday_tooltip": "Day",
+  "classes_lesson_start_tooltip": "Start",
+  "classes_lesson_end_tooltip": "End",
+  "classes_lesson_delete_tooltip": "Delete lesson",
+  "classes_lesson_endBeforeStart": "A lesson has to end after it starts.",
+  "classes_dialog_new_title": "New class",
+  "classes_dialog_rename_title": "Rename class",
+  "classes_dialog_name_label": "Class name",
+  "classes_dialog_rename_note": "{count, plural, =0{There are no students in this class.} =1{The student in this class moves along.} other{The {count} students in this class move along.}}",
+  "@classes_dialog_rename_note": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "classes_dialog_cancel": "Cancel",
+  "classes_dialog_save": "Save",
+  "classes_validation_empty": "Give the class a name.",
+  "classes_validation_taken": "There already is a class {name}.",
+  "@classes_validation_taken": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_delete_dialog_title": "Delete {name}?",
+  "@classes_delete_dialog_title": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_delete_dialog_body": "The class and its lessons are removed from the list.",
+  "classes_delete_dialog_cancel": "Cancel",
+  "classes_delete_dialog_confirm": "Delete",
+  "classes_delete_hasStudents": "{name} still has students. Put them in another class first.",
+  "@classes_delete_hasStudents": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "classes_actionFailed": "That did not work: {error}",
+  "@classes_actionFailed": {
+    "placeholders": { "error": { "type": "String" } }
   }
 }

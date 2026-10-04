@@ -24,6 +24,8 @@ enum SessionMode { explain, practice, playground }
 /// run and review surface (#148) — grades, so teacher-only like
 /// `milestones`. `questions` is the question bank (#185): every question the
 /// tutor generated, for the teacher to review and hide the bad ones.
+/// `classes` is the class list with each class's weekly lessons (#218), next
+/// to `students`: the Students page picks a student's class from it.
 ///
 /// `myReports` is the other end of that surface (#151): the reports #150
 /// released, as the student they belong to reads them. It is *not* a second
@@ -42,6 +44,7 @@ enum Section {
   questions,
   instructions,
   students,
+  classes,
   milestones,
   reports,
   options,
@@ -282,6 +285,8 @@ extension SectionLabel on Section {
         return l.sidebar_section_instructions;
       case Section.students:
         return l.sidebar_section_students;
+      case Section.classes:
+        return l.sidebar_section_classes;
       case Section.milestones:
         return l.sidebar_section_milestones;
       case Section.reports:
@@ -298,6 +303,7 @@ extension SectionLabel on Section {
       case Section.questions:
       case Section.instructions:
       case Section.students:
+      case Section.classes:
       case Section.milestones:
       case Section.reports:
         return true;

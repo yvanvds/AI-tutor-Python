@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
+import 'package:ai_tutor_python/features/classes/classes_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
@@ -140,6 +141,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const InstructionsEditorPage();
       case Section.students:
         return const AccountsPage();
+      case Section.classes:
+        return const ClassesPage();
       case Section.milestones:
         return const MilestonesPage();
       case Section.reports:

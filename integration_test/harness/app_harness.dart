@@ -592,22 +592,44 @@ Finder optionsScrollable() => find
     .descendant(of: find.byType(OptionsPage), matching: find.byType(Scrollable))
     .first;
 
-/// The Students page's free-text search box, and the class-name field of the
-/// "Assign class" dialog it opens (#158).
+/// The Students page's free-text search box, and the class choice of the
+/// "Assign class" dialog it opens (#158, #218).
 ///
 /// Same rule as [optionsScrollable], one level in: these two were
 /// `find.byType(TextField).first` and `.last`, which only worked because the
 /// page happens to lay its fields out in that order. Add one field above the
 /// search box, or leave a dialog open that keeps a field of its own, and the
 /// ordinal re-points at a different widget — the flow then fails somewhere
-/// unrelated, with nothing static to warn anyone. Both keys come from
-/// `lib/features/account/accounts_page.dart`, so the key guard in
+/// unrelated, with nothing static to warn anyone. Both keys come from lib/
+/// (`accounts_page.dart`, `class_choice_dialog.dart`), so the key guard in
 /// `test/tooling/integration_flow_symbols_test.dart` keeps them honest.
 Finder studentsSearchField() => find.byKey(const Key('students-search-field'));
 
-/// The class-name field of the "Assign class" dialog — the per-row one and
-/// the bulk one are the same widget. See [studentsSearchField].
-Finder classNameField() => find.byKey(const Key('class-name-field'));
+/// The class choice of the "Assign class" dialog — the per-row one and the
+/// bulk one are the same widget. Until #218 a typed class name; now a list
+/// of the classes on the Classes page, plus "No class". See
+/// [studentsSearchField].
+Finder classChoiceField() => find.byKey(const Key('class-choice'));
+
+/// Picks [className] — `''` for "No class" — in the open "Assign class"
+/// dialog, and saves (#218).
+///
+/// The menu's entry is the *last* copy of the label: the dialog's button may
+/// show the same text, and so may a class badge on the page behind it, but
+/// the menu is the route on top. Each tap gets the menu's open or close
+/// animation pumped through before the next, the way the Reports flow
+/// drives its class filter — the menu's barrier would otherwise take the
+/// tap meant for Save.
+Future<void> chooseClassAndSave(WidgetTester tester, String className) async {
+  await tester.tap(classChoiceField());
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.tap(find.text(className.isEmpty ? 'No class' : className).last);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.tap(find.byKey(const Key('class-choice-save')));
+  await tester.pump();
+}
 
 /// Pumps real frames until [condition] holds. Preferred over
 /// `pumpAndSettle` here: the code editor's cursor blink and the 5 s Cosmos

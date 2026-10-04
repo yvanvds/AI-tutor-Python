@@ -22,6 +22,7 @@ import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/chat_collapse.dart' as chat_collapse;
 import 'flows/chat_composer_growth.dart' as chat_composer_growth;
+import 'flows/classes_tab.dart' as classes_tab;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
@@ -137,6 +138,7 @@ void main() {
   goals_import_replace.main();
   students_class_filter.main();
   students_bulk_class.main();
+  classes_tab.main();
   students_current_goal.main();
   students_progress_column.main();
   students_sort.main();

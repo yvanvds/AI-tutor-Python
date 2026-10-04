@@ -194,6 +194,12 @@ abstract class AppLocalizations {
   /// **'Students'**
   String get sidebar_section_students;
 
+  /// Teacher section listing the classes with their weekly lessons (#218)
+  ///
+  /// In en, this message translates to:
+  /// **'Classes'**
+  String get sidebar_section_classes;
+
   /// No description provided for @sidebar_section_milestones.
   ///
   /// In en, this message translates to:
@@ -3594,11 +3600,35 @@ abstract class AppLocalizations {
   /// **'Assign class'**
   String get accounts_class_dialog_title;
 
-  /// No description provided for @accounts_class_dialog_hint.
+  /// No description provided for @accounts_class_choice_hint.
   ///
   /// In en, this message translates to:
-  /// **'Class name (leave empty to clear)'**
-  String get accounts_class_dialog_hint;
+  /// **'Choose a class'**
+  String get accounts_class_choice_hint;
+
+  /// No description provided for @accounts_class_choice_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No class'**
+  String get accounts_class_choice_none;
+
+  /// No description provided for @accounts_class_choice_noClasses.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no classes yet. Add them on the Classes page.'**
+  String get accounts_class_choice_noClasses;
+
+  /// No description provided for @accounts_class_choice_unlisted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in the class list.'**
+  String get accounts_class_choice_unlisted;
+
+  /// No description provided for @accounts_class_unlisted_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'This class is not in the class list. Add it on the Classes page, or choose a class from the list.'**
+  String get accounts_class_unlisted_tooltip;
 
   /// No description provided for @accounts_class_dialog_cancel.
   ///
@@ -4685,6 +4715,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Found'**
   String get questions_badge_found;
+
+  /// No description provided for @classes_page_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Classes'**
+  String get classes_page_title;
+
+  /// No description provided for @classes_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every class with its students and its lessons each week. A student\'s class is chosen on the Students page.'**
+  String get classes_page_subtitle;
+
+  /// No description provided for @classes_button_new.
+  ///
+  /// In en, this message translates to:
+  /// **'New class'**
+  String get classes_button_new;
+
+  /// No description provided for @classes_list_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No classes yet.'**
+  String get classes_list_empty;
+
+  /// No description provided for @classes_studentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{no students} =1{1 student} other{{count} students}}'**
+  String classes_studentCount(int count);
+
+  /// Above the class names that students' accounts carry but the class list does not have, each with an Add button
+  ///
+  /// In en, this message translates to:
+  /// **'On accounts, not in the list'**
+  String get classes_unlisted_header;
+
+  /// No description provided for @classes_unlisted_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get classes_unlisted_add;
+
+  /// No description provided for @classes_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a class, or add one.'**
+  String get classes_placeholder;
+
+  /// No description provided for @classes_rename_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get classes_rename_tooltip;
+
+  /// No description provided for @classes_delete_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get classes_delete_tooltip;
+
+  /// No description provided for @classes_delete_blocked_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a class without students can be deleted'**
+  String get classes_delete_blocked_tooltip;
+
+  /// No description provided for @classes_lessons_header.
+  ///
+  /// In en, this message translates to:
+  /// **'Lessons'**
+  String get classes_lessons_header;
+
+  /// No description provided for @classes_lessons_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No lessons yet.'**
+  String get classes_lessons_empty;
+
+  /// No description provided for @classes_lesson_add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add lesson'**
+  String get classes_lesson_add;
+
+  /// No description provided for @classes_lesson_weekday_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get classes_lesson_weekday_tooltip;
+
+  /// No description provided for @classes_lesson_start_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get classes_lesson_start_tooltip;
+
+  /// No description provided for @classes_lesson_end_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get classes_lesson_end_tooltip;
+
+  /// No description provided for @classes_lesson_delete_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete lesson'**
+  String get classes_lesson_delete_tooltip;
+
+  /// No description provided for @classes_lesson_endBeforeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'A lesson has to end after it starts.'**
+  String get classes_lesson_endBeforeStart;
+
+  /// No description provided for @classes_dialog_new_title.
+  ///
+  /// In en, this message translates to:
+  /// **'New class'**
+  String get classes_dialog_new_title;
+
+  /// No description provided for @classes_dialog_rename_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename class'**
+  String get classes_dialog_rename_title;
+
+  /// No description provided for @classes_dialog_name_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Class name'**
+  String get classes_dialog_name_label;
+
+  /// No description provided for @classes_dialog_rename_note.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{There are no students in this class.} =1{The student in this class moves along.} other{The {count} students in this class move along.}}'**
+  String classes_dialog_rename_note(int count);
+
+  /// No description provided for @classes_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get classes_dialog_cancel;
+
+  /// No description provided for @classes_dialog_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get classes_dialog_save;
+
+  /// No description provided for @classes_validation_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the class a name.'**
+  String get classes_validation_empty;
+
+  /// No description provided for @classes_validation_taken.
+  ///
+  /// In en, this message translates to:
+  /// **'There already is a class {name}.'**
+  String classes_validation_taken(String name);
+
+  /// No description provided for @classes_delete_dialog_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String classes_delete_dialog_title(String name);
+
+  /// No description provided for @classes_delete_dialog_body.
+  ///
+  /// In en, this message translates to:
+  /// **'The class and its lessons are removed from the list.'**
+  String get classes_delete_dialog_body;
+
+  /// No description provided for @classes_delete_dialog_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get classes_delete_dialog_cancel;
+
+  /// No description provided for @classes_delete_dialog_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get classes_delete_dialog_confirm;
+
+  /// No description provided for @classes_delete_hasStudents.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} still has students. Put them in another class first.'**
+  String classes_delete_hasStudents(String name);
+
+  /// No description provided for @classes_actionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not work: {error}'**
+  String classes_actionFailed(String error);
 }
 
 class _AppLocalizationsDelegate

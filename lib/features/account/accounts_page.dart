@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/date_format.dart';
+import 'package:ai_tutor_python/features/account/class_choice_dialog.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/account/students_selection.dart';
 import 'package:ai_tutor_python/features/account/students_sort.dart';
@@ -10,6 +11,8 @@ import 'package:ai_tutor_python/features/account/token_usage_card.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/classes/classes_service.dart';
+import 'package:ai_tutor_python/services/classes/school_class.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
@@ -93,6 +96,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The class list (#218): what a student's class is chosen from, and what
+    // an account's class is checked against. `null` while it loads — then no
+    // class is flagged, rather than every class for one poll.
+    final classList = ref.watch(classesServiceProvider);
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.ink0,
@@ -132,6 +139,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                             accountsSnap: accountsSnap,
                             progressByUid: progressSnap.data ?? const {},
                             goals: goalsSnap.data ?? const [],
+                            classList: classList,
                           );
                         },
                       );
@@ -150,6 +158,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     required AsyncSnapshot<List<Account>> accountsSnap,
     required Map<String, List<Progress>> progressByUid,
     required List<Goal> goals,
+    required ClassList? classList,
   }) {
     if (accountsSnap.connectionState == ConnectionState.waiting) {
       return const Center(child: CircularProgressIndicator());
@@ -222,6 +231,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           child: _buildAccountsTable(
             page.items,
             filteredUids: [for (final r in filtered) r.account.uid],
+            classList: classList,
           ),
         ),
         _buildPaginationBar(page),
@@ -457,6 +467,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   Widget _buildAccountsTable(
     List<StudentRowData> pageItems, {
     required List<String> filteredUids,
+    required ClassList? classList,
   }) {
     return Scrollbar(
       controller: _hCtrl,
@@ -550,7 +561,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                         DataColumn(label: Text(l.accounts_column_key)),
                         DataColumn(label: Text(l.accounts_column_actions)),
                       ],
-                      rows: pageItems.map(_buildAccountRow).toList(),
+                      rows: [
+                        for (final row in pageItems)
+                          _buildAccountRow(row, classList: classList),
+                      ],
                     );
                   },
                 ),
@@ -562,7 +576,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  DataRow _buildAccountRow(StudentRowData row) {
+  DataRow _buildAccountRow(
+    StudentRowData row, {
+    required ClassList? classList,
+  }) {
     // All derived values (goal titles, active-root progress (#89), status)
     // were computed once per account in `_buildContent` so sorting and
     // rendering agree by construction (#87).
@@ -599,7 +616,17 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
         DataCell(_EmailCell(email: a.email, lastActive: lastActiveStr)),
         DataCell(Text(fullName.isEmpty ? '—' : fullName)),
         DataCell(
-          _ClassBadge(key: Key('class-cell-${a.uid}'), className: a.className),
+          _ClassBadge(
+            key: Key('class-cell-${a.uid}'),
+            uid: a.uid,
+            className: a.className,
+            // A name typed before the class list existed, or a class since
+            // renamed or removed: shown as it is, with a warning (#218).
+            unlisted:
+                classList != null &&
+                a.className.isNotEmpty &&
+                !classList.contains(a.className),
+          ),
           showEditIcon: true,
           onTap: () => _editClass(a),
         ),
@@ -690,19 +717,23 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  /// Opens the class-assignment dialog once and persists the result to every
-  /// selected account (#91) — one [AccountService.setClassName] patch per
-  /// account, same as the per-row edit. Saving an empty name clears the
-  /// assignment for all of them. On a failure the loop stops and the
-  /// selection is kept so the teacher can retry; accounts patched before the
-  /// failure keep their new class (each patch is independent).
+  /// The classes a student can be put in (#218), as the dialog offers them.
+  List<String> get _classChoices =>
+      ref.read(classesServiceProvider)?.names ?? const [];
+
+  /// Opens the class choice once and persists the result to every selected
+  /// account (#91) — one [AccountService.setClassName] patch per account,
+  /// same as the per-row edit. Choosing "no class" clears the assignment for
+  /// all of them. On a failure the loop stops and the selection is kept so
+  /// the teacher can retry; accounts patched before the failure keep their
+  /// new class (each patch is independent).
   Future<void> _bulkAssignClass() async {
     final messenger = ScaffoldMessenger.of(context);
     final l = AppLocalizations.of(context);
     final uids = _selectedUids.toList();
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => const _ClassNameDialog(initial: ''),
+      builder: (_) => ClassChoiceDialog(classNames: _classChoices),
     );
     if (result == null) return;
     final service = ref.read(accountServiceProvider.notifier);
@@ -722,16 +753,18 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     );
   }
 
-  /// Opens the class-assignment dialog for one student and persists the
-  /// result. Saving an empty name clears the assignment.
+  /// Opens the class choice for one student and persists the result.
+  /// Choosing "no class" clears the assignment.
   Future<void> _editClass(Account a) async {
     final messenger = ScaffoldMessenger.of(context);
     final l = AppLocalizations.of(context);
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => _ClassNameDialog(initial: a.className),
+      builder: (_) =>
+          ClassChoiceDialog(classNames: _classChoices, initial: a.className),
     );
-    if (result == null) return;
+    // Cancelled, or the class it already had: nothing to write.
+    if (result == null || result == a.className) return;
     try {
       await ref
           .read(accountServiceProvider.notifier)
@@ -828,18 +861,26 @@ class _PageHeader extends StatelessWidget {
 }
 
 /// Class tag shown in the students table: a small pill when assigned,
-/// a faint dash when not.
+/// a faint dash when not. A class that is not in the class list (#218) keeps
+/// its pill, with a warning next to it.
 class _ClassBadge extends StatelessWidget {
-  const _ClassBadge({super.key, required this.className});
+  const _ClassBadge({
+    super.key,
+    required this.uid,
+    required this.className,
+    required this.unlisted,
+  });
 
+  final String uid;
   final String className;
+  final bool unlisted;
 
   @override
   Widget build(BuildContext context) {
     if (className.isEmpty) {
       return Text('—', style: TextStyle(color: AppColors.fgFaint));
     }
-    return Container(
+    final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.ink2,
@@ -854,65 +895,20 @@ class _ClassBadge extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Modal editor for one student's class name. Owns its text controller so
-/// disposal happens with the dialog's own lifecycle, not mid-animation.
-class _ClassNameDialog extends StatefulWidget {
-  const _ClassNameDialog({required this.initial});
-
-  final String initial;
-
-  @override
-  State<_ClassNameDialog> createState() => _ClassNameDialogState();
-}
-
-class _ClassNameDialogState extends State<_ClassNameDialog> {
-  late final TextEditingController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.initial);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l.accounts_class_dialog_title),
-      content: SizedBox(
-        width: 320,
-        child: TextField(
-          // Named for the same reason as the search box above (#158): the
-          // page behind this dialog has a TextField of its own, so a flow
-          // reaching for `.last` was only ever right by accident.
-          key: const Key('class-name-field'),
-          controller: _ctrl,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: l.accounts_class_dialog_hint,
-            border: const OutlineInputBorder(),
-            isDense: true,
+    if (!unlisted) return pill;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        pill,
+        const SizedBox(width: AppSpacing.xs),
+        Tooltip(
+          message: AppLocalizations.of(context).accounts_class_unlisted_tooltip,
+          child: Icon(
+            Icons.warning_amber_rounded,
+            key: Key('class-unlisted-$uid'),
+            size: 16,
+            color: AppColors.accent2,
           ),
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.accounts_class_dialog_cancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _ctrl.text),
-          child: Text(l.accounts_class_dialog_save),
         ),
       ],
     );

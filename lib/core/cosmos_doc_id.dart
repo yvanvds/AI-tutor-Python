@@ -47,5 +47,9 @@ class CosmosDocId {
   /// Single global config doc.
   static const String globalConfig = 'global';
 
+  /// The school's classes and their lessons (#218), next to [globalConfig]
+  /// in the `config` container.
+  static const String classes = 'classes';
+
   static final Random _random = Random();
 }

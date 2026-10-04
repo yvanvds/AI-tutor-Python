@@ -58,6 +58,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get sidebar_section_students => 'Studenten';
 
   @override
+  String get sidebar_section_classes => 'Klassen';
+
+  @override
   String get sidebar_section_milestones => 'Mijlpalen';
 
   @override
@@ -2166,7 +2169,22 @@ class AppLocalizationsNl extends AppLocalizations {
   String get accounts_class_dialog_title => 'Klas toewijzen';
 
   @override
-  String get accounts_class_dialog_hint => 'Klasnaam (leeg laten om te wissen)';
+  String get accounts_class_choice_hint => 'Kies een klas';
+
+  @override
+  String get accounts_class_choice_none => 'Geen klas';
+
+  @override
+  String get accounts_class_choice_noClasses =>
+      'Er zijn nog geen klassen. Voeg ze toe bij Klassen.';
+
+  @override
+  String get accounts_class_choice_unlisted =>
+      'Staat niet in de lijst met klassen.';
+
+  @override
+  String get accounts_class_unlisted_tooltip =>
+      'Deze klas staat niet in de lijst met klassen. Voeg ze toe bij Klassen, of kies een klas uit de lijst.';
 
   @override
   String get accounts_class_dialog_cancel => 'Annuleer';
@@ -2844,4 +2862,133 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get questions_badge_found => 'Gevonden';
+
+  @override
+  String get classes_page_title => 'Klassen';
+
+  @override
+  String get classes_page_subtitle =>
+      'Elke klas met haar leerlingen en haar lessen per week. De klas van een leerling kies je bij Studenten.';
+
+  @override
+  String get classes_button_new => 'Nieuwe klas';
+
+  @override
+  String get classes_list_empty => 'Nog geen klassen.';
+
+  @override
+  String classes_studentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count leerlingen',
+      one: '1 leerling',
+      zero: 'geen leerlingen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_unlisted_header => 'Op accounts, nog niet in de lijst';
+
+  @override
+  String get classes_unlisted_add => 'Toevoegen';
+
+  @override
+  String get classes_placeholder => 'Kies een klas, of voeg er een toe.';
+
+  @override
+  String get classes_rename_tooltip => 'Hernoemen';
+
+  @override
+  String get classes_delete_tooltip => 'Verwijderen';
+
+  @override
+  String get classes_delete_blocked_tooltip =>
+      'Alleen een klas zonder leerlingen kan verwijderd worden';
+
+  @override
+  String get classes_lessons_header => 'Lessen';
+
+  @override
+  String get classes_lessons_empty => 'Nog geen lessen.';
+
+  @override
+  String get classes_lesson_add => 'Les toevoegen';
+
+  @override
+  String get classes_lesson_weekday_tooltip => 'Dag';
+
+  @override
+  String get classes_lesson_start_tooltip => 'Begin';
+
+  @override
+  String get classes_lesson_end_tooltip => 'Einde';
+
+  @override
+  String get classes_lesson_delete_tooltip => 'Les verwijderen';
+
+  @override
+  String get classes_lesson_endBeforeStart =>
+      'Een les moet eindigen na haar begin.';
+
+  @override
+  String get classes_dialog_new_title => 'Nieuwe klas';
+
+  @override
+  String get classes_dialog_rename_title => 'Klas hernoemen';
+
+  @override
+  String get classes_dialog_name_label => 'Klasnaam';
+
+  @override
+  String classes_dialog_rename_note(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'De $count leerlingen van deze klas verhuizen mee.',
+      one: 'De leerling van deze klas verhuist mee.',
+      zero: 'Er zitten geen leerlingen in deze klas.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_dialog_cancel => 'Annuleer';
+
+  @override
+  String get classes_dialog_save => 'Opslaan';
+
+  @override
+  String get classes_validation_empty => 'Geef de klas een naam.';
+
+  @override
+  String classes_validation_taken(String name) {
+    return 'Er is al een klas $name.';
+  }
+
+  @override
+  String classes_delete_dialog_title(String name) {
+    return '$name verwijderen?';
+  }
+
+  @override
+  String get classes_delete_dialog_body =>
+      'De klas en haar lessen verdwijnen uit de lijst.';
+
+  @override
+  String get classes_delete_dialog_cancel => 'Annuleer';
+
+  @override
+  String get classes_delete_dialog_confirm => 'Verwijderen';
+
+  @override
+  String classes_delete_hasStudents(String name) {
+    return 'In $name zitten nog leerlingen. Zet ze eerst in een andere klas.';
+  }
+
+  @override
+  String classes_actionFailed(String error) {
+    return 'Dat lukte niet: $error';
+  }
 }

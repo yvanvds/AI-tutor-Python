@@ -61,7 +61,8 @@ class CosmosPaths {
   static CosmosContainer instructions() =>
       _client.container(_instructionsContainer);
 
-  /// `/type` partition (always `"config"`). Single doc with id `global`.
+  /// `/type` partition (always `"config"`). Two docs: `global` (the school
+  /// settings) and `classes` (the classes and their lessons, #218).
   static CosmosContainer config() => _client.container(_configContainer);
 
   /// `/type` partition (always `"content"`). One doc per authored

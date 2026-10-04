@@ -101,6 +101,8 @@ lib/
 │   ├── config/                  # GlobalConfigService, AzureConfig (envied), LocalApiKeyStorage,
 │   │                            #   LocaleService (#23), ThemeService + resolveAppPalette (#32),
 │   │                            #   ModelPreference — per-device model override (#32)
+│   ├── classes/                 # NEW (#218) — SchoolClass / LessonSlot / ClassList (the config/classes
+│   │                            #   doc), ClassesService + classesServiceProvider, classLessonsProvider
 │   ├── github/                  # NEW (#57) — GitHubDeviceFlow (OAuth device flow, scope public_repo),
 │   │                            #   GitHubIssueService, GitHubOAuthConfig (envied GITHUB_OAUTH_CLIENT_ID)
 │   ├── playground/              # NEW — PlaygroundFileStore (#19) + PlaygroundFilesService and
@@ -224,8 +226,10 @@ lib/
 │   │
 │   ├── goals/                          # Teacher: goal-tree CRUD + reparent + DnD; new export/import buttons (v2 JSON envelope; Add vs Replace; preserves contentId); goal_form has inline _LesinhoudRow that opens Lesinhoud, and a language picker for title + description (#210)
 │   ├── instructions/                   # Teacher: doc/section editor over instructions/{id}.sections{}
+│   ├── classes/classes_page.dart       # NEW (#218) — Teacher "Klassen": class list with student counts, one-click add for names on accounts, rename (moves the students), delete when empty, weekly lessons (weekday + time picker)
 │   └── account/
 │       ├── accounts_page.dart          # Teacher: paginated DataTable; status dot + unacknowledged signal-event badge per student; helpers _activeRootTitle / _overallRootProgress
+│       ├── class_choice_dialog.dart    # NEW (#218) — a student's class from the class list, plus "geen klas" (row cell and bulk assignment)
 │       └── detail/                     # Right-hand peek drawer for one student
 │           ├── student_detail_drawer.dart       # Hosts the four sections below
 │           ├── student_status_summary.dart      # One-line "Recent actief op X" / "Geen recente activiteit"
@@ -279,6 +283,7 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
 - `firstName: string`, `lastName: string`
 - `targetGoal: string` (a goal id; written but not currently read by selection logic)
 - `mayUseGlobalKey: bool`
+- `className: string` (#86) — the student's class, `''` for none. Since #218 chosen from the class list (`config/classes`) instead of typed; the name itself stays the key, so the Students and Reports filters and `tooling/evaluation` still look classes up by this text.
 - `createdAt: string` (ISO 8601), `updatedAt: string` (ISO 8601)
 - **`calibration: object`** — embedded `StudentCalibration` (STUDENT_MODEL §"Account doc"):
   - `difficulty: 'easy' | 'medium' | 'hard'` — current difficulty notch (defaults to `medium`)
@@ -345,10 +350,15 @@ The LO-belief redesign added four new containers (`content`, `modules`, `lo_beli
 - `sections: map<string, string>`
 - `updatedAt: string`
 
-**`config`** — single doc with id `global`. `type: "config"`. Model: [services/config/global_config.dart](lib/services/config/global_config.dart).
+**`config`** — two docs, `type: "config"`: `global` and, since #218, `classes`. Model of `global`: [services/config/global_config.dart](lib/services/config/global_config.dart).
 - `Model: string` (OpenAI model id, e.g. `gpt-4o`)
 - `ApiKey: string` (parsed but not used by `OpenaiConnector`)
 - `MinimumVersion: string?` *(new, #165)* — the oldest build allowed to run (`2.6.0`, or `2.6.0+23` to name a build), set from the Cosmos portal like `ApiKey`. Read by [core/update_required.dart](lib/core/update_required.dart): a build below it gets `UpdateRequiredScreen` instead of the shell. Absent or blank means no minimum; a value that does not parse is logged and ignored.
+
+`config/classes` *(new, #218)* — the school's classes. Model: [services/classes/school_class.dart](lib/services/classes/school_class.dart); service: [classes_service.dart](lib/services/classes/classes_service.dart).
+- `classes: [{name, lessons: [{weekday, start, end}]}]` — `weekday` ISO (1 = Monday … 7), `start` / `end` `"HH:MM"` in **local wall-clock time**, never UTC (a lesson must not move by an hour when the clock changes). Sorted by name; lessons in week order; an entry that cannot be a lesson is skipped on read.
+- Written only by the teacher's Klassen page (`Section.classes`), always read-modify-write of the stored doc (unknown fields kept, `global` untouched); created on the first write. Names are unique up to case. Renaming a class first moves its students (one `AccountService.setClassName` per account, like the bulk assignment of #91), then the list entry; deleting is offered only for a class without students.
+- Read through `classesServiceProvider` (`ClassList?`, polled; `null` until the first read, `ClassList.empty` without the doc) and `classLessonsProvider(className)`; `ClassList.isDuringLesson(className, at, margin:)` / `LessonSlot.contains` answer whether a moment, compared in local time, falls in a lesson — for supervision from the timetable (#219) and the lesson badges (#220).
 
 ### Identity & roles
 
@@ -377,7 +387,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 
 [features/shell/app_shell.dart](lib/features/shell/app_shell.dart) is the top-level Scaffold. It composes:
 
-- A 72px [Sidebar](lib/features/shell/sidebar.dart) with two student sections (`Sessie`, `Leerpad`) and, for teachers only, a `Docent` group (`Doelen`, `Lesinhoud`, `Instructies`, `Studenten`). An options button at the foot opens `Section.options`, which is where language, appearance, progress export/import, bug reports and — behind `developerToolsProvider` — the former debug tools now live (#25, #26, #32).
+- A 72px [Sidebar](lib/features/shell/sidebar.dart) with two student sections (`Sessie`, `Leerpad`) and, for teachers only, a `Docent` group (`Doelen`, `Lesinhoud`, `Instructies`, `Studenten`, `Klassen` (#218)). An options button at the foot opens `Section.options`, which is where language, appearance, progress export/import, bug reports and — behind `developerToolsProvider` — the former debug tools now live (#25, #26, #32).
 - A [TopBar](lib/features/shell/top_bar.dart) with three slots: a `Hoi {name}` greeting + subline on the left, a centred `ModeSwitcher` pill (visible only in `Section.session`), and a `StatStrip` with a streak chip and an XP/level pill on the right (fed by `xpStateProvider` and `Account.streakDays`). A 2px gradient `AmbientProgress` line sits along the very top edge.
 - The active body, switched on `sectionProvider`: `SessionView`, `LeerpadPage`, `GoalsPage`, `LessonContentPage`, `InstructionsEditorPage`, `AccountsPage`, or `OptionsPage`. [UpdateOfferBar](lib/widgets/update_status.dart) is inserted above the body while `UpdateState.isOffering` (#48). If a teacher-only section is selected and the user is not a teacher, the shell bounces back to `Section.session`.
 - Two stacked overlays: [GoalSplashOverlay](lib/widgets/goal_splash_overlay.dart) and [LevelUpOverlay](lib/widgets/level_up_overlay.dart). Both get the goal's id with its Dutch text and name the goal in the app language when they render (#211), as do the warm-up, recheck and "new goal selected" (#212) pills in chat (`ChatNotice.goalId`).
@@ -447,7 +457,7 @@ This is the heart of the redesign — the previous three-phase (guiding/warm-up/
 - **Goal authoring:** [features/goals/goals_page.dart](lib/features/goals/goals_page.dart) — three-pane layout (roots / children / editor) with drag-and-drop reparent and reorder. Subtree backup/restore lives in [goals_service.dart](lib/services/goal/goals_service.dart). Reorder and subtree-delete use a Cosmos transactional batch since every doc shares the `/type = "goal"` partition. New **Export goals** / **Import goals** actions serialize to a v2 JSON envelope (`{version: 2, exportedAt, goals: [{goal, subgoals}, …]}`) including `moduleId`, `teachingTips`, `allowChains`, `objectives[]`, and `contentId`. Import offers two modes: **Add** (strict — aborts on any id collision) and **Replace** (upserts by id while preserving each existing `contentId` link, then deletes any goals not in the imported file). The subgoal editor surfaces an inline `_LesinhoudRow` showing whether authored content exists with a one-click handoff to the Lesinhoud page.
 - **Lesinhoud:** [features/lesson_content/lesson_content_page.dart](lib/features/lesson_content/lesson_content_page.dart) — see "Lesson content authoring" above.
 - **AI-instruction authoring:** [features/instructions/instructions_editor_page.dart](lib/features/instructions/instructions_editor_page.dart) — left pane lists instruction docs, middle lists named sections, right is a markdown `CodeField` editor. Save persists the whole `sections` map back to Cosmos. Supports importing/exporting Markdown via `file_picker`.
-- **Account admin:** [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable` with columns EMAIL (with "last active" subtext), NAAM, STREAK (placeholder em-dash), HUIDIG DOEL (computed via `_activeRootTitle`), VOORTGANG (bar + % via `_overallRootProgress`), STATUS (active/idle dot + red badge with unacknowledged-strong-event count from `TurnHistoryService.watchStrongUnacknowledgedFor(uid)`), SLEUTEL (global-key switch), ACTIES (delete). Tapping a row opens [features/account/detail/student_detail_drawer.dart](lib/features/account/detail/student_detail_drawer.dart), which composes:
+- **Account admin:** [features/account/accounts_page.dart](lib/features/account/accounts_page.dart) — paginated `DataTable` with columns EMAIL (with "last active" subtext), NAAM, STREAK (placeholder em-dash), HUIDIG DOEL (computed via `_activeRootTitle`), VOORTGANG (bar + % via `_overallRootProgress`), STATUS (active/idle dot + red badge with unacknowledged-strong-event count from `TurnHistoryService.watchStrongUnacknowledgedFor(uid)`), SLEUTEL (global-key switch), ACTIES (delete). The KLAS cell and the bulk "Klas toewijzen" (#91) open `ClassChoiceDialog`: a class from the class list or "geen klas" (#218); a class on an account that is not in the list is shown as it is, with a warning. Tapping a row opens [features/account/detail/student_detail_drawer.dart](lib/features/account/detail/student_detail_drawer.dart), which composes:
   - [student_status_summary.dart](lib/features/account/detail/student_status_summary.dart) — one-line "Recent actief op X" / "Geen recente activiteit" header.
   - [signal_events_section.dart](lib/features/account/detail/signal_events_section.dart) *(new)* — strong + audit events from `turn_history`, newest-first; severity dot + Dutch label per `TurnSignalEventKind`; "Bevestigen (n)" button calls `acknowledgeAllFor(uid)`.
   - The read-only goal/progress list (older `GoalTile` view).

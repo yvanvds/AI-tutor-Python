@@ -58,6 +58,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebar_section_students => 'Students';
 
   @override
+  String get sidebar_section_classes => 'Classes';
+
+  @override
   String get sidebar_section_milestones => 'Milestones';
 
   @override
@@ -2145,7 +2148,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accounts_class_dialog_title => 'Assign class';
 
   @override
-  String get accounts_class_dialog_hint => 'Class name (leave empty to clear)';
+  String get accounts_class_choice_hint => 'Choose a class';
+
+  @override
+  String get accounts_class_choice_none => 'No class';
+
+  @override
+  String get accounts_class_choice_noClasses =>
+      'There are no classes yet. Add them on the Classes page.';
+
+  @override
+  String get accounts_class_choice_unlisted => 'Not in the class list.';
+
+  @override
+  String get accounts_class_unlisted_tooltip =>
+      'This class is not in the class list. Add it on the Classes page, or choose a class from the list.';
 
   @override
   String get accounts_class_dialog_cancel => 'Cancel';
@@ -2815,4 +2832,133 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get questions_badge_found => 'Found';
+
+  @override
+  String get classes_page_title => 'Classes';
+
+  @override
+  String get classes_page_subtitle =>
+      'Every class with its students and its lessons each week. A student\'s class is chosen on the Students page.';
+
+  @override
+  String get classes_button_new => 'New class';
+
+  @override
+  String get classes_list_empty => 'No classes yet.';
+
+  @override
+  String classes_studentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count students',
+      one: '1 student',
+      zero: 'no students',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_unlisted_header => 'On accounts, not in the list';
+
+  @override
+  String get classes_unlisted_add => 'Add';
+
+  @override
+  String get classes_placeholder => 'Choose a class, or add one.';
+
+  @override
+  String get classes_rename_tooltip => 'Rename';
+
+  @override
+  String get classes_delete_tooltip => 'Delete';
+
+  @override
+  String get classes_delete_blocked_tooltip =>
+      'Only a class without students can be deleted';
+
+  @override
+  String get classes_lessons_header => 'Lessons';
+
+  @override
+  String get classes_lessons_empty => 'No lessons yet.';
+
+  @override
+  String get classes_lesson_add => 'Add lesson';
+
+  @override
+  String get classes_lesson_weekday_tooltip => 'Day';
+
+  @override
+  String get classes_lesson_start_tooltip => 'Start';
+
+  @override
+  String get classes_lesson_end_tooltip => 'End';
+
+  @override
+  String get classes_lesson_delete_tooltip => 'Delete lesson';
+
+  @override
+  String get classes_lesson_endBeforeStart =>
+      'A lesson has to end after it starts.';
+
+  @override
+  String get classes_dialog_new_title => 'New class';
+
+  @override
+  String get classes_dialog_rename_title => 'Rename class';
+
+  @override
+  String get classes_dialog_name_label => 'Class name';
+
+  @override
+  String classes_dialog_rename_note(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count students in this class move along.',
+      one: 'The student in this class moves along.',
+      zero: 'There are no students in this class.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get classes_dialog_cancel => 'Cancel';
+
+  @override
+  String get classes_dialog_save => 'Save';
+
+  @override
+  String get classes_validation_empty => 'Give the class a name.';
+
+  @override
+  String classes_validation_taken(String name) {
+    return 'There already is a class $name.';
+  }
+
+  @override
+  String classes_delete_dialog_title(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get classes_delete_dialog_body =>
+      'The class and its lessons are removed from the list.';
+
+  @override
+  String get classes_delete_dialog_cancel => 'Cancel';
+
+  @override
+  String get classes_delete_dialog_confirm => 'Delete';
+
+  @override
+  String classes_delete_hasStudents(String name) {
+    return '$name still has students. Put them in another class first.';
+  }
+
+  @override
+  String classes_actionFailed(String error) {
+    return 'That did not work: $error';
+  }
 }
