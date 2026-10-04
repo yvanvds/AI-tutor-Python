@@ -44,6 +44,9 @@ class Sidebar extends ConsumerWidget {
   static const _studentSections = [
     Section.session,
     Section.map,
+    // The student's badges (#220), next to the learning path. Student-only,
+    // like "My reports".
+    Section.trophies,
     Section.puntenformule,
     Section.myReports,
   ];
@@ -160,6 +163,8 @@ class Sidebar extends ConsumerWidget {
         return Icons.terminal_outlined;
       case Section.map:
         return Icons.insights_outlined;
+      case Section.trophies:
+        return Icons.emoji_events_outlined;
       case Section.puntenformule:
         return Icons.calculate_outlined;
       case Section.myReports:

@@ -255,6 +255,33 @@ void main() {
     expect(container.read(sectionProvider), Section.myReports);
   });
 
+  testWidgets('a student has the trophy case right under the learning path, '
+      'and tapping it routes to the section (#220)', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+
+    final entry = find.byTooltip('Trophy case');
+    expect(entry, findsOneWidget);
+    expect(
+      tester.getTopLeft(entry).dy,
+      greaterThan(tester.getTopLeft(find.byTooltip('Learning path')).dy),
+    );
+    expect(
+      tester.getTopLeft(entry).dy,
+      lessThan(tester.getTopLeft(find.byTooltip('Grade formula')).dy),
+    );
+
+    await tester.tap(entry);
+    await tester.pump();
+    expect(containerOf(tester).read(sectionProvider), Section.trophies);
+  });
+
+  testWidgets('a teacher has no trophy case entry: no badges, and the rail '
+      'keeps its slack (#220)', (tester) async {
+    await mount(tester, profile: _teacher, devTools: true);
+
+    expect(find.byTooltip('Trophy case'), findsNothing);
+  });
+
   testWidgets('a teacher gets the class-wide Reports and not My reports', (
     tester,
   ) async {
@@ -395,8 +422,14 @@ void main() {
     });
   }
 
-  test('Section.myReports is the one student-only section', () {
-    expect(Section.values.where((s) => s.isStudentOnly), [Section.myReports]);
+  test('the student-only sections are My reports and the trophy case '
+      '(#151, #220)', () {
+    expect(Section.values.where((s) => s.isStudentOnly), [
+      Section.trophies,
+      Section.myReports,
+    ]);
+    expect(Section.trophies.isTeacherOnly, isFalse);
+    expect(Section.trophies.isDeveloperOnly, isFalse);
     expect(Section.myReports.isTeacherOnly, isFalse);
     expect(Section.myReports.isDeveloperOnly, isFalse);
     expect(Section.reports.isTeacherOnly, isTrue);

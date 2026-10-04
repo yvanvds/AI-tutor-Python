@@ -1843,6 +1843,72 @@ void main() {
     });
   });
 
+  // #220 — the badge proof sheet stays after the teacher's review, for a
+  // teacher or a developer build; a student has the trophy case instead.
+  group('badges', () {
+    final proofSheetButton = find.byKey(
+      const ValueKey('options-badge-proof-sheet'),
+    );
+
+    testWidgets('a student does not get the proof sheet', (tester) async {
+      await mount(tester);
+      expect(find.text('Open the proof sheet'), findsNothing);
+      await unmount(tester);
+    });
+
+    testWidgets('a teacher opens it from Options, and comes back', (
+      tester,
+    ) async {
+      await mount(tester, isTeacher: true);
+      expect(find.text('Badges'), findsOneWidget);
+      await tester.ensureVisible(proofSheetButton);
+      await tester.tap(proofSheetButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Badge proof sheet'), findsOneWidget);
+      expect(find.byKey(const ValueKey('badge-proof-dark')), findsOneWidget);
+      expect(find.byKey(const ValueKey('badge-proof-light')), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(OptionsPage), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('a developer build gets it too', (tester) async {
+      await mount(tester, devTools: true);
+      expect(proofSheetButton, findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('About credits every badge icon\'s author, with the licence', (
+      tester,
+    ) async {
+      await mount(tester);
+      final credits = find.byKey(const ValueKey('about-badge-credits'));
+      await tester.ensureVisible(credits);
+      await tester.tap(credits);
+      await tester.pumpAndSettle();
+      expect(find.text('Badge icons'), findsOneWidget);
+      expect(find.textContaining('CC BY 3.0'), findsWidgets);
+      expect(find.text('Weight lifting up by Delapouite'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Owl by Lorc'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(AlertDialog),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Owl by Lorc'), findsOneWidget);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Badge icons'), findsNothing);
+      await unmount(tester);
+    });
+  });
+
   testWidgets('about card shows the app version', (tester) async {
     await mount(tester);
     expect(find.text('Version $kAppVersion'), findsOneWidget);

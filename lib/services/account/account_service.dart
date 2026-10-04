@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -208,6 +209,33 @@ class AccountService extends Notifier<Account?> {
     );
   }
 
+  /// Records the badge tiers the rules reach now (#220) — badge id → tier —
+  /// on the current user's account doc, merged into what is stored there:
+  /// a tier only ever goes up, and every other entry and field stays
+  /// (`mergeBadgeTiers`). Returns what the write did — the badges that went
+  /// up, and whether the doc had no `badges` yet — so the caller announces
+  /// exactly what this write raised, also when another laptop got there
+  /// first. Nothing is written when nothing goes up; `null` without a
+  /// signed-in user or an account doc.
+  Future<BadgeAward?> awardBadges(
+    Map<String, int> tiers, {
+    DateTime? now,
+  }) async {
+    final uid = currentUid;
+    if (uid == null) return null;
+    BadgeAward? award;
+    await _patchWith(uid, (doc) {
+      final merged = mergeBadgeTiers(
+        doc['badges'],
+        tiers,
+        now: now ?? DateTime.now().toUtc(),
+      );
+      award = merged;
+      return merged.changed ? {'badges': merged.badges} : const {};
+    });
+    return award;
+  }
+
   /// Records that the current user had a successful tutor turn "today".
   /// Implements the streak counter from issue #10 (option c): one int +
   /// one timestamp stored on the account doc, with a 36-hour grace window
@@ -251,17 +279,32 @@ class AccountService extends Notifier<Account?> {
   Future<void> _patch(String uid, Map<String, Object?> changes) =>
       _patchWith(uid, (_) => changes);
 
+  /// The read-modify-writes of this app, one after the other (#220): the
+  /// badge write after a graded answer must not read the doc before the
+  /// calibration write in front of it has landed and then write the old
+  /// `oefeningCount` back. A failed write does not hold up the next.
+  Future<void> _writes = Future<void>.value();
+
   /// Read-modify-write of the account doc: [changes] sees the doc as read
-  /// and returns the fields to set; every other field stays as it is.
+  /// and returns the fields to set; every other field stays as it is. An
+  /// empty map writes nothing.
   Future<void> _patchWith(
     String uid,
     Map<String, Object?> Function(Map<String, dynamic> doc) changes,
-  ) async {
-    final doc = await safeCosmos(() => _container.read(uid, partitionKey: uid));
-    if (doc == null) return;
-    doc.addAll(changes(doc));
-    doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-    await safeCosmos(() => _container.replace(uid, doc, partitionKey: uid));
+  ) {
+    final run = _writes.then((_) async {
+      final doc = await safeCosmos(
+        () => _container.read(uid, partitionKey: uid),
+      );
+      if (doc == null) return;
+      final set = changes(doc);
+      if (set.isEmpty) return;
+      doc.addAll(set);
+      doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      await safeCosmos(() => _container.replace(uid, doc, partitionKey: uid));
+    });
+    _writes = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
   }
 
   Future<Account?> _fetchAccount(String uid) async {

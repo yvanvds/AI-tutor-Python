@@ -2305,6 +2305,16 @@ TurnRecord {
   fromBank: bool?
   gradedByKey: bool?
 
+  // For the badges (#220); neither is evidence, nothing in the conductor
+  // or a replay reads them. `keyDisputed`: the grader of a multiple-choice
+  // pick said the answer key is wrong (#198) — the bank counts it on the
+  // question, this on the student's own record ("Bugjager"); omitted when
+  // false. `askedAt`: when the question this turn grades went up — the
+  // question's arrival, or the follow-up's for a follow-up ("Rome …");
+  // omitted when unknown, and on docs written before the field.
+  keyDisputed: bool?
+  askedAt: string?
+
   usage: {
     model: string,                   // the model of the last call
     promptTokens: int,               // OpenAI's prompt_tokens, cached included

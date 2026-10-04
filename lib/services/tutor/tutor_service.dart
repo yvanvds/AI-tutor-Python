@@ -12,6 +12,7 @@ import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
@@ -75,6 +76,7 @@ class _FollowUpInFlight {
     required this.originalPlan,
     required this.depth,
     required this.question,
+    required this.askedAt,
   });
 
   /// The plan the grader was originally answering (carries `targetLOs`,
@@ -87,6 +89,10 @@ class _FollowUpInFlight {
   final int depth;
 
   final FollowUp question;
+
+  /// When the follow-up was asked (#220): the `askedAt` of its grade's
+  /// turn record.
+  final DateTime askedAt;
 }
 
 class _RequestInput {
@@ -151,6 +157,11 @@ class TutorService extends Notifier<TutorState> {
   /// history the question opens. Only the grading call of a pick carries
   /// it ([_keyForPick]).
   String? _mcqKey;
+
+  /// When the last question was put in front of the student (#220) —
+  /// generated or from the bank: the `askedAt` of the turn record that
+  /// grades its answer.
+  DateTime? _questionAskedAt;
 
   /// Per subgoal, the bank ids on this student's turn records — the
   /// questions they answered there — read once when the bank is first
@@ -715,6 +726,8 @@ class TutorService extends Notifier<TutorState> {
     });
     _conductor.notePlannedQuestion(plan);
     _inFlightPlan = plan;
+    // Its moment is set when it comes in; until then it is not known (#220).
+    _questionAskedAt = null;
     // A new question replaces the one in flight, also when it never
     // arrives — and the ID of the one before leaves the exercise header
     // (#216).
@@ -1177,9 +1190,18 @@ class TutorService extends Notifier<TutorState> {
       questionId: bankQuestion?.id,
       fromBank: fromBank,
       gradedByKey: gradedByKey,
+      // #198 on the student's own record, for the "Bugjager" badge (#220).
+      keyDisputed: disputed,
+      // How long the question was on screen (#220): the follow-up's own
+      // moment for a follow-up, else the question's.
+      askedAt: isFollowUpGrading ? priorFollowUp.askedAt : _questionAskedAt,
     );
     _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
+    // The badges (#220) after the feedback the student already has: the
+    // grade's text is on screen before it is integrated. Off the student's
+    // path, and silent when it fails; never XP, never a grade.
+    unawaited(ref.read(badgeServiceProvider.notifier).afterTurn(record));
     // #107: whether the class work on this LO now contradicts the home work
     // before it. A teacher-only event; off the student's path, and silent
     // when it fails.
@@ -1294,6 +1316,7 @@ class TutorService extends Notifier<TutorState> {
       originalPlan: plan,
       depth: depth,
       question: question,
+      askedAt: DateTime.now().toUtc(),
     );
     _debug.recordEvent('tutor.follow_up_presented', {
       'depth': depth,
@@ -1651,6 +1674,7 @@ class TutorService extends Notifier<TutorState> {
       loId: _inFlightPlan?.targetLOs.firstOrNull?.id,
     );
     if (!isQuestion) return;
+    _questionAskedAt = DateTime.now().toUtc();
     _mcqKey = response is MultipleChoice ? response.correct : null;
     if (fromBank != null) {
       _askBankQuestion(fromBank);

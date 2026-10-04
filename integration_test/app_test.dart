@@ -18,6 +18,7 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/badges.dart' as badges;
 import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
 import 'flows/chat_collapse.dart' as chat_collapse;
@@ -135,6 +136,7 @@ void main() {
   stuck_advance_progress.main();
   level_up_gate.main();
   oefening_xp.main();
+  badges.main();
   bug_report_oauth.main();
   bug_report_file.main();
   goals_import_replace.main();

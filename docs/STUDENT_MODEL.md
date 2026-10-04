@@ -273,6 +273,23 @@ answer to a question, whatever the grade, never for a follow-up. It only
 goes up and feeds the XP (`kXpPerOefening` each) — no belief, calibration
 or grade reads it.
 
+The badges (#220) sit on the same doc, in a write of their own after the
+graded answer (`AccountService.awardBadges`, queued behind the calibration
+write so neither loses the other's field):
+
+```
+account.badges {                   // absent: badges never counted yet
+  <badgeId>: {
+    tier: int                      // highest reached, 1 for the first
+    earnedAt: string               // when that tier was reached
+    awardedBy: string?             // #221: "teacher" / "podium"; absent = the app's rules
+  }
+}
+```
+
+A tier only ever goes up, also when a threshold changes later or the
+history is reset. No belief, calibration, XP or grade reads it.
+
 ### `progress` container (kept, repurposed as cache)
 
 Existing `progress` doc holds `progress: 0.0..1.0` per subgoal. New

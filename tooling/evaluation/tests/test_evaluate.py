@@ -1062,6 +1062,31 @@ class TurnScopeTest(unittest.TestCase):
         self.assertEqual((s.n_direct, s.ratchet), (1, "hard"))
 
 
+class BadgeFieldsTest(unittest.TestCase):
+    """#220 put two fields on the turn record for the badges: `keyDisputed`
+    (the grader called the answer key wrong, #198) and `askedAt` (when the
+    question went up). Neither is evidence: a record carrying them replays
+    and counts exactly as one without."""
+
+    def _log(self, **extra) -> list[dict]:
+        return [
+            _turn("2026-10-05T09:00:00.000Z", "sg-a", "recall_a1", **extra),
+            _turn("2026-10-05T09:04:00.000Z", "sg-a", "recall_a1", overallQuality="wrong",
+                  loSignals=[_sig("sg-a", "recall_a1", signal="negative")], **extra),
+        ]
+
+    def test_the_replay_is_the_same(self):
+        plain = rules.replay(self._log(), GOALS)
+        marked = rules.replay(self._log(keyDisputed=True, askedAt="2026-10-05T08:58:30.000Z"), GOALS)
+        self.assertEqual(plain.keys(), marked.keys())
+        for key in plain:
+            self.assertEqual(plain[key], marked[key], key)
+
+    def test_they_are_oefeningen_like_any_other(self):
+        for turn in self._log(keyDisputed=True, askedAt="2026-10-05T08:58:30.000Z"):
+            self.assertFalse(rules.is_audit(turn))
+
+
 class NeutralSignalTest(unittest.TestCase):
     """#202: a neutral signal down the conductor's write path, at its edges."""
 

@@ -20,7 +20,12 @@ PersistedTurnRecord _record({
   bool isWarmUp = false,
   bool isRecheck = false,
   String? activeSubgoalId,
+  bool keyDisputed = false,
+  DateTime? askedAt,
+  List<TurnLoStatus> loStatusAfter = const [],
 }) => PersistedTurnRecord(
+  keyDisputed: keyDisputed,
+  askedAt: askedAt,
   clientVersion: clientVersion,
   usage: usage,
   questionId: questionId,
@@ -46,7 +51,7 @@ PersistedTurnRecord _record({
   calibrationBefore: QuestionDifficulty.medium,
   calibrationAfter: QuestionDifficulty.medium,
   subgoalProgressAfter: 0.0,
-  loStatusAfter: const [],
+  loStatusAfter: loStatusAfter,
   subgoalAdvanced: false,
   provenance: provenance ?? EvidenceProvenance.home,
   transferCredits: transferCredits,
@@ -324,6 +329,86 @@ void main() {
       expect(byModel.containsKey('gradedByKey'), isFalse);
     });
   });
+
+  group('PersistedTurnRecord keyDisputed / askedAt (#220)', () {
+    test('an ordinary turn writes neither and reads back false and null — as '
+        'does every doc from before the fields', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('keyDisputed'), isFalse);
+      expect(map.containsKey('askedAt'), isFalse);
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.keyDisputed, isFalse);
+      expect(back.askedAt, isNull);
+    });
+
+    test('a disputed key and the moment the question was asked are written '
+        'and read back', () {
+      final asked = DateTime.utc(2026, 9, 2, 9, 53, 12);
+      final map = _record(keyDisputed: true, askedAt: asked).toMap(uid: 'u1');
+      expect(map['keyDisputed'], isTrue);
+      expect(map['askedAt'], '2026-09-02T09:53:12.000Z');
+      final back = PersistedTurnRecord.fromCosmos(map);
+      expect(back.keyDisputed, isTrue);
+      expect(back.askedAt, asked);
+    });
+
+    test('an askedAt that is not a date reads back null', () {
+      final map = _record().toMap(uid: 'u1')..['askedAt'] = 'soon';
+      expect(PersistedTurnRecord.fromCosmos(map).askedAt, isNull);
+    });
+  });
+
+  group(
+    'PersistedTurnRecord statuses and transfer credits read back (#220)',
+    () {
+      test('the LO statuses and the transfer credits on the doc come back, '
+          'malformed entries left out', () {
+        final map = _record(
+          loStatusAfter: const [
+            TurnLoStatus(
+              loId: 'lo1',
+              mean: 0.85,
+              evidence: 6,
+              mastered: true,
+              stuck: false,
+            ),
+            TurnLoStatus(
+              loId: 'lo2',
+              mean: 0.4,
+              evidence: 9,
+              mastered: false,
+              stuck: true,
+            ),
+          ],
+          transferCredits: const [
+            TurnTransferCredit(
+              subgoalId: 's0',
+              loId: 'lo-old',
+              alphaDelta: 0.5,
+            ),
+          ],
+        ).toMap(uid: 'u1');
+        // As read from Cosmos: plain JSON, with entries this build cannot use.
+        map['loStatusAfter'] = [
+          ...map['loStatusAfter'] as List,
+          'not a status',
+        ];
+        map['transferCredits'] = [
+          ...map['transferCredits'] as List,
+          {'subgoalId': 's0'},
+        ];
+
+        final back = PersistedTurnRecord.fromCosmos(map);
+        expect(back.loStatusAfter.map((s) => s.loId), ['lo1', 'lo2']);
+        expect(back.loStatusAfter.first.mastered, isTrue);
+        expect(back.loStatusAfter.last.stuck, isTrue);
+        expect(back.loStatusAfter.first.mean, 0.85);
+        expect(back.transferCredits, hasLength(1));
+        expect(back.transferCredits.single.loId, 'lo-old');
+        expect(back.transferCredits.single.alphaDelta, 0.5);
+      });
+    },
+  );
 
   group('PersistedTurnRecord usage (#183)', () {
     test('a record whose calls reported nothing writes no field and reads '

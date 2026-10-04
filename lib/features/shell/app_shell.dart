@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
+import 'package:ai_tutor_python/features/badges/prijzenkast_page.dart';
 import 'package:ai_tutor_python/features/classes/classes_page.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/instructions/instructions_editor_page.dart';
@@ -18,7 +19,9 @@ import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
+import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/badges/badge_toast_overlay.dart';
 import 'package:ai_tutor_python/widgets/goal_splash_overlay.dart';
 import 'package:ai_tutor_python/widgets/level_up_overlay.dart';
 import 'package:ai_tutor_python/widgets/update_status.dart';
@@ -46,6 +49,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       // stashed on its way into the installer. Also fire-and-forget — it only
       // reads a preference, and a launch never waits on it.
       unawaited(ref.read(whatsNewControllerProvider.notifier).load());
+      // The badges (#220): counted once from the student's history now, and
+      // after every graded answer from here on. Reading the service starts
+      // it; it reads, writes and announces by itself, off the first frame.
+      ref.read(badgeServiceProvider);
     });
   }
 
@@ -110,6 +117,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
                 const GoalSplashOverlay(),
                 const LevelUpOverlay(),
+                // Above the content, under nothing it should wait for: it
+                // holds itself back while a celebration above is up (#220).
+                const BadgeToastOverlay(),
                 // Last, so a launch that has news to tell puts it in front of
                 // anything else that happens to be up (#119).
                 const WhatsNewOverlay(),
@@ -127,6 +137,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return const SessionView();
       case Section.map:
         return const LeerpadPage();
+      case Section.trophies:
+        return const PrijzenkastPage();
       case Section.puntenformule:
         return const PuntenformulePage();
       case Section.myReports:

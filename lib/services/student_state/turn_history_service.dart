@@ -206,6 +206,33 @@ class TurnHistoryService {
     });
   }
 
+  /// Every graded turn record of [uid], oldest first: what the badges are
+  /// computed from (#220), read once when the app starts — one query on the
+  /// student's own partition. Only the fields the badges read are fetched;
+  /// the rest of each record comes back as `fromCosmos` defaults. Audit
+  /// stubs (no question asked) are left out. Throws, like the other reads.
+  Future<List<PersistedTurnRecord>> listForBadges(String uid) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.id, c.uid, c.turnAt, c.askedAt, c.subgoalId, '
+        'c.activeSubgoalId, c.targetLOIds, c.questionType, c.difficulty, '
+        'c.isFollowUp, c.isWarmUp, c.isRecheck, c.overallQuality, '
+        'c.provenance, c.usage, c.keyDisputed, c.transferCredits, '
+        'c.loStatusAfter, c.subgoalAdvanced '
+        'FROM c WHERE c.uid = @uid',
+        parameters: {'@uid': uid},
+        partitionKey: uid,
+      );
+      final out = <PersistedTurnRecord>[
+        for (final doc in docs)
+          // Re-applied client-side, as in [listTurnsBetween].
+          if (doc['uid'] == uid) PersistedTurnRecord.fromCosmos(doc),
+      ]..removeWhere((r) => r.questionType.isEmpty);
+      out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
   /// The question bank ids of every question the current student answered
   /// on [subgoalId] (#186): what the conductor must not serve them again.
   /// A record's `questionId` names a question of its own `subgoalId` — the

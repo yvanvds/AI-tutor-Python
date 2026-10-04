@@ -576,6 +576,8 @@ void main() {
       expect(record.difficulty, QuestionDifficulty.medium);
       expect(record.overallQuality, AnswerQuality.wrong);
       expect(record.usage, isNull, reason: 'no call, no tokens');
+      expect(record.keyDisputed, isFalse);
+      expect(record.askedAt, isNotNull, reason: 'a bank question is asked too');
 
       final q = stored(idOf(doc));
       expect(q.answeredCount, 1);
@@ -894,6 +896,7 @@ void main() {
       expect(jsonDecode(connector.sent[1].input)['correct_option'], _key);
       expect(graded.single.overallQuality, AnswerQuality.wrong);
       expect(store.docs, isEmpty, reason: 'wrong at its first answer');
+      expect(history.records.single.keyDisputed, isTrue);
 
       // The student gets the text and the verdict, nothing else; and the
       // reply goes on the exercise's history without the dispute.
@@ -938,7 +941,9 @@ void main() {
       final doc = _mcqDoc('q');
       final bank = await boot(docs: [doc], minimum: 1, share: 1);
       planNext(_plan(ChatRequestType.mcQuestion));
+      final beforeAsked = DateTime.now().toUtc();
       await tutor().requestExercise();
+      final afterAsked = DateTime.now().toUtc();
 
       connector.scripts.add(disputing());
       await tutor().submitMcqAnswer(_wrong);
@@ -955,6 +960,13 @@ void main() {
       final record = history.records.single;
       expect(record.fromBank, isTrue);
       expect(record.gradedByKey, isFalse);
+      // #220: the dispute is on the student's own record too ("Bugjager"),
+      // and so is the moment the question went up ("Rome …").
+      expect(record.keyDisputed, isTrue);
+      expect(record.askedAt, isNotNull);
+      expect(record.askedAt!.isBefore(beforeAsked), isFalse);
+      expect(record.askedAt!.isAfter(afterAsked), isFalse);
+      expect(record.turnAt.isBefore(record.askedAt!), isFalse);
       final q = stored(idOf(doc));
       expect(q.keyDisputedCount, 1);
       expect(q.graderDisagreesWithKey, isTrue);
