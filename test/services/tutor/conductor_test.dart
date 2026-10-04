@@ -28,6 +28,9 @@ class _Fakes {
   final List<PersistedTurnRecord> turnHistory = [];
   StudentCalibration calibration = StudentCalibration.fresh();
 
+  /// The oefeningen the conductor counted on the account (#217).
+  int oefeningen = 0;
+
   /// How often the conductor read the student's whole belief set — the
   /// warm-up and recheck selections' query (#194).
   int allBeliefReads = 0;
@@ -41,6 +44,9 @@ class _Fakes {
 
   /// The chat notices the conductor raised (#212).
   final List<ChatNotice> notices = [];
+
+  /// The debug events the conductor recorded, name and payload (#204).
+  final List<(String, Map<String, Object?>?)> debugEvents = [];
 
   String _key(String subgoalId, String loId) => '${subgoalId}__$loId';
 }
@@ -78,13 +84,16 @@ ConductorDeps _buildDeps(_Fakes f) {
     getProgressByGoalId: (id) async => f.progressById[id],
     setCurrentProgress: (v) => f.currentProgress = v,
     addSystemNotice: f.notices.add,
-    recordDebugEvent: (name, [data]) {},
+    recordDebugEvent: (name, [data]) => f.debugEvents.add((name, data)),
     playCorrectAnswer: () {},
     playGoalReached: () {},
     showGoalReached: f.goalsReached.add,
     pushConceptMastered: f.conceptsMastered.add,
     getCalibration: () => f.calibration,
-    setCalibration: (c) async => f.calibration = c,
+    setCalibration: (c, {countOefening = false}) async {
+      f.calibration = c;
+      if (countOefening) f.oefeningen += 1;
+    },
     getLoBelief: ({required subgoalId, required loId}) async =>
         f.beliefs[f._key(subgoalId, loId)],
     getLoBeliefsForSubgoal: (id) async =>
@@ -1231,6 +1240,136 @@ void main() {
     );
   });
 
+  // ---- #217 XP per oefening -------------------------------------------------
+  group('#217 every oefening is counted once', () {
+    const lo1 = LearningObjective(
+      id: 'lo1',
+      statement: 'one',
+      kind: LoKind.apply,
+    );
+    const lo0 = LearningObjective(
+      id: 'lo0',
+      statement: 'zero',
+      kind: LoKind.recall,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 's0',
+      parentId: 'r',
+      order: 0,
+      objectives: const [lo0],
+    );
+
+    QuestionPlan planFor(LearningObjective lo, {WarmUpReview? warmUp}) =>
+        QuestionPlan(
+          type: ChatRequestType.mcQuestion,
+          difficulty: QuestionDifficulty.medium,
+          targetLOs: [lo],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'test',
+            notchDropFired: false,
+          ),
+          warmUp: warmUp,
+        );
+
+    Future<({Conductor c, _Fakes f})> setup() async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 1000,
+        objectives: const [lo1],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [earlier, subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    GradedAnswer graded(
+      AnswerQuality quality, {
+      bool isFollowUp = false,
+      String subgoalId = 's',
+      String loId = 'lo1',
+    }) => GradedAnswer(
+      overallQuality: quality,
+      signals: [
+        GradedSignal(
+          subgoalId: subgoalId,
+          loId: loId,
+          kind: quality == AnswerQuality.correct
+              ? LoSignalKind.positive
+              : LoSignalKind.negative,
+          strength: LoSignalStrength.moderate,
+        ),
+      ],
+      isFollowUp: isFollowUp,
+      chainDepth: isFollowUp ? 1 : 0,
+    );
+
+    test('a first graded answer counts one, whatever the grade', () async {
+      final s = await setup();
+      for (final quality in AnswerQuality.values) {
+        final plan = planFor(lo1);
+        s.c.notePlannedQuestion(plan);
+        await s.c.integrateAnswer(plan: plan, answer: graded(quality));
+      }
+      expect(s.f.oefeningen, AnswerQuality.values.length);
+    });
+
+    test('a follow-up is the same oefening continued and does not count '
+        'again', () async {
+      final s = await setup();
+      final plan = planFor(lo1);
+      s.c.notePlannedQuestion(plan);
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.wrong),
+      );
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.correct, isFollowUp: true),
+      );
+      expect(s.f.oefeningen, 1);
+    });
+
+    test('a warm-up review question is an oefening too', () async {
+      final s = await setup();
+      final plan = planFor(lo0, warmUp: WarmUpReview(subgoal: earlier));
+      s.c.notePlannedQuestion(plan);
+      final calibration = s.f.calibration;
+      await s.c.integrateAnswer(
+        plan: plan,
+        answer: graded(AnswerQuality.wrong, subgoalId: 's0', loId: 'lo0'),
+      );
+      expect(s.f.oefeningen, 1);
+      // Counted on the write, not by moving the calibration (§1.5).
+      expect(s.f.calibration.recentAnswers, calibration.recentAnswers);
+    });
+
+    test(
+      'with no active subgoal nothing is written, the counter neither',
+      () async {
+        final s = await setup();
+        // The selection went away between the question and its grade.
+        s.f.selection = const GoalSelectionState();
+        await s.c.integrateAnswer(
+          plan: planFor(lo1),
+          answer: graded(AnswerQuality.correct),
+        );
+        expect(s.f.oefeningen, 0);
+      },
+    );
+  });
+
   // ---- §8.2 signalEvents ---------------------------------------------------
   group('§8.2 signalEvents emission', () {
     test('stuck-LO advance emits stuckLoAdvance + advances subgoal', () async {
@@ -2267,6 +2406,7 @@ void main() {
       List<GradedTransfer> transferLOs = const [],
       bool isFollowUp = false,
       EvidenceProvenance provenance = EvidenceProvenance.home,
+      LoSignalKind? targetKind,
     }) async {
       final plan = QuestionPlan(
         type: ChatRequestType.writeCodeQuestion,
@@ -2287,9 +2427,11 @@ void main() {
             GradedSignal(
               subgoalId: 's1',
               loId: 'lo-var',
-              kind: quality == AnswerQuality.correct
-                  ? LoSignalKind.positive
-                  : LoSignalKind.negative,
+              kind:
+                  targetKind ??
+                  (quality == AnswerQuality.correct
+                      ? LoSignalKind.positive
+                      : LoSignalKind.negative),
               strength: LoSignalStrength.strong,
             ),
             ...extra,
@@ -2396,6 +2538,109 @@ void main() {
       expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
       expect(outcome.reviewFlags, isEmpty);
       expect(outcome.appliedSignals.single.loId, 'lo-var');
+    });
+
+    const neutralOnPrint = GradedSignal(
+      subgoalId: 's0',
+      loId: 'lo-print',
+      kind: LoSignalKind.neutral,
+      strength: LoSignalStrength.weak,
+    );
+
+    /// The `conductor.signal_dropped` events of this test, as payloads.
+    List<Map<String, Object?>?> dropped(_Fakes f) => [
+      for (final (name, data) in f.debugEvents)
+        if (name == 'conductor.signal_dropped') data,
+    ];
+
+    test('a neutral on an earlier LO never probed is not written (#204): no '
+        'doc at the prior, nothing applied, and the drop is logged', () async {
+      final s = await setup();
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        extra: const [neutralOnPrint],
+      );
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
+      // On record as graded, never as applied.
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+      expect(
+        outcome.loSignals.where((l) => l.loId == 'lo-print').single.signal,
+        'neutral',
+      );
+      expect(outcome.reviewFlags, isEmpty);
+      expect(dropped(s.f), [
+        {'subgoalId': 's0', 'loId': 'lo-print', 'reason': 'incidental neutral'},
+      ]);
+    });
+
+    test('a neutral on a once-mastered earlier LO leaves its doc exactly as '
+        'stored (#204): not the clock, not the review flag', () async {
+      final flaggedAt = DateTime.utc(2026, 4, 20, 12);
+      final s = await setup(
+        printBelief: masteredPrint().copyWith(regressedAt: flaggedAt),
+      );
+      final before = printAfter(s.f);
+      await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        extra: const [neutralOnPrint],
+      );
+      final after = printAfter(s.f);
+      // Not decayed to now and not re-stamped: an untouched doc keeps its
+      // staleness for the warm-up review (§1.5) and the proposal's count.
+      expect(identical(after, before), isTrue);
+      expect(after.lastUpdatedAt, aMinuteAgo);
+      expect(after.regressedAt, flaggedAt);
+    });
+
+    test('a direct neutral is still written (§3.1): the target gets a doc '
+        'at the prior, its clocks, and a zero-delta applied signal', () async {
+      final s = await setup();
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.partial,
+        targetKind: LoSignalKind.neutral,
+        extra: const [neutralOnPrint],
+      );
+      final onVar = s.f.beliefs[s.f._key('s1', 'lo-var')]!;
+      expect(onVar.alpha, PolicyConstants.prior);
+      expect(onVar.beta, PolicyConstants.prior);
+      expect(onVar.lastProbedAt, onVar.lastUpdatedAt);
+      final applied = outcome.appliedSignals.single;
+      expect(applied.loId, 'lo-var');
+      expect(applied.alphaDelta, 0.0);
+      expect(applied.betaDelta, 0.0);
+      // The incidental one beside it is not.
+      expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-print')), isFalse);
+    });
+
+    test('a transfer nomination on an LO the grader named neutral this turn '
+        'is dropped: the answer cannot both leave it open and credit it '
+        '(#204)', () async {
+      final s = await setup(printBelief: masteredPrint());
+      final outcome = await grade(
+        s.c,
+        quality: AnswerQuality.correct,
+        extra: const [neutralOnPrint],
+        transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
+      );
+      expect(outcome.transferCredits, isEmpty);
+      expect(printAfter(s.f).alpha, 5.0);
+      expect(printAfter(s.f).lastUpdatedAt, aMinuteAgo);
+      expect(
+        [
+          for (final (name, data) in s.f.debugEvents)
+            if (name == 'conductor.transfer_dropped') data,
+        ],
+        [
+          {
+            'subgoalId': 's0',
+            'loId': 'lo-print',
+            'reason': 'incidental neutral',
+          },
+        ],
+      );
     });
 
     test('a positive on an earlier LO never probed gets a belief doc at '

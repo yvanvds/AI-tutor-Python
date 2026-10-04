@@ -315,8 +315,9 @@ BUILD_STORED = {
 # recall_a1 right four times on 08-10 (stamped at medium), then, on 09-20,
 # a partial answer on write_a2: the grader names write_a2 and recall_a1,
 # both neutral. On 09-22, in Deel B, predict_b1 right, and a neutral from
-# the side on fix_a3. The app writes every one of those neutrals: no
-# weight, but the doc (at the prior if new) and its clock (§3.1).
+# the side on fix_a3. The app writes the two direct neutrals: no weight,
+# but the doc (at the prior if new) and its clock (§3.1). The one from the
+# side it only logs: nobody asked fix_a3 (#204).
 KLAS_NEUTRAL = "6NEUTRAAL"
 ACCOUNTS += [
     {"uid": "u-jens", "firstName": "Jens", "lastName": "Grijs", "className": KLAS_NEUTRAL,
@@ -333,13 +334,16 @@ TURNS["u-jens"] = [
           loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-a", "fix_a3", "weak", "neutral")], **_NOW_BUILD),
 ]
 # What the app stored: recall_a1's (9, 1) of 08-10 decayed over 41 days to
-# the neutral's write; write_a2 and fix_a3 at the prior; predict_b1 (3, 1).
+# the neutral's write; write_a2 at the prior; predict_b1 (3, 1); no doc for
+# fix_a3.
 JENS_STORED = {
     ("sg-a", "recall_a1"): {"alpha": 5.9819, "beta": 1.0, "highestPositiveDifficulty": "medium"},
     ("sg-a", "write_a2"): {"alpha": 1.0, "beta": 1.0},
-    ("sg-a", "fix_a3"): {"alpha": 1.0, "beta": 1.0},
     ("sg-b", "predict_b1"): {"alpha": 3.0, "beta": 1.0, "highestPositiveDifficulty": "medium"},
 }
+# A build from before #204 wrote the neutral from the side too: fix_a3 at
+# the prior.
+JENS_STORED_BEFORE_204 = {**JENS_STORED, ("sg-a", "fix_a3"): {"alpha": 1.0, "beta": 1.0}}
 
 # #189: a class of one made-up student whose near-goals got their belief in
 # three different ways. recall_a1: three right at `easy` on 09-02, which
@@ -590,8 +594,9 @@ class AuditRecordDraftTest(_CommandTest):
 
 
 class NeutralSignalDraftTest(_CommandTest):
-    """#202: the app writes a neutral signal — the doc and its clock — so
-    the counts on the proposal read it as the app does."""
+    """#202: the app writes a direct neutral signal — the doc and its clock
+    — and since #204 not one from the side, so the counts on the proposal
+    read them as the app does."""
 
     def setUp(self):
         super().setUp()
@@ -600,14 +605,15 @@ class NeutralSignalDraftTest(_CommandTest):
         self.jens = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-jens")["computed"]
 
     def test_the_counts_on_the_proposal_are_the_apps(self):
-        # recall_a1 was written on 09-20, four days ago; write_a2 and fix_a3
-        # have a doc. `eval3` had 3 stale and 2 never probed.
+        # recall_a1 was written on 09-20, four days ago; write_a2 has a doc.
+        # fix_a3, reached only by a neutral from the side, has none (#204).
+        # `eval3` had 3 stale and 2 never probed, `eval4` 0 and 0.
         self.assertEqual(
             {f: self.jens[f] for f in ("staleLoCount", "neverProbedCount", "supervisedTurns", "homeTurns")},
-            {"staleLoCount": 0, "neverProbedCount": 0, "supervisedTurns": 0, "homeTurns": 2},
+            {"staleLoCount": 1, "neverProbedCount": 1, "supervisedTurns": 0, "homeTurns": 2},
         )
         self.assertIn(
-            "**Mee op het voorstel:** verouderd 0 leerdoel(en) (nooit bevraagd: 0) · "
+            "**Mee op het voorstel:** verouderd 1 leerdoel(en) (nooit bevraagd: 1) · "
             "oefeningen deze periode: 0 onder toezicht, 2 thuis.",
             self.section(self.md, "Jens Grijs"),
         )
@@ -620,9 +626,10 @@ class NeutralSignalDraftTest(_CommandTest):
         jens = self.section(self.md, "Jens Grijs")
 
         self.assertIn("Je kan A2 schrijven. `write_a2` (uitbreiding) — μ 0.50 · herkomst: 1 vraag (0 juist) — te weinig vragen om aan te tonen", jens)
-        self.assertIn("Je kan A3 verbeteren. `fix_a3` (uitbreiding) — μ 0.50 · herkomst: 0 vragen — te weinig vragen om aan te tonen", jens)
         self.assertIn("  - laatste vragen: 09-22 ✓m\n", jens)  # predict_b1; the side neutral on fix_a3 is none
-        self.assertNotIn("— nooit bevraagd", jens)
+        # A neutral from the side asked nothing and wrote nothing (#204).
+        self.assertIn("Je kan A3 verbeteren. `fix_a3` (uitbreiding) — nooit bevraagd", jens)
+        self.assertEqual(jens.count("— nooit bevraagd"), 1)
         self.assertIn(f"regels `{rules.RULES_VERSION}`", self.md)
 
 
@@ -773,13 +780,23 @@ class ValidateTest(_CommandTest):
         self.assertNotIn("transfer-krediet", stdout)  # replayed since eval2
 
     def test_docs_the_app_wrote_on_a_neutral_signal_match(self):
-        # #202: `eval3` compared 2 of the 4 docs, and read recall_a1, whose
+        # #202: `eval3` compared 2 of these 3 docs, and read recall_a1, whose
         # last write was a neutral 41 days on, as a deviation.
         self.cosmos.beliefs = lambda uid: JENS_STORED if uid == "u-jens" else {}
 
         stdout = self.run_cli("validate", "--klas", KLAS_NEUTRAL)
 
-        self.assertEqual(self.row(stdout, "Jens Grijs"), ["4", "4", "0", "0", "2.6.0+23"])
+        self.assertEqual(self.row(stdout, "Jens Grijs"), ["3", "3", "0", "0", "2.6.0+23"])
+
+    def test_a_doc_from_a_neutral_from_the_side_is_left_out_not_a_deviation(self):
+        # #204: a build from before wrote fix_a3 at the prior on the neutral
+        # from the side. The replay has no state for it, so it is not
+        # compared; at the prior it holds no evidence to compare anyway.
+        self.cosmos.beliefs = lambda uid: JENS_STORED_BEFORE_204 if uid == "u-jens" else {}
+
+        stdout = self.run_cli("validate", "--klas", KLAS_NEUTRAL)
+
+        self.assertEqual(self.row(stdout, "Jens Grijs"), ["4", "3", "0", "0", "2.6.0+23"])
 
     def test_the_old_arithmetic_is_what_the_old_build_stored(self):
         # The fixture's old-build docs are that arithmetic, not a guess.
@@ -850,10 +867,38 @@ class NeutralSignalTest(unittest.TestCase):
         write = st[("sg-a", "write_a2")]
         self.assertEqual((write.alpha, write.beta, write.last_at, write.last_direct_at), (1.0, 1.0, NEUTRAL_AT, NEUTRAL_AT))
         self.assertEqual((write.n_direct, write.ratchet, write.demonstrated), (1, None, False))
-        # From the side: the doc and its clock, but nobody asked it.
-        fix = st[("sg-a", "fix_a3")]
-        self.assertEqual((fix.alpha, fix.beta, fix.last_at), (1.0, 1.0, dt.datetime(2026, 9, 22, 9, 0, tzinfo=dt.timezone.utc)))
-        self.assertEqual((fix.last_direct_at, fix.n_direct), (None, 0))
+        # From the side nobody asked it, and nothing was seen: no state (#204).
+        self.assertNotIn(("sg-a", "fix_a3"), st)
+
+    def test_a_neutral_from_the_side_writes_nothing(self):
+        # #204: recall_a1, stamped on 08-10, is named neutral from Deel B on
+        # 09-22. The app leaves its doc as it was — no decay persisted, no
+        # clock — so it stays stale; the old arithmetic replays it the same.
+        side = _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", uid="u-jens",
+                     loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-a", "recall_a1", "moderate", "neutral")])
+        before = rules.replay(TURNS["u-jens"][:4], GOALS)[("sg-a", "recall_a1")]
+        for kwargs in ({}, {"asymmetric": False, "drop_incidental_negatives": False}):
+            st = rules.replay([*TURNS["u-jens"][:4], side], GOALS, **kwargs)
+            recall = st[("sg-a", "recall_a1")]
+            self.assertEqual((recall.alpha, recall.beta, recall.last_at), (before.alpha, before.beta, before.last_at))
+            self.assertEqual((recall.n_direct, recall.n_incidental_pos, recall.n_incidental_neg), (4, 0, 0))
+            self.assertEqual(st[("sg-b", "predict_b1")].n_direct, 1)  # the target is replayed as ever
+            los = [rules.MilestoneLo("sg-a", "recall_a1", True)]
+            self.assertEqual(rules.reliability(los, st, [], None, NOW).stale_lo_count, 1)  # last written 08-10
+
+    def test_a_neutral_from_the_side_leaves_the_review_flag(self):
+        # #204: flagged from the side on 09-21, named neutral from the side on
+        # 09-22: the flag and the clock stay as the negative left them.
+        flag_at = dt.datetime(2026, 9, 21, 9, 0, tzinfo=dt.timezone.utc)
+        side = [
+            _turn(f"2026-09-2{d}T09:00:00.000Z", "sg-b", "predict_b1", uid="u-jens",
+                  loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-a", "recall_a1", "moderate", signal)])
+            for d, signal in ((1, "negative"), (2, "neutral"))
+        ]
+        flagged = rules.replay([*TURNS["u-jens"][:4], side[0]], GOALS)[("sg-a", "recall_a1")]
+        recall = rules.replay([*TURNS["u-jens"][:4], *side], GOALS)[("sg-a", "recall_a1")]
+        self.assertEqual(recall.regressed_at, flag_at)
+        self.assertEqual((recall.alpha, recall.beta, recall.last_at), (flagged.alpha, flagged.beta, flagged.last_at))
 
     def test_the_next_evidence_lands_as_if_it_were_not_there(self):
         # Decay composes: the belief a later answer lands on is the same

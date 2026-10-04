@@ -1,15 +1,25 @@
-// Teacher-only "Vragen" page (#185): the question bank — every question the
-// tutor generated — per root goal and subgoal, for the teacher to weed out.
+// Teacher-only "Vragen" page (#185): the question bank per root goal and
+// subgoal. The students do the weeding (#215): a generated question is only
+// stored when its first answer is correct, and hides itself when too few
+// answers to it are correct. This page is for what is still off.
 //
 // Left: the curriculum, each subgoal with how many questions it has and how
-// many of those the teacher has not reviewed yet. Right: the selected
-// subgoal's questions, each with its type, level, target LO, how often it
-// was asked and what share of the answers was correct, rendered the way the
-// student sees it. Per question: mark it reviewed, hide it (never deleted:
-// turn records point at it) or show it again, and a note. A filter keeps to
-// the questions not reviewed yet; the list sorts on the share correct,
+// many of those are hidden. Right: the selected subgoal's questions, each
+// with its type, level, target LO, how often it was asked and what share of
+// the answers was correct, rendered the way the student sees it, and whether
+// the teacher or the bank itself hid it. Per question: hide it or show it
+// again, and delete it (with a confirmation) — safe, as nothing reads a
+// question through the turn records that keep its id. A filter keeps to the
+// hidden questions, to clear them out; the list sorts on the share correct,
 // because an extreme share — very low or very high — points at a bad or a
 // too easy question.
+//
+// Every card shows the question's short ID (#216), the one the student sees
+// with the exercise; "Zoek op ID" at the top finds it again. The lookup runs
+// over the ids the page loaded for the tree, then reads the question itself:
+// its subgoal is selected and the card put on top of the list, marked. More
+// than one question with the ID — the same short ID, or the same question on
+// two subgoals — are all marked, and the subgoals they are in are named.
 //
 // Read once when the page opens and after every action, not polled: the
 // bank grows with every exercise, and a teacher reviewing it does not need
@@ -26,9 +36,11 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/services/question_bank/question_bank_service.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/question_id_tag.dart';
 import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
@@ -74,14 +86,49 @@ List<BankQuestion> sortQuestions(
 }
 
 /// Counts per subgoal for the tree.
-typedef _SubgoalCounts = ({int total, int unreviewed});
+typedef _SubgoalCounts = ({int total, int hidden});
 
 class _Overview {
-  const _Overview({required this.goals, required this.counts});
+  _Overview({required this.goals, required this.summaries})
+    : counts = _countsOf(summaries);
 
   final List<Goal> goals;
+
+  /// Every question's id, subgoal and whether it is hidden: what the tree
+  /// counts and the lookup by ID searches (#216).
+  final List<BankQuestionSummary> summaries;
   final Map<String, _SubgoalCounts> counts;
+
+  static Map<String, _SubgoalCounts> _countsOf(
+    List<BankQuestionSummary> summaries,
+  ) {
+    final counts = <String, _SubgoalCounts>{};
+    for (final s in summaries) {
+      final c = counts[s.subgoalId] ?? (total: 0, hidden: 0);
+      counts[s.subgoalId] = (
+        total: c.total + 1,
+        hidden: c.hidden + (s.hidden ? 1 : 0),
+      );
+    }
+    return counts;
+  }
+
+  /// This overview after [before] became [after] — `null`: deleted — with
+  /// no round trip.
+  _Overview replacing(BankQuestion before, BankQuestion? after) => _Overview(
+    goals: goals,
+    summaries: [
+      for (final s in summaries)
+        if (s.id != before.id)
+          s
+        else if (after != null)
+          (id: after.id, subgoalId: after.subgoalId, hidden: !after.isActive),
+    ],
+  );
 }
+
+/// Why a lookup by ID showed no question.
+enum _LookupMiss { invalid, notFound }
 
 class QuestionsPage extends ConsumerStatefulWidget {
   const QuestionsPage({super.key});
@@ -100,11 +147,24 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
   /// an action replaces its question in here without a reload.
   List<BankQuestion>? _items;
 
-  bool _unreviewedOnly = false;
+  bool _hiddenOnly = false;
   QuestionSort _sort = QuestionSort.newest;
 
   /// Ids of the questions with an action in flight.
   final Set<String> _busy = <String>{};
+
+  final TextEditingController _lookupField = TextEditingController();
+
+  /// The questions the last lookup by ID found (#216): marked, and on top
+  /// of their subgoal's list.
+  List<BankQuestion> _found = const [];
+
+  /// Why the last lookup found nothing; `null` after one that did.
+  _LookupMiss? _lookupMiss;
+  bool _lookingUp = false;
+
+  /// Per subgoal, the key of its tile, to scroll the tree to it.
+  final Map<String, GlobalKey> _treeKeys = {};
 
   QuestionBankService get _bank => ref.read(questionBankServiceProvider);
 
@@ -114,18 +174,16 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     _overview = _loadOverview();
   }
 
+  @override
+  void dispose() {
+    _lookupField.dispose();
+    super.dispose();
+  }
+
   Future<_Overview> _loadOverview() async {
     final summaries = await _bank.listSummaries();
     final goals = await ref.read(goalsServiceProvider).getAllGoalsOnce();
-    final counts = <String, _SubgoalCounts>{};
-    for (final s in summaries) {
-      final c = counts[s.subgoalId] ?? (total: 0, unreviewed: 0);
-      counts[s.subgoalId] = (
-        total: c.total + 1,
-        unreviewed: c.unreviewed + (s.reviewed ? 0 : 1),
-      );
-    }
-    return _Overview(goals: goals, counts: counts);
+    return _Overview(goals: goals, summaries: summaries);
   }
 
   void _reload() {
@@ -153,26 +211,26 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     }, onError: (_) {});
   }
 
+  /// Runs [action] on [question]: it returns the question as it now
+  /// stands, or `null` when it deleted it.
   Future<void> _act(
     BankQuestion question,
-    Future<BankQuestion> Function() action,
+    Future<BankQuestion?> Function() action,
   ) async {
     setState(() => _busy.add(question.id));
     try {
       final updated = await action();
       if (!mounted) return;
+      List<BankQuestion> replaced(List<BankQuestion> list) => [
+        for (final q in list)
+          if (q.id != question.id) q else if (updated != null) updated,
+      ];
       setState(() {
-        _items = [
-          for (final q in _items ?? const <BankQuestion>[])
-            q.id == updated.id ? updated : q,
-        ];
-        // The tree's "new" count follows without a round trip.
-        _overview = _overview.then(
-          (o) => _Overview(
-            goals: o.goals,
-            counts: _recount(o.counts, question, updated),
-          ),
-        );
+        _items = replaced(_items ?? const []);
+        _found = replaced(_found);
+        // The tree's counts — and what the lookup searches — follow
+        // without a round trip.
+        _overview = _overview.then((o) => o.replacing(question, updated));
       });
     } catch (e) {
       if (!mounted) return;
@@ -188,30 +246,115 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     }
   }
 
-  static Map<String, _SubgoalCounts> _recount(
-    Map<String, _SubgoalCounts> counts,
-    BankQuestion before,
-    BankQuestion after,
-  ) {
-    if (before.isReviewed == after.isReviewed) return counts;
-    final c = counts[before.subgoalId];
-    if (c == null) return counts;
-    return {
-      ...counts,
-      before.subgoalId: (
-        total: c.total,
-        unreviewed: c.unreviewed + (after.isReviewed ? -1 : 1),
-      ),
-    };
+  /// Looks up the question whose ID the teacher typed (#216): over the ids
+  /// the tree was loaded with, then each hit read — one deleted since is no
+  /// hit. The first hit's subgoal is selected, its list shown from the top
+  /// with every hit on top, marked; the hidden-only filter is switched off
+  /// so an active one shows too.
+  Future<void> _lookup() async {
+    if (_lookingUp) return;
+    final query = BankQuestion.idQueryOf(_lookupField.text);
+    if (query == null) {
+      setState(() {
+        _found = const [];
+        _lookupMiss = _LookupMiss.invalid;
+      });
+      return;
+    }
+    setState(() => _lookingUp = true);
+    try {
+      final overview = await _overview;
+      final hits = overview.summaries
+          .where((s) => BankQuestion.matchesIdQuery(s.id, query))
+          .toList();
+      final read = await Future.wait([
+        for (final hit in hits) _bank.get(hit.id, subgoalId: hit.subgoalId),
+      ]);
+      final found = [for (final q in read) ?q];
+      if (!mounted) return;
+      setState(() {
+        _found = found;
+        _lookupMiss = found.isEmpty ? _LookupMiss.notFound : null;
+        if (found.isNotEmpty) {
+          _hiddenOnly = false;
+          _selectedSubgoalId = found.first.subgoalId;
+          _loadQuestions(found.first.subgoalId);
+        }
+      });
+      if (found.isNotEmpty) _revealInTree(found.first.subgoalId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).questions_actionFailed('$e'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _lookingUp = false);
+    }
   }
 
-  Future<void> _editNote(BankQuestion question) async {
-    final note = await showDialog<String>(
+  void _clearLookup() {
+    _lookupField.clear();
+    setState(() {
+      _found = const [];
+      _lookupMiss = null;
+    });
+  }
+
+  /// Selects [subgoalId] as a tap on its tile does, and scrolls the tree to
+  /// it.
+  void _selectFound(String subgoalId) {
+    _select(subgoalId);
+    _revealInTree(subgoalId);
+  }
+
+  /// Scrolls the tree so the tile of [subgoalId] is in view, once it is
+  /// built.
+  void _revealInTree(String subgoalId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final tile = _treeKeys[subgoalId]?.currentContext;
+      if (tile == null || !tile.mounted) return;
+      Scrollable.ensureVisible(
+        tile,
+        alignment: 0.3,
+        duration: AppDurations.hover,
+      );
+    });
+  }
+
+  Future<void> _delete(BankQuestion question) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => _NoteDialog(initial: question.teacherNote ?? ''),
+      builder: (context) => AlertDialog(
+        title: Text(l.questions_delete_dialog_title),
+        content: SizedBox(
+          width: 420,
+          child: Text(l.questions_delete_dialog_body),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('questions-delete-cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.questions_delete_dialog_cancel),
+          ),
+          FilledButton(
+            key: const Key('questions-delete-confirm'),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.questions_delete_dialog_confirm),
+          ),
+        ],
+      ),
     );
-    if (note == null || !mounted) return;
-    await _act(question, () => _bank.setNote(question, note));
+    if (confirmed != true || !mounted) return;
+    await _act(question, () async {
+      await _bank.delete(question);
+      return null;
+    });
   }
 
   @override
@@ -257,6 +400,9 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.lg),
+              SizedBox(width: 260, child: _buildLookupField(l)),
+              const SizedBox(width: AppSpacing.s),
               IconButton(
                 key: const Key('questions-refresh'),
                 tooltip: l.questions_refresh_tooltip,
@@ -280,12 +426,24 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                     child: LinearProgressIndicator(minHeight: 2),
                   );
                 }
-                return Row(
+                final outcome = _buildLookupOutcome(l, overview);
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(width: 300, child: _buildTree(l, overview)),
-                    const VerticalDivider(width: 24),
-                    Expanded(child: _buildQuestions(l, overview)),
+                    if (outcome != null) ...[
+                      outcome,
+                      const SizedBox(height: AppSpacing.m),
+                    ],
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(width: 300, child: _buildTree(l, overview)),
+                          const VerticalDivider(width: 24),
+                          Expanded(child: _buildQuestions(l, overview)),
+                        ],
+                      ),
+                    ),
                   ],
                 );
               },
@@ -293,6 +451,85 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// "Zoek op ID" (#216): Enter or the search button looks the question up.
+  Widget _buildLookupField(AppLocalizations l) {
+    return TextField(
+      key: const Key('questions-lookup'),
+      controller: _lookupField,
+      style: AppMono.code(size: 13).copyWith(height: 1.3),
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _lookup(),
+      onChanged: (_) {
+        if (_lookupMiss != null) setState(() => _lookupMiss = null);
+      },
+      decoration: InputDecoration(
+        isDense: true,
+        labelText: l.questions_lookup_label,
+        hintText: l.questions_lookup_hint,
+        border: const OutlineInputBorder(),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_found.isNotEmpty || _lookupMiss != null)
+              IconButton(
+                key: const Key('questions-lookup-clear'),
+                tooltip: l.questions_lookup_clear_tooltip,
+                visualDensity: VisualDensity.compact,
+                onPressed: _clearLookup,
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            IconButton(
+              key: const Key('questions-lookup-go'),
+              tooltip: l.questions_lookup_tooltip,
+              visualDensity: VisualDensity.compact,
+              onPressed: _lookingUp ? null : _lookup,
+              icon: const Icon(Icons.search, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// What the last lookup came to, above the tree: why it found nothing,
+  /// or — more than one question with the ID — the subgoals they are in, to
+  /// go from one to the other. Nothing after a lookup with one hit: its
+  /// subgoal is selected and its card marked.
+  Widget? _buildLookupOutcome(AppLocalizations l, _Overview overview) {
+    final miss = _lookupMiss;
+    if (miss != null) {
+      return Text(
+        miss == _LookupMiss.invalid
+            ? l.questions_lookup_invalid
+            : l.questions_lookup_notFound,
+        key: const Key('questions-lookup-miss'),
+        style: TextStyle(color: AppColors.accent2, height: 1.4),
+      );
+    }
+    if (_found.length < 2) return null;
+    final titles = {for (final g in overview.goals) g.id: g.title};
+    final subgoalIds = {for (final q in _found) q.subgoalId};
+    return Wrap(
+      key: const Key('questions-lookup-several'),
+      spacing: AppSpacing.s,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          l.questions_lookup_several(_found.length),
+          style: TextStyle(color: AppColors.fgMute),
+        ),
+        for (final id in subgoalIds)
+          ChoiceChip(
+            key: Key('questions-lookup-subgoal-$id'),
+            label: Text(titles[id] ?? l.questions_tree_unknownSubgoal(id)),
+            selected: id == _selectedSubgoalId,
+            onSelected: (_) => _selectFound(id),
+          ),
+      ],
     );
   }
 
@@ -318,25 +555,31 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
         overview.counts.keys.where((id) => !known.contains(id)).toList()
           ..sort();
 
-    return ListView(
+    // Every tile built, not only the ones in view: a lookup by ID scrolls
+    // the tree to the subgoal it selects (#216). A curriculum is a few dozen
+    // subgoals.
+    return SingleChildScrollView(
       key: const Key('questions-tree'),
-      children: [
-        for (final root in roots) ...[
-          _GroupHeader(title: root.title),
-          for (final sub in childrenOf[root.id] ?? const <Goal>[])
-            _subgoalTile(l, sub.id, sub.title, overview.counts[sub.id]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final root in roots) ...[
+            _GroupHeader(title: root.title),
+            for (final sub in childrenOf[root.id] ?? const <Goal>[])
+              _subgoalTile(l, sub.id, sub.title, overview.counts[sub.id]),
+          ],
+          if (orphans.isNotEmpty) ...[
+            _GroupHeader(title: l.questions_tree_otherGroup),
+            for (final id in orphans)
+              _subgoalTile(
+                l,
+                id,
+                l.questions_tree_unknownSubgoal(id),
+                overview.counts[id],
+              ),
+          ],
         ],
-        if (orphans.isNotEmpty) ...[
-          _GroupHeader(title: l.questions_tree_otherGroup),
-          for (final id in orphans)
-            _subgoalTile(
-              l,
-              id,
-              l.questions_tree_unknownSubgoal(id),
-              overview.counts[id],
-            ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -347,21 +590,24 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
     _SubgoalCounts? counts,
   ) {
     final total = counts?.total ?? 0;
-    final unreviewed = counts?.unreviewed ?? 0;
-    return ListTile(
-      key: Key('questions-subgoal-$id'),
-      dense: true,
-      selected: id == _selectedSubgoalId,
-      enabled: total > 0,
-      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          l.questions_tree_count(total),
-          if (unreviewed > 0) l.questions_tree_unreviewed(unreviewed),
-        ].join(' · '),
-        key: Key('questions-subgoal-count-$id'),
+    final hidden = counts?.hidden ?? 0;
+    return KeyedSubtree(
+      key: _treeKeys.putIfAbsent(id, GlobalKey.new),
+      child: ListTile(
+        key: Key('questions-subgoal-$id'),
+        dense: true,
+        selected: id == _selectedSubgoalId,
+        enabled: total > 0,
+        title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          [
+            l.questions_tree_count(total),
+            if (hidden > 0) l.questions_tree_hidden(hidden),
+          ].join(' · '),
+          key: Key('questions-subgoal-count-$id'),
+        ),
+        onTap: () => _select(id),
       ),
-      onTap: () => _select(id),
     );
   }
 
@@ -388,10 +634,16 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
             child: LinearProgressIndicator(minHeight: 2),
           );
         }
-        final shown = sortQuestions(
-          _unreviewedOnly ? items.where((q) => !q.isReviewed) : items,
-          _sort,
-        );
+        // What a lookup by ID found goes on top (#216); the rest in the
+        // chosen order.
+        final found = {for (final q in _found) q.id};
+        final filtered = _hiddenOnly
+            ? items.where((q) => !q.isActive).toList()
+            : items;
+        final shown = [
+          ...filtered.where((q) => found.contains(q.id)),
+          ...sortQuestions(filtered.where((q) => !found.contains(q.id)), _sort),
+        ];
         final goalsById = {for (final g in overview.goals) g.id: g};
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -403,7 +655,7 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                   ? Text(
                       items.isEmpty
                           ? l.questions_list_empty
-                          : l.questions_list_allReviewed,
+                          : l.questions_list_noneHidden,
                       key: const Key('questions-list-empty'),
                       style: TextStyle(color: AppColors.fgFaint),
                     )
@@ -418,12 +670,11 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
                           key: Key('questions-card-${q.id}'),
                           question: q,
                           subgoal: goalsById[q.subgoalId],
+                          found: found.contains(q.id),
                           busy: _busy.contains(q.id),
-                          onMarkReviewed: () =>
-                              _act(q, () => _bank.markReviewed(q)),
                           onToggleHidden: () =>
                               _act(q, () => _bank.setHidden(q, q.isActive)),
-                          onNote: () => _editNote(q),
+                          onDelete: () => _delete(q),
                         );
                       },
                     ),
@@ -447,10 +698,10 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         FilterChip(
-          key: const Key('questions-filter-unreviewed'),
-          label: Text(l.questions_filter_unreviewed),
-          selected: _unreviewedOnly,
-          onSelected: (v) => setState(() => _unreviewedOnly = v),
+          key: const Key('questions-filter-hidden'),
+          label: Text(l.questions_filter_hidden),
+          selected: _hiddenOnly,
+          onSelected: (v) => setState(() => _hiddenOnly = v),
         ),
         const SizedBox(width: AppSpacing.m),
         for (final s in QuestionSort.values)
@@ -460,60 +711,6 @@ class _QuestionsPageState extends ConsumerState<QuestionsPage> {
             selected: _sort == s,
             onSelected: (_) => setState(() => _sort = s),
           ),
-      ],
-    );
-  }
-}
-
-/// The note editor. Its own state, so the text controller lives exactly as
-/// long as the dialog — disposing it when `showDialog` returns would pull it
-/// out from under the closing animation.
-class _NoteDialog extends StatefulWidget {
-  const _NoteDialog({required this.initial});
-  final String initial;
-
-  @override
-  State<_NoteDialog> createState() => _NoteDialogState();
-}
-
-class _NoteDialogState extends State<_NoteDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initial,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l.questions_note_dialog_title),
-      content: SizedBox(
-        width: 420,
-        child: TextField(
-          key: const Key('questions-note-field'),
-          controller: _controller,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 5,
-          decoration: InputDecoration(hintText: l.questions_note_dialog_hint),
-        ),
-      ),
-      actions: [
-        TextButton(
-          key: const Key('questions-note-cancel'),
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.questions_note_dialog_cancel),
-        ),
-        FilledButton(
-          key: const Key('questions-note-save'),
-          onPressed: () => Navigator.pop(context, _controller.text),
-          child: Text(l.questions_note_dialog_save),
-        ),
       ],
     );
   }
@@ -634,9 +831,9 @@ class _QuestionCard extends StatelessWidget {
     required this.question,
     required this.subgoal,
     required this.busy,
-    required this.onMarkReviewed,
     required this.onToggleHidden,
-    required this.onNote,
+    required this.onDelete,
+    this.found = false,
   });
 
   final BankQuestion question;
@@ -644,10 +841,12 @@ class _QuestionCard extends StatelessWidget {
   /// The subgoal it was asked on, for the target LO's statement; `null`
   /// when that subgoal is gone.
   final Goal? subgoal;
+
+  /// Found by a lookup on its ID (#216): marked.
+  final bool found;
   final bool busy;
-  final VoidCallback onMarkReviewed;
   final VoidCallback onToggleHidden;
-  final VoidCallback onNote;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -659,7 +858,6 @@ class _QuestionCard extends StatelessWidget {
       for (final lo in subgoal?.objectives ?? const []) lo.id: lo.statement,
     };
     final targets = q.targetLOIds.join(', ');
-    final note = q.teacherNote;
 
     return Opacity(
       opacity: q.isActive ? 1 : 0.6,
@@ -667,7 +865,9 @@ class _QuestionCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: AppColors.ink1,
-          border: Border.all(color: AppColors.ink2),
+          border: found
+              ? Border.all(color: AppColors.accent, width: 2)
+              : Border.all(color: AppColors.ink2),
           borderRadius: BorderRadius.circular(AppRadius.cardLarge),
         ),
         child: Column(
@@ -682,10 +882,17 @@ class _QuestionCard extends StatelessWidget {
                     runSpacing: AppSpacing.xxs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      if (found)
+                        _Pill(
+                          key: Key('questions-found-${q.id}'),
+                          text: l.questions_badge_found,
+                          color: AppColors.accent,
+                        ),
                       _Pill(
                         text: questionTypeLabel(l, q.questionType),
                         color: AppColors.accent3,
                       ),
+                      QuestionIdTag(q.id, key: Key('questions-id-${q.id}')),
                       Text(_difficultyLabel(l, q.difficulty), style: meta),
                       if (targets.isNotEmpty)
                         Tooltip(
@@ -712,17 +919,22 @@ class _QuestionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (!q.isActive)
+                if (q.isAutoHidden)
+                  Tooltip(
+                    message: l.questions_badge_autoHidden_tooltip(
+                      PolicyConstants.bankAutoHideMinAnswers,
+                    ),
+                    child: _Pill(
+                      key: Key('questions-hidden-${q.id}'),
+                      text: l.questions_badge_autoHidden,
+                      color: AppColors.danger,
+                    ),
+                  )
+                else if (!q.isActive)
                   _Pill(
                     key: Key('questions-hidden-${q.id}'),
                     text: l.questions_badge_hidden,
                     color: AppColors.danger,
-                  )
-                else if (q.isReviewed)
-                  _Pill(
-                    key: Key('questions-reviewed-${q.id}'),
-                    text: l.questions_badge_reviewed,
-                    color: AppColors.accent,
                   ),
               ],
             ),
@@ -758,29 +970,10 @@ class _QuestionCard extends StatelessWidget {
             ],
             const SizedBox(height: AppSpacing.m),
             QuestionPreview(question: q),
-            if (note != null && note.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.m),
-              Text(
-                l.questions_note(note),
-                key: Key('questions-note-text-${q.id}'),
-                style: TextStyle(
-                  color: AppColors.fgMute,
-                  fontStyle: FontStyle.italic,
-                  height: 1.4,
-                ),
-              ),
-            ],
             const SizedBox(height: AppSpacing.m),
             Wrap(
               spacing: AppSpacing.s,
               children: [
-                if (!q.isReviewed)
-                  OutlinedButton.icon(
-                    key: Key('questions-review-${q.id}'),
-                    onPressed: busy ? null : onMarkReviewed,
-                    icon: const Icon(Icons.check, size: 16),
-                    label: Text(l.questions_action_markReviewed),
-                  ),
                 OutlinedButton.icon(
                   key: q.isActive
                       ? Key('questions-hide-${q.id}')
@@ -799,10 +992,13 @@ class _QuestionCard extends StatelessWidget {
                   ),
                 ),
                 OutlinedButton.icon(
-                  key: Key('questions-note-${q.id}'),
-                  onPressed: busy ? null : onNote,
-                  icon: const Icon(Icons.edit_note, size: 16),
-                  label: Text(l.questions_action_note),
+                  key: Key('questions-delete-${q.id}'),
+                  onPressed: busy ? null : onDelete,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: Text(l.questions_action_delete),
                 ),
               ],
             ),

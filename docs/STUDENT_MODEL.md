@@ -100,9 +100,10 @@ Half-life on the order of months, not weeks. Exact curve is policy
 (part 4).
 
 When evidence arrives, the decayed values are persisted as the new
-`(α, β)` and `lastUpdatedAt` is bumped to `now`. So does a `neutral`
-signal, which adds no evidence but is written all the same (conductor
-policy 3.1, #202).
+`(α, β)` and `lastUpdatedAt` is bumped to `now`. So does a direct
+`neutral` signal, which adds no evidence but is written all the same
+(conductor policy 3.1, #202). A neutral on an earlier subgoal's LO is
+not written at all (conductor policy 2.4, #204).
 
 ### 2. Per-student difficulty calibration
 
@@ -266,6 +267,11 @@ account.calibration {
 
 Every calibration update rewrites the account doc. Updates happen at
 most once per answer; the doc is small. Acceptable.
+
+The same write carries `oefeningCount` (#217): +1 at the first graded
+answer to a question, whatever the grade, never for a follow-up. It only
+goes up and feeds the XP (`kXpPerOefening` each) — no belief, calibration
+or grade reads it.
 
 ### `progress` container (kept, repurposed as cache)
 
@@ -459,8 +465,9 @@ release pressed again for reports nobody touched rewrites nothing.
   the grader places on an earlier subgoal's LO (conductor policy 2.4,
   #108): a positive moves only `(α, β)` and `lastUpdatedAt` — never a
   ratchet, the counter or `lastQuestionType` — and creates the doc at
-  the prior if there was none; a neutral does the same with no weight,
-  so only `lastUpdatedAt` moves; a negative writes nothing to the belief
+  the prior if there was none; a neutral writes nothing at all (#204):
+  no doc, no `lastUpdatedAt`, since nobody asked the LO and nothing was
+  seen; a negative writes nothing to the belief
   (#167) and only sets `regressedAt` (next bullet). `lastUpdatedAt`
   doubles as the staleness clock for the warm-up review: an LO not
   written for `warmUpStaleAfter` is due. None of these mechanisms

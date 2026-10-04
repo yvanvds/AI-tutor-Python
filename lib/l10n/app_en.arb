@@ -687,6 +687,10 @@
   "@session_quiz_pill": {
     "description": "Quiz header pill — displayed uppercase"
   },
+  "session_questionId_tooltip": "The ID of this question. Your teacher can use it to find the question.",
+  "@session_questionId_tooltip": {
+    "description": "Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)"
+  },
   "session_quiz_next_button": "Next →",
 
   "session_output_state_idle": "No output",
@@ -1315,6 +1319,10 @@
   "@levelUp_caption": {
     "placeholders": { "xp": { "type": "int" } }
   },
+  "levelUp_caption_oefening": "+{xp} XP · EXERCISE DONE",
+  "@levelUp_caption_oefening": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
   "levelUp_level": "Level {level}",
   "@levelUp_level": {
     "placeholders": { "level": { "type": "int" } }
@@ -1323,6 +1331,10 @@
   "levelUp_subtitle_concept": "You've mastered {concept}.",
   "@levelUp_subtitle_concept": {
     "placeholders": { "concept": { "type": "String" } }
+  },
+  "levelUp_subtitle_oefeningen": "{count, plural, =1{You've done 1 exercise so far.} other{You've done {count} exercises so far.}}",
+  "@levelUp_subtitle_oefeningen": {
+    "placeholders": { "count": { "type": "int" } }
   },
   "levelUp_button_continue": "Keep learning",
 
@@ -1432,7 +1444,7 @@
   "chat_notice_submitViaEditor": "Adjust your code in the editor on the left and press Run to submit your solution.",
 
   "questions_page_title": "Questions",
-  "questions_page_subtitle": "Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.",
+  "questions_page_subtitle": "A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.",
   "questions_refresh_tooltip": "Refresh",
   "questions_containerMissing_title": "The question bank has not been set up yet",
   "questions_containerMissing_body": "The Cosmos container `questions` does not exist. Create it with partition key `/subgoalId` (README, step 3). Until then students practise as usual, but their questions are not stored.",
@@ -1441,14 +1453,14 @@
     "placeholders": { "error": { "type": "String" } }
   },
   "questions_retry": "Try again",
-  "questions_tree_empty": "No questions stored yet. They appear here as students practise.",
+  "questions_tree_empty": "No questions stored yet. They appear here once a student answers a new question correctly.",
   "questions_tree_count": "{count, plural, =1{1 question} other{{count} questions}}",
   "@questions_tree_count": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "questions_tree_unreviewed": "{count} new",
-  "@questions_tree_unreviewed": {
-    "description": "Questions of a subgoal the teacher has not reviewed yet",
+  "questions_tree_hidden": "{count} hidden",
+  "@questions_tree_hidden": {
+    "description": "Questions of a subgoal that are hidden, by the teacher or automatically",
     "placeholders": { "count": { "type": "int" } }
   },
   "questions_tree_unknownSubgoal": "Removed subgoal ({id})",
@@ -1457,13 +1469,13 @@
   },
   "questions_tree_otherGroup": "No longer in the curriculum",
   "questions_placeholder": "Pick a subgoal on the left.",
-  "questions_filter_unreviewed": "Not reviewed yet",
+  "questions_filter_hidden": "Hidden only",
   "questions_sort_newest": "Newest",
   "questions_sort_shareAsc": "Share correct ↑",
   "questions_sort_shareDesc": "Share correct ↓",
   "questions_sort_mostAsked": "Most asked",
   "questions_list_empty": "No questions for this subgoal.",
-  "questions_list_allReviewed": "Every question of this subgoal has been reviewed.",
+  "questions_list_noneHidden": "No hidden questions for this subgoal.",
   "questions_type_mcQuestion": "Multiple choice",
   "questions_type_completeCodeQuestion": "Complete the code",
   "questions_type_explainCodeQuestion": "Explain the code",
@@ -1487,7 +1499,11 @@
     "placeholders": { "ids": { "type": "String" } }
   },
   "questions_badge_hidden": "Hidden",
-  "questions_badge_reviewed": "Reviewed",
+  "questions_badge_autoHidden": "Hidden automatically",
+  "questions_badge_autoHidden_tooltip": "Less than half correct on {count} or more answers. Show it again and the app no longer hides it by itself.",
+  "@questions_badge_autoHidden_tooltip": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "questions_keyDisagreement": "The grading disagreed with the answer key at least once.",
   "questions_keyDisputed": "{count, plural, =1{The grading called the answer key wrong once.} other{The grading called the answer key wrong {count} times.}}",
   "@questions_keyDisputed": {
@@ -1495,20 +1511,33 @@
   },
   "questions_noKey": "No answer key: the model did not name the correct option.",
   "questions_answerKey_tooltip": "Answer key",
-  "questions_note": "Note: {note}",
-  "@questions_note": {
-    "placeholders": { "note": { "type": "String" } }
-  },
-  "questions_action_markReviewed": "Mark reviewed",
   "questions_action_hide": "Hide",
   "questions_action_unhide": "Show again",
-  "questions_action_note": "Note",
-  "questions_note_dialog_title": "Note on this question",
-  "questions_note_dialog_hint": "What is wrong with it, or what to remember",
-  "questions_note_dialog_cancel": "Cancel",
-  "questions_note_dialog_save": "Save",
+  "questions_action_delete": "Delete",
+  "questions_delete_dialog_title": "Delete this question?",
+  "questions_delete_dialog_body": "The question is removed from the question bank. If the tutor generates the same question later, it only comes back when the first student answers it correctly.",
+  "questions_delete_dialog_cancel": "Cancel",
+  "questions_delete_dialog_confirm": "Delete",
   "questions_actionFailed": "That did not work: {error}",
   "@questions_actionFailed": {
     "placeholders": { "error": { "type": "String" } }
+  },
+  "questions_lookup_label": "Find by ID",
+  "@questions_lookup_label": {
+    "description": "Field on the Questions page to look a question up by the short ID a student sees with the exercise (#216)"
+  },
+  "questions_lookup_hint": "e.g. #3fa91c",
+  "questions_lookup_tooltip": "Find",
+  "questions_lookup_clear_tooltip": "Clear",
+  "questions_lookup_notFound": "This question is not in the bank. Usually the first answer to it was not (fully) correct, and then a question is not kept. Or it was deleted.",
+  "questions_lookup_invalid": "That is not a question ID. An ID looks like #3fa91c.",
+  "questions_lookup_several": "{count} questions have this ID:",
+  "@questions_lookup_several": {
+    "description": "Above the subgoals of the questions a lookup found, when there is more than one",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "questions_badge_found": "Found",
+  "@questions_badge_found": {
+    "description": "Badge on the card a lookup by ID found — displayed uppercase"
   }
 }

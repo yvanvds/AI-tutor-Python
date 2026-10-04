@@ -105,62 +105,115 @@ final ambientProgressProvider = Provider<double>((ref) {
       );
 });
 
-// XP & level derivation — issue #9, option (a); curve flattened in #116.
+// XP & level derivation — issue #9, option (a); curve flattened in #116;
+// XP per oefening since #217.
 //
-// XP is derived from `Progress.progress` summed over every non-optional
-// subgoal × a flat constant. Every level is the same width, so the ramp
-// never gets steeper: one level per five completed subgoals, forever. The
-// original `1500 * level` ramp cost 15 subgoals for level 2 and widened
-// after that, which meant most students never saw a level-up at all.
-// No new collection, no migration — the whole thing is derived.
+// XP = oefeningen × [kXpPerOefening] + mastery XP. The oefeningen are the
+// account's `oefeningCount`: one per question at its first graded answer,
+// right or wrong, never for a follow-up, and it only goes up. Mastery XP is
+// `Progress.progress` summed over every non-optional subgoal × a flat
+// constant; it moves only when an LO crosses the mastery bar, and back down
+// when one falls under it again. Before #217 that was the whole of XP, so a
+// lesson spent on one hard LO showed no progress at all and the bar could
+// run backwards. Every level is the same width, so the ramp never gets
+// steeper. No new collection — mastery XP is derived, the counter rides on
+// the account doc the conductor already writes on every graded answer.
 
 /// XP a fully-completed non-optional subgoal is worth.
 const int kXpPerSubgoal = 100;
 
-/// Constant width of every level, in XP. Five subgoals per level.
+/// XP every oefening is worth (#217), whatever the grade. At the 20–25
+/// oefeningen of a lesson hour in the September baseline that is about one
+/// level per lesson hour, before any mastery XP.
+const int kXpPerOefening = 20;
+
+/// Constant width of every level, in XP.
 const int kXpPerLevel = 500;
 
-typedef XpState = ({int xp, int level, int xpNext});
+/// The level at [totalXp] XP: level 1 from 0, one more every [kXpPerLevel].
+int levelForXp(int totalXp) => 1 + (totalXp < 0 ? 0 : totalXp) ~/ kXpPerLevel;
 
-const XpState _defaultXpState = (xp: 0, level: 1, xpNext: kXpPerLevel);
+/// The XP shown in the top bar: [xp] into [level], of [xpNext] for the
+/// next one, and the two parts the total is made of — what the level-up
+/// moment needs to tell an oefening's crossing from a mastery's (#217).
+typedef XpState = ({
+  int xp,
+  int level,
+  int xpNext,
+  int oefeningCount,
+  int masteryXp,
+});
 
-XpState _xpBreakdown(int totalXp) {
-  final total = totalXp < 0 ? 0 : totalXp;
+const XpState _defaultXpState = (
+  xp: 0,
+  level: 1,
+  xpNext: kXpPerLevel,
+  oefeningCount: 0,
+  masteryXp: 0,
+);
+
+XpState _xpBreakdown({required int oefeningCount, required int masteryXp}) {
+  final raw = oefeningCount * kXpPerOefening + masteryXp;
+  final total = raw < 0 ? 0 : raw;
   return (
     xp: total % kXpPerLevel,
-    level: 1 + total ~/ kXpPerLevel,
+    level: levelForXp(total),
     xpNext: kXpPerLevel,
+    oefeningCount: oefeningCount,
+    masteryXp: masteryXp,
   );
 }
 
-final xpStateProvider = StreamProvider<XpState>((ref) async* {
+/// The mastery part of the XP: `progress × kXpPerSubgoal` summed over the
+/// non-optional subgoals, re-emitted on every progress poll.
+final masteryXpProvider = StreamProvider<int>((ref) async* {
   // Only react to sign-in/sign-out, not to every poll-driven re-emission of
   // the account doc — Account has no `==` override, so each 5 s
   // accountServiceProvider tick is a "new" object and would otherwise
   // tear this provider down and flash the XP pill back to 0.
   final signedIn = ref.watch(accountServiceProvider.select((a) => a != null));
   if (!signedIn) {
-    yield _defaultXpState;
+    yield 0;
     return;
   }
   final subgoals = (await ref.watch(goalsServiceProvider).getAllGoalsOnce())
       .where((g) => g.parentId != null && !g.optional)
       .toList();
   if (subgoals.isEmpty) {
-    yield _defaultXpState;
+    yield 0;
     return;
   }
   final progressStream = ref.watch(progressServiceProvider).watchAll();
   await for (final progress in progressStream) {
     final byId = {for (final p in progress) p.goalID: p};
-    final total = subgoals
+    yield subgoals
         .fold<double>(
           0.0,
           (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * kXpPerSubgoal,
         )
         .round();
-    yield _xpBreakdown(total);
   }
+});
+
+/// The signed-in student's `oefeningCount` (#217); 0 when signed out. An
+/// int, so the account doc's 5 s poll only passes on a real change.
+final oefeningCountProvider = Provider<int>(
+  (ref) =>
+      ref.watch(accountServiceProvider.select((a) => a?.oefeningCount ?? 0)),
+);
+
+/// XP and level: [oefeningCountProvider] × [kXpPerOefening] plus
+/// [masteryXpProvider]. Loading until the mastery part has its first value;
+/// after that a new count or a progress poll recomputes it in place, so the
+/// pill never drops back to its default in between.
+final xpStateProvider = Provider<AsyncValue<XpState>>((ref) {
+  final oefeningCount = ref.watch(oefeningCountProvider);
+  return ref
+      .watch(masteryXpProvider)
+      .whenData(
+        (masteryXp) =>
+            _xpBreakdown(oefeningCount: oefeningCount, masteryXp: masteryXp),
+      );
 });
 
 /// Derived view of the signed-in user for the new shell. Reads name + role

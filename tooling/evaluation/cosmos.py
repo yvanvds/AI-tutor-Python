@@ -151,6 +151,26 @@ def upsert(coll: str, doc: dict, pk, etag: str | None = None) -> dict:
         raise
 
 
+def delete(coll: str, doc_id: str, pk, etag: str | None = None) -> bool:
+    """Deletes [doc_id]. With [etag], a concurrent change raises [Conflict].
+    Returns False when the doc was already gone."""
+    rlink = f"dbs/{DB}/colls/{coll}/docs/{doc_id}"
+    h = _headers("DELETE", "docs", rlink, pk)
+    if etag:
+        h["If-Match"] = etag
+    req = urllib.request.Request(f"{ENDPOINT}/{rlink}", headers=h, method="DELETE")
+    try:
+        with urllib.request.urlopen(req):
+            return True
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        if e.code == 412:
+            raise Conflict(doc_id)
+        print("HTTP", e.code, e.read()[:400].decode(errors="replace"), file=sys.stderr)
+        raise
+
+
 def create(coll: str, doc: dict, pk) -> dict:
     """Creates [doc]. A doc with the same id raises [Exists] and stays as it
     is: create never overwrites, unlike [upsert]."""

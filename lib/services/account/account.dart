@@ -32,6 +32,13 @@ class Account {
   /// students table.
   final String className;
 
+  /// How many oefeningen the student has made (#217): one per question,
+  /// counted at its first graded answer whatever the grade, never for a
+  /// follow-up. Only ever goes up — a progress reset or archive import
+  /// leaves it alone — and is worth `kXpPerOefening` each in the XP.
+  /// `0` when the field is absent on disk.
+  final int oefeningCount;
+
   const Account({
     required this.uid,
     required this.email,
@@ -47,6 +54,7 @@ class Account {
     this.streakDays = 0,
     this.streakLastAt,
     this.className = '',
+    this.oefeningCount = 0,
   });
 
   String get displayFirstName => firstName;
@@ -73,6 +81,7 @@ class Account {
     if (streakLastAt != null)
       'streakLastAt': streakLastAt!.toUtc().toIso8601String(),
     'className': className,
+    'oefeningCount': oefeningCount,
   };
 
   factory Account.fromMap(Map<String, dynamic> data) {
@@ -97,6 +106,16 @@ class Account {
           ? DateTime.tryParse(data['streakLastAt'] as String)
           : null,
       className: data['className'] as String? ?? '',
+      oefeningCount: oefeningCountOf(data),
     );
   }
+}
+
+/// The `oefeningCount` on an account doc map (#217): a whole number of at
+/// least 0, `0` when the field is missing or not a number.
+int oefeningCountOf(Map<String, dynamic> doc) {
+  final raw = doc['oefeningCount'];
+  if (raw is! num || raw.isNaN || raw.isInfinite) return 0;
+  final n = raw.toInt();
+  return n < 0 ? 0 : n;
 }

@@ -1,6 +1,13 @@
 // One question of the question bank (#185): a question the tutor generated
-// for a student, kept so the teacher can weed out the bad ones and — #186 —
-// so the conductor can ask it again without generating it.
+// for a student, kept so the conductor can ask it again without generating
+// it (#186).
+//
+// The students do the weeding (#215): a generated question is stored only
+// when the first answer to it is graded correct, and a stored one hides
+// itself once too few answers to it are correct
+// (`PolicyConstants.bankAutoHideMinAnswers` / `bankAutoHideMaxShare`). A
+// question in the bank is approved by being there; the teacher hides, shows
+// again or deletes what is still off.
 //
 // A doc in the `questions` container (`/subgoalId` partition):
 //
@@ -20,12 +27,21 @@
 //     feedback text the grader gave and the verdict it came with;
 //   - `keyDisputedCount`, `keyDisputedAt`: how often the grader of a pick
 //     said the answer key itself is wrong, and the last time (#198);
-//   - the teacher's: `status` (`active` | `hidden`), `teacherNote`,
-//     `reviewedAt`.
+//   - `status` (`active` | `hidden`); for a hidden one `hiddenBy` (`teacher`
+//     | `auto`, #215 — absent on a question hidden before #215, which was
+//     the teacher) and `hiddenAt`; `keptByTeacher`: the teacher showed it
+//     again after it hid itself, so it does not hide itself again.
 //
 // The doc id is `${subgoalId}_${contentHash}` — the same generation for the
 // same subgoal is the same doc, and the id alone names the question, which
-// is what a turn record's `questionId` holds.
+// is what a turn record's `questionId` holds. Nothing reads a question doc
+// through a turn record — the tutor uses the ids only to not give a student
+// the same question twice, the evaluation tooling only the turn record's own
+// fields — so the teacher can delete a question; the same generation later
+// gets the same id and has to pass its first answer again. The first
+// characters of the hash are the question's short ID (#216, `shortIdOf`):
+// what the student sees with the exercise and the teacher looks up on the
+// Questions page.
 
 import 'dart:convert';
 
@@ -41,9 +57,13 @@ import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 
-/// `status` of a bank question. A hidden one stays in the container — turn
-/// records point at it — but is never served again (#186).
+/// `status` of a bank question. A hidden one stays in the container until
+/// the teacher deletes it, but is not served (#186).
 enum BankQuestionStatus { active, hidden }
+
+/// Who hid a hidden bank question (#215): the teacher on the Questions
+/// page, or the bank itself when too few answers to it were correct.
+enum BankHiddenBy { teacher, auto }
 
 /// The grader's feedback on one multiple-choice option, kept the first time
 /// a student picks it (#185) so a later pick of the same option can be
@@ -108,8 +128,9 @@ class BankQuestion {
     this.keyDisputedCount = 0,
     this.keyDisputedAt,
     this.status = BankQuestionStatus.active,
-    this.teacherNote,
-    this.reviewedAt,
+    this.hiddenBy,
+    this.hiddenAt,
+    this.keptByTeacher = false,
   });
 
   /// `type` discriminator on every doc, like the other containers carry.
@@ -141,14 +162,22 @@ class BankQuestion {
   /// The last time one did; `null` when none ever has.
   final DateTime? keyDisputedAt;
   final BankQuestionStatus status;
-  final String? teacherNote;
 
-  /// When the teacher last looked at it and acted: marked it reviewed, hid
-  /// or showed it, or wrote a note. `null` is "not reviewed yet".
-  final DateTime? reviewedAt;
+  /// Who hid it, as the doc says; `null` on an active question and on one
+  /// hidden before #215 (the teacher then).
+  final BankHiddenBy? hiddenBy;
+
+  /// When it was hidden; `null` on an active question.
+  final DateTime? hiddenAt;
+
+  /// The teacher showed it again after it hid itself (#215): it does not
+  /// hide itself again.
+  final bool keptByTeacher;
 
   bool get isActive => status == BankQuestionStatus.active;
-  bool get isReviewed => reviewedAt != null;
+
+  /// Hidden by the bank itself (#215), not by the teacher.
+  bool get isAutoHidden => !isActive && hiddenBy == BankHiddenBy.auto;
 
   /// Correct answers per graded answer; `null` before the first one.
   double? get shareCorrect =>
@@ -265,9 +294,75 @@ class BankQuestion {
   static String idFor({required String subgoalId, required String hash}) =>
       '${subgoalId}_$hash';
 
-  /// The bank entry for [response], asked on [subgoalId] — or `null` when
-  /// [response] is not a question. Counters start at zero: storing it
-  /// counts the ask (`QuestionBankService.recordAsked`).
+  /// The [contentHash] of [response], or `null` when it is not a question
+  /// — what its doc id ends in, on whichever subgoal it is asked.
+  static String? contentHashOf(ChatResponse response) =>
+      questionTypeFor(response) == null
+      ? null
+      : _hashOfPayload(response.type, payloadOf(response));
+
+  static String _hashOfPayload(
+    String payloadType,
+    Map<String, dynamic> payload,
+  ) => contentHash(
+    payloadType: payloadType,
+    code: (payload['code'] as String?) ?? '',
+    options: [
+      for (final o in (payload['options'] as List?) ?? const [])
+        if (o is Map && o['option'] is String) o['option'] as String,
+    ],
+    prompt: (payload['prompt'] as String?) ?? '',
+  );
+
+  // ---- The short ID (#216) -------------------------------------------------
+  //
+  // What the student sees in the header of an exercise and the teacher types
+  // on the Questions page to find that question: the first characters of the
+  // content hash, as `#3fa91c`. 16.7 million possibilities — a clash among
+  // the questions of a school is rare, and the lookup shows every question
+  // that has the ID. The hash is known as soon as the question exists, so a
+  // generated question shows its ID before the bank has it, if it ever does.
+
+  /// How many characters of the content hash the short ID shows.
+  static const int shortIdLength = 6;
+
+  /// The short ID of the question [id] names: `#` and the first
+  /// [shortIdLength] characters of its content hash. [id] is a doc id
+  /// ([idFor]) or the content hash alone.
+  static String shortIdOf(String id) {
+    final hash = id.substring(id.lastIndexOf('_') + 1);
+    return '#${hash.length <= shortIdLength ? hash : hash.substring(0, shortIdLength)}';
+  }
+
+  /// This question's short ID ([shortIdOf]).
+  String get shortId => shortIdOf(id);
+
+  /// What the teacher typed to look a question up, as [matchesIdQuery]
+  /// compares it: trimmed, without a leading `#`, in lower case — or `null`
+  /// when it cannot name a question: neither a doc id (`<subgoal>_<hash>`)
+  /// nor at least [shortIdLength] characters of a hash. A short ID in
+  /// capitals, a longer piece of the hash and the whole doc id all do.
+  static String? idQueryOf(String raw) {
+    var query = raw.trim().toLowerCase();
+    if (query.startsWith('#')) query = query.substring(1).trimLeft();
+    final hash = query.substring(query.lastIndexOf('_') + 1);
+    return _hashPiece.hasMatch(hash) ? query : null;
+  }
+
+  static final RegExp _hashPiece = RegExp('^[0-9a-f]{$shortIdLength,32}\$');
+
+  /// Whether [query], as [idQueryOf] made it, names the question [id]: the
+  /// whole doc id, or the start of its content hash.
+  static bool matchesIdQuery(String id, String query) {
+    final lower = id.toLowerCase();
+    if (query.contains('_')) return lower == query;
+    return lower.substring(lower.lastIndexOf('_') + 1).startsWith(query);
+  }
+
+  /// The bank entry for [response], asked on [subgoalId] at [createdAt] —
+  /// or `null` when [response] is not a question. Counters start at zero:
+  /// the bank stores it, ask and answer counted, only when the first answer
+  /// to it is correct (`QuestionBankService.recordFirstAnswer`, #215).
   static BankQuestion? fromResponse(
     ChatResponse response, {
     required String subgoalId,
@@ -282,16 +377,7 @@ class BankQuestion {
     final questionType = questionTypeFor(response);
     if (questionType == null) return null;
     final payload = payloadOf(response);
-    final options = [
-      for (final o in (payload['options'] as List?) ?? const [])
-        if (o is Map && o['option'] is String) o['option'] as String,
-    ];
-    final hash = contentHash(
-      payloadType: response.type,
-      code: (payload['code'] as String?) ?? '',
-      options: options,
-      prompt: (payload['prompt'] as String?) ?? '',
-    );
+    final hash = _hashOfPayload(response.type, payload);
     return BankQuestion(
       id: idFor(subgoalId: subgoalId, hash: hash),
       subgoalId: subgoalId,
@@ -332,8 +418,9 @@ class BankQuestion {
     if (keyDisputedAt != null)
       'keyDisputedAt': keyDisputedAt!.toUtc().toIso8601String(),
     'status': status.name,
-    if (teacherNote != null) 'teacherNote': teacherNote,
-    if (reviewedAt != null) 'reviewedAt': reviewedAt!.toUtc().toIso8601String(),
+    if (hiddenBy != null) 'hiddenBy': hiddenBy!.name,
+    if (hiddenAt != null) 'hiddenAt': hiddenAt!.toUtc().toIso8601String(),
+    if (keptByTeacher) 'keptByTeacher': true,
   };
 
   /// A doc as `toMap` wrote it, or `null` when it is not one a later reader
@@ -386,8 +473,11 @@ class BankQuestion {
       status: doc['status'] == BankQuestionStatus.hidden.name
           ? BankQuestionStatus.hidden
           : BankQuestionStatus.active,
-      teacherNote: doc['teacherNote'] as String?,
-      reviewedAt: date(doc['reviewedAt']),
+      hiddenBy: BankHiddenBy.values.firstWhereOrNull(
+        (b) => b.name == doc['hiddenBy'],
+      ),
+      hiddenAt: date(doc['hiddenAt']),
+      keptByTeacher: doc['keptByTeacher'] == true,
     );
   }
 }

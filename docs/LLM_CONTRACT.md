@@ -504,7 +504,8 @@ answer was just graded.
   difficulty and without any ratchet (#108); a negative is not applied
   to the belief but flags the LO for a direct re-probe at the next
   session start (#167) — it is how a prerequisite gap suspected from
-  later work gets checked rather than assumed.
+  later work gets checked rather than assumed; a neutral is only logged,
+  not written (#204).
 - **Categorical signals only.** No numeric scores from the LLM. The
   conductor maps `(signal, strength)` to evidence weights — keeping
   calibration in code, not prompts.

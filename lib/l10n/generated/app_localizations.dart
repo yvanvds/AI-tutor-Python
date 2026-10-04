@@ -2065,6 +2065,12 @@ abstract class AppLocalizations {
   /// **'Quiz question'**
   String get session_quiz_pill;
 
+  /// Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)
+  ///
+  /// In en, this message translates to:
+  /// **'The ID of this question. Your teacher can use it to find the question.'**
+  String get session_questionId_tooltip;
+
   /// No description provided for @session_quiz_next_button.
   ///
   /// In en, this message translates to:
@@ -3966,6 +3972,12 @@ abstract class AppLocalizations {
   /// **'+{xp} XP · CONCEPT UNLOCKED'**
   String levelUp_caption(int xp);
 
+  /// No description provided for @levelUp_caption_oefening.
+  ///
+  /// In en, this message translates to:
+  /// **'+{xp} XP · EXERCISE DONE'**
+  String levelUp_caption_oefening(int xp);
+
   /// No description provided for @levelUp_level.
   ///
   /// In en, this message translates to:
@@ -3983,6 +3995,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'ve mastered {concept}.'**
   String levelUp_subtitle_concept(String concept);
+
+  /// No description provided for @levelUp_subtitle_oefeningen.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You\'ve done 1 exercise so far.} other{You\'ve done {count} exercises so far.}}'**
+  String levelUp_subtitle_oefeningen(int count);
 
   /// No description provided for @levelUp_button_continue.
   ///
@@ -4365,7 +4383,7 @@ abstract class AppLocalizations {
   /// No description provided for @questions_page_subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Every question the tutor generated, per subgoal. Hide the ones that are wrong or unclear: a hidden question is not asked again.'**
+  /// **'A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.'**
   String get questions_page_subtitle;
 
   /// No description provided for @questions_refresh_tooltip.
@@ -4401,7 +4419,7 @@ abstract class AppLocalizations {
   /// No description provided for @questions_tree_empty.
   ///
   /// In en, this message translates to:
-  /// **'No questions stored yet. They appear here as students practise.'**
+  /// **'No questions stored yet. They appear here once a student answers a new question correctly.'**
   String get questions_tree_empty;
 
   /// No description provided for @questions_tree_count.
@@ -4410,11 +4428,11 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 question} other{{count} questions}}'**
   String questions_tree_count(int count);
 
-  /// Questions of a subgoal the teacher has not reviewed yet
+  /// Questions of a subgoal that are hidden, by the teacher or automatically
   ///
   /// In en, this message translates to:
-  /// **'{count} new'**
-  String questions_tree_unreviewed(int count);
+  /// **'{count} hidden'**
+  String questions_tree_hidden(int count);
 
   /// No description provided for @questions_tree_unknownSubgoal.
   ///
@@ -4434,11 +4452,11 @@ abstract class AppLocalizations {
   /// **'Pick a subgoal on the left.'**
   String get questions_placeholder;
 
-  /// No description provided for @questions_filter_unreviewed.
+  /// No description provided for @questions_filter_hidden.
   ///
   /// In en, this message translates to:
-  /// **'Not reviewed yet'**
-  String get questions_filter_unreviewed;
+  /// **'Hidden only'**
+  String get questions_filter_hidden;
 
   /// No description provided for @questions_sort_newest.
   ///
@@ -4470,11 +4488,11 @@ abstract class AppLocalizations {
   /// **'No questions for this subgoal.'**
   String get questions_list_empty;
 
-  /// No description provided for @questions_list_allReviewed.
+  /// No description provided for @questions_list_noneHidden.
   ///
   /// In en, this message translates to:
-  /// **'Every question of this subgoal has been reviewed.'**
-  String get questions_list_allReviewed;
+  /// **'No hidden questions for this subgoal.'**
+  String get questions_list_noneHidden;
 
   /// No description provided for @questions_type_mcQuestion.
   ///
@@ -4536,11 +4554,17 @@ abstract class AppLocalizations {
   /// **'Hidden'**
   String get questions_badge_hidden;
 
-  /// No description provided for @questions_badge_reviewed.
+  /// No description provided for @questions_badge_autoHidden.
   ///
   /// In en, this message translates to:
-  /// **'Reviewed'**
-  String get questions_badge_reviewed;
+  /// **'Hidden automatically'**
+  String get questions_badge_autoHidden;
+
+  /// No description provided for @questions_badge_autoHidden_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Less than half correct on {count} or more answers. Show it again and the app no longer hides it by itself.'**
+  String questions_badge_autoHidden_tooltip(int count);
 
   /// No description provided for @questions_keyDisagreement.
   ///
@@ -4566,18 +4590,6 @@ abstract class AppLocalizations {
   /// **'Answer key'**
   String get questions_answerKey_tooltip;
 
-  /// No description provided for @questions_note.
-  ///
-  /// In en, this message translates to:
-  /// **'Note: {note}'**
-  String questions_note(String note);
-
-  /// No description provided for @questions_action_markReviewed.
-  ///
-  /// In en, this message translates to:
-  /// **'Mark reviewed'**
-  String get questions_action_markReviewed;
-
   /// No description provided for @questions_action_hide.
   ///
   /// In en, this message translates to:
@@ -4590,41 +4602,89 @@ abstract class AppLocalizations {
   /// **'Show again'**
   String get questions_action_unhide;
 
-  /// No description provided for @questions_action_note.
+  /// No description provided for @questions_action_delete.
   ///
   /// In en, this message translates to:
-  /// **'Note'**
-  String get questions_action_note;
+  /// **'Delete'**
+  String get questions_action_delete;
 
-  /// No description provided for @questions_note_dialog_title.
+  /// No description provided for @questions_delete_dialog_title.
   ///
   /// In en, this message translates to:
-  /// **'Note on this question'**
-  String get questions_note_dialog_title;
+  /// **'Delete this question?'**
+  String get questions_delete_dialog_title;
 
-  /// No description provided for @questions_note_dialog_hint.
+  /// No description provided for @questions_delete_dialog_body.
   ///
   /// In en, this message translates to:
-  /// **'What is wrong with it, or what to remember'**
-  String get questions_note_dialog_hint;
+  /// **'The question is removed from the question bank. If the tutor generates the same question later, it only comes back when the first student answers it correctly.'**
+  String get questions_delete_dialog_body;
 
-  /// No description provided for @questions_note_dialog_cancel.
+  /// No description provided for @questions_delete_dialog_cancel.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get questions_note_dialog_cancel;
+  String get questions_delete_dialog_cancel;
 
-  /// No description provided for @questions_note_dialog_save.
+  /// No description provided for @questions_delete_dialog_confirm.
   ///
   /// In en, this message translates to:
-  /// **'Save'**
-  String get questions_note_dialog_save;
+  /// **'Delete'**
+  String get questions_delete_dialog_confirm;
 
   /// No description provided for @questions_actionFailed.
   ///
   /// In en, this message translates to:
   /// **'That did not work: {error}'**
   String questions_actionFailed(String error);
+
+  /// Field on the Questions page to look a question up by the short ID a student sees with the exercise (#216)
+  ///
+  /// In en, this message translates to:
+  /// **'Find by ID'**
+  String get questions_lookup_label;
+
+  /// No description provided for @questions_lookup_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. #3fa91c'**
+  String get questions_lookup_hint;
+
+  /// No description provided for @questions_lookup_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Find'**
+  String get questions_lookup_tooltip;
+
+  /// No description provided for @questions_lookup_clear_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get questions_lookup_clear_tooltip;
+
+  /// No description provided for @questions_lookup_notFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This question is not in the bank. Usually the first answer to it was not (fully) correct, and then a question is not kept. Or it was deleted.'**
+  String get questions_lookup_notFound;
+
+  /// No description provided for @questions_lookup_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a question ID. An ID looks like #3fa91c.'**
+  String get questions_lookup_invalid;
+
+  /// Above the subgoals of the questions a lookup found, when there is more than one
+  ///
+  /// In en, this message translates to:
+  /// **'{count} questions have this ID:'**
+  String questions_lookup_several(int count);
+
+  /// Badge on the card a lookup by ID found — displayed uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Found'**
+  String get questions_badge_found;
 }
 
 class _AppLocalizationsDelegate

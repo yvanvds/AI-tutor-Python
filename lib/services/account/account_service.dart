@@ -142,7 +142,11 @@ class AccountService extends Notifier<Account?> {
       () => _container.read(uid, partitionKey: uid),
     );
     final nowIso = DateTime.now().toUtc().toIso8601String();
+    // Everything else already on the doc stays as it is (#217): a rewrite
+    // of the profile must never drop the calibration, the streak or — since
+    // it only ever goes up — the oefening counter.
     final doc = <String, Object?>{
+      ...?existing,
       'id': uid,
       'uid': uid,
       'firstName': firstName,
@@ -180,11 +184,28 @@ class AccountService extends Notifier<Account?> {
   }
 
   /// Persists the calibration substructure on the current user's account
-  /// doc. Called by the conductor after every belief update.
-  Future<void> setCalibration(StudentCalibration calibration) async {
+  /// doc. Called by the conductor after every graded answer, and by a
+  /// progress reset or archive import.
+  ///
+  /// [countOefening] also counts one oefening (#217) in the same write: the
+  /// conductor sets it on the first graded answer to a question, never on a
+  /// follow-up. The count is taken from the doc as it is read for the write,
+  /// not from the polled [state], so an answer given before the last poll
+  /// came back still adds one to what is stored. Without it the counter is
+  /// left as it is — a reset or an import does not touch it.
+  Future<void> setCalibration(
+    StudentCalibration calibration, {
+    bool countOefening = false,
+  }) async {
     final uid = currentUid;
     if (uid == null) return;
-    await _patch(uid, {'calibration': calibration.toJson()});
+    await _patchWith(
+      uid,
+      (doc) => {
+        'calibration': calibration.toJson(),
+        if (countOefening) 'oefeningCount': oefeningCountOf(doc) + 1,
+      },
+    );
   }
 
   /// Records that the current user had a successful tutor turn "today".
@@ -227,10 +248,18 @@ class AccountService extends Notifier<Account?> {
 
   // --- HELPERS ------------------------------------------------------------
 
-  Future<void> _patch(String uid, Map<String, Object?> changes) async {
+  Future<void> _patch(String uid, Map<String, Object?> changes) =>
+      _patchWith(uid, (_) => changes);
+
+  /// Read-modify-write of the account doc: [changes] sees the doc as read
+  /// and returns the fields to set; every other field stays as it is.
+  Future<void> _patchWith(
+    String uid,
+    Map<String, Object?> Function(Map<String, dynamic> doc) changes,
+  ) async {
     final doc = await safeCosmos(() => _container.read(uid, partitionKey: uid));
     if (doc == null) return;
-    doc.addAll(changes);
+    doc.addAll(changes(doc));
     doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     await safeCosmos(() => _container.replace(uid, doc, partitionKey: uid));
   }

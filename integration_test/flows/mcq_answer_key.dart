@@ -14,9 +14,11 @@
 //
 // And #198: a wrong key with a pick of yet another wrong option — grade and
 // key agree the pick is wrong, so only the grader saying outright that the
-// key is wrong (META `keyDisputed`) reveals it. The bank counts that and
-// flags the question; the student sees the grade and nothing of the
-// dispute, and the reply goes on the exercise's history without it.
+// key is wrong (META `keyDisputed`) reveals it. The student sees the grade
+// and nothing of the dispute, and the reply goes on the exercise's history
+// without it. A question wrong at its first answer never enters the bank
+// (#215); when the bank already has the same generation, it counts the
+// dispute there and flags the question.
 //
 // Real app, real navigation, real quiz view, real TutorService → question
 // formatter → instruction generator → connector history bookkeeping → question
@@ -31,12 +33,16 @@
 
 import 'dart:convert';
 
+import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
+import 'package:ai_tutor_python/services/question_bank/question_bank_service.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +54,16 @@ import '../harness/scripted_llm.dart';
 
 /// The line the answer-key directive opens with (`answerKeyDirective`).
 const String _directive = 'ANSWER KEY — STRICT.';
+
+// The #198 case: `2 * 3` prints 6, the model's key says 23, the student
+// picks 5.
+const String _truth = '6';
+const String _wrongKey = '23';
+const String _picked = '5';
+const String _disputedCode = 'print(2 * 3)';
+const List<String> _disputedOptions = [_truth, _wrongKey, _picked];
+const String _disputeFeedback =
+    'Nee: 2 * 3 is een vermenigvuldiging, geen optelling.';
 
 /// A multiple-choice turn whose key is [letter], the positional letter the
 /// `mcQuestion` instructions ask for.
@@ -280,36 +296,57 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('a wrong key and a pick of yet another wrong option: the grader '
-      'says the key is wrong (#198) — the bank flags the question, the '
-      'student sees only the grade, and the exercise\'s history does not '
-      'carry the dispute', (tester) async {
-    const truth = '6';
-    const wrongKey = '23';
-    const picked = '5';
-    const feedback = 'Nee: 2 * 3 is een vermenigvuldiging, geen optelling.';
+  /// The #198 case: a wrong key (`2 * 3` prints 6, not 23) and a pick of
+  /// yet another wrong option — wrong by the key and by the grader alike, so
+  /// the grade cannot show the wrong key; the grader says so outright. With
+  /// [bankDocs] in the bank beforehand.
+  Future<(AppHarness, ScriptedLlm)> disputeOnWrongPick(
+    WidgetTester tester, {
+    List<Map<String, dynamic>> bankDocs = const [],
+  }) async {
     final llm = ScriptedLlm([
-      // The model's key is off: `2 * 3` prints 6, not 23.
       _mcqReply(
         prompt: 'Wat drukt print(2 * 3) af?',
-        code: 'print(2 * 3)',
-        options: const [truth, wrongKey, picked],
+        code: _disputedCode,
+        options: _disputedOptions,
         letter: 'B',
       ),
-      // The pick is wrong by the key and by the grader alike, so the grade
-      // cannot show the wrong key; the grader says so outright.
-      _gradeReply(text: feedback, quality: 'wrong', keyDisputed: true),
+      _gradeReply(text: _disputeFeedback, quality: 'wrong', keyDisputed: true),
     ]);
-    final harness = AppHarness(llm: llm);
+    final harness = AppHarness(
+      llm: llm,
+      extraDocs: {if (bankDocs.isNotEmpty) 'questions': bankDocs},
+    );
     await harness.boot(tester);
-    final bank = harness.cosmos['questions'];
 
-    await openQuiz(tester, truth);
+    await openQuiz(tester, _truth);
     await waitForIdle(tester, harness);
-    await pickAndWait(tester, harness, picked, 'geen optelling');
+    await pickAndWait(tester, harness, _picked, 'geen optelling');
+
+    // The turn is the grader's.
+    await pumpUntil(
+      tester,
+      () => harness.cosmos['turn_history'].docs.isNotEmpty,
+      reason: 'the grade was not recorded',
+    );
+    final turn = harness.cosmos['turn_history'].docs.values.single;
+    expect(turn['overallQuality'], 'wrong');
+    expect(turn['questionId'], startsWith('s1_'));
+    // Every bank write this answer queued has landed.
+    await harness.container.read(questionBankServiceProvider).idle;
+    return (harness, llm);
+  }
+
+  testWidgets('a wrong key and a pick of yet another wrong option: the grader '
+      'says the key is wrong (#198) — the student sees only the grade, the '
+      'exercise\'s history does not carry the dispute, and the question, '
+      'wrong at its first answer, stays out of the bank (#215)', (
+    tester,
+  ) async {
+    final (harness, llm) = await disputeOnWrongPick(tester);
 
     // The grader was told the (wrong) key, and how to dispute it.
-    expect(sent(llm, 1)['correct_option'], wrongKey);
+    expect(sent(llm, 1)['correct_option'], _wrongKey);
     expect(
       llm.sentInstructions[1],
       contains('When you find the key wrong, add `"keyDisputed": true`'),
@@ -320,44 +357,23 @@ void main() {
     // drawn alike — neither singled out.
     expect(
       harness.container.read(activeMcqProvider)?.feedback,
-      feedback,
+      _disputeFeedback,
       reason: 'the student sees the grader\'s text, nothing added to it',
     );
     expect(
-      _border(_row(tester, picked)).withValues(alpha: 1),
+      _border(_row(tester, _picked)).withValues(alpha: 1),
       AppColors.danger,
     );
-    expect(_border(_row(tester, wrongKey)), AppColors.ink2);
-    expect(_border(_row(tester, wrongKey)), _border(_row(tester, truth)));
-    expect(_row(tester, wrongKey).color, _row(tester, truth).color);
+    expect(_border(_row(tester, _wrongKey)), AppColors.ink2);
+    expect(_border(_row(tester, _wrongKey)), _border(_row(tester, _truth)));
+    expect(_row(tester, _wrongKey).color, _row(tester, _truth).color);
     expect(find.textContaining('keyDisputed'), findsNothing);
     expect(find.textContaining('answer key'), findsNothing);
 
-    // The turn is the grader's; the bank counts the dispute, and with it
-    // the question is in doubt — though every pick so far was graded as
-    // the key says.
-    await pumpUntil(
-      tester,
-      () => harness.cosmos['turn_history'].docs.isNotEmpty,
-      reason: 'the grade was not recorded',
-    );
-    expect(
-      harness.cosmos['turn_history'].docs.values.single['overallQuality'],
-      'wrong',
-    );
-    await pumpUntil(
-      tester,
-      () =>
-          bank.docs.isNotEmpty &&
-          bank.docs.values.single['keyDisputedCount'] == 1,
-      reason: 'the dispute was not counted on the bank question',
-    );
-    final stored = BankQuestion.tryFromCosmos(bank.docs.values.single)!;
-    expect(stored.correctOption, wrongKey);
-    expect(stored.optionFeedback.single.option, picked);
-    expect(stored.optionFeedback.single.quality?.name, 'wrong');
-    expect(stored.keyDisputedAt, isNotNull);
-    expect(stored.graderDisagreesWithKey, isTrue);
+    // A question is stored only when its first answer is correct (#215):
+    // this one never enters the bank, so its wrong key reaches no other
+    // student.
+    expect(harness.cosmos['questions'].docs, isEmpty);
 
     // A later call on this exercise — a hint, a question typed in the chat
     // — reads its history as the connector keeps it: the grader's reply is
@@ -368,12 +384,69 @@ void main() {
           jsonDecode(m['content']!) as Map<String, dynamic>,
     ];
     final grade = replies.singleWhere((r) => r['type'] == 'mcq_feedback');
-    expect(grade['prompt'], feedback);
+    expect(grade['prompt'], _disputeFeedback);
     expect(grade.containsKey('keyDisputed'), isFalse);
     expect(
       llm.exerciseHistory.any((m) => m['content']!.contains('keyDisputed')),
       isFalse,
     );
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('the same generation the bank already has — another student '
+      'answered it right first — counts the dispute (#198) on its doc, and '
+      'the bank flags the question though every pick so far was graded as '
+      'the key says', (tester) async {
+    final already = BankQuestion.fromResponse(
+      MultipleChoice(
+        type: 'multiple_choice',
+        prompt: 'Wat geeft print(2 * 3)?',
+        code: _disputedCode,
+        options: _disputedOptions,
+        correct: _wrongKey,
+      ),
+      subgoalId: 's1',
+      rootGoalId: 'r1',
+      targetLOIds: const ['lo-print'],
+      difficulty: QuestionDifficulty.medium,
+      language: 'en',
+      model: 'gpt-5-mini',
+      createdByUid: 'another-student',
+      createdAt: DateTime.utc(2026, 9, 20),
+    )!;
+    final (harness, _) = await disputeOnWrongPick(
+      tester,
+      bankDocs: [
+        {
+          ...already.toMap(),
+          'askedCount': 1,
+          'answeredCount': 1,
+          'correctCount': 1,
+          'lastAskedAt': '2026-09-20T00:00:00.000Z',
+        },
+      ],
+    );
+
+    // The fresh generation is that doc: the same content, the same id.
+    final bank = harness.cosmos['questions'];
+    expect(
+      harness.cosmos['turn_history'].docs.values.single['questionId'],
+      already.id,
+    );
+    expect(bank.docs, hasLength(1));
+    final stored = BankQuestion.tryFromCosmos(bank[already.id]!)!;
+    expect(stored.askedCount, 2);
+    expect(stored.answeredCount, 2);
+    expect(stored.correctCount, 1);
+    expect(stored.createdByUid, 'another-student');
+    expect(stored.correctOption, _wrongKey);
+    expect(stored.optionFeedback.single.option, _picked);
+    expect(stored.optionFeedback.single.quality?.name, 'wrong');
+    expect(stored.keyDisputedCount, 1);
+    expect(stored.keyDisputedAt, isNotNull);
+    expect(stored.graderDisagreesWithKey, isTrue);
+    expect(BankChoice.servable(stored), isFalse, reason: 'not served again');
 
     await harness.dispose(tester);
   });

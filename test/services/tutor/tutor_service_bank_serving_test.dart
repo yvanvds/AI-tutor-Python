@@ -38,6 +38,7 @@ import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
@@ -47,6 +48,7 @@ import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -514,6 +516,8 @@ void main() {
       expect(q.askedCount, 2);
       expect(q.lastAskedAt!.isAfter(DateTime.utc(2026, 9, 23)), isTrue);
       expect(stored(idOf(newer)).askedCount, 1);
+      // Its bank id is the one the exercise header shows (#216).
+      expect(pc!.read(shownQuestionIdProvider), idOf(older));
 
       // The exercise starts with the question, for a grading call to read.
       expect(connector.exerciseHistory, hasLength(1));
@@ -820,22 +824,26 @@ void main() {
       expect(input(3).containsKey('correct_option'), isFalse);
     });
 
-    test('a grader that sees the key can still overrule it: its grade stands '
-        'and the bank flags the question', () async {
+    test('a grader that sees the key can still overrule it: its grade stands, '
+        'and a question it called right against the key enters the bank '
+        'flagged, so it is not served (#215: a first answer graded wrong '
+        'keeps it out altogether)', () async {
       final bank = await boot(share: 0);
       planNext(_plan(ChatRequestType.mcQuestion));
       connector.scripts.add(_reply(fresh()));
       await tutor().requestExercise();
 
-      connector.scripts.add(grade(AnswerQuality.wrong, 'Nee, dat klopt niet.'));
-      await tutor().submitMcqAnswer(_key);
+      connector.scripts.add(grade(AnswerQuality.correct, 'Juist.'));
+      await tutor().submitMcqAnswer(_wrong);
       await bank.idle;
 
       expect(input(1)['correct_option'], _key);
-      expect(graded.single.overallQuality, AnswerQuality.wrong);
+      expect(graded.single.overallQuality, AnswerQuality.correct);
       final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
       expect(q.correctOption, _key);
+      expect(q.optionFeedback.single.option, _wrong);
       expect(q.graderDisagreesWithKey, isTrue);
+      expect(BankChoice.servable(q), isFalse);
     });
   });
 
@@ -871,9 +879,9 @@ void main() {
       correct: correct,
     );
 
-    test('on a fresh question: the grade is the grader\'s, the bank counts '
-        'the dispute and flags the question — though the pick was wrong by '
-        'the key too', () async {
+    test('on a fresh question: the grade is the grader\'s; graded wrong, the '
+        'question stays out of the bank (#215), graded right the bank counts '
+        'the dispute and flags it', () async {
       final bank = await boot(share: 0);
       planNext(_plan(ChatRequestType.mcQuestion));
       connector.scripts.add(_reply(fresh()));
@@ -885,12 +893,7 @@ void main() {
 
       expect(jsonDecode(connector.sent[1].input)['correct_option'], _key);
       expect(graded.single.overallQuality, AnswerQuality.wrong);
-      final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
-      expect(q.optionFeedback.single.option, 'Error');
-      expect(q.optionFeedback.single.quality, AnswerQuality.wrong);
-      expect(q.keyDisputedCount, 1);
-      expect(q.keyDisputedAt, isNotNull);
-      expect(q.graderDisagreesWithKey, isTrue);
+      expect(store.docs, isEmpty, reason: 'wrong at its first answer');
 
       // The student gets the text and the verdict, nothing else; and the
       // reply goes on the exercise's history without the dispute.
@@ -900,6 +903,33 @@ void main() {
       final reply = jsonDecode(connector.exerciseHistory.last['content']!);
       expect(reply['type'], 'mcq_feedback');
       expect(reply.containsKey('keyDisputed'), isFalse);
+
+      // Another fresh question, whose pick the grader calls right while it
+      // calls the key wrong: stored, with the dispute counted.
+      connector.scripts.add(
+        _reply(
+          MultipleChoice(
+            type: 'multiple_choice',
+            prompt: 'Vers 2',
+            code: 'print(2 + 2)',
+            options: const ['4', '22', 'Error'],
+            correct: '22',
+          ),
+        ),
+      );
+      await tutor().advanceFromMcq();
+      connector.scripts.add(
+        disputing(quality: AnswerQuality.correct, text: _rightText),
+      );
+      await tutor().submitMcqAnswer('4');
+      await bank.idle;
+
+      final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.optionFeedback.single.option, '4');
+      expect(q.optionFeedback.single.quality, AnswerQuality.correct);
+      expect(q.keyDisputedCount, 1);
+      expect(q.keyDisputedAt, isNotNull);
+      expect(q.graderDisagreesWithKey, isTrue);
     });
 
     test('on a bank question: a contradiction — the grader\'s grade and '
@@ -954,8 +984,11 @@ void main() {
       await tutor().requestExercise();
 
       // Typed, not picked: no key went out, so the field means nothing.
-      connector.scripts.add(disputing(text: 'Kies een optie.'));
-      await tutor().handleStudentMessage('Welke is het?');
+      // (Graded right, so the question is stored and the bank can be read.)
+      connector.scripts.add(
+        disputing(quality: AnswerQuality.correct, text: 'Ja, 2.'),
+      );
+      await tutor().handleStudentMessage('Het is 2.');
       await bank.idle;
       expect(
         jsonDecode(connector.sent[1].input).containsKey('correct_option'),
@@ -972,7 +1005,7 @@ void main() {
       graded.clear();
       connector.scripts.add(_reply(fresh(correct: null)));
       await tutor().advanceFromMcq();
-      connector.scripts.add(disputing());
+      connector.scripts.add(disputing(quality: AnswerQuality.correct));
       await tutor().submitMcqAnswer('Error');
       await bank.idle;
       expect(
@@ -1028,7 +1061,7 @@ void main() {
     });
 
     test('fewer than N new fitting questions: generated, and the bank keeps '
-        'growing', () async {
+        'growing — with every one answered right first time (#215)', () async {
       final bank = await boot(
         docs: [
           _mcqDoc('a'),
@@ -1057,6 +1090,19 @@ void main() {
 
       expect(connector.sent, hasLength(1));
       expect(pc!.read(activeMcqProvider)!.prompt, 'Vers');
+      expect(store.docs, hasLength(4), reason: 'asked, not answered yet');
+
+      connector.scripts.add(
+        _reply(
+          McqFeedback(
+            type: 'mcq_feedback',
+            quality: AnswerQuality.correct,
+            prompt: _rightText,
+          ),
+        ),
+      );
+      await tutor().submitMcqAnswer('4');
+      await bank.idle;
       expect(store.docs, hasLength(5));
     });
   });

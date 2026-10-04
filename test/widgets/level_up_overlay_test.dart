@@ -4,6 +4,10 @@
 // event keeps the goal's id, so a language switch while the card is up
 // renames the concept at once. A moment that is not about a goal (the debug
 // push, no id) shows its concept name as it is.
+//
+// Issue #217 — a level reached by making oefeningen has its own moment: the
+// caption names the oefening, the line under the level says how many the
+// student has made, and no concept is mentioned.
 
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
@@ -61,6 +65,7 @@ void main() {
     Locale locale, {
     String? goalId = 's2',
     String conceptName = 'Variabelen',
+    LevelUpEvent? event,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -87,12 +92,13 @@ void main() {
     container
         .read(levelUpControllerProvider.notifier)
         .push(
-          LevelUpEvent(
-            newLevel: 2,
-            xpAwarded: 100,
-            conceptName: conceptName,
-            goalId: goalId,
-          ),
+          event ??
+              LevelUpEvent(
+                newLevel: 2,
+                xpAwarded: 100,
+                conceptName: conceptName,
+                goalId: goalId,
+              ),
         );
     await settle(tester);
   }
@@ -161,5 +167,54 @@ void main() {
     expect(find.text("You've mastered elif-ladder."), findsOneWidget);
 
     await unmount(tester);
+  });
+
+  group('a level reached by making oefeningen (#217)', () {
+    const reached = LevelUpEvent.oefeningen(
+      newLevel: 7,
+      xpAwarded: 20,
+      oefeningCount: 140,
+    );
+
+    testWidgets('Dutch: the level, and how many oefeningen so far', (
+      tester,
+    ) async {
+      await celebrate(tester, const Locale('nl'), event: reached);
+
+      expect(find.text('+20 XP · OEFENING GEMAAKT'), findsOneWidget);
+      expect(find.text('Level 7'), findsOneWidget);
+      expect(find.text('Je hebt al 140 oefeningen gemaakt.'), findsOneWidget);
+      expect(find.textContaining('onder de knie'), findsNothing);
+      expect(find.textContaining('CONCEPT'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('English', (tester) async {
+      await celebrate(tester, const Locale('en'), event: reached);
+
+      expect(find.text('+20 XP · EXERCISE DONE'), findsOneWidget);
+      expect(find.text('Level 7'), findsOneWidget);
+      expect(find.text("You've done 140 exercises so far."), findsOneWidget);
+      expect(find.textContaining('mastered'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('one oefening is singular', (tester) async {
+      await celebrate(
+        tester,
+        const Locale('nl'),
+        event: const LevelUpEvent.oefeningen(
+          newLevel: 2,
+          xpAwarded: 20,
+          oefeningCount: 1,
+        ),
+      );
+
+      expect(find.text('Je hebt al 1 oefening gemaakt.'), findsOneWidget);
+
+      await unmount(tester);
+    });
   });
 }

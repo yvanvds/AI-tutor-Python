@@ -1,8 +1,11 @@
-// Issue #185 — every generated question lands in the question bank, and the
-// graded answer to it is counted there; the turn record names the question
-// it graded. And the bank is best-effort: without its container, or when it
-// does not answer at all, the student's exercise goes on as if it were not
-// there.
+// Issues #185 and #215 — a generated question lands in the question bank
+// at its first graded answer, and only when that answer is correct: not
+// when it is asked, not on a wrong or partial answer, never for a socratic
+// question. The turn record names the question it graded either way. And
+// the bank is best-effort: without its container, or when it does not
+// answer at all, the student's exercise goes on as if it were not there.
+// And #216: the question on screen carries the bank id it has or would
+// have, for its short ID in the exercise header.
 //
 // The real `TutorService` and the real `QuestionBankService` over an
 // in-memory `questions` container; the connector replays canned chunks, the
@@ -41,6 +44,7 @@ import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -157,13 +161,14 @@ const _reason = TurnSelectionReason(
   notchDropFired: false,
 );
 
-const _outcome = TurnOutcome(
-  overallQuality: AnswerQuality.wrong,
+/// What the mocked conductor makes of a graded answer: its own quality.
+TurnOutcome _outcome(AnswerQuality quality) => TurnOutcome(
+  overallQuality: quality,
   subgoalAdvanced: false,
   degraded: false,
-  loSignals: [],
-  appliedSignals: [],
-  loStatusAfter: [],
+  loSignals: const [],
+  appliedSignals: const [],
+  loStatusAfter: const [],
   subgoalProgressAfter: 0.2,
   calibrationBefore: QuestionDifficulty.medium,
   calibrationAfter: QuestionDifficulty.medium,
@@ -198,13 +203,16 @@ McqFeedback _mcqGrade(AnswerQuality quality, String text) =>
 SocraticQuestion _socratic(String text) =>
     SocraticQuestion(type: 'socratic_question', prompt: text);
 
-SocraticFeedback _socraticGrade(String text, {FollowUp? followUp}) =>
-    SocraticFeedback(
-      type: 'socratic_feedback',
-      quality: AnswerQuality.partial,
-      prompt: text,
-      followUp: followUp,
-    );
+SocraticFeedback _socraticGrade(
+  String text, {
+  AnswerQuality quality = AnswerQuality.partial,
+  FollowUp? followUp,
+}) => SocraticFeedback(
+  type: 'socratic_feedback',
+  quality: quality,
+  prompt: text,
+  followUp: followUp,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -258,7 +266,11 @@ void main() {
         plan: any(named: 'plan'),
         answer: any(named: 'answer'),
       ),
-    ).thenAnswer((_) async => _outcome);
+    ).thenAnswer(
+      (inv) async => _outcome(
+        (inv.namedArguments[#answer] as GradedAnswer).overallQuality,
+      ),
+    );
   });
 
   tearDown(() {
@@ -310,19 +322,23 @@ void main() {
   void planNext(QuestionPlan plan) =>
       when(() => conductor.planNext()).thenAnswer((_) async => plan);
 
-  test('a generated question is stored for the plan it was asked for; the '
-      'graded pick is counted on it with its feedback, and the turn record '
+  test('a generated question is not stored when it is asked, only when its '
+      'first answer is graded correct: for the plan it was asked for, ask '
+      'and answer counted, with the feedback on the pick; the turn record '
       'names it', () async {
     final bank = await boot();
     planNext(_plan(ChatRequestType.mcQuestion));
     connector.scripts.add(_reply(_mcq(), usage: _usage));
+    final before = DateTime.now().toUtc();
     await tutor().requestExercise();
     expect(pc!.read(activeMcqProvider)?.options, hasLength(3));
+    await bank.idle;
+    expect(store.docs, isEmpty, reason: 'asked, not answered yet');
 
     connector.scripts.add(
-      _reply(_mcqGrade(AnswerQuality.wrong, 'Nee: 1 + 1 is een som.')),
+      _reply(_mcqGrade(AnswerQuality.correct, 'Juist: 1 + 1 is 2.')),
     );
-    await tutor().submitMcqAnswer('11');
+    await tutor().submitMcqAnswer('2');
     await bank.idle;
 
     expect(store.docs, hasLength(1));
@@ -340,21 +356,146 @@ void main() {
     expect(q.correctOption, '2');
     expect(q.askedCount, 1);
     expect(q.answeredCount, 1);
-    expect(q.correctCount, 0);
+    expect(q.correctCount, 1);
+    expect(q.isActive, isTrue);
+    // Asked when it was put in front of the student.
+    expect(q.lastAskedAt, q.createdAt);
+    expect(q.createdAt.isBefore(before), isFalse);
     expect(q.optionFeedback.map((f) => f.toJson()), [
-      {'option': '11', 'text': 'Nee: 1 + 1 is een som.', 'quality': 'wrong'},
+      {'option': '2', 'text': 'Juist: 1 + 1 is 2.', 'quality': 'correct'},
     ]);
 
     expect(history.records.single.questionId, q.id);
+  });
+
+  test('the question on screen carries the bank id it would have from the '
+      'start (#216) — the one its turn record names, stored or not — until '
+      'the next question is planned or the quiz is dismissed; a socratic '
+      'question has none', () async {
+    final bank = await boot();
+    planNext(_plan(ChatRequestType.mcQuestion));
+    connector.scripts.add(_reply(_mcq()));
+    await tutor().requestExercise();
+    String? shown() => pc!.read(shownQuestionIdProvider);
+    final first = shown();
+    expect(first, 's1_${BankQuestion.contentHashOf(_mcq())}');
+    expect(store.docs, isEmpty, reason: 'not in the bank, and shown anyway');
+
+    // Answered wrong: never stored, and the ID stays with the quiz while
+    // its feedback is on screen.
+    connector.scripts.add(_reply(_mcqGrade(AnswerQuality.wrong, 'Nee.')));
+    await tutor().submitMcqAnswer('11');
+    await bank.idle;
+    expect(store.docs, isEmpty);
+    expect(shown(), first);
+    expect(history.records.single.questionId, first);
+
+    // The next question is planned and never arrives: the ID of the one
+    // before is gone with it.
+    await tutor().requestExercise();
+    expect(pc!.read(activeMcqProvider), isNotNull, reason: 'still on screen');
+    expect(shown(), isNull);
+
+    final next = MultipleChoice(
+      type: 'multiple_choice',
+      prompt: 'En print(2 + 2)?',
+      code: 'print(2 + 2)',
+      options: const ['4', '22'],
+      correct: '4',
+    );
+    connector.scripts.add(_reply(next));
+    await tutor().requestExercise();
+    expect(shown(), allOf(startsWith('s1_'), isNot(first)));
+    expect(
+      BankQuestion.shortIdOf(shown()!),
+      isNot(BankQuestion.shortIdOf(first!)),
+    );
+
+    // "Next" dismisses the quiz and its ID at once, before the next
+    // exercise is even planned.
+    final planned = Completer<QuestionPlan>();
+    when(() => conductor.planNext()).thenAnswer((_) => planned.future);
+    final advancing = tutor().advanceFromMcq();
+    expect(pc!.read(activeMcqProvider), isNull);
+    expect(shown(), isNull);
+
+    // A socratic question: the bank never keeps one, so it has no ID.
+    connector.scripts.add(_reply(_socratic('Waarom werkt dit?')));
+    planned.complete(_plan(ChatRequestType.socraticQuestion));
+    await advancing;
+    expect(connector.scripts, isEmpty, reason: 'the socratic question came');
+    expect(shown(), isNull);
+  });
+
+  test('a wrong or a partial first answer stores nothing; the turn record '
+      'still names the question', () async {
+    final bank = await boot();
+    planNext(_plan(ChatRequestType.mcQuestion));
+    connector.scripts.add(_reply(_mcq()));
+    await tutor().requestExercise();
+    connector.scripts.add(
+      _reply(_mcqGrade(AnswerQuality.wrong, 'Nee: 1 + 1 is een som.')),
+    );
+    await tutor().submitMcqAnswer('11');
+    await bank.idle;
+
+    expect(store.docs, isEmpty);
+    final wrong = history.records.single.questionId;
+    expect(wrong, startsWith('s1_'));
+
+    // Partial is not correct (#215), as in `correctCount`.
+    connector.scripts.add(
+      _reply(
+        MultipleChoice(
+          type: 'multiple_choice',
+          prompt: 'En print(2 + 2)?',
+          code: 'print(2 + 2)',
+          options: const ['4', '22'],
+          correct: '4',
+        ),
+      ),
+    );
+    await tutor().advanceFromMcq();
+    connector.scripts.add(_reply(_mcqGrade(AnswerQuality.partial, 'Bijna.')));
+    await tutor().submitMcqAnswer('4');
+    await bank.idle;
+
+    expect(store.docs, isEmpty);
+    expect(history.records, hasLength(2));
+    expect(
+      history.records[1].questionId,
+      allOf(startsWith('s1_'), isNot(wrong)),
+    );
+  });
+
+  test('a socratic question is never stored, not even on a correct answer; '
+      'the turn record still names it', () async {
+    final bank = await boot();
+    planNext(_plan(ChatRequestType.socraticQuestion));
+    connector.scripts.add(_reply(_socratic('Waarom werkt dit?')));
+    await tutor().requestExercise();
+
+    connector.scripts
+      ..add(_reply(_socraticGrade('Juist.', quality: AnswerQuality.correct)))
+      // The grade asks for the next exercise.
+      ..add(_reply(_socratic('Wat doet str()?')));
+    await tutor().handleStudentMessage('Omdat het een som is.');
+    await bank.idle;
+
+    expect(history.records.first.overallQuality, AnswerQuality.correct);
+    expect(history.records.first.questionId, startsWith('s1_'));
+    expect(store.docs, isEmpty);
   });
 
   test(
     'a question whose call reported no usage names the default model',
     () async {
       final bank = await boot();
-      planNext(_plan(ChatRequestType.socraticQuestion));
-      connector.scripts.add(_reply(_socratic('Waarom werkt dit?')));
+      planNext(_plan(ChatRequestType.mcQuestion));
+      connector.scripts.add(_reply(_mcq()));
       await tutor().requestExercise();
+      connector.scripts.add(_reply(_mcqGrade(AnswerQuality.correct, 'Ja.')));
+      await tutor().submitMcqAnswer('2');
       await bank.idle;
 
       expect(
@@ -367,26 +508,28 @@ void main() {
   test("a follow-up's grade is not counted on the question and names no "
       'question', () async {
     final bank = await boot();
-    planNext(_plan(ChatRequestType.socraticQuestion));
-    connector.scripts.add(_reply(_socratic('Waarom werkt dit?')));
+    planNext(_plan(ChatRequestType.mcQuestion));
+    connector.scripts.add(_reply(_mcq()));
     await tutor().requestExercise();
 
     connector.scripts.add(
       _reply(
-        _socraticGrade(
-          'Bijna.',
-          followUp: const FollowUp(question: 'En zonder haakjes?'),
+        McqFeedback(
+          type: 'mcq_feedback',
+          quality: AnswerQuality.correct,
+          prompt: 'Juist.',
+          followUp: const FollowUp(question: 'En print("1" + "1")?'),
         ),
       ),
     );
-    await tutor().handleStudentMessage('Omdat het een som is.');
+    await tutor().submitMcqAnswer('2');
     expect(tutor().state, TutorState.idle);
 
     connector.scripts
-      ..add(_reply(_socraticGrade('Juist.')))
-      // The follow-up's grade asks for the next exercise.
+      ..add(_reply(_socraticGrade('Nee, dat wordt 11.')))
+      // The follow-up's grade may ask for the next exercise.
       ..add(_reply(_socratic('Wat doet str()?')));
-    await tutor().handleStudentMessage('Dan is het een fout.');
+    await tutor().handleStudentMessage('Ook 2.');
     await bank.idle;
 
     expect(history.records, hasLength(2));
@@ -396,29 +539,29 @@ void main() {
     expect(followUp.questionId, isNull);
 
     final asked = BankQuestion.tryFromCosmos(store[first.questionId!]!)!;
-    expect(asked.prompt, 'Waarom werkt dit?');
+    expect(asked.prompt, 'Wat drukt print(1 + 1) af?');
     expect(asked.answeredCount, 1);
-    // ... and the next exercise is in the bank too.
-    expect(store.docs, hasLength(2));
+    expect(asked.correctCount, 1);
+    expect(store.docs, hasLength(1));
   });
 
   test('a warm-up question goes into the bank of the older subgoal it is '
       'about', () async {
     final bank = await boot();
     planNext(
-      _plan(
-        ChatRequestType.socraticQuestion,
-        warmUp: WarmUpReview(subgoal: earlier),
-      ),
+      _plan(ChatRequestType.mcQuestion, warmUp: WarmUpReview(subgoal: earlier)),
     );
-    connector.scripts.add(_reply(_socratic('Wat doet print()?')));
+    connector.scripts.add(_reply(_mcq()));
     await tutor().requestExercise();
+    connector.scripts.add(_reply(_mcqGrade(AnswerQuality.correct, 'Ja.')));
+    await tutor().submitMcqAnswer('2');
     await bank.idle;
 
     final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
     expect(q.subgoalId, 's0');
     expect(q.rootGoalId, 'r1');
     expect(q.id, startsWith('s0_'));
+    expect(history.records.single.questionId, q.id);
   });
 
   group('the bank never reaches the student', () {

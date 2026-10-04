@@ -1,13 +1,18 @@
-// Issue #116 — the level curve. XP is derived from `Progress.progress`
-// summed over the non-optional subgoals × 100, and every level is a constant
-// 500 XP wide (it used to be `1500 * level`, so level 2 cost 15 subgoals and
-// each level after that was wider than the last).
+// Issue #116 — the level curve. Mastery XP is derived from
+// `Progress.progress` summed over the non-optional subgoals × 100, and every
+// level is a constant 500 XP wide (it used to be `1500 * level`, so level 2
+// cost 15 subgoals and each level after that was wider than the last).
 //
-// `_xpBreakdown` / the curve constants are private, so the curve is exercised
-// where the app reads it: `xpStateProvider` over the real `GoalsService` /
-// `ProgressService` on an in-memory Cosmos. The user-visible end of the same
-// change — the top bar's XP pill — is asserted in
-// `integration_test/flows/options_panel.dart`.
+// Issue #217 — every oefening is worth 20 XP on top, from the account's
+// `oefeningCount`: XP that only goes up, so a lesson spent on one hard LO
+// still moves the bar.
+//
+// `_xpBreakdown` is private, so the curve is exercised where the app reads
+// it: `xpStateProvider` over the real `AccountService` state, `GoalsService`
+// and `ProgressService` on an in-memory Cosmos. The user-visible end of the
+// same change — the top bar's XP pill — is asserted in
+// `integration_test/flows/options_panel.dart` and, for the oefeningen,
+// `integration_test/flows/oefening_xp.dart`.
 
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
@@ -22,14 +27,34 @@ import '../../helpers/in_memory_cosmos.dart';
 const String _uid = 'u1';
 
 class _SignedInAccount extends AccountService {
+  _SignedInAccount([this.oefeningCount = 0]);
+  final int oefeningCount;
+
   @override
-  Account? build() => const Account(
+  Account? build() => Account(
     uid: _uid,
     email: 'sam@school.example',
     firstName: 'Sam',
     lastName: 'Peeters',
     targetGoal: 'Python basics',
+    oefeningCount: oefeningCount,
   );
+
+  /// A poll that brought a new count back.
+  void counted(int n) => state = Account(
+    uid: _uid,
+    email: 'sam@school.example',
+    firstName: 'Sam',
+    lastName: 'Peeters',
+    targetGoal: 'Python basics',
+    oefeningCount: n,
+  );
+}
+
+/// What the top bar reads, once the mastery part has its first value.
+Future<XpState> _xp(ProviderContainer container) async {
+  await container.read(masteryXpProvider.future);
+  return container.read(xpStateProvider).requireValue;
 }
 
 Map<String, dynamic> _goalDoc({
@@ -59,13 +84,12 @@ Map<String, dynamic> _progressDoc(String goalId, double progress) => {
 };
 
 void main() {
-  /// [completed] fully-finished non-optional subgoals out of [subgoals], each
-  /// worth 100 XP.
-  Future<XpState> xpFor({
+  ProviderContainer containerFor({
     required int subgoals,
     required int completed,
     double partial = 0.0,
-  }) async {
+    int oefeningen = 0,
+  }) {
     final goals = InMemoryCosmos([
       _goalDoc(id: 'r1'),
       for (var i = 0; i < subgoals; i++) _goalDoc(id: 's$i', parentId: 'r1'),
@@ -77,7 +101,7 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
-        accountServiceProvider.overrideWith(_SignedInAccount.new),
+        accountServiceProvider.overrideWith(() => _SignedInAccount(oefeningen)),
         goalsServiceProvider.overrideWithValue(
           GoalsService(container: goals.container),
         ),
@@ -91,8 +115,24 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    return container.read(xpStateProvider.future);
+    return container;
   }
+
+  /// [completed] fully-finished non-optional subgoals out of [subgoals], each
+  /// worth 100 XP, and [oefeningen] made, each worth 20.
+  Future<XpState> xpFor({
+    required int subgoals,
+    required int completed,
+    double partial = 0.0,
+    int oefeningen = 0,
+  }) async => _xp(
+    containerFor(
+      subgoals: subgoals,
+      completed: completed,
+      partial: partial,
+      oefeningen: oefeningen,
+    ),
+  );
 
   group('xp level curve', () {
     test('every level is the same 500 XP wide', () async {
@@ -168,8 +208,55 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final s = await container.read(xpStateProvider.future);
+      final s = await _xp(container);
       expect(s.xp, 100);
+    });
+  });
+
+  group('XP per oefening (#217)', () {
+    test('every oefening is 20 XP, with no subgoal mastered at all', () async {
+      final s = await xpFor(subgoals: 5, completed: 0, oefeningen: 7);
+      expect(kXpPerOefening, 20);
+      expect(s.level, 1);
+      expect(s.xp, 140);
+      expect(s.oefeningCount, 7);
+      expect(s.masteryXp, 0);
+    });
+
+    test('25 oefeningen are a level on their own', () async {
+      expect((await xpFor(subgoals: 5, completed: 0, oefeningen: 24)).xp, 480);
+      final s = await xpFor(subgoals: 5, completed: 0, oefeningen: 25);
+      expect(s.level, 2);
+      expect(s.xp, 0);
+    });
+
+    test('the oefeningen and the mastery XP add up', () async {
+      // 140 oefeningen (≈ six lesson hours) = 2800 XP, plus three subgoals
+      // = 300: 3100 XP is level 7, 100 into it.
+      final s = await xpFor(subgoals: 8, completed: 3, oefeningen: 140);
+      expect(s.level, 7);
+      expect(s.xp, 100);
+      expect(s.oefeningCount, 140);
+      expect(s.masteryXp, 300);
+    });
+
+    test('a new count from the account poll is re-derived in place, without '
+        'the pill falling back to its default in between', () async {
+      final container = containerFor(subgoals: 5, completed: 1, oefeningen: 4);
+      expect((await _xp(container)).xp, 180);
+
+      final seen = <AsyncValue<XpState>>[];
+      container.listen(xpStateProvider, (_, next) => seen.add(next));
+      (container.read(accountServiceProvider.notifier) as _SignedInAccount)
+          .counted(5);
+      // Dependents re-derive on the scheduler's next flush.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, hasLength(1));
+      expect(seen.single.hasValue, isTrue);
+      expect(seen.single.isLoading, isFalse);
+      expect(seen.single.requireValue.xp, 200);
+      expect(container.read(profileProvider).xp, 200);
     });
   });
 }

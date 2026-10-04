@@ -94,4 +94,35 @@ void main() {
       expect(Account.fromMap(doc()).className, '');
     });
   });
+
+  group('Account — oefeningCount (#217)', () {
+    Map<String, dynamic> doc([Object? count]) => {
+      'id': 'uid-4',
+      'uid': 'uid-4',
+      'email': 'd@e.com',
+      'firstName': 'Dani',
+      'lastName': 'Claes',
+      'targetGoal': '',
+      if (count != null) 'oefeningCount': count,
+    };
+
+    test('reads the stored count', () {
+      expect(Account.fromMap(doc(140)).oefeningCount, 140);
+      // JSON numbers may come back as doubles.
+      expect(Account.fromMap(doc(12.0)).oefeningCount, 12);
+    });
+
+    test('is 0 on a doc from before the counter, or one with nonsense in '
+        'it', () {
+      expect(Account.fromMap(doc()).oefeningCount, 0);
+      expect(Account.fromMap(doc('7')).oefeningCount, 0);
+      expect(Account.fromMap(doc(-3)).oefeningCount, 0);
+    });
+
+    test('round-trips through toMap', () {
+      final a = Account.fromMap(doc(25));
+      expect(a.toMap()['oefeningCount'], 25);
+      expect(Account.fromMap(a.toMap()).oefeningCount, 25);
+    });
+  });
 }

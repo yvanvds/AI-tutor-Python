@@ -11,7 +11,9 @@
 // model like a fresh one, on its own exercise. And a missing bank changes
 // nothing for the student: the question is generated. A grader on that
 // feedback call that calls the key wrong (#198) — even while grading the
-// pick as the key does — overrules the key like a contradicting grade.
+// pick as the key does — overrules the key like a contradicting grade. And
+// a bank question whose answers fall below half correct on at least 10
+// hides itself (#215): it is not served any more.
 //
 // Real app, real navigation, real quiz and practice views, real tutor →
 // question bank service → in-memory Cosmos; only the model is scripted, and
@@ -33,6 +35,7 @@ import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
+import 'package:ai_tutor_python/services/question_bank/question_bank_service.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -253,6 +256,72 @@ void main() {
     expect(doc['correctCount'], 0);
     expect(doc['optionFeedback'], hasLength(1));
     expect(bank[other['id'] as String]!['askedCount'], 3);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a wrong pick that leaves the question below half correct on '
+      'its tenth answer hides it (#215): the student sees nothing of it, and '
+      'the bank does not serve it any more', (tester) async {
+    final llm = ScriptedLlm(const []);
+    final harness = AppHarness(
+      llm: llm,
+      extraDocs: {
+        'goals': [_printSubgoal()],
+        'config': [_config(minimum: 1)],
+        // 4 of 9 correct: under half, but on fewer than 10 answers.
+        'questions': [
+          {...served, 'askedCount': 9, 'answeredCount': 9, 'correctCount': 4},
+        ],
+      },
+    );
+    await harness.boot(tester);
+    await waitForMix(tester, harness);
+
+    await practise(tester);
+    await pumpUntilFound(tester, find.byType(QuizView));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('Wat drukt print(1 + 1) af?', findRichText: true),
+    );
+    await pumpUntilFound(tester, find.text(_wrong));
+    await waitForIdle(tester, harness);
+
+    await tester.tap(find.text(_wrong));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('1 + 1 is een som', findRichText: true),
+    );
+    await waitForIdle(tester, harness);
+    await tester.pump(AppDurations.hover);
+
+    // For the student, a pick graded like any other.
+    expect(llm.sends, 0);
+    expect(optionHue(tester, _wrong), AppColors.danger);
+    expect(find.text('Next →'), findsOneWidget);
+    expect(find.textContaining('went wrong'), findsNothing);
+
+    // 4 of 10: hidden by the bank itself.
+    final bank = harness.cosmos['questions'];
+    final id = served['id'] as String;
+    await pumpUntil(
+      tester,
+      () => bank[id]!['answeredCount'] == 10,
+      reason: 'the answer was not counted',
+    );
+    final doc = bank[id]!;
+    expect(doc['correctCount'], 4);
+    expect(doc['status'], 'hidden');
+    expect(doc['hiddenBy'], 'auto');
+    expect(doc['hiddenAt'], isA<String>());
+    expect(BankQuestion.tryFromCosmos(doc)!.isAutoHidden, isTrue);
+    expect(
+      await harness.container
+          .read(questionBankServiceProvider)
+          .listServable('s1'),
+      isEmpty,
+      reason: 'a hidden question is not served',
+    );
 
     await harness.dispose(tester);
   });

@@ -1,27 +1,36 @@
 // The question bank's reads and writes (#185), over the `questions`
 // container (`/subgoalId` partition — see `CosmosPaths.questions`).
 //
+// What the bank keeps (#215): a generated question is stored only at the
+// first graded answer to it, and only when that answer is correct
+// ([recordFirstAnswer]); a stored one hides itself once at least
+// `PolicyConstants.bankAutoHideMinAnswers` answers are graded and less than
+// `bankAutoHideMaxShare` of them were correct, unless the teacher showed it
+// again after that (`keptByTeacher`). The teacher hides, shows again or
+// deletes the rest by hand.
+//
 // Two kinds of caller, two error contracts:
 //
 //   - The tutor, on a student's machine: [listServable] when it considers
-//     serving a question from the bank (#186), [recordAsked] when a question
-//     is put in front of the student, [recordAnswer] when the answer to it
-//     is graded. Best-effort, like the turn history: a failure is logged and
-//     swallowed, never thrown, the tutor does not wait for either write, and
-//     the read gives up after [kQuestionBankReadTimeout] — a bank that is
-//     slow, down, or not created yet must not break or delay an exercise.
-//     The writes of one app run are queued, so the answer to a question can
-//     never overtake the write that stores it.
-//   - The teacher's Questions page: listing and the review actions throw,
-//     so the page can say what went wrong — in particular that the
-//     container does not exist yet ([CosmosException.isContainerNotFound]).
+//     serving a question from the bank (#186), [recordAsked] when a bank
+//     question is put in front of the student, [recordAnswer] when the
+//     answer to it is graded, [recordFirstAnswer] when the answer to a
+//     question it just generated is. Best-effort, like the turn history: a
+//     failure is logged and swallowed, never thrown, the tutor does not
+//     wait for any write, and the read gives up after
+//     [kQuestionBankReadTimeout] — a bank that is slow, down, or not created
+//     yet must not break or delay an exercise. The writes of one app run are
+//     queued, so they land in the order they were made.
+//   - The teacher's Questions page: listing, hiding and deleting throw, so
+//     the page can say what went wrong — in particular that the container
+//     does not exist yet ([CosmosException.isContainerNotFound]).
 //
-// Every write reads the doc, changes the fields it owns and writes the doc
-// back whole — with the fields it does not know about still in it, so a
-// newer build's fields survive an older build's write (#165). Two clients
-// counting the same question in the same instant can lose one increment;
-// the counts are a teacher's statistic, not a grade, and Cosmos' REST patch
-// is not wired into the client.
+// Every write but a create or a delete reads the doc, changes the fields it
+// owns and writes the doc back whole — with the fields it does not know
+// about still in it, so a newer build's fields survive an older build's
+// write (#165). Two clients counting the same question in the same instant
+// can lose one increment; the counts are a statistic, not a grade, and
+// Cosmos' REST patch is not wired into the client.
 
 import 'dart:async';
 
@@ -30,6 +39,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -40,12 +50,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const Duration kQuestionBankRetryAfter = Duration(minutes: 10);
 
 /// The part of a bank question the Questions page's goal tree counts with.
-typedef BankQuestionSummary = ({
-  String id,
-  String subgoalId,
-  bool hidden,
-  bool reviewed,
-});
+typedef BankQuestionSummary = ({String id, String subgoalId, bool hidden});
 
 /// How long the tutor waits for the bank before it generates the question
 /// instead (#186). A bank read normally takes a fraction of this; one that
@@ -77,49 +82,97 @@ class QuestionBankService {
   /// Until when the tutor skips the bank after a `ContainerNotFound`.
   DateTime? _unavailableUntil;
 
+  /// Whether [answered] graded answers of which [correct] were correct hide
+  /// a bank question (#215): at least `bankAutoHideMinAnswers` answers and
+  /// less than `bankAutoHideMaxShare` correct. Exactly that share stays.
+  static bool hidesItself({required int answered, required int correct}) =>
+      answered >= PolicyConstants.bankAutoHideMinAnswers &&
+      correct / answered < PolicyConstants.bankAutoHideMaxShare;
+
   // ---- Tutor side: best-effort, queued -------------------------------------
 
-  /// Counts one ask of [question]: stores it when the bank does not have it
-  /// yet (with `askedCount` 1), else adds one to its `askedCount`. Dedupe is
-  /// the doc id — the same generation for the same subgoal is the same doc.
+  /// Counts one ask of [question], served from the bank (#186): one more on
+  /// its `askedCount`, and `lastAskedAt`. A question the bank no longer has
+  /// — the teacher deleted it since it was read — is left alone: only a
+  /// correct first answer stores a question ([recordFirstAnswer]).
   ///
   /// Never throws; the returned future is for tests; the tutor does not wait
   /// for it.
   Future<void> recordAsked(BankQuestion question) =>
       _queue('recordAsked ${question.id}', () async {
-        final at = _now().toIso8601String();
-        final existing = await _container.read(
+        final at = _now();
+        await _modify(
           question.id,
-          partitionKey: question.subgoalId,
+          question.subgoalId,
+          (doc) => _countAsk(doc, at),
         );
-        if (existing == null) {
-          try {
-            await _container.create({
-              ...question.toMap(),
-              'askedCount': 1,
-              'lastAskedAt': at,
-            }, partitionKey: question.subgoalId);
-            return;
-          } on CosmosException catch (e) {
-            // Another student's app stored the same generation first.
-            if (e.statusCode != 409) rethrow;
-          }
-        }
-        await _modify(question.id, question.subgoalId, (doc) {
-          doc['askedCount'] = _count(doc['askedCount']) + 1;
-          doc['lastAskedAt'] = at;
-        });
       });
 
-  /// Counts one graded answer to the question [questionId]: `answeredCount`
-  /// always, `correctCount` when [correct]. For a multiple-choice pick, the
-  /// grader's [feedback] on [pickedOption] is kept with its [quality] the
-  /// first time that option is picked — a later text never replaces it.
-  /// [keyDisputed]: the grader said the answer key itself is wrong (#198);
-  /// counted in `keyDisputedCount`, the last time in `keyDisputedAt`.
+  /// The first graded answer to [question], a question the tutor just
+  /// generated (#215). [question] is as it was put in front of the student:
+  /// its `createdAt` is when it was asked.
   ///
-  /// A question the bank does not have (its ask was never stored) is left
-  /// alone. Never throws.
+  /// When the bank does not have it yet, it is stored only when [correct] —
+  /// a wrong or partial answer stores nothing — with the ask and the answer
+  /// counted: `askedCount`, `answeredCount` and `correctCount` 1,
+  /// `lastAskedAt` the moment it was asked, and for a multiple-choice pick
+  /// the feedback the student got on it. When the bank has it already — the
+  /// same generation, stored by another student's correct answer, also when
+  /// that happened while this one was being created (a 409) — the ask and
+  /// the answer count on that doc as they would on a served question,
+  /// whatever the answer.
+  ///
+  /// [pickedOption], [feedback], [quality] and [keyDisputed] as for
+  /// [recordAnswer]. Never throws.
+  Future<void> recordFirstAnswer(
+    BankQuestion question, {
+    required bool correct,
+    String? pickedOption,
+    String? feedback,
+    AnswerQuality? quality,
+    bool keyDisputed = false,
+  }) => _queue('recordFirstAnswer ${question.id}', () async {
+    void count(Map<String, dynamic> doc) {
+      _countAsk(doc, question.createdAt);
+      _countAnswer(
+        doc,
+        correct: correct,
+        pickedOption: pickedOption,
+        feedback: feedback,
+        quality: quality,
+        keyDisputed: keyDisputed,
+      );
+    }
+
+    final existing = await _container.read(
+      question.id,
+      partitionKey: question.subgoalId,
+    );
+    if (existing == null) {
+      if (!correct) return;
+      final doc = question.toMap();
+      count(doc);
+      try {
+        await _container.create(doc, partitionKey: question.subgoalId);
+        return;
+      } on CosmosException catch (e) {
+        // Another student's app stored the same generation first.
+        if (e.statusCode != 409) rethrow;
+      }
+    }
+    await _modify(question.id, question.subgoalId, count);
+  });
+
+  /// Counts one graded answer to the question [questionId], served from the
+  /// bank: `answeredCount` always, `correctCount` when [correct]. For a
+  /// multiple-choice pick, the grader's [feedback] on [pickedOption] is kept
+  /// with its [quality] the first time that option is picked — a later text
+  /// never replaces it. [keyDisputed]: the grader said the answer key itself
+  /// is wrong (#198); counted in `keyDisputedCount`, the last time in
+  /// `keyDisputedAt`. An answer that leaves the question with too few
+  /// correct ([hidesItself]) hides it (#215).
+  ///
+  /// A question the bank no longer has is left alone. Never throws.
   Future<void> recordAnswer({
     required String questionId,
     required String subgoalId,
@@ -129,29 +182,18 @@ class QuestionBankService {
     AnswerQuality? quality,
     bool keyDisputed = false,
   }) => _queue('recordAnswer $questionId', () async {
-    await _modify(questionId, subgoalId, (doc) {
-      doc['answeredCount'] = _count(doc['answeredCount']) + 1;
-      if (correct) doc['correctCount'] = _count(doc['correctCount']) + 1;
-      if (keyDisputed) {
-        doc['keyDisputedCount'] = _count(doc['keyDisputedCount']) + 1;
-        doc['keyDisputedAt'] = _now().toIso8601String();
-      }
-      final text = feedback?.trim() ?? '';
-      if (pickedOption == null || text.isEmpty) return;
-      final question = BankQuestion.tryFromCosmos(doc);
-      if (question == null || !question.options.contains(pickedOption)) {
-        return;
-      }
-      if (question.feedbackFor(pickedOption) != null) return;
-      doc['optionFeedback'] = [
-        ...question.optionFeedback.map((f) => f.toJson()),
-        BankOptionFeedback(
-          option: pickedOption,
-          text: text,
-          quality: quality,
-        ).toJson(),
-      ];
-    });
+    await _modify(
+      questionId,
+      subgoalId,
+      (doc) => _countAnswer(
+        doc,
+        correct: correct,
+        pickedOption: pickedOption,
+        feedback: feedback,
+        quality: quality,
+        keyDisputed: keyDisputed,
+      ),
+    );
   });
 
   /// The questions of [subgoalId] the tutor may serve (#186): the active
@@ -222,6 +264,59 @@ class QuestionBankService {
     }
   }
 
+  /// One more ask on [doc], asked at [at]; `lastAskedAt` never goes back.
+  static void _countAsk(Map<String, dynamic> doc, DateTime at) {
+    doc['askedCount'] = _count(doc['askedCount']) + 1;
+    final last = doc['lastAskedAt'] is String
+        ? DateTime.tryParse(doc['lastAskedAt'] as String)
+        : null;
+    if (last == null || at.isAfter(last)) {
+      doc['lastAskedAt'] = at.toUtc().toIso8601String();
+    }
+  }
+
+  /// One more graded answer on [doc] (see [recordAnswer]), and the hide it
+  /// may bring (#215).
+  void _countAnswer(
+    Map<String, dynamic> doc, {
+    required bool correct,
+    String? pickedOption,
+    String? feedback,
+    AnswerQuality? quality,
+    bool keyDisputed = false,
+  }) {
+    final answered = _count(doc['answeredCount']) + 1;
+    final right = _count(doc['correctCount']) + (correct ? 1 : 0);
+    doc['answeredCount'] = answered;
+    doc['correctCount'] = right;
+    if (keyDisputed) {
+      doc['keyDisputedCount'] = _count(doc['keyDisputedCount']) + 1;
+      doc['keyDisputedAt'] = _now().toIso8601String();
+    }
+    if (doc['status'] != BankQuestionStatus.hidden.name &&
+        doc['keptByTeacher'] != true &&
+        hidesItself(answered: answered, correct: right)) {
+      doc['status'] = BankQuestionStatus.hidden.name;
+      doc['hiddenBy'] = BankHiddenBy.auto.name;
+      doc['hiddenAt'] = _now().toIso8601String();
+    }
+    final text = feedback?.trim() ?? '';
+    if (pickedOption == null || text.isEmpty) return;
+    final question = BankQuestion.tryFromCosmos(doc);
+    if (question == null || !question.options.contains(pickedOption)) {
+      return;
+    }
+    if (question.feedbackFor(pickedOption) != null) return;
+    doc['optionFeedback'] = [
+      ...question.optionFeedback.map((f) => f.toJson()),
+      BankOptionFeedback(
+        option: pickedOption,
+        text: text,
+        quality: quality,
+      ).toJson(),
+    ];
+  }
+
   // ---- Reads (#186 and the Questions page) ---------------------------------
 
   /// One question, or `null` when the bank does not have it. Throws.
@@ -256,13 +351,13 @@ class QuestionBankService {
     return out;
   }
 
-  /// What the Questions page's goal tree counts: every question's subgoal,
-  /// status and whether it was reviewed. The one read that crosses
-  /// partitions; teacher-only. Throws.
+  /// What the Questions page's goal tree counts: every question's subgoal
+  /// and whether it is hidden. The one read that crosses partitions;
+  /// teacher-only. Throws.
   Future<List<BankQuestionSummary>> listSummaries() async {
     final docs = await safeCosmos(
       () => _container.query(
-        'SELECT c.id, c.subgoalId, c.status, c.reviewedAt FROM c',
+        'SELECT c.id, c.subgoalId, c.status FROM c',
         crossPartition: true,
       ),
     );
@@ -274,49 +369,36 @@ class QuestionBankService {
               id: id,
               subgoalId: subgoalId,
               hidden: doc['status'] == BankQuestionStatus.hidden.name,
-              reviewed: doc['reviewedAt'] is String,
             ),
     ];
   }
 
   // ---- Teacher actions -----------------------------------------------------
   //
-  // Each marks the question reviewed and returns it as it now stands in the
-  // container — counts included that students added since the page loaded.
   // They throw.
 
-  /// "Looked at it, it is fine."
-  Future<BankQuestion> markReviewed(BankQuestion question) =>
-      _review(question, (_) {});
-
-  /// Hides [question] from being served again, or ([hidden] false) lets it
-  /// back in. Never deletes: turn records point at it.
-  Future<BankQuestion> setHidden(BankQuestion question, bool hidden) =>
-      _review(question, (doc) {
-        doc['status'] = hidden
-            ? BankQuestionStatus.hidden.name
-            : BankQuestionStatus.active.name;
-      });
-
-  /// Sets the teacher's note; a blank [note] removes it.
-  Future<BankQuestion> setNote(BankQuestion question, String? note) =>
-      _review(question, (doc) {
-        final text = note?.trim() ?? '';
-        if (text.isEmpty) {
-          doc.remove('teacherNote');
-        } else {
-          doc['teacherNote'] = text;
-        }
-      });
-
-  Future<BankQuestion> _review(
-    BankQuestion question,
-    void Function(Map<String, dynamic> doc) change,
-  ) async {
+  /// Hides [question] from being served, or ([hidden] false) lets it back
+  /// in. Returns it as it now stands in the container — counts included
+  /// that students added since the page loaded. Showing again a question
+  /// that hid itself marks it `keptByTeacher` (#215): it does not hide
+  /// itself again, or it would at the next answer.
+  Future<BankQuestion> setHidden(BankQuestion question, bool hidden) async {
     final written = await safeCosmos(
       () => _modify(question.id, question.subgoalId, (doc) {
-        change(doc);
-        doc['reviewedAt'] = _now().toIso8601String();
+        if (hidden) {
+          doc['status'] = BankQuestionStatus.hidden.name;
+          doc['hiddenBy'] = BankHiddenBy.teacher.name;
+          doc['hiddenAt'] = _now().toIso8601String();
+          return;
+        }
+        if (doc['status'] == BankQuestionStatus.hidden.name &&
+            doc['hiddenBy'] == BankHiddenBy.auto.name) {
+          doc['keptByTeacher'] = true;
+        }
+        doc['status'] = BankQuestionStatus.active.name;
+        doc
+          ..remove('hiddenBy')
+          ..remove('hiddenAt');
       }),
     );
     final updated = written == null
@@ -327,6 +409,15 @@ class QuestionBankService {
     }
     return updated;
   }
+
+  /// Deletes [question] from the bank (#215) — hidden or not. Safe: turn
+  /// records keep its id, but nothing reads the question through one (see
+  /// `bank_question.dart`). The same generation, asked again later, gets the
+  /// same id and is stored only when its first answer is correct. A question
+  /// already gone is no error.
+  Future<void> delete(BankQuestion question) => safeCosmos(
+    () => _container.delete(question.id, partitionKey: question.subgoalId),
+  );
 
   /// Reads the doc, applies [change] and writes it back. Returns what was
   /// written, or `null` when the doc does not exist.

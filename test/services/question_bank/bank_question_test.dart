@@ -1,5 +1,6 @@
 // Issue #185 — the question bank's model: what a generated question is
 // stored as, and what the next reader (#186, the Questions page) gets back.
+// And #216: the short ID the student sees and the teacher looks up.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
@@ -73,7 +74,21 @@ void main() {
       expect(q.correctOption, "'Python'");
       expect(q.askedCount, 0);
       expect(q.isActive, isTrue);
-      expect(q.isReviewed, isFalse);
+      expect(q.hiddenBy, isNull);
+      expect(q.keptByTeacher, isFalse);
+      // Nothing of the teacher's: no hide, no review stamp, no note (#215).
+      expect(
+        q.toMap().keys,
+        isNot(
+          anyOf(
+            contains('hiddenBy'),
+            contains('hiddenAt'),
+            contains('keptByTeacher'),
+            contains('reviewedAt'),
+            contains('teacherNote'),
+          ),
+        ),
+      );
     });
 
     test('the question type is what the model returned', () {
@@ -159,11 +174,15 @@ void main() {
           {'option': 'Error', 'text': 'Nee, dit werkt.', 'quality': 'wrong'},
         ],
         'status': 'hidden',
-        'teacherNote': 'Te makkelijk',
-        'reviewedAt': '2026-09-24T10:00:00.000Z',
-        // Cosmos system fields and a field of a newer build are ignored.
+        'hiddenBy': 'auto',
+        'hiddenAt': '2026-09-24T10:00:00.000Z',
+        'keptByTeacher': true,
+        // Cosmos system fields, a field of a newer build, and the review
+        // stamp and note of a doc from before #215 are ignored.
         '_etag': '"0"',
         'futureField': true,
+        'teacherNote': 'Te makkelijk',
+        'reviewedAt': '2026-09-24T10:00:00.000Z',
       };
       final back = BankQuestion.tryFromCosmos(stored)!;
 
@@ -177,14 +196,36 @@ void main() {
           {'option': 'Error', 'text': 'Nee, dit werkt.', 'quality': 'wrong'},
         ],
         'status': 'hidden',
-        'teacherNote': 'Te makkelijk',
-        'reviewedAt': '2026-09-24T10:00:00.000Z',
+        'hiddenBy': 'auto',
+        'hiddenAt': '2026-09-24T10:00:00.000Z',
+        'keptByTeacher': true,
       });
       expect(back.shareCorrect, 0.25);
       expect(back.isActive, isFalse);
-      expect(back.isReviewed, isTrue);
+      expect(back.isAutoHidden, isTrue);
+      expect(back.hiddenAt, DateTime.utc(2026, 9, 24, 10));
+      expect(back.keptByTeacher, isTrue);
       expect(back.feedbackFor('Error')!.quality, AnswerQuality.wrong);
       expect(back.feedbackFor('Python'), isNull);
+    });
+
+    test('a question hidden before #215 carries no hiddenBy: the teacher hid '
+        'it', () {
+      final q = BankQuestion.tryFromCosmos({
+        ..._bank(_mcq())!.toMap(),
+        'status': 'hidden',
+      })!;
+      expect(q.isActive, isFalse);
+      expect(q.hiddenBy, isNull);
+      expect(q.isAutoHidden, isFalse);
+      expect(
+        BankQuestion.tryFromCosmos({
+          ..._bank(_mcq())!.toMap(),
+          'status': 'hidden',
+          'hiddenBy': 'teacher',
+        })!.isAutoHidden,
+        isFalse,
+      );
     });
 
     test('a doc a reader cannot use is skipped, not guessed at', () {
@@ -282,6 +323,54 @@ void main() {
         ]).graderDisagreesWithKey,
         isTrue,
       );
+    });
+  });
+
+  group('short ID (#216)', () {
+    test('is # and the first six characters of the content hash — of a doc '
+        'id or of the hash alone, the same on every subgoal', () {
+      final q = _bank(_mcq())!;
+      final hash = q.id.substring('s1_'.length);
+      expect(q.shortId, '#${hash.substring(0, 6)}');
+      expect(BankQuestion.shortIdOf(q.id), q.shortId);
+      expect(BankQuestion.shortIdOf(hash), q.shortId);
+      expect(_bank(_mcq(), subgoalId: 'other_subgoal')!.shortId, q.shortId);
+      expect(BankQuestion.contentHashOf(_mcq()), hash);
+      expect(
+        BankQuestion.contentHashOf(Answer(type: 'answer', prompt: 'Ja.')),
+        isNull,
+      );
+    });
+
+    test('a lookup takes the short ID with or without #, in capitals, a '
+        'longer piece of the hash, or the whole doc id', () {
+      const id = 's1_3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e';
+      bool finds(String typed) {
+        final query = BankQuestion.idQueryOf(typed);
+        return query != null && BankQuestion.matchesIdQuery(id, query);
+      }
+
+      expect(finds('3fa91c'), isTrue);
+      expect(finds('#3fa91c'), isTrue);
+      expect(finds('  #3FA91C '), isTrue);
+      expect(finds('3fa91c0b5e'), isTrue);
+      expect(finds('3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e'), isTrue);
+      expect(finds(id), isTrue);
+      expect(finds('S1_3FA91C0B5E7D4A2F9C8B1E6D0A4F7C2E'), isTrue);
+
+      expect(finds('3fa91d'), isFalse);
+      expect(finds('s2_3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e'), isFalse);
+      expect(finds('a91c0b'), isFalse, reason: 'the start of the hash only');
+      expect(BankQuestion.matchesIdQuery('s1_3fa91c', 's1'), isFalse);
+    });
+
+    test('what cannot be an ID is no query: too short, not hex, empty', () {
+      expect(BankQuestion.idQueryOf('3fa91'), isNull);
+      expect(BankQuestion.idQueryOf('#xyz123'), isNull);
+      expect(BankQuestion.idQueryOf(''), isNull);
+      expect(BankQuestion.idQueryOf('#'), isNull);
+      expect(BankQuestion.idQueryOf('s1_'), isNull);
+      expect(BankQuestion.idQueryOf('#3FA91C'), '3fa91c');
     });
   });
 }

@@ -264,7 +264,9 @@ graded and are out) whose belief doc:
 
 There is no separate "not naturally recurring" test: any write bumps
 `lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
-later work keeps using never *becomes* stale. Staleness is what keeps
+later work keeps using never *becomes* stale. A neutral from the side is
+no write (2.4, #204): later work that touches the LO without showing
+anything either way does not count as using it. Staleness is what keeps
 the recurring LOs out. The review flag exists because staleness alone
 would never get a suspected gap checked: a fresh, once-mastered LO that
 later work casts doubt on would wait out the full 30 days (and before
@@ -572,9 +574,19 @@ the two are not equally trustworthy:
   `medium`. On a code answer the instructions route "correctly used" to
   `transferLOs`, so in practice this path is rare (an MCQ that shows a
   prerequisite is solid).
-- **A neutral carries no weight** (3.1) but is written like a positive:
-  the doc, at the prior if the LO had none, and `lastUpdatedAt`. Nothing
-  else moves.
+- **A neutral is not written at all (#204).** It carries no weight
+  (3.1), and unlike a direct neutral it is no measurement either: nobody
+  asked this LO, and the grader saw nothing either way. So no doc is
+  created at the prior for an LO never probed (it stays "never probed",
+  `neverProbedCount`), and an existing doc keeps its `lastUpdatedAt` —
+  the clock that decides whether a once-mastered LO is stale enough for
+  the warm-up review (1.5) and that `staleLoCount` on the grade proposal
+  reads. Before #204 the neutral was written like a positive, and an old
+  LO that later work only touched neutrally stayed out of the warm-up
+  review for another 30 days on nothing new. It says even less than a
+  negative, which writes nothing to the belief either. The signal is
+  logged as declined (`conductor.signal_dropped`, reason `incidental
+  neutral`) and stays on record under `loSignals`.
 - **A negative is a prompt, not evidence (#167).** It is the least
   reliable verdict the system produces: inferred from an answer about
   something else, by a probe not designed for this LO. And it lands by
@@ -605,6 +617,8 @@ the two are not equally trustworthy:
   where the warm-up selection and the teacher drawer read it.
 - **Once per LO per answer:** a `transferLOs` nomination on an LO that
   already took a signal — or a review flag — this turn is dropped (3.7).
+  So is one on an LO the grader named neutral this turn (#204): the same
+  answer cannot call the LO inconclusive and credit it.
 - **Forward references are dropped and logged**, per the contract's
   scope check: only the active subgoal and subgoals *before* it in the
   root can receive a signal.
@@ -612,7 +626,8 @@ the two are not equally trustworthy:
 The turn record lists every applied signal with its `subgoalId` and
 every LO flagged for review under `reviewFlags` (8.1), so both are
 visible in the audit trail: a negative on an earlier LO appears in
-`loSignals` and `reviewFlags`, never in `appliedSignals`.
+`loSignals` and `reviewFlags`, never in `appliedSignals`; a neutral on
+one only in `loSignals`.
 
 **Deliberate multi-LO targeting is structurally allowed but not yet
 triggered by any rule.** The `targetLOs` field is a list; nothing
@@ -786,14 +801,54 @@ they are.
 ### 2.7 Where the question comes from: the question bank (#186)
 
 2.1–2.3 (or 1.5, 2.6) decide *what* to ask: one target LO, of a subgoal,
-with a type and a difficulty. Every question the tutor generates is kept
-in the question bank (the `questions` container, #185), where the teacher
-hides the bad ones on the Questions page. Once the bank holds enough
-questions that fit a plan, the question can come from there instead of a
-generation call: no wait, a question the teacher can have seen, and — for
-multiple choice — no tokens at all. The rule lives in `BankChoice`
+with a type and a difficulty. A question the tutor generates is kept in
+the question bank (the `questions` container, #185) when its first answer
+is correct (below). Once the bank holds enough questions that fit a plan,
+the question can come from there instead of a generation call: no wait, a
+question that passed its first test, and — for multiple choice — no
+tokens at all. The rule lives in `BankChoice`
 (`lib/services/tutor/bank_choice.dart`); the tutor does the reads and
 hands it what it found.
+
+**What the bank keeps (#215).** The students do the weeding; the bank is
+too big to review by hand, and how a question is answered says enough
+about it:
+
+- *A new question goes in only when its first answer is correct.* A
+  generated question is stored at the first graded answer to it, not when
+  it is asked, and only when that answer is `correct` — `partial` is not
+  (as in `correctCount`; on a code question a partial answer often points
+  at a question that is not clear-cut). A question left unanswered is not
+  stored either. It is stored with its ask and that answer counted
+  (`askedCount`, `answeredCount`, `correctCount` 1, `lastAskedAt` when it
+  was asked, the feedback on a multiple-choice pick). When the bank already
+  has the same generation — another student's correct answer stored it,
+  also in the same instant (a 409 on the create) — the ask and the answer
+  count on that doc, whatever the answer. Socratic questions are never
+  stored: the bank does not serve them. The turn record names the
+  question (`questionId`) either way: the id is a content hash, fixed once
+  the question exists.
+- *A question hides itself when too few answers are correct.* After an
+  answer is counted, a question with at least
+  `PolicyConstants.bankAutoHideMinAnswers` (10) graded answers —
+  `answeredCount`, not `askedCount`: a question left unanswered says
+  nothing about it — and less than `bankAutoHideMaxShare` (0.5) of them
+  correct gets `status: hidden`, `hiddenBy: auto` and `hiddenAt`. Exactly
+  half stays. A question the teacher shows again after that gets
+  `keptByTeacher` and does not hide itself again; otherwise the next answer
+  would hide it at once.
+- *The teacher hides, shows again or deletes the rest* on the Questions
+  page. Delete removes the doc: turn records keep its id, but nothing reads
+  a question through them (the tutor uses the ids only to not ask a
+  student the same question twice, `tooling/evaluation` only the turn
+  record's own fields). The same generation, asked again later, gets the
+  same id and has to pass its first answer again. There is no review step:
+  a question in the bank is approved by being there.
+
+Builds from before #215 store a question when it is asked and do not hide
+one; once `MinimumVersion` keeps them out, every client follows the rules.
+`tooling/question_bank/cleanup.py` brings the questions stored before in
+line (a dry run first; it writes only with `--apply`, after a backup).
 
 **What fits a plan.** A bank question that is active (not hidden), filed
 under the plan's target subgoal — the active one, or the older one of a
@@ -822,10 +877,11 @@ nothing was graded on it.
 **N** questions fit, may be served and are new (`QuestionBankMinimum` in
 `config/global`, default `PolicyConstants.bankMinimum` = 8), and then with
 chance **p** (`QuestionBankShare`, default `bankShare` = 0.5); otherwise it
-is generated, and the bank grows. So the bank fills per level, a level with
-fewer than N keeps generating, and students do not all get the same few
-questions. Both knobs are set from the Cosmos portal and can change per
-period without a build; p = 0 switches serving off (the bank still fills).
+is generated, and the bank grows with every one answered right first time.
+So the bank fills per level, a level with fewer than N keeps generating,
+and students do not all get the same few questions. Both knobs are set
+from the Cosmos portal and can change per period without a build; p = 0
+switches serving off (the bank still fills).
 The dice are rolled before the bank is read — the same odds as rolling
 after the count, and a plan the roll gives to generation costs no read.
 
@@ -851,7 +907,7 @@ and the warm-up slot move exactly as for a generated question), the same
 `recent_questions` line (#184). A generation call opens the exercise its
 reply starts; a bank question opens its exercise itself, so a later grading
 or hint call reads it as the exercise's own. The ask is counted on the bank
-doc.
+doc, and so is the graded answer — which can hide the question (above).
 
 **A multiple-choice pick is graded from the key.** Right or wrong is known.
 The target LO's signal is fixed — the key: `positive`/`strong`; any other
@@ -889,10 +945,11 @@ first entry is the bank question; follow-ups as usual.
 missing `questions` container, an error, or a bank or turn history that
 does not answer within `kQuestionBankReadTimeout` (2 s) means the question
 is generated as before; a missing container or a bank read that timed out
-leaves the bank alone — reads and writes — for 10 minutes. A question the teacher hides
-while it is open at a student runs out that exercise; after it, it is not
-chosen again (the bank is read afresh for every question that may come
-from it).
+leaves the bank alone — reads and writes — for 10 minutes. A question
+hidden or deleted while it is open at a student runs out that exercise;
+after it, it is not chosen again (the bank is read afresh for every
+question that may come from it), and the counts of a deleted one are not
+written back.
 
 **Audit.** The turn record (8.1) carries `questionId` as for any question,
 `fromBank: true` for a served one and `gradedByKey: true` when the key
@@ -951,20 +1008,20 @@ means "the answer touched the LO but gave no clear evidence." Adding
 belief — wrong. The LLM still emits `neutral` for grading honesty (per
 part 3), and when grading fails on a `partial` answer the fallback
 signal is `(neutral, weak)` (LLM contract). The conductor adds nothing to `(α, β)`
-(`signalDeltas` returns zero), but the signal goes down the same write
-as any other, so it is a measurement without weight:
+(`signalDeltas` returns zero), but a direct neutral — on the question's
+target or on an LO of the active subgoal, in a follow-up too — goes
+down the same write as any other signal, so it is a measurement without
+weight:
 
 - `(α, β)` are persisted decayed to now and `lastUpdatedAt = now` (3.3).
   Decay composes exactly, so the belief the next signal lands on is the
   same as without the neutral write.
-- An LO without a doc gets one at the prior (3.5), also from the side
-  (2.4).
+- An LO without a doc gets one at the prior (3.5).
 - A direct probe (the question's target, or a signal on an LO of the
   active subgoal; not a follow-up, 6.2) also sets `lastProbedAt = now`,
   the recheck clock (2.6), and `lastQuestionType` when it is the target.
-  Every write that is not from the side, a follow-up's included, clears
-  `regressedAt` (1.5, #112). The question was asked, whichever way the
-  answer went.
+  Every direct write, a follow-up's included, clears `regressedAt` (1.5,
+  #112). The question was asked, whichever way the answer went.
 - Neither ratchet nor the notch-drop counter moves (2.3, 4.3), and the
   mastery stamp cannot be set by it: decay only moves a belief toward
   the prior.
@@ -975,6 +1032,16 @@ partially was still asked. Without the clock bump the same LO would be
 due again in the next free recheck slot. The evaluation replay
 (`tooling/evaluation/rules.replay`) writes a neutral the same way since
 rule set `eval4` (#202).
+
+**A neutral from the side is not written (#204).** On an LO of an
+earlier subgoal (2.4) nothing was asked, so there is no clock to
+restart, and the grader saw nothing either way: no doc, no
+`lastUpdatedAt`, nothing under `appliedSignals`. It is logged as a
+declined signal (`conductor.signal_dropped`, reason `incidental
+neutral`). Writing it, as the conductor did before #204, created a doc
+for an LO nobody probed and made an old LO read as freshly updated to
+the warm-up review (1.5) and to `staleLoCount` on the grade proposal.
+The replay skips it since rule set `eval5`.
 
 ### 3.2 Difficulty modulation
 
@@ -1117,11 +1184,14 @@ recover from after decay or isolated bad answers.
 - **Signal on an LO with no existing belief doc** (incidental signal
   on an LO the student has never been probed on before). Create the
   belief doc with prior `(α=1, β=1)`, `lastUpdatedAt = now`, then
-  apply the update normally — a neutral too, which leaves the doc at
-  the prior (3.1). Same code path; only the create-or-load
-  step is special. A cross-subgoal *negative* is the exception (2.4,
+  apply the update normally — a direct neutral too, which leaves the
+  doc at the prior (3.1). Same code path; only the create-or-load
+  step is special. A cross-subgoal *negative* is an exception (2.4,
   #167): it writes nothing, so no doc is created — a never-asked LO
-  must not start life in debit on a verdict nobody will re-test.
+  must not start life in debit on a verdict nobody will re-test. A
+  cross-subgoal *neutral* is the other (2.4, #204): it writes nothing
+  either, so an LO only ever named neutral from the side stays never
+  probed. Only a cross-subgoal positive creates a doc from the side.
 
 ### 3.6 Worked example
 
@@ -2211,7 +2281,9 @@ TurnRecord {
   // docs written before the field existed.
   // The question bank (2.7). `questionId`: the bank doc of the question
   // this turn graded (#185) — set on the grade of the question itself, not
-  // a follow-up's; a content hash, so set even when the bank write failed.
+  // a follow-up's; a content hash, so set whether or not the bank keeps
+  // the question (#215: a generated one only when this grade is correct, a
+  // socratic one never) and even when the bank write failed.
   // `fromBank`: the question was served from the bank, not generated
   // (#186). `gradedByKey`: the verdict and the target signal came from the
   // bank question's answer key, not the grader (#186). Each omitted when

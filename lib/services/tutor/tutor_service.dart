@@ -59,6 +59,7 @@ import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.d
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,6 +233,7 @@ class TutorService extends Notifier<TutorState> {
         _answeredQuestionIds.clear();
         _seenQuestionIds.clear();
         _stopCurriculumWatch();
+        ref.read(levelUpControllerProvider.notifier).reset();
         return;
       }
       if (!_initialized) unawaited(Future.microtask(initializeSession));
@@ -247,12 +249,16 @@ class TutorService extends Notifier<TutorState> {
       }
     }, fireImmediately: true);
 
-    // Feed the derived level to the level-up controller so a mastered
-    // concept can be checked against a real threshold crossing (#116).
+    // Feed the derived XP to the level-up controller so a mastered concept
+    // or a counted oefening can be checked against a real threshold
+    // crossing (#116, #217), and the crossing told apart by which part of
+    // the XP made it.
     ref.listen<AsyncValue<XpState>>(xpStateProvider, (_, next) {
-      final level = next.maybeWhen(data: (s) => s.level, orElse: () => null);
-      if (level == null) return;
-      ref.read(levelUpControllerProvider.notifier).observeLevel(level);
+      final xp = next.maybeWhen(data: (s) => s, orElse: () => null);
+      if (xp == null) return;
+      ref
+          .read(levelUpControllerProvider.notifier)
+          .observeXp(oefeningCount: xp.oefeningCount, masteryXp: xp.masteryXp);
     }, fireImmediately: true);
 
     ref.onDispose(_stopCurriculumWatch);
@@ -481,8 +487,9 @@ class TutorService extends Notifier<TutorState> {
       getCalibration: () =>
           ref.read(accountServiceProvider)?.calibration ??
           StudentCalibration.fresh(),
-      setCalibration: (cal) =>
-          ref.read(accountServiceProvider.notifier).setCalibration(cal),
+      setCalibration: (cal, {countOefening = false}) => ref
+          .read(accountServiceProvider.notifier)
+          .setCalibration(cal, countOefening: countOefening),
       getLoBelief: ({required subgoalId, required loId}) => ref
           .read(loBeliefsServiceProvider)
           .getOne(subgoalId: subgoalId, loId: loId),
@@ -505,6 +512,7 @@ class TutorService extends Notifier<TutorState> {
     _currentExerciseGoalId = null;
     _inFlightPlan = null;
     _setInFlightQuestion(null);
+    ref.read(shownQuestionIdProvider.notifier).state = null;
     _followUpInFlight = null;
     _chat.clear();
 
@@ -707,8 +715,10 @@ class TutorService extends Notifier<TutorState> {
     _conductor.notePlannedQuestion(plan);
     _inFlightPlan = plan;
     // A new question replaces the one in flight, also when it never
-    // arrives.
+    // arrives — and the ID of the one before leaves the exercise header
+    // (#216).
     _setInFlightQuestion(null);
+    ref.read(shownQuestionIdProvider.notifier).state = null;
   }
 
   void _setInFlightQuestion(BankQuestion? question, {bool fromBank = false}) {
@@ -1117,6 +1127,13 @@ class TutorService extends Notifier<TutorState> {
       provenance: provenance,
       fromAnswerKey: gradedByKey,
     );
+    // The conductor counts this oefening (#217) — a first graded answer,
+    // not a follow-up — and its XP reaches the level on the next account
+    // poll. Armed before the count is written, so that poll cannot come
+    // back first and make the crossing look like no one's.
+    if (!answer.isFollowUp) {
+      ref.read(levelUpControllerProvider.notifier).armOefening();
+    }
     final outcome = await _conductor.integrateAnswer(
       plan: plan,
       answer: answer,
@@ -1165,6 +1182,7 @@ class TutorService extends Notifier<TutorState> {
     if (bankQuestion != null) {
       _bankAnswer(
         bankQuestion,
+        fromBank: fromBank,
         quality: outcome.overallQuality,
         keyDisputed: disputed,
       );
@@ -1347,6 +1365,9 @@ class TutorService extends Notifier<TutorState> {
   /// feedback.
   Future<void> advanceFromMcq() async {
     ref.read(activeMcqProvider.notifier).state = null;
+    // Its ID goes with it (#216): the strip above the editor, back in view,
+    // must not show it while the next exercise is on its way.
+    ref.read(shownQuestionIdProvider.notifier).state = null;
     if (_pendingExplainAfterMcqAdvance) {
       _pendingExplainAfterMcqAdvance = false;
       ref.read(modeProvider.notifier).state = SessionMode.explain;
@@ -1609,8 +1630,8 @@ class TutorService extends Notifier<TutorState> {
   /// Puts [response] on the connector's history and, when it is a
   /// question, on the list the next question request names (#184) — under
   /// the LO of the plan it was asked for, which is still in flight here —
-  /// and in the bank: stored when it was generated, counted when it came
-  /// [fromBank] (#186).
+  /// and in flight for the bank: counted when it came [fromBank] (#186), a
+  /// generated one kept for its first answer (#215).
   void _recordResponse(ChatResponse response, {BankQuestion? fromBank}) {
     _connector.addResponse(response);
     final isQuestion = _recentQuestions.add(
@@ -1624,17 +1645,38 @@ class TutorService extends Notifier<TutorState> {
     } else {
       _bankQuestion(response);
     }
+    _showQuestionId(response);
+  }
+
+  /// Puts the ID of [response], the question that just came in, in the
+  /// header of its exercise (#216): the bank id it has — served from the
+  /// bank — or would have, which a generated question has from the start.
+  /// None for a kind the bank does not keep: a socratic question could
+  /// never be looked up.
+  void _showQuestionId(ChatResponse response) {
+    final question = _inFlightQuestion;
+    final type =
+        question?.questionType ?? BankQuestion.questionTypeFor(response);
+    final id = BankChoice.servedTypes.contains(type)
+        ? question?.id ?? BankQuestion.contentHashOf(response)
+        : null;
+    ref.read(shownQuestionIdProvider.notifier).state = id;
   }
 
   // ---- Question bank (#185) -------------------------------------------------
   //
-  // Every generated question goes into the bank, and every graded answer to
-  // one is counted there. Neither is waited for: the bank is best-effort
-  // and a failed or slow write — a container not created yet, a Cosmos
-  // blip — never reaches the student (`QuestionBankService`).
+  // A generated question goes into the bank at the first graded answer to
+  // it, and only when that answer is correct (#215); a socratic one never,
+  // as the bank does not serve those (`BankChoice.servedTypes`). Every
+  // graded answer to a bank question is counted there. Nothing is waited
+  // for: the bank is best-effort and a failed or slow write — a container
+  // not created yet, a Cosmos blip — never reaches the student
+  // (`QuestionBankService`).
 
-  /// Stores [response], a question that just came in for the plan in
-  /// flight, and remembers it for the turn record of its answer.
+  /// Remembers [response], a question that just came in for the plan in
+  /// flight, as the bank entry it would be — for the turn record of its
+  /// answer, which names it whether or not the bank keeps it, and for the
+  /// bank, which stores it only when that answer is correct.
   void _bankQuestion(ChatResponse response) {
     _setInFlightQuestion(null);
     final plan = _inFlightPlan;
@@ -1662,8 +1704,6 @@ class TutorService extends Notifier<TutorState> {
     // The student has seen it: an identical question in the bank is not
     // served to them later (#186).
     _seenQuestionIds.add(question.id);
-    _debug.recordEvent('tutor.question_banked', {'questionId': question.id});
-    unawaited(ref.read(questionBankServiceProvider).recordAsked(question));
   }
 
   /// Remembers [question], just put in front of the student from the bank
@@ -1927,27 +1967,48 @@ class TutorService extends Notifier<TutorState> {
     return true;
   }
 
-  /// Counts the graded answer to [question]; for a multiple-choice pick,
-  /// with the feedback the student got on it, and whether the grader said
-  /// its answer key is wrong ([keyDisputed], #198).
+  /// Counts the graded answer to [question] — served [fromBank], or just
+  /// generated, which the bank then keeps only when the answer is correct
+  /// (#215: `partial` is not) and only for a type it serves; for a
+  /// multiple-choice pick, with the feedback the student got on it, and
+  /// whether the grader said its answer key is wrong ([keyDisputed], #198).
   void _bankAnswer(
     BankQuestion question, {
+    required bool fromBank,
     required AnswerQuality quality,
     bool keyDisputed = false,
   }) {
+    final bank = ref.read(questionBankServiceProvider);
+    final correct = quality == AnswerQuality.correct;
     final mcq = question.isMultipleChoice ? ref.read(activeMcqProvider) : null;
+    if (fromBank) {
+      unawaited(
+        bank.recordAnswer(
+          questionId: question.id,
+          subgoalId: question.subgoalId,
+          correct: correct,
+          pickedOption: mcq?.selected,
+          feedback: mcq?.feedback,
+          quality: mcq?.feedbackQuality,
+          keyDisputed: keyDisputed,
+        ),
+      );
+      return;
+    }
+    if (!BankChoice.servedTypes.contains(question.questionType)) return;
+    _debug.recordEvent('tutor.question_banked', {
+      'questionId': question.id,
+      'firstAnswerCorrect': correct,
+    });
     unawaited(
-      ref
-          .read(questionBankServiceProvider)
-          .recordAnswer(
-            questionId: question.id,
-            subgoalId: question.subgoalId,
-            correct: quality == AnswerQuality.correct,
-            pickedOption: mcq?.selected,
-            feedback: mcq?.feedback,
-            quality: mcq?.feedbackQuality,
-            keyDisputed: keyDisputed,
-          ),
+      bank.recordFirstAnswer(
+        question,
+        correct: correct,
+        pickedOption: mcq?.selected,
+        feedback: mcq?.feedback,
+        quality: mcq?.feedbackQuality,
+        keyDisputed: keyDisputed,
+      ),
     );
   }
 

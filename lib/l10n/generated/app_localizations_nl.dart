@@ -1226,6 +1226,10 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_quiz_pill => 'Quizvraag';
 
   @override
+  String get session_questionId_tooltip =>
+      'De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.';
+
+  @override
   String get session_quiz_next_button => 'Volgende →';
 
   @override
@@ -2379,6 +2383,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String levelUp_caption_oefening(int xp) {
+    return '+$xp XP · OEFENING GEMAAKT';
+  }
+
+  @override
   String levelUp_level(int level) {
     return 'Level $level';
   }
@@ -2390,6 +2399,17 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String levelUp_subtitle_concept(String concept) {
     return 'Je hebt $concept onder de knie.';
+  }
+
+  @override
+  String levelUp_subtitle_oefeningen(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Je hebt al $count oefeningen gemaakt.',
+      one: 'Je hebt al 1 oefening gemaakt.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -2630,7 +2650,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get questions_page_subtitle =>
-      'Elke vraag die de tutor maakte, per subdoel. Verberg de vragen die fout of onduidelijk zijn: een verborgen vraag wordt niet opnieuw gesteld.';
+      'Een nieuwe vraag komt hier pas in als de eerste leerling ze juist beantwoordt, en een vraag die te vaak fout beantwoord wordt, verbergt de app vanzelf. Verberg of verwijder wat nog fout of onduidelijk is: een verborgen vraag wordt niet opnieuw gesteld.';
 
   @override
   String get questions_refresh_tooltip => 'Vernieuwen';
@@ -2653,7 +2673,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get questions_tree_empty =>
-      'Nog geen vragen bewaard. Ze verschijnen hier zodra leerlingen oefenen.';
+      'Nog geen vragen bewaard. Ze verschijnen hier zodra een leerling een nieuwe vraag juist beantwoordt.';
 
   @override
   String questions_tree_count(int count) {
@@ -2667,8 +2687,8 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
-  String questions_tree_unreviewed(int count) {
-    return '$count nieuw';
+  String questions_tree_hidden(int count) {
+    return '$count verborgen';
   }
 
   @override
@@ -2683,7 +2703,7 @@ class AppLocalizationsNl extends AppLocalizations {
   String get questions_placeholder => 'Kies links een subdoel.';
 
   @override
-  String get questions_filter_unreviewed => 'Nog niet nagekeken';
+  String get questions_filter_hidden => 'Alleen verborgen';
 
   @override
   String get questions_sort_newest => 'Nieuwste';
@@ -2701,8 +2721,8 @@ class AppLocalizationsNl extends AppLocalizations {
   String get questions_list_empty => 'Geen vragen voor dit subdoel.';
 
   @override
-  String get questions_list_allReviewed =>
-      'Alle vragen van dit subdoel zijn nagekeken.';
+  String get questions_list_noneHidden =>
+      'Geen verborgen vragen bij dit subdoel.';
 
   @override
   String get questions_type_mcQuestion => 'Meerkeuze';
@@ -2741,7 +2761,12 @@ class AppLocalizationsNl extends AppLocalizations {
   String get questions_badge_hidden => 'Verborgen';
 
   @override
-  String get questions_badge_reviewed => 'Nagekeken';
+  String get questions_badge_autoHidden => 'Automatisch verborgen';
+
+  @override
+  String questions_badge_autoHidden_tooltip(int count) {
+    return 'Minder dan de helft juist op $count of meer antwoorden. Toon je ze opnieuw, dan verbergt de app ze niet meer vanzelf.';
+  }
 
   @override
   String get questions_keyDisagreement =>
@@ -2766,37 +2791,57 @@ class AppLocalizationsNl extends AppLocalizations {
   String get questions_answerKey_tooltip => 'Antwoordsleutel';
 
   @override
-  String questions_note(String note) {
-    return 'Notitie: $note';
-  }
+  String get questions_action_hide => 'Verberg';
 
   @override
-  String get questions_action_markReviewed => 'Nagekeken';
+  String get questions_action_unhide => 'Toon opnieuw';
 
   @override
-  String get questions_action_hide => 'Verbergen';
+  String get questions_action_delete => 'Verwijder';
 
   @override
-  String get questions_action_unhide => 'Weer tonen';
+  String get questions_delete_dialog_title => 'Deze vraag verwijderen?';
 
   @override
-  String get questions_action_note => 'Notitie';
+  String get questions_delete_dialog_body =>
+      'De vraag verdwijnt uit de vragenbank. Maakt de tutor later dezelfde vraag, dan komt ze er pas opnieuw in als de eerste leerling ze juist beantwoordt.';
 
   @override
-  String get questions_note_dialog_title => 'Notitie bij deze vraag';
+  String get questions_delete_dialog_cancel => 'Annuleren';
 
   @override
-  String get questions_note_dialog_hint =>
-      'Wat is er mis mee, of wat wil je onthouden';
-
-  @override
-  String get questions_note_dialog_cancel => 'Annuleren';
-
-  @override
-  String get questions_note_dialog_save => 'Opslaan';
+  String get questions_delete_dialog_confirm => 'Verwijder';
 
   @override
   String questions_actionFailed(String error) {
     return 'Dat lukte niet: $error';
   }
+
+  @override
+  String get questions_lookup_label => 'Zoek op ID';
+
+  @override
+  String get questions_lookup_hint => 'bv. #3fa91c';
+
+  @override
+  String get questions_lookup_tooltip => 'Zoeken';
+
+  @override
+  String get questions_lookup_clear_tooltip => 'Wissen';
+
+  @override
+  String get questions_lookup_notFound =>
+      'Deze vraag zit niet in de bank. Meestal was het eerste antwoord erop niet (helemaal) juist, en dan wordt een vraag niet bewaard. Of ze werd verwijderd.';
+
+  @override
+  String get questions_lookup_invalid =>
+      'Dat is geen vraag-ID. Een ID ziet eruit als #3fa91c.';
+
+  @override
+  String questions_lookup_several(int count) {
+    return '$count vragen hebben deze ID:';
+  }
+
+  @override
+  String get questions_badge_found => 'Gevonden';
 }

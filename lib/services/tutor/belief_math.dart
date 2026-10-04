@@ -120,7 +120,8 @@ double baseWeight(LoSignalStrength s) {
 /// least reliable verdict the system has and lands on LOs the tutor no
 /// longer probes directly, so a debit here would never be re-tested. The
 /// conductor turns it into a review flag instead ([nextRegressedAt]) and
-/// does not call this for it.
+/// does not call this for it. Nor for a cross-subgoal *neutral* (#204):
+/// that one is only logged — no doc, no clock.
 ({double alphaDelta, double betaDelta}) crossSubgoalSignalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,

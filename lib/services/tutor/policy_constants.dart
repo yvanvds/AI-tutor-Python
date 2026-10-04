@@ -187,6 +187,17 @@ class PolicyConstants {
   /// older material, and the bank has it at once and for no tokens.
   static const int bankMinimumOffSubgoal = 1;
 
+  /// A bank question hides itself (`hiddenBy: auto`, #215) once it has at
+  /// least this many graded answers — `answeredCount`, not `askedCount`: a
+  /// question put on the screen and left unanswered says nothing about the
+  /// question — and less than [bankAutoHideMaxShare] of them were correct.
+  /// One the teacher showed again after that (`keptByTeacher`) stays.
+  static const int bankAutoHideMinAnswers = 10;
+
+  /// The share of correct answers below which [bankAutoHideMinAnswers]
+  /// answers hide a bank question. Exactly this share stays.
+  static const double bankAutoHideMaxShare = 0.5;
+
   // ---- Calibration (CONDUCTOR_POLICY §5) ---------------------------------
 
   /// Recent-answer window size on the account doc.
