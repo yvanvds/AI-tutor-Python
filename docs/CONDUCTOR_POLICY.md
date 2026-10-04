@@ -1671,6 +1671,52 @@ looks weird, teacher might want to know" event, not "student in
 trouble." Log to the student's record for teacher audit. Passive
 surfacing — the student experience is fine. (Section 8 details.)
 
+**The bar in the session shows a display state, not the cached share
+(#230).** The cached fraction above is what the Leerpad, the teacher's
+overview, the report and the XP read, and it stays exactly that. The
+bar the student watches while practising — under the subgoal in the
+objective banner, and the 2px line at the top of the window — shows
+instead one segment per non-optional LO of the active subgoal (an
+optional LO gets none), each in one of three states:
+
+- **empty**;
+- **half**: one right answer would master the LO. A `(positive,
+  strong)` signal at the student's calibration, with the home factor
+  (×1.0), applied to the current decayed `(α, β)` with the cap (3.4),
+  meets conditions 1 and 2 of 4.1; condition 3 that answer meets
+  itself;
+- **full**: mastered now, mastered once (`firstMasteredAt`, the
+  one-way reading the grade uses), or stuck (4.4). Stuck looks full to
+  the student, as the advance it allows looks normal (4.4,
+  "student-side invisibility").
+
+The shape it replaces: from the prior one strong positive on hard
+leaves μ at 0.79, just under 0.8, and 2.1 asks every LO once before
+it asks one twice — so the cached share sat on 0 for the first round
+and then jumped. In the class data of 2026-10-04 half the subgoals
+started from cold kept the bar on 0 for at least 41% of their
+oefeningen; with segments it moves from the first right answer.
+
+**Hold.** A segment does not go back on what the student did not
+answer themselves. Full stays full. Half becomes empty only after a
+question on that LO itself — or a follow-up on it — whose answer was
+not right; a negative from the side (the grader's signal on this LO
+from a question about another) leaves it half, as does a not-right
+answer that still leaves the LO one right answer away. The hold lives
+in the session: at session start (`setTarget`) every segment follows
+the beliefs as they are. A warm-up review or a recheck (1.5, 2.6) is
+not a question on an LO of the active subgoal and empties nothing.
+
+The conductor publishes the segments next to the cached share — at
+session start, at every planned question on the active subgoal, and
+after every graded answer (at the calibration of the next question;
+after an advance, the next subgoal's, read afresh) — in
+`subgoalLoDisplayProvider` (`lib/services/tutor/lo_display.dart`). A
+tooltip and the screen-reader label say it in the app language: "2
+parts mastered, 1 almost, 2 still to do". Until the active subgoal's
+segments are published — and for a subgoal without LOs — the bar is
+the plain bar of the cached share.
+
 ### 4.6 Worked example
 
 Continuing from 3.6, end of Q9:

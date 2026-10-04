@@ -24,6 +24,7 @@ import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 
@@ -388,6 +389,7 @@ class ConductorDeps {
     required this.getProgressAll,
     required this.getProgressByGoalId,
     required this.setCurrentProgress,
+    required this.setLoDisplay,
     required this.addSystemNotice,
     required this.recordDebugEvent,
     required this.playCorrectAnswer,
@@ -418,6 +420,11 @@ class ConductorDeps {
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
   final void Function(double) setCurrentProgress;
+
+  /// Publishes the segments of the student's subgoal bar (#230, §4.5): one
+  /// per non-optional LO of the active subgoal, held for the session.
+  /// `null` when there is no active subgoal.
+  final void Function(SubgoalLoDisplay?) setLoDisplay;
 
   /// Post a system pill in chat. Takes a [ChatNotice], not text — the
   /// conductor has no locale; the chat widget localizes (#23).
@@ -519,6 +526,12 @@ class Conductor {
   /// lower, until a `correct` on it removes the entry.
   final Map<String, int> _attemptsWithoutCorrect = {};
 
+  /// What each segment of the student's subgoal bar showed so far this
+  /// session (#230, §4.5), keyed by [_attemptKey]. Holds a segment against
+  /// what the student did not answer themselves ([heldLoDisplayState]); a
+  /// new session reads the beliefs afresh.
+  final Map<String, LoDisplayState> _loDisplay = {};
+
   /// Pending audit event — populated when `_advanceWithCascadeCap` halts.
   /// Consumed by the next call to `integrateAnswer` so the cascade-halt
   /// rides on the same persisted turn that caused the advance.
@@ -564,6 +577,9 @@ class Conductor {
     _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
+    // #230: the session's bar starts from the beliefs as they are.
+    _loDisplay.clear();
+    await _publishActiveLoDisplay();
   }
 
   /// Pick the next question. CONDUCTOR_POLICY §1 (entry) and §2 (per-question).
@@ -643,6 +659,9 @@ class Conductor {
         .toList(growable: false);
 
     final calibration = _deps.getCalibration().difficulty;
+
+    // #230: the bar of the subgoal this question is about.
+    _publishLoDisplay(subgoal, byId, calibration: calibration);
 
     LearningObjective target;
     String chosenReason;
@@ -1855,6 +1874,23 @@ class Conductor {
             questionTypeName: plan.type.name,
           );
     final calibrationAfter = updatedCal.difficulty;
+    // #230: the bar after this answer, at the level of the next question.
+    // A segment empties only on a question on its own LO — or a follow-up
+    // on it — that was not right; after an advance it is the next
+    // subgoal's bar, read afresh.
+    if (advanced) {
+      await _publishActiveLoDisplay(calibration: calibrationAfter);
+    } else {
+      _publishLoDisplay(
+        subgoal,
+        freshById,
+        calibration: calibrationAfter,
+        askedAndNotRight:
+            !plan.isOffSubgoal && answer.overallQuality != AnswerQuality.correct
+            ? {for (final lo in plan.targetLOs) lo.id}
+            : const {},
+      );
+    }
     if (cal.difficulty != calibrationAfter) {
       _deps.addSystemNotice(
         ChatNotice(
@@ -2265,6 +2301,67 @@ class Conductor {
   /// calibration in the new conductor (CONDUCTOR_POLICY §5.2).
   void hintProvided() {
     _deps.recordDebugEvent('conductor.hint_provided');
+  }
+
+  // ---- The student's subgoal bar (#230, §4.5) -----------------------------
+
+  /// Reads the active subgoal's beliefs and publishes its bar; `null` when
+  /// there is no active subgoal. [calibration] defaults to the student's.
+  Future<void> _publishActiveLoDisplay({
+    QuestionDifficulty? calibration,
+  }) async {
+    final subgoal = _activeChildGoal;
+    if (subgoal == null) {
+      _deps.setLoDisplay(null);
+      return;
+    }
+    final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
+    _publishLoDisplay(subgoal, {
+      for (final b in beliefs) b.loId: b,
+    }, calibration: calibration ?? _deps.getCalibration().difficulty);
+  }
+
+  /// Publishes [subgoal]'s bar from its beliefs [byId]: a segment per
+  /// non-optional LO, from the decayed belief at [calibration]
+  /// ([loDisplayStateOf]), held against this session's earlier reading
+  /// ([heldLoDisplayState]). [askedAndNotRight] are the LOs this turn asked
+  /// about directly and did not get right.
+  void _publishLoDisplay(
+    Goal subgoal,
+    Map<String, LoBelief> byId, {
+    required QuestionDifficulty calibration,
+    Set<String> askedAndNotRight = const {},
+  }) {
+    final now = DateTime.now().toUtc();
+    final los = <LoDisplayEntry>[];
+    for (final lo in subgoal.objectives) {
+      if (lo.optional) continue;
+      final b = byId[lo.id];
+      final snap = b == null
+          ? const BeliefSnapshot(PolicyConstants.prior, PolicyConstants.prior)
+          : applyDecay(
+              alpha: b.alpha,
+              beta: b.beta,
+              lastUpdatedAt: b.lastUpdatedAt,
+              now: now,
+            );
+      final key = _attemptKey(subgoal.id, lo.id);
+      final state = heldLoDisplayState(
+        held: _loDisplay[key],
+        fresh: loDisplayStateOf(
+          snap: snap,
+          lastPositiveAtCalibratedAt: b?.lastPositiveAtCalibratedAt,
+          firstMasteredAt: b?.firstMasteredAt,
+          calibration: calibration,
+        ),
+        askedAndNotRight: askedAndNotRight.contains(lo.id),
+      );
+      _loDisplay[key] = state;
+      los.add(LoDisplayEntry(loId: lo.id, state: state));
+    }
+    _deps.setLoDisplay(
+      SubgoalLoDisplay(subgoalId: subgoal.id, los: List.unmodifiable(los)),
+    );
   }
 
   // ---- Persistence helpers ------------------------------------------------

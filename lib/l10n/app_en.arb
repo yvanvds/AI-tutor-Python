@@ -735,6 +735,15 @@
   "@session_objectiveBanner_pill": {
     "description": "Banner header pill at the top of practice view — displayed uppercase"
   },
+  "session_objectiveBanner_segments": "{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do",
+  "@session_objectiveBanner_segments": {
+    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.",
+    "placeholders": {
+      "mastered": {"type": "int"},
+      "almost": {"type": "int"},
+      "todo": {"type": "int"}
+    }
+  },
 
   "chat_tutorName": "Tutor",
   "chat_userName_you": "You",

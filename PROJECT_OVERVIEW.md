@@ -175,6 +175,9 @@ lib/
 │       ├── conductor.dart               # ~1400 lines: LO-belief mastery model, calibration, notch-drop, follow-up chains, signal events, degraded mode
 │       ├── policy_constants.dart        # NEW — every numeric knob (mastery thresholds, evidence cap, decay half-life, calibration windows, signal weights, follow-up depths)
 │       ├── belief_math.dart             # NEW — applyDecay, signalDeltas, applyEvidence, meetsMasteryMeanAndEvidence, isStuck, isPracticeable
+│       ├── lo_display.dart              # NEW (#230) — the student's subgoal bar per LO: LoDisplayState (empty / half / full), loDisplayStateOf,
+│       │                                #   oneRightAnswerMasters, heldLoDisplayState (the session's hold), SubgoalLoDisplay,
+│       │                                #   subgoalLoDisplayProvider (the conductor publishes) + activeSubgoalLoDisplayProvider
 │       ├── active_mcq.dart              # NEW — StateProvider<ActiveMcq?>; transient in-flight MCQ state (prompt + code + options + selected + feedback)
 │       ├── shown_question.dart          # StateProvider<String?> — bank id of the question on screen, for its short ID in the exercise header (#216)
 │       ├── openai_connector.dart        # chat.completions client (sync + streaming) + history
@@ -210,7 +213,10 @@ lib/
 │   │   │   ├── quiz_view.dart          # Full MCQ surface: header pill + TutorMarkdown prompt + optional code card + 2-column option grid (badges A–F) + colored feedback panel + "Volgende"
 │   │   │   └── playground_view.dart    # Playground header + file browser + reused PracticeView (no objective)
 │   │   └── widgets/
-│   │       ├── objective_banner.dart   # "Huidig doel" pill + title from goalSelectionProvider, in the app language (#210)
+│   │       ├── objective_banner.dart   # "Huidig doel" pill + title from goalSelectionProvider, in the app language (#210); the subgoal bar under it
+│   │       ├── subgoal_progress_bar.dart  # NEW (#230) — SubgoalProgressBar: one LoSegment per non-optional LO (empty / half / full) from
+│   │       │                              #   activeSubgoalLoDisplayProvider, tooltip + semantics label in the app language; the plain
+│   │       │                              #   cached-share bar until the conductor published the active subgoal's segments
 │   │       ├── run_controls.dart       # Run/Stop/Reset/Hint/Send-to-tutor strip
 │   │       └── output_panel.dart       # py_runner-backed runner + log view + interactive input
 │   │
@@ -269,7 +275,6 @@ lib/
     ├── badges/badge_frame.dart             # NEW (#220) — one badge: the hexagon frame drawn in code + its SVG glyph
     ├── badges/badge_toast_overlay.dart     # NEW (#220) — the notice for a badge earned (or a summary), top right, confetti
     ├── goal_splash_overlay.dart            # Subgoal/goal-completion confetti splash
-    ├── goal_crumb_in_app_bar.dart          # Crumb (legacy)
     ├── undo_snackbar.dart                  # Generic undo snackbar helper
     ├── update_status.dart                  # NEW (#48) — updateStatusText() + UpdateOfferBar (Update / Later),
     │                                       #   the strip of shell chrome that offers an update instead of
@@ -442,7 +447,7 @@ The Entra app registration must declare `http://localhost` (no port) under "Mobi
 - **Quiz (sub-mode of Oefenen)** ([quiz_view.dart](lib/features/session/modes/quiz_view.dart)) — full MCQ surface: header pill + `TutorMarkdown` prompt + optional code card (syntax highlighted) + 2-column option grid (badges A–F) + colored feedback panel (green/red, rendered via `TutorMarkdown`) + "Volgende" advance button. Reads/writes `activeMcqProvider`.
 - **Playground** ([playground_view.dart](lib/features/session/modes/playground_view.dart)) — header strip with the file browser (save / open / delete, #19) over a re-used `PracticeView(showObjective: false)`. Saved files mirror to the student's `playground_files` container so they follow them between classroom machines (#31).
 
-[ObjectiveBanner](lib/features/session/widgets/objective_banner.dart) reads the active goal from `goalSelectionProvider` and shows its title and description in the app language (#210). [RunControls](lib/features/session/widgets/run_controls.dart) renders Run/Stop as a pill button, plus ghost icon buttons for Reset, Hint (`tutorService.requestHint(code)`), and Send-to-tutor (`tutorService.submitCode(code)`). In Practice it also carries the short ID of the code question in the editor (#216).
+[ObjectiveBanner](lib/features/session/widgets/objective_banner.dart) reads the active goal from `goalSelectionProvider` and shows its title and description in the app language (#210). Under a subgoal it mounts [SubgoalProgressBar](lib/features/session/widgets/subgoal_progress_bar.dart) (#230): one segment per non-optional LO — empty, half (one right answer at the student's calibration would master it) or full (mastered, once mastered, or stuck) — held for the session so a segment only empties after a not-right answer on its own LO (CONDUCTOR_POLICY §4.5). The conductor publishes the segments in `subgoalLoDisplayProvider` next to the cached share; the 2px `AmbientProgress` line follows the same share (`ambientProgressProvider`), while the Leerpad, the teacher's views and the report keep the cached `progress`. [RunControls](lib/features/session/widgets/run_controls.dart) renders Run/Stop as a pill button, plus ghost icon buttons for Reset, Hint (`tutorService.requestHint(code)`), and Send-to-tutor (`tutorService.submitCode(code)`). In Practice it also carries the short ID of the code question in the editor (#216).
 
 ### Python code panel (editor + execution)
 
@@ -532,7 +537,7 @@ A second motivator next to XP, for moments worth marking: a badge gives **no XP*
 Notable Riverpod providers:
 - **Identity / account:** `authServiceProvider`, `isTeacherProvider`, `accountServiceProvider`, `localApiKeyStorageProvider`
 - **Curriculum / content:** `goalsServiceProvider`, `goalSelectionProvider`, `globalConfigServiceProvider`, `instructionsServiceProvider`, `moduleServiceProvider` *(new)*, `contentServiceProvider` *(new)*
-- **Tutor / mastery:** `tutorServiceProvider`, `chatServiceProvider`, `loBeliefsServiceProvider` *(new)*, `turnHistoryServiceProvider` *(new)*, `splashServiceProvider`, `outputServiceProvider`
+- **Tutor / mastery:** `tutorServiceProvider`, `chatServiceProvider`, `loBeliefsServiceProvider` *(new)*, `turnHistoryServiceProvider` *(new)*, `splashServiceProvider`, `outputServiceProvider`, `subgoalLoDisplayProvider` *(#230 — the segments of the student's subgoal bar, published by the conductor)*
 - **Shell / UI:** `sectionProvider`, `modeProvider`, `ambientProgressProvider`, `profileProvider`
 - **Chat-flow state:** `streamStateProvider`, `mcqPendingProvider`, `activeMcqProvider` *(new — non-null while an MCQ is in flight; takes over the practice surface)*
 - **Progression:** `levelUpControllerProvider`, `xpStateProvider`

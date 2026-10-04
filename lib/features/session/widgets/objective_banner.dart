@@ -1,4 +1,4 @@
-import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/features/session/widgets/subgoal_progress_bar.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// "Huidig doel" banner shown at the top of [PracticeView]. Renders nothing
 /// when there is no active goal (e.g. before the conductor has selected one).
 /// The goal's title and description are in the app language when there is
-/// a translation, else in Dutch (#210).
+/// a translation, else in Dutch (#210). Under them, for a subgoal, its bar:
+/// a segment per LO ([SubgoalProgressBar], #230).
 class ObjectiveBanner extends ConsumerWidget {
   const ObjectiveBanner({super.key});
 
@@ -22,10 +23,6 @@ class ObjectiveBanner extends ConsumerWidget {
 
     final shown = ref.watch(localizedGoalOf(goal));
     final description = (shown.description ?? '').trim();
-    final progress = activeChildGoal == null
-        ? 0.0
-        : ref.watch(ambientProgressProvider).clamp(0.0, 1.0);
-    final completed = progress >= 0.999;
 
     return Container(
       width: double.infinity,
@@ -92,27 +89,9 @@ class ObjectiveBanner extends ConsumerWidget {
             ),
           ],
           if (activeChildGoal != null) ...[
-            const SizedBox(height: AppSpacing.s),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              child: SizedBox(
-                height: 4,
-                child: Stack(
-                  children: [
-                    Container(color: AppColors.ink2),
-                    AnimatedFractionallySizedBox(
-                      duration: AppDurations.progressFill,
-                      curve: AppCurves.layout,
-                      widthFactor: progress,
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        color: completed ? AppColors.accent2 : AppColors.accent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // The bar's hover area adds AppSpacing.xxs above it (#230).
+            const SizedBox(height: AppSpacing.s - AppSpacing.xxs),
+            const SubgoalProgressBar(),
           ],
         ],
       ),

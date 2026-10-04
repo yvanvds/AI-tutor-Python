@@ -1291,6 +1291,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_objectiveBanner_pill => 'Current goal';
 
   @override
+  String session_objectiveBanner_segments(int mastered, int almost, int todo) {
+    String _temp0 = intl.Intl.pluralLogic(
+      mastered,
+      locale: localeName,
+      other: '$mastered parts mastered',
+      one: '1 part mastered',
+    );
+    return '$_temp0, $almost almost, $todo still to do';
+  }
+
+  @override
   String get chat_tutorName => 'Tutor';
 
   @override

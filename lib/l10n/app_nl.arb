@@ -383,6 +383,7 @@
   "session_runControls_button_stop": "Stop",
 
   "session_objectiveBanner_pill": "Huidig doel",
+  "session_objectiveBanner_segments": "{mastered, plural, =1{1 onderdeel beheerst} other{{mastered} onderdelen beheerst}}, {almost} bijna, {todo} nog te doen",
 
   "chat_tutorName": "Tutor",
   "chat_userName_you": "Jij",

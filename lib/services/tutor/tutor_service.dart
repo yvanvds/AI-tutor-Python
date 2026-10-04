@@ -50,6 +50,7 @@ import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -525,6 +526,8 @@ class TutorService extends Notifier<TutorState> {
           ref.read(progressServiceProvider).getByGoalId(id),
       setCurrentProgress: (v) =>
           ref.read(progressServiceProvider).setCurrentProgress(v),
+      setLoDisplay: (d) =>
+          ref.read(subgoalLoDisplayProvider.notifier).state = d,
       addSystemNotice: _chat.addSystemNotice,
       recordDebugEvent: _debug.recordEvent,
       playCorrectAnswer: () =>

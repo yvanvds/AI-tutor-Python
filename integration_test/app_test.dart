@@ -77,6 +77,7 @@ import 'flows/students_progress_column.dart' as students_progress_column;
 import 'flows/students_sort.dart' as students_sort;
 import 'flows/students_sort_persist.dart' as students_sort_persist;
 import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
+import 'flows/subgoal_segments.dart' as subgoal_segments;
 import 'flows/teacher_badges.dart' as teacher_badges;
 import 'flows/token_usage.dart' as token_usage;
 import 'flows/transfer_credit.dart' as transfer_credit;
@@ -142,6 +143,7 @@ void main() {
   own_key.main();
   status_report_retry.main();
   stuck_advance_progress.main();
+  subgoal_segments.main();
   next_root_signal.main();
   turn_content.main();
   level_up_gate.main();

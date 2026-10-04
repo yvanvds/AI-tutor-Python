@@ -2191,6 +2191,12 @@ abstract class AppLocalizations {
   /// **'Current goal'**
   String get session_objectiveBanner_pill;
 
+  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.
+  ///
+  /// In en, this message translates to:
+  /// **'{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do'**
+  String session_objectiveBanner_segments(int mastered, int almost, int todo);
+
   /// No description provided for @chat_tutorName.
   ///
   /// In en, this message translates to:
