@@ -159,9 +159,10 @@ class _Accounts implements CosmosContainer {
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
+    String? ifMatch,
   }) {
     if (failWrites) throw CosmosException(503, 'unavailable');
-    return inner.replace(id, doc, partitionKey: partitionKey);
+    return inner.replace(id, doc, partitionKey: partitionKey, ifMatch: ifMatch);
   }
 
   @override

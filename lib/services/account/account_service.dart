@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/badges/earned_badges.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -326,26 +327,74 @@ class AccountService extends Notifier<Account?> {
   /// `oefeningCount` back. A failed write does not hold up the next.
   Future<void> _writes = Future<void>.value();
 
+  /// How often [_patchWith] reads and writes in all when other apps keep
+  /// writing the doc between its read and its replace (#223).
+  @visibleForTesting
+  static const int maxPatchAttempts = 4;
+
   /// Read-modify-write of the account doc: [changes] sees the doc as read
   /// and returns the fields to set; every other field stays as it is. An
   /// empty map writes nothing.
+  ///
+  /// The write queue above orders the writes of this app, not those of two
+  /// apps (#223): the teacher's badge, or the student's other laptop, can
+  /// land between this read and this replace. So the replace carries the
+  /// `_etag` of the doc as read; such a write makes it fail with a 412
+  /// instead of being overwritten, and [changes] runs again on the doc as it
+  /// is now — it is a pure function of that doc, so that is safe. After
+  /// [maxPatchAttempts] the 412 surfaces like any failed write.
   Future<void> _patchWith(
     String uid,
     Map<String, Object?> Function(Map<String, dynamic> doc) changes,
   ) {
     final run = _writes.then((_) async {
-      final doc = await safeCosmos(
-        () => _container.read(uid, partitionKey: uid),
-      );
-      if (doc == null) return;
-      final set = changes(doc);
-      if (set.isEmpty) return;
-      doc.addAll(set);
-      doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-      await safeCosmos(() => _container.replace(uid, doc, partitionKey: uid));
+      Map<String, dynamic>? sent;
+      for (var attempt = 1; ; attempt++) {
+        final doc = await safeCosmos(
+          () => _container.read(uid, partitionKey: uid),
+        );
+        if (doc == null) return;
+        // The client replays a replace whose answer got lost; when the first
+        // one did land, the replay meets this write's own etag. The doc is
+        // then what this write sent: done, not to be applied twice.
+        if (sent != null && _sameFields(doc, sent)) return;
+        final set = changes(doc);
+        if (set.isEmpty) return;
+        final etag = doc['_etag'];
+        doc.addAll(set);
+        doc['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        sent = doc;
+        try {
+          await safeCosmos(
+            () => _container.replace(
+              uid,
+              doc,
+              partitionKey: uid,
+              ifMatch: etag is String ? etag : null,
+            ),
+          );
+          return;
+        } on CosmosException catch (e) {
+          if (!e.isPreconditionFailed || attempt >= maxPatchAttempts) {
+            rethrow;
+          }
+          debugPrint(
+            'AccountService: the account doc changed under write '
+            '$attempt; reading it again.',
+          );
+        }
+      }
     });
     _writes = run.then<void>((_) {}, onError: (Object _) {});
     return run;
+  }
+
+  /// Whether [a] and [b] hold the same fields, Cosmos' own (`_etag`, `_ts`…)
+  /// aside.
+  static bool _sameFields(Map<String, dynamic> a, Map<String, dynamic> b) {
+    Map<String, dynamic> own(Map<String, dynamic> d) =>
+        Map.of(d)..removeWhere((k, _) => k.startsWith('_'));
+    return const DeepCollectionEquality().equals(own(a), own(b));
   }
 
   Future<Account?> _fetchAccount(String uid) async {

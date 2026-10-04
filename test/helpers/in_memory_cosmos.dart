@@ -23,6 +23,11 @@
 // relies on. `translations` (#206) holds the same id once per language, so
 // it runs [InMemoryCosmos.partitioned]: keyed on (partition, id) the way
 // Cosmos keys it, with single-partition queries kept to their partition.
+//
+// Every write gives the doc a fresh `_etag`, which every doc handed out
+// carries, as in Cosmos; a replace with `ifMatch` answers 412 when the doc
+// changed since (#223). [InMemoryCosmos.beforeReplace] lets a test put
+// another app's write between a read and the replace that follows it.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 
@@ -46,7 +51,7 @@ class InMemoryCosmos {
 
   void _init(Iterable<Map<String, dynamic>> seed) {
     for (final d in seed) {
-      docs[_keyOf(d)] = Map<String, dynamic>.from(d);
+      _put(_keyOf(d), Map<String, dynamic>.from(d));
     }
     container = _InMemoryContainer(this);
   }
@@ -58,7 +63,44 @@ class InMemoryCosmos {
   late final CosmosContainer container;
 
   /// Keyed on id, or on `'$partitionKey/$id'` for a partitioned container.
+  ///
+  /// Each doc as it was last written — what the writer sent, so a test sees
+  /// whether a service echoed Cosmos' system fields back. The `_etag` the
+  /// docs handed out carry is kept apart ([etagOf]); a test that changes a
+  /// doc here directly changes no `_etag`, and one it puts here directly has
+  /// none until the store writes it. To stand in for another app's write,
+  /// go through [upsert] or [replace].
   final Map<String, Map<String, dynamic>> docs = {};
+
+  /// Runs before every replace through [container], after the caller read
+  /// the doc and before the replace's `If-Match` is checked (#223): a test
+  /// puts another app's write here — the teacher's badge landing between
+  /// the student's read and replace. It sees the id and the doc as sent.
+  Future<void> Function(String id, Map<String, Object?> doc)? beforeReplace;
+
+  final Map<String, String> _etags = {};
+  int _writes = 0;
+
+  /// The `_etag` of the doc under [key]: a new one on every write.
+  String? etagOf(String key) => _etags[key];
+
+  void _put(String key, Map<String, dynamic> d) {
+    docs[key] = d;
+    _etags[key] = '"etag-${++_writes}"';
+  }
+
+  void _remove(String key) {
+    docs.remove(key);
+    _etags.remove(key);
+  }
+
+  /// A copy of the doc under [key] as Cosmos hands it out, with its `_etag`.
+  Map<String, dynamic> _out(String key) {
+    final d = _copy(docs[key]!);
+    final etag = _etags[key];
+    if (etag != null) d['_etag'] = etag;
+    return d;
+  }
 
   Map<String, dynamic>? operator [](String key) => docs[key];
 
@@ -87,8 +129,8 @@ class InMemoryCosmos {
   }
 
   Map<String, dynamic>? read(String id, {Object? partitionKey}) {
-    final d = docs[_key(id, partitionKey)];
-    return d == null ? null : _copy(d);
+    final key = _key(id, partitionKey);
+    return docs.containsKey(key) ? _out(key) : null;
   }
 
   Map<String, dynamic> create(
@@ -101,8 +143,8 @@ class InMemoryCosmos {
     if (docs.containsKey(_keyOf(d))) {
       throw CosmosException(409, 'id $id exists', code: 'Conflict');
     }
-    docs[_keyOf(d)] = d;
-    return _copy(d);
+    _put(_keyOf(d), d);
+    return _out(_keyOf(d));
   }
 
   Map<String, dynamic> upsert(
@@ -111,38 +153,59 @@ class InMemoryCosmos {
   }) {
     final d = _copy(doc);
     _checkPartition(d, partitionKey);
-    docs[_keyOf(d)] = d;
-    return _copy(d);
+    _put(_keyOf(d), d);
+    return _out(_keyOf(d));
   }
 
+  /// With [ifMatch], only when the stored doc still has that `_etag`: a 412
+  /// otherwise, as Cosmos answers, and a 404 when the doc is gone.
   Map<String, dynamic> replace(
     String id,
     Map<String, Object?> doc, {
     Object? partitionKey,
+    String? ifMatch,
   }) {
     final d = _copy(doc);
     _checkPartition(d, partitionKey);
-    docs[_key(id, partitionKey)] = d;
-    return _copy(d);
+    final key = _key(id, partitionKey);
+    if (ifMatch != null) {
+      if (!docs.containsKey(key)) {
+        throw CosmosException(
+          404,
+          'Entity with the specified id does not exist in the system.',
+          code: 'NotFound',
+        );
+      }
+      if (_etags[key] != ifMatch) {
+        throw CosmosException(
+          412,
+          'Operation cannot be performed because one of the specified '
+          'precondition is not met.',
+          code: 'PreconditionFailed',
+        );
+      }
+    }
+    _put(key, d);
+    return _out(key);
   }
 
   void delete(String id, {Object? partitionKey}) =>
-      docs.remove(_key(id, partitionKey));
+      _remove(_key(id, partitionKey));
 
   void executeBatch(List<BatchOperation> ops, {Object? partitionKey}) {
     for (final op in ops) {
       switch (op.operationType) {
         case 'Delete':
-          docs.remove(_key(op.id!, partitionKey));
+          _remove(_key(op.id!, partitionKey));
         case 'Create':
         case 'Upsert':
           final d = _copy(op.resourceBody!);
           _checkPartition(d, partitionKey);
-          docs[_keyOf(d)] = d;
+          _put(_keyOf(d), d);
         case 'Replace':
           final d = _copy(op.resourceBody!);
           _checkPartition(d, partitionKey);
-          docs[_key(op.id!, partitionKey)] = d;
+          _put(_key(op.id!, partitionKey), d);
       }
     }
   }
@@ -153,7 +216,7 @@ class InMemoryCosmos {
     Object? partitionKey,
     bool crossPartition = false,
   }) {
-    Iterable<Map<String, dynamic>> rows = docs.values.map(_copy);
+    Iterable<Map<String, dynamic>> rows = docs.keys.map(_out);
 
     final field = partitionKeyField;
     if (field != null && !crossPartition && partitionKey != null) {
@@ -272,7 +335,16 @@ class _InMemoryContainer implements CosmosContainer {
     String id,
     Map<String, Object?> doc, {
     required Object partitionKey,
-  }) async => _store.replace(id, doc, partitionKey: partitionKey);
+    String? ifMatch,
+  }) async {
+    await _store.beforeReplace?.call(id, doc);
+    return _store.replace(
+      id,
+      doc,
+      partitionKey: partitionKey,
+      ifMatch: ifMatch,
+    );
+  }
 
   @override
   Future<void> delete(String id, {required Object partitionKey}) async =>

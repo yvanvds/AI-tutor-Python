@@ -12,23 +12,36 @@
 //     again, and the trophy case shows "Received 2×" under "From your
 //     teacher";
 //   - with the app open, a badge the teacher gives arrives with the next
-//     poll of the account doc (5 s).
+//     poll of the account doc (5 s);
+//   - a badge the teacher gives between the student's app reading the doc
+//     and writing a graded answer back is not overwritten (#223): the write
+//     goes with `If-Match` on the doc's `_etag`, meets the teacher's, reads
+//     again — and the answer is counted and the badge announced.
 //
-// Cosmos is the in-memory fake; no model is involved.
+// Cosmos is the in-memory fake, which keeps an `_etag` per doc and honours
+// `If-Match`; the one graded answer comes from a scripted model.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
 //   flutter test integration_test/flows/teacher_badges.dart -d windows
 
+import 'dart:convert';
+
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
 import 'package:ai_tutor_python/features/account/detail/student_detail_drawer.dart';
 import 'package:ai_tutor_python/features/badges/prijzenkast_page.dart';
+import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
+import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
+import 'package:ai_tutor_python/services/account/account_service.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import '../harness/app_harness.dart';
+import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
 
 Map<String, dynamic> _student({Map<String, dynamic>? badges}) => {
@@ -53,6 +66,38 @@ Map<String, dynamic> _storedBadges(AppHarness harness) =>
 Finder _toast() => find.byKey(const ValueKey('badge-toast'));
 
 Finder _inToast(Finder what) => find.descendant(of: _toast(), matching: what);
+
+const String _mcqWrong = '11';
+
+String _mcqReply(String prompt) => llmEnvelope(
+  text: prompt,
+  meta: jsonEncode({
+    'type': 'multiple_choice',
+    'code': 'print(1 + 1)',
+    'options': [
+      {'option': '2'},
+      {'option': _mcqWrong},
+      {'option': 'Error'},
+    ],
+    'correct': 'A',
+  }),
+);
+
+String _mcqGrade(String text) => llmEnvelope(
+  text: text,
+  meta: jsonEncode({
+    'type': 'mcq_feedback',
+    'overallQuality': 'wrong',
+    'loSignals': [
+      {
+        'subgoalId': 's1',
+        'loId': 'lo-print',
+        'signal': 'negative',
+        'strength': 'moderate',
+      },
+    ],
+  }),
+);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -240,6 +285,97 @@ void main() {
     );
     await tester.tap(_inToast(find.byTooltip('Close')));
     await pumpUntilGone(tester, _toast());
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a badge the teacher gives while the student\'s answer is being '
+      'written is not lost: the answer is counted and the badge announced '
+      '(#223)', (tester) async {
+    final harness = AppHarness(
+      llm: ScriptedLlm([
+        _mcqReply('Wat drukt print(1 + 1) af?'),
+        _mcqGrade('Nee: 1 + 1 is een som.'),
+      ]),
+      extraDocs: {
+        'accounts': [
+          _student(
+            badges: {
+              'helloWorld': {'tier': 1, 'earnedAt': '2026-09-01T10:00:00.000Z'},
+            },
+          ),
+        ],
+      },
+    );
+    await harness.boot(tester);
+    final accounts = harness.cosmos['accounts'];
+
+    // The teacher's app: an account service of its own on the same docs. Its
+    // badge lands after the student's app read the doc for the write of the
+    // answer — the one that counts the oefening — and before that write's
+    // replace.
+    final teacher = AccountService(container: accounts.container);
+    var given = false;
+    accounts.beforeReplace = (id, doc) async {
+      if (given || id != kStudentUid || doc['oefeningCount'] != 4) return;
+      given = true;
+      await teacher.awardTeacherBadge(
+        uid: kStudentUid,
+        badgeId: 'teacher:helpingHand',
+      );
+    };
+
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await tester.tap(find.text('Continue'));
+    await pumpUntilFound(tester, find.byType(ExplainView));
+    await tester.tap(find.text('Try it yourself'));
+    await pumpUntilFound(tester, find.byType(QuizView));
+    await pumpUntilFound(tester, find.text(_mcqWrong));
+    await pumpUntil(
+      tester,
+      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+    );
+    await tester.tap(find.text(_mcqWrong));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('1 + 1 is een som', findRichText: true),
+    );
+
+    // Both on the doc: the oefening counted, and the teacher's badge.
+    Map<String, dynamic> doc() => accounts.docs[kStudentUid]!;
+    await pumpUntil(
+      tester,
+      () => given && doc()['oefeningCount'] == 4,
+      timeout: const Duration(seconds: 30),
+      reason: 'the answer was never written with its oefening counted',
+    );
+    expect(doc()['calibration'], isA<Map>());
+    final entry = _storedBadges(harness)['teacher:helpingHand'] as Map?;
+    expect(entry, isNotNull, reason: "the answer's write dropped the badge");
+    expect(entry!['count'], 1);
+    expect(entry['awardedBy'], 'teacher');
+    expect(_storedBadges(harness)['helloWorld'], {
+      'tier': 1,
+      'earnedAt': '2026-09-01T10:00:00.000Z',
+    });
+
+    // So the student's app announces it on a poll, and marks it seen.
+    await pumpUntilFound(
+      tester,
+      _inToast(find.text('Helping hand')),
+      timeout: const Duration(seconds: 40),
+    );
+    expect(
+      _inToast(find.text('From your teacher · You helped a classmate.')),
+      findsOneWidget,
+    );
+    await pumpUntil(
+      tester,
+      () => (_storedBadges(harness)['teacher:helpingHand'] as Map)['seen'] == 1,
+      reason: 'the badge was never marked seen',
+    );
+    expect(doc()['oefeningCount'], 4);
 
     await harness.dispose(tester);
   });
