@@ -293,6 +293,9 @@ void main() {
       'written is not lost: the answer is counted and the badge announced '
       '(#223)', (tester) async {
     final harness = AppHarness(
+      // A school morning (#235): on a weekend night the graded answer earns
+      // "Night owl" and "Weekend warrior", whose notices come first.
+      turnClockStart: kWeekdayMorning,
       llm: ScriptedLlm([
         _mcqReply('Wat drukt print(1 + 1) af?'),
         _mcqGrade('Nee: 1 + 1 is een som.'),
