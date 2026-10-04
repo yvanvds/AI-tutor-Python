@@ -221,6 +221,9 @@ class TutorService extends Notifier<TutorState> {
   InstructionGenerator get _instructionGenerator =>
       _instructionGeneratorOverride ?? InstructionGenerator();
 
+  /// Now, on the clock a graded turn is stamped with ([turnClockProvider]).
+  DateTime _turnClockNow() => ref.read(turnClockProvider)().toUtc();
+
   @override
   TutorState build() {
     _chat = ref.read(chatServiceProvider);
@@ -1068,7 +1071,7 @@ class TutorService extends Notifier<TutorState> {
         bankQuestion.isMultipleChoice &&
         _keyOfPick() != null;
 
-    final now = DateTime.now().toUtc();
+    final now = _turnClockNow();
     final provenance = await _resolveProvenance(at: now);
     // A warm-up review (#102) or a recheck (#187) targets an LO of an
     // older subgoal: the fallback signal and the turn record name that
@@ -1316,7 +1319,7 @@ class TutorService extends Notifier<TutorState> {
       originalPlan: plan,
       depth: depth,
       question: question,
-      askedAt: DateTime.now().toUtc(),
+      askedAt: _turnClockNow(),
     );
     _debug.recordEvent('tutor.follow_up_presented', {
       'depth': depth,
@@ -1674,7 +1677,7 @@ class TutorService extends Notifier<TutorState> {
       loId: _inFlightPlan?.targetLOs.firstOrNull?.id,
     );
     if (!isQuestion) return;
-    _questionAskedAt = DateTime.now().toUtc();
+    _questionAskedAt = _turnClockNow();
     _mcqKey = response is MultipleChoice ? response.correct : null;
     if (fromBank != null) {
       _askBankQuestion(fromBank);
@@ -2080,3 +2083,13 @@ class TutorService extends Notifier<TutorState> {
 final tutorServiceProvider = NotifierProvider<TutorService, TutorState>(
   TutorService.new,
 );
+
+/// The clock a graded turn is stamped with (#235): when its question went up
+/// (`askedAt`) and when its answer was graded — the record's `turnAt` and id,
+/// and the moment the supervision registry is asked about. The wall clock.
+///
+/// A seam for the end-to-end flows: the time-bound secret badges are counted
+/// from these stamps in local time (`badge_facts.dart`), so on the wall clock
+/// the same graded answer earns "Night owl" and "Weekend warrior" as well on
+/// a weekend night. A flow pins the clock to say when its turns happen.
+final turnClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

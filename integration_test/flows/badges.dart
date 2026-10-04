@@ -172,6 +172,10 @@ void main() {
   testWidgets('a graded answer that earns a badge is announced after its '
       'feedback, once, and stored', (tester) async {
     final harness = AppHarness(
+      // A school morning (#235): on a weekend night the same answer earns
+      // "Night owl" and "Weekend warrior" too, and three badges at once are
+      // one summary, not the "Effort" notice this flow looks for.
+      turnClockStart: kWeekdayMorning,
       llm: ScriptedLlm([
         completeCodeReply(text: 'Toon de tekst Hallo.', code: _exercise),
         codeFeedbackReply(
@@ -267,6 +271,9 @@ void main() {
     final answered = DateTime.parse(record['turnAt'] as String);
     expect(asked.isAfter(answered), isFalse);
     expect(record.containsKey('keyDisputed'), isFalse);
+    // Both on the flow's clock, not the wall clock (#235).
+    expect(answered.toLocal().weekday, DateTime.wednesday);
+    expect(answered.toLocal().hour, 10);
 
     // Closed, it stays closed: the badge is announced once.
     await tester.tap(_inToast(find.byTooltip('Close')));

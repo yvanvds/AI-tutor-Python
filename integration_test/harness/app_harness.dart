@@ -79,6 +79,12 @@ import 'seed.dart';
 /// carried without the developer's own key ever appearing in a test.
 const String kSchoolApiKey = 'sk-school-key';
 
+/// A plain school morning (#235): Wednesday 16 September 2026, 10:00 local
+/// time. No weekend, no night, no early morning, no Friday afternoon, no
+/// 15:14, no 14 March or 31 October — a graded turn stamped then earns no
+/// time-bound secret badge. See [AppHarness.turnClockStart].
+final DateTime kWeekdayMorning = DateTime(2026, 9, 16, 10);
+
 /// The window the Windows runner creates the app in, in logical pixels
 /// (`windows/runner/main.cpp`), and the size every flow lays out at unless
 /// it says otherwise — see [AppHarness.windowSize].
@@ -133,6 +139,13 @@ class _NoSound extends SoundService {
   Future<void> guidingComplete() async {}
 }
 
+/// A clock that reads [start] now and runs on at the wall clock's pace
+/// (#235) — see [AppHarness.turnClockStart].
+DateTime Function() _clockFrom(DateTime start) {
+  final elapsed = Stopwatch()..start();
+  return () => start.add(elapsed.elapsed);
+}
+
 /// What the app asked the save dialog for (#127): the name it suggested and
 /// the extension filter it set — the two things the fixed path below takes
 /// out of a flow's sight.
@@ -185,6 +198,7 @@ class AppHarness {
     this.openaiClient,
     this.developerTools,
     this.supervision,
+    this.turnClockStart,
     this.extraDocs = const {},
     Map<String, LessonRunResult> lessonResults = const {},
   }) : assert(
@@ -359,6 +373,23 @@ class AppHarness {
   /// wired (#160).
   final SupervisionSource? supervision;
 
+  /// The moment the tutor's clock for graded turns reads at boot (#235),
+  /// running on at the wall clock's pace from there: what a turn is stamped
+  /// with (`turnClockProvider` — its `turnAt`, and the `askedAt` of its
+  /// question), so a flow's turns still come one after the other and a
+  /// question still goes up before its answer. `null` (the default) leaves
+  /// the wall clock in place.
+  ///
+  /// The time-bound secret badges are counted from those stamps in local
+  /// time (`badge_facts.dart`). On the wall clock, the graded answer that
+  /// earns "Effort" earns "Night owl" and "Weekend warrior" as well on a
+  /// Saturday or Sunday from 22:00 — on the CI runner, which keeps UTC — and
+  /// three badges at once are announced as one summary, not as the notice a
+  /// flow looks for. So a flow that counts the badges a graded answer earns
+  /// starts the clock on [kWeekdayMorning]; a flow about a time-bound badge
+  /// starts it on the moment it needs.
+  final DateTime? turnClockStart;
+
   /// Cosmos docs upserted on top of the standard seed before the app boots,
   /// keyed by container name as `CosmosPaths` names them (#101). A doc whose
   /// id already exists in the seed replaces it, so a flow can start a
@@ -463,6 +494,8 @@ class AppHarness {
           developerToolsProvider.overrideWithValue(developerTools!),
         if (supervision != null)
           supervisionSourceProvider.overrideWithValue(supervision!),
+        if (turnClockStart != null)
+          turnClockProvider.overrideWithValue(_clockFrom(turnClockStart!)),
         soundServiceProvider.overrideWithValue(_NoSound()),
         browserLauncherProvider.overrideWithValue((Uri url) async {
           browserLaunches.add(url);
@@ -501,6 +534,12 @@ class AppHarness {
         systemBrightnessProvider.overrideWithValue(systemBrightness),
       ],
     );
+    // Torn down even when the flow fails before its own [dispose] (#235).
+    // Left alive, this container keeps polling the account doc every 5 s
+    // through `CosmosClient.instance` — which the next flow's boot replaces
+    // with its own fake — so it reads the next flow's docs for the same
+    // student, and announces and marks seen what that flow is waiting for.
+    addTearDown(() => dispose(tester));
 
     // Same root and scope as `main()`.
     await tester.pumpWidget(
@@ -515,10 +554,15 @@ class AppHarness {
   }
 
   /// Unmounts the app and tears down services, timers and temp files.
+  ///
+  /// [boot] also registers this as a tear-down, so a flow that fails half
+  /// way leaves nothing running; once done, a second call does nothing.
   Future<void> dispose(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    _container?.dispose();
+    final container = _container;
+    if (container == null) return;
     _container = null;
+    await tester.pumpWidget(const SizedBox.shrink());
+    container.dispose();
     await _deletePlaygroundDir();
   }
 

@@ -414,14 +414,16 @@ void main() {
   });
 
   /// Boots the tutor over the bank [docs] (or [bank]), with the school's
-  /// mix at N = [minimum] and p = [share] (the defaults when null), and the
-  /// dice pinned to [rolls].
+  /// mix at N = [minimum] and p = [share] (the defaults when null), the
+  /// dice pinned to [rolls] and the turns stamped by [clock] (the wall
+  /// clock when null).
   Future<QuestionBankService> boot({
     List<Map<String, dynamic>> docs = const [],
     QuestionBankService? bank,
     int? minimum,
     double? share,
     Random? rolls,
+    DateTime Function()? clock,
   }) async {
     for (final d in docs) {
       store.upsert(d);
@@ -454,6 +456,7 @@ void main() {
         soundServiceProvider.overrideWithValue(sound),
         turnHistoryServiceProvider.overrideWithValue(history),
         questionBankServiceProvider.overrideWithValue(service),
+        if (clock != null) turnClockProvider.overrideWithValue(clock),
         globalConfigServiceProvider.overrideWith(
           () => _Config(
             GlobalConfig(
@@ -597,6 +600,33 @@ void main() {
         _key,
         reason: 'as the grading call would have carried it (#197)',
       );
+    });
+
+    test('the turn is stamped by the turn clock, not the wall clock (#235): '
+        'when its question went up and when its answer was graded', () async {
+      final doc = _mcqDoc('q', feedback: const [_feedbackOnWrong]);
+      // A school morning, whatever the machine's clock says: on a weekend
+      // night the same turn would earn the time-bound secret badges too.
+      final asked = DateTime(2026, 9, 16, 10);
+      final answered = DateTime(2026, 9, 16, 10, 7);
+      var now = asked;
+      final bank = await boot(
+        docs: [doc],
+        minimum: 1,
+        share: 1,
+        clock: () => now,
+      );
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      now = answered;
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      final record = history.records.single;
+      expect(record.askedAt, asked.toUtc());
+      expect(record.turnAt, answered.toUtc());
+      expect(record.id, startsWith(answered.toUtc().toIso8601String()));
     });
 
     test('the key is a strong positive', () async {

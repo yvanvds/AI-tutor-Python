@@ -134,6 +134,10 @@ void main() {
       'trophy case', (tester) async {
     final now = DateTime.now().toUtc();
     final harness = AppHarness(
+      // A school morning (#235): on a weekend night the answer earns "Night
+      // owl" and "Weekend warrior" too, and from three badges at once the
+      // notice is one summary, not the "Silver" one this flow looks for.
+      turnClockStart: kWeekdayMorning,
       llm: ScriptedLlm(_script()),
       extraDocs: {
         'accounts': [
@@ -262,9 +266,13 @@ void main() {
       findsOneWidget,
     );
     final tile = find.byKey(const ValueKey('badge-tile-podium:s2'));
-    expect(
+    // The case shows the medal once the next poll of the account doc (5 s)
+    // brings it (#236). Until #235 this passed only with a second notice —
+    // "Weekend warrior" or "Night owl" — keeping the toast up that long; on
+    // a weekday morning the toast is gone well before the poll.
+    await pumpUntilFound(
+      tester,
       find.descendant(of: tile, matching: find.text('Silver: Variables')),
-      findsOneWidget,
     );
     expect(
       find.descendant(of: section, matching: find.byType(BadgeTileCard)),
@@ -289,6 +297,8 @@ void main() {
       'claimed, and the trophy case says why', (tester) async {
     final now = DateTime.now().toUtc();
     final harness = AppHarness(
+      // Same school morning as above (#235): no time-bound badge's notice.
+      turnClockStart: kWeekdayMorning,
       llm: ScriptedLlm(_script()),
       extraDocs: {
         'accounts': [
