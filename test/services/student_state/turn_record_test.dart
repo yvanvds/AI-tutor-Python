@@ -23,6 +23,7 @@ PersistedTurnRecord _record({
   bool keyDisputed = false,
   DateTime? askedAt,
   List<TurnLoStatus> loStatusAfter = const [],
+  TurnSelectionReason? selectionReason,
 }) => PersistedTurnRecord(
   keyDisputed: keyDisputed,
   askedAt: askedAt,
@@ -43,7 +44,7 @@ PersistedTurnRecord _record({
   difficulty: QuestionDifficulty.medium,
   isFollowUp: false,
   chainDepth: 0,
-  selectionReason: null,
+  selectionReason: selectionReason,
   overallQuality: AnswerQuality.correct,
   loSignals: const [],
   hadFallback: false,
@@ -69,6 +70,41 @@ void main() {
       final map = _record(isWarmUp: true).toMap(uid: 'u1');
       expect(map['isWarmUp'], isTrue);
       expect(PersistedTurnRecord.fromCosmos(map).isWarmUp, isTrue);
+    });
+  });
+
+  group('PersistedTurnRecord selectionReason notchDropRules (#227)', () {
+    test('a plan without a notch drop writes no rules, as before', () {
+      final map = _record(
+        selectionReason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'lowest mean unmastered',
+          notchDropFired: false,
+        ),
+      ).toMap(uid: 'u1');
+      final reason = map['selectionReason'] as Map<String, dynamic>;
+      expect(reason['notchDropFired'], isFalse);
+      expect(reason.containsKey('notchDropRules'), isFalse);
+    });
+
+    test('a dropped plan names the rules that dropped it, by name', () {
+      final map = _record(
+        selectionReason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'lowest mean (recency relaxed)',
+          notchDropFired: true,
+          notchDropRules: [
+            NotchDropRule.strongNegatives,
+            NotchDropRule.attemptsWithoutCorrect,
+          ],
+        ),
+      ).toMap(uid: 'u1');
+      final reason = map['selectionReason'] as Map<String, dynamic>;
+      expect(reason['notchDropFired'], isTrue);
+      expect(reason['notchDropRules'], [
+        'strongNegatives',
+        'attemptsWithoutCorrect',
+      ]);
     });
   });
 

@@ -53,6 +53,7 @@ import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
 import 'flows/next_root_signal.dart' as next_root_signal;
 import 'flows/no_progress.dart' as no_progress;
+import 'flows/notch_drop_attempts.dart' as notch_drop_attempts;
 import 'flows/oefening_xp.dart' as oefening_xp;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
@@ -121,6 +122,7 @@ void main() {
   no_progress.main();
   difficulty_ratchet.main();
   difficulty_asymmetry.main();
+  notch_drop_attempts.main();
   legacy_ratchet.main();
   transfer_credit.main();
   cross_subgoal_signal.main();

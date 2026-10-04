@@ -779,6 +779,10 @@ class TutorService extends Notifier<TutorState> {
       'difficulty': plan.difficulty.name,
       'chosenReason': plan.reason.chosenReason,
       'notchDropFired': plan.reason.notchDropFired,
+      if (plan.reason.notchDropRules.isNotEmpty)
+        'notchDropRules': plan.reason.notchDropRules
+            .map((r) => r.name)
+            .toList(),
       'candidateLOs': plan.reason.candidateLOs
           .map((c) => {'loId': c.loId, 'mean': c.mean, 'evidence': c.evidence})
           .toList(),

@@ -490,11 +490,12 @@ conflict.
 
 **Default: read from the student's calibration.** Same as cold start.
 
-**Override: drop one notch on this LO.** Two strong-negative signals
-on this LO at the calibrated difficulty, with no positive signal in
-between, triggers a one-notch drop *for this LO only*. The student's
-overall calibration doesn't change; just this LO gets gentler probing
-until it recovers.
+**Override: drop one notch on this LO (the strike rule).** Two
+strong-negative signals on this LO at the calibrated difficulty, with
+no positive signal in between, triggers a one-notch drop *for this LO
+only*. The student's overall calibration doesn't change; just this LO
+gets gentler probing until it recovers. A second rule drops the same
+notch after four attempts without a correct answer (below, #227).
 
 Concretely, the conductor maintains a per-LO counter
 `recentNegativesAtCalibrated`. The counter:
@@ -530,6 +531,87 @@ just two unlucky questions.
 Why two strikes and not one: one-strike fires on slip answers (typo,
 momentary lapse). Two confirmed strong-negatives at calibration,
 without an intervening positive, is the signal we need.
+
+**Second override: four attempts without a correct answer (#227).**
+The strike rule reads the grader's *signals*, and a run of "partial"
+answers slips through it. In #227 a student got the same `completeCode`
+LO nine times in 22 minutes on hard — six partial, three wrong, never
+correct. The direct partials came with a positive on the asked LO
+(moderate, once strong): each reset the strike counter, and the first
+closed the `lastPositiveAtCalibratedAt` guard for good. Six of the nine
+were follow-ups, which are no strike (6.2) and stay out of the
+calibration window, and right answers on another LO in between kept the
+window under the demotion bar (5.2). No rule lowered anything; the only
+way out was a correct answer on hard. So a second rule counts answers,
+not signals:
+
+- **The rule.** After `notchDropAfterAttempts` = 4 attempts on the same
+  LO in one session without a single fully correct answer, the next
+  question on that LO is asked one notch below calibration — this LO
+  only, like the strike rule.
+- **An attempt** is a graded answer to a question whose target is that
+  LO: the question itself (generated or from the bank, a multiple-choice
+  pick graded by its key included, 2.7) and every follow-up on it (6),
+  whose grade is integrated against the question's plan and so has the
+  same target. Follow-ups count because the run in #227 was mostly
+  follow-ups: a follow-up asks about the same LO with the student's own
+  answer still in view, and not getting that right either says as much
+  about the level as the question did. A **warm-up review or a recheck** (1.5, 2.6) is no attempt: one
+  question on older material, where a miss says "forgotten" rather than
+  "too hard" — the reason those answers stay out of the calibration
+  window too (5.3); it is never notch-dropped itself (condition 3 of 4.1
+  wants a positive at calibration); and its LO belongs to an earlier
+  subgoal, which this session's planning (2.1) does not ask, so a count
+  there could only ever leak onto an active LO with the same id. An
+  incidental signal on the LO from a question about another LO is no
+  attempt either way: nobody asked it.
+- **Fully correct** means `overallQuality == correct` — the answer's
+  verdict, whatever signal the grader filed with it. A `partial` is "not
+  yet", as for promotion (5.1). This is what the strike rule cannot see.
+- **Every level counts.** An answer to the lower question is an attempt
+  too, so the drop holds until the first correct answer.
+- **Release.** The first correct answer on the LO — at the lower level,
+  or on a follow-up — ends the run: the count goes back to 0 and the
+  next question on that LO is at calibration again, where mastery
+  condition 3 is still to be met (4.3). Four more attempts without a
+  correct one drop it again. There is no `lastPositiveAtCalibratedAt`
+  guard, unlike the strike rule: in #227 that guard was closed by a
+  partial.
+- **Per session.** The count is in-flight conductor state, never
+  persisted: a new session (`setTarget`, at every session start) starts
+  every LO at 0. The pattern is a run inside one sitting; after a break
+  the student gets a fresh go at calibration, and the strike counter and
+  the calibration window carry the longer memory.
+- **Same notch.** The drop is one notch below the calibration in force
+  at plan time, as for the strike rule; a demotion in between does not
+  reset the count. When both rules fire it is still one notch, never two.
+- **Floor.** At `easy` there is no lower level: neither rule drops
+  anything, and the count goes on without effect. A student stuck at
+  easy is the stuck rule's business (4.4), and the teacher's (`noProgress`,
+  8.2).
+- **The lower question is an ordinary probe at the level asked.** Its
+  answers weigh at that level (3.2) — a strong positive at medium is
+  `2.0 × 1.0`, not the `× 1.4` of hard — and its `difficulty`, on the turn
+  record and in the calibration window, is that level, so it filters out
+  of the at-calibration set like the strike rule's (5.3). A positive on it
+  sets `highestPositiveDifficulty` to the level asked and not
+  `lastPositiveAtCalibratedAt` (4.3). From the bank it is served at the
+  lower level (2.7).
+- **On the record.** The turn says `selectionReason.notchDropFired:
+  true`, as for the strike rule, and `notchDropRules` names which rule
+  fired — `strongNegatives`, `attemptsWithoutCorrect`, or both (8.1). The
+  field is omitted when no rule fired; older docs carry
+  `notchDropFired` only.
+- **The evaluation replay needs no change.** `tooling/evaluation`
+  replays beliefs from each turn's logged signals, `difficulty` and
+  `calibrationBefore`, which already say the level asked; it never
+  re-decides a notch drop and does not read `selectionReason`
+  (`NotchDropReplayTest`).
+
+Why four (the teacher's choice, 2026-10-04): for a student who gets the
+LO right half the time, four in a row without a correct one happens by
+chance about once in sixteen runs; with follow-ups, four attempts are
+often only two questions — the student in #227 had nine in 22 minutes.
 
 **No upward override.** If belief on a target LO is high but not yet
 mastered (e.g. mean 0.78, just below threshold), the policy does *not*
@@ -656,7 +738,7 @@ nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
     target_lo = candidates sorted by (mean ascending, weight descending)[0]
     type = pickType(target_lo, beliefs[target_lo])
     difficulty = student.calibration.difficulty
-    if shouldDropNotch(target_lo, beliefs[target_lo]):
+    if shouldDropNotch(target_lo, beliefs[target_lo]):   # either rule, one notch
         difficulty = oneStepDown(difficulty)
     return Question(targetLOs=[target_lo], type=type, difficulty=difficulty)
     # the host then serves it from the bank or generates it (2.7)
@@ -670,9 +752,15 @@ pickType(lo, belief):
         return gentlest(candidates)
     return leastRecentlyUsed(candidates, lo)
 
-shouldDropNotch(lo, belief):
-    return previous answer on lo was strong-negative
-       and prior answer at calibrated difficulty on lo was also negative
+shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
+    if calibration is easy: return []               # no lower level
+    rules = []
+    if belief.recentNegativesAtCalibrated >= 2
+       and belief.lastPositiveAtCalibratedAt is null:
+        rules += strongNegatives
+    if attemptsWithoutCorrect[lo] >= 4:              # this session, #227
+        rules += attemptsWithoutCorrect
+    return rules
 ```
 
 The pseudocode glosses several details (how "previous answer on lo"
@@ -1431,9 +1519,9 @@ purposes of condition 3.
 
 **The notch-drop override cannot bypass this.** A student whose
 override (section 2.3) keeps firing on a specific LO at easy gets a
-softer path through, but the override releases on positive signal.
-The next probe is at calibrated difficulty. Mastery requires
-demonstrating there.
+softer path through, but the override releases — the strike rule on a
+positive signal, the attempts rule (#227) on a correct answer. The next
+probe is at calibrated difficulty. Mastery requires demonstrating there.
 
 **Three-level ratchet (#103, PUNTENFORMULE §2.5).** A second field,
 `highestPositiveDifficulty: "easy" | "medium" | "hard" | absent`,
@@ -1748,8 +1836,8 @@ flag on previously-mastered LOs. The same holds for
 calibration at all.
 
 **Per-LO override (section 2.3) is independent of student-level
-calibration.** The notch-drop on a struggling LO doesn't appear in
-the recent-answer window as a special case — the answer's
+calibration.** The notch-drop on a struggling LO — either rule —
+doesn't appear in the recent-answer window as a special case — the answer's
 `difficulty` field records the actual difficulty asked, which may be
 below the student's calibration if the override fired. Those answers
 filter out of the at-calibrated set. They influence neither
@@ -2265,6 +2353,7 @@ TurnRecord {
     candidateLOs: [{loId, mean, evidence}]   // top 3
     chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …", "recheck: …"
     notchDropFired: bool
+    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; omitted when none fired
   }
 
   // What happened

@@ -323,8 +323,10 @@ class GradedAnswer {
   ///   - treats the difficulty multiplier as `medium` regardless of the
   ///     original probe's difficulty,
   ///   - skips the calibration window update (§6.2 / §6.5),
-  ///   - skips the notch-drop counter (a follow-up's effective difficulty
-  ///     is medium, not the calibrated value).
+  ///   - skips the strike counter of the first notch-drop rule (a
+  ///     follow-up's effective difficulty is medium, not the calibrated
+  ///     value) — but is an attempt on the question's LO for the second
+  ///     (§2.3, #227).
   final bool isFollowUp;
 
   /// Depth of the follow-up at the time the answer was received: 1 for the
@@ -509,6 +511,14 @@ class Conductor {
   /// a direct question whose grade arrived ends the run.
   int _lostTargetRun = 0;
 
+  /// Attempts this session on each LO of the active subgoal since its last
+  /// `correct`, keyed by [_attemptKey] (§2.3 second notch-drop rule, #227).
+  /// An attempt is a graded answer to a question on the LO or to a
+  /// follow-up on it; a warm-up review or a recheck is none. At
+  /// `notchDropAfterAttempts` the next question on the LO is asked a notch
+  /// lower, until a `correct` on it removes the entry.
+  final Map<String, int> _attemptsWithoutCorrect = {};
+
   /// Pending audit event — populated when `_advanceWithCascadeCap` halts.
   /// Consumed by the next call to `integrateAnswer` so the cascade-halt
   /// rides on the same persisted turn that caused the advance.
@@ -549,6 +559,7 @@ class Conductor {
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
     _lostTargetRun = 0;
+    _attemptsWithoutCorrect.clear();
     _pendingCascadeHaltEvent = null;
     _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
@@ -707,18 +718,13 @@ class Conductor {
     }
 
     final type = _pickType(target, snapshots[target.id]!);
-    var difficulty = calibration;
-    var notchDrop = false;
-    final maybeDrop = await _shouldDropNotch(
+    final notchDropRules = await _shouldDropNotch(
       lo: target,
       subgoalId: subgoal.id,
-      snap: snapshots[target.id]!,
       calibration: calibration,
     );
-    if (maybeDrop) {
-      difficulty = _stepDown(calibration);
-      notchDrop = true;
-    }
+    final notchDrop = notchDropRules.isNotEmpty;
+    final difficulty = notchDrop ? _stepDown(calibration) : calibration;
 
     final candidateStats = (unmastered.isNotEmpty ? unmastered : objectives)
         .take(3)
@@ -735,6 +741,7 @@ class Conductor {
       candidateLOs: candidateStats,
       chosenReason: chosenReason,
       notchDropFired: notchDrop,
+      notchDropRules: notchDropRules,
     );
 
     return QuestionPlan(
@@ -1147,26 +1154,43 @@ class Conductor {
     return _lastQuestionType?.name;
   }
 
-  Future<bool> _shouldDropNotch({
+  /// The §2.3 rules that ask the next question on [lo] one notch below
+  /// [calibration] — empty when none does. Both rules drop the same one
+  /// notch, never two, and at `easy` there is no lower level.
+  Future<List<NotchDropRule>> _shouldDropNotch({
     required LearningObjective lo,
     required String subgoalId,
-    required BeliefSnapshot snap,
     required QuestionDifficulty calibration,
   }) async {
+    if (calibration == QuestionDifficulty.easy) return const [];
+    final rules = <NotchDropRule>[];
     // Two strikes at calibrated difficulty on this LO trigger a one-notch
-    // drop (CONDUCTOR_POLICY §2.3). The literal rule is implemented via the
+    // drop. The literal rule is implemented via the
     // `recentNegativesAtCalibrated` counter on `LoBelief`: it increments on
-    // each negative-at-calibrated answer and resets on any positive (any
+    // each strong negative at calibration and resets on any positive (any
     // difficulty). The override releases the next time a positive lands on
     // this LO, hence the `lastPositiveAtCalibratedAt is null` guard — once
     // the student has demonstrated this LO at calibration, we no longer
     // gate it back to easy.
-    if (calibration == QuestionDifficulty.easy) return false;
     final belief = await _deps.getLoBelief(subgoalId: subgoalId, loId: lo.id);
-    if (belief == null) return false;
-    if (belief.lastPositiveAtCalibratedAt != null) return false;
-    return belief.recentNegativesAtCalibrated >= 2;
+    if (belief != null &&
+        belief.lastPositiveAtCalibratedAt == null &&
+        belief.recentNegativesAtCalibrated >= 2) {
+      rules.add(NotchDropRule.strongNegatives);
+    }
+    // #227: a run of attempts without a correct answer, whatever signals
+    // the grader gave with them — a "partial" often comes with a positive,
+    // which resets the strike counter and closes the guard above. No such
+    // guard here: the run is this session's, and a correct answer ends it.
+    final attempts = _attemptsWithoutCorrect[_attemptKey(subgoalId, lo.id)];
+    if ((attempts ?? 0) >= PolicyConstants.notchDropAfterAttempts) {
+      rules.add(NotchDropRule.attemptsWithoutCorrect);
+    }
+    return rules;
   }
+
+  static String _attemptKey(String subgoalId, String loId) =>
+      '$subgoalId/$loId';
 
   QuestionDifficulty _stepDown(QuestionDifficulty d) {
     switch (d) {
@@ -1322,6 +1346,22 @@ class Conductor {
 
     if (answer.overallQuality == AnswerQuality.correct) {
       _deps.playCorrectAnswer();
+    }
+
+    // §2.3 second notch-drop rule (#227): every graded answer to a question
+    // on an LO of the active subgoal — the question itself, at whatever
+    // level it was asked, or a follow-up on it — is an attempt on that LO,
+    // and only `correct` ends the run. A warm-up review or a recheck is no
+    // attempt: one question on older material, where a miss says
+    // "forgotten" rather than "too hard", never notch-dropped itself, on an
+    // LO of an earlier subgoal that this session's planning does not ask.
+    if (targetLo != null && !plan.isOffSubgoal) {
+      final key = _attemptKey(subgoal.id, targetLo.id);
+      if (answer.overallQuality == AnswerQuality.correct) {
+        _attemptsWithoutCorrect.remove(key);
+      } else {
+        _attemptsWithoutCorrect[key] = (_attemptsWithoutCorrect[key] ?? 0) + 1;
+      }
     }
 
     // ---- Belief updates --------------------------------------------------

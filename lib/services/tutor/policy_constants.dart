@@ -125,6 +125,17 @@ class PolicyConstants {
   /// At most this many subgoals can auto-skip in a row.
   static const int cascadeSkipCap = 1;
 
+  // ---- Difficulty per question (CONDUCTOR_POLICY §2.3) --------------------
+
+  /// The second notch-drop rule (#227): after this many attempts on one LO
+  /// in a session — the question or a follow-up on it — without a single
+  /// `correct`, the next question on that LO is asked one notch below the
+  /// calibration, until a correct answer on it. Four: a student who gets
+  /// the LO right half the time sees four in a row without one about once
+  /// in sixteen runs, and with follow-ups four attempts are often only two
+  /// questions — the student in #227 had nine in 22 minutes.
+  static const int notchDropAfterAttempts = 4;
+
   // ---- Warm-up review (CONDUCTOR_POLICY §1.5, #102) ------------------------
 
   /// How long a once-mastered LO in another subgoal must go without a

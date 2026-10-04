@@ -2001,7 +2001,10 @@ class _RecentTurnsList extends StatelessWidget {
           subtitle: Text(
             [
               if (reason != null) reason.chosenReason,
-              if (reason?.notchDropFired == true) 'notch-dropped',
+              if (reason?.notchDropFired == true)
+                reason!.notchDropRules.isEmpty
+                    ? 'notch-dropped'
+                    : 'notch-dropped (${reason.notchDropRules.map((r) => r.name).join(', ')})',
               if (p != null) 'targets: ${p.targetLOIds.join(", ")}',
               if (p != null)
                 'cal: ${p.calibrationBefore.name}→${p.calibrationAfter.name}',

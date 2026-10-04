@@ -1069,6 +1069,36 @@ class SupervisedWeightTest(unittest.TestCase):
         self.assertEqual((timetable.supervised_turns, timetable.home_turns), (2, 1))
 
 
+class NotchDropReplayTest(unittest.TestCase):
+    """#227: a question the app asked a notch below the calibration
+    (CONDUCTOR_POLICY §2.3, either rule) replays from the turn's own
+    `difficulty` and `calibrationBefore`, as the conductor weighed it — no
+    change to the replay. Which rule dropped it (`notchDropRules`) is on the
+    record for the reader and moves nothing."""
+
+    KEY = ("sg-a", "write_a2")
+
+    def lower(self, **reason) -> dict:
+        return _turn(
+            "2026-10-02T09:00:00.000Z", "sg-a", "write_a2", uid="u-x",
+            difficulty="medium", calibrationBefore="hard", calibrationAfter="hard",
+            selectionReason={"candidateLOs": [], "chosenReason": "lowest mean unmastered",
+                             "notchDropFired": True, **reason},
+        )
+
+    def test_it_weighs_at_the_level_asked_and_certifies_nothing_at_calibration(self):
+        lo = rules.replay([self.lower(notchDropRules=["attemptsWithoutCorrect"])], GOALS)[self.KEY]
+        self.assertAlmostEqual(lo.alpha, 1 + 2.0 * 1.0)  # strong × medium, not × 1.4
+        self.assertIsNone(lo.positive_at_calibrated_at)  # below the calibration (§4.3)
+        self.assertEqual(lo.ratchet, "medium")  # the level asked (#103)
+        self.assertEqual(lo.direct_signals[0].difficulty, "medium")
+
+    def test_the_rule_on_the_record_changes_nothing(self):
+        named = rules.replay([self.lower(notchDropRules=["attemptsWithoutCorrect"])], GOALS)[self.KEY]
+        before = rules.replay([self.lower()], GOALS)[self.KEY]
+        self.assertEqual(named, before)
+
+
 class TurnScopeTest(unittest.TestCase):
     """The conductor's reading of a warm-up or recheck, at its edges."""
 
