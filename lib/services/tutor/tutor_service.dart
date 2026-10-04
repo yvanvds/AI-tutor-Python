@@ -59,6 +59,7 @@ import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.d
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -505,6 +506,7 @@ class TutorService extends Notifier<TutorState> {
     _currentExerciseGoalId = null;
     _inFlightPlan = null;
     _setInFlightQuestion(null);
+    ref.read(shownQuestionIdProvider.notifier).state = null;
     _followUpInFlight = null;
     _chat.clear();
 
@@ -707,8 +709,10 @@ class TutorService extends Notifier<TutorState> {
     _conductor.notePlannedQuestion(plan);
     _inFlightPlan = plan;
     // A new question replaces the one in flight, also when it never
-    // arrives.
+    // arrives — and the ID of the one before leaves the exercise header
+    // (#216).
     _setInFlightQuestion(null);
+    ref.read(shownQuestionIdProvider.notifier).state = null;
   }
 
   void _setInFlightQuestion(BankQuestion? question, {bool fromBank = false}) {
@@ -1348,6 +1352,9 @@ class TutorService extends Notifier<TutorState> {
   /// feedback.
   Future<void> advanceFromMcq() async {
     ref.read(activeMcqProvider.notifier).state = null;
+    // Its ID goes with it (#216): the strip above the editor, back in view,
+    // must not show it while the next exercise is on its way.
+    ref.read(shownQuestionIdProvider.notifier).state = null;
     if (_pendingExplainAfterMcqAdvance) {
       _pendingExplainAfterMcqAdvance = false;
       ref.read(modeProvider.notifier).state = SessionMode.explain;
@@ -1625,6 +1632,22 @@ class TutorService extends Notifier<TutorState> {
     } else {
       _bankQuestion(response);
     }
+    _showQuestionId(response);
+  }
+
+  /// Puts the ID of [response], the question that just came in, in the
+  /// header of its exercise (#216): the bank id it has — served from the
+  /// bank — or would have, which a generated question has from the start.
+  /// None for a kind the bank does not keep: a socratic question could
+  /// never be looked up.
+  void _showQuestionId(ChatResponse response) {
+    final question = _inFlightQuestion;
+    final type =
+        question?.questionType ?? BankQuestion.questionTypeFor(response);
+    final id = BankChoice.servedTypes.contains(type)
+        ? question?.id ?? BankQuestion.contentHashOf(response)
+        : null;
+    ref.read(shownQuestionIdProvider.notifier).state = id;
   }
 
   // ---- Question bank (#185) -------------------------------------------------

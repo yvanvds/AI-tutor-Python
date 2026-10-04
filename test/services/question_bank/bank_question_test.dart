@@ -1,5 +1,6 @@
 // Issue #185 — the question bank's model: what a generated question is
 // stored as, and what the next reader (#186, the Questions page) gets back.
+// And #216: the short ID the student sees and the teacher looks up.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
@@ -322,6 +323,54 @@ void main() {
         ]).graderDisagreesWithKey,
         isTrue,
       );
+    });
+  });
+
+  group('short ID (#216)', () {
+    test('is # and the first six characters of the content hash — of a doc '
+        'id or of the hash alone, the same on every subgoal', () {
+      final q = _bank(_mcq())!;
+      final hash = q.id.substring('s1_'.length);
+      expect(q.shortId, '#${hash.substring(0, 6)}');
+      expect(BankQuestion.shortIdOf(q.id), q.shortId);
+      expect(BankQuestion.shortIdOf(hash), q.shortId);
+      expect(_bank(_mcq(), subgoalId: 'other_subgoal')!.shortId, q.shortId);
+      expect(BankQuestion.contentHashOf(_mcq()), hash);
+      expect(
+        BankQuestion.contentHashOf(Answer(type: 'answer', prompt: 'Ja.')),
+        isNull,
+      );
+    });
+
+    test('a lookup takes the short ID with or without #, in capitals, a '
+        'longer piece of the hash, or the whole doc id', () {
+      const id = 's1_3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e';
+      bool finds(String typed) {
+        final query = BankQuestion.idQueryOf(typed);
+        return query != null && BankQuestion.matchesIdQuery(id, query);
+      }
+
+      expect(finds('3fa91c'), isTrue);
+      expect(finds('#3fa91c'), isTrue);
+      expect(finds('  #3FA91C '), isTrue);
+      expect(finds('3fa91c0b5e'), isTrue);
+      expect(finds('3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e'), isTrue);
+      expect(finds(id), isTrue);
+      expect(finds('S1_3FA91C0B5E7D4A2F9C8B1E6D0A4F7C2E'), isTrue);
+
+      expect(finds('3fa91d'), isFalse);
+      expect(finds('s2_3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e'), isFalse);
+      expect(finds('a91c0b'), isFalse, reason: 'the start of the hash only');
+      expect(BankQuestion.matchesIdQuery('s1_3fa91c', 's1'), isFalse);
+    });
+
+    test('what cannot be an ID is no query: too short, not hex, empty', () {
+      expect(BankQuestion.idQueryOf('3fa91'), isNull);
+      expect(BankQuestion.idQueryOf('#xyz123'), isNull);
+      expect(BankQuestion.idQueryOf(''), isNull);
+      expect(BankQuestion.idQueryOf('#'), isNull);
+      expect(BankQuestion.idQueryOf('s1_'), isNull);
+      expect(BankQuestion.idQueryOf('#3FA91C'), '3fa91c');
     });
   });
 }

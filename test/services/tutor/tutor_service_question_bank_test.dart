@@ -4,6 +4,8 @@
 // question. The turn record names the question it graded either way. And
 // the bank is best-effort: without its container, or when it does not
 // answer at all, the student's exercise goes on as if it were not there.
+// And #216: the question on screen carries the bank id it has or would
+// have, for its short ID in the exercise header.
 //
 // The real `TutorService` and the real `QuestionBankService` over an
 // in-memory `questions` container; the connector replays canned chunks, the
@@ -42,6 +44,7 @@ import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/socratic_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -363,6 +366,65 @@ void main() {
     ]);
 
     expect(history.records.single.questionId, q.id);
+  });
+
+  test('the question on screen carries the bank id it would have from the '
+      'start (#216) — the one its turn record names, stored or not — until '
+      'the next question is planned or the quiz is dismissed; a socratic '
+      'question has none', () async {
+    final bank = await boot();
+    planNext(_plan(ChatRequestType.mcQuestion));
+    connector.scripts.add(_reply(_mcq()));
+    await tutor().requestExercise();
+    String? shown() => pc!.read(shownQuestionIdProvider);
+    final first = shown();
+    expect(first, 's1_${BankQuestion.contentHashOf(_mcq())}');
+    expect(store.docs, isEmpty, reason: 'not in the bank, and shown anyway');
+
+    // Answered wrong: never stored, and the ID stays with the quiz while
+    // its feedback is on screen.
+    connector.scripts.add(_reply(_mcqGrade(AnswerQuality.wrong, 'Nee.')));
+    await tutor().submitMcqAnswer('11');
+    await bank.idle;
+    expect(store.docs, isEmpty);
+    expect(shown(), first);
+    expect(history.records.single.questionId, first);
+
+    // The next question is planned and never arrives: the ID of the one
+    // before is gone with it.
+    await tutor().requestExercise();
+    expect(pc!.read(activeMcqProvider), isNotNull, reason: 'still on screen');
+    expect(shown(), isNull);
+
+    final next = MultipleChoice(
+      type: 'multiple_choice',
+      prompt: 'En print(2 + 2)?',
+      code: 'print(2 + 2)',
+      options: const ['4', '22'],
+      correct: '4',
+    );
+    connector.scripts.add(_reply(next));
+    await tutor().requestExercise();
+    expect(shown(), allOf(startsWith('s1_'), isNot(first)));
+    expect(
+      BankQuestion.shortIdOf(shown()!),
+      isNot(BankQuestion.shortIdOf(first!)),
+    );
+
+    // "Next" dismisses the quiz and its ID at once, before the next
+    // exercise is even planned.
+    final planned = Completer<QuestionPlan>();
+    when(() => conductor.planNext()).thenAnswer((_) => planned.future);
+    final advancing = tutor().advanceFromMcq();
+    expect(pc!.read(activeMcqProvider), isNull);
+    expect(shown(), isNull);
+
+    // A socratic question: the bank never keeps one, so it has no ID.
+    connector.scripts.add(_reply(_socratic('Waarom werkt dit?')));
+    planned.complete(_plan(ChatRequestType.socraticQuestion));
+    await advancing;
+    expect(connector.scripts, isEmpty, reason: 'the socratic question came');
+    expect(shown(), isNull);
   });
 
   test('a wrong or a partial first answer stores nothing; the turn record '

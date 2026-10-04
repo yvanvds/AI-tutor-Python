@@ -359,6 +359,7 @@
   "session_playground_snack_tooManyFiles": "Je hebt al {max} opgeslagen bestanden, dat is het maximum. Verwijder er eerst een.",
 
   "session_quiz_pill": "Quizvraag",
+  "session_questionId_tooltip": "De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.",
   "session_quiz_next_button": "Volgende →",
 
   "session_output_state_idle": "Geen output",
@@ -823,5 +824,13 @@
   "questions_delete_dialog_body": "De vraag verdwijnt uit de vragenbank. Maakt de tutor later dezelfde vraag, dan komt ze er pas opnieuw in als de eerste leerling ze juist beantwoordt.",
   "questions_delete_dialog_cancel": "Annuleren",
   "questions_delete_dialog_confirm": "Verwijder",
-  "questions_actionFailed": "Dat lukte niet: {error}"
+  "questions_actionFailed": "Dat lukte niet: {error}",
+  "questions_lookup_label": "Zoek op ID",
+  "questions_lookup_hint": "bv. #3fa91c",
+  "questions_lookup_tooltip": "Zoeken",
+  "questions_lookup_clear_tooltip": "Wissen",
+  "questions_lookup_notFound": "Deze vraag zit niet in de bank. Meestal was het eerste antwoord erop niet (helemaal) juist, en dan wordt een vraag niet bewaard. Of ze werd verwijderd.",
+  "questions_lookup_invalid": "Dat is geen vraag-ID. Een ID ziet eruit als #3fa91c.",
+  "questions_lookup_several": "{count} vragen hebben deze ID:",
+  "questions_badge_found": "Gevonden"
 }

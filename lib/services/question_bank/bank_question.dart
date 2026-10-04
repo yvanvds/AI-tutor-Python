@@ -38,7 +38,10 @@
 // through a turn record — the tutor uses the ids only to not give a student
 // the same question twice, the evaluation tooling only the turn record's own
 // fields — so the teacher can delete a question; the same generation later
-// gets the same id and has to pass its first answer again.
+// gets the same id and has to pass its first answer again. The first
+// characters of the hash are the question's short ID (#216, `shortIdOf`):
+// what the student sees with the exercise and the teacher looks up on the
+// Questions page.
 
 import 'dart:convert';
 
@@ -291,6 +294,71 @@ class BankQuestion {
   static String idFor({required String subgoalId, required String hash}) =>
       '${subgoalId}_$hash';
 
+  /// The [contentHash] of [response], or `null` when it is not a question
+  /// — what its doc id ends in, on whichever subgoal it is asked.
+  static String? contentHashOf(ChatResponse response) =>
+      questionTypeFor(response) == null
+      ? null
+      : _hashOfPayload(response.type, payloadOf(response));
+
+  static String _hashOfPayload(
+    String payloadType,
+    Map<String, dynamic> payload,
+  ) => contentHash(
+    payloadType: payloadType,
+    code: (payload['code'] as String?) ?? '',
+    options: [
+      for (final o in (payload['options'] as List?) ?? const [])
+        if (o is Map && o['option'] is String) o['option'] as String,
+    ],
+    prompt: (payload['prompt'] as String?) ?? '',
+  );
+
+  // ---- The short ID (#216) -------------------------------------------------
+  //
+  // What the student sees in the header of an exercise and the teacher types
+  // on the Questions page to find that question: the first characters of the
+  // content hash, as `#3fa91c`. 16.7 million possibilities — a clash among
+  // the questions of a school is rare, and the lookup shows every question
+  // that has the ID. The hash is known as soon as the question exists, so a
+  // generated question shows its ID before the bank has it, if it ever does.
+
+  /// How many characters of the content hash the short ID shows.
+  static const int shortIdLength = 6;
+
+  /// The short ID of the question [id] names: `#` and the first
+  /// [shortIdLength] characters of its content hash. [id] is a doc id
+  /// ([idFor]) or the content hash alone.
+  static String shortIdOf(String id) {
+    final hash = id.substring(id.lastIndexOf('_') + 1);
+    return '#${hash.length <= shortIdLength ? hash : hash.substring(0, shortIdLength)}';
+  }
+
+  /// This question's short ID ([shortIdOf]).
+  String get shortId => shortIdOf(id);
+
+  /// What the teacher typed to look a question up, as [matchesIdQuery]
+  /// compares it: trimmed, without a leading `#`, in lower case — or `null`
+  /// when it cannot name a question: neither a doc id (`<subgoal>_<hash>`)
+  /// nor at least [shortIdLength] characters of a hash. A short ID in
+  /// capitals, a longer piece of the hash and the whole doc id all do.
+  static String? idQueryOf(String raw) {
+    var query = raw.trim().toLowerCase();
+    if (query.startsWith('#')) query = query.substring(1).trimLeft();
+    final hash = query.substring(query.lastIndexOf('_') + 1);
+    return _hashPiece.hasMatch(hash) ? query : null;
+  }
+
+  static final RegExp _hashPiece = RegExp('^[0-9a-f]{$shortIdLength,32}\$');
+
+  /// Whether [query], as [idQueryOf] made it, names the question [id]: the
+  /// whole doc id, or the start of its content hash.
+  static bool matchesIdQuery(String id, String query) {
+    final lower = id.toLowerCase();
+    if (query.contains('_')) return lower == query;
+    return lower.substring(lower.lastIndexOf('_') + 1).startsWith(query);
+  }
+
   /// The bank entry for [response], asked on [subgoalId] at [createdAt] —
   /// or `null` when [response] is not a question. Counters start at zero:
   /// the bank stores it, ask and answer counted, only when the first answer
@@ -309,16 +377,7 @@ class BankQuestion {
     final questionType = questionTypeFor(response);
     if (questionType == null) return null;
     final payload = payloadOf(response);
-    final options = [
-      for (final o in (payload['options'] as List?) ?? const [])
-        if (o is Map && o['option'] is String) o['option'] as String,
-    ];
-    final hash = contentHash(
-      payloadType: response.type,
-      code: (payload['code'] as String?) ?? '',
-      options: options,
-      prompt: (payload['prompt'] as String?) ?? '',
-    );
+    final hash = _hashOfPayload(response.type, payload);
     return BankQuestion(
       id: idFor(subgoalId: subgoalId, hash: hash),
       subgoalId: subgoalId,

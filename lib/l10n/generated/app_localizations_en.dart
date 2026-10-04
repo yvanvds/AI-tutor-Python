@@ -1216,6 +1216,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_quiz_pill => 'Quiz question';
 
   @override
+  String get session_questionId_tooltip =>
+      'The ID of this question. Your teacher can use it to find the question.';
+
+  @override
   String get session_quiz_next_button => 'Next →';
 
   @override
@@ -2767,4 +2771,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String questions_actionFailed(String error) {
     return 'That did not work: $error';
   }
+
+  @override
+  String get questions_lookup_label => 'Find by ID';
+
+  @override
+  String get questions_lookup_hint => 'e.g. #3fa91c';
+
+  @override
+  String get questions_lookup_tooltip => 'Find';
+
+  @override
+  String get questions_lookup_clear_tooltip => 'Clear';
+
+  @override
+  String get questions_lookup_notFound =>
+      'This question is not in the bank. Usually the first answer to it was not (fully) correct, and then a question is not kept. Or it was deleted.';
+
+  @override
+  String get questions_lookup_invalid =>
+      'That is not a question ID. An ID looks like #3fa91c.';
+
+  @override
+  String questions_lookup_several(int count) {
+    return '$count questions have this ID:';
+  }
+
+  @override
+  String get questions_badge_found => 'Found';
 }

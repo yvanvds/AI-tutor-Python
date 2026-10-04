@@ -687,6 +687,10 @@
   "@session_quiz_pill": {
     "description": "Quiz header pill — displayed uppercase"
   },
+  "session_questionId_tooltip": "The ID of this question. Your teacher can use it to find the question.",
+  "@session_questionId_tooltip": {
+    "description": "Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)"
+  },
   "session_quiz_next_button": "Next →",
 
   "session_output_state_idle": "No output",
@@ -1509,5 +1513,23 @@
   "questions_actionFailed": "That did not work: {error}",
   "@questions_actionFailed": {
     "placeholders": { "error": { "type": "String" } }
+  },
+  "questions_lookup_label": "Find by ID",
+  "@questions_lookup_label": {
+    "description": "Field on the Questions page to look a question up by the short ID a student sees with the exercise (#216)"
+  },
+  "questions_lookup_hint": "e.g. #3fa91c",
+  "questions_lookup_tooltip": "Find",
+  "questions_lookup_clear_tooltip": "Clear",
+  "questions_lookup_notFound": "This question is not in the bank. Usually the first answer to it was not (fully) correct, and then a question is not kept. Or it was deleted.",
+  "questions_lookup_invalid": "That is not a question ID. An ID looks like #3fa91c.",
+  "questions_lookup_several": "{count} questions have this ID:",
+  "@questions_lookup_several": {
+    "description": "Above the subgoals of the questions a lookup found, when there is more than one",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "questions_badge_found": "Found",
+  "@questions_badge_found": {
+    "description": "Badge on the card a lookup by ID found — displayed uppercase"
   }
 }

@@ -1,10 +1,12 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/question_id_tag.dart';
 import 'package:ai_tutor_python/widgets/tutor_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
@@ -85,11 +87,14 @@ class QuizView extends ConsumerWidget {
   }
 }
 
-class _QuizHeader extends StatelessWidget {
+/// The pill, and next to it the question's short ID (#216): what the
+/// student reads out to the teacher, who looks the question up with it.
+class _QuizHeader extends ConsumerWidget {
   const _QuizHeader();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final questionId = ref.watch(shownQuestionIdProvider);
     return Row(
       children: [
         Container(
@@ -111,6 +116,14 @@ class _QuizHeader extends StatelessWidget {
             ),
           ),
         ),
+        if (questionId != null) ...[
+          const SizedBox(width: AppSpacing.s),
+          QuestionIdTag(
+            questionId,
+            key: const Key('quiz-question-id'),
+            tooltip: AppLocalizations.of(context).session_questionId_tooltip,
+          ),
+        ],
       ],
     );
   }

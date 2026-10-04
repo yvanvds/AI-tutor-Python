@@ -1226,6 +1226,10 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_quiz_pill => 'Quizvraag';
 
   @override
+  String get session_questionId_tooltip =>
+      'De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.';
+
+  @override
   String get session_quiz_next_button => 'Volgende →';
 
   @override
@@ -2796,4 +2800,32 @@ class AppLocalizationsNl extends AppLocalizations {
   String questions_actionFailed(String error) {
     return 'Dat lukte niet: $error';
   }
+
+  @override
+  String get questions_lookup_label => 'Zoek op ID';
+
+  @override
+  String get questions_lookup_hint => 'bv. #3fa91c';
+
+  @override
+  String get questions_lookup_tooltip => 'Zoeken';
+
+  @override
+  String get questions_lookup_clear_tooltip => 'Wissen';
+
+  @override
+  String get questions_lookup_notFound =>
+      'Deze vraag zit niet in de bank. Meestal was het eerste antwoord erop niet (helemaal) juist, en dan wordt een vraag niet bewaard. Of ze werd verwijderd.';
+
+  @override
+  String get questions_lookup_invalid =>
+      'Dat is geen vraag-ID. Een ID ziet eruit als #3fa91c.';
+
+  @override
+  String questions_lookup_several(int count) {
+    return '$count vragen hebben deze ID:';
+  }
+
+  @override
+  String get questions_badge_found => 'Gevonden';
 }

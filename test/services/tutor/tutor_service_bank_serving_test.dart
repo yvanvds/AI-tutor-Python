@@ -48,6 +48,7 @@ import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -515,6 +516,8 @@ void main() {
       expect(q.askedCount, 2);
       expect(q.lastAskedAt!.isAfter(DateTime.utc(2026, 9, 23)), isTrue);
       expect(stored(idOf(newer)).askedCount, 1);
+      // Its bank id is the one the exercise header shows (#216).
+      expect(pc!.read(shownQuestionIdProvider), idOf(older));
 
       // The exercise starts with the question, for a grading call to read.
       expect(connector.exerciseHistory, hasLength(1));

@@ -4,7 +4,8 @@
 // their statistics and who hid them, the "hidden only" filter and the sort
 // on the share correct, hide / show again and delete with a confirmation —
 // and a clear message, not a crash, while the `questions` container does not
-// exist. No "reviewed" and no notes any more (#215).
+// exist. No "reviewed" and no notes any more (#215). And #216: every card
+// shows the question's short ID, and "Find by ID" looks one up.
 //
 // The end-to-end run (integration_test/flows/question_bank.dart) drives the
 // same page in the real shell; this pins the details per widget.
@@ -173,13 +174,15 @@ void main() {
     List<Map<String, dynamic>>? questions,
     CosmosContainer? questionsContainer,
     Locale locale = const Locale('en'),
-  }) async {
+    List<Map<String, dynamic>>? goals,
     // Tall enough that every card of a subgoal is built.
-    tester.view.physicalSize = const Size(1280, 1600);
+    Size size = const Size(1280, 1600),
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     cosmos = InMemoryCosmosClient({
-      'goals': InMemoryCosmos(_goals),
+      'goals': InMemoryCosmos(goals ?? _goals),
       'questions': InMemoryCosmos(
         questions ?? [_mcq, _easy, _open, _variables, _orphan],
       ),
@@ -609,6 +612,290 @@ void main() {
       find.textContaining('answers a new question correctly'),
       findsOneWidget,
     );
+  });
+
+  group('the short ID (#216)', () {
+    const hash = '3fa91c0b5e7d4a2f9c8b1e6d0a4f7c2e';
+    const wantedId = 's1_$hash';
+    const twinId = 's3_$hash';
+
+    /// The question the teacher saw on a student's screen: the oldest of
+    /// its subgoal, so last on "Newest".
+    final wanted = _question(
+      id: wantedId,
+      questionType: 'writeCodeQuestion',
+      payload: {'type': 'write_code', 'prompt': 'Gezocht.'},
+      createdAt: '2026-09-01T10:00:00.000Z',
+    );
+
+    /// The same question, asked on another subgoal: the same short ID.
+    final twin = _question(
+      id: twinId,
+      subgoalId: 's3',
+      questionType: 'writeCodeQuestion',
+      payload: {'type': 'write_code', 'prompt': 'Gezocht.'},
+    );
+
+    Future<void> lookUp(WidgetTester tester, String typed) async {
+      await tester.enterText(find.byKey(const Key('questions-lookup')), typed);
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+    }
+
+    bool selected(WidgetTester tester, String subgoalId) => tester
+        .widget<ListTile>(find.byKey(Key('questions-subgoal-$subgoalId')))
+        .selected;
+
+    String? miss(WidgetTester tester) {
+      final f = find.byKey(const Key('questions-lookup-miss'));
+      return f.evaluate().isEmpty ? null : tester.widget<Text>(f).data;
+    }
+
+    Finder foundBadge(String id) => find.byKey(Key('questions-found-$id'));
+
+    /// The id of the card on top of the list.
+    String topCard(WidgetTester tester) {
+      const prefix = 'questions-card-';
+      final ids = [
+        for (final e
+            in find
+                .byWidgetPredicate(
+                  (w) =>
+                      w.key is ValueKey<String> &&
+                      (w.key! as ValueKey<String>).value.startsWith(prefix),
+                )
+                .evaluate())
+          (e.widget.key! as ValueKey<String>).value.substring(prefix.length),
+      ];
+      double top(String id) =>
+          tester.getTopLeft(find.byKey(Key('$prefix$id'))).dy;
+      return (ids..sort((a, b) => top(a).compareTo(top(b)))).first;
+    }
+
+    testWidgets('every card shows its short ID, small and monospace', (
+      tester,
+    ) async {
+      await mount(tester, questions: [_mcq, wanted]);
+      await open(tester, 's1');
+
+      final tag = find.byKey(const Key('questions-id-$wantedId'));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('questions-card-$wantedId')),
+          matching: tag,
+        ),
+        findsOneWidget,
+      );
+      final text = tester.widget<Text>(
+        find.descendant(of: tag, matching: find.byType(Text)),
+      );
+      expect(text.data, '#3fa91c');
+      expect(text.style!.fontSize, lessThan(13));
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: find.byKey(const Key('questions-id-s1_mcq')),
+                matching: find.byType(Text),
+              ),
+            )
+            .data,
+        '#mcq',
+      );
+    });
+
+    testWidgets('a short ID — with or without #, in capitals — or the whole '
+        'doc id selects the subgoal and puts the card on top, marked, with '
+        'the hidden-only filter off; clearing unmarks it', (tester) async {
+      await mount(tester, questions: [_mcq, _easy, _open, wanted, _variables]);
+      // Elsewhere, with the filter on.
+      await open(tester, 's2');
+      await tester.tap(find.byKey(const Key('questions-filter-hidden')));
+      await tester.pumpAndSettle();
+
+      for (final typed in ['#3FA91C', '3fa91c', ' #3fa91c0b ', wantedId]) {
+        await lookUp(tester, typed);
+        expect(selected(tester, 's1'), isTrue, reason: typed);
+        expect(selected(tester, 's2'), isFalse, reason: typed);
+        expect(topCard(tester), wantedId, reason: typed);
+        expect(
+          find.descendant(
+            of: foundBadge(wantedId),
+            matching: find.text('FOUND'),
+          ),
+          findsOneWidget,
+          reason: typed,
+        );
+        expect(miss(tester), isNull, reason: typed);
+      }
+      // The rest of the subgoal is still there, unmarked.
+      expect(find.byKey(const Key('questions-card-s1_mcq')), findsOneWidget);
+      expect(foundBadge('s1_mcq'), findsNothing);
+      expect(
+        tester
+            .widget<FilterChip>(
+              find.byKey(const Key('questions-filter-hidden')),
+            )
+            .selected,
+        isFalse,
+      );
+      expect(find.byKey(const Key('questions-lookup-several')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('questions-lookup-clear')));
+      await tester.pumpAndSettle();
+      expect(foundBadge(wantedId), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('questions-lookup')))
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(topCard(tester), 's1_open', reason: 'newest first again');
+    });
+
+    testWidgets('no hit says the question is not in the bank — not kept or '
+        'deleted since — and what is no ID says what one looks like', (
+      tester,
+    ) async {
+      await mount(tester, questions: [_mcq, wanted]);
+
+      await lookUp(tester, '#abcdef');
+      expect(
+        miss(tester),
+        'This question is not in the bank. Usually the first answer to it '
+        'was not (fully) correct, and then a question is not kept. Or it was '
+        'deleted.',
+      );
+      expect(find.text('Pick a subgoal on the left.'), findsOneWidget);
+
+      // Typing on clears it.
+      await tester.enterText(find.byKey(const Key('questions-lookup')), '#3f');
+      await tester.pump();
+      expect(miss(tester), isNull);
+
+      // In the tree's ids, but deleted since the page was loaded.
+      cosmos['questions'].delete(wantedId, partitionKey: 's1');
+      await lookUp(tester, '#3fa91c');
+      expect(miss(tester), startsWith('This question is not in the bank.'));
+      expect(foundBadge(wantedId), findsNothing);
+
+      await lookUp(tester, '#3fa9');
+      expect(
+        miss(tester),
+        'That is not a question ID. An ID looks like #3fa91c.',
+      );
+      await lookUp(tester, 'print');
+      expect(miss(tester), startsWith('That is not a question ID.'));
+    });
+
+    testWidgets('an ID on two subgoals: both are found, and the subgoals are '
+        'named to go from one to the other', (tester) async {
+      await mount(tester, questions: [wanted, _mcq, twin]);
+
+      await lookUp(tester, '#3fa91c');
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('questions-lookup-several')),
+          matching: find.text('2 questions have this ID:'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('questions-lookup-subgoal-s1')),
+          matching: find.text('Print'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('questions-lookup-subgoal-s3')),
+          matching: find.text('For'),
+        ),
+        findsOneWidget,
+      );
+      expect(selected(tester, 's1'), isTrue);
+      expect(foundBadge(wantedId), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('questions-lookup-subgoal-s3')));
+      await tester.pumpAndSettle();
+      expect(selected(tester, 's3'), isTrue);
+      expect(selected(tester, 's1'), isFalse);
+      expect(foundBadge(twinId), findsOneWidget);
+      expect(topCard(tester), twinId);
+
+      // The whole doc id names one of them.
+      await lookUp(tester, wantedId);
+      expect(find.byKey(const Key('questions-lookup-several')), findsNothing);
+      expect(selected(tester, 's1'), isTrue);
+    });
+
+    testWidgets('the tree scrolls to the subgoal a lookup selects', (
+      tester,
+    ) async {
+      // A long curriculum in a short window: the last subgoal is out of
+      // view until the lookup selects it.
+      String idOf(int i) => 's${i}_${i.toRadixString(16).padLeft(6, '0')}ffff';
+      await mount(
+        tester,
+        goals: [
+          _goal('r1', 'Basics'),
+          for (var i = 0; i < 30; i++)
+            _goal('s$i', 'Subgoal $i', parentId: 'r1', order: i),
+        ],
+        size: const Size(1280, 700),
+        questions: [
+          for (var i = 0; i < 30; i++)
+            _question(
+              id: idOf(i),
+              subgoalId: 's$i',
+              questionType: 'writeCodeQuestion',
+              payload: {'type': 'write_code', 'prompt': 'Vraag $i.'},
+            ),
+        ],
+      );
+      final tree = tester.getRect(find.byKey(const Key('questions-tree')));
+      Rect tile() =>
+          tester.getRect(find.byKey(const Key('questions-subgoal-s29')));
+      expect(tile().top, greaterThan(tree.bottom), reason: 'out of view');
+
+      await lookUp(tester, '#00001d');
+      expect(selected(tester, 's29'), isTrue);
+      expect(tile().top, greaterThanOrEqualTo(tree.top));
+      expect(tile().bottom, lessThanOrEqualTo(tree.bottom));
+      expect(foundBadge(idOf(29)), findsOneWidget);
+    });
+
+    testWidgets('in Dutch', (tester) async {
+      await mount(
+        tester,
+        questions: [_mcq, wanted],
+        locale: const Locale('nl'),
+      );
+      expect(find.text('Zoek op ID'), findsOneWidget);
+
+      await lookUp(tester, '#abcdef');
+      expect(
+        miss(tester),
+        'Deze vraag zit niet in de bank. Meestal was het eerste antwoord '
+        'erop niet (helemaal) juist, en dan wordt een vraag niet bewaard. Of '
+        'ze werd verwijderd.',
+      );
+      await lookUp(tester, 'xyz');
+      expect(
+        miss(tester),
+        'Dat is geen vraag-ID. Een ID ziet eruit als #3fa91c.',
+      );
+      await lookUp(tester, '#3fa91c');
+      expect(
+        find.descendant(
+          of: foundBadge(wantedId),
+          matching: find.text('GEVONDEN'),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   test('sortQuestions leaves unanswered questions last on either share '

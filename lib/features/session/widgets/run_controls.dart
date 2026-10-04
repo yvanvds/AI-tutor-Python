@@ -3,14 +3,18 @@ import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
+import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/question_id_tag.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Strip above the editor: Run/Stop primary button, Reset (ghost), and on the
 /// right hint + send-to-tutor (both ghost). Used by Practice and Playground modes.
+/// In Practice it is the header of the code exercise, and carries the
+/// question's short ID (#216) as the quiz header does.
 class RunControls extends ConsumerWidget {
   const RunControls({super.key});
 
@@ -41,6 +45,7 @@ class RunControls extends ConsumerWidget {
             onTap: output.clear,
           ),
           const Spacer(),
+          if (mode == SessionMode.practice) const _QuestionId(),
           _GhostIconButton(
             tooltip: l.session_runControls_tooltip_askHint,
             icon: Icons.lightbulb_outline,
@@ -65,6 +70,25 @@ class RunControls extends ConsumerWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The short ID of the question in the editor (#216), when there is one.
+class _QuestionId extends ConsumerWidget {
+  const _QuestionId();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = ref.watch(shownQuestionIdProvider);
+    if (id == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.m),
+      child: QuestionIdTag(
+        id,
+        key: const Key('exercise-question-id'),
+        tooltip: AppLocalizations.of(context).session_questionId_tooltip,
       ),
     );
   }
