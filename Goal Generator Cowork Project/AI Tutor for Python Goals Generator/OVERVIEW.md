@@ -62,3 +62,20 @@ Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen vi
   - LOs: `predict_immutable_error`, `write_tuple_unpacking`, `write_loop_over_pairs`, `predict_list_aliasing`, `reason_tuple_vs_list`
 - **Geneste lussen en lijsten van lijsten** (`geneste-lussen`)
   - LOs: `predict_nested_loop_output`, `write_all_pairs`, `reason_unique_pairs`, `predict_grid_index`, `write_grid_traversal`
+
+### 5. Functies (`functies`)
+
+Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegevens doorgeven via parameters, een resultaat teruggeven met return, voorspellen welke variabelen binnen en buiten een functie bestaan, formules uit wiskunde, fysica en economie vertalen naar functies en er waardetabellen mee maken, en een groter probleem opsplitsen in functies die elkaar aanroepen.
+
+- **Een functie schrijven en aanroepen** (`functies-definieren`)
+  - LOs: `recall_function_parts`, `predict_return_value`, `write_function_with_return`, `write_use_call_result`, `predict_def_and_calls`
+- **Parameters en argumenten** (`parameters-argumenten`)
+  - LOs: `predict_argument_binding`, `write_function_with_params`, `write_call_with_arguments`, `predict_arg_count_error`, `write_extract_function`, `predict_default_parameter`
+- **Return onder de loep** (`return-waarden`)
+  - LOs: `predict_print_vs_return`, `fix_print_to_return`, `reason_print_vs_return`, `predict_return_ends_function`, `write_boolean_function`, `write_turtle_function`
+- **Lokale variabelen** (`lokale-variabelen`)
+  - LOs: `predict_local_not_visible`, `predict_global_unchanged`, `predict_list_argument_mutation`, `fix_function_returns_result`, `reason_parameters_over_globals`
+- **Wiskundige functies en waardetabellen** (`wiskundige-functies`)
+  - LOs: `write_formula_function`, `write_math_module_call`, `predict_table_x_values`, `write_value_table`, `write_search_function_values`, `reason_step_size`
+- **Een probleem opsplitsen in functies** (`functies-combineren`)
+  - LOs: `predict_nested_calls`, `write_function_with_helper`, `write_list_function`, `decompose_into_functions`, `choose_function_tests`, `fix_function_bug`

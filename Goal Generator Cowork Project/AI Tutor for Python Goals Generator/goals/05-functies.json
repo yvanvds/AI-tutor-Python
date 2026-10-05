@@ -1,0 +1,372 @@
+{
+  "goal": {
+    "id": "functies",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Functies",
+    "description": "Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegevens doorgeven via parameters, een resultaat teruggeven met return, voorspellen welke variabelen binnen en buiten een functie bestaan, formules uit wiskunde, fysica en economie vertalen naar functies en er waardetabellen mee maken, en een groter probleem opsplitsen in functies die elkaar aanroepen.",
+    "order": 5000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "functies-definieren",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Een functie schrijven en aanroepen",
+      "description": "Je kan met def een functie schrijven die een waarde binnenkrijgt via een parameter en een resultaat teruggeeft met return, ze aanroepen, en het resultaat opslaan, afdrukken of verder gebruiken in een expressie.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Present a function the way students know it from maths: something goes in, something comes out. `def dubbel(x): return 2 * x` is f(x) = 2x with a better name, and a call like `dubbel(4)` is an expression with a value, just like `2 + 3`.",
+        "Every function in this goal returns its result: never put `print` or `input` inside a function body. Printing happens in the main script, on the returned value (`print(dubbel(4))`).",
+        "Probe that `def` only defines: a script that defines a function and never calls it shows nothing, a bare `dubbel(4)` line computes a value that is thrown away, and a call placed above the definition raises a NameError.",
+        "Use descriptive Dutch names instead of f and g (`dubbel`, `kwadraat`, `naar_fahrenheit`, `btw`), so that several functions in one script stay apart.",
+        "Stay with one parameter and a single `return` at the end of the body here — several parameters come in the next subgoal, early returns later. No docstrings, type hints, f-strings, default values or lambda."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "recall_function_parts",
+          "statement": "Je kan in een functiedefinitie en een aanroep de naam, de parameter, het argument en de teruggegeven waarde aanwijzen.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_return_value",
+          "statement": "Je kan voorspellen welke waarde een aanroep zoals dubbel(4) oplevert en wat een expressie met die aanroep als resultaat geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_function_with_return",
+          "statement": "Je kan een functie met één parameter schrijven die een resultaat berekent en teruggeeft met return.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_use_call_result",
+          "statement": "Je kan een gegeven functie aanroepen en het resultaat opslaan in een variabele, afdrukken of in een expressie gebruiken.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_def_and_calls",
+          "statement": "Je kan voorspellen wat een script toont als het een functie definieert en die nul, één of meerdere keren aanroept.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "parameters-argumenten",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Parameters en argumenten",
+      "description": "Je kan een functie meerdere parameters geven, ze aanroepen met de juiste argumenten in de juiste volgorde, voorspellen welke waarde elke parameter krijgt, en een berekening die je meermaals nodig hebt veralgemenen tot een functie.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe positional binding with a function where swapping the arguments changes the result (`verschil(a, b)`, `macht(grondtal, exponent)`), and with caller variables whose names differ from — or are deliberately swapped against — the parameter names.",
+        "Watch for students who overwrite a parameter inside the body (`def btw(prijs): prijs = 100`) or ask for it with input(): the value comes from the call.",
+        "For the extraction LO, show a script in which the same formula appears two or three times with different numbers; the numbers that vary become the parameters.",
+        "Use a default value only when targeting that LO, and then a single trailing one (`def korting(prijs, procent=10)`).",
+        "Functions return their result and contain no `print` or `input`; no keyword arguments, `*args`, type hints, docstrings or f-strings."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "predict_argument_binding",
+          "statement": "Je kan voorspellen welke waarde elke parameter krijgt bij een aanroep met meerdere argumenten en wat de functie daardoor teruggeeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_function_with_params",
+          "statement": "Je kan een functie met meerdere parameters schrijven die een resultaat teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_call_with_arguments",
+          "statement": "Je kan een gegeven functie aanroepen met waarden, variabelen of expressies als argument, in de juiste volgorde.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_arg_count_error",
+          "statement": "Je kan herkennen wanneer een aanroep een TypeError geeft omdat het aantal argumenten niet overeenkomt met het aantal parameters.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_extract_function",
+          "statement": "Je kan een berekening die meerdere keren in een script voorkomt met andere waarden onderbrengen in een functie en de herhalingen vervangen door aanroepen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_default_parameter",
+          "statement": "Je kan voorspellen welke waarde een parameter met een standaardwaarde krijgt als het argument weggelaten wordt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "return-waarden",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Return onder de loep",
+      "description": "Je kan voorspellen wat er misloopt als een functie afdrukt in plaats van teruggeeft en dat herstellen, voorspellen dat een functie stopt bij de eerste return, functies schrijven die True of False teruggeven, en herkennen wanneer een functie iets doet, zoals tekenen, in plaats van iets te berekenen.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Students will meet functions that print in examples elsewhere: treat it as a bug to diagnose, not a style to practise. Lean on `resultaat = toon_dubbel(4)` followed by `print(resultaat)` showing None, and on `print(toon_dubbel(4))` showing the number and then None.",
+        "For the reason LO, press on reuse: a returned value can be stored, compared, summed or passed on to another function; a printed one is gone.",
+        "Probe early return: a `return` inside a for-loop ends the whole function at the first hit — contrast a correct search (`return True` inside the loop, `return False` after it) with the buggy if/else that already returns in the first iteration.",
+        "For True/False functions, watch for `if is_even(x) == True` and for an if/else that returns the literals; show `return getal % 2 == 0` once the long version works.",
+        "A function that draws with turtle is the legitimate case of a function that does something instead of computing something: it returns nothing and its call stands alone on a line. Create `t` once at the top of the script, use it inside the function, and reuse the 360/n rule from the loops goal. Returning tuples, a bare `return`, recursion and f-strings are out of scope."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_print_vs_return",
+          "statement": "Je kan voorspellen dat het resultaat van een functie die afdrukt in plaats van teruggeeft None is.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_print_to_return",
+          "statement": "Je kan een functie die haar resultaat afdrukt herschrijven zodat ze het teruggeeft en de aanroeper het afdrukt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_print_vs_return",
+          "statement": "Je kan uitleggen waarom een functie haar resultaat beter teruggeeft dan afdrukt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_return_ends_function",
+          "statement": "Je kan voorspellen dat een functie stopt bij de eerste return die uitgevoerd wordt, ook midden in een if of een lus.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_boolean_function",
+          "statement": "Je kan een functie schrijven die True of False teruggeeft, zodat je ze als voorwaarde in een if of while kan gebruiken.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_function",
+          "statement": "Je kan een turtle-functie met parameters schrijven die iets tekent en niets teruggeeft, zoals een veelhoek waarvan je het aantal zijden en de lengte meegeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "lokale-variabelen",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Lokale variabelen",
+      "description": "Je kan voorspellen welke variabelen binnen en buiten een functie bestaan, wat er met een variabele van buitenaf gebeurt als de functie een variabele met dezelfde naam een waarde geeft, en uitleggen waarom een functie haar gegevens best via parameters krijgt en via return teruggeeft.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Frame each call as getting its own fresh workspace: parameters and variables made inside exist only while the call runs, and are gone afterwards.",
+        "Probe shadowing with the same name inside and outside (`x = 10`, then a function that does `x = 5`, then `print(x)`), and with a parameter that is reassigned (`def verhoog(getal): getal = getal + 1`).",
+        "Lean on `teller = teller + 1` inside a function crashing with UnboundLocalError as the motivation for 'geef terug en sla op': `teller = verhoog(teller)`.",
+        "Contrast with lists, tying back to aliasing from the tuples subgoal: `lijst.append(x)` or `lijst[0] = x` inside a function changes the caller's list, but `lijst = []` inside does not.",
+        "Do not introduce the `global` keyword; reading a variable from outside (like the turtle `t`) is fine, changing one goes through return. Functions return their result and contain no `print` — printing happens in the main script."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_local_not_visible",
+          "statement": "Je kan voorspellen dat een parameter of een variabele die binnen een functie gemaakt wordt, buiten die functie niet bestaat en daar een NameError geeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_global_unchanged",
+          "statement": "Je kan voorspellen dat een toekenning binnen een functie een variabele met dezelfde naam buiten de functie ongemoeid laat.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_list_argument_mutation",
+          "statement": "Je kan voorspellen dat een functie die een lijst-argument aanpast met een methode of via een index, ook de lijst van de aanroeper verandert.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_function_returns_result",
+          "statement": "Je kan een functie die een variabele van buitenaf probeert aan te passen herschrijven zodat ze het resultaat teruggeeft en de aanroeper het opslaat.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_parameters_over_globals",
+          "statement": "Je kan uitleggen waarom een functie haar gegevens beter via parameters krijgt dan via variabelen van buitenaf.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "wiskundige-functies",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Wiskundige functies en waardetabellen",
+      "description": "Je kan een voorschrift uit de wiskunde, fysica of economie vertalen naar een Python-functie, de math-module gebruiken, met een lus een waardetabel maken, en uit die functiewaarden iets afleiden over de functie, zoals waar ze het kleinst is of van teken wisselt.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Take formulas from mathematics, physics and economics in turn — a quadratic, distance s = v*t + a*t**2/2, kinetic energy, compound interest K*(1 + r)**n, cost and revenue functions — and always state the formula in the question: the student translates it, they do not have to know it.",
+        "Watch for math notation leaking into code: `2x` for `2 * x`, `x^2` for `x ** 2`, and `f(x) = ...` instead of `def f(x):` with `return`.",
+        "For a step smaller than 1, compute x from the loop index (`x = start + i * stap`): `range` with a step argument or with floats has not been introduced. Probe how many rows the table has and whether the end value is included. The function only computes and returns; the loop in the main script prints the rows or collects them in a list.",
+        "Link the search questions to the list patterns goal: the smallest function value is the manual-minimum pattern, a sign change is a comparison of two neighbouring values. For the step-size LO, use a function whose two zeros or whose minimum fall between two rows of a coarse table.",
+        "From math use only `math.sqrt` and `math.pi`, plus `math.sin`/`math.cos` (radians) when the formula needs them; `round(waarde, 2)` may tidy output but avoid values ending in exactly 5. No numpy, matplotlib, lambda or f-strings, and do not pass a function as an argument — the table loop calls the function by its name."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_formula_function",
+          "statement": "Je kan een voorschrift of formule, zoals f(x) = x² - 4x + 3, vertalen naar een Python-functie met parameters en return.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_math_module_call",
+          "statement": "Je kan na import math functies en constanten zoals math.sqrt en math.pi gebruiken in een berekening.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_table_x_values",
+          "statement": "Je kan voorspellen welke x-waarden een lus voor een waardetabel doorloopt, inclusief de eerste en de laatste.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_value_table",
+          "statement": "Je kan een lus schrijven die een waardetabel van een functie toont of in een lijst bewaart, ook met een stap kleiner dan 1.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_search_function_values",
+          "statement": "Je kan een lus schrijven die in een reeks functiewaarden een bijzonder punt zoekt, zoals de kleinste waarde of een tekenwissel.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_step_size",
+          "statement": "Je kan uitleggen waarom een waardetabel met een te grote stap een nulpunt of een extremum kan missen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "functies-combineren",
+      "type": "goal",
+      "parentId": "functies",
+      "title": "Een probleem opsplitsen in functies",
+      "description": "Je kan een groter probleem opsplitsen in functies die elk één taak hebben, functies schrijven die andere functies aanroepen of met lijsten werken, en een functie testen met goed gekozen aanroepen.",
+      "order": 6000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Elicit the plan before code on larger tasks: which functions, what goes in (parameters), what comes out (return) — probe decomposition separately from coding, as in probleem-naar-programma.",
+        "Build on functions with one clear task that feed each other: `is_priem(n)` used by `tel_priemgetallen(grens)`, `gemiddelde(lijst)` used by `boven_gemiddelde(lijst)`; watch for helper logic being copy-pasted instead of called.",
+        "For list functions, reuse the patterns from the lists goal (largest, count, filter, search) and have the function return the result instead of printing it; build and return a new list rather than changing the argument.",
+        "Turtle compositions are welcome (`teken_huis(grootte)` calling `teken_vierkant` and `teken_driehoek`); returning two values as a tuple and unpacking them is allowed here.",
+        "Introduce no new mechanics: no recursion, lambda, `global`, try/except, `break` or f-strings. Apart from turtle drawing functions, every function returns its result and only the main script prints."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_nested_calls",
+          "statement": "Je kan voorspellen wat een script oplevert waarin een functie een andere functie aanroept of waarin aanroepen in elkaar genest zijn.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_function_with_helper",
+          "statement": "Je kan een functie schrijven die een andere zelfgeschreven functie als hulpfunctie aanroept.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_list_function",
+          "statement": "Je kan een functie schrijven die een lijst als parameter krijgt en een waarde of een nieuwe lijst teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "decompose_into_functions",
+          "statement": "Je kan voor een probleem aangeven welke functies je nodig hebt, met voor elke functie haar parameters en wat ze teruggeeft.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "choose_function_tests",
+          "statement": "Je kan voor een functie aanroepen kiezen die haar goed testen, inclusief randgevallen, en zeggen welk resultaat je bij elke aanroep verwacht.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_function_bug",
+          "statement": "Je kan een fout in een functie opsporen en verbeteren aan de hand van een aanroep die een verkeerd resultaat geeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}

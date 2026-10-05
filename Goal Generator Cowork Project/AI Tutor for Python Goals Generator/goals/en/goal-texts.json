@@ -277,6 +277,90 @@
         "title": "Nested loops and lists of lists",
         "description": "You can write a loop inside a loop to go through pairs from a list, predict how often the inner loop runs, and loop through and change a grid as a list of lists with grid[r][c]."
       }
+    },
+    {
+      "id": "functies",
+      "parentId": null,
+      "nl": {
+        "title": "Functies",
+        "description": "Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegevens doorgeven via parameters, een resultaat teruggeven met return, voorspellen welke variabelen binnen en buiten een functie bestaan, formules uit wiskunde, fysica en economie vertalen naar functies en er waardetabellen mee maken, en een groter probleem opsplitsen in functies die elkaar aanroepen."
+      },
+      "en": {
+        "title": "Functions",
+        "description": "You can write and call your own functions: give code a name with def, pass data in through parameters, give back a result with return, predict which variables exist inside and outside a function, translate formulas from math, physics and economics into functions and make tables of values with them, and split a bigger problem into functions that call each other."
+      }
+    },
+    {
+      "id": "functies-definieren",
+      "parentId": "functies",
+      "nl": {
+        "title": "Een functie schrijven en aanroepen",
+        "description": "Je kan met def een functie schrijven die een waarde binnenkrijgt via een parameter en een resultaat teruggeeft met return, ze aanroepen, en het resultaat opslaan, afdrukken of verder gebruiken in een expressie."
+      },
+      "en": {
+        "title": "Writing and calling a function",
+        "description": "You can use def to write a function that takes in a value through a parameter and gives back a result with return, call it, and store the result, print it or use it further in an expression."
+      }
+    },
+    {
+      "id": "parameters-argumenten",
+      "parentId": "functies",
+      "nl": {
+        "title": "Parameters en argumenten",
+        "description": "Je kan een functie meerdere parameters geven, ze aanroepen met de juiste argumenten in de juiste volgorde, voorspellen welke waarde elke parameter krijgt, en een berekening die je meermaals nodig hebt veralgemenen tot een functie."
+      },
+      "en": {
+        "title": "Parameters and arguments",
+        "description": "You can give a function several parameters, call it with the right arguments in the right order, predict which value each parameter gets, and generalize a calculation you need more than once into a function."
+      }
+    },
+    {
+      "id": "return-waarden",
+      "parentId": "functies",
+      "nl": {
+        "title": "Return onder de loep",
+        "description": "Je kan voorspellen wat er misloopt als een functie afdrukt in plaats van teruggeeft en dat herstellen, voorspellen dat een functie stopt bij de eerste return, functies schrijven die True of False teruggeven, en herkennen wanneer een functie iets doet, zoals tekenen, in plaats van iets te berekenen."
+      },
+      "en": {
+        "title": "A closer look at return",
+        "description": "You can predict what goes wrong when a function prints instead of giving back a value and fix that, predict that a function stops at the first return, write functions that give back True or False, and recognize when a function does something, such as drawing, instead of calculating something."
+      }
+    },
+    {
+      "id": "lokale-variabelen",
+      "parentId": "functies",
+      "nl": {
+        "title": "Lokale variabelen",
+        "description": "Je kan voorspellen welke variabelen binnen en buiten een functie bestaan, wat er met een variabele van buitenaf gebeurt als de functie een variabele met dezelfde naam een waarde geeft, en uitleggen waarom een functie haar gegevens best via parameters krijgt en via return teruggeeft."
+      },
+      "en": {
+        "title": "Local variables",
+        "description": "You can predict which variables exist inside and outside a function, what happens to a variable from outside when the function assigns a value to a variable with the same name, and explain why a function should get its data through parameters and give it back through return."
+      }
+    },
+    {
+      "id": "wiskundige-functies",
+      "parentId": "functies",
+      "nl": {
+        "title": "Wiskundige functies en waardetabellen",
+        "description": "Je kan een voorschrift uit de wiskunde, fysica of economie vertalen naar een Python-functie, de math-module gebruiken, met een lus een waardetabel maken, en uit die functiewaarden iets afleiden over de functie, zoals waar ze het kleinst is of van teken wisselt."
+      },
+      "en": {
+        "title": "Mathematical functions and tables of values",
+        "description": "You can translate a rule from math, physics or economics into a Python function, use the math module, make a table of values with a loop, and work out something about the function from those values, such as where it is smallest or changes sign."
+      }
+    },
+    {
+      "id": "functies-combineren",
+      "parentId": "functies",
+      "nl": {
+        "title": "Een probleem opsplitsen in functies",
+        "description": "Je kan een groter probleem opsplitsen in functies die elk één taak hebben, functies schrijven die andere functies aanroepen of met lijsten werken, en een functie testen met goed gekozen aanroepen."
+      },
+      "en": {
+        "title": "Splitting a problem into functions",
+        "description": "You can split a bigger problem into functions that each have one task, write functions that call other functions or work with lists, and test a function with well-chosen calls."
+      }
     }
   ]
 }

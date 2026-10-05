@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lokale variabelen</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+<p>Een functie werkt in haar eigen afgesloten ruimte. Wat daarbinnen gemaakt wordt, blijft daarbinnen, en dat maakt functies betrouwbaar.</p>
+
+<h2>Een eigen werkruimte per aanroep</h2>
+
+<pre><code>def met_btw(prijs):
+    btw = prijs * 21 / 100
+    return prijs + btw
+
+print(met_btw(100))
+print(btw)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>121.0
+NameError: name 'btw' is not defined</code></pre>
+
+<p>Bij elke aanroep krijgt de functie een nieuwe, lege werkruimte. De parameter <code>prijs</code> en de variabele <code>btw</code> bestaan alleen daarin, en alleen zolang de aanroep loopt. Zulke variabelen heten <em>lokaal</em>.</p>
+
+<p>Na de <code>return</code> ruimt Python de werkruimte op. In het hoofdscript bestaat er dus geen <code>btw</code>, en ook geen <code>prijs</code>. Het enige wat naar buiten komt, is de teruggegeven waarde.</p>
+
+<h2>Dezelfde naam, een andere variabele</h2>
+
+<pre><code>def verhoog(getal):
+    getal = getal + 1
+    return getal
+
+getal = 5
+verhoog(getal)
+print(getal)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>5</code></pre>
+
+<p>Er zijn hier twee variabelen die <code>getal</code> heten: één in het hoofdscript en één in de werkruimte van de functie. De functie krijgt de waarde 5 binnen, maakt er in haar eigen ruimte 6 van en geeft die terug. Het hoofdscript doet niets met dat resultaat, en zijn eigen <code>getal</code> is nooit aangeraakt.</p>
+
+<p>Een toekenning binnen een functie verandert nooit een variabele erbuiten, ook niet als beide dezelfde naam hebben.</p>
+
+<h2>Teruggeven en opslaan</h2>
+
+<p>Een functie die een variabele van buitenaf rechtstreeks wil aanpassen, loopt vast:</p>
+
+<pre><code>teller = 0
+
+def tel_bij():
+    teller = teller + 1
+
+tel_bij()</code></pre>
+<p>Uitvoer:</p>
+<pre><code>UnboundLocalError: cannot access local variable 'teller' where it is not associated with a value</code></pre>
+
+<p>Door de toekenning beschouwt Python <code>teller</code> als een lokale variabele, en die heeft nog geen waarde op het moment dat de rechterkant uitgerekend wordt. De oplossing is altijd dezelfde: de waarde gaat binnen via een parameter, het resultaat komt terug via <code>return</code>, en het hoofdscript slaat het op.</p>
+
+<pre><code>def tel_bij(waarde):
+    return waarde + 1
+
+teller = 0
+teller = tel_bij(teller)
+teller = tel_bij(teller)
+print(teller)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>2</code></pre>
+
+<h2>Waarom via parameters</h2>
+
+<p>Een functie kan een variabele uit het hoofdscript wel <em>lezen</em>; zo gebruikt een tekenfunctie de turtle <code>t</code>. Voor de gegevens waarmee ze rekent, is dat toch geen goed idee.</p>
+
+<p>Een functie die alles via haar parameters krijgt, begrijp je door alleen die functie te lezen. Je kan ze testen met gelijk welke waarden, en bij dezelfde argumenten geeft ze altijd hetzelfde resultaat. Een functie die afhangt van een variabele ergens anders in het script, geeft plots iets anders zodra iemand die variabele verandert.</p>
+
+<h2>Lijsten gedragen zich anders</h2>
+
+<pre><code>def voeg_nul_toe(lijst):
+    lijst.append(0)
+
+getallen = [1, 2, 3]
+voeg_nul_toe(getallen)
+print(getallen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>[1, 2, 3, 0]</code></pre>
+
+<div class="callout warn"><p>Dit is hetzelfde verschijnsel als <code>b = a</code> bij lijsten: de parameter <code>lijst</code> is een tweede naam voor dezelfde lijst. Een methode zoals <code>append</code> of een toekenning aan een index, zoals <code>lijst[0] = 9</code>, past die ene lijst aan, en dat zie je ook buiten de functie.</p></div>
+
+<p>Een toekenning aan de naam zelf, zoals <code>lijst = []</code>, maakt alleen een nieuwe lokale variabele en laat de lijst van de aanroeper met rust. Wil je de lijst van de aanroeper niet veranderen, bouw dan in de functie een nieuwe lijst op en geef die terug.</p>
+
+<p>Wie weet wat binnen blijft en wat naar buiten komt, kan van elke functie voorspellen wat ze met de rest van het script doet.</p>
+</body>
+</html>

@@ -145,6 +145,33 @@ Pythons eigen namen (`t.pencolor`). De leerling wordt aangesproken met
 | (regelmatige) veelhoek | (regular) polygon |
 | figuur | shape |
 
+## Functies
+
+| Nederlands | Engels |
+|---|---|
+| (een functie) definiëren, definitie | define, definition |
+| aanroeper | caller |
+| parameter / argument | parameter / argument |
+| teruggeven (met `return`) | give back |
+| afdrukken (met `print`) | print |
+| standaardwaarde | default value |
+| hoofdscript | main script |
+| werkruimte (van een aanroep) | workspace |
+| lokale variabele | local variable |
+| hulpfunctie | helper function |
+| geneste aanroep | nested call |
+| voorschrift (van een functie) | rule |
+| formule | formula |
+| waardetabel | table of values |
+| functiewaarde | function value |
+| nulpunt | zero |
+| tekenwissel | sign change |
+| stap (in een tabel) | step |
+| priemgetal | prime number |
+| btw | VAT |
+| rentevoet | interest rate |
+| schuine zijde | hypotenuse |
+
 ## Namen in de code
 
 Nederlandse variabelenamen, strings en commentaar in de voorbeelden zijn mee
@@ -169,5 +196,16 @@ Dries) blijven.
 | `gevonden`, `positie` | `found`, `position` | `hulp` | `temp` |
 | `rooster` | `grid` | `raster` (nieuw opgebouwd) | `new_grid` |
 | `rij`, `k` (kolom) | `row`, `c` (column) | `lijst` (als voorbeeldnaam) | `my_list` (nooit `list`: dat is Pythons eigen naam) |
+| `dubbel(x)`, `kwadraat(x)` (functies) | `double(x)`, `square(x)` | `toon_dubbel` | `show_double` |
+| `resultaat`, `waarde` | `result`, `value` | `verschil` | `difference` |
+| `oppervlakte(lengte, breedte)` | `area(length, width)` | `procent` | `percent` |
+| `met_btw`, `met_korting` | `with_vat`, `with_discount` | `btw` | `vat` |
+| `veelhoek(aantal, lengte)` | `polygon(sides, length)` | `aantal` (als teller) | `count` |
+| `verhoog`, `tel_bij` | `increase`, `add_one` | `voeg_nul_toe` | `add_zero` |
+| `eindkapitaal(kapitaal, rentevoet, jaren)` | `final_capital(capital, rate, years)` | `stap` | `step` |
+| `schuine_zijde`, `omtrek_cirkel(straal)` | `hypotenuse`, `circumference(radius)` | `links`, `rechts` | `left`, `right` |
+| `kleinste_x` | `smallest_x` | `grens` | `limit` |
+| `boven_gemiddelde` | `above_average` | `som_van_kwadraten` | `sum_of_squares` |
+| `is_priem`, `tel_priemgetallen` | `is_prime`, `count_primes` | `deler` | `divisor` |
 
 Zo wordt `rooster[r][k]` in de Engelse les en doeltekst `grid[r][c]`.

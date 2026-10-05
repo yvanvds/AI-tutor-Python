@@ -83,6 +83,8 @@ CASES: dict[str, dict[int, dict]] = {
         6: {"turtle": {"segments": 4, "colors": ["red", "orange", "green", "blue"], "lengths": [50, 100, 150, 200]}},
     },
     "geneste-lussen": {1: {"lines": 9}},
+    # A triangle and a hexagon, each drawn by one call of the same function.
+    "return-waarden": {5: {"turtle": {"segments": 9, "closed": True}}},
 }
 
 # Inline code whose result the prose states, run in the lesson's namespace
@@ -139,6 +141,29 @@ INLINE: dict[str, list[tuple[str, str, str]]] = {
         ("nl", "rooster = [[1, 2, 3], [4, 5, 6]]; rooster[2][1]", "IndexError"),
         ("en", "grid = [[1, 2, 3], [4, 5, 6]]; grid[2][1]", "IndexError"),
     ],
+    "functies-definieren": [
+        ("nl", "kwadraat(5)", "25"),
+        ("en", "square(5)", "25"),
+        # "The definition has to be above the first call."
+        ("*", "print(cube(3))\ndef cube(x):\n    return x ** 3", "NameError"),
+    ],
+    "parameters-argumenten": [
+        ("nl", "oppervlakte(5, 3, 2)", "TypeError"),
+        ("en", "area(5, 3, 2)", "TypeError"),
+    ],
+    "return-waarden": [
+        ("nl", "toon_dubbel(4) + 1", "TypeError"),
+        ("en", "show_double(4) + 1", "TypeError"),
+    ],
+    "lokale-variabelen": [
+        ("nl", "prijs", "NameError"),
+        ("en", "price", "NameError"),
+        ("nl", "def maak_leeg(lijst):\n    lijst = []\ngetallen = [1, 2, 3]\nmaak_leeg(getallen)\ngetallen", "[1, 2, 3]"),
+        ("en", "def make_empty(my_list):\n    my_list = []\nnumbers = [1, 2, 3]\nmake_empty(numbers)\nnumbers", "[1, 2, 3]"),
+        ("nl", "def zet_negen(lijst):\n    lijst[0] = 9\ngetallen = [1, 2, 3]\nzet_negen(getallen)\ngetallen", "[9, 2, 3]"),
+        ("en", "def set_nine(my_list):\n    my_list[0] = 9\nnumbers = [1, 2, 3]\nset_nine(numbers)\nnumbers", "[9, 2, 3]"),
+    ],
+    "functies-combineren": [("*", "list(range(2, 1))", "[]")],
 }
 
 
