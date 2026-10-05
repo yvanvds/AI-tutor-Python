@@ -43,6 +43,14 @@ def _fake_cosmos() -> types.ModuleType:
     m.classes = lambda: CLASSES_DOC
     m.read = lambda coll, doc_id, pk: None
     m.query = lambda *a, **k: []
+    m.all_accounts = lambda: list(ACCOUNTS)
+    m.content_reads = []
+
+    def turn_contents(uid, since, until):
+        m.content_reads.append((uid, since, until))
+        return {c["id"]: c for c in CONTENTS.get(uid, []) if since <= c["turnAt"] < until}
+
+    m.turn_contents = turn_contents
 
     def upsert(coll, doc, pk, etag=None):
         m.upserts.append((coll, doc, pk, etag))
@@ -54,6 +62,7 @@ def _fake_cosmos() -> types.ModuleType:
 
 sys.modules.setdefault("cosmos", _fake_cosmos())
 
+import diagnostics as dx  # noqa: E402
 import evaluate  # noqa: E402
 import rules  # noqa: E402
 
@@ -62,6 +71,9 @@ KLAS = "6TEST"
 
 # `config/classes` (#218): no class list unless a test sets one.
 CLASSES_DOC = None
+
+# `turn_content` (#228), per uid: none unless a test's student has some.
+CONTENTS: dict[str, list[dict]] = {}
 
 GOALS = {
     "g-root": {"id": "g-root", "title": "Hoofddoel", "order": 1},
@@ -419,6 +431,42 @@ TOM_STORED = {
     ("sg-b", "predict_b1"): {"alpha": 3.4999, "beta": 1.0, "highestPositiveDifficulty": "medium"},
     ("sg-a", "recall_a1"): {"alpha": 1.5, "beta": 1.0, "highestPositiveDifficulty": "medium"},
 }
+
+# #225: a class of one made-up student who lost oefeningen. Nora pressed
+# "Verder" and finished Deel A; on 09-22, on Deel B, the grader's signal on
+# the asked predict_b1 was dropped (the scope was still the old one) while a
+# side remark on recall_a1 survived: three questions, two of them right,
+# and no signal on their own LO. On 09-23, in the next goal (Deel C), the
+# same twice. Not lost: a follow-up and a recheck without a signal on the
+# asked LO (neither is a first direct question), and a bank pick whose
+# weak fallback signal did land on predict_b1.
+GOALS["g-next"] = {"id": "g-next", "title": "Volgend doel", "order": 2}
+GOALS["sg-c"] = {
+    "id": "sg-c",
+    "parentId": "g-next",
+    "order": 1,
+    "title": "Deel C",
+    "objectives": [{"id": "cmp_c1", "statement": "Je kan C1 vergelijken."}],
+}
+KLAS_LOST = "6VERLOREN"
+ACCOUNTS += [
+    {"uid": "u-nora", "firstName": "Nora", "lastName": "Verloren", "className": KLAS_LOST,
+     "updatedAt": "2026-09-23T10:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+_SIDE = [_sig("sg-a", "recall_a1", "weak")]
+TURNS["u-nora"] = [
+    *[_turn(f"2026-09-20T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-nora") for i in range(2)],
+    _turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE),
+    _turn("2026-09-22T09:05:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE, overallQuality="wrong"),
+    _turn("2026-09-22T09:06:00.000Z", "sg-b", "predict_b1", uid="u-nora", isFollowUp=True, chainDepth=1, loSignals=[]),
+    _turn("2026-09-22T09:10:00.000Z", "sg-b", "predict_b1", uid="u-nora", loSignals=_SIDE),
+    _turn("2026-09-22T09:15:00.000Z", "sg-a", "fix_a3", uid="u-nora", isRecheck=True, activeSubgoalId="sg-b",
+          loSignals=[_sig("sg-b", "predict_b1")]),
+    _turn("2026-09-23T09:00:00.000Z", "sg-b", "predict_b1", uid="u-nora", questionId="q-sg-b-3", fromBank=True,
+          gradedByKey=True, hadFallback=True, loSignals=[_sig("sg-b", "predict_b1", "weak")]),
+    *[_turn(f"2026-09-23T09:1{i}:00.000Z", "sg-c", "cmp_c1", uid="u-nora", loSignals=[_sig("sg-b", "predict_b1", "weak")])
+      for i in range(2)],
+]
 
 JUSTIFICATION = "Verantwoording van je score\n\nJe kan B1 voorspellen.\n\nFeedback\n\nGa zo door."
 COUNTED = ("staleLoCount", "supervisedTurns", "homeTurns")
@@ -1021,6 +1069,36 @@ class SupervisedWeightTest(unittest.TestCase):
         self.assertEqual((timetable.supervised_turns, timetable.home_turns), (2, 1))
 
 
+class NotchDropReplayTest(unittest.TestCase):
+    """#227: a question the app asked a notch below the calibration
+    (CONDUCTOR_POLICY §2.3, either rule) replays from the turn's own
+    `difficulty` and `calibrationBefore`, as the conductor weighed it — no
+    change to the replay. Which rule dropped it (`notchDropRules`) is on the
+    record for the reader and moves nothing."""
+
+    KEY = ("sg-a", "write_a2")
+
+    def lower(self, **reason) -> dict:
+        return _turn(
+            "2026-10-02T09:00:00.000Z", "sg-a", "write_a2", uid="u-x",
+            difficulty="medium", calibrationBefore="hard", calibrationAfter="hard",
+            selectionReason={"candidateLOs": [], "chosenReason": "lowest mean unmastered",
+                             "notchDropFired": True, **reason},
+        )
+
+    def test_it_weighs_at_the_level_asked_and_certifies_nothing_at_calibration(self):
+        lo = rules.replay([self.lower(notchDropRules=["attemptsWithoutCorrect"])], GOALS)[self.KEY]
+        self.assertAlmostEqual(lo.alpha, 1 + 2.0 * 1.0)  # strong × medium, not × 1.4
+        self.assertIsNone(lo.positive_at_calibrated_at)  # below the calibration (§4.3)
+        self.assertEqual(lo.ratchet, "medium")  # the level asked (#103)
+        self.assertEqual(lo.direct_signals[0].difficulty, "medium")
+
+    def test_the_rule_on_the_record_changes_nothing(self):
+        named = rules.replay([self.lower(notchDropRules=["attemptsWithoutCorrect"])], GOALS)[self.KEY]
+        before = rules.replay([self.lower()], GOALS)[self.KEY]
+        self.assertEqual(named, before)
+
+
 class TurnScopeTest(unittest.TestCase):
     """The conductor's reading of a warm-up or recheck, at its edges."""
 
@@ -1218,6 +1296,296 @@ class ReliabilityTest(unittest.TestCase):
 
         everything = rules.reliability([], {}, turns, None, NOW)
         self.assertEqual((everything.supervised_turns, everything.home_turns), (2, 2))
+
+
+class LostOefeningenDraftTest(_CommandTest):
+    """#225: the direct questions whose grade left no signal on their own
+    LO, per student in the concept — they counted for nothing there."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, _ = self.draft(KLAS_LOST)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+        self.nora = self.section(self.md, "Nora Verloren")
+
+    def test_the_concept_lists_them_per_lo(self):
+        self.assertIn(
+            "**Oefeningen die niet telden voor hun eigen leerdoel:** 5, waarvan 4 juist (3 over deze mijlpaal).",
+            self.nora,
+        )
+        self.assertIn(
+            "- Je kan B1 voorspellen. `predict_b1` (Deel B) ×3, 2 juist (09-22) — mijlpaal\n"
+            "- Je kan C1 vergelijken. `cmp_c1` (Deel C) ×2, 2 juist (09-23)\n",
+            self.nora,
+        )
+
+    def test_the_overview_flags_them(self):
+        row = next(line for line in self.md.splitlines() if line.startswith("| Nora Verloren |"))
+        self.assertIn("5 oefeningen telden niet voor hun leerdoel", row)
+
+    def test_a_student_without_them_gets_no_line(self):
+        md_path, _, _ = self.draft(KLAS_OFF)
+        md = md_path.read_text(encoding="utf-8")
+        self.assertNotIn("telden niet", md)
+
+    def test_the_sidecar_and_the_number_do_not_change(self):
+        # Diagnostics only: nothing of it goes on the proposal.
+        nora = self.student(self.sidecar, "u-nora")
+        self.assertNotIn("lost", nora)
+        self.assertNotIn("lostOefeningen", nora["computed"])
+        self.assertEqual(self.sidecar["rulesVersion"], rules.RULES_VERSION)
+
+
+class LostOefeningenTest(unittest.TestCase):
+    """Which turns `diagnostics.lost_oefeningen` counts (#225)."""
+
+    def lost(self, *turns: dict) -> dict:
+        return dx.lost_oefeningen(list(turns), GOALS, {"sg-a", "sg-b"})
+
+    def test_a_first_direct_question_without_a_signal_on_its_lo(self):
+        r = self.lost(_turn("2026-09-22T09:00:00.000Z", "sg-b", "predict_b1", loSignals=[_sig("sg-a", "recall_a1")]))
+        self.assertEqual((r["total"], r["correct"], r["in_milestone"]), (1, 1, 1))
+
+    def test_its_lo_under_another_subgoal_is_no_signal_on_it(self):
+        r = self.lost(_turn("2026-09-22T09:00:00.000Z", "sg-c", "cmp_c1", loSignals=[_sig("sg-b", "cmp_c1")]))
+        self.assertEqual((r["total"], r["in_milestone"]), (1, 0))
+        self.assertEqual(r["per"][0]["subgoal_title"], "Deel C")
+
+    def test_not_counted(self):
+        at = "2026-09-22T09:00:00.000Z"
+        r = self.lost(
+            # A signal on its own LO, also the weak fallback one.
+            _turn(at, "sg-b", "predict_b1"),
+            _turn(at, "sg-b", "predict_b1", hadFallback=True, loSignals=[_sig("sg-b", "predict_b1", "weak")]),
+            # A neutral is a signal too.
+            _turn(at, "sg-b", "predict_b1", loSignals=[_sig("sg-b", "predict_b1", signal="neutral")]),
+            # Not a first direct question: a follow-up, a warm-up, a recheck.
+            _turn(at, "sg-b", "predict_b1", isFollowUp=True, chainDepth=1, loSignals=[]),
+            _turn(at, "sg-a", "recall_a1", isWarmUp=True, activeSubgoalId="sg-b", loSignals=[]),
+            _turn(at, "sg-a", "fix_a3", isRecheck=True, activeSubgoalId="sg-b", loSignals=[]),
+            # No question at all: an audit record; and a turn without a target.
+            _audit(at, "sg-b", "u-anna"),
+            _turn(at, "sg-b", "predict_b1", targetLOIds=[], loSignals=[]),
+        )
+        self.assertEqual(r, {"total": 0, "correct": 0, "in_milestone": 0, "per": []})
+
+
+
+# ---- trace (#228) -------------------------------------------------------------
+
+# Wout's Friday 2 October, Belgian time (CEST, UTC+2): an oefening at 00:30
+# that the app wrote before it kept content; a multiple-choice pick with a
+# side remark outside the goal; a code question on which every signal
+# dropped and the fallback stood in, after two hints; its follow-up; and the
+# content of a turn whose record is gone. Not on the day: 00:30 on Saturday,
+# and an audit record is no oefening.
+KLAS_SPOOR = "6SPOOR"
+ACCOUNTS += [
+    {"uid": "u-wout", "firstName": "Wout", "lastName": "Spoor", "className": KLAS_SPOOR,
+     "updatedAt": "2026-10-02T10:00:00Z"},
+]
+_W = {"uid": "u-wout"}
+TURNS["u-wout"] = [
+    _turn("2026-10-01T22:30:00.000Z", "sg-b", "predict_b1", **_W),
+    _turn("2026-10-02T07:15:00.000Z", "sg-a", "recall_a1", **_W, overallQuality="wrong",
+          loSignals=[_sig("sg-a", "recall_a1", "moderate", "negative")]),
+    _turn("2026-10-02T07:20:00.000Z", "sg-a", "write_a2", **_W, questionType="completeCodeQuestion",
+          difficulty="hard", overallQuality="partial", hadFallback=True,
+          loSignals=[_sig("sg-a", "write_a2", "weak", "neutral")]),
+    _turn("2026-10-02T07:25:00.000Z", "sg-a", "write_a2", **_W, questionType="completeCodeQuestion",
+          isFollowUp=True, chainDepth=1, overallQuality="correct",
+          loSignals=[_sig("sg-a", "write_a2", "weak"), _sig("sg-b", "predict_b1", "weak", "negative")]),
+    _audit("2026-10-02T08:30:00.000Z", "sg-a", "u-wout"),
+    _turn("2026-10-02T22:30:00.000Z", "sg-a", "recall_a1", **_W),
+]
+
+
+def _content(turn_at: str, subgoal: str, **fields) -> dict:
+    doc = {
+        "id": f"t-{turn_at}",
+        "uid": "u-wout",
+        "type": "turn_content",
+        "turnAt": turn_at,
+        "subgoalId": subgoal,
+        "questionType": "mcQuestion",
+        "isFollowUp": False,
+        "question": None,
+        "answer": None,
+        "feedback": "",
+        "rawSignals": [],
+        "droppedSignals": [],
+        "context": {"activeRootId": "g-root", "activeSubgoalId": subgoal, "selectedRootId": "g-root",
+                    "selectedChildId": subgoal, "preferredRootId": None, "preferredChildId": None,
+                    "sessionStart": "startup"},
+        "hintCount": 0,
+        "keepUntil": "2027-06-30T22:00:00.000Z",
+        "ttl": 23_000_000,
+    }
+    doc.update(fields)
+    return doc
+
+
+CONTENTS["u-wout"] = [
+    _content(
+        "2026-10-02T07:15:00.000Z", "sg-a",
+        question={"text": "Wat drukt print(1 + 1) af?", "code": "print(1 + 1)",
+                  "options": ["11", "2", "Error"], "correctOption": "2", "questionId": "sg-a_abc123"},
+        answer={"picked": "11"},
+        feedback="Nee: 1 + 1 is een som, geen tekst.",
+        rawSignals=[_sig("sg-a", "recall_a1", "moderate", "negative"), _sig("sg-z", "lo-x", "weak")],
+        droppedSignals=[{**_sig("sg-z", "lo-x", "weak"), "reason": "outOfScope"}],
+        context={"activeRootId": "g-root", "activeSubgoalId": "sg-a", "selectedRootId": "g-root",
+                 "selectedChildId": "sg-a", "preferredRootId": "g-root", "preferredChildId": None,
+                 "sessionStart": "continueLearningPath"},
+    ),
+    _content(
+        "2026-10-02T07:20:00.000Z", "sg-a", questionType="completeCodeQuestion",
+        question={"text": "Vul de som in.", "code": "a = 1\nprint(a ___ 1)"},
+        answer={"code": "a = 1\nprint(a + 1)"},
+        feedback="Bijna.\nKijk naar de haakjes.",
+        rawSignals=[_sig("sg-q", "lo-q")],
+        droppedSignals=[{**_sig("sg-q", "lo-q"), "reason": "targetOutOfScope"}],
+        hintCount=2,
+    ),
+    _content(
+        "2026-10-02T07:25:00.000Z", "sg-a", questionType="completeCodeQuestion", isFollowUp=True,
+        question={"text": "Waarom werkt het nu?"},
+        answer={"text": "Omdat + optelt."},
+        feedback="Juist.",
+        rawSignals=[_sig("sg-a", "write_a2", "weak"), _sig("sg-b", "predict_b1", "weak", "negative")],
+        droppedSignals=[{**_sig("sg-b", "predict_b1", "weak", "negative"), "reason": "laterSubgoal"}],
+    ),
+    _content("2026-10-02T08:00:00.000Z", "sg-b", id="t-gone", answer={"picked": "B"}, feedback="Ja.",
+             question={"text": "Welke?", "options": ["A", "B"]}),
+    # Saturday 3 October, 00:30 Belgian time: not on the day.
+    _content("2026-10-02T22:30:00.000Z", "sg-a", feedback="Later."),
+]
+
+
+class TraceTest(_CommandTest):
+    """#228: `trace` prints one student's oefeningen of one day as they
+    happened — from `turn_history` and `turn_content` — and writes nothing."""
+
+    def trace(self, *extra: str) -> str:
+        return self.run_cli("trace", "--leerling", "wout", "--dag", "2026-10-02", *extra)
+
+    def block(self, stdout: str, time: str) -> str:
+        """The lines of the oefening at [time], up to the next one."""
+        lines = stdout.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith(f"{time}  "))
+        end = next((i for i in range(start + 1, len(lines)) if lines[i] == ""), len(lines))
+        return "\n".join(lines[start:end])
+
+    def test_every_oefening_of_the_belgian_day_in_order(self):
+        out = self.trace()
+        self.assertTrue(out.startswith("Wout Spoor · vrijdag 2026-10-02 · 5 oefeningen\nzonder bewaarde inhoud: 1\n"))
+        times = [line[:5] for line in out.splitlines() if line[:2].isdigit() and line[5:7] == "  "]
+        # 00:30 on Friday is 22:30 UTC on Thursday; 00:30 on Saturday is not
+        # the day, and the audit record at 10:30 is no oefening.
+        self.assertEqual(times, ["00:30", "09:15", "09:20", "09:25", "10:00"])
+        self.assertEqual(self.cosmos.upserts, [])
+        # The content of the Belgian day, read from the UTC days around it.
+        self.assertEqual(self.cosmos.content_reads, [("u-wout", "2026-10-01", "2026-10-04")])
+
+    def test_a_pick_with_a_side_remark_outside_the_goal(self):
+        self.assertEqual(
+            self.block(self.trace(), "09:15"),
+            "09:15  Deel A · Je kan A1 benoemen. `recall_a1` · meerkeuze · gewoon · fout\n"
+            "  vraag     Wat drukt print(1 + 1) af?\n"
+            "            | print(1 + 1)\n"
+            "            opties: 11 · 2 · Error — sleutel: 2\n"
+            "  antwoord  gekozen: 11\n"
+            "  feedback  Nee: 1 + 1 is een som, geen tekst.\n"
+            "  signalen  telt        sg-a/recall_a1 negatief, matig\n"
+            "            weggegooid  sg-z/lo-x positief, zwak — buiten de scope\n"
+            "  context   hoofddoel g-root, subdoel sg-a · begon met: Verder in Leerpad · hints: 0\n"
+            "            voorkeur: preferredRootId g-root",
+        )
+
+    def test_a_code_question_whose_signals_all_dropped(self):
+        self.assertEqual(
+            self.block(self.trace(), "09:20"),
+            "09:20  Deel A · Je kan A2 schrijven. `write_a2` · code aanvullen · moeilijk · deels juist\n"
+            "  vraag     Vul de som in.\n"
+            "            | a = 1\n"
+            "            | print(a ___ 1)\n"
+            "  antwoord  code:\n"
+            "            | a = 1\n"
+            "            | print(a + 1)\n"
+            "  feedback  Bijna.\n"
+            "            Kijk naar de haakjes.\n"
+            "  signalen  weggegooid  sg-q/lo-q positief, sterk — gevraagd leerdoel buiten de scope\n"
+            "            terugval (alle signalen weggegooid) sg-a/write_a2 neutraal, zwak\n"
+            "  context   hoofddoel g-root, subdoel sg-a · begon met: opstart · hints: 2",
+        )
+
+    def test_a_follow_up_with_a_forward_reference(self):
+        block = self.block(self.trace(), "09:25")
+        self.assertIn("· code aanvullen · gewoon · juist · vervolgvraag\n", block)
+        self.assertIn("  vraag     Waarom werkt het nu?\n  antwoord  Omdat + optelt.\n", block)
+        self.assertIn(
+            "  signalen  telt        sg-a/write_a2 positief, zwak\n"
+            "            weggegooid  sg-b/predict_b1 negatief, zwak — later subdoel\n",
+            block,
+        )
+
+    def test_without_content_or_without_a_record(self):
+        out = self.trace()
+        self.assertEqual(
+            self.block(out, "00:30"),
+            "00:30  Deel B · Je kan B1 voorspellen. `predict_b1` · meerkeuze · gewoon · juist\n"
+            "  (geen inhoud bewaard: van vóór #228, of de schrijving mislukte)\n"
+            "  signalen  aanvaard    sg-b/predict_b1 positief, sterk",
+        )
+        gone = self.block(out, "10:00")
+        self.assertIn("10:00  Deel B · ? · meerkeuze\n  (geen turn_history-record: gewist bij een reset?)\n", gone)
+        self.assertIn("  antwoord  gekozen: B\n", gone)
+
+    def test_one_subgoal(self):
+        out = self.trace("--subdoel", "sg-b")
+        self.assertTrue(out.startswith("Wout Spoor · vrijdag 2026-10-02 · subdoel Deel B `sg-b` · 2 oefeningen\n"))
+        times = [line[:5] for line in out.splitlines() if line[:2].isdigit() and line[5:7] == "  "]
+        self.assertEqual(times, ["00:30", "10:00"])
+
+    def test_the_student_is_found_in_every_class_or_in_one(self):
+        self.assertIn("Wout Spoor", self.trace("--klas", KLAS_SPOOR))
+        with self.assertRaises(SystemExit) as stop:
+            self.trace("--klas", KLAS)
+        self.assertIn("--leerling 'wout' matcht 0 leerlingen in 6TEST", str(stop.exception.code))
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("trace", "--leerling", "niemand", "--dag", "2026-10-02")
+        self.assertIn("--leerling 'niemand' matcht 0 leerlingen in de database", str(stop.exception.code))
+
+    def test_a_day_that_is_no_date_stops(self):
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("trace", "--leerling", "wout", "--dag", "2-10")
+        self.assertIn("--dag '2-10' is geen datum", str(stop.exception.code))
+
+    def test_a_day_without_oefeningen(self):
+        out = self.run_cli("trace", "--leerling", "wout", "--dag", "2026-09-30")
+        self.assertEqual(out, "Wout Spoor · woensdag 2026-09-30 · 0 oefeningen\n")
+
+
+class TraceSignalsTest(unittest.TestCase):
+    """What `diagnostics.trace_signals` makes of a turn's signals (#228)."""
+
+    def test_a_pick_graded_by_its_key(self):
+        # The grader's own signal was not used: the key decided, and its
+        # signal on the asked LO is what was checked.
+        turn = _turn("2026-10-02T07:15:00.000Z", "sg-a", "recall_a1", gradedByKey=True,
+                     loSignals=[_sig("sg-a", "recall_a1", "moderate", "negative")])
+        content = _content("2026-10-02T07:15:00.000Z", "sg-a", rawSignals=[_sig("sg-a", "recall_a1", "weak")])
+        self.assertEqual(
+            [(s["status"], s["strength"]) for s in dx.trace_signals(turn, content)],
+            [("sleutel", "weak"), ("telt", "moderate")],
+        )
+
+    def test_a_signal_twice_drops_once_per_drop(self):
+        twice = [_sig("sg-z", "lo-x", "weak"), _sig("sg-z", "lo-x", "weak")]
+        content = _content("2026-10-02T07:15:00.000Z", "sg-a", rawSignals=twice,
+                           droppedSignals=[{**twice[0], "reason": "outOfScope"}])
+        self.assertEqual([s["status"] for s in dx.trace_signals(None, content)], ["weggegooid", "telt"])
 
 
 if __name__ == "__main__":

@@ -457,7 +457,15 @@ model:
    dropped; the drop is logged.
 3. **Scope check.** `subgoalId` must be the current subgoal or an
    earlier subgoal *within the current root goal*. Forward-references
-   (next subgoal, future goal) are dropped and logged.
+   (next subgoal, future goal) are dropped and logged. A signal on the
+   question's own target LO, filed under the target's subgoal, can
+   only fail this check when the scope itself is wrong — the conductor
+   chose that LO — so it is dropped and logged like the rest, and also
+   recorded on the turn as a `targetSignalLost` event (conductor
+   policy 8.2, #225; strong on the third direct question in a row,
+   #229). Every dropped signal is also kept, with its
+   reason, on the turn's `turn_content` doc next to the grader's raw
+   signals (conductor policy 8.1, #228).
 4. **Self-consistency.** If `overallQuality = correct` but every
    surviving signal is negative (or vice versa), log it. The conductor
    trusts `loSignals` over `overallQuality` for belief updates;

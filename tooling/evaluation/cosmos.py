@@ -197,6 +197,13 @@ def accounts(klas: str) -> list[dict]:
     return sorted(rows, key=lambda a: (a.get("lastName", ""), a.get("firstName", "")))
 
 
+def all_accounts() -> list[dict]:
+    """Every account, of every class: for a command that finds a student by
+    name without `--klas`."""
+    rows = query("accounts", "SELECT * FROM c")
+    return sorted(rows, key=lambda a: (a.get("lastName", ""), a.get("firstName", "")))
+
+
 def goals() -> dict[str, dict]:
     return {g["id"]: g for g in query("goals", "SELECT * FROM c")}
 
@@ -214,6 +221,25 @@ def classes() -> dict | None:
 def turns(uid: str) -> list[dict]:
     rows = query("turn_history", "SELECT * FROM c WHERE c.uid = @u", {"@u": uid}, pk=uid, cross=False)
     return sorted(rows, key=lambda t: t["turnAt"])
+
+
+def turn_contents(uid: str, since: str, until: str) -> dict[str, dict]:
+    """The `turn_content` docs of one student (#228) with `since <= turnAt <
+    until` (ISO strings, UTC), by id — the id of their `turn_history` doc.
+    Empty when the container does not exist yet."""
+    try:
+        rows = query(
+            "turn_content",
+            "SELECT * FROM c WHERE c.uid = @u AND c.turnAt >= @since AND c.turnAt < @until",
+            {"@u": uid, "@since": since, "@until": until},
+            pk=uid,
+            cross=False,
+        )
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {}
+        raise
+    return {c["id"]: c for c in rows}
 
 
 def beliefs(uid: str) -> dict[tuple[str, str], dict]:

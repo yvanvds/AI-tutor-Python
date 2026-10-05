@@ -37,7 +37,19 @@ python tooling/evaluation/evaluate.py validate --klas 6WEWI            # replay 
 python tooling/evaluation/evaluate.py backup   --klas 6WEWI            # volledige dump
 python tooling/evaluation/evaluate.py apply    ~/ai-tutor-evaluaties/<...>.json
 python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b   # punt als die doelen meetellen
+python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>]   # een dag, oefening per oefening
 ```
+
+`trace` (#228) toont de oefeningen van één leerling op één dag (Belgische
+tijd), in volgorde: per oefening de tijd, het leerdoel, het type, het
+niveau en de beoordeling uit `turn_history`, en uit `turn_content` de vraag
+zoals de leerling ze zag, het antwoord, de feedback en de signalen van de
+grader — wat telde en wat werd weggegooid, met de reden (buiten de scope,
+gevraagd leerdoel buiten de scope, onbekend leerdoel, later subdoel,
+negatief of neutraal van opzij). Een oefening van vóór #228 heeft geen
+inhoud; dat staat erbij. `--klas` zoekt de leerling in één klas, zonder
+zoekt hij in alle. Alleen lezen, alleen naar de terminal: er komt geen
+bestand, want het zijn antwoorden van leerlingen.
 
 Alleen standaardbibliotheek; leest `COSMOS_ENDPOINT`/`COSMOS_KEY` uit `.env`.
 De `az` CLI kan geen documenten lezen of schrijven, vandaar de REST-client.
@@ -52,10 +64,10 @@ tellingen, en pas na een "go" `apply`.
 
 | | |
 |---|---|
-| `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`) |
+| `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`); de inhoud van de oefeningen van een leerling (`turn_contents`, #228) |
 | `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
-| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen |
-| `evaluate.py` | de vijf commando's; rendert concept en sidecar |
+| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel, het verloop van een dag (`trace`, #228) |
+| `evaluate.py` | de zes commando's; rendert concept, sidecar en `trace` |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 
 ## Mee op het voorstel
@@ -244,7 +256,22 @@ niveau ≥ verwacht niveau, `M = 50·k + 50·k·(0,6·u + 0,4·d)`.
 - **weggegooide signalen**: oordelen van de grader over de leerdoelen van
   deze mijlpaal terwijl de leerling in een ander doel werkte; de app laat
   ze vallen. Let op: hun frequentie verschilt sterk per sessie (vraagtype?
-  grader-versie?) — informatief, geen bewijs.
+  grader-versie?) — informatief, geen bewijs;
+- **oefeningen die niet telden voor hun leerdoel** (#225): rechtstreekse
+  vragen zonder signaal op het eigen leerdoel (`targetLOIds` onder
+  `subgoalId`) in `loSignals`. Rechtstreeks: geen vervolgvraag, geen
+  opfris- of controlevraag, geen auditrecord. Per leerdoel: hoeveel,
+  hoeveel juist, op welke dagen, en of het een leerdoel van de mijlpaal
+  is; in het overzicht als signaal. De oorzaak is de app of de grader:
+  tot #225 bleef na *Verder* en het laatste subdoel van een doel het
+  oude doel actief, en gooide de app elk oordeel op het nieuwe subdoel
+  weg (sinds #225 staat dat ook als `targetSignalLost` op de oefening);
+  een grader kan het gevraagde leerdoel ook gewoon overslaan. Wat weg
+  is, komt niet terug: de oefening bewaart alleen `overallQuality` en
+  de signalen die bleven. Viel elk signaal weg, dan landde het zwakke
+  terugvalsignaal op het eigen leerdoel, en staat de oefening er niet
+  bij. De herspeling verandert niet (geen nieuwe regelversie): wat de
+  leerkracht met zo'n reeks doet, is een aanpassing met een reden.
 
 ## `what-if`: wat een aanpassing oplevert
 

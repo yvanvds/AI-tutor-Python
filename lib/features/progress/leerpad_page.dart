@@ -169,7 +169,7 @@ class _LeerpadBody extends ConsumerWidget {
     sel.setPreferredRoot(root);
     sel.setPreferredChild(null);
     section.state = Section.session;
-    await tutor.initializeSession(force: true);
+    await tutor.startSession(SessionStart.continueLearningPath);
 
     final child = sel.current.activeChildGoal;
     final hasContent = child != null && (child.contentId?.isNotEmpty ?? false);

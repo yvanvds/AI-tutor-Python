@@ -193,10 +193,18 @@ enum TurnSignalEventKind {
   singleLoDeadlock,
   repeatedDemotions,
   sustainedLlmFailure,
+  // Long work on the active subgoal without progress and with mostly wrong
+  // answers (#229, `NoProgress`):
+  noProgress,
   // Audit-only:
   cascadeHalt,
   emptyObjectivesBlock,
   subgoalDeletedRedirect,
+  // The grader's signal on the LO the question asked about fell outside the
+  // grading scope (#225): the app's error, not the grader's. Audit, strong
+  // on the third direct question in a row (#229) — the conductor emits that
+  // one as strong explicitly.
+  targetSignalLost,
   // Audit by default, strong when well-evidenced — the event carries its
   // own severity (#107, `ProvenanceGap`):
   provenanceGap,
@@ -223,10 +231,13 @@ class TurnSignalEvent {
       case TurnSignalEventKind.singleLoDeadlock:
       case TurnSignalEventKind.repeatedDemotions:
       case TurnSignalEventKind.sustainedLlmFailure:
+      case TurnSignalEventKind.noProgress:
         return TurnSignalEventSeverity.strong;
       case TurnSignalEventKind.cascadeHalt:
       case TurnSignalEventKind.emptyObjectivesBlock:
       case TurnSignalEventKind.subgoalDeletedRedirect:
+      // The default; a run of three is emitted as strong explicitly.
+      case TurnSignalEventKind.targetSignalLost:
       // The default; a well-evidenced gap is emitted as strong explicitly.
       case TurnSignalEventKind.provenanceGap:
         return TurnSignalEventSeverity.audit;
@@ -273,21 +284,44 @@ class TurnSignalEvent {
   }
 }
 
+/// A rule that asks the next question on an LO one notch below the student's
+/// calibration (CONDUCTOR_POLICY §2.3). Both drop the same one notch; the
+/// turn record names which fired (`selectionReason.notchDropRules`).
+enum NotchDropRule {
+  /// Two strong negatives at calibration with no positive in between, on an
+  /// LO never answered positively at calibration (`LoBelief`'s
+  /// `recentNegativesAtCalibrated` and `lastPositiveAtCalibratedAt`).
+  strongNegatives,
+
+  /// #227: `PolicyConstants.notchDropAfterAttempts` attempts on the LO in
+  /// this session — the question or a follow-up on it — without a single
+  /// `correct`.
+  attemptsWithoutCorrect,
+}
+
 class TurnSelectionReason {
   final List<CandidateLoStat> candidateLOs;
   final String chosenReason;
   final bool notchDropFired;
 
+  /// Which §2.3 rules dropped the notch (#227) — one or both when
+  /// [notchDropFired], empty otherwise. Omitted from the doc when empty, so
+  /// a doc without it reads as before: [notchDropFired] alone.
+  final List<NotchDropRule> notchDropRules;
+
   const TurnSelectionReason({
     required this.candidateLOs,
     required this.chosenReason,
     required this.notchDropFired,
+    this.notchDropRules = const [],
   });
 
   Map<String, dynamic> toJson() => {
     'candidateLOs': candidateLOs.map((c) => c.toJson()).toList(),
     'chosenReason': chosenReason,
     'notchDropFired': notchDropFired,
+    if (notchDropRules.isNotEmpty)
+      'notchDropRules': notchDropRules.map((r) => r.name).toList(),
   };
 }
 

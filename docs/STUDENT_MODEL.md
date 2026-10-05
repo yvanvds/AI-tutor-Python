@@ -344,6 +344,18 @@ teacher-dashboard surfaces, not by the conductor's decision logic.
 Belief and calibration are the source of truth for decisions;
 `turn_history` is the audit trail.
 
+### `turn_content` container (#228)
+
+Next to each graded turn's `turn_history` doc, with its id: what the
+student saw, answered and was told — the question, the answer, the
+feedback — plus the grader's signals before the scope check with a reason
+for every one that did not count, and the context (active goal and
+subgoal, selection, preferences, how the session began, hints asked).
+Partition `/uid`. Schema in conductor policy 8.1; kept until the end of
+the school year by a per-doc `ttl` (8.4). Nothing in the student model
+reads it: it is for the teacher, who wants to know *why* an oefening went
+wrong.
+
 ### `milestones` and `grade_proposals` containers (#99)
 
 Teacher-edited and teacher-read; the conductor does not know they exist.

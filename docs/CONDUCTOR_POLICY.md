@@ -490,11 +490,12 @@ conflict.
 
 **Default: read from the student's calibration.** Same as cold start.
 
-**Override: drop one notch on this LO.** Two strong-negative signals
-on this LO at the calibrated difficulty, with no positive signal in
-between, triggers a one-notch drop *for this LO only*. The student's
-overall calibration doesn't change; just this LO gets gentler probing
-until it recovers.
+**Override: drop one notch on this LO (the strike rule).** Two
+strong-negative signals on this LO at the calibrated difficulty, with
+no positive signal in between, triggers a one-notch drop *for this LO
+only*. The student's overall calibration doesn't change; just this LO
+gets gentler probing until it recovers. A second rule drops the same
+notch after four attempts without a correct answer (below, #227).
 
 Concretely, the conductor maintains a per-LO counter
 `recentNegativesAtCalibrated`. The counter:
@@ -530,6 +531,87 @@ just two unlucky questions.
 Why two strikes and not one: one-strike fires on slip answers (typo,
 momentary lapse). Two confirmed strong-negatives at calibration,
 without an intervening positive, is the signal we need.
+
+**Second override: four attempts without a correct answer (#227).**
+The strike rule reads the grader's *signals*, and a run of "partial"
+answers slips through it. In #227 a student got the same `completeCode`
+LO nine times in 22 minutes on hard — six partial, three wrong, never
+correct. The direct partials came with a positive on the asked LO
+(moderate, once strong): each reset the strike counter, and the first
+closed the `lastPositiveAtCalibratedAt` guard for good. Six of the nine
+were follow-ups, which are no strike (6.2) and stay out of the
+calibration window, and right answers on another LO in between kept the
+window under the demotion bar (5.2). No rule lowered anything; the only
+way out was a correct answer on hard. So a second rule counts answers,
+not signals:
+
+- **The rule.** After `notchDropAfterAttempts` = 4 attempts on the same
+  LO in one session without a single fully correct answer, the next
+  question on that LO is asked one notch below calibration — this LO
+  only, like the strike rule.
+- **An attempt** is a graded answer to a question whose target is that
+  LO: the question itself (generated or from the bank, a multiple-choice
+  pick graded by its key included, 2.7) and every follow-up on it (6),
+  whose grade is integrated against the question's plan and so has the
+  same target. Follow-ups count because the run in #227 was mostly
+  follow-ups: a follow-up asks about the same LO with the student's own
+  answer still in view, and not getting that right either says as much
+  about the level as the question did. A **warm-up review or a recheck** (1.5, 2.6) is no attempt: one
+  question on older material, where a miss says "forgotten" rather than
+  "too hard" — the reason those answers stay out of the calibration
+  window too (5.3); it is never notch-dropped itself (condition 3 of 4.1
+  wants a positive at calibration); and its LO belongs to an earlier
+  subgoal, which this session's planning (2.1) does not ask, so a count
+  there could only ever leak onto an active LO with the same id. An
+  incidental signal on the LO from a question about another LO is no
+  attempt either way: nobody asked it.
+- **Fully correct** means `overallQuality == correct` — the answer's
+  verdict, whatever signal the grader filed with it. A `partial` is "not
+  yet", as for promotion (5.1). This is what the strike rule cannot see.
+- **Every level counts.** An answer to the lower question is an attempt
+  too, so the drop holds until the first correct answer.
+- **Release.** The first correct answer on the LO — at the lower level,
+  or on a follow-up — ends the run: the count goes back to 0 and the
+  next question on that LO is at calibration again, where mastery
+  condition 3 is still to be met (4.3). Four more attempts without a
+  correct one drop it again. There is no `lastPositiveAtCalibratedAt`
+  guard, unlike the strike rule: in #227 that guard was closed by a
+  partial.
+- **Per session.** The count is in-flight conductor state, never
+  persisted: a new session (`setTarget`, at every session start) starts
+  every LO at 0. The pattern is a run inside one sitting; after a break
+  the student gets a fresh go at calibration, and the strike counter and
+  the calibration window carry the longer memory.
+- **Same notch.** The drop is one notch below the calibration in force
+  at plan time, as for the strike rule; a demotion in between does not
+  reset the count. When both rules fire it is still one notch, never two.
+- **Floor.** At `easy` there is no lower level: neither rule drops
+  anything, and the count goes on without effect. A student stuck at
+  easy is the stuck rule's business (4.4), and the teacher's (`noProgress`,
+  8.2).
+- **The lower question is an ordinary probe at the level asked.** Its
+  answers weigh at that level (3.2) — a strong positive at medium is
+  `2.0 × 1.0`, not the `× 1.4` of hard — and its `difficulty`, on the turn
+  record and in the calibration window, is that level, so it filters out
+  of the at-calibration set like the strike rule's (5.3). A positive on it
+  sets `highestPositiveDifficulty` to the level asked and not
+  `lastPositiveAtCalibratedAt` (4.3). From the bank it is served at the
+  lower level (2.7).
+- **On the record.** The turn says `selectionReason.notchDropFired:
+  true`, as for the strike rule, and `notchDropRules` names which rule
+  fired — `strongNegatives`, `attemptsWithoutCorrect`, or both (8.1). The
+  field is omitted when no rule fired; older docs carry
+  `notchDropFired` only.
+- **The evaluation replay needs no change.** `tooling/evaluation`
+  replays beliefs from each turn's logged signals, `difficulty` and
+  `calibrationBefore`, which already say the level asked; it never
+  re-decides a notch drop and does not read `selectionReason`
+  (`NotchDropReplayTest`).
+
+Why four (the teacher's choice, 2026-10-04): for a student who gets the
+LO right half the time, four in a row without a correct one happens by
+chance about once in sixteen runs; with follow-ups, four attempts are
+often only two questions — the student in #227 had nine in 22 minutes.
 
 **No upward override.** If belief on a target LO is high but not yet
 mastered (e.g. mean 0.78, just below threshold), the policy does *not*
@@ -656,7 +738,7 @@ nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
     target_lo = candidates sorted by (mean ascending, weight descending)[0]
     type = pickType(target_lo, beliefs[target_lo])
     difficulty = student.calibration.difficulty
-    if shouldDropNotch(target_lo, beliefs[target_lo]):
+    if shouldDropNotch(target_lo, beliefs[target_lo]):   # either rule, one notch
         difficulty = oneStepDown(difficulty)
     return Question(targetLOs=[target_lo], type=type, difficulty=difficulty)
     # the host then serves it from the bank or generates it (2.7)
@@ -670,9 +752,15 @@ pickType(lo, belief):
         return gentlest(candidates)
     return leastRecentlyUsed(candidates, lo)
 
-shouldDropNotch(lo, belief):
-    return previous answer on lo was strong-negative
-       and prior answer at calibrated difficulty on lo was also negative
+shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
+    if calibration is easy: return []               # no lower level
+    rules = []
+    if belief.recentNegativesAtCalibrated >= 2
+       and belief.lastPositiveAtCalibratedAt is null:
+        rules += strongNegatives
+    if attemptsWithoutCorrect[lo] >= 4:              # this session, #227
+        rules += attemptsWithoutCorrect
+    return rules
 ```
 
 The pseudocode glosses several details (how "previous answer on lo"
@@ -1431,9 +1519,9 @@ purposes of condition 3.
 
 **The notch-drop override cannot bypass this.** A student whose
 override (section 2.3) keeps firing on a specific LO at easy gets a
-softer path through, but the override releases on positive signal.
-The next probe is at calibrated difficulty. Mastery requires
-demonstrating there.
+softer path through, but the override releases — the strike rule on a
+positive signal, the attempts rule (#227) on a correct answer. The next
+probe is at calibrated difficulty. Mastery requires demonstrating there.
 
 **Three-level ratchet (#103, PUNTENFORMULE §2.5).** A second field,
 `highestPositiveDifficulty: "easy" | "medium" | "hard" | absent`,
@@ -1554,6 +1642,18 @@ Advancement:
   `progress == 1.0`, and still counts).
 - The conductor selects the next unmastered subgoal in curriculum
   order.
+- Any preference the student entered the old subgoal with goes first:
+  the preferred root *and* the preferred child, as soon as either is
+  set (#225). The walk sets the selection, and the active root and
+  subgoal read a preference over it, so one left behind shadows what
+  the walk chose. "Verder" in the leerpad prefers only a root; until
+  #225 only a preferred child cleared both, and after the last subgoal
+  of that root the student landed on the next root's first subgoal
+  with the *old* root still active. The grader's scope (LLM_CONTRACT
+  part 3) and the signal check then stayed on the old root, and every
+  signal on the asked LO was dropped — oefening after oefening, until
+  the app restarted. A signal on the asked LO that still falls outside
+  the scope is recorded as `targetSignalLost` (8.2).
 - The next question targets the new subgoal's first LO using the
   cold-start path (section 1.1) — fresh subgoal has no beliefs yet.
 - The subgoal-completion event fires (existing splash/celebration UI
@@ -1570,6 +1670,52 @@ to the student.
 looks weird, teacher might want to know" event, not "student in
 trouble." Log to the student's record for teacher audit. Passive
 surfacing — the student experience is fine. (Section 8 details.)
+
+**The bar in the session shows a display state, not the cached share
+(#230).** The cached fraction above is what the Leerpad, the teacher's
+overview, the report and the XP read, and it stays exactly that. The
+bar the student watches while practising — under the subgoal in the
+objective banner, and the 2px line at the top of the window — shows
+instead one segment per non-optional LO of the active subgoal (an
+optional LO gets none), each in one of three states:
+
+- **empty**;
+- **half**: one right answer would master the LO. A `(positive,
+  strong)` signal at the student's calibration, with the home factor
+  (×1.0), applied to the current decayed `(α, β)` with the cap (3.4),
+  meets conditions 1 and 2 of 4.1; condition 3 that answer meets
+  itself;
+- **full**: mastered now, mastered once (`firstMasteredAt`, the
+  one-way reading the grade uses), or stuck (4.4). Stuck looks full to
+  the student, as the advance it allows looks normal (4.4,
+  "student-side invisibility").
+
+The shape it replaces: from the prior one strong positive on hard
+leaves μ at 0.79, just under 0.8, and 2.1 asks every LO once before
+it asks one twice — so the cached share sat on 0 for the first round
+and then jumped. In the class data of 2026-10-04 half the subgoals
+started from cold kept the bar on 0 for at least 41% of their
+oefeningen; with segments it moves from the first right answer.
+
+**Hold.** A segment does not go back on what the student did not
+answer themselves. Full stays full. Half becomes empty only after a
+question on that LO itself — or a follow-up on it — whose answer was
+not right; a negative from the side (the grader's signal on this LO
+from a question about another) leaves it half, as does a not-right
+answer that still leaves the LO one right answer away. The hold lives
+in the session: at session start (`setTarget`) every segment follows
+the beliefs as they are. A warm-up review or a recheck (1.5, 2.6) is
+not a question on an LO of the active subgoal and empties nothing.
+
+The conductor publishes the segments next to the cached share — at
+session start, at every planned question on the active subgoal, and
+after every graded answer (at the calibration of the next question;
+after an advance, the next subgoal's, read afresh) — in
+`subgoalLoDisplayProvider` (`lib/services/tutor/lo_display.dart`). A
+tooltip and the screen-reader label say it in the app language: "2
+parts mastered, 1 almost, 2 still to do". Until the active subgoal's
+segments are published — and for a subgoal without LOs — the bar is
+the plain bar of the cached share.
 
 ### 4.6 Worked example
 
@@ -1736,8 +1882,8 @@ flag on previously-mastered LOs. The same holds for
 calibration at all.
 
 **Per-LO override (section 2.3) is independent of student-level
-calibration.** The notch-drop on a struggling LO doesn't appear in
-the recent-answer window as a special case — the answer's
+calibration.** The notch-drop on a struggling LO — either rule —
+doesn't appear in the recent-answer window as a special case — the answer's
 `difficulty` field records the actual difficulty asked, which may be
 below the student's calibration if the override fired. Those answers
 filter out of the at-calibrated set. They influence neither
@@ -2253,6 +2399,7 @@ TurnRecord {
     candidateLOs: [{loId, mean, evidence}]   // top 3
     chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …", "recheck: …"
     notchDropFired: bool
+    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; omitted when none fired
   }
 
   // What happened
@@ -2339,14 +2486,91 @@ turns and audit events.
 **Storage estimate.** ~500 bytes per turn × ~50 turns/student/week
 × ~30 students ≈ 750 KB/week. Negligible for Cosmos.
 
-**Deliberately not captured:**
+**Deliberately not captured in `turn_history`:**
 
 - Full LLM response text (redundant with `loSignals` + `feedbackText`).
-- Rendered question prompt text (regenerable from inputs).
-- Student's literal answer text (privacy, bulk).
+- Rendered question prompt text — kept, until the end of the school
+  year, in `turn_content` (below).
+- Student's literal answer text — the same.
 - Time-on-question or engagement signals.
 
-If a future debug need requires full text, it can be added later.
+#### The content of an oefening: `turn_content` (#228)
+
+`turn_history` says *that* an oefening went wrong and how the rules
+reacted. It cannot say *why*: whether a "partial" was fair, which
+misconception was behind nine wrong answers on one LO, or that the app
+threw away the grader's signal on the asked LO (#225 was visible only by
+what was missing). And a question enters the bank only when its first
+answer was right (#215), so the questions where it goes wrong are the ones
+the bank does not have. A second container, `turn_content`, holds that
+part: one doc per graded turn — follow-ups included — with the id of its
+`turn_history` doc, partition `/uid`.
+
+```
+TurnContent {
+  id: string                  // the turn_history doc's id
+  uid: string                 // partition key
+  type: "turn_content"
+  turnAt: string              // as on the turn record
+  subgoalId: string           // as on the turn record
+  questionType: string        // as on the turn record
+  isFollowUp: bool
+
+  question: {                 // as the student saw it; the follow-up
+    text: string              //   question itself for a follow-up
+    code: string?             // complete-code skeleton, code to explain,
+                              //   or the code of a multiple-choice question
+    options: string[]?        // multiple choice, in the order on screen
+    correctOption: string?    // its key, as option text
+    questionId: string?       // the bank id (2.7), as on the turn record
+  }?                          // null when the app restarted in between
+  answer: { code? | picked? | text? }?   // the code handed in, the option
+                              //   picked, or the text typed
+  feedback: string            // the grade's <TEXT>, as shown
+  rawSignals: [{subgoalId, loId, signal, strength}]
+                              // the grader's own, before any check; on a
+                              //   pick graded by its key (2.7) the key's
+                              //   signal is what was checked
+  droppedSignals: [{subgoalId, loId, signal, strength, reason}]
+                              // every signal that did not count, reason
+                              //   outOfScope | targetOutOfScope (#225) |
+                              //   unknownLo (the scope check), then
+                              //   laterSubgoal | outsideActiveRoot |
+                              //   unknownLo | incidentalNeutral (#204) |
+                              //   incidentalNegative (#167) (the conductor)
+  context: {
+    activeRootId, activeSubgoalId,        // when the answer was graded
+    selectedRootId, selectedChildId,
+    preferredRootId, preferredChildId,
+    sessionStart: startup | continueLearningPath | workOnGoal | restart
+  }
+  hintCount: int              // hints since the question (or the last
+                              //   graded answer) went up
+  clientVersion: string?
+  keepUntil: string           // when it expires (8.4)
+  ttl: int                    // seconds from this write until keepUntil
+}
+```
+
+The drops come from where they are decided: `GradedAnswerBuilder` hands
+on its own with their reason (`GradedAnswer.droppedSignals`, of which
+`lostTargetSignals` is the asked-LO part), the conductor adds its own and
+returns them all on the turn (`TurnOutcome.droppedSignals`). Nothing reads
+them back to decide anything. Not in it: the full prompts (the instructions
+are in `instructions`) and the model's raw output. About 1–3 KB a doc.
+
+**Written like the question bank (2.7): best-effort.** `TutorService`
+assembles the doc once the turn record is built and hands it to
+`TurnContentService` unawaited: the oefening never waits for it, a failure
+is logged and swallowed, and a missing container leaves the service alone
+for 10 minutes. The writes of one app run are queued in order.
+
+**Read by the teacher only**, in the tooling first: `evaluate.py trace
+--leerling <naam> --dag <datum> [--subdoel <id>]` prints a student's day
+per oefening (`tooling/evaluation`). Seeing an oefening in the student's
+drawer in the app is later work (#229). As for `turn_history`, "teacher
+only" is a boundary in the app, not access control: the app holds the
+account key.
 
 ### 8.2 Teacher-facing surfaces
 
@@ -2371,6 +2595,12 @@ Each `signalEvents[*].kind` is one of:
   `degradedWindow` grading calls fell back; the conductor flips
   into degraded mode (section 7.3). `details: {fallbackCount,
   window}`. Fires once per session.
+- `noProgress` — the student has worked long on the active subgoal
+  without progress, with mostly wrong answers (#229; see "No
+  progress" below). `details: {subgoalId, since, minutes, oefeningen,
+  answers, notRight, loId, mean, calibration}`. Written on an audit
+  stub record (8.1) on the subgoal, not on the graded turn. Fires once
+  per (session, subgoal).
 
 **Audit-only (no badge, drawer-only):**
 
@@ -2382,6 +2612,27 @@ Each `signalEvents[*].kind` is one of:
   {subgoalId}`. Fires once per (session, subgoal).
 - `subgoalDeletedRedirect` — teacher deleted the active subgoal
   mid-session (section 7.4). `details: {subgoalId}`.
+- `targetSignalLost` — the grader's signal on the LO the question
+  asked about was dropped because its subgoal is not in the grading
+  scope (#225, section 4.5). The app chose that LO, so this is the
+  app's error, not the grader's: the oefening counted for nothing on
+  its own LO, or only through the weak fallback. Also logged as a
+  declined signal (`conductor.signal_dropped`, reason `target out of
+  scope`). `details: {subgoalId, loId, signal, strength, activeRootId,
+  fallback}`; `fallback` is true when every signal dropped and the
+  weak fallback on the target stood in. An LO missing from a subgoal
+  that *is* in scope is a curriculum edit (7.4) and is not this event.
+  **Strong on a run** (#229): the direct question — no follow-up, no
+  warm-up review, no recheck — that makes
+  `targetSignalLostStrongRun` (3) in a row whose grade on the asked LO
+  was lost carries the event at `severity: strong`, with `run: 3` in
+  `details`; the ones before and after it in the run stay audit, so a
+  run raises the badge once. A direct question whose grade on its LO
+  arrived ends the run; follow-ups, warm-up reviews and rechecks
+  neither lengthen nor end it. The count is the conductor's,
+  per session (reset on `setTarget`). Oefeningen that count for
+  nothing while mostly right are what `noProgress` does not catch;
+  with #225 fixed this is the watch for the next bug of its kind.
 
 **Audit, strong when well-evidenced (the event carries its severity):**
 
@@ -2453,6 +2704,74 @@ strong is. Acknowledgment is the usual per-student one.
 **In the drawer** the line names the LO by its statement and gives the
 two counts in words ("at home 3 of 3 positive, in class afterwards 0 of
 3 (last 42 days)").
+
+#### No progress (#229)
+
+The teacher's "this student is stuck" during the lesson. Long work on a
+subgoal without a newly mastered LO is ordinary; long work with mostly
+wrong answers is not, and the student should not have to say so. It
+changes no belief, no weight and no grade, and the student never sees
+it.
+
+**When it runs.** Like the provenance gap: after every graded turn, on
+the student's laptop, off the student's path, alongside the write of
+the turn's record (which it takes as it has it), and silent when it
+fails. It reads the student's records of the last `noProgressLookback`
+(4 hours) on every subgoal (`TurnHistoryService.listSince`). A warm-up
+review or a recheck is not checked; the next answer on the active
+subgoal is.
+
+**What it reads.** The answers on the subgoal the student practised:
+graded turns, follow-ups included, not audit records, warm-up reviews
+or rechecks (those are about another subgoal; they neither count nor
+end the work on this one). In order, the clock starts again:
+
+- on the first answer on a subgoal after an answer on another one —
+  the start of the work on this subgoal in this session;
+- after a pause of more than `noProgressSessionGap` (30 minutes)
+  between two answers — a new session; a session longer than the read
+  counts from its start;
+- on progress: an answer that advanced the subgoal, or after which an
+  LO of the subgoal is mastered (`loStatusAfter`) that no earlier
+  answer read left mastered. That answer is progress, not one of the
+  answers since. An LO that slips under the bar and comes back is not
+  new; the first answer read on a subgoal is the baseline.
+
+**When it fires** (`PolicyConstants.noProgress*`), on the subgoal of
+the answer just graded: at least `noProgressMinMinutes` (25) since the
+clock started, and at least `noProgressMinBadShare` (half) of the last
+answers since then not right — wrong or partly right — over at most
+`noProgressWindow` (10) and at least `noProgressMinAnswers` (6) of
+them. Always **strong**: it drives the "needs attention" badge, which
+the Students page polls, so the teacher sees it in the lesson.
+
+**Once per (session, subgoal).** An alert on the subgoal whose clock
+started in the current session is not raised again, whatever happened
+since — read from the `since` in its details, so a second laptop or a
+restarted app does not raise it twice. A new session, or another
+subgoal, may.
+
+**What it says** (`details`): the subgoal; `since`, the moment the
+clock started; `minutes` since then; `oefeningen`, the questions since
+then (follow-ups left out); `answers` and `notRight`, the last answers
+read and how many were not right; `loId`, the LO asked most since the
+clock started (of two asked as often, the one asked last) and `mean`,
+its μ after the answer; `calibration`, the level after it. **In the
+drawer**: "Print since 11:20 (33 min): 7 of the last 10 answers not
+right, most asked: Use print() to show text (μ 0.69)" — the subgoal by
+its title, the LO by its statement. The oefeningen themselves are in
+`turn_content` (8.1, #228); the drawer does not open them yet.
+
+**Calibration.** Replayed over `turn_history` of 6EWI and 6WEWI up to
+2026-10-04 (five two-hour lessons in 6WEWI, about ten lesson hours in
+6EWI), read only: 25 minutes and half not right gave 20 alerts — about
+3 to 4 per two-hour lesson in a class of 17 — among them the two
+students who said in class on 2026-10-02 that they got nowhere, 14 and
+59 minutes before the end of the lesson. 20 minutes gave 28, 30
+minutes 14, 25 minutes with 60% not right 13. A threshold on the
+number of questions without a newly mastered LO alone gave 45 (twelve
+questions) or 61 (ten). The thresholds are the teacher's choice, to be
+adjusted after a few lessons.
 
 #### Strong signals — needs attention
 
@@ -2563,6 +2882,19 @@ happen is sufficient.
 `turn_history` accumulates indefinitely by default. No automatic
 pruning.
 
+`turn_content` (8.1, #228) does not: it is kept **until the end of the
+school year**, then Cosmos removes it. The container has `defaultTtl: -1`
+(TTL on, no default), and every doc carries `ttl`: the seconds from that
+write until midnight Belgian time on the day `config/global` names
+(`TurnContentKeepUntil: "MM-DD"`, default `07-01` — after the
+deliberations at the end of June) that comes after the turn
+(`KeepUntil`). Cosmos counts the ttl from the doc's last write (`_ts`), so
+it is computed at every write. A doc without `ttl` would be kept forever;
+a container created without TTL ignores the field altogether (README
+step 3). A progress reset deletes `turn_history`, not `turn_content`: those
+docs run out with the rest (whether a reset should take them along is
+#232).
+
 **Manual clean action (deferred admin feature).** A teacher-only
 action to purge `turn_history` (and optionally `progress_history`)
 for a configurable date range or specific students. Use case: end
@@ -2590,6 +2922,12 @@ different button, not part of the year-end-archive flow.
   keystrokes, or attention proxies in `turn_history`.
 - **No literal student answer text** in `turn_history`. The LLM's
   extracted `loSignals` and `overallQuality` are what's stored.
+- **`turn_content` (#228) does hold it**: the answers of minors, and a
+  free text field can hold anything. Nothing is filtered; the expiry at
+  the end of the school year (8.4) is the limit. Students are told in
+  Options, in one sentence: their questions and answers are kept until
+  the end of the school year, so their teacher can see where they get
+  stuck. None of it goes into the repo, an issue or a PR (#190).
 
 ### 8.6 What this section deliberately does not address
 

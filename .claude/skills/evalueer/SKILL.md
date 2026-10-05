@@ -319,5 +319,16 @@ is ook.
   informatie voor de leerkracht ("ze kan het intussen"), geen reden om het
   getal te veranderen — hoogstens om hem een aanpassing voor te stellen,
   mét reden. In de rapporttekst komt het niet.
+- Het concept toont *oefeningen die niet telden voor hun eigen leerdoel*
+  (#225): rechtstreekse vragen waarvan het oordeel op het gevraagde
+  leerdoel verloren ging, meestal door de app. Noem ze onder *Voor de
+  leerkracht* (hoeveel, waarvan juist, welk leerdoel, of het een doel van
+  de mijlpaal is); het getal verandert er niet door. Een aanpassing stel
+  je hoogstens voor, mét reden. In de rapporttekst komt het niet.
+- Waarom liep het mis op een dag? `evaluate.py trace --leerling <naam>
+  --dag <datum> [--subdoel <id>]` (#228) toont per oefening de vraag, het
+  antwoord, de feedback en welke signalen telden of werden weggegooid, met
+  de reden. Alleen lezen. Wat je daar leest, zijn antwoorden van
+  leerlingen: niets ervan in een issue, PR of de repo.
 - De regel zelf ter discussie? Niet hier aanpassen. Dat is een wijziging
   aan `rules.py` met een nieuwe `RULES_VERSION`, in een apart gesprek.

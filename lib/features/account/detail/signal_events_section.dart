@@ -8,10 +8,12 @@ import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/no_progress.dart';
 import 'package:ai_tutor_python/services/supervision/provenance_gap.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 class SignalEventsSection extends ConsumerStatefulWidget {
   const SignalEventsSection({
@@ -22,8 +24,9 @@ class SignalEventsSection extends ConsumerStatefulWidget {
 
   final String uid;
 
-  /// The curriculum, to name an event's LO by its statement rather than its
-  /// id (#107). An LO it does not hold is shown by its id.
+  /// The curriculum, to name an event's LO by its statement and its subgoal
+  /// by its title rather than their ids (#107, #229). One it does not hold
+  /// is shown by its id.
   final List<Goal> goals;
 
   @override
@@ -170,20 +173,37 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
         return l.drawer_signals_kind_repeatedDemotions;
       case TurnSignalEventKind.sustainedLlmFailure:
         return l.drawer_signals_kind_sustainedLlmFailure;
+      case TurnSignalEventKind.noProgress:
+        return l.drawer_signals_kind_noProgress;
       case TurnSignalEventKind.cascadeHalt:
         return l.drawer_signals_kind_cascadeHalt;
       case TurnSignalEventKind.emptyObjectivesBlock:
         return l.drawer_signals_kind_emptyObjectivesBlock;
       case TurnSignalEventKind.subgoalDeletedRedirect:
         return l.drawer_signals_kind_subgoalDeletedRedirect;
+      case TurnSignalEventKind.targetSignalLost:
+        return l.drawer_signals_kind_targetSignalLost;
       case TurnSignalEventKind.provenanceGap:
         return l.drawer_signals_kind_provenanceGap;
     }
   }
 
   /// What follows the timestamp: for a provenance gap (#107) the LO and the
-  /// two counts in words, for every other kind the first details.
+  /// two counts in words; for a stuck student (#229) the subgoal, since
+  /// when, the answers not right and the LO asked most; for a run of lost
+  /// grades (#229) how many and on which LO; for every other kind the first
+  /// details.
   String _detailLine(AppLocalizations l, TurnSignalEvent event) {
+    final stuck = NoProgress.fromEvent(event);
+    if (stuck != null) return ' — ${_noProgressLine(l, stuck)}';
+    final run = _lostRun(event);
+    if (run != null) {
+      final text = l.drawer_signals_targetSignalLost_run_detail(
+        run.count,
+        _loStatement(run.subgoalId, run.loId),
+      );
+      return ' — $text';
+    }
     final gap = ProvenanceGap.fromEvent(event);
     if (gap == null) return _detailSummary(event.details);
     final days = switch (event.details['windowDays']) {
@@ -199,6 +219,50 @@ class _SignalEventsSectionState extends ConsumerState<SignalEventsSection> {
       days,
     );
     return ' — $text';
+  }
+
+  String _noProgressLine(AppLocalizations l, NoProgress stuck) {
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
+    final line = l.drawer_signals_noProgress_detail(
+      _subgoalTitle(stuck.subgoalId),
+      DateFormat.Hm(localeTag).format(stuck.since.toLocal()),
+      stuck.minutes,
+      stuck.notRight,
+      stuck.answers,
+    );
+    final loId = stuck.loId;
+    final mean = stuck.mean;
+    if (loId == null || mean == null) return line;
+    final mostAsked = l.drawer_signals_noProgress_mostAsked(
+      _loStatement(stuck.subgoalId, loId),
+      NumberFormat('0.00', localeTag).format(mean),
+    );
+    return '$line, $mostAsked';
+  }
+
+  /// The run of a strong `targetSignalLost` event (#229): how many direct
+  /// questions in a row, and the last one's LO. `null` for an audit one, or
+  /// another kind.
+  static ({int count, String subgoalId, String loId})? _lostRun(
+    TurnSignalEvent event,
+  ) {
+    if (event.kind != TurnSignalEventKind.targetSignalLost ||
+        event.severity != TurnSignalEventSeverity.strong) {
+      return null;
+    }
+    final d = event.details;
+    final count = d['run'];
+    final subgoalId = d['subgoalId'];
+    final loId = d['loId'];
+    if (count is! num || subgoalId is! String || loId is! String) return null;
+    return (count: count.toInt(), subgoalId: subgoalId, loId: loId);
+  }
+
+  String _subgoalTitle(String subgoalId) {
+    for (final g in widget.goals) {
+      if (g.id == subgoalId && g.title.trim().isNotEmpty) return g.title.trim();
+    }
+    return subgoalId;
   }
 
   String _loStatement(String subgoalId, String loId) {

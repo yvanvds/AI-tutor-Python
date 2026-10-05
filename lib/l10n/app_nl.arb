@@ -263,6 +263,8 @@
   "options_developer_turnDetail_title": "Beurt #{id}",
   "options_developer_turnDetail_close": "Sluiten",
 
+  "options_answersKept_title": "Je antwoorden",
+  "options_answersKept_text": "Je vragen en antwoorden worden bewaard tot het einde van het schooljaar, zodat je leerkracht kan zien waar het vastloopt.",
   "options_about_title": "Over",
   "options_about_version": "Versie {version}",
   "options_about_whatsNew": "Wat is er nieuw",
@@ -381,6 +383,7 @@
   "session_runControls_button_stop": "Stop",
 
   "session_objectiveBanner_pill": "Huidig doel",
+  "session_objectiveBanner_segments": "{mastered, plural, =1{1 onderdeel beheerst} other{{mastered} onderdelen beheerst}}, {almost} bijna, {todo} nog te doen",
 
   "chat_tutorName": "Tutor",
   "chat_userName_you": "Jij",
@@ -685,6 +688,11 @@
   "drawer_signals_kind_cascadeHalt": "Cascade-halt (audit)",
   "drawer_signals_kind_emptyObjectivesBlock": "Subdoel zonder LO's (audit)",
   "drawer_signals_kind_subgoalDeletedRedirect": "Subdoel verwijderd (audit)",
+  "drawer_signals_kind_targetSignalLost": "Oordeel op het gevraagde leerdoel verloren",
+  "drawer_signals_targetSignalLost_run_detail": "{count} vragen op rij zonder oordeel op het leerdoel dat ze vroegen, de laatste op {lo}",
+  "drawer_signals_kind_noProgress": "Loopt vast",
+  "drawer_signals_noProgress_detail": "{subgoal} sinds {since} ({minutes} min): {notRight} van de laatste {answers} antwoorden niet juist",
+  "drawer_signals_noProgress_mostAsked": "meest gevraagd: {lo} (μ {mean})",
   "drawer_signals_kind_provenanceGap": "De les spreekt het thuiswerk tegen",
   "drawer_signals_provenanceGap_detail": "{lo}: thuis {homePositive} van {homeSignals} positief, in de les daarna {supervisedPositive} van {supervisedSignals} (laatste {days} dagen)",
 

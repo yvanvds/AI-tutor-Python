@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,10 +102,16 @@ final _progressByGoalIdStreamProvider = StreamProvider.autoDispose
 
 /// Aggregated session-progress signal driving the 2px ambient progress line
 /// at the top of the workspace. Tracks the active child goal's persisted
-/// progress (issue #11, option a) — same data the goal tile reads.
+/// progress (issue #11, option a) — same data the goal tile reads — except
+/// while the conductor has published the active subgoal's segments (#230,
+/// CONDUCTOR_POLICY §4.5): then it is the share the segments fill, so the
+/// line moves with the bar in the objective banner instead of sitting on 0
+/// until LOs are mastered.
 final ambientProgressProvider = Provider<double>((ref) {
   final goalId = ref.watch(goalSelectionProvider).activeChildGoal?.id;
   if (goalId == null) return 0.0;
+  final display = ref.watch(activeSubgoalLoDisplayProvider);
+  if (display != null && display.los.isNotEmpty) return display.fraction;
   return ref
       .watch(_progressByGoalIdStreamProvider(goalId))
       .maybeWhen(

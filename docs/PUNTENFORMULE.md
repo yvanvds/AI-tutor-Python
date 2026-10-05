@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-10-04.
+schaduwperiode (zie §4). Laatste wijziging: 2026-10-05.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -220,6 +220,22 @@ onder de 100% staan (bijvoorbeeld 4 van de 5); dat het subdoel afgerond
 is, toont de app apart met een vinkje (sinds v1.0.15 een eigen stempel op
 je voortgang, `advancedAt`), niet door het balkje vol te maken. Het
 balkje van een hoofddoel is het gemiddelde van zijn subdoelen.
+
+**Tijdens het oefenen** (sinds v1.0.21) bestaat het balkje onder je
+huidige subdoel uit één stuk per niet-optioneel leerdoel. Een stuk is
+leeg, half of vol: **half** betekent dat één goed antwoord op jouw
+niveau genoeg is om het leerdoel te beheersen, **vol** dat je het
+beheerst (of beheerst hebt), of dat je erop vastliep. Zo beweegt het
+balkje vanaf je eerste goede antwoord, ook al is één goed antwoord
+nog net niet genoeg voor "beheerst". Een half stuk wordt pas weer leeg
+na een fout of half juist antwoord op een vraag over dat leerdoel zelf,
+niet door wat de tutor zag in een vraag over iets anders; een vol stuk
+blijft vol. Wanneer je een nieuwe sessie begint, volgen de stukken
+weer je overtuigingen zoals ze dan zijn. Wil je weten hoe het staat,
+ga dan met je muis over het balkje: "2 onderdelen beheerst, 1 bijna,
+2 nog te doen". Het leerpad en de rest van de app tonen nog altijd het
+aandeel beheerste leerdoelen van hierboven, en aan het punt verandert
+dit niets.
 
 **De balkjes zijn geen punten.** Ze tonen live de stand van de
 overtuigingen; het rapportpunt komt uit de formule van deel 2 en wordt
@@ -645,6 +661,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.18 | 2026-09-24 | Geen structuurwijziging aan M of P. §2.8: de controlevraag krijgt een tweede geval, **boven de grens**. Een leerdoel uit een eerder subdoel met μ vanaf 0,80 en genoeg bewijs, waarop je nooit rechtstreeks een juist antwoord gaf op je niveau (of waarvan oude data het niveau niet bijhield, §2.5), krijgt één controlevraag: minstens 7 dagen na de laatste rechtstreekse vraag, of meteen als het nooit rechtstreeks bevraagd werd, zonder voorwaarde op je recente werk. Een juist antwoord vervult voorwaarde 3 van §1.5 en geeft zo de stempel van §2.2 en het niveau in de ratel; een fout antwoord verlaagt de overtuiging. Reden: in de eerste rapportronde stond een leerdoel op μ 0,93 met bewijs op het plafond en toch niet aangetoond — de twee rechtstreekse vragen erover waren fout beantwoord, en de overtuiging kwam van 27 positieve signalen van opzij uit scripts in het volgende subdoel. Zulke signalen bewegen de ratel niet, en de tutor vroeg er niet meer naar, dus de leerling kon het niet meer zelf aantonen; de leerkracht moest het met de hand meetellen (#188). §4 en bijlage A: de voorlopige waarden. |
 | 1.0.19 | 2026-10-04 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: de toezichtfactor s van §2.7 (× 1,25) weegt nu echt mee. "Onder toezicht" kwam tot nu van de Anchor-klassenomgeving, die nooit gekoppeld werd, dus telde elk antwoord als thuis en veranderde s niets. Vanaf nu is een antwoord onder toezicht als het binnen de lestijd van je klas valt, 10 minuten voor en na de les inbegrepen; de lesuren staan per klas in de app. Waar je zit, speelt geen rol: wie ziek thuis op het lesuur oefent, telt ook. In de eerste maand viel 94 à 97% van de oefeningen binnen de lesuren, dus een antwoord in de les telt voortaan 25% zwaarder dan voorheen, in beide richtingen: een leerdoel raakt sneller beheerst en zakt ook sneller terug. Thuiswerk blijft × 1,0 en wordt nooit afgewaardeerd: de leerkracht verkoos dat boven de les op × 1,0 en thuis op × 0,8 te zetten. Bijlage A: de nieuwe bron. De telling onder toezicht/thuis op het voorstel en de evaluatie buiten de app lezen de beurten van vóór deze versie met hetzelfde lesrooster; de opgeslagen beurten zelf worden niet herschreven (#219). |
 | 1.0.20 | 2026-10-04 | Geen wijziging aan M, P of de metingen eronder. §2.7: de bevestiging of tegenspraak van thuiswerk door het latere werk in de les wordt nu ook zichtbaar voor de leerkracht. Antwoord je op één leerdoel thuis vooral juist en in de les daarna vooral fout, dan krijgt je leerkracht een melding — pas met minstens drie antwoorden aan elke kant over de laatste zes weken, en alleen met lessen ná het thuiswerk. De melding verandert niets aan je overtuigingen, aan het gewicht van je antwoorden of aan je punt, en je ziet ze zelf niet. §3.3 en bijlage A volgen. Zuinig omdat er erg weinig thuiswerk is: in september zou ze niet één keer gegeven zijn (#107). |
+| 1.0.21 | 2026-10-05 | Geen wijziging aan M, P of de metingen eronder. §1.7: het balkje onder je huidige subdoel bestaat tijdens het oefenen uit één stuk per niet-optioneel leerdoel, leeg, half of vol. Half betekent dat één goed antwoord op jouw niveau het leerdoel beheerst maakt; vol dat je het beheerst, ooit beheerste of erop vastliep. Een half stuk wordt alleen weer leeg na een antwoord dat niet juist is op een vraag over dat leerdoel zelf, een vol stuk blijft vol, en bij een nieuwe sessie volgen de stukken weer je overtuigingen. Reden: één goed antwoord op moeilijk brengt een leerdoel op μ 0,79, net onder de grens van 0,80, en de tutor vraagt eerst elk leerdoel één keer; het oude balkje bleef daardoor bij de start van een subdoel lang op 0 staan en sprong dan plots vooruit, wat leerlingen ontmoedigde. Het leerpad, het overzicht van de leerkracht en het rapport tonen nog altijd het aandeel beheerste leerdoelen (#230). |
 | 1.0.16 | 2026-09-23 | **Structuurwijziging aan P.** §2.6: het puntvoorstel is de beheersingsscore, P = M; de groeiscore G (§2.4) vervalt, en daarmee M_start, de momentopname bij de periodestart (v1.0.7) en de overgangsregel uit de voortgangshistoriek (v1.0.5). §4: de open parameter w_M / w_G vervalt; bijlage A en B volgen. §2.9: "Mijn rapporten" toont M, k, u en d, geen beginscore of groei meer. §3.1 en §3.3 steunen niet langer op G: een trage start laat in M geen spoor na omdat de stempel van §2.2 niet vraagt wanneer je iets aantoonde. Reden: de app rekende 60/40 met G, terwijl de evaluatie buiten de app (regelset `1.0.10-eval1`, kader 4) al P = M schreef in dezelfde puntvoorstellen — wie in de app op "Opnieuw berekenen" drukte, kreeg een ander getal dan wat er stond; en G hing af van een momentopname die het ene keer exact en het andere keer een schatting was. De container `period_start_snapshots` wordt niet meer geschreven of gelezen; oude voorstellen en rapporten met `mStart` en `g` blijven leesbaar en worden niet herschreven (#191). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 

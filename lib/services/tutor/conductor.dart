@@ -24,6 +24,7 @@ import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 
@@ -211,6 +212,12 @@ class TurnOutcome {
   /// Those negatives are in [loSignals] but never in [appliedSignals].
   final List<TurnReviewFlag> reviewFlags;
 
+  /// Every grader signal of this turn that did not count as evidence, with
+  /// why (#228): the scope check's ([GradedAnswer.droppedSignals]) first,
+  /// then the conductor's own. For the turn's content doc; nothing decides
+  /// on it.
+  final List<DroppedSignal> droppedSignals;
+
   const TurnOutcome({
     required this.overallQuality,
     required this.subgoalAdvanced,
@@ -225,6 +232,7 @@ class TurnOutcome {
     this.signalEvents = const [],
     this.transferCredits = const [],
     this.reviewFlags = const [],
+    this.droppedSignals = const [],
   });
 }
 
@@ -241,6 +249,48 @@ class GradedSignal {
     required this.kind,
     required this.strength,
   });
+}
+
+/// Why a grader signal did not count as evidence (#228). The scope check
+/// (`GradedAnswerBuilder`) decides the first three, the conductor the rest
+/// (CONDUCTOR_POLICY §2.4, §3.5). [label] is what the debug log has always
+/// called it (`conductor.signal_dropped`); the content doc stores [name].
+enum SignalDropReason {
+  /// Its subgoal is not in the grading scope (the active root's subgoals).
+  outOfScope('out of scope'),
+
+  /// The asked LO itself, its subgoal outside the scope (#225): the app's
+  /// error, not the grader's.
+  targetOutOfScope('target out of scope'),
+
+  /// Its subgoal is in the scope but has no such LO.
+  unknownLo('unknown LO'),
+
+  /// A subgoal after the active one: a forward reference (§2.4).
+  laterSubgoal('forward reference'),
+
+  /// Its subgoal is not under the active root, though the scope check let
+  /// it through.
+  outsideActiveRoot('outside the active root'),
+
+  /// A negative on an earlier subgoal's LO: a prompt for the warm-up
+  /// review, never a debit (#167).
+  incidentalNegative('incidental negative'),
+
+  /// A neutral on an earlier subgoal's LO: not written at all (#204).
+  incidentalNeutral('incidental neutral');
+
+  const SignalDropReason(this.label);
+
+  final String label;
+}
+
+/// A grader signal that did not count, and why (#228).
+class DroppedSignal {
+  const DroppedSignal(this.signal, this.reason);
+
+  final GradedSignal signal;
+  final SignalDropReason reason;
 }
 
 /// One LO the grader saw correctly used in service of the task (#101),
@@ -274,8 +324,10 @@ class GradedAnswer {
   ///   - treats the difficulty multiplier as `medium` regardless of the
   ///     original probe's difficulty,
   ///   - skips the calibration window update (§6.2 / §6.5),
-  ///   - skips the notch-drop counter (a follow-up's effective difficulty
-  ///     is medium, not the calibrated value).
+  ///   - skips the strike counter of the first notch-drop rule (a
+  ///     follow-up's effective difficulty is medium, not the calibrated
+  ///     value) — but is an attempt on the question's LO for the second
+  ///     (§2.3, #227).
   final bool isFollowUp;
 
   /// Depth of the follow-up at the time the answer was received: 1 for the
@@ -298,6 +350,19 @@ class GradedAnswer {
   /// which watches the grader.
   final bool fromAnswerKey;
 
+  /// The grader's signals on the LO the question asked about that the scope
+  /// check dropped because their subgoal is not in the grading scope (#225).
+  /// The app picked that LO, so the grader filing a signal on it is never
+  /// the error: the scope is. Not in [signals]; the conductor logs each and
+  /// records a `targetSignalLost` event (CONDUCTOR_POLICY §8.2).
+  final List<GradedSignal> lostTargetSignals;
+
+  /// Every signal the scope check dropped, with why (#228): out of scope,
+  /// the asked LO out of scope (also in [lostTargetSignals]), or an LO its
+  /// subgoal does not have. Not in [signals]. The conductor adds its own
+  /// drops and hands them all on in [TurnOutcome.droppedSignals].
+  final List<DroppedSignal> droppedSignals;
+
   const GradedAnswer({
     required this.overallQuality,
     required this.signals,
@@ -307,6 +372,8 @@ class GradedAnswer {
     this.provenance = EvidenceProvenance.home,
     this.transferLOs = const [],
     this.fromAnswerKey = false,
+    this.lostTargetSignals = const [],
+    this.droppedSignals = const [],
   });
 }
 
@@ -321,7 +388,7 @@ class ConductorDeps {
     required this.upsertProgress,
     required this.getProgressAll,
     required this.getProgressByGoalId,
-    required this.setCurrentProgress,
+    required this.setLoDisplay,
     required this.addSystemNotice,
     required this.recordDebugEvent,
     required this.playCorrectAnswer,
@@ -351,7 +418,11 @@ class ConductorDeps {
   upsertProgress;
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
-  final void Function(double) setCurrentProgress;
+
+  /// Publishes the segments of the student's subgoal bar (#230, §4.5): one
+  /// per non-optional LO of the active subgoal, held for the session.
+  /// `null` when there is no active subgoal.
+  final void Function(SubgoalLoDisplay?) setLoDisplay;
 
   /// Post a system pill in chat. Takes a [ChatNotice], not text — the
   /// conductor has no locale; the chat widget localizes (#23).
@@ -439,6 +510,26 @@ class Conductor {
   /// Idempotency guard so the event fires once per (session, subgoal).
   String? _singleLoDeadlockSubgoalId;
 
+  /// Direct questions in a row (no follow-up, no warm-up review, no
+  /// recheck) whose grade on the asked LO was lost (#229). The one that
+  /// makes `targetSignalLostStrongRun` carries a strong `targetSignalLost`;
+  /// a direct question whose grade arrived ends the run.
+  int _lostTargetRun = 0;
+
+  /// Attempts this session on each LO of the active subgoal since its last
+  /// `correct`, keyed by [_attemptKey] (§2.3 second notch-drop rule, #227).
+  /// An attempt is a graded answer to a question on the LO or to a
+  /// follow-up on it; a warm-up review or a recheck is none. At
+  /// `notchDropAfterAttempts` the next question on the LO is asked a notch
+  /// lower, until a `correct` on it removes the entry.
+  final Map<String, int> _attemptsWithoutCorrect = {};
+
+  /// What each segment of the student's subgoal bar showed so far this
+  /// session (#230, §4.5), keyed by [_attemptKey]. Holds a segment against
+  /// what the student did not answer themselves ([heldLoDisplayState]); a
+  /// new session reads the beliefs afresh.
+  final Map<String, LoDisplayState> _loDisplay = {};
+
   /// Pending audit event — populated when `_advanceWithCascadeCap` halts.
   /// Consumed by the next call to `integrateAnswer` so the cascade-halt
   /// rides on the same persisted turn that caused the advance.
@@ -478,10 +569,15 @@ class Conductor {
     _repeatedDemotionsFired = false;
     _sustainedLlmFailureFired = false;
     _singleLoDeadlockSubgoalId = null;
+    _lostTargetRun = 0;
+    _attemptsWithoutCorrect.clear();
     _pendingCascadeHaltEvent = null;
     _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
+    // #230: the session's bar starts from the beliefs as they are.
+    _loDisplay.clear();
+    await _publishActiveLoDisplay();
   }
 
   /// Pick the next question. CONDUCTOR_POLICY §1 (entry) and §2 (per-question).
@@ -562,6 +658,9 @@ class Conductor {
 
     final calibration = _deps.getCalibration().difficulty;
 
+    // #230: the bar of the subgoal this question is about.
+    _publishLoDisplay(subgoal, byId, calibration: calibration);
+
     LearningObjective target;
     String chosenReason;
 
@@ -636,18 +735,13 @@ class Conductor {
     }
 
     final type = _pickType(target, snapshots[target.id]!);
-    var difficulty = calibration;
-    var notchDrop = false;
-    final maybeDrop = await _shouldDropNotch(
+    final notchDropRules = await _shouldDropNotch(
       lo: target,
       subgoalId: subgoal.id,
-      snap: snapshots[target.id]!,
       calibration: calibration,
     );
-    if (maybeDrop) {
-      difficulty = _stepDown(calibration);
-      notchDrop = true;
-    }
+    final notchDrop = notchDropRules.isNotEmpty;
+    final difficulty = notchDrop ? _stepDown(calibration) : calibration;
 
     final candidateStats = (unmastered.isNotEmpty ? unmastered : objectives)
         .take(3)
@@ -664,6 +758,7 @@ class Conductor {
       candidateLOs: candidateStats,
       chosenReason: chosenReason,
       notchDropFired: notchDrop,
+      notchDropRules: notchDropRules,
     );
 
     return QuestionPlan(
@@ -1076,26 +1171,43 @@ class Conductor {
     return _lastQuestionType?.name;
   }
 
-  Future<bool> _shouldDropNotch({
+  /// The §2.3 rules that ask the next question on [lo] one notch below
+  /// [calibration] — empty when none does. Both rules drop the same one
+  /// notch, never two, and at `easy` there is no lower level.
+  Future<List<NotchDropRule>> _shouldDropNotch({
     required LearningObjective lo,
     required String subgoalId,
-    required BeliefSnapshot snap,
     required QuestionDifficulty calibration,
   }) async {
+    if (calibration == QuestionDifficulty.easy) return const [];
+    final rules = <NotchDropRule>[];
     // Two strikes at calibrated difficulty on this LO trigger a one-notch
-    // drop (CONDUCTOR_POLICY §2.3). The literal rule is implemented via the
+    // drop. The literal rule is implemented via the
     // `recentNegativesAtCalibrated` counter on `LoBelief`: it increments on
-    // each negative-at-calibrated answer and resets on any positive (any
+    // each strong negative at calibration and resets on any positive (any
     // difficulty). The override releases the next time a positive lands on
     // this LO, hence the `lastPositiveAtCalibratedAt is null` guard — once
     // the student has demonstrated this LO at calibration, we no longer
     // gate it back to easy.
-    if (calibration == QuestionDifficulty.easy) return false;
     final belief = await _deps.getLoBelief(subgoalId: subgoalId, loId: lo.id);
-    if (belief == null) return false;
-    if (belief.lastPositiveAtCalibratedAt != null) return false;
-    return belief.recentNegativesAtCalibrated >= 2;
+    if (belief != null &&
+        belief.lastPositiveAtCalibratedAt == null &&
+        belief.recentNegativesAtCalibrated >= 2) {
+      rules.add(NotchDropRule.strongNegatives);
+    }
+    // #227: a run of attempts without a correct answer, whatever signals
+    // the grader gave with them — a "partial" often comes with a positive,
+    // which resets the strike counter and closes the guard above. No such
+    // guard here: the run is this session's, and a correct answer ends it.
+    final attempts = _attemptsWithoutCorrect[_attemptKey(subgoalId, lo.id)];
+    if ((attempts ?? 0) >= PolicyConstants.notchDropAfterAttempts) {
+      rules.add(NotchDropRule.attemptsWithoutCorrect);
+    }
+    return rules;
   }
+
+  static String _attemptKey(String subgoalId, String loId) =>
+      '$subgoalId/$loId';
 
   QuestionDifficulty _stepDown(QuestionDifficulty d) {
     switch (d) {
@@ -1140,6 +1252,9 @@ class Conductor {
     final targetLo = plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
 
     final events = <TurnSignalEvent>[];
+    // Every signal of this turn that does not count, with why (#228): the
+    // scope check's, then the conductor's own below.
+    final dropped = <DroppedSignal>[...answer.droppedSignals];
 
     // Track sustained-failure (degraded mode rule §7.3). Grading calls
     // only: a pick graded from a bank question's answer key (§2.7) says
@@ -1176,6 +1291,54 @@ class Conductor {
       }
     }
 
+    // #225: the grader's signal on the asked LO fell outside the grading
+    // scope. The app chose that LO, so the scope was wrong, not the grader:
+    // logged like any declined signal, and put on the turn, so that an
+    // oefening that counted for nothing on its own LO shows in
+    // `turn_history` (§8.2). `fallback` says whether the weak fallback
+    // signal on the target stood in for it (every signal dropped) or the
+    // target got nothing at all.
+    //
+    // #229: one is an audit line; the direct question that makes
+    // `targetSignalLostStrongRun` in a row is the teacher's business during
+    // the lesson — strong, with the length of the run. Oefeningen that
+    // count for nothing while mostly right are what `noProgress` misses.
+    // Follow-ups, warm-up reviews and rechecks neither lengthen nor end
+    // the run.
+    final direct = !answer.isFollowUp && !plan.isOffSubgoal;
+    if (direct) {
+      _lostTargetRun = answer.lostTargetSignals.isEmpty
+          ? 0
+          : _lostTargetRun + 1;
+    }
+    if (answer.lostTargetSignals.isNotEmpty) {
+      // Already among the scope check's drops: logged here, not added.
+      for (final sig in answer.lostTargetSignals) {
+        _dropSignal(sig, SignalDropReason.targetOutOfScope);
+      }
+      final lost = answer.lostTargetSignals.first;
+      final rootId = selection.activeRootGoal?.id;
+      final strong =
+          direct && _lostTargetRun == PolicyConstants.targetSignalLostStrongRun;
+      events.add(
+        TurnSignalEvent(
+          kind: TurnSignalEventKind.targetSignalLost,
+          severity: strong
+              ? TurnSignalEventSeverity.strong
+              : TurnSignalEventSeverity.audit,
+          details: {
+            'subgoalId': lost.subgoalId,
+            'loId': lost.loId,
+            'signal': lost.kind.name,
+            'strength': lost.strength.name,
+            if (rootId != null) 'activeRootId': rootId,
+            'fallback': answer.hadFallback,
+            if (strong) 'run': _lostTargetRun,
+          },
+        ),
+      );
+    }
+
     if (subgoal == null) {
       // Nothing to update — not even the oefening counter (#217): with no
       // active subgoal there is no calibration write for it to ride on.
@@ -1192,6 +1355,7 @@ class Conductor {
         calibrationAfter: _deps.getCalibration().difficulty,
         hadFallback: answer.hadFallback,
         signalEvents: events,
+        droppedSignals: List.unmodifiable(dropped),
       );
     }
 
@@ -1199,6 +1363,22 @@ class Conductor {
 
     if (answer.overallQuality == AnswerQuality.correct) {
       _deps.playCorrectAnswer();
+    }
+
+    // §2.3 second notch-drop rule (#227): every graded answer to a question
+    // on an LO of the active subgoal — the question itself, at whatever
+    // level it was asked, or a follow-up on it — is an attempt on that LO,
+    // and only `correct` ends the run. A warm-up review or a recheck is no
+    // attempt: one question on older material, where a miss says
+    // "forgotten" rather than "too hard", never notch-dropped itself, on an
+    // LO of an earlier subgoal that this session's planning does not ask.
+    if (targetLo != null && !plan.isOffSubgoal) {
+      final key = _attemptKey(subgoal.id, targetLo.id);
+      if (answer.overallQuality == AnswerQuality.correct) {
+        _attemptsWithoutCorrect.remove(key);
+      } else {
+        _attemptsWithoutCorrect[key] = (_attemptsWithoutCorrect[key] ?? 0) + 1;
+      }
     }
 
     // ---- Belief updates --------------------------------------------------
@@ -1263,11 +1443,11 @@ class Conductor {
         siblings ??= await _rootSubgoals(selection);
         final other = siblings.firstWhereOrNull((g) => g.id == sig.subgoalId);
         if (other == null) {
-          _dropSignal(sig, 'outside the active root');
+          _dropSignal(sig, SignalDropReason.outsideActiveRoot, dropped);
           continue;
         }
         if (other.order > subgoal.order) {
-          _dropSignal(sig, 'forward reference');
+          _dropSignal(sig, SignalDropReason.laterSubgoal, dropped);
           continue;
         }
         signalSubgoalId = other.id;
@@ -1275,7 +1455,7 @@ class Conductor {
         isCrossSubgoal = true;
       }
       if (lo == null) {
-        _dropSignal(sig, 'unknown LO');
+        _dropSignal(sig, SignalDropReason.unknownLo, dropped);
         continue;
       }
       if (isCrossSubgoal && sig.kind == LoSignalKind.neutral) {
@@ -1284,7 +1464,7 @@ class Conductor {
         // doc at the prior for an LO never probed (§3.5), no `lastUpdatedAt`
         // that would pass for fresh evidence (§1.5 staleness, the proposal's
         // `staleLoCount`). Only logged, like any declined signal.
-        _dropSignal(sig, 'incidental neutral');
+        _dropSignal(sig, SignalDropReason.incidentalNeutral, dropped);
         writtenElsewhere.putIfAbsent(
           '$signalSubgoalId/${sig.loId}',
           () => 'incidental neutral',
@@ -1338,6 +1518,9 @@ class Conductor {
         // Still "this answer is on record for this LO": a transfer
         // nomination on it is dropped (§3.7).
         writtenElsewhere.putIfAbsent(key, () => 'flagged for review');
+        // Not evidence (#228): on the turn's content doc with the drops —
+        // its own debug event above, not `signal_dropped`.
+        dropped.add(DroppedSignal(sig, SignalDropReason.incidentalNegative));
         continue;
       }
       final isTarget =
@@ -1623,7 +1806,6 @@ class Conductor {
         recordHistory: true,
         advancedAt: DateTime.now().toUtc(),
       );
-      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
       _deps.showGoalReached(subgoal);
       _deps.playGoalReached();
@@ -1665,7 +1847,6 @@ class Conductor {
         quality: answer.overallQuality,
         recordHistory: true,
       );
-      _deps.setCurrentProgress(cached);
       await _recomputeRoot();
     }
 
@@ -1689,6 +1870,23 @@ class Conductor {
             questionTypeName: plan.type.name,
           );
     final calibrationAfter = updatedCal.difficulty;
+    // #230: the bar after this answer, at the level of the next question.
+    // A segment empties only on a question on its own LO — or a follow-up
+    // on it — that was not right; after an advance it is the next
+    // subgoal's bar, read afresh.
+    if (advanced) {
+      await _publishActiveLoDisplay(calibration: calibrationAfter);
+    } else {
+      _publishLoDisplay(
+        subgoal,
+        freshById,
+        calibration: calibrationAfter,
+        askedAndNotRight:
+            !plan.isOffSubgoal && answer.overallQuality != AnswerQuality.correct
+            ? {for (final lo in plan.targetLOs) lo.id}
+            : const {},
+      );
+    }
     if (cal.difficulty != calibrationAfter) {
       _deps.addSystemNotice(
         ChatNotice(
@@ -1747,6 +1945,7 @@ class Conductor {
       signalEvents: List.unmodifiable(events),
       transferCredits: transferCredits,
       reviewFlags: reviewFlags,
+      droppedSignals: List.unmodifiable(dropped),
     );
   }
 
@@ -1893,13 +2092,19 @@ class Conductor {
   }
 
   /// A validated signal the conductor still declines (§3.5 "drop the
-  /// signal, log"): the reason goes to the debug recorder.
-  void _dropSignal(GradedSignal sig, String reason) {
+  /// signal, log"): the reason goes to the debug recorder, and with
+  /// [into] onto the turn's list of drops (#228).
+  void _dropSignal(
+    GradedSignal sig,
+    SignalDropReason reason, [
+    List<DroppedSignal>? into,
+  ]) {
     _deps.recordDebugEvent('conductor.signal_dropped', {
       'subgoalId': sig.subgoalId,
       'loId': sig.loId,
-      'reason': reason,
+      'reason': reason.label,
     });
+    into?.add(DroppedSignal(sig, reason));
   }
 
   bool _difficultyAtLeast(QuestionDifficulty asked, QuestionDifficulty calib) {
@@ -1963,8 +2168,17 @@ class Conductor {
   /// Walk forward through subgoals; cap consecutive auto-skips at
   /// `cascadeSkipCap` (CONDUCTOR_POLICY §4.5). When the cascade halts the
   /// student lands on the subgoal that would have been skipped.
+  ///
+  /// The walk below sets the selection, so a preference — root or child —
+  /// would outlive the subgoal it chose and shadow it. Both go as soon as
+  /// either is set (#225): "Verder" in the leerpad prefers only a root, and
+  /// a root left behind after the last subgoal of that root kept the old
+  /// root active over the new root's first subgoal — the grader's scope and
+  /// the signal check stayed on the old root, and dropped every signal on
+  /// the LO the student was asked about.
   Future<void> _advanceWithCascadeCap() async {
-    if (_deps.getGoalSelection().preferredChild != null) {
+    final selection = _deps.getGoalSelection();
+    if (selection.preferredRoot != null || selection.preferredChild != null) {
       _deps.clearPreferred();
     }
     while (true) {
@@ -2048,7 +2262,6 @@ class Conductor {
         if (targetChild != null) {
           _deps.setSelectedRoot(root);
           _deps.setSelectedChild(targetChild);
-          _deps.setCurrentProgress(progressFor(targetChild));
           // The Dutch title plus the id: the chat pill names the subgoal in
           // the app language (#212).
           _deps.addSystemNotice(
@@ -2062,7 +2275,6 @@ class Conductor {
         }
       }
     }
-    _deps.setCurrentProgress(0.0);
     return false;
   }
 
@@ -2083,6 +2295,67 @@ class Conductor {
   /// calibration in the new conductor (CONDUCTOR_POLICY §5.2).
   void hintProvided() {
     _deps.recordDebugEvent('conductor.hint_provided');
+  }
+
+  // ---- The student's subgoal bar (#230, §4.5) -----------------------------
+
+  /// Reads the active subgoal's beliefs and publishes its bar; `null` when
+  /// there is no active subgoal. [calibration] defaults to the student's.
+  Future<void> _publishActiveLoDisplay({
+    QuestionDifficulty? calibration,
+  }) async {
+    final subgoal = _activeChildGoal;
+    if (subgoal == null) {
+      _deps.setLoDisplay(null);
+      return;
+    }
+    final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
+    _publishLoDisplay(subgoal, {
+      for (final b in beliefs) b.loId: b,
+    }, calibration: calibration ?? _deps.getCalibration().difficulty);
+  }
+
+  /// Publishes [subgoal]'s bar from its beliefs [byId]: a segment per
+  /// non-optional LO, from the decayed belief at [calibration]
+  /// ([loDisplayStateOf]), held against this session's earlier reading
+  /// ([heldLoDisplayState]). [askedAndNotRight] are the LOs this turn asked
+  /// about directly and did not get right.
+  void _publishLoDisplay(
+    Goal subgoal,
+    Map<String, LoBelief> byId, {
+    required QuestionDifficulty calibration,
+    Set<String> askedAndNotRight = const {},
+  }) {
+    final now = DateTime.now().toUtc();
+    final los = <LoDisplayEntry>[];
+    for (final lo in subgoal.objectives) {
+      if (lo.optional) continue;
+      final b = byId[lo.id];
+      final snap = b == null
+          ? const BeliefSnapshot(PolicyConstants.prior, PolicyConstants.prior)
+          : applyDecay(
+              alpha: b.alpha,
+              beta: b.beta,
+              lastUpdatedAt: b.lastUpdatedAt,
+              now: now,
+            );
+      final key = _attemptKey(subgoal.id, lo.id);
+      final state = heldLoDisplayState(
+        held: _loDisplay[key],
+        fresh: loDisplayStateOf(
+          snap: snap,
+          lastPositiveAtCalibratedAt: b?.lastPositiveAtCalibratedAt,
+          firstMasteredAt: b?.firstMasteredAt,
+          calibration: calibration,
+        ),
+        askedAndNotRight: askedAndNotRight.contains(lo.id),
+      );
+      _loDisplay[key] = state;
+      los.add(LoDisplayEntry(loId: lo.id, state: state));
+    }
+    _deps.setLoDisplay(
+      SubgoalLoDisplay(subgoalId: subgoal.id, los: List.unmodifiable(los)),
+    );
   }
 
   // ---- Persistence helpers ------------------------------------------------

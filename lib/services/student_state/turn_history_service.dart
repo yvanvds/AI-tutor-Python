@@ -206,6 +206,39 @@ class TurnHistoryService {
     });
   }
 
+  /// Every record of [uid] from [from] on, on every subgoal — graded turns
+  /// and audit records alike, oldest first — for the no-progress check
+  /// (#229): the graded turns say when the student switched subgoals or
+  /// paused and how the answers went, the audit records whether it already
+  /// raised the alert. Only the fields the check reads are fetched; the
+  /// rest of each record comes back as `fromCosmos` defaults.
+  Future<List<PersistedTurnRecord>> listSince(
+    String uid, {
+    required DateTime from,
+  }) async {
+    return safeCosmos(() async {
+      final docs = await _container.query(
+        'SELECT c.id, c.uid, c.turnAt, c.subgoalId, c.questionType, '
+        'c.targetLOIds, c.isFollowUp, c.isWarmUp, c.isRecheck, '
+        'c.overallQuality, c.calibrationAfter, c.loStatusAfter, '
+        'c.subgoalAdvanced, c.signalEvents '
+        'FROM c WHERE c.uid = @uid AND c.turnAt >= @from',
+        parameters: {'@uid': uid, '@from': from.toUtc().toIso8601String()},
+        partitionKey: uid,
+      );
+      final out = <PersistedTurnRecord>[];
+      for (final doc in docs) {
+        // Re-applied client-side, as in [listTurnsBetween].
+        if (doc['uid'] != uid) continue;
+        final record = PersistedTurnRecord.fromCosmos(doc);
+        if (record.turnAt.isBefore(from)) continue;
+        out.add(record);
+      }
+      out.sort((a, b) => a.turnAt.compareTo(b.turnAt));
+      return out;
+    });
+  }
+
   /// Every graded turn record of [uid], oldest first: what the badges are
   /// computed from (#220), read once when the app starts — one query on the
   /// student's own partition. Only the fields the badges read are fetched;

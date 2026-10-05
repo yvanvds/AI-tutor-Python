@@ -154,4 +154,60 @@ void main() {
     expect(records.first.appliedSignals.single.alphaDelta, 2.0);
     expect(records.first.targetLOIds, ['lo1']);
   });
+
+  test('listSince reads the records of one student on every subgoal from a '
+      'moment on, audit records included, oldest first, with what the '
+      'no-progress check reads (#229)', () async {
+    Map<String, dynamic> doc(
+      String id,
+      String turnAt, {
+      String uid = 'u1',
+      String subgoalId = 's1',
+      String questionType = 'completeCodeQuestion',
+    }) => {
+      'id': id,
+      'type': 'turn_history',
+      'uid': uid,
+      'subgoalId': subgoalId,
+      'turnAt': turnAt,
+      'questionType': questionType,
+      'targetLOIds': ['lo1'],
+      'isFollowUp': true,
+      'isWarmUp': true,
+      'overallQuality': 'partial',
+      'calibrationAfter': 'hard',
+      'loStatusAfter': [
+        {'loId': 'lo1', 'mean': 0.69, 'evidence': 8.0, 'mastered': true},
+      ],
+      'subgoalAdvanced': true,
+      'signalEvents': [
+        {'kind': 'noProgress', 'severity': 'strong'},
+      ],
+    };
+    store = InMemoryCosmos([
+      doc('late', '2026-10-02T11:00:00.000Z'),
+      doc('early', '2026-10-02T09:30:00.000Z', subgoalId: 's0'),
+      doc('audit', '2026-10-02T10:00:00.000Z', questionType: ''),
+      doc('before', '2026-10-02T08:59:00.000Z'),
+      doc('other-student', '2026-10-02T10:00:00.000Z', uid: 'u2'),
+    ]);
+
+    final records = await service().listSince(
+      'u1',
+      from: DateTime.utc(2026, 10, 2, 9),
+    );
+
+    expect(records.map((r) => r.id), ['early', 'audit', 'late']);
+    final r = records.last;
+    expect(r.subgoalId, 's1');
+    expect(r.targetLOIds, ['lo1']);
+    expect(r.isFollowUp, isTrue);
+    expect(r.isWarmUp, isTrue);
+    expect(r.overallQuality, AnswerQuality.partial);
+    expect(r.calibrationAfter, QuestionDifficulty.hard);
+    expect(r.loStatusAfter.single.mean, 0.69);
+    expect(r.loStatusAfter.single.mastered, isTrue);
+    expect(r.subgoalAdvanced, isTrue);
+    expect(r.signalEvents.single.kind, TurnSignalEventKind.noProgress);
+  });
 }

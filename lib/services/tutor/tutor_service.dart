@@ -37,8 +37,11 @@ import 'package:ai_tutor_python/services/splash/splash_service.dart';
 import 'package:ai_tutor_python/services/status_report/report_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
+import 'package:ai_tutor_python/services/student_state/turn_content.dart';
+import 'package:ai_tutor_python/services/student_state/turn_content_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/supervision/no_progress.dart';
 import 'package:ai_tutor_python/services/supervision/provenance_gap.dart';
 import 'package:ai_tutor_python/services/supervision/supervision_source.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
@@ -47,6 +50,7 @@ import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -55,18 +59,38 @@ import 'package:ai_tutor_python/services/tutor/question_formatter.dart';
 import 'package:ai_tutor_python/services/tutor/recent_questions.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
+import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/error_summary.dart';
+import 'package:ai_tutor_python/services/tutor/responses/explain_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.dart';
 import 'package:ai_tutor_python/services/tutor/responses/mcq_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/responses/response_handlers.dart';
+import 'package:ai_tutor_python/services/tutor/responses/socratic_question.dart';
+import 'package:ai_tutor_python/services/tutor/responses/write_code.dart';
 import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum TutorState { idle, working, hasFollowUp }
+
+/// How the session the student is in began (#228): what the content of an
+/// oefening records as its `sessionStart`.
+enum SessionStart {
+  /// The app started, or the chat came up for the first time.
+  startup,
+
+  /// "Continue" on a goal in the learning path.
+  continueLearningPath,
+
+  /// "Work on this" on a subgoal.
+  workOnGoal,
+
+  /// The restart button in the chat header.
+  restart,
+}
 
 /// Tracks a presented follow-up while we wait for the student's answer.
 /// CONDUCTOR_POLICY §6 / §6.4: depth 1 by default, depth 2 when the active
@@ -162,6 +186,23 @@ class TutorService extends Notifier<TutorState> {
   /// generated or from the bank: the `askedAt` of the turn record that
   /// grades its answer.
   DateTime? _questionAskedAt;
+
+  /// The question the student has in front of them, as it came in —
+  /// generated or from the bank — for the content of the oefening that
+  /// grades its answer (#228). Cleared when the next question is planned.
+  ChatResponse? _questionShown;
+
+  /// What the student handed in for the grading in flight (#228): set when
+  /// a grading call goes out, or a pick is graded by the answer key.
+  TurnContentAnswer? _answerInFlight;
+
+  /// Hints asked since the question went up or the last graded answer
+  /// (#228).
+  int _hintsAsked = 0;
+
+  /// How the session began (#228); see [startSession].
+  SessionStart _sessionStart = SessionStart.startup;
+  SessionStart? _pendingSessionStart;
 
   /// Per subgoal, the bank ids on this student's turn records — the
   /// questions they answered there — read once when the bank is first
@@ -442,7 +483,6 @@ class TutorService extends Notifier<TutorState> {
           Progress(goalID: activeChild.id, progress: cached),
           recordHistory: false,
         );
-    ref.read(progressServiceProvider).setCurrentProgress(cached);
   }
 
   /// Translates the conductor's "a concept goal just mastered" signal into an
@@ -483,8 +523,8 @@ class TutorService extends Notifier<TutorState> {
       getProgressAll: () => ref.read(progressServiceProvider).getAll(),
       getProgressByGoalId: (id) =>
           ref.read(progressServiceProvider).getByGoalId(id),
-      setCurrentProgress: (v) =>
-          ref.read(progressServiceProvider).setCurrentProgress(v),
+      setLoDisplay: (d) =>
+          ref.read(subgoalLoDisplayProvider.notifier).state = d,
       addSystemNotice: _chat.addSystemNotice,
       recordDebugEvent: _debug.recordEvent,
       playCorrectAnswer: () =>
@@ -520,9 +560,24 @@ class TutorService extends Notifier<TutorState> {
 
   // ---- Public API -----------------------------------------------------------
 
+  /// Starts a fresh session the way [how] says — "Continue" in the learning
+  /// path, "Work on this" on a subgoal — so the content of the oefeningen
+  /// in it says how it began (#228). The preferences it acts on are set by
+  /// the caller first.
+  Future<void> startSession(SessionStart how) {
+    _pendingSessionStart = how;
+    return initializeSession(force: true);
+  }
+
   Future<void> initializeSession({bool force = false}) async {
     if (_initialized && !force) return;
     _initialized = true;
+    // A forced start without a reason given is the chat header's restart;
+    // the first, unforced one is the app coming up.
+    _sessionStart =
+        _pendingSessionStart ??
+        (force ? SessionStart.restart : SessionStart.startup);
+    _pendingSessionStart = null;
     _currentExerciseType = '';
     _currentExerciseGoalId = null;
     _inFlightPlan = null;
@@ -657,6 +712,7 @@ class TutorService extends Notifier<TutorState> {
         state = TutorState.idle;
         return;
       }
+      _noteStudentInput(type, code: code, prompt: prompt);
 
       _debug.beginTurn(
         requestType: type.name,
@@ -723,6 +779,10 @@ class TutorService extends Notifier<TutorState> {
       'difficulty': plan.difficulty.name,
       'chosenReason': plan.reason.chosenReason,
       'notchDropFired': plan.reason.notchDropFired,
+      if (plan.reason.notchDropRules.isNotEmpty)
+        'notchDropRules': plan.reason.notchDropRules
+            .map((r) => r.name)
+            .toList(),
       'candidateLOs': plan.reason.candidateLOs
           .map((c) => {'loId': c.loId, 'mean': c.mean, 'evidence': c.evidence})
           .toList(),
@@ -731,11 +791,39 @@ class TutorService extends Notifier<TutorState> {
     _inFlightPlan = plan;
     // Its moment is set when it comes in; until then it is not known (#220).
     _questionAskedAt = null;
+    // So are its text and options; the hints and answer of the one before
+    // are not its own (#228).
+    _questionShown = null;
+    _answerInFlight = null;
+    _hintsAsked = 0;
     // A new question replaces the one in flight, also when it never
     // arrives — and the ID of the one before leaves the exercise header
     // (#216).
     _setInFlightQuestion(null);
     ref.read(shownQuestionIdProvider.notifier).state = null;
+  }
+
+  /// Notes what the student hands in with a grading call, or that they
+  /// asked for a hint (#228) — for the content of the oefening.
+  void _noteStudentInput(ChatRequestType type, {String? code, String? prompt}) {
+    switch (type) {
+      case ChatRequestType.submitCode:
+        _answerInFlight = TurnContentAnswer(code: code);
+      case ChatRequestType.mcqAnswer:
+        // A pick on the quiz, or text typed in the chat about it.
+        final picked = ref.read(activeMcqProvider)?.selected;
+        _answerInFlight = picked != null && picked == prompt
+            ? TurnContentAnswer(picked: prompt)
+            : TurnContentAnswer(text: prompt);
+      case ChatRequestType.explainAnswer ||
+          ChatRequestType.socraticFeedback ||
+          ChatRequestType.followUpAnswer:
+        _answerInFlight = TurnContentAnswer(text: prompt);
+      case ChatRequestType.requestHint:
+        _hintsAsked += 1;
+      default:
+        break;
+    }
   }
 
   void _setInFlightQuestion(BankQuestion? question, {bool fromBank = false}) {
@@ -1045,6 +1133,7 @@ class TutorService extends Notifier<TutorState> {
     required List<TransferLoRef> transferLOs,
     required FollowUp? followUp,
     bool keyDisputed = false,
+    String feedback = '',
   }) async {
     final plan = _inFlightPlan;
     if (plan == null) return IntegrateOutcome.continuing;
@@ -1201,19 +1290,36 @@ class TutorService extends Notifier<TutorState> {
     );
     _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
+    // What was asked, answered and said, next to the record (#228). Off the
+    // student's path, like the bank: never waited for, silent on failure.
+    _recordTurnContent(
+      record: record,
+      selection: selection,
+      followUp: priorFollowUp,
+      bankQuestion: bankQuestion,
+      feedback: feedback,
+      graderSignals: loSignals,
+      dropped: outcome.droppedSignals,
+    );
     // The badges (#220) after the feedback the student already has: the
     // grade's text is on screen before it is integrated. Off the student's
     // path, and silent when it fails; never XP, never a grade.
     unawaited(ref.read(badgeServiceProvider.notifier).afterTurn(record));
     // #107: whether the class work on this LO now contradicts the home work
-    // before it. A teacher-only event; off the student's path, and silent
-    // when it fails.
-    final gapUid = ref.read(authServiceProvider)?.oid;
-    if (gapUid != null) {
+    // before it. #229: whether the student is stuck on the subgoal — long
+    // without progress, mostly not right. Teacher-only events; off the
+    // student's path, and silent when they fail.
+    final checkUid = ref.read(authServiceProvider)?.oid;
+    if (checkUid != null) {
       unawaited(
         ref
             .read(provenanceGapServiceProvider)
-            .checkAfter(uid: gapUid, turn: record),
+            .checkAfter(uid: checkUid, turn: record),
+      );
+      unawaited(
+        ref
+            .read(noProgressServiceProvider)
+            .checkAfter(uid: checkUid, turn: record),
       );
     }
     if (bankQuestion != null) {
@@ -1271,6 +1377,104 @@ class TutorService extends Notifier<TutorState> {
     }
 
     return IntegrateOutcome.continuing;
+  }
+
+  /// Puts the content of the oefening [record] graded in `turn_content`
+  /// (#228): the question as the student saw it — the follow-up's, for a
+  /// follow-up — the answer, the [feedback], the grader's own signals
+  /// before the scope check with the ones that did not count and why, and
+  /// where the student was ([selection], read before the grade moved
+  /// anything). The answer and hint count are spent on it.
+  void _recordTurnContent({
+    required PersistedTurnRecord record,
+    required GoalSelectionState selection,
+    required _FollowUpInFlight? followUp,
+    required BankQuestion? bankQuestion,
+    required String feedback,
+    required List<LoSignal> graderSignals,
+    required List<DroppedSignal> dropped,
+  }) {
+    final answer = _answerInFlight;
+    final hints = _hintsAsked;
+    _answerInFlight = null;
+    _hintsAsked = 0;
+    try {
+      final content = TurnContent(
+        id: record.id,
+        turnAt: record.turnAt,
+        subgoalId: record.subgoalId,
+        questionType: record.questionType,
+        isFollowUp: record.isFollowUp,
+        question: followUp != null
+            ? TurnContentQuestion(text: followUp.question.question)
+            : _shownQuestionContent(bankQuestion),
+        answer: answer,
+        feedback: feedback,
+        rawSignals: [
+          for (final s in graderSignals)
+            TurnLoSignal(
+              subgoalId: s.subgoalId,
+              loId: s.loId,
+              signal: s.kind.name,
+              strength: s.strength.name,
+            ),
+        ],
+        droppedSignals: [
+          for (final d in dropped)
+            TurnDroppedSignal(
+              subgoalId: d.signal.subgoalId,
+              loId: d.signal.loId,
+              signal: d.signal.kind.name,
+              strength: d.signal.strength.name,
+              reason: d.reason.name,
+            ),
+        ],
+        context: TurnContentContext(
+          activeRootId: selection.activeRootGoal?.id,
+          activeSubgoalId: selection.activeChildGoal?.id,
+          selectedRootId: selection.selectedRoot?.id,
+          selectedChildId: selection.selectedChild?.id,
+          preferredRootId: selection.preferredRoot?.id,
+          preferredChildId: selection.preferredChild?.id,
+          sessionStart: _sessionStart.name,
+        ),
+        hintCount: hints,
+        clientVersion: record.clientVersion,
+      );
+      unawaited(
+        ref
+            .read(turnContentServiceProvider)
+            .record(content, keepUntil: _globalConfig()?.turnContentKeepUntil),
+      );
+    } catch (e) {
+      debugPrint('TutorService: turn content not recorded: $e');
+    }
+  }
+
+  /// The question on screen, as the student saw it (#228): its text, the
+  /// code shown with it, and for a multiple-choice question the options in
+  /// their order on screen and the key. `null` when no question came in
+  /// since the app started.
+  TurnContentQuestion? _shownQuestionContent(BankQuestion? bankQuestion) {
+    final id = bankQuestion?.id;
+    return switch (_questionShown) {
+      MultipleChoice(:final prompt, :final code, :final options) =>
+        TurnContentQuestion(
+          text: prompt,
+          code: code,
+          options: ref.read(activeMcqProvider)?.options ?? options,
+          correctOption: _mcqKey,
+          questionId: id,
+        ),
+      CompleteCode(:final prompt, :final code) ||
+      ExplainCode(
+        :final prompt,
+        :final code,
+      ) => TurnContentQuestion(text: prompt, code: code, questionId: id),
+      WriteCode(:final prompt) || SocraticQuestion(:final prompt) =>
+        TurnContentQuestion(text: prompt, questionId: id),
+      _ => null,
+    };
   }
 
   bool _shouldPresentFollowUp({
@@ -1678,6 +1882,7 @@ class TutorService extends Notifier<TutorState> {
     );
     if (!isQuestion) return;
     _questionAskedAt = _turnClockNow();
+    _questionShown = response;
     _mcqKey = response is MultipleChoice ? response.correct : null;
     if (fromBank != null) {
       _askBankQuestion(fromBank);
@@ -1984,6 +2189,7 @@ class TutorService extends Notifier<TutorState> {
       _applyMcqFeedback(prompt: text, quality: shown);
       unawaited(ref.read(soundServiceProvider).askQuestion());
       _registerSessionTurn();
+      _answerInFlight = TurnContentAnswer(picked: pick.picked);
       await _integrateGradedAnswer(
         overallQuality: pick.correct
             ? AnswerQuality.correct
@@ -1991,6 +2197,7 @@ class TutorService extends Notifier<TutorState> {
         loSignals: const [],
         transferLOs: const [],
         followUp: null,
+        feedback: text,
       );
     } catch (e, stack) {
       debugPrint('TutorService: grading by the answer key failed: $e\n$stack');

@@ -5,13 +5,20 @@
     python tooling/evaluation/evaluate.py backup   --klas 6WEWI [--out DIR]
     python tooling/evaluation/evaluate.py apply    <draft>.json [--force]
     python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b [--mijlpaal ...]
+    python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>] [--klas 6WEWI]
 
 `draft` writes two files outside the repo (default `C:\\Users\\yvan\\ai-tutor-evaluaties`):
 a Markdown draft to discuss, and a JSON sidecar that `apply` reads. The
 JSON is the source of truth for what gets written; the Markdown is for
 people. `what-if` prints the number `rules.score` gives with the named LOs
 counted as demonstrated: what a teacher's adjustment comes to by the rule.
-Nothing is written to Cosmos by `draft`, `validate` or `what-if`.
+Nothing is written to Cosmos by `draft`, `validate`, `what-if` or `trace`.
+
+`trace` prints one student's oefeningen of one day (Belgian time) as they
+happened (#228): per oefening the time, LO, type, level and grade from
+`turn_history`, and from `turn_content` the question, the answer, the
+feedback and the grader's signals — the ones that counted and the ones that
+were dropped, with why. To the terminal only; it writes no file.
 
 `apply` backs up the target `grade_proposals` docs first, then upserts one
 signed-off proposal per student that is not marked `skip`, guarded by
@@ -173,6 +180,7 @@ def cmd_draft(args) -> None:
                 "profile": dx.profile(turns),
                 "fossils": dx.fossils(los, st, turns, now),
                 "cross_root": dx.discarded_cross_root(turns, goals, ms_subgoals),
+                "lost": dx.lost_oefeningen(turns, goals, ms_subgoals),
                 "has_data": any(lo.key in st for lo in los),
             }
         )
@@ -299,6 +307,8 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             sig.append(f"{thin} doelen te weinig bevraagd")
         if p["cross_root"]["positive"] >= 10:
             sig.append(f"{p['cross_root']['positive']} weggegooide positieven")
+        if p["lost"]["total"]:
+            sig.append(f"{p['lost']['total']} oefeningen telden niet voor hun leerdoel")
         L.append(f"| {p['name']} | {sc.core_counted}/{sc.core_total} | {sc.extension_mastered}/{sc.extension_total} | {sc.hard_count}/{sc.mastered_total} | **{sc.proposal}** | {need_s} | {', '.join(sig)} |")
     L.append("")
     for p in sorted(per_student, key=lambda p: p["name"]):
@@ -381,6 +391,19 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             L.append(f"**Signalen vanuit ander doel, door de app weggegooid:** {cr['positive']} positief, {cr['negative']} negatief.")
             for r in cr["top"][:4]:
                 L.append(f"- {r['lo']} +{r['pos']}/−{r['neg']} ({', '.join(r['days'])})")
+            L.append("")
+        lost = p["lost"]
+        if lost["total"]:
+            L.append(
+                f"**Oefeningen die niet telden voor hun eigen leerdoel:** {lost['total']}, waarvan {lost['correct']} juist"
+                f" ({lost['in_milestone']} over deze mijlpaal). Rechtstreekse vragen zonder oordeel op het gevraagde leerdoel:"
+                " de app gooide het weg (#225) of de grader gaf het niet. Wat weg is, komt niet terug; alleen juist of fout bleef bewaard."
+            )
+            for r in lost["per"]:
+                ms = " — mijlpaal" if r["in_milestone"] else ""
+                L.append(
+                    f"- {r['statement']} `{r['lo']}` ({r['subgoal_title']}) ×{r['n']}, {r['correct']} juist ({', '.join(r['days'])}){ms}"
+                )
             L.append("")
         L.append("### Voor de leerkracht (concept)")
         L.append("")
@@ -683,6 +706,146 @@ def cmd_what_if(args) -> None:
         print(f"- {_lo_label(lo)} — {state} — " + ("telt al mee" if not change else "geteld als " + " en ".join(change)))
 
 
+# ---- trace (#228) ------------------------------------------------------------
+
+QUALITY_NL = {"correct": "juist", "partial": "deels juist", "wrong": "fout"}
+SIGNAL_NL = {"positive": "positief", "negative": "negatief", "neutral": "neutraal"}
+STRENGTH_NL = {"strong": "sterk", "moderate": "matig", "weak": "zwak"}
+STATUS_NL = {
+    "telt": "telt",
+    "aanvaard": "aanvaard",
+    "weggegooid": "weggegooid",
+    "sleutel": "niet gebruikt (de sleutel besliste)",
+    "terugval": "terugval (alle signalen weggegooid)",
+}
+WEEKDAY_NL = ("maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag")
+
+
+def _parse_day(text: str) -> dt.date:
+    try:
+        return dt.date.fromisoformat(text)
+    except ValueError:
+        sys.exit(f"--dag {text!r} is geen datum (JJJJ-MM-DD)")
+
+
+def _block(label: str, text: str) -> list[str]:
+    """[text] after [label], its continuation lines indented to match."""
+    lines = (text or "").splitlines() or [""]
+    return [f"  {label:<9} {lines[0]}"] + [f"  {'':<9} {line}" for line in lines[1:]]
+
+
+def _code(text: str) -> list[str]:
+    return [f"  {'':<9} | {line}" for line in (text or "").splitlines()]
+
+
+def _signal_line(s: dict) -> str:
+    signal = SIGNAL_NL.get(s.get("signal"), s.get("signal"))
+    strength = STRENGTH_NL.get(s.get("strength"), s.get("strength"))
+    what = f"{s.get('subgoalId')}/{s.get('loId')} {signal}, {strength}"
+    reason = s.get("reason")
+    status = STATUS_NL.get(s["status"], s["status"])
+    return f"{status:<11} {what}" + (f" — {dx.DROP_NL.get(reason, reason)}" if reason else "")
+
+
+def _render_trace_row(r: dict) -> list[str]:
+    kind = " · ".join(
+        x
+        for x in (
+            r["type"],
+            dx.DIFF_NL.get(r["difficulty"], r["difficulty"]) if r["difficulty"] else None,
+            QUALITY_NL.get(r["quality"], r["quality"]) if r["quality"] else None,
+            "vervolgvraag" if r["follow_up"] else None,
+            "opwarmer" if r["warm_up"] else None,
+            "hercontrole" if r["recheck"] else None,
+            "beoordeeld met de sleutel" if r["graded_by_key"] else None,
+        )
+        if x
+    )
+    if r["statement"]:
+        lo = f"{r['statement']} `{r['lo']}`"
+    else:
+        lo = f"`{r['lo']}`" if r["lo"] else "?"
+    out = [f"{r['at']:%H:%M}  {r['subgoal_title']} · {lo} · {kind}"]
+    if not r["has_turn"]:
+        out.append("  (geen turn_history-record: gewist bij een reset?)")
+    if not r["has_content"]:
+        out.append("  (geen inhoud bewaard: van vóór #228, of de schrijving mislukte)")
+    else:
+        q = r["question"] or {}
+        if q:
+            out += _block("vraag", q.get("text", ""))
+            out += _code(q.get("code"))
+            if q.get("options"):
+                key = f" — sleutel: {q['correctOption']}" if q.get("correctOption") else ""
+                out.append(f"  {'':<9} opties: {' · '.join(q['options'])}{key}")
+        else:
+            out.append("  vraag     (onbekend: de app herstartte tussen vraag en antwoord)")
+        a = r["answer"] or {}
+        if "code" in a:
+            out.append("  antwoord  code:")
+            out += _code(a["code"])
+        elif "picked" in a:
+            out.append(f"  antwoord  gekozen: {a['picked']}")
+        elif "text" in a:
+            out += _block("antwoord", a["text"])
+        else:
+            out.append("  antwoord  (onbekend)")
+        out += _block("feedback", r["feedback"] or "")
+    sigs = r["signals"]
+    if sigs:
+        out.append(f"  signalen  {_signal_line(sigs[0])}")
+        out += [f"  {'':<9} {_signal_line(s)}" for s in sigs[1:]]
+    else:
+        out.append("  signalen  geen")
+    if r["has_content"]:
+        ctx = r["context"]
+        out.append(
+            f"  context   hoofddoel {ctx.get('activeRootId')}, subdoel {ctx.get('activeSubgoalId')}"
+            f" · begon met: {r['session_start']} · hints: {r['hints'] or 0}"
+        )
+        pref = [f"{k} {ctx[k]}" for k in ("preferredRootId", "preferredChildId") if ctx.get(k)]
+        if pref:
+            out.append(f"  {'':<9} voorkeur: {', '.join(pref)}")
+    return out
+
+
+def cmd_trace(args) -> None:
+    """What happened on one student's oefeningen on one day (#228): the turn
+    records and the content next to them, by `diagnostics.trace`. Reads only;
+    prints to the terminal, writes no file."""
+    day = _parse_day(args.dag)
+    students = cosmos.accounts(args.klas) if args.klas else cosmos.all_accounts()
+    a = _pick_student(students, args.leerling, args.klas or "de database")
+    goals = cosmos.goals()
+
+    def on_day(at: str) -> bool:
+        return rules.belgian_time(rules.parse_at(at)).date() == day
+
+    # The Belgian day lies inside the UTC days around it; `turnAt` is stored
+    # as an ISO string, so the bounds compare as text.
+    since = (day - dt.timedelta(days=1)).isoformat()
+    until = (day + dt.timedelta(days=2)).isoformat()
+    turns = [t for t in cosmos.turns(a["uid"]) if on_day(t["turnAt"])]
+    contents = {
+        cid: c for cid, c in cosmos.turn_contents(a["uid"], since, until).items() if on_day(c["turnAt"])
+    }
+    if args.subdoel:
+        turns = [t for t in turns if t.get("subgoalId") == args.subdoel]
+        contents = {cid: c for cid, c in contents.items() if c.get("subgoalId") == args.subdoel}
+    rows = dx.trace(turns, contents, goals)
+
+    title = f"{_full_name(a)} · {WEEKDAY_NL[day.weekday()]} {day.isoformat()}"
+    if args.subdoel:
+        title += f" · subdoel {(goals.get(args.subdoel) or {}).get('title') or args.subdoel} `{args.subdoel}`"
+    print(f"{title} · {len(rows)} {'oefening' if len(rows) == 1 else 'oefeningen'}")
+    without = sum(1 for r in rows if not r["has_content"])
+    if without:
+        print(f"zonder bewaarde inhoud: {without}")
+    for r in rows:
+        print()
+        print("\n".join(_render_trace_row(r)))
+
+
 # ---- main --------------------------------------------------------------------
 
 
@@ -701,8 +864,11 @@ def main() -> None:
     a = sub.add_parser("apply"); a.add_argument("draft"); a.add_argument("--force", action="store_true")
     w = sub.add_parser("what-if"); w.add_argument("--klas", required=True); w.add_argument("--leerling", required=True)
     w.add_argument("--tel", required=True, help="leerdoelen, komma-gescheiden: lo_id of subdoel/lo_id"); w.add_argument("--mijlpaal")
+    t = sub.add_parser("trace"); t.add_argument("--leerling", required=True); t.add_argument("--dag", required=True, help="JJJJ-MM-DD, Belgische tijd")
+    t.add_argument("--subdoel"); t.add_argument("--klas", help="zoek de leerling alleen in deze klas")
     args = ap.parse_args()
-    {"draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply, "what-if": cmd_what_if}[args.cmd](args)
+    commands = {"draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply, "what-if": cmd_what_if, "trace": cmd_trace}
+    commands[args.cmd](args)
 
 
 if __name__ == "__main__":

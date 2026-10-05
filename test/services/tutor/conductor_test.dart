@@ -17,7 +17,10 @@ import 'package:ai_tutor_python/services/student_state/student_calibration.dart'
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
+import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
+import 'package:ai_tutor_python/services/tutor/responses/graded_answer_builder.dart';
+import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Fakes {
@@ -36,7 +39,10 @@ class _Fakes {
   int allBeliefReads = 0;
 
   GoalSelectionState selection = const GoalSelectionState();
-  double currentProgress = 0.0;
+
+  /// The segments of the student's subgoal bar the conductor last published
+  /// (#230).
+  SubgoalLoDisplay? loDisplay;
 
   /// What the conductor handed to the splash and the level-up (#211).
   final List<Goal> goalsReached = [];
@@ -82,7 +88,7 @@ ConductorDeps _buildDeps(_Fakes f) {
     },
     getProgressAll: () async => f.progressById.values.toList(),
     getProgressByGoalId: (id) async => f.progressById[id],
-    setCurrentProgress: (v) => f.currentProgress = v,
+    setLoDisplay: (d) => f.loDisplay = d,
     addSystemNotice: f.notices.add,
     recordDebugEvent: (name, [data]) => f.debugEvents.add((name, data)),
     playCorrectAnswer: () {},
@@ -540,6 +546,441 @@ void main() {
       final next = await s.c.planNext();
       expect(next.reason.notchDropFired, isTrue);
       expect(next.difficulty, QuestionDifficulty.easy);
+    });
+  });
+
+  // ---- #227 second notch-drop rule -----------------------------------------
+  group('§2.3 attempts without a correct answer (#227)', () {
+    const write = LearningObjective(
+      id: 'write_compound',
+      statement: 'Je schrijft een samengestelde voorwaarde.',
+      kind: LoKind.apply,
+    );
+    const predict = LearningObjective(
+      id: 'predict_compound',
+      statement: 'Je voorspelt de uitkomst van een samengestelde voorwaarde.',
+      kind: LoKind.predict,
+    );
+
+    /// A student on [calibration] working on "elif", after any [earlier]
+    /// subgoals. At `hard` the window holds ten right answers at that level,
+    /// so the wrong ones these tests give — up to five — change no
+    /// calibration (§5.2), and there is nothing to promote to; at `easy`
+    /// wrong answers can neither promote nor demote.
+    Future<({Conductor c, _Fakes f, Goal subgoal})> setup({
+      QuestionDifficulty calibration = QuestionDifficulty.hard,
+      List<LearningObjective> objectives = const [write],
+      List<Goal> earlier = const [],
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 'elif',
+        title: 'elif',
+        parentId: 'r',
+        order: 1000,
+        objectives: objectives,
+      );
+      f.roots.add(root);
+      f.children[root.id] = [...earlier, subgoal];
+      for (final g in earlier) {
+        f.progressById[g.id] = Progress(goalID: g.id, progress: 1.0);
+      }
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      final t0 = DateTime.now().toUtc().subtract(const Duration(hours: 1));
+      f.calibration = StudentCalibration(
+        difficulty: calibration,
+        recentAnswers: [
+          if (calibration == QuestionDifficulty.hard)
+            for (var i = 0; i < PolicyConstants.calibrationWindow; i++)
+              CalibrationAnswer(
+                quality: AnswerQuality.correct,
+                difficulty: calibration,
+                at: t0.add(Duration(minutes: i)),
+              ),
+        ],
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f, subgoal: subgoal);
+    }
+
+    /// Asks the question the conductor plans next and grades the answer
+    /// [quality] with one signal on its target. Returns the plan, for a
+    /// follow-up on it.
+    Future<QuestionPlan> ask(
+      Conductor c, {
+      required AnswerQuality quality,
+      LoSignalKind kind = LoSignalKind.negative,
+      LoSignalStrength strength = LoSignalStrength.moderate,
+    }) async {
+      final plan = _expectQuestion(await c.planNext());
+      c.notePlannedQuestion(plan);
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: 'elif',
+              loId: plan.targetLOs.single.id,
+              kind: kind,
+              strength: strength,
+            ),
+          ],
+        ),
+      );
+      return plan;
+    }
+
+    /// The student answers the follow-up the grader asked on [plan]'s
+    /// question: graded against that plan, as the host does (§6).
+    Future<void> followUp(
+      Conductor c,
+      QuestionPlan plan, {
+      required AnswerQuality quality,
+      LoSignalKind kind = LoSignalKind.negative,
+    }) => c.integrateAnswer(
+      plan: plan,
+      answer: GradedAnswer(
+        overallQuality: quality,
+        isFollowUp: true,
+        chainDepth: 1,
+        signals: [
+          GradedSignal(
+            subgoalId: 'elif',
+            loId: plan.targetLOs.single.id,
+            kind: kind,
+            strength: LoSignalStrength.weak,
+          ),
+        ],
+      ),
+    );
+
+    test('four attempts without a correct one — questions and follow-ups '
+        'alike — ask the next question one notch lower, also when every '
+        '"partial" came with a positive', () async {
+      // The pattern of #227: "partial" on hard, graded with a positive on
+      // the asked LO, and follow-ups that are not right either. Each
+      // positive resets the strike counter, and the first one closes the
+      // strike rule for good — the student had no way out.
+      final s = await setup();
+      final q1 = await ask(
+        s.c,
+        quality: AnswerQuality.partial,
+        kind: LoSignalKind.positive,
+      );
+      expect(q1.difficulty, QuestionDifficulty.hard);
+      await followUp(s.c, q1, quality: AnswerQuality.partial);
+      final q2 = await ask(
+        s.c,
+        quality: AnswerQuality.partial,
+        kind: LoSignalKind.positive,
+      );
+      expect(q2.difficulty, QuestionDifficulty.hard);
+      expect(q2.reason.notchDropFired, isFalse);
+
+      // Three attempts: not yet.
+      final belief = s.f.beliefs.values.single;
+      expect(belief.recentNegativesAtCalibrated, 0);
+      expect(belief.lastPositiveAtCalibratedAt, isNotNull);
+
+      await followUp(s.c, q2, quality: AnswerQuality.wrong);
+
+      final next = await s.c.planNext();
+      expect(next.targetLOs.single.id, 'write_compound');
+      expect(next.difficulty, QuestionDifficulty.medium);
+      expect(next.reason.notchDropFired, isTrue);
+      expect(next.reason.notchDropRules, [
+        NotchDropRule.attemptsWithoutCorrect,
+      ]);
+      // The student's own level is untouched (§2.3: this LO only).
+      expect(s.f.calibration.difficulty, QuestionDifficulty.hard);
+    });
+
+    test('three attempts are not enough', () async {
+      final s = await setup();
+      final q1 = await ask(s.c, quality: AnswerQuality.wrong);
+      await followUp(s.c, q1, quality: AnswerQuality.partial);
+      await ask(s.c, quality: AnswerQuality.partial);
+
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.hard);
+      expect(next.reason.notchDropFired, isFalse);
+      expect(next.reason.notchDropRules, isEmpty);
+    });
+
+    test('a correct answer at the lower level ends the run: the next '
+        'question is at calibration, and it takes four more to drop '
+        'again', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        final q = await ask(s.c, quality: AnswerQuality.partial);
+        await followUp(s.c, q, quality: AnswerQuality.partial);
+      }
+      final lower = await ask(
+        s.c,
+        quality: AnswerQuality.correct,
+        kind: LoSignalKind.positive,
+      );
+      expect(lower.difficulty, QuestionDifficulty.medium);
+      expect(lower.reason.notchDropFired, isTrue);
+
+      final back = await ask(s.c, quality: AnswerQuality.partial);
+      expect(back.difficulty, QuestionDifficulty.hard);
+      expect(back.reason.notchDropFired, isFalse);
+      await followUp(s.c, back, quality: AnswerQuality.partial);
+      final again = await ask(s.c, quality: AnswerQuality.partial);
+      expect(again.difficulty, QuestionDifficulty.hard);
+      await followUp(s.c, again, quality: AnswerQuality.wrong);
+
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.medium);
+      expect(next.reason.notchDropRules, [
+        NotchDropRule.attemptsWithoutCorrect,
+      ]);
+    });
+
+    test('a correct follow-up is a correct answer on the LO too', () async {
+      final s = await setup();
+      final q1 = await ask(s.c, quality: AnswerQuality.partial);
+      await followUp(s.c, q1, quality: AnswerQuality.partial);
+      final q2 = await ask(s.c, quality: AnswerQuality.partial);
+      await followUp(
+        s.c,
+        q2,
+        quality: AnswerQuality.correct,
+        kind: LoSignalKind.positive,
+      );
+      final q3 = await ask(s.c, quality: AnswerQuality.partial);
+      await followUp(s.c, q3, quality: AnswerQuality.partial);
+      final q4 = await ask(s.c, quality: AnswerQuality.wrong);
+      expect(q4.difficulty, QuestionDifficulty.hard);
+      expect(q4.reason.notchDropFired, isFalse);
+
+      // The fourth since the correct follow-up.
+      await followUp(s.c, q4, quality: AnswerQuality.partial);
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.medium);
+    });
+
+    test('answers at the lower level count on: the drop holds until a '
+        'correct one', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        final q = await ask(s.c, quality: AnswerQuality.wrong);
+        await followUp(s.c, q, quality: AnswerQuality.wrong);
+      }
+      final lower = await ask(s.c, quality: AnswerQuality.partial);
+      expect(lower.difficulty, QuestionDifficulty.medium);
+      await followUp(s.c, lower, quality: AnswerQuality.partial);
+
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.medium);
+      expect(next.reason.notchDropRules, [
+        NotchDropRule.attemptsWithoutCorrect,
+      ]);
+    });
+
+    test('the lower question weighs at the level asked (§3.2) and stays out '
+        'of the at-calibration window (§5.3); it certifies nothing at '
+        'calibration (§4.3)', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        final q = await ask(s.c, quality: AnswerQuality.wrong);
+        await followUp(s.c, q, quality: AnswerQuality.partial);
+      }
+      final lower = _expectQuestion(await s.c.planNext());
+      expect(lower.difficulty, QuestionDifficulty.medium);
+      s.c.notePlannedQuestion(lower);
+      final outcome = await s.c.integrateAnswer(
+        plan: lower,
+        answer: const GradedAnswer(
+          overallQuality: AnswerQuality.partial,
+          signals: [
+            GradedSignal(
+              subgoalId: 'elif',
+              loId: 'write_compound',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.moderate,
+            ),
+          ],
+        ),
+      );
+
+      // A moderate positive at medium: 1.0 × 1.0, not the 1.4 of hard.
+      expect(outcome.appliedSignals.single.alphaDelta, closeTo(1.0, 1e-9));
+      final belief = s.f.beliefs.values.single;
+      expect(belief.lastPositiveAtCalibratedAt, isNull);
+      expect(belief.highestPositiveDifficulty, QuestionDifficulty.medium);
+      // In the window at the level asked, so out of the hard set.
+      final last = s.f.calibration.recentAnswers.last;
+      expect(last.difficulty, QuestionDifficulty.medium);
+      expect(last.quality, AnswerQuality.partial);
+      expect(s.f.calibration.difficulty, QuestionDifficulty.hard);
+    });
+
+    test('per LO: the other LO of the subgoal keeps its calibration', () async {
+      final s = await setup(objectives: const [write, predict]);
+      // Cold start: the first LO in order, then the recency guard (§2.1)
+      // alternates.
+      final w1 = await ask(s.c, quality: AnswerQuality.partial);
+      expect(w1.targetLOs.single.id, 'write_compound');
+      await followUp(s.c, w1, quality: AnswerQuality.partial);
+      final p1 = await ask(
+        s.c,
+        quality: AnswerQuality.correct,
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+      expect(p1.targetLOs.single.id, 'predict_compound');
+      final w2 = await ask(s.c, quality: AnswerQuality.partial);
+      expect(w2.targetLOs.single.id, 'write_compound');
+      await followUp(s.c, w2, quality: AnswerQuality.wrong);
+
+      // A right answer on the other LO ends nothing here, and that LO is
+      // asked at calibration.
+      final p2 = await ask(
+        s.c,
+        quality: AnswerQuality.correct,
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+      expect(p2.targetLOs.single.id, 'predict_compound');
+      expect(p2.difficulty, QuestionDifficulty.hard);
+      expect(p2.reason.notchDropFired, isFalse);
+
+      final next = await s.c.planNext();
+      expect(next.targetLOs.single.id, 'write_compound');
+      expect(next.difficulty, QuestionDifficulty.medium);
+    });
+
+    test('per session: a new session starts every LO at zero', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        final q = await ask(s.c, quality: AnswerQuality.partial);
+        await followUp(s.c, q, quality: AnswerQuality.partial);
+      }
+      expect((await s.c.planNext()).difficulty, QuestionDifficulty.medium);
+
+      await s.c.setTarget();
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.hard);
+      expect(next.reason.notchDropFired, isFalse);
+    });
+
+    test('a warm-up review or a recheck is no attempt, even on an LO with '
+        'the same id', () async {
+      final earlier = Goal(
+        id: 'if',
+        title: 'if',
+        parentId: 'r',
+        order: 500,
+        objectives: const [write],
+      );
+      final s = await setup(earlier: [earlier]);
+      final q1 = await ask(s.c, quality: AnswerQuality.partial);
+      await followUp(s.c, q1, quality: AnswerQuality.partial);
+      await ask(s.c, quality: AnswerQuality.partial);
+
+      for (final plan in [
+        QuestionPlan(
+          type: ChatRequestType.completeCodeQuestion,
+          difficulty: QuestionDifficulty.hard,
+          targetLOs: const [write],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'recheck: near goal',
+            notchDropFired: false,
+          ),
+          recheck: Recheck(subgoal: earlier, rule: RecheckRule.nearGoal),
+        ),
+        QuestionPlan(
+          type: ChatRequestType.completeCodeQuestion,
+          difficulty: QuestionDifficulty.hard,
+          targetLOs: const [write],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'warm-up review',
+            notchDropFired: false,
+          ),
+          warmUp: WarmUpReview(subgoal: earlier),
+        ),
+      ]) {
+        s.c.notePlannedQuestion(plan);
+        await s.c.integrateAnswer(
+          plan: plan,
+          answer: const GradedAnswer(
+            overallQuality: AnswerQuality.wrong,
+            signals: [
+              GradedSignal(
+                subgoalId: 'if',
+                loId: 'write_compound',
+                kind: LoSignalKind.negative,
+                strength: LoSignalStrength.moderate,
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Still three attempts on the active subgoal's LO.
+      final next = await s.c.planNext();
+      expect(next.targetLOs.single.id, 'write_compound');
+      expect(next.difficulty, QuestionDifficulty.hard);
+      expect(next.reason.notchDropFired, isFalse);
+    });
+
+    test('at easy there is no lower level: nothing drops', () async {
+      final s = await setup(calibration: QuestionDifficulty.easy);
+      for (var i = 0; i < 3; i++) {
+        final q = await ask(s.c, quality: AnswerQuality.wrong);
+        expect(q.difficulty, QuestionDifficulty.easy);
+        await followUp(s.c, q, quality: AnswerQuality.wrong);
+      }
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.easy);
+      expect(next.reason.notchDropFired, isFalse);
+      expect(next.reason.notchDropRules, isEmpty);
+    });
+
+    test('with both rules at once it is still one notch, and the reason '
+        'names both', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        final q = await ask(
+          s.c,
+          quality: AnswerQuality.wrong,
+          strength: LoSignalStrength.strong,
+        );
+        await followUp(s.c, q, quality: AnswerQuality.wrong);
+      }
+      expect(s.f.beliefs.values.single.recentNegativesAtCalibrated, 2);
+
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.medium);
+      expect(next.reason.notchDropFired, isTrue);
+      expect(next.reason.notchDropRules, [
+        NotchDropRule.strongNegatives,
+        NotchDropRule.attemptsWithoutCorrect,
+      ]);
+    });
+
+    test('the strike rule alone is named as such', () async {
+      final s = await setup();
+      for (var i = 0; i < 2; i++) {
+        await ask(
+          s.c,
+          quality: AnswerQuality.wrong,
+          strength: LoSignalStrength.strong,
+        );
+      }
+      final next = await s.c.planNext();
+      expect(next.difficulty, QuestionDifficulty.medium);
+      expect(next.reason.notchDropRules, [NotchDropRule.strongNegatives]);
     });
   });
 
@@ -2263,7 +2704,6 @@ void main() {
       // re-enrolment. The active subgoal was not touched at all.
       expect(s.f.progressById['s0']!.progress, 1.0);
       expect(s.f.progressById.containsKey('s1'), isFalse);
-      expect(s.f.currentProgress, 0.0);
     });
 
     test('warm-up answers stay out of the calibration window', () async {
@@ -2407,6 +2847,7 @@ void main() {
       bool isFollowUp = false,
       EvidenceProvenance provenance = EvidenceProvenance.home,
       LoSignalKind? targetKind,
+      List<DroppedSignal> scopeDrops = const [],
     }) async {
       final plan = QuestionPlan(
         type: ChatRequestType.writeCodeQuestion,
@@ -2440,6 +2881,7 @@ void main() {
           isFollowUp: isFollowUp,
           chainDepth: isFollowUp ? 1 : 0,
           provenance: provenance,
+          droppedSignals: scopeDrops,
         ),
       );
     }
@@ -2697,6 +3139,71 @@ void main() {
       expect(s.f.beliefs.containsKey(s.f._key('s0', 'lo-gone')), isFalse);
       expect(printAfter(s.f).beta, 1);
     });
+
+    test('#228: every signal that does not count is on the outcome with why '
+        '— the scope check\'s first, then a later subgoal, an unknown LO, '
+        'an incidental neutral and an incidental negative; what counts is '
+        'not among them', () async {
+      final s = await setup(printBelief: masteredPrint());
+      const offScope = GradedSignal(
+        subgoalId: 'elsewhere',
+        loId: 'lo-x',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+      final outcome = await grade(
+        s.c,
+        scopeDrops: const [
+          DroppedSignal(offScope, SignalDropReason.outOfScope),
+        ],
+        extra: const [
+          GradedSignal(
+            subgoalId: 's2',
+            loId: 'lo-loop',
+            kind: LoSignalKind.negative,
+            strength: LoSignalStrength.strong,
+          ),
+          GradedSignal(
+            subgoalId: 's0',
+            loId: 'lo-gone',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.weak,
+          ),
+          neutralOnPrint,
+          negativeOnPrint,
+        ],
+      );
+      expect(
+        outcome.droppedSignals.map(
+          (d) =>
+              '${d.signal.subgoalId}/${d.signal.loId} '
+              '${d.signal.kind.name} ${d.reason.name}',
+        ),
+        [
+          'elsewhere/lo-x positive outOfScope',
+          's2/lo-loop negative laterSubgoal',
+          's0/lo-gone positive unknownLo',
+          's0/lo-print neutral incidentalNeutral',
+          's0/lo-print negative incidentalNegative',
+        ],
+      );
+      expect(outcome.appliedSignals.single.loId, 'lo-var');
+      // The debug log keeps its own words for the conductor's drops.
+      expect(dropped(s.f).map((d) => d!['reason']), [
+        'forward reference',
+        'unknown LO',
+        'incidental neutral',
+      ]);
+    });
+
+    test(
+      '#228: a turn with nothing dropped has no drops on its outcome',
+      () async {
+        final s = await setup(printBelief: masteredPrint());
+        final outcome = await grade(s.c, extra: const []);
+        expect(outcome.droppedSignals, isEmpty);
+      },
+    );
 
     test('follow-up grading caps a cross-subgoal positive at weak', () async {
       final s = await setup(printBelief: masteredPrint());
@@ -3549,7 +4056,6 @@ void main() {
           ),
         );
         expect(f.selection.activeChildGoal?.id, 's2');
-        expect(f.currentProgress, 0.0);
       });
 
       test(
@@ -3564,7 +4070,6 @@ void main() {
           'lands', () async {
         final f = await walkWith(Progress(goalID: 's', progress: 0.5));
         expect(f.selection.activeChildGoal?.id, 's');
-        expect(f.currentProgress, 0.5);
       });
     });
   });
@@ -4344,5 +4849,661 @@ void main() {
         expect((await s.c.planNext()).recheck?.rule, RecheckRule.unconfirmed);
       });
     });
+  });
+
+  group(
+    '#225 "Verder" into the last subgoal of a root, then the next root',
+    () {
+      const loVar = LearningObjective(
+        id: 'lo-var',
+        statement: 'var',
+        kind: LoKind.apply,
+      );
+      const loCmp = LearningObjective(
+        id: 'lo-cmp',
+        statement: 'cmp',
+        kind: LoKind.apply,
+      );
+      final basics = Goal(id: 'r1', title: 'Basis', order: 0);
+      final printGoal = Goal(
+        id: 's1',
+        title: 'Print',
+        parentId: 'r1',
+        order: 0,
+      );
+      final variables = Goal(
+        id: 's2',
+        title: 'Variabelen',
+        parentId: 'r1',
+        order: 1,
+        objectives: const [loVar],
+      );
+      final conditions = Goal(id: 'r2', title: 'Condities', order: 1);
+      final comparisons = Goal(
+        id: 'c1',
+        title: 'Vergelijkingen',
+        parentId: 'r2',
+        order: 0,
+        objectives: const [loCmp],
+      );
+
+      /// A student who pressed "Verder" on "Basis" — `preferredRoot` only, as
+      /// `LeerpadPage._continueRoot` sets it — with "Print" done and one
+      /// strong positive short of mastering "Variabelen", the root's last
+      /// subgoal; and the conductor after the session's `setTarget`.
+      Future<(_Fakes, Conductor)> continued() async {
+        final f = _Fakes();
+        f.roots.addAll([basics, conditions]);
+        f.children['r1'] = [printGoal, variables];
+        f.children['r2'] = [comparisons];
+        f.progressById['s1'] = Progress(goalID: 's1', progress: 1.0);
+        final now = DateTime.now().toUtc();
+        f.beliefs[f._key('s2', 'lo-var')] = LoBelief(
+          subgoalId: 's2',
+          loId: 'lo-var',
+          alpha: 3,
+          beta: 1,
+          lastUpdatedAt: now,
+          lastPositiveAtCalibratedAt: now,
+        );
+        f.calibration = const StudentCalibration(
+          difficulty: QuestionDifficulty.medium,
+        );
+        f.selection = GoalSelectionState(preferredRoot: basics);
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        expect(f.selection.activeRootGoal?.id, 'r1');
+        expect(f.selection.activeChildGoal?.id, 's2');
+        return (f, c);
+      }
+
+      /// The grader's answer as the host builds it: validated against the
+      /// subgoals of the root that is active now (`_integrateGradedAnswer`),
+      /// or against [scope] when given.
+      GradedAnswer graded(
+        _Fakes f,
+        QuestionPlan plan,
+        List<LoSignal> signals, {
+        List<Goal>? scope,
+      }) => GradedAnswerBuilder.build(
+        overallQuality: AnswerQuality.correct,
+        rawSignals: signals,
+        scopeSubgoals: scope ?? f.children[f.selection.activeRootGoal!.id]!,
+        intendedTargetLO: plan.targetLOs.first,
+        intendedTargetSubgoalId: f.selection.activeChildGoal!.id,
+      );
+
+      const onVar = LoSignal(
+        subgoalId: 's2',
+        loId: 'lo-var',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+      );
+      const onCmp = LoSignal(
+        subgoalId: 'c1',
+        loId: 'lo-cmp',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+      );
+      // The grader also names the old root's LO. Under the old scope that
+      // signal survived, so no fallback stood in for the lost one.
+      const sideOnVar = LoSignal(
+        subgoalId: 's2',
+        loId: 'lo-var',
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.weak,
+      );
+
+      Future<void> finishVariables(_Fakes f, Conductor c) async {
+        final plan = _expectQuestion(await c.planNext());
+        expect(plan.targetLOs.single.id, 'lo-var');
+        c.notePlannedQuestion(plan);
+        final outcome = await c.integrateAnswer(
+          plan: plan,
+          answer: graded(f, plan, const [onVar]),
+        );
+        expect(outcome.subgoalAdvanced, isTrue);
+      }
+
+      test('advancing clears the preferred root: the new root is active with '
+          'its first subgoal', () async {
+        final (f, c) = await continued();
+
+        await finishVariables(f, c);
+
+        expect(f.selection.preferredRoot, isNull);
+        expect(f.selection.preferredChild, isNull);
+        expect(f.selection.activeRootGoal?.id, 'r2');
+        expect(f.selection.activeChildGoal?.id, 'c1');
+      });
+
+      test(
+        'the first answer in the new root lands on the LO it asked about',
+        () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          final plan = _expectQuestion(await c.planNext());
+          expect(plan.targetLOs.single.id, 'lo-cmp');
+          c.notePlannedQuestion(plan);
+          final answer = graded(f, plan, const [onCmp, sideOnVar]);
+          final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+          expect(answer.lostTargetSignals, isEmpty);
+          expect(outcome.loSignals.map((s) => '${s.subgoalId}/${s.loId}'), [
+            'c1/lo-cmp',
+          ]);
+          expect(outcome.appliedSignals.single.loId, 'lo-cmp');
+          expect(f.beliefs[f._key('c1', 'lo-cmp')]?.alpha, greaterThan(1.0));
+          expect(
+            outcome.signalEvents.where(
+              (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+            ),
+            isEmpty,
+          );
+        },
+      );
+
+      test('a signal on the asked LO dropped by a stale scope is logged and '
+          'recorded on the turn', () async {
+        final (f, c) = await continued();
+        await finishVariables(f, c);
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        // The scope the host built before the fix: the old root's subgoals.
+        final answer = graded(f, plan, const [
+          onCmp,
+          sideOnVar,
+        ], scope: f.children['r1']);
+        final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+        final lost = outcome.signalEvents.singleWhere(
+          (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+        );
+        expect(lost.severity, TurnSignalEventSeverity.audit);
+        expect(lost.details, {
+          'subgoalId': 'c1',
+          'loId': 'lo-cmp',
+          'signal': 'positive',
+          'strength': 'strong',
+          'activeRootId': 'r2',
+          'fallback': false,
+        });
+        expect(lost.toJson()['kind'], 'targetSignalLost');
+        final dropped = f.debugEvents
+            .where((e) => e.$1 == 'conductor.signal_dropped')
+            .map((e) => e.$2)
+            .toList();
+        expect(
+          dropped.where((d) => d?['reason'] == 'target out of scope').single,
+          {
+            'subgoalId': 'c1',
+            'loId': 'lo-cmp',
+            'reason': 'target out of scope',
+          },
+        );
+        // Nothing reached the asked LO, and no fallback stood in for it.
+        expect(outcome.hadFallback, isFalse);
+        expect(f.beliefs[f._key('c1', 'lo-cmp')], isNull);
+      });
+
+      test('when the fallback stands in, the event still says the grade was '
+          'lost', () async {
+        final (f, c) = await continued();
+        await finishVariables(f, c);
+        final plan = _expectQuestion(await c.planNext());
+        c.notePlannedQuestion(plan);
+
+        final answer = graded(f, plan, const [onCmp], scope: f.children['r1']);
+        final outcome = await c.integrateAnswer(plan: plan, answer: answer);
+
+        expect(outcome.hadFallback, isTrue);
+        final lost = outcome.signalEvents.singleWhere(
+          (e) => e.kind == TurnSignalEventKind.targetSignalLost,
+        );
+        expect(lost.details['fallback'], isTrue);
+        // The weak fallback did reach the asked LO.
+        expect(f.beliefs[f._key('c1', 'lo-cmp')], isNotNull);
+      });
+
+      group('#229 a run of lost grades', () {
+        /// One answer in "Vergelijkingen": its grade on the asked LO lost
+        /// to the old root's scope ([lost]) or arriving in the new one's.
+        /// Returns the turn's `targetSignalLost` event, if any.
+        Future<TurnSignalEvent?> answer(
+          _Fakes f,
+          Conductor c, {
+          bool lost = true,
+          bool followUp = false,
+        }) async {
+          final plan = _expectQuestion(await c.planNext());
+          expect(plan.targetLOs.single.id, 'lo-cmp');
+          // A follow-up answers the grader's own question: nothing fired.
+          if (!followUp) c.notePlannedQuestion(plan);
+          final graded = GradedAnswerBuilder.build(
+            overallQuality: AnswerQuality.correct,
+            rawSignals: const [onCmp, sideOnVar],
+            scopeSubgoals: f.children[lost ? 'r1' : 'r2']!,
+            intendedTargetLO: plan.targetLOs.first,
+            intendedTargetSubgoalId: 'c1',
+            isFollowUp: followUp,
+            chainDepth: followUp ? 1 : 0,
+          );
+          expect(graded.lostTargetSignals.isNotEmpty, lost);
+          final outcome = await c.integrateAnswer(plan: plan, answer: graded);
+          return outcome.signalEvents
+              .where((e) => e.kind == TurnSignalEventKind.targetSignalLost)
+              .firstOrNull;
+        }
+
+        test('the third direct question in a row is strong, with the run; '
+            'the ones before and after it are audit', () async {
+          expect(PolicyConstants.targetSignalLostStrongRun, 3);
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          final events = [for (var i = 0; i < 4; i++) await answer(f, c)];
+
+          expect(events.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+            TurnSignalEventSeverity.audit,
+          ]);
+          expect(events[2]!.details, {
+            'subgoalId': 'c1',
+            'loId': 'lo-cmp',
+            'signal': 'positive',
+            'strength': 'strong',
+            'activeRootId': 'r2',
+            'fallback': false,
+            'run': 3,
+          });
+          expect(events[3]!.details.containsKey('run'), isFalse);
+          // Strong rides on the turn record: the badge counts it.
+          expect(events[2]!.toJson(), containsPair('severity', 'strong'));
+        });
+
+        test('a direct question whose grade arrived ends the run', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          expect(await answer(f, c, lost: false), isNull);
+          final after = [for (var i = 0; i < 3; i++) await answer(f, c)];
+
+          expect(after.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+          ]);
+        });
+
+        test('a follow-up neither lengthens nor ends the run', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          final followUp = await answer(f, c, followUp: true);
+          expect(followUp!.severity, TurnSignalEventSeverity.audit);
+          expect(await answer(f, c, followUp: true, lost: false), isNull);
+          final third = await answer(f, c);
+          expect(third!.severity, TurnSignalEventSeverity.strong);
+          expect(third.details['run'], 3);
+        });
+
+        test('a new session counts from zero', () async {
+          final (f, c) = await continued();
+          await finishVariables(f, c);
+
+          await answer(f, c);
+          await answer(f, c);
+          await c.setTarget();
+          final events = [for (var i = 0; i < 3; i++) await answer(f, c)];
+
+          expect(events.map((e) => e!.severity), [
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.audit,
+            TurnSignalEventSeverity.strong,
+          ]);
+        });
+      });
+    },
+  );
+
+  group("#230 the segments of the student's subgoal bar (§4.5)", () {
+    // "Print" with two LOs that gate it and one optional one; a student on
+    // hard. The optional LO is mastered, so no question goes to it; every
+    // other belief starts at the prior unless the test seeds one.
+    final root = Goal(id: 'r', title: 'Basics', order: 0);
+    final print = Goal(
+      id: 's1',
+      title: 'Print',
+      parentId: 'r',
+      order: 1000,
+      objectives: const [
+        LearningObjective(id: 'lo-a', statement: 'a', kind: LoKind.apply),
+        LearningObjective(id: 'lo-b', statement: 'b', kind: LoKind.apply),
+        LearningObjective(
+          id: 'lo-c',
+          statement: 'c',
+          kind: LoKind.apply,
+          optional: true,
+        ),
+      ],
+    );
+    final variables = Goal(
+      id: 's2',
+      title: 'Variables',
+      parentId: 'r',
+      order: 2000,
+      objectives: const [
+        LearningObjective(id: 'lo-v', statement: 'v', kind: LoKind.apply),
+      ],
+    );
+
+    _Fakes onHard() {
+      final f = _Fakes();
+      f.roots.add(root);
+      f.children[root.id] = [print, variables];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: print,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.hard,
+      );
+      final now = DateTime.now().toUtc();
+      f.beliefs[f._key('s1', 'lo-c')] = LoBelief(
+        subgoalId: 's1',
+        loId: 'lo-c',
+        alpha: 9,
+        beta: 1,
+        lastUpdatedAt: now,
+        lastPositiveAtCalibratedAt: now,
+        firstMasteredAt: now,
+      );
+      return f;
+    }
+
+    void seed(
+      _Fakes f,
+      String loId,
+      double alpha,
+      double beta, {
+      bool atCalibration = true,
+      DateTime? firstMasteredAt,
+    }) {
+      final now = DateTime.now().toUtc();
+      f.beliefs[f._key('s1', loId)] = LoBelief(
+        subgoalId: 's1',
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: now,
+        lastPositiveAtCalibratedAt: atCalibration ? now : null,
+        firstMasteredAt: firstMasteredAt,
+      );
+    }
+
+    GradedSignal sig(
+      String loId,
+      LoSignalKind kind, [
+      LoSignalStrength strength = LoSignalStrength.strong,
+    ]) => GradedSignal(
+      subgoalId: 's1',
+      loId: loId,
+      kind: kind,
+      strength: strength,
+    );
+
+    /// Plans the next question, checks it is on [loId], and answers it.
+    Future<QuestionPlan> ask(
+      Conductor c,
+      String loId,
+      AnswerQuality quality,
+      List<GradedSignal> signals,
+    ) async {
+      final plan = _expectQuestion(await c.planNext());
+      expect(plan.targetLOs.single.id, loId);
+      c.notePlannedQuestion(plan);
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(overallQuality: quality, signals: signals),
+      );
+      return plan;
+    }
+
+    Map<String, LoDisplayState> states(_Fakes f) => {
+      for (final e in f.loDisplay!.los) e.loId: e.state,
+    };
+
+    /// What the belief alone says about [loId] now, without the hold.
+    LoDisplayState fresh(_Fakes f, String loId) {
+      final b = f.beliefs[f._key('s1', loId)]!;
+      return loDisplayStateOf(
+        snap: BeliefSnapshot(b.alpha, b.beta),
+        lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
+        firstMasteredAt: b.firstMasteredAt,
+        calibration: f.calibration.difficulty,
+      );
+    }
+
+    test('at session start every segment follows the prior: empty, and the '
+        'optional LO gets no segment', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+
+      expect(f.loDisplay!.subgoalId, 's1');
+      expect(states(f), {
+        'lo-a': LoDisplayState.empty,
+        'lo-b': LoDisplayState.empty,
+      });
+    });
+
+    test('the first right answer on hard makes its segment half; the cached '
+        'share stays 0', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+
+      // μ = 3.8 / 4.8 = 0.79: not mastered, one right answer away.
+      expect(f.beliefs[f._key('s1', 'lo-a')]!.alpha, closeTo(3.8, 1e-9));
+      expect(states(f), {
+        'lo-a': LoDisplayState.half,
+        'lo-b': LoDisplayState.empty,
+      });
+      expect(f.progressById['s1']!.progress, 0.0);
+    });
+
+    test('a negative from the side leaves a half segment half', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+
+      // A question on lo-b, right, with a strong negative on lo-a from the
+      // grader.
+      await ask(c, 'lo-b', AnswerQuality.correct, [
+        sig('lo-b', LoSignalKind.positive),
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+
+      // The belief alone would empty lo-a's segment; the hold keeps it.
+      expect(fresh(f, 'lo-a'), LoDisplayState.empty);
+      expect(states(f), {
+        'lo-a': LoDisplayState.half,
+        'lo-b': LoDisplayState.half,
+      });
+    });
+
+    test(
+      'a wrong answer on the question itself empties a half segment',
+      () async {
+        final f = onHard();
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        await ask(c, 'lo-a', AnswerQuality.correct, [
+          sig('lo-a', LoSignalKind.positive),
+        ]);
+        await ask(c, 'lo-b', AnswerQuality.correct, [
+          sig('lo-b', LoSignalKind.positive),
+          sig('lo-a', LoSignalKind.negative),
+        ]);
+
+        await ask(c, 'lo-a', AnswerQuality.wrong, [
+          sig('lo-a', LoSignalKind.negative),
+        ]);
+
+        expect(states(f), {
+          'lo-a': LoDisplayState.empty,
+          'lo-b': LoDisplayState.half,
+        });
+      },
+    );
+
+    test('a not-right answer that leaves the LO one answer away keeps it '
+        'half; a follow-up on it that is not right empties it', () async {
+      final f = onHard();
+      // lo-a one right answer away (6.5 ≥ 4 × 1.5); lo-b mastered, so the
+      // question is on lo-a.
+      seed(f, 'lo-a', 3.7, 1.5);
+      seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(states(f)['lo-a'], LoDisplayState.half);
+
+      final plan = await ask(c, 'lo-a', AnswerQuality.partial, [
+        sig('lo-a', LoSignalKind.neutral),
+      ]);
+      expect(states(f)['lo-a'], LoDisplayState.half);
+
+      // The follow-up's weak negative (§6.2) is enough to take it out of
+      // reach of one answer.
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.partial,
+          isFollowUp: true,
+          chainDepth: 1,
+          signals: [sig('lo-a', LoSignalKind.negative, LoSignalStrength.weak)],
+        ),
+      );
+
+      expect(states(f), {
+        'lo-a': LoDisplayState.empty,
+        'lo-b': LoDisplayState.full,
+      });
+    });
+
+    test('a segment mastered in the session is full and stays full after a '
+        'negative on it from the side', () async {
+      final f = onHard();
+      // lo-a one right answer away; lo-b just as high but never right at
+      // the student's level, so the question goes to lo-a.
+      seed(f, 'lo-a', 3.8, 1);
+      seed(f, 'lo-b', 4, 1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+      expect(states(f)['lo-a'], LoDisplayState.full);
+
+      await ask(c, 'lo-b', AnswerQuality.wrong, [
+        sig('lo-b', LoSignalKind.negative),
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+      expect(states(f)['lo-a'], LoDisplayState.full);
+    });
+
+    test('a full segment stays full after a later wrong answer on its own '
+        'LO', () async {
+      final f = onHard();
+      // Mastered once, decayed and debited since: μ 0.44.
+      seed(f, 'lo-a', 2, 2.5, firstMasteredAt: DateTime.utc(2026, 9, 1));
+      seed(f, 'lo-b', 4, 1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(states(f)['lo-a'], LoDisplayState.full);
+
+      await ask(c, 'lo-a', AnswerQuality.wrong, [
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+
+      expect(states(f)['lo-a'], LoDisplayState.full);
+    });
+
+    test('stuck is full, and stays full when a right answer lifts the LO off '
+        'the stuck rule without mastering it', () async {
+      final f = onHard();
+      // Evidence 8, μ 0.49: stuck (§4.4).
+      seed(f, 'lo-a', 3.9, 4.1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(states(f)['lo-a'], LoDisplayState.full);
+
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+
+      // μ 0.62: neither stuck nor one answer from mastery any more.
+      expect(fresh(f, 'lo-a'), LoDisplayState.empty);
+      expect(states(f)['lo-a'], LoDisplayState.full);
+    });
+
+    test('a new session reads the beliefs afresh; an LO ever mastered is '
+        'full', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+      await ask(c, 'lo-b', AnswerQuality.correct, [
+        sig('lo-b', LoSignalKind.positive),
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+      expect(states(f)['lo-a'], LoDisplayState.half);
+      // lo-b once mastered, now well under the bar.
+      seed(f, 'lo-b', 2, 4, firstMasteredAt: DateTime.utc(2026, 9, 1));
+
+      await c.setTarget();
+
+      expect(states(f), {
+        'lo-a': LoDisplayState.empty,
+        'lo-b': LoDisplayState.full,
+      });
+    });
+
+    test(
+      "after an advance the bar is the next subgoal's, read afresh",
+      () async {
+        final f = onHard();
+        seed(f, 'lo-a', 3.8, 1);
+        seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+
+        await ask(c, 'lo-a', AnswerQuality.correct, [
+          sig('lo-a', LoSignalKind.positive),
+        ]);
+
+        expect(f.selection.activeChildGoal?.id, 's2');
+        expect(f.loDisplay!.subgoalId, 's2');
+        expect(states(f), {'lo-v': LoDisplayState.empty});
+      },
+    );
   });
 }

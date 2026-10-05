@@ -11,7 +11,7 @@ import datetime as dt
 import statistics
 from collections import Counter, defaultdict
 
-from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, parse_at, turn_scope
+from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, belgian_time, is_audit, parse_at, turn_scope
 
 # Plain-Dutch labels for the report text; the raw names are app vocabulary.
 DIFF_NL = {"easy": "makkelijk", "medium": "gewoon", "hard": "moeilijk"}
@@ -266,3 +266,159 @@ def discarded_cross_root(turns: list[dict], goals: dict, milestone_subgoals: set
             for k, v in top
         ],
     }
+
+
+def lost_oefeningen(turns: list[dict], goals: dict, milestone_subgoals: set[str]) -> dict:
+    """Direct questions whose grade left no signal on the LO they asked
+    about (#225): the oefening counted for nothing on its own LO. A direct
+    question here is a first answer (no follow-up) on the active subgoal (no
+    warm-up or recheck), and no audit record. Its own LO is the turn's
+    target (`targetLOIds`) under its `subgoalId`.
+
+    What is gone does not come back: the record keeps `overallQuality` and
+    the signals that survived, nothing of the one that was dropped. The
+    cause is the app's (a stale grading scope dropped the signal, #225) or
+    the grader's (it judged other LOs and not the asked one). Grouped per
+    LO, most first."""
+    total = correct = in_ms = 0
+    per: dict[tuple[str, str], dict] = {}
+    for t in turns:
+        if is_audit(t) or t.get("isFollowUp") or t.get("isWarmUp") or t.get("isRecheck"):
+            continue
+        sg = t["subgoalId"]
+        targets = set(t.get("targetLOIds") or [])
+        if not targets:
+            continue
+        if any(s.get("subgoalId") == sg and s.get("loId") in targets for s in t.get("loSignals") or []):
+            continue
+        lo = (t.get("targetLOIds") or [])[0]
+        right = t.get("overallQuality") == "correct"
+        total += 1
+        correct += right
+        in_ms += sg in milestone_subgoals
+        row = per.setdefault(
+            (sg, lo),
+            {"subgoal": sg, "lo": lo, "n": 0, "correct": 0, "days": [], "in_milestone": sg in milestone_subgoals},
+        )
+        row["n"] += 1
+        row["correct"] += right
+        day = t["turnAt"][5:10]
+        if day not in row["days"]:
+            row["days"].append(day)
+    for row in per.values():
+        g = goals.get(row["subgoal"]) or {}
+        row["subgoal_title"] = g.get("title") or row["subgoal"]
+        row["statement"] = next(
+            (o.get("statement") for o in g.get("objectives") or [] if o.get("id") == row["lo"]), None
+        ) or row["lo"]
+    return {
+        "total": total,
+        "correct": correct,
+        "in_milestone": in_ms,
+        "per": sorted(per.values(), key=lambda r: (-r["n"], r["days"][0])),
+    }
+
+
+# ---- trace (#228) ------------------------------------------------------------
+
+# Why a grader signal did not count, as `SignalDropReason` names it.
+DROP_NL = {
+    "outOfScope": "buiten de scope",
+    "targetOutOfScope": "gevraagd leerdoel buiten de scope",
+    "unknownLo": "onbekend leerdoel",
+    "laterSubgoal": "later subdoel",
+    "outsideActiveRoot": "buiten het actieve hoofddoel",
+    "incidentalNegative": "negatief van opzij",
+    "incidentalNeutral": "neutraal van opzij",
+}
+SESSION_START_NL = {
+    "startup": "opstart",
+    "continueLearningPath": "Verder in Leerpad",
+    "workOnGoal": "Werk hieraan",
+    "restart": "herstart in de chat",
+}
+
+
+def _signal_key(s: dict) -> tuple:
+    return (s.get("subgoalId"), s.get("loId"), s.get("signal"), s.get("strength"))
+
+
+def trace_signals(turn: dict | None, content: dict | None) -> list[dict]:
+    """The grader's signals on one oefening (#228), each with what became of
+    it: `telt` (it passed every check), `weggegooid` with the reason, `sleutel`
+    (a grader's signal the answer key replaced, #186) or `terugval` (the weak
+    signal the app put on the asked LO when every signal dropped). Without a
+    content doc only the turn record's signals are known: `aanvaard` — they
+    passed the scope check, and the conductor may still have declined one."""
+    if content is None:
+        return [{**s, "status": "aanvaard"} for s in (turn or {}).get("loSignals") or []]
+    out: list[dict] = []
+    dropped = list(content.get("droppedSignals") or [])
+    raw = content.get("rawSignals") or []
+    checked = raw
+    if turn is not None and turn.get("gradedByKey"):
+        out.extend({**s, "status": "sleutel"} for s in raw)
+        checked = turn.get("loSignals") or []
+    for s in checked:
+        hit = next((d for d in dropped if _signal_key(d) == _signal_key(s)), None)
+        if hit is None:
+            out.append({**s, "status": "telt"})
+        else:
+            dropped.remove(hit)
+            out.append({**s, "status": "weggegooid", "reason": hit.get("reason")})
+    # A drop with no raw signal to go with it: shown all the same.
+    out.extend({**d, "status": "weggegooid"} for d in dropped)
+    if turn is not None and turn.get("hadFallback"):
+        out.extend({**s, "status": "terugval"} for s in turn.get("loSignals") or [])
+    return out
+
+
+def trace(turns: list[dict], contents: dict[str, dict], goals: dict) -> list[dict]:
+    """One row per oefening (#228), oldest first: the turn record and the
+    content doc with the same id. A turn without content (from before #228,
+    or a write that failed) and content without a turn (a turn record
+    deleted by a progress reset) both get a row with what there is. Audit
+    records are not oefeningen and are left out."""
+    by_id: dict[str, tuple[dict | None, dict | None]] = {}
+    for t in turns:
+        if not is_audit(t):
+            by_id[t["id"]] = (t, contents.get(t["id"]))
+    for cid, c in contents.items():
+        by_id.setdefault(cid, (None, c))
+    rows = []
+    for tid, (t, c) in by_id.items():
+        src = t or c
+        sg = src.get("subgoalId")
+        g = goals.get(sg) or {}
+        lo = ((t or {}).get("targetLOIds") or [None])[0]
+        statement = next((o.get("statement") for o in g.get("objectives") or [] if o.get("id") == lo), None)
+        qtype = (src.get("questionType") or "").replace("Question", "")
+        context = dict((c or {}).get("context") or {})
+        rows.append(
+            {
+                "id": tid,
+                "at": belgian_time(parse_at(src["turnAt"])),
+                "subgoal": sg,
+                "subgoal_title": g.get("title") or sg,
+                "lo": lo,
+                "statement": statement,
+                "type": TYPE_NL.get(qtype, qtype),
+                "difficulty": (t or {}).get("difficulty"),
+                "quality": (t or {}).get("overallQuality"),
+                "follow_up": bool(src.get("isFollowUp")),
+                "warm_up": bool((t or {}).get("isWarmUp")),
+                "recheck": bool((t or {}).get("isRecheck")),
+                "graded_by_key": bool((t or {}).get("gradedByKey")),
+                "has_turn": t is not None,
+                "has_content": c is not None,
+                "question": (c or {}).get("question"),
+                "answer": (c or {}).get("answer"),
+                "feedback": (c or {}).get("feedback"),
+                "hints": (c or {}).get("hintCount"),
+                "signals": trace_signals(t, c),
+                "context": context,
+                "session_start": SESSION_START_NL.get(context.get("sessionStart"), context.get("sessionStart")),
+            }
+        )
+    rows.sort(key=lambda r: r["at"])
+    return rows

@@ -124,6 +124,10 @@ class OptionsPage extends ConsumerWidget {
               const _ProgressCard(),
               const SizedBox(height: AppSpacing.lg),
               const _TransferCard(),
+              // What happens to the content of the oefeningen (#228): one
+              // sentence, for everyone — a student has a right to know.
+              const SizedBox(height: AppSpacing.lg),
+              const _AnswersKeptCard(),
               if (usesOwnKey) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _ApiKeyCard(),
@@ -217,6 +221,29 @@ Widget _choiceRow({
 void _snack(BuildContext context, String message) {
   ScaffoldMessenger.maybeOf(context)
       ?.showSnackBar(SnackBar(content: Text(message)));
+}
+
+// ---------------------------------------------------------------------------
+// Your answers (#228)
+// ---------------------------------------------------------------------------
+
+/// Tells the student that their questions and answers are kept, and until
+/// when: `turn_content`, until the end of the school year.
+class _AnswersKeptCard extends StatelessWidget {
+  const _AnswersKeptCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _OptionsCard(
+      title: l.options_answersKept_title,
+      child: Text(
+        l.options_answersKept_text,
+        key: const Key('options-answers-kept'),
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1974,7 +2001,10 @@ class _RecentTurnsList extends StatelessWidget {
           subtitle: Text(
             [
               if (reason != null) reason.chosenReason,
-              if (reason?.notchDropFired == true) 'notch-dropped',
+              if (reason?.notchDropFired == true)
+                reason!.notchDropRules.isEmpty
+                    ? 'notch-dropped'
+                    : 'notch-dropped (${reason.notchDropRules.map((r) => r.name).join(', ')})',
               if (p != null) 'targets: ${p.targetLOIds.join(", ")}',
               if (p != null)
                 'cal: ${p.calibrationBefore.name}→${p.calibrationAfter.name}',

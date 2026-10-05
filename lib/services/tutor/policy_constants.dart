@@ -125,6 +125,17 @@ class PolicyConstants {
   /// At most this many subgoals can auto-skip in a row.
   static const int cascadeSkipCap = 1;
 
+  // ---- Difficulty per question (CONDUCTOR_POLICY §2.3) --------------------
+
+  /// The second notch-drop rule (#227): after this many attempts on one LO
+  /// in a session — the question or a follow-up on it — without a single
+  /// `correct`, the next question on that LO is asked one notch below the
+  /// calibration, until a correct answer on it. Four: a student who gets
+  /// the LO right half the time sees four in a row without one about once
+  /// in sixteen runs, and with follow-ups four attempts are often only two
+  /// questions — the student in #227 had nine in 22 minutes.
+  static const int notchDropAfterAttempts = 4;
+
   // ---- Warm-up review (CONDUCTOR_POLICY §1.5, #102) ------------------------
 
   /// How long a once-mastered LO in another subgoal must go without a
@@ -283,6 +294,54 @@ class PolicyConstants {
   /// 2 of 6 in class. For the same student, chance alone does that on fewer
   /// than 1 in 50 of the LOs that reach six a side.
   static const double provenanceGapStrongMinShareGap = 0.6;
+
+  // ---- No progress (CONDUCTOR_POLICY §8.2, #229) --------------------------
+  //
+  // A student who works long on the active subgoal without progress and
+  // with mostly wrong answers is stuck, and should not have to say so: the
+  // `noProgress` event drives the "needs attention" badge during the
+  // lesson. Progress is an LO newly mastered or a subgoal advance; the
+  // clock also starts when the student starts on the subgoal, and again
+  // after a pause. Long work without a newly mastered LO is ordinary — long
+  // work with mostly wrong answers is not.
+  //
+  // Replayed over `turn_history` of two classes up to 2026-10-04: 25
+  // minutes and half the answers not right gave 20 alerts (about 3 to 4
+  // per two-hour lesson in a class of 17), 30 minutes 14, 20 minutes 28;
+  // 60% not right instead of half, 13. A count of questions without a
+  // newly mastered LO alone gave 45 (twelve questions) or 61 (ten). A
+  // choice for the teacher: adjust after a few lessons.
+
+  /// The fewest minutes since the last moment of progress on the subgoal.
+  static const int noProgressMinMinutes = 25;
+
+  /// The share of the last answers on the subgoal that were not right
+  /// (wrong or partly right) must reach this.
+  static const double noProgressMinBadShare = 0.5;
+
+  /// The last answers it reads: at most this many since the last moment of
+  /// progress, follow-ups included …
+  static const int noProgressWindow = 10;
+
+  /// … and at least this many, or it does not fire.
+  static const int noProgressMinAnswers = 6;
+
+  /// A pause longer than this between two answers starts a new session:
+  /// the clock starts again and the event may fire again.
+  static const Duration noProgressSessionGap = Duration(minutes: 30);
+
+  /// How far back the check reads the student's records. A session longer
+  /// than this counts from the start of the read.
+  static const Duration noProgressLookback = Duration(hours: 4);
+
+  // ---- Lost grades on the asked LO (CONDUCTOR_POLICY §8.2, #225, #229) ----
+
+  /// A `targetSignalLost` event is audit, except on the direct question
+  /// (no follow-up, no warm-up review, no recheck) that makes this many in
+  /// a row whose grade on the asked LO was lost: that one is strong, once
+  /// per run. Oefeningen that count for nothing while mostly right are not
+  /// what `noProgress` catches.
+  static const int targetSignalLostStrongRun = 3;
 
   // ---- Follow-up chains (CONDUCTOR_POLICY §6.4) --------------------------
 

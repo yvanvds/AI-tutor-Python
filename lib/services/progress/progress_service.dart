@@ -29,14 +29,12 @@ class ProgressService {
     CosmosContainer? container,
     CosmosContainer? historyContainer,
     required this._getUid,
-    this._updateCurrentProgress,
   }) : _containerOverride = container,
        _historyContainerOverride = historyContainer;
 
   final CosmosContainer? _containerOverride;
   final CosmosContainer? _historyContainerOverride;
   final String? Function() _getUid;
-  final void Function(double)? _updateCurrentProgress;
 
   CosmosContainer get _container =>
       _containerOverride ?? CosmosPaths.progress();
@@ -49,8 +47,6 @@ class ProgressService {
     if (uid == null) throw StateError('No authenticated user.');
     return uid;
   }
-
-  void setCurrentProgress(double value) => _updateCurrentProgress?.call(value);
 
   Future<List<Progress>> getAll() {
     final uid = _uid;
@@ -158,7 +154,6 @@ class ProgressService {
         await _historyContainer.delete(id, partitionKey: uid);
       }
     });
-    setCurrentProgress(0.0);
   }
 
   /// Removes the current user's `progress` doc and every `progress_history`
@@ -352,12 +347,6 @@ class ProgressService {
   }
 }
 
-final currentProgressProvider = StateProvider<double>((_) => 0.0);
-
 final progressServiceProvider = Provider<ProgressService>((ref) {
-  return ProgressService(
-    getUid: () => ref.read(authServiceProvider)?.oid,
-    updateCurrentProgress: (v) =>
-        ref.read(currentProgressProvider.notifier).state = v,
-  );
+  return ProgressService(getUid: () => ref.read(authServiceProvider)?.oid);
 });

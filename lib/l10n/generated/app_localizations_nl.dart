@@ -904,6 +904,13 @@ class AppLocalizationsNl extends AppLocalizations {
   String get options_developer_turnDetail_close => 'Sluiten';
 
   @override
+  String get options_answersKept_title => 'Je antwoorden';
+
+  @override
+  String get options_answersKept_text =>
+      'Je vragen en antwoorden worden bewaard tot het einde van het schooljaar, zodat je leerkracht kan zien waar het vastloopt.';
+
+  @override
   String get options_about_title => 'Over';
 
   @override
@@ -1293,6 +1300,17 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get session_objectiveBanner_pill => 'Huidig doel';
+
+  @override
+  String session_objectiveBanner_segments(int mastered, int almost, int todo) {
+    String _temp0 = intl.Intl.pluralLogic(
+      mastered,
+      locale: localeName,
+      other: '$mastered onderdelen beheerst',
+      one: '1 onderdeel beheerst',
+    );
+    return '$_temp0, $almost bijna, $todo nog te doen';
+  }
 
   @override
   String get chat_tutorName => 'Tutor';
@@ -2321,6 +2339,34 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get drawer_signals_kind_subgoalDeletedRedirect =>
       'Subdoel verwijderd (audit)';
+
+  @override
+  String get drawer_signals_kind_targetSignalLost =>
+      'Oordeel op het gevraagde leerdoel verloren';
+
+  @override
+  String drawer_signals_targetSignalLost_run_detail(int count, String lo) {
+    return '$count vragen op rij zonder oordeel op het leerdoel dat ze vroegen, de laatste op $lo';
+  }
+
+  @override
+  String get drawer_signals_kind_noProgress => 'Loopt vast';
+
+  @override
+  String drawer_signals_noProgress_detail(
+    String subgoal,
+    String since,
+    int minutes,
+    int notRight,
+    int answers,
+  ) {
+    return '$subgoal sinds $since ($minutes min): $notRight van de laatste $answers antwoorden niet juist';
+  }
+
+  @override
+  String drawer_signals_noProgress_mostAsked(String lo, String mean) {
+    return 'meest gevraagd: $lo (μ $mean)';
+  }
 
   @override
   String get drawer_signals_kind_provenanceGap =>

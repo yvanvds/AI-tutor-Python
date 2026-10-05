@@ -19,6 +19,7 @@ const String _gradeProposalsContainer = 'grade_proposals';
 const String _reportsContainer = 'reports';
 const String _questionsContainer = 'questions';
 const String _translationsContainer = 'translations';
+const String _turnContentContainer = 'turn_content';
 
 /// Constant partition-key values for the `/type` containers (`goals`,
 /// `instructions`, `config`, `content`, `modules`, `milestones`). Each doc in
@@ -135,4 +136,14 @@ class CosmosPaths {
   /// only the language they read in — and nothing when that is Dutch.
   static CosmosContainer translations() =>
       _client.container(_translationsContainer);
+
+  /// `/uid` partition. What the student saw, answered and was told on each
+  /// graded turn (#228): one doc per `turn_history` doc, with its id — the
+  /// question, the answer, the feedback, the grader's signals before the
+  /// scope check with a reason per dropped one, and the context. Expires at
+  /// the end of the school year: every doc carries a `ttl`, the container
+  /// has `defaultTtl: -1`. Written best-effort after the oefening; read by
+  /// the teacher's tooling (`evaluate.py trace`).
+  static CosmosContainer turnContent() =>
+      _client.container(_turnContentContainer);
 }
