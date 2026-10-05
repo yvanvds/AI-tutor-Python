@@ -2891,9 +2891,13 @@ deliberations at the end of June) that comes after the turn
 (`KeepUntil`). Cosmos counts the ttl from the doc's last write (`_ts`), so
 it is computed at every write. A doc without `ttl` would be kept forever;
 a container created without TTL ignores the field altogether (README
-step 3). A progress reset deletes `turn_history`, not `turn_content`: those
-docs run out with the rest (whether a reset should take them along is
-#232).
+step 3). A progress reset takes them along (#232): resetting everything,
+or a goal or subgoal, deletes the `turn_content` docs next to the
+`turn_history` records it deletes — last, best-effort, so a missing
+container or a failed delete never fails the reset. An import of a progress
+archive keeps both. The question bank (`questions`) is never touched by
+either: it is kept for next year, also the questions the student was the
+first to get.
 
 **Manual clean action (deferred admin feature).** A teacher-only
 action to purge `turn_history` (and optionally `progress_history`)
@@ -2924,7 +2928,8 @@ different button, not part of the year-end-archive flow.
   extracted `loSignals` and `overallQuality` are what's stored.
 - **`turn_content` (#228) does hold it**: the answers of minors, and a
   free text field can hold anything. Nothing is filtered; the expiry at
-  the end of the school year (8.4) is the limit. Students are told in
+  the end of the school year (8.4) is the limit, or sooner a progress
+  reset by the student (#232). Students are told in
   Options, in one sentence: their questions and answers are kept until
   the end of the school year, so their teacher can see where they get
   stuck. None of it goes into the repo, an issue or a PR (#190).
