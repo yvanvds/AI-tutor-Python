@@ -66,6 +66,7 @@ class BadgeSnapshot {
     required this.facts,
     this.roots = const [],
     this.goals = const [],
+    this.podium = const {},
   });
 
   /// `null` when the history could not be read: the trophy case then shows
@@ -79,6 +80,12 @@ class BadgeSnapshot {
   /// Every goal, for the subgoal a medal of the class podium is for (#221);
   /// empty when the goals could not be read.
   final List<Goal> goals;
+
+  /// The medals of the class podium the student holds, by badge id: read at
+  /// start and won since (#221). The account doc as the app has it brings a
+  /// new one only with its next poll (5 s), after the notice that points to
+  /// it — so the trophy case takes them from here as well (#236).
+  final Map<String, EarnedBadge> podium;
 }
 
 /// One class list read, now — the seam a test replaces.
@@ -358,7 +365,13 @@ class BadgeService extends Notifier<BadgeSnapshot?> {
     final all = goals ?? const <Goal>[];
     final roots = all.where((g) => g.parentId == null).toList()
       ..sort((a, b) => a.order.compareTo(b.order));
-    state = BadgeSnapshot(facts: facts, roots: roots, goals: all);
+    final podium = _podium;
+    state = BadgeSnapshot(
+      facts: facts,
+      roots: roots,
+      goals: all,
+      podium: podium,
+    );
 
     final reached = <String, int>{};
     for (final badge in BadgeCatalog.all(
@@ -370,7 +383,6 @@ class BadgeService extends Notifier<BadgeSnapshot?> {
     // Only write when something may have gone up since the last poll of the
     // account doc — the write itself checks against the doc as stored.
     final stored = ref.read(accountServiceProvider)?.badges;
-    final podium = _podium;
     final mayRaise =
         stored == null ||
         reached.entries.any((e) => e.value > stored.tierOf(e.key)) ||
@@ -549,7 +561,8 @@ class BadgeTile {
   /// What the student has for this badge; `null` when it is not known.
   final int? value;
 
-  /// What the account doc stores for it.
+  /// What the account doc stores for it — for a medal of the class podium,
+  /// the one the badge service holds when that is higher (#236).
   final EarnedBadge? earned;
 
   /// The hoofddoel of a "Kenner van …" badge; the subgoal of a medal of the
@@ -626,9 +639,12 @@ class BadgeBoard {
     bool inClass = false,
   }) {
     final facts = snapshot.facts;
-    BadgeTile tile(BadgeDefinition badge, {Goal? goal}) {
+    BadgeTile tile(BadgeDefinition badge, {Goal? goal, EarnedBadge? held}) {
       final value = facts == null ? null : badge.valueIn(facts);
-      final stored = earned.byId[badge.id];
+      var stored = earned.byId[badge.id];
+      // A medal won just now is on the doc as the app has it only after the
+      // next poll (#236); the notice pointing to it comes before that.
+      if (held != null && held.tier > (stored?.tier ?? 0)) stored = held;
       final reached = badge.tierFor(value);
       final storedTier = stored?.tier ?? 0;
       return BadgeTile(
@@ -650,10 +666,14 @@ class BadgeBoard {
     final goalsById = {for (final g in snapshot.goals) g.id: g};
     final podium =
         <BadgeTile>[
-          for (final id in earned.byId.keys)
+          for (final id in {...earned.byId.keys, ...snapshot.podium.keys})
             if (BadgeCatalog.byId(id) case final badge?
                 when badge.group == BadgeGroup.podium)
-              tile(badge, goal: goalsById[badge.goalId]),
+              tile(
+                badge,
+                goal: goalsById[badge.goalId],
+                held: snapshot.podium[id],
+              ),
         ]..sort((a, b) {
           final byPlace = b.tier.compareTo(a.tier);
           if (byPlace != 0) return byPlace;

@@ -266,13 +266,12 @@ void main() {
       findsOneWidget,
     );
     final tile = find.byKey(const ValueKey('badge-tile-podium:s2'));
-    // The case shows the medal once the next poll of the account doc (5 s)
-    // brings it (#236). Until #235 this passed only with a second notice —
-    // "Weekend warrior" or "Night owl" — keeping the toast up that long; on
-    // a weekday morning the toast is gone well before the poll.
-    await pumpUntilFound(
-      tester,
+    // There at once, the moment the notice is gone (#236) — not only once
+    // the next poll of the account doc (5 s) brings the medal written a
+    // moment ago.
+    expect(
       find.descendant(of: tile, matching: find.text('Silver: Variables')),
+      findsOneWidget,
     );
     expect(
       find.descendant(of: section, matching: find.byType(BadgeTileCard)),

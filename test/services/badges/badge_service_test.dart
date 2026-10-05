@@ -10,6 +10,9 @@
 // out are picked up at start; a claim Cosmos cannot answer waits for the
 // next graded turn. A badge from the teacher is announced once, with how
 // often, and marked seen on the doc.
+//
+// #236: the trophy case shows a medal won just now at once, before the
+// next poll of the account doc brings it.
 
 import 'dart:async';
 
@@ -20,6 +23,7 @@ import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/badges/badge_catalog.dart';
+import 'package:ai_tutor_python/services/badges/badge_facts.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/badges/class_podium.dart';
 import 'package:ai_tutor_python/services/badges/earned_badges.dart';
@@ -505,6 +509,69 @@ void main() {
       expect(notice.goalTitle, 'Variabelen');
       // Nobody else's place is anywhere in what the student has.
       expect(accounts.docs[_uid].toString(), isNot(contains('someone-else')));
+    });
+
+    test('the trophy case shows the medal as soon as it is announced, not '
+        'only after the next poll of the account doc (#236)', () async {
+      seedVariables();
+      seedAccount(className: '6EWI', badges: earnedAlready);
+      seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
+      config.create({
+        ...PodiumPlace(
+          className: '6EWI',
+          subgoalId: 's1',
+          place: 1,
+          uid: 'someone-else',
+        ).toDoc(),
+      }, partitionKey: 'podium');
+      start();
+      await until(() => pc.read(badgeServiceProvider)?.facts != null);
+      await until(() => pc.read(accountServiceProvider) != null);
+
+      await pc
+          .read(badgeServiceProvider.notifier)
+          .afterTurn(_turn(10, advanced: true));
+
+      expect(
+        announced().expand((a) => a.badges).map((n) => n.badge.id),
+        contains('podium:s1'),
+      );
+      // Stored, but the doc as the app has it is still the one polled
+      // before the write.
+      expect(storedBadges()!.containsKey('podium:s1'), isTrue);
+      expect(pc.read(accountServiceProvider)!.badges!.tierOf('podium:s1'), 0);
+      var medals = pc.read(badgeBoardProvider)!.podium;
+      expect(medals.map((t) => t.badge.id), ['podium:s1']);
+      expect(medals.single.tier, 2, reason: 'silver');
+      expect(medals.single.goal?.title, 'Variabelen');
+      expect(medals.single.earned?.earnedAt, _at(10).toUtc());
+
+      // The poll brings the same medal: still the one tile.
+      (pc.read(accountServiceProvider.notifier) as _Accounts221).poll(
+        accounts.docs[_uid]!,
+      );
+      medals = pc.read(badgeBoardProvider)!.podium;
+      expect(medals.map((t) => t.badge.id), ['podium:s1']);
+      expect(medals.single.tier, 2);
+    });
+
+    test('the trophy case shows the better of the medal stored and the one '
+        'the app holds', () {
+      final s1 = podiumBadgeId('s1');
+      final s2 = podiumBadgeId('s2');
+      EarnedBadge medal(int tier) =>
+          EarnedBadge(tier: tier, awardedBy: kAwardedByPodium);
+      final board = BadgeBoard.from(
+        BadgeSnapshot(
+          facts: const BadgeFacts(oefeningen: 1),
+          podium: {s1: medal(3), s2: medal(1)},
+        ),
+        EarnedBadges({s1: medal(2), s2: medal(2)}),
+      );
+      expect(
+        {for (final t in board.podium) t.badge.id: t.tier},
+        {s1: 3, s2: 2},
+      );
     });
 
     test('finishing the subgoal again does not count again', () async {
