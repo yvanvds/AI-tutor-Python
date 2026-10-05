@@ -31,7 +31,7 @@ Drie keuzes lopen door alle doelen:
 | # | Doel | Status |
 |---|---|---|
 | 5 | Functies (`functies`) | live sinds 5 oktober 2026 |
-| 6 | Toeval en simulatie (`toeval-simulatie`) | doelbestand en lessen geschreven, nog niet live |
+| 6 | Toeval en simulatie (`toeval-simulatie`) | live sinds 5 oktober 2026 |
 | 7 | Grafieken maken | idee |
 | 8 | Vergelijkingen oplossen door te zoeken | idee |
 | 9 | De wereld in tijdstappen | idee |
