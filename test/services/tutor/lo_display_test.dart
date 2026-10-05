@@ -106,8 +106,9 @@ void main() {
     });
 
     test('stuck is full', () {
-      // Classic: evidence 8, μ 0.49.
-      const classic = BeliefSnapshot(3.9, 4.1);
+      // Classic: evidence 8.2, μ 0.49 — clear of the evidence floor of 8
+      // (#239).
+      const classic = BeliefSnapshot(4.05, 4.15);
       expect(isStuck(classic), isTrue);
       expect(_state(classic, atCalibration: false), LoDisplayState.full);
       // Saturated: evidence 19, μ 0.68.

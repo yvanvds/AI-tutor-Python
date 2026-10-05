@@ -5229,6 +5229,11 @@ void main() {
       return f;
     }
 
+    /// Seeds [loId]'s belief, written an hour ago. The conductor decays
+    /// every belief it reads with its own clock (§3.3), so a seed always
+    /// reads a little lower than written: one that sits exactly on a
+    /// threshold must fail on every run, not only when a clock tick falls
+    /// between the seed and the read (#239). Seed with a margin.
     void seed(
       _Fakes f,
       String loId,
@@ -5237,14 +5242,14 @@ void main() {
       bool atCalibration = true,
       DateTime? firstMasteredAt,
     }) {
-      final now = DateTime.now().toUtc();
+      final written = DateTime.now().toUtc().subtract(const Duration(hours: 1));
       f.beliefs[f._key('s1', loId)] = LoBelief(
         subgoalId: 's1',
         loId: loId,
         alpha: alpha,
         beta: beta,
-        lastUpdatedAt: now,
-        lastPositiveAtCalibratedAt: atCalibration ? now : null,
+        lastUpdatedAt: written,
+        lastPositiveAtCalibratedAt: atCalibration ? written : null,
         firstMasteredAt: firstMasteredAt,
       );
     }
@@ -5409,10 +5414,11 @@ void main() {
     test('a segment mastered in the session is full and stays full after a '
         'negative on it from the side', () async {
       final f = onHard();
-      // lo-a one right answer away; lo-b just as high but never right at
-      // the student's level, so the question goes to lo-a.
+      // lo-a one right answer away; lo-b higher (μ 0.82, clear of the bar
+      // at 0.8) but never right at the student's level, so unmastered and
+      // the question goes to lo-a.
       seed(f, 'lo-a', 3.8, 1);
-      seed(f, 'lo-b', 4, 1, atCalibration: false);
+      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
 
@@ -5433,7 +5439,7 @@ void main() {
       final f = onHard();
       // Mastered once, decayed and debited since: μ 0.44.
       seed(f, 'lo-a', 2, 2.5, firstMasteredAt: DateTime.utc(2026, 9, 1));
-      seed(f, 'lo-b', 4, 1, atCalibration: false);
+      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
       expect(states(f)['lo-a'], LoDisplayState.full);
@@ -5448,8 +5454,10 @@ void main() {
     test('stuck is full, and stays full when a right answer lifts the LO off '
         'the stuck rule without mastering it', () async {
       final f = onHard();
-      // Evidence 8, μ 0.49: stuck (§4.4).
-      seed(f, 'lo-a', 3.9, 4.1, atCalibration: false);
+      // Evidence 8.2, μ 0.49: stuck (§4.4), clear of the evidence floor
+      // of 8 that decay would take it under (#239), and under lo-b's 0.5,
+      // so the question goes to lo-a.
+      seed(f, 'lo-a', 4.05, 4.15, atCalibration: false);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
       expect(states(f)['lo-a'], LoDisplayState.full);
@@ -5458,8 +5466,15 @@ void main() {
         sig('lo-a', LoSignalKind.positive),
       ]);
 
-      // μ 0.62: neither stuck nor one answer from mastery any more.
+      // μ 0.62: off the stuck rule (≥ 0.6), not mastered, and not one
+      // answer from mastery either (+2.8 makes 0.70).
+      final b = f.beliefs[f._key('s1', 'lo-a')]!;
+      final after = BeliefSnapshot(b.alpha, b.beta);
+      expect(after.mean, closeTo(0.62, 0.01));
+      expect(isStuck(after), isFalse);
+      expect(meetsMasteryMeanAndEvidence(after), isFalse);
       expect(fresh(f, 'lo-a'), LoDisplayState.empty);
+      // The hold keeps it full.
       expect(states(f)['lo-a'], LoDisplayState.full);
     });
 
