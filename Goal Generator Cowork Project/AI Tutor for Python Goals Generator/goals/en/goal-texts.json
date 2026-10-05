@@ -361,6 +361,78 @@
         "title": "Splitting a problem into functions",
         "description": "You can split a bigger problem into functions that each have one task, write functions that call other functions or work with lists, and test a function with well-chosen calls."
       }
+    },
+    {
+      "id": "toeval-simulatie",
+      "parentId": null,
+      "nl": {
+        "title": "Toeval en simulatie",
+        "description": "Je kan met de random-module toeval in een programma brengen en daarmee experimenten naspelen: toevallige waarden maken, een kans schatten door een experiment vaak te herhalen, een oppervlakte schatten met toevallige punten, een toevalswandeling programmeren, en een beschreven situatie vertalen naar een simulatie die je controleert met een geval waarvan je het antwoord kent."
+      },
+      "en": {
+        "title": "Randomness and simulation",
+        "description": "You can bring randomness into a program with the random module and use it to act out experiments: make random values, estimate a probability by repeating an experiment many times, estimate an area with random points, program a random walk, and translate a described situation into a simulation that you check with a case whose answer you know."
+      }
+    },
+    {
+      "id": "toevalsgetallen",
+      "parentId": "toeval-simulatie",
+      "nl": {
+        "title": "Toevalsgetallen maken",
+        "description": "Je kan met de random-module toevallige waarden maken: een geheel getal tussen twee grenzen, een kommagetal tussen 0 en 1 of een willekeurig element uit een lijst, een gebeurtenis met een gegeven kans laten gebeuren, en voorspellen welke uitvoer van zo'n script mogelijk is."
+      },
+      "en": {
+        "title": "Making random numbers",
+        "description": "You can make random values with the random module: a whole number between two limits, a decimal number between 0 and 1 or a random element from a list, make an event happen with a given probability, and predict which output of such a script is possible."
+      }
+    },
+    {
+      "id": "kans-schatten",
+      "parentId": "toeval-simulatie",
+      "nl": {
+        "title": "Een kans schatten door te herhalen",
+        "description": "Je kan een toevalsexperiment vele keren herhalen, tellen hoe vaak een gebeurtenis voorkomt en zo haar kans schatten, bijhouden hoe vaak elke uitkomst valt, en uitleggen waarom meer herhalingen een betrouwbaardere schatting geven."
+      },
+      "en": {
+        "title": "Estimating a probability by repeating",
+        "description": "You can repeat a random experiment many times, count how often an event occurs and so estimate its probability, keep track of how often each outcome comes up, and explain why more repetitions give a more reliable estimate."
+      }
+    },
+    {
+      "id": "oppervlakte-schatten",
+      "parentId": "toeval-simulatie",
+      "nl": {
+        "title": "Een oppervlakte schatten met toevallige punten",
+        "description": "Je kan toevallige punten binnen een rechthoek maken, nagaan of een punt binnen een figuur ligt, en uit het aandeel treffers de oppervlakte van die figuur schatten, zoals een cirkel of het gebied onder een grafiek."
+      },
+      "en": {
+        "title": "Estimating an area with random points",
+        "description": "You can make random points inside a rectangle, check whether a point is inside a shape, and estimate the area of that shape from the share of hits, such as a circle or the area under a graph."
+      }
+    },
+    {
+      "id": "toevalswandeling",
+      "parentId": "toeval-simulatie",
+      "nl": {
+        "title": "Toevalswandelingen",
+        "description": "Je kan een toevalswandeling programmeren waarbij een positie bij elke stap toevallig verandert, de afgelegde weg in een lijst bewaren, een wandeling laten stoppen bij een grens, en uitleggen wat vele herhaalde wandelingen tonen dat één wandeling niet toont."
+      },
+      "en": {
+        "title": "Random walks",
+        "description": "You can program a random walk in which a position changes randomly at every step, keep the path in a list, make a walk stop at a limit, and explain what many repeated walks show that one walk does not."
+      }
+    },
+    {
+      "id": "situatie-simuleren",
+      "parentId": "toeval-simulatie",
+      "nl": {
+        "title": "Van situatie naar simulatie",
+        "description": "Je kan een beschreven situatie met toeval vertalen naar een simulatie: bepalen wat één experiment is, dat experiment als functie schrijven, het vaak herhalen om een kans of een gemiddelde te schatten, en de simulatie controleren met een geval waarvan je het antwoord kent."
+      },
+      "en": {
+        "title": "From situation to simulation",
+        "description": "You can translate a described situation with randomness into a simulation: decide what one experiment is, write that experiment as a function, repeat it many times to estimate a probability or an average, and check the simulation with a case whose answer you know."
+      }
     }
   ]
 }

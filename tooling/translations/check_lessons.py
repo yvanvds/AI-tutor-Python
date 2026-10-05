@@ -13,7 +13,9 @@ For every lesson with a file in `lessons/<module>/<lang>/`:
    `The average is 8.5`") are in [CASES] too. The blocks of one lesson run
    in one namespace, in order, because later blocks use earlier variables.
    `turtle` is a headless stub that follows the turtle, so a drawing that
-   should close (a square) is checked to end where it started.
+   should close (a square) is checked to end where it started. A block whose
+   output is random has a `seed` in [CASES]: the lesson shows, under "Een
+   mogelijke uitvoer:" / "One possible output:", what that seed prints.
 3. **Inline claims** in [INLINE]: short inline snippets whose result the
    text states (`"5" == 5` gives `False`, `int("3.5")` fails, ...).
 
@@ -32,6 +34,7 @@ import contextlib
 import html
 import io
 import math
+import random
 import re
 import sys
 import types
@@ -85,6 +88,20 @@ CASES: dict[str, dict[int, dict]] = {
     "geneste-lussen": {1: {"lines": 9}},
     # A triangle and a hexagon, each drawn by one call of the same function.
     "return-waarden": {5: {"turtle": {"segments": 9, "closed": True}}},
+    # Goal 6: the output of these blocks is random. The lesson shows what the
+    # seed prints; if a new Python version draws differently, pick the output
+    # again (in both languages) rather than a seed that happens to fit.
+    "toevalsgetallen": {0: {"seed": 5}, 1: {"seed": 5}, 3: {"seed": 2}, 5: {"seed": 5}},
+    "kans-schatten": {0: {"seed": 1}, 1: {"seed": 5}, 2: {"seed": 1}, 3: {"seed": 1}},
+    "oppervlakte-schatten": {0: {"seed": 5}, 2: {"seed": 4}, 3: {"seed": 1}},
+    "toevalswandeling": {
+        0: {"seed": 1},
+        1: {"seed": 5},
+        2: {"seed": 3},
+        3: {"seed": 1},
+        4: {"turtle": {"segments": 200}},
+    },
+    "situatie-simuleren": {1: {"seed": 1}, 3: {"seed": 5}},
 }
 
 # Inline code whose result the prose states, run in the lesson's namespace
@@ -164,6 +181,9 @@ INLINE: dict[str, list[tuple[str, str, str]]] = {
         ("en", "def set_nine(my_list):\n    my_list[0] = 9\nnumbers = [1, 2, 3]\nset_nine(numbers)\nnumbers", "[9, 2, 3]"),
     ],
     "functies-combineren": [("*", "list(range(2, 1))", "[]")],
+    "toevalsgetallen": [("*", "6 in range(1, 6)", "False")],
+    "oppervlakte-schatten": [("*", "round(0.9 ** 2 + 0.8 ** 2, 2)", "1.45"), ("*", "f(2)", "4")],
+    "toevalswandeling": [("*", "abs(-8)", "8")],
 }
 
 
@@ -312,6 +332,8 @@ def check_lesson(lid: str, body: str, lang: str, verbose: bool = False) -> tuple
         state.clear()
         stdin = _pick(case.get("stdin", []), lang)
         code = b["code"]
+        if "seed" in case:
+            random.seed(case["seed"])
         out, err = _run(code, ns, stdin)
         shown = out + (err + "\n" if err and err != "_TooMuchOutput" else "")
         if case.get("infinite"):

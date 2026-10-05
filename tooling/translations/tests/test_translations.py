@@ -264,6 +264,20 @@ class CheckLessonsTest(unittest.TestCase):
         )
         self.assertEqual(check_lessons.check_lesson("x", body, "en"), (2, []))
 
+    def test_a_seeded_block_prints_what_the_lesson_shows(self):
+        body = (
+            "<pre><code>import random\nprint(random.randint(1, 6), random.randint(1, 6))</code></pre>\n"
+            "<p>One possible output:</p>\n<pre><code>{}</code></pre>"
+        )
+        import random
+
+        random.seed(7)
+        shown = f"{random.randint(1, 6)} {random.randint(1, 6)}"
+        with mock.patch.dict(check_lessons.CASES, {"x": {0: {"seed": 7}}}):
+            self.assertEqual(check_lessons.check_lesson("x", body.format(shown), "en"), (1, []))
+            _, failures = check_lessons.check_lesson("x", body.format("0 0"), "en")
+        self.assertEqual(len(failures), 1)
+
     def test_a_different_tag_sequence_shows(self):
         self.assertNotEqual(
             check_lessons.tags('<div class="callout warn"><p>a</p></div>'),

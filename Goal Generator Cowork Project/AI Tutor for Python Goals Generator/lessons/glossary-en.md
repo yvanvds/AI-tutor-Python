@@ -172,6 +172,33 @@ Pythons eigen namen (`t.pencolor`). De leerling wordt aangesproken met
 | rentevoet | interest rate |
 | schuine zijde | hypotenuse |
 
+## Toeval en simulatie
+
+| Nederlands | Engels |
+|---|---|
+| toeval | randomness |
+| toevallig, willekeurig | random |
+| toevalsgetal | random number |
+| kans | probability |
+| kansspel | game of chance |
+| gebeurtenis | event |
+| uitkomst | outcome |
+| experiment | experiment |
+| schatten, schatting | estimate |
+| aandeel | share |
+| naspelen | act out |
+| dobbelsteen, worp | die (dice), roll |
+| kop / munt | heads / tails |
+| treffer / ernaast | hit / miss |
+| toevalswandeling | random walk |
+| startpositie, eindpositie | start position, end position |
+| afstand (tot het startpunt) | distance |
+| grens (van een wandeling) | limit |
+| blut | broke |
+| simulatie | simulation |
+| trekken zonder terugleggen | draw without putting back |
+| "Een mogelijke uitvoer:" boven de uitvoer van een script met toeval | "One possible output:" |
+
 ## Namen in de code
 
 Nederlandse variabelenamen, strings en commentaar in de voorbeelden zijn mee
@@ -207,5 +234,13 @@ Dries) blijven.
 | `kleinste_x` | `smallest_x` | `grens` | `limit` |
 | `boven_gemiddelde` | `above_average` | `som_van_kwadraten` | `sum_of_squares` |
 | `is_priem`, `tel_priemgetallen` | `is_prime`, `count_primes` | `deler` | `divisor` |
+| `worp` (variabele), `gooi()` | `roll`, `roll_die()` | `twee_dobbelstenen` | `two_dice` |
+| `herhalingen`, `successen` | `repetitions`, `successes` | `tellingen`, `som` | `counts`, `total` |
+| `schat_kans`, `schat_oppervlakte` | `estimate_probability`, `estimate_area` | `treffers` | `hits` |
+| `in_cirkel` | `in_circle` | `wandeling(stappen)` | `walk(steps)` |
+| `positie`, `weg` | `position`, `path` | `speel_tot_einde(geld, doel)` | `play_until_end(money, goal)` |
+| `gemiddelde_afstand` | `average_distance` | `heeft_dubbele(groep)` | `has_duplicate(group)` |
+| `dag`, `dagen` (verjaardagen) | `day`, `days` | `worpen_tot_zes` | `rolls_until_six` |
+| `kaart`, `stapel` | `card`, `deck` | `"regen"`, `"droog"` | `"rain"`, `"dry"` |
 
 Zo wordt `rooster[r][k]` in de Engelse les en doeltekst `grid[r][c]`.

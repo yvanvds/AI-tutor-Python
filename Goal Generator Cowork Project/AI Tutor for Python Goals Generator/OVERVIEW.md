@@ -79,3 +79,18 @@ Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegev
   - LOs: `write_formula_function`, `write_math_module_call`, `predict_table_x_values`, `write_value_table`, `write_search_function_values`, `reason_step_size`
 - **Een probleem opsplitsen in functies** (`functies-combineren`)
   - LOs: `predict_nested_calls`, `write_function_with_helper`, `write_list_function`, `decompose_into_functions`, `choose_function_tests`, `fix_function_bug`
+
+### 6. Toeval en simulatie (`toeval-simulatie`)
+
+Je kan met de random-module toeval in een programma brengen en daarmee experimenten naspelen: toevallige waarden maken, een kans schatten door een experiment vaak te herhalen, een oppervlakte schatten met toevallige punten, een toevalswandeling programmeren, en een beschreven situatie vertalen naar een simulatie die je controleert met een geval waarvan je het antwoord kent.
+
+- **Toevalsgetallen maken** (`toevalsgetallen`)
+  - LOs: `recall_random_ranges`, `predict_possible_outputs`, `write_random_value`, `write_event_with_chance`, `predict_two_calls_differ`, `write_random_function`
+- **Een kans schatten door te herhalen** (`kans-schatten`)
+  - LOs: `write_estimate_chance`, `predict_estimate_value`, `reason_more_repetitions`, `write_frequency_list`, `reason_model_the_mechanism`, `fix_estimate_bug`
+- **Een oppervlakte schatten met toevallige punten** (`oppervlakte-schatten`)
+  - LOs: `write_random_point`, `predict_point_is_hit`, `write_region_condition`, `write_area_estimate`, `reason_share_is_area`
+- **Toevalswandelingen** (`toevalswandeling`)
+  - LOs: `predict_reachable_positions`, `write_random_walk`, `write_walk_history`, `write_walk_until_boundary`, `reason_position_vs_distance`, `write_turtle_random_walk`
+- **Van situatie naar simulatie** (`situatie-simuleren`)
+  - LOs: `decompose_simulation`, `write_experiment_function`, `predict_experiment_for_given_draws`, `write_repeat_until_event`, `write_average_of_experiment`, `choose_sanity_check`

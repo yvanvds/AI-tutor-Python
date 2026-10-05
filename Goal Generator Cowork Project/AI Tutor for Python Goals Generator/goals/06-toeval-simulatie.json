@@ -1,0 +1,322 @@
+{
+  "goal": {
+    "id": "toeval-simulatie",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Toeval en simulatie",
+    "description": "Je kan met de random-module toeval in een programma brengen en daarmee experimenten naspelen: toevallige waarden maken, een kans schatten door een experiment vaak te herhalen, een oppervlakte schatten met toevallige punten, een toevalswandeling programmeren, en een beschreven situatie vertalen naar een simulatie die je controleert met een geval waarvan je het antwoord kent.",
+    "order": 6000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "toevalsgetallen",
+      "type": "goal",
+      "parentId": "toeval-simulatie",
+      "title": "Toevalsgetallen maken",
+      "description": "Je kan met de random-module toevallige waarden maken: een geheel getal tussen twee grenzen, een kommagetal tussen 0 en 1 of een willekeurig element uit een lijst, een gebeurtenis met een gegeven kans laten gebeuren, en voorspellen welke uitvoer van zo'n script mogelijk is.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Probe the inclusive upper bound: `random.randint(1, 6)` can give 6, unlike `range(1, 6)`; `random.random()` can give 0.0 but never 1.0.",
+        "Lean on the roll-twice bug: `if random.randint(1, 6) == 6:` followed by `elif random.randint(1, 6) == 5:` rolls two different dice — the value has to be stored in a variable first.",
+        "For an event with a given chance use `random.random() < 0.3` or `random.randint(1, 100) <= 30`; probe the direction of the comparison (`> 0.3` happens 70 percent of the time).",
+        "A function that uses random is the one exception to 'same arguments, same result' from the functions goal: probe that `worp()` gives a new value at every call, and that `worp() + worp()` is two throws while `2 * worp()` is one throw doubled.",
+        "The output of these scripts is random, so never ask for 'the output': ask which results are possible or impossible, how many values are printed, or give the random values that were drawn and ask what happens then. State every rule of the game or situation in the question itself: the student must not need probability theory, and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random` and `random.choice` — no uniform, shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, f-strings, `+=`, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "recall_random_ranges",
+          "statement": "Je kan aangeven welke waarden random.randint(a, b) en random.random() kunnen opleveren, inclusief de grenzen.",
+          "kind": "recall",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_possible_outputs",
+          "statement": "Je kan van een kort script met toevalsgetallen voorspellen welke uitvoer mogelijk is en welke niet.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_random_value",
+          "statement": "Je kan met random.randint, random.random of random.choice een toevallige waarde maken die bij een beschrijving past, zoals een dobbelsteenworp of een willekeurige naam uit een lijst.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_event_with_chance",
+          "statement": "Je kan een voorwaarde schrijven die met een gegeven kans waar is, zoals random.random() < 0.3 voor 30 procent.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_two_calls_differ",
+          "statement": "Je kan voorspellen wat er misloopt als een script twee keer een toevalsgetal opvraagt waar het twee keer dezelfde waarde nodig heeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_random_function",
+          "statement": "Je kan een functie schrijven die bij elke aanroep een nieuwe toevallige waarde teruggeeft, zoals de som van twee dobbelstenen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "kans-schatten",
+      "type": "goal",
+      "parentId": "toeval-simulatie",
+      "title": "Een kans schatten door te herhalen",
+      "description": "Je kan een toevalsexperiment vele keren herhalen, tellen hoe vaak een gebeurtenis voorkomt en zo haar kans schatten, bijhouden hoe vaak elke uitkomst valt, en uitleggen waarom meer herhalingen een betrouwbaardere schatting geven.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Build every estimate from the same three parts and name them: one experiment, a counter, and the division by the number of repetitions. The function takes the number of repetitions as a parameter and returns the estimate. Vary the experiment: coins and dice, but also a product that is defective with a given chance, a free throw that goes in 70 percent of the time, a seed that germinates.",
+        "Probe the classic bugs: the counter set to zero inside the loop, the number of repetitions divided by the counter, failures counted instead of successes, and a `return` indented inside the loop so that only one repetition runs.",
+        "For the repetitions LO, contrast 10 with 10 000 repetitions of the same experiment: with 10 an estimate of 0.3 or 0.7 for a fair coin is normal, with 10 000 it is not. Do not use the terms 'wet van de grote aantallen', variance or standard deviation.",
+        "For the frequency list, index a list of counters with the outcome (`tellingen[worp]`, with an unused position 0 for a die) and update with `tellingen[worp] = tellingen[worp] + 1`. The sum of two dice counted this way shows why 7 comes up more often than 2 or 12: there are more ways to throw it.",
+        "The output of these scripts is random, so never ask for 'the output': ask which results are possible or impossible, around which value an estimate lies, or give the random values that were drawn and ask what happens then. State every rule of the game or situation in the question itself: the student must not need probability theory, and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random` and `random.choice` — no uniform, shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, f-strings, `+=`, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_estimate_chance",
+          "statement": "Je kan een functie schrijven die een experiment een gegeven aantal keer herhaalt, de successen telt en het aandeel successen teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_estimate_value",
+          "statement": "Je kan van een script dat de kans op een eenvoudige gebeurtenis schat voorspellen rond welke waarde de uitvoer ligt en dat die bij elke run een beetje verschilt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_more_repetitions",
+          "statement": "Je kan uitleggen waarom een schatting met veel herhalingen betrouwbaarder is dan een met weinig herhalingen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_frequency_list",
+          "statement": "Je kan met een lijst van tellers bijhouden hoe vaak elke uitkomst van een experiment voorkomt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_model_the_mechanism",
+          "statement": "Je kan uitleggen waarom je de som van twee dobbelstenen naspeelt met twee worpen en niet met één toevalsgetal van 2 tot 12.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "fix_estimate_bug",
+          "statement": "Je kan een fout in een schattingsscript opsporen en verbeteren, zoals een teller die binnen de lus opnieuw op nul gezet wordt of een deling door het verkeerde aantal.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "oppervlakte-schatten",
+      "type": "goal",
+      "parentId": "toeval-simulatie",
+      "title": "Een oppervlakte schatten met toevallige punten",
+      "description": "Je kan toevallige punten binnen een rechthoek maken, nagaan of een punt binnen een figuur ligt, en uit het aandeel treffers de oppervlakte van die figuur schatten, zoals een cirkel of het gebied onder een grafiek.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Frame it as throwing darts blindly at a rectangle that encloses the shape: the share of darts inside the shape is the share of the rectangle's area that the shape covers.",
+        "Always give the test for 'inside' in the question: for a circle with centre (0, 0) and radius r it is `x ** 2 + y ** 2 < r ** 2`; for the area under a graph it is `y < f(x)`, with f written as a function as in the functions goal.",
+        "Probe the forgotten last step — the share of hits is not yet the area, it still has to be multiplied by the area of the rectangle — and a rectangle that does not enclose the whole shape.",
+        "Estimating pi with a quarter circle in the square from 0 to 1 (hits divided by total, times 4) is welcome as one context among others: the area under a parabola, an ellipse, a lake on a map described by a condition.",
+        "The output of these scripts is random, so never ask for 'the output': ask around which value an estimate lies, whether a given point counts as a hit, or give the random values that were drawn and ask what happens then. State every rule and formula in the question itself: the student must not need probability theory or know an area formula by heart.",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform`, which is introduced in this subgoal — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `+=`, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_random_point",
+          "statement": "Je kan een toevallig punt binnen een gegeven rechthoek maken met random.uniform voor elke coördinaat.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_point_is_hit",
+          "statement": "Je kan voor een gegeven punt voorspellen of een voorwaarde het als treffer binnen de figuur telt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_region_condition",
+          "statement": "Je kan een voorwaarde schrijven die nagaat of een punt binnen een figuur ligt, zoals een cirkel of het gebied onder de grafiek van een functie.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_area_estimate",
+          "statement": "Je kan een oppervlakte schatten door het aandeel treffers te vermenigvuldigen met de oppervlakte van de rechthoek.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_share_is_area",
+          "statement": "Je kan uitleggen waarom het aandeel toevallige punten binnen een figuur haar oppervlakte benadert.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "toevalswandeling",
+      "type": "goal",
+      "parentId": "toeval-simulatie",
+      "title": "Toevalswandelingen",
+      "description": "Je kan een toevalswandeling programmeren waarbij een positie bij elke stap toevallig verandert, de afgelegde weg in een lijst bewaren, een wandeling laten stoppen bij een grens, en uitleggen wat vele herhaalde wandelingen tonen dat één wandeling niet toont.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Start with the walk on a line: a position that starts at 0 and goes one step up or down with `random.choice([-1, 1])`. Probe that after an odd number of steps the position is odd, so 0 is impossible, and that the farthest reachable position equals the number of steps.",
+        "For the boundary LO use a `while` with both limits in the condition (`while 0 < geld and geld < doel`) and return which limit was reached or how many steps it took; `break` has not been introduced.",
+        "For the reason LO, combine the walk with the repeat-and-average pattern from the earlier subgoals: steps up and down cancel out in the average end position, but the distance `abs(positie)` never cancels. The built-in `abs()` is introduced in this subgoal.",
+        "For turtle walks, turn to a random direction with `t.left(random.choice([0, 90, 180, 270]))` or `t.left(random.randint(0, 359))` and then go a fixed step forward; stay within the turtle commands from the earlier goals.",
+        "The output of these scripts is random, so never ask for 'the output': ask which positions are possible or impossible, or give the random steps that were drawn and ask where the walk ends. State the step rule in the question itself and vary the setting: a walker who has lost his way, a pollen grain pushed around by water molecules, a player who wins or loses 1 euro per round, a share price that rises or falls a little every day. The student must not need probability theory.",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform` — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `+=`, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`, apart from turtle drawing functions; the main script prints."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_reachable_positions",
+          "statement": "Je kan voorspellen welke posities een toevalswandeling na een gegeven aantal stappen kan bereiken en welke niet.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_random_walk",
+          "statement": "Je kan een functie schrijven die een toevalswandeling van een gegeven aantal stappen uitvoert en de eindpositie teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_walk_history",
+          "statement": "Je kan alle posities van een toevalswandeling in een lijst bewaren en die lijst teruggeven.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_walk_until_boundary",
+          "statement": "Je kan een toevalswandeling schrijven die stopt zodra een grens bereikt is, zoals een speler die blut is of zijn doel haalt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_position_vs_distance",
+          "statement": "Je kan uitleggen waarom de gemiddelde eindpositie van vele eerlijke wandelingen rond nul ligt terwijl de gemiddelde afstand tot het startpunt groeit met het aantal stappen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_turtle_random_walk",
+          "statement": "Je kan met turtle een toevalswandeling tekenen waarbij de richting bij elke stap toevallig gekozen wordt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "situatie-simuleren",
+      "type": "goal",
+      "parentId": "toeval-simulatie",
+      "title": "Van situatie naar simulatie",
+      "description": "Je kan een beschreven situatie met toeval vertalen naar een simulatie: bepalen wat één experiment is, dat experiment als functie schrijven, het vaak herhalen om een kans of een gemiddelde te schatten, en de simulatie controleren met een geval waarvan je het antwoord kent.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Elicit the plan before code: what is one experiment, what does it return (True or False, or a number), what is counted or averaged, and how many repetitions — as in functies-combineren, one function for the experiment and one that repeats it.",
+        "Use situations whose answer is not obvious and describe them completely: shared birthdays in a group (365 equally likely days), the three-door game with a host who always opens an empty door, a batch with defective products, a queue, a dice game with a stake and a payout, atoms that each decay with a given chance per step. For averages ask for the average profit per round or the average number of attempts until success.",
+        "For drawing without replacement and for 'is there a duplicate', stay with lists: `random.choice` followed by `remove`, `in`, `append`, and an early `return` as in the functions goal.",
+        "For the check LO, push for a case with a known answer before a surprising result is trusted: set a chance to 0 or 1, take a group of 366 people, a game that cannot be lost, or a fair coin.",
+        "The output of these scripts is random, so never ask for 'the output': ask around which value an estimate lies, or give the random values that were drawn and ask what the experiment returns. State every rule of the game or situation in the question itself: the student must not need probability theory — no combinations, expected-value formulas or conditional probability — and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform` — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `+=`, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "decompose_simulation",
+          "statement": "Je kan voor een beschreven situatie aangeven wat één experiment is, wat je telt of meet, en hoe vaak je het herhaalt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_experiment_function",
+          "statement": "Je kan één experiment met meerdere toevallige stappen schrijven als functie die True of False of een getal teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_experiment_for_given_draws",
+          "statement": "Je kan van een experimentfunctie voorspellen wat ze teruggeeft als je weet welke toevalswaarden getrokken worden.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_repeat_until_event",
+          "statement": "Je kan een experiment schrijven dat doorgaat tot een gebeurtenis zich voordoet en het aantal pogingen teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_average_of_experiment",
+          "statement": "Je kan een gemiddelde schatten door een experiment dat een getal teruggeeft vele keren te herhalen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "choose_sanity_check",
+          "statement": "Je kan een simulatie controleren met een geval waarvan je het antwoord kent, zoals een kans van 0 of 1 of een eerlijke munt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}
