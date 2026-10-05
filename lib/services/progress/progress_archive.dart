@@ -11,7 +11,15 @@
 // and the difficulty calibration — everything the conductor reads to decide
 // what to ask next. What does not: `turn_history`, which is a debugging /
 // analytics log of raw tutor turns rather than student state, and would make
-// the file an order of magnitude larger for no behavioural difference.
+// the file an order of magnitude larger for no behavioural difference — nor
+// `turn_content` (#228), the question, answer and feedback next to each of
+// those turns.
+//
+// An import replaces the state it carries and leaves the rest alone: the
+// account's `turn_history` stays, and so does its `turn_content` (#232). The
+// content goes with its turn records — a progress reset deletes both, an
+// import neither — so a turn is never left without the record next to it.
+// The question bank is never touched.
 //
 // The file carries no uid, no email and no key: identity is stamped on write
 // by the services, from whoever is signed in at import time.

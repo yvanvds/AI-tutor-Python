@@ -3,6 +3,9 @@
 // and a `ttl` that runs out at the end of the school year. Best-effort like
 // the question bank: without the container, or when Cosmos fails or does
 // not answer, nothing is thrown and nothing waits.
+//
+// #232 — a progress reset deletes it: the student's docs, all or one
+// subgoal's, after the writes still on their way. Best-effort as well.
 
 import 'dart:async';
 
@@ -20,10 +23,73 @@ import '../../helpers/unprovisioned_cosmos.dart';
 
 final DateTime _turnAt = DateTime.utc(2026, 10, 2, 9, 15);
 
-TurnContent _content({String id = 't-1', DateTime? at}) => TurnContent(
+/// A stored doc of [uid] on [subgoalId], as far as a delete reads it.
+Map<String, dynamic> _stored(String id, String uid, String subgoalId) => {
+  'id': id,
+  'uid': uid,
+  'type': 'turn_content',
+  'subgoalId': subgoalId,
+};
+
+/// [InMemoryCosmos], with the writes held until [open] and the deletes of
+/// [goneIds] answered as Cosmos answers a doc whose `ttl` ran out between
+/// the query and the delete.
+class _HeldContainer implements CosmosContainer {
+  _HeldContainer(this._store, {this.goneIds = const {}});
+
+  final InMemoryCosmos _store;
+  final Set<String> goneIds;
+  final Completer<void> _gate = Completer<void>();
+
+  void open() => _gate.complete();
+
+  @override
+  Future<Map<String, dynamic>> upsert(
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+  }) async {
+    await _gate.future;
+    return _store.container.upsert(doc, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<void> delete(String id, {required Object partitionKey}) async {
+    if (goneIds.contains(id)) {
+      throw CosmosException(
+        404,
+        'Entity with the specified id does not exist in the system.',
+        code: 'NotFound',
+      );
+    }
+    return _store.container.delete(id, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String sql, {
+    Map<String, Object?> parameters = const {},
+    Object? partitionKey,
+    bool crossPartition = false,
+  }) => _store.container.query(
+    sql,
+    parameters: parameters,
+    partitionKey: partitionKey,
+    crossPartition: crossPartition,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
+
+TurnContent _content({
+  String id = 't-1',
+  DateTime? at,
+  String subgoalId = 's1',
+}) => TurnContent(
   id: id,
   turnAt: at ?? _turnAt,
-  subgoalId: 's1',
+  subgoalId: subgoalId,
   questionType: 'mcQuestion',
   isFollowUp: false,
   question: const TurnContentQuestion(
@@ -210,6 +276,83 @@ void main() {
       now = now.add(kTurnContentRetryAfter);
       await s.record(_content(id: 't-3'));
       expect(missing.requests.length, greaterThan(afterFirst));
+    });
+  });
+
+  group('a progress reset (#232)', () {
+    setUp(() {
+      store = InMemoryCosmos([
+        _stored('t-1', 'u1', 's1'),
+        _stored('t-2', 'u1', 's2'),
+        _stored('t-3', 'u2', 's1'),
+      ]);
+    });
+
+    test(
+      'deletes every doc of the signed-in student, and only theirs',
+      () async {
+        await service().deleteAllForCurrentUser();
+        expect(store.docs.keys, ['t-3']);
+      },
+    );
+
+    test('of one subgoal deletes the docs of the student on it, and only '
+        'those', () async {
+      await service().deleteAllForSubgoal('s1');
+      expect(store.docs.keys, ['t-2', 't-3']);
+    });
+
+    test('deletes nothing without a signed-in student', () async {
+      uid = null;
+      await service().deleteAllForCurrentUser();
+      await service().deleteAllForSubgoal('s1');
+      expect(store.docs.keys, ['t-1', 't-2', 't-3']);
+    });
+
+    test('also deletes a write that was still on its way: the delete waits '
+        'for the writes queued before it', () async {
+      final held = _HeldContainer(store);
+      final s = service(container: held);
+
+      unawaited(s.record(_content(id: 't-4', subgoalId: 's1')));
+      final deleted = s.deleteAllForCurrentUser();
+      held.open();
+      await deleted;
+
+      expect(store.docs.keys, ['t-3']);
+    });
+
+    test('skips a doc that is already gone and deletes the rest', () async {
+      final held = _HeldContainer(store, goneIds: {'t-1'})..open();
+      await service(container: held).deleteAllForCurrentUser();
+      expect(store.docs.keys, ['t-1', 't-3']);
+    });
+
+    test('a failing delete is swallowed: nothing is thrown', () async {
+      final failing = MockCosmosContainer();
+      when(
+        () => failing.query(
+          any(),
+          parameters: any(named: 'parameters'),
+          partitionKey: any(named: 'partitionKey'),
+          crossPartition: any(named: 'crossPartition'),
+        ),
+      ).thenThrow(CosmosException(503, 'Service unavailable'));
+      final s = service(container: failing);
+      await expectLater(s.deleteAllForCurrentUser(), completes);
+      await expectLater(s.deleteAllForSubgoal('s1'), completes);
+    });
+
+    test('without the container it completes, and is tried even while the '
+        'writes are left alone', () async {
+      final missing = UnprovisionedCosmos('turn_content');
+      final s = service(container: missing.container);
+
+      await s.record(_content());
+      final afterWrite = missing.requests.length;
+
+      await expectLater(s.deleteAllForCurrentUser(), completes);
+      expect(missing.requests.length, greaterThan(afterWrite));
     });
   });
 }

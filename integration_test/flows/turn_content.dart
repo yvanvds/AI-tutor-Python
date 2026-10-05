@@ -13,6 +13,12 @@
 // And it is best-effort, like the question bank: without the container the
 // student practises as before.
 //
+// #232 — a progress reset takes it along: "Reset all progress" deletes the
+// content of every oefening with its turn record, and resetting one subgoal
+// the content on that subgoal — and the dialog says so, in the student's
+// language. The question bank stays exactly as it was, also the questions
+// this student was the first to get: it is kept for next year.
+//
 // Real app, real navigation (learning path → theory → practice), real
 // practice view, editor and hint button, real TutorService → grader payload
 // → scope check → conductor → turn content service → in-memory Cosmos. Only
@@ -24,19 +30,25 @@
 // Run just this flow:
 //   flutter test integration_test/flows/turn_content.dart -d windows
 
+import 'dart:convert';
+
 import 'package:ai_tutor_python/core/keep_until.dart';
+import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
+import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../../test/helpers/in_memory_cosmos.dart';
 import '../../test/helpers/unprovisioned_cosmos.dart';
 import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
@@ -91,6 +103,78 @@ Map<String, dynamic> _config(String keepUntil) => {
   'ApiKey': '',
   'TurnContentKeepUntil': keepUntil,
 };
+
+/// A bank question on "Print" about what `print(a + b)` shows, the first
+/// time asked to [createdByUid], and counted since.
+Map<String, dynamic> _bankDoc(int a, int b, {required String createdByUid}) => {
+  ...BankQuestion.fromResponse(
+    MultipleChoice(
+      type: 'multiple_choice',
+      prompt: 'Wat drukt dit af?',
+      code: 'print($a + $b)',
+      options: ['$a$b', '${a + b}', 'Error'],
+      correct: '${a + b}',
+    ),
+    subgoalId: 's1',
+    rootGoalId: 'r1',
+    targetLOIds: const ['lo-print'],
+    difficulty: QuestionDifficulty.medium,
+    language: 'en',
+    model: 'gpt-5-mini',
+    createdByUid: createdByUid,
+    createdAt: DateTime.utc(2026, 9, 20),
+  )!.toMap(),
+  'askedCount': 4,
+  'answeredCount': 3,
+  'correctCount': 2,
+  'lastAskedAt': '2026-09-29T10:00:00.000Z',
+};
+
+/// The question bank: one question this student was the first to get, one
+/// another student was.
+List<Map<String, dynamic>> _bank() => [
+  _bankDoc(1, 1, createdByUid: kStudentUid),
+  _bankDoc(2, 2, createdByUid: 'another-student'),
+];
+
+typedef _BankSnapshot = ({
+  Map<String, dynamic> docs,
+  Map<String, String?> etags,
+});
+
+/// The bank as it stands, docs and `_etag`s: a write that left a doc as it
+/// was still gives it a new `_etag`.
+_BankSnapshot _snapshot(InMemoryCosmos bank) => (
+  docs: jsonDecode(jsonEncode(bank.docs)) as Map<String, dynamic>,
+  etags: {for (final id in bank.docs.keys) id: bank.etagOf(id)},
+);
+
+/// Not a bank question deleted, changed or even written again.
+void _expectUntouched(InMemoryCosmos bank, _BankSnapshot before) {
+  expect(bank.docs, hasLength(2));
+  expect(bank.docs, equals(before.docs));
+  expect(
+    {for (final id in bank.docs.keys) id: bank.etagOf(id)},
+    before.etags,
+    reason: 'a bank question was written',
+  );
+  expect(
+    bank.docs.values.where((d) => d['createdByUid'] == kStudentUid),
+    hasLength(1),
+  );
+}
+
+/// Brings [finder] on the Options page into view and taps it.
+Future<void> _tapInOptions(WidgetTester tester, Finder finder) async {
+  final scrollable = optionsScrollable();
+  tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+  await tester.pump();
+  await tester.scrollUntilVisible(finder, 120, scrollable: scrollable);
+  await tester.ensureVisible(finder);
+  await tester.pump(const Duration(milliseconds: 200));
+  await tester.tap(finder);
+  await tester.pump();
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -295,6 +379,116 @@ void main() {
       'schooljaar, zodat je leerkracht kan zien waar het vastloopt.',
     );
     expect(find.text('Je antwoorden'), findsOneWidget);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('Reset all progress takes the content of the oefeningen along '
+      'with their turn records, says so, and leaves the question bank as it '
+      'was', (tester) async {
+    final llm = ScriptedLlm(_script());
+    final harness = AppHarness(
+      llm: llm,
+      extraDocs: {
+        'config': [_config('06-30')],
+        'questions': _bank(),
+      },
+    );
+    await harness.boot(tester);
+
+    await openExercise(tester);
+    await hintAnswerAndGoOn(tester, harness);
+    expect(llm.remaining, 0);
+
+    final contents = harness.cosmos['turn_content'];
+    final turns = harness.cosmos['turn_history'];
+    await pumpUntil(
+      tester,
+      () => contents.docs.isNotEmpty,
+      reason: 'no content was written for the oefening',
+    );
+    expect(contents.docs.keys, turns.docs.keys);
+    final bank = harness.cosmos['questions'];
+    final before = _snapshot(bank);
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+    await _tapInOptions(tester, find.text('Reset all progress'));
+    await pumpUntilFound(tester, find.text('Reset all progress?'));
+    expect(
+      find.text(
+        'This deletes all your progress, learning history, tutor beliefs, '
+        'questions and answers, and resets the difficulty calibration to '
+        'medium. This cannot be undone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset everything'));
+    await pumpUntilFound(tester, find.text('All progress has been reset.'));
+
+    expect(contents.docs, isEmpty);
+    expect(turns.docs, isEmpty);
+    _expectUntouched(bank, before);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('resetting one subgoal takes the content of the oefeningen on '
+      'it along, says so in Dutch, and leaves the rest and the question bank '
+      'as they were', (tester) async {
+    Map<String, dynamic> content(String id, String uid, String subgoalId) => {
+      'id': id,
+      'uid': uid,
+      'type': 'turn_content',
+      'turnAt': '2026-10-01T09:00:00.000Z',
+      'subgoalId': subgoalId,
+      'feedback': 'Bijna.',
+    };
+    final harness = AppHarness(
+      extraDocs: {
+        'turn_content': [
+          content('t1', kStudentUid, 's1'),
+          content('t2', kStudentUid, 's1'),
+          content('t3', kStudentUid, 's2'),
+          content('t4', 'another-student', 's1'),
+        ],
+        'questions': _bank(),
+      },
+    );
+    await harness.boot(tester);
+    final contents = harness.cosmos['turn_content'];
+    final bank = harness.cosmos['questions'];
+    final before = _snapshot(bank);
+
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+    tester.state<ScrollableState>(optionsScrollable()).position.jumpTo(0);
+    await tester.pump();
+    await tester.tap(find.text('Nederlands'));
+    await pumpUntilFound(tester, find.text('Opties'));
+
+    await _tapInOptions(tester, find.text('Eén doel wissen…'));
+    await pumpUntilFound(tester, find.text('Voortgang van een doel wissen'));
+    final printRow = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Print'),
+    );
+    await pumpUntilFound(tester, printRow);
+    await tester.tap(printRow);
+    await pumpUntilFound(tester, find.text('"Print" wissen?'));
+    expect(
+      find.text(
+        'Je voortgang, leergeschiedenis, tutorinschattingen, vragen en '
+        'antwoorden voor dit subdoel worden verwijderd. Dit kan niet '
+        'ongedaan gemaakt worden.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Wissen'));
+    await pumpUntilFound(tester, find.text('Voortgang van "Print" is gewist.'));
+
+    expect(contents.docs.keys, ['t3', 't4']);
+    _expectUntouched(bank, before);
 
     await harness.dispose(tester);
   });

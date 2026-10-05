@@ -590,7 +590,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_progress_resetAll_dialog_message =>
-      'This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.';
+      'This deletes all your progress, learning history, tutor beliefs, questions and answers, and resets the difficulty calibration to medium. This cannot be undone.';
 
   @override
   String get options_progress_resetAll_dialog_confirm => 'Reset everything';
@@ -625,11 +625,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_progress_resetGoal_confirm_message_subgoal =>
-      'Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.';
+      'Your progress, learning history, tutor beliefs, questions and answers for this subgoal will be deleted. This cannot be undone.';
 
   @override
   String get options_progress_resetGoal_confirm_message_root =>
-      'Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.';
+      'Your progress, learning history, tutor beliefs, questions and answers for every subgoal of this goal will be deleted. This cannot be undone.';
 
   @override
   String get options_progress_resetGoal_confirm_button => 'Reset';

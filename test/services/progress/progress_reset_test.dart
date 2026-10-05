@@ -1,13 +1,23 @@
+// Issue #25 — the Options panel's progress reset, everything or one goal.
+// #232 — it takes the content of the oefeningen (`turn_content`) along with
+// their turn records, last and best-effort: a missing container or a failed
+// delete does not fail the reset of the rest.
+
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_reset.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/student_state/lo_beliefs_service.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
+import 'package:ai_tutor_python/services/student_state/turn_content_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_history_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/mocks.dart';
+import '../../helpers/unprovisioned_cosmos.dart';
 
 const _uid = 'u1';
 const _other = 'u2';
@@ -45,8 +55,32 @@ void main() {
   late InMemoryCosmos history;
   late InMemoryCosmos beliefs;
   late InMemoryCosmos turns;
+  late InMemoryCosmos contents;
   late List<StudentCalibration> calibrations;
   late ProgressReset reset;
+
+  ProgressReset resetWith({required CosmosContainer turnContent}) =>
+      ProgressReset(
+        goals: GoalsService(container: goals.container),
+        progress: ProgressService(
+          container: progress.container,
+          historyContainer: history.container,
+          getUid: () => _uid,
+        ),
+        loBeliefs: LoBeliefsService(
+          container: beliefs.container,
+          getUid: () => _uid,
+        ),
+        turnHistory: TurnHistoryService(
+          container: turns.container,
+          getUid: () => _uid,
+        ),
+        turnContent: TurnContentService(
+          container: turnContent,
+          getUid: () => _uid,
+        ),
+        setCalibration: (c) async => calibrations.add(c),
+      );
 
   setUp(() {
     goals = InMemoryCosmos([
@@ -78,24 +112,14 @@ void main() {
       _bySubgoal('t2', _uid, 's2'),
       _bySubgoal('t3', _other, 's1'),
     ]);
+    // The content of each turn, next to its record with the same id.
+    contents = InMemoryCosmos([
+      _bySubgoal('t1', _uid, 's1'),
+      _bySubgoal('t2', _uid, 's2'),
+      _bySubgoal('t3', _other, 's1'),
+    ]);
     calibrations = [];
-    reset = ProgressReset(
-      goals: GoalsService(container: goals.container),
-      progress: ProgressService(
-        container: progress.container,
-        historyContainer: history.container,
-        getUid: () => _uid,
-      ),
-      loBeliefs: LoBeliefsService(
-        container: beliefs.container,
-        getUid: () => _uid,
-      ),
-      turnHistory: TurnHistoryService(
-        container: turns.container,
-        getUid: () => _uid,
-      ),
-      setCalibration: (c) async => calibrations.add(c),
-    );
+    reset = resetWith(turnContent: contents.container);
   });
 
   test(
@@ -107,6 +131,7 @@ void main() {
       expect(history.docs.keys, ['h3']);
       expect(beliefs.docs.keys, ['b3']);
       expect(turns.docs.keys, ['t3']);
+      expect(contents.docs.keys, ['t3']);
       expect(
         calibrations.single.difficulty,
         StudentCalibration.defaultDifficulty,
@@ -130,6 +155,7 @@ void main() {
       expect(history.docs.keys, ['h2', 'h3']);
       expect(beliefs.docs.keys, ['b2', 'b3']);
       expect(turns.docs.keys, ['t2', 't3']);
+      expect(contents.docs.keys, ['t2', 't3']);
       expect(calibrations, isEmpty);
     },
   );
@@ -143,6 +169,7 @@ void main() {
     expect(history.docs.keys, ['h3']);
     expect(beliefs.docs.keys, ['b3']);
     expect(turns.docs.keys, ['t3']);
+    expect(contents.docs.keys, ['t3']);
   });
 
   test('resetGoal tolerates a subgoal without any stored state', () async {
@@ -152,5 +179,46 @@ void main() {
 
     expect(progress['${_uid}_s3'], isNull);
     expect(progress['${_uid}_r2']!['progress'], 0.0);
+  });
+
+  group('the content of the oefeningen is best-effort', () {
+    void expectRestReset() {
+      expect(progress.docs.keys, ['${_other}_s1']);
+      expect(history.docs.keys, ['h3']);
+      expect(beliefs.docs.keys, ['b3']);
+      expect(turns.docs.keys, ['t3']);
+      expect(
+        calibrations.single.difficulty,
+        StudentCalibration.defaultDifficulty,
+      );
+    }
+
+    test('without a `turn_content` container the rest is reset all the '
+        'same', () async {
+      final missing = UnprovisionedCosmos('turn_content');
+      await resetWith(turnContent: missing.container).resetAll();
+
+      expect(missing.requests, isNotEmpty, reason: 'it was tried');
+      expectRestReset();
+    });
+
+    test('a failing delete does not fail the reset', () async {
+      final failing = MockCosmosContainer();
+      when(
+        () => failing.query(
+          any(),
+          parameters: any(named: 'parameters'),
+          partitionKey: any(named: 'partitionKey'),
+          crossPartition: any(named: 'crossPartition'),
+        ),
+      ).thenThrow(CosmosException(503, 'Service unavailable'));
+      final failingReset = resetWith(turnContent: failing);
+
+      await failingReset.resetAll();
+      expectRestReset();
+
+      final s3 = Goal(id: 's3', title: 'Def', parentId: 'r2', order: 1000);
+      await expectLater(failingReset.resetGoal(s3), completion(1));
+    });
   });
 }

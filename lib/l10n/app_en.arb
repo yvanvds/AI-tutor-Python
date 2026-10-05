@@ -320,7 +320,7 @@
   "options_progress_subtitle": "Clearing progress also clears the tutor's memory of what you know. It cannot be undone.",
   "options_progress_resetAll_button": "Reset all progress",
   "options_progress_resetAll_dialog_title": "Reset all progress?",
-  "options_progress_resetAll_dialog_message": "This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.",
+  "options_progress_resetAll_dialog_message": "This deletes all your progress, learning history, tutor beliefs, questions and answers, and resets the difficulty calibration to medium. This cannot be undone.",
   "options_progress_resetAll_dialog_confirm": "Reset everything",
   "options_progress_resetAll_done": "All progress has been reset.",
   "options_progress_resetGoal_button": "Reset one goal…",
@@ -335,8 +335,8 @@
   "@options_progress_resetGoal_confirm_title": {
     "placeholders": { "title": { "type": "String" } }
   },
-  "options_progress_resetGoal_confirm_message_subgoal": "Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.",
-  "options_progress_resetGoal_confirm_message_root": "Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.",
+  "options_progress_resetGoal_confirm_message_subgoal": "Your progress, learning history, tutor beliefs, questions and answers for this subgoal will be deleted. This cannot be undone.",
+  "options_progress_resetGoal_confirm_message_root": "Your progress, learning history, tutor beliefs, questions and answers for every subgoal of this goal will be deleted. This cannot be undone.",
   "options_progress_resetGoal_confirm_button": "Reset",
   "options_progress_resetGoal_done": "Progress for \"{title}\" has been reset.",
   "@options_progress_resetGoal_done": {

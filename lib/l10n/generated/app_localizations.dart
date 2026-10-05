@@ -1048,7 +1048,7 @@ abstract class AppLocalizations {
   /// No description provided for @options_progress_resetAll_dialog_message.
   ///
   /// In en, this message translates to:
-  /// **'This deletes all progress, learning history and tutor beliefs for your account, and resets the difficulty calibration to medium. This cannot be undone.'**
+  /// **'This deletes all your progress, learning history, tutor beliefs, questions and answers, and resets the difficulty calibration to medium. This cannot be undone.'**
   String get options_progress_resetAll_dialog_message;
 
   /// No description provided for @options_progress_resetAll_dialog_confirm.
@@ -1102,13 +1102,13 @@ abstract class AppLocalizations {
   /// No description provided for @options_progress_resetGoal_confirm_message_subgoal.
   ///
   /// In en, this message translates to:
-  /// **'Progress, learning history and tutor beliefs for this subgoal will be deleted. This cannot be undone.'**
+  /// **'Your progress, learning history, tutor beliefs, questions and answers for this subgoal will be deleted. This cannot be undone.'**
   String get options_progress_resetGoal_confirm_message_subgoal;
 
   /// No description provided for @options_progress_resetGoal_confirm_message_root.
   ///
   /// In en, this message translates to:
-  /// **'Progress, learning history and tutor beliefs for every subgoal of this goal will be deleted. This cannot be undone.'**
+  /// **'Your progress, learning history, tutor beliefs, questions and answers for every subgoal of this goal will be deleted. This cannot be undone.'**
   String get options_progress_resetGoal_confirm_message_root;
 
   /// No description provided for @options_progress_resetGoal_confirm_button.

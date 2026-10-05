@@ -12,7 +12,13 @@
 // at midnight Belgian time. The container has `defaultTtl: -1` — TTL on,
 // no default — so a doc without one would be kept forever.
 //
-// Only written here; read by the teacher's tooling (`evaluate.py trace`).
+// Written here, and deleted here when the student resets their progress
+// (#232): everything, or one subgoal — the docs next to the `turn_history`
+// records the reset deletes. Best-effort as well: the reset of progress,
+// beliefs and history never waits on it or fails by it. Never the question
+// bank (`questions`): it is kept for next year, also the questions this
+// student was the first to get. Read by the teacher's tooling
+// (`evaluate.py trace`).
 
 import 'dart:async';
 
@@ -54,15 +60,31 @@ class TurnContentService {
   /// Writes [content] for the signed-in student, kept until [keepUntil]
   /// (the school's day, `null` for 1 July) after its turn. Never throws;
   /// the returned future is for tests — the tutor does not wait for it.
-  Future<void> record(TurnContent content, {KeepUntil? keepUntil}) {
-    final run = _tail.then((_) => _write(content, keepUntil));
+  Future<void> record(TurnContent content, {KeepUntil? keepUntil}) =>
+      _enqueue(() => _write(content, keepUntil));
+
+  /// Deletes every `turn_content` doc of the signed-in student (#232):
+  /// "Reset all progress" takes the content of the oefeningen along with
+  /// their `turn_history` records. Queued behind the writes made so far, so
+  /// one still on its way is deleted too. Never throws.
+  Future<void> deleteAllForCurrentUser() => _enqueue(() => _delete(null));
+
+  /// Deletes the signed-in student's docs on [subgoalId] (#232): the
+  /// subgoal of the asked LO, as on the turn record, so what goes is what
+  /// the reset of that subgoal deletes from `turn_history`. Queued and
+  /// never throws, like [deleteAllForCurrentUser].
+  Future<void> deleteAllForSubgoal(String subgoalId) =>
+      _enqueue(() => _delete(subgoalId));
+
+  /// Waits for every write and delete queued so far. For tests.
+  @visibleForTesting
+  Future<void> get idle => _tail;
+
+  Future<void> _enqueue(Future<void> Function() op) {
+    final run = _tail.then((_) => op());
     _tail = run;
     return run;
   }
-
-  /// Waits for every write queued so far. For tests.
-  @visibleForTesting
-  Future<void> get idle => _tail;
 
   Future<void> _write(TurnContent content, KeepUntil? keepUntil) async {
     if (!_available) return;
@@ -92,6 +114,47 @@ class TurnContentService {
       debugPrint('TurnContentService: write ${content.id} failed: $e');
     } catch (e) {
       debugPrint('TurnContentService: write ${content.id} failed: $e');
+    }
+  }
+
+  /// Tried even while writes are left alone: a reset is rare, and the
+  /// container may have been created since. A missing container has nothing
+  /// to delete; a doc already gone (its `ttl` ran out) is skipped; any other
+  /// failure stops the delete, logged.
+  Future<void> _delete(String? subgoalId) async {
+    try {
+      final uid = _getUid();
+      if (uid == null) return;
+      await safeCosmos(() async {
+        final docs = await _container.query(
+          subgoalId == null
+              ? 'SELECT c.id FROM c WHERE c.uid = @uid'
+              : 'SELECT c.id FROM c WHERE c.uid = @uid AND c.subgoalId = @sid',
+          parameters: {'@uid': uid, '@sid': ?subgoalId},
+          partitionKey: uid,
+        );
+        for (final doc in docs) {
+          final id = doc['id'];
+          if (id is! String) continue;
+          try {
+            await _container.delete(id, partitionKey: uid);
+          } on CosmosException catch (e) {
+            if (e.statusCode != 404 || e.isContainerNotFound) rethrow;
+          }
+        }
+      });
+    } on CosmosException catch (e) {
+      if (e.isContainerNotFound) {
+        _unavailableUntil = _now().add(kTurnContentRetryAfter);
+        debugPrint(
+          'TurnContentService: no `turn_content` container — nothing to '
+          'delete. $e',
+        );
+        return;
+      }
+      debugPrint('TurnContentService: delete failed: $e');
+    } catch (e) {
+      debugPrint('TurnContentService: delete failed: $e');
     }
   }
 

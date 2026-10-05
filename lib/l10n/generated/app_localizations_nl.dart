@@ -592,7 +592,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_progress_resetAll_dialog_message =>
-      'Dit verwijdert alle voortgang, leergeschiedenis en tutorinschattingen van je account en zet de moeilijkheidsgraad terug op gemiddeld. Dit kan niet ongedaan gemaakt worden.';
+      'Dit verwijdert al je voortgang, leergeschiedenis, tutorinschattingen, vragen en antwoorden en zet de moeilijkheidsgraad terug op gemiddeld. Dit kan niet ongedaan gemaakt worden.';
 
   @override
   String get options_progress_resetAll_dialog_confirm => 'Alles wissen';
@@ -627,11 +627,11 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_progress_resetGoal_confirm_message_subgoal =>
-      'Voortgang, leergeschiedenis en tutorinschattingen voor dit subdoel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+      'Je voortgang, leergeschiedenis, tutorinschattingen, vragen en antwoorden voor dit subdoel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
 
   @override
   String get options_progress_resetGoal_confirm_message_root =>
-      'Voortgang, leergeschiedenis en tutorinschattingen voor elk subdoel van dit doel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
+      'Je voortgang, leergeschiedenis, tutorinschattingen, vragen en antwoorden voor elk subdoel van dit doel worden verwijderd. Dit kan niet ongedaan gemaakt worden.';
 
   @override
   String get options_progress_resetGoal_confirm_button => 'Wissen';
