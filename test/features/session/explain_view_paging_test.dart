@@ -127,8 +127,10 @@ void main() {
     ]);
   });
 
-  List<Override> overrides(Goal child) => [
-    goalSelectionProvider.overrideWith(() => _PresetSelection(root, child)),
+  List<Override> overrides(Goal child, {Goal? rootGoal}) => [
+    goalSelectionProvider.overrideWith(
+      () => _PresetSelection(rootGoal ?? root, child),
+    ),
     goalsServiceProvider.overrideWithValue(
       GoalsService(container: goals.container),
     ),
@@ -153,16 +155,21 @@ void main() {
     home: Scaffold(body: home),
   );
 
-  Widget app(Goal child) => ProviderScope(
-    overrides: overrides(child),
+  Widget app(Goal child, {Goal? rootGoal}) => ProviderScope(
+    overrides: overrides(child, rootGoal: rootGoal),
     child: materialApp(const ExplainView()),
   );
 
-  Future<void> mount(WidgetTester tester, {Goal? child}) async {
-    tester.view.physicalSize = const Size(1400, 900);
+  Future<void> mount(
+    WidgetTester tester, {
+    Goal? child,
+    Goal? rootGoal,
+    double width = 1400,
+  }) async {
+    tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(app(child ?? active));
+    await tester.pumpWidget(app(child ?? active, rootGoal: rootGoal));
     // Content poll, sibling poll, stylesheet asset load, channel
     // registration, page load.
     for (var i = 0; i < 6; i++) {
@@ -335,6 +342,114 @@ void main() {
       await settlePage(tester);
       expect(shownLesson(), contains('lesson-one'));
 
+      await unmount(tester);
+    });
+  });
+
+  // #259: next to an open chat in a narrow window — or while the chat slides
+  // shut after the window was made narrow — the lesson column is a few
+  // hundred pixels wide, and the footer's row ran 243 px past it. Now the
+  // footer shows the richest form of itself that fits: first the XP caption
+  // goes, then the words on the paging buttons, then the words on "Try it
+  // yourself", each word kept in its button's tooltip. The widths below are
+  // for the test font, which is wider than the app's.
+  group('explain footer in a narrow column', () {
+    final footer = find.byKey(const Key('explain-footer'));
+
+    /// Every part of the footer on screen lies inside the view.
+    void expectInside(WidgetTester tester) {
+      final view = tester.getRect(find.byType(ExplainView));
+      final parts = find.descendant(
+        of: footer,
+        matching: find.byWidgetPredicate((w) => w is Text || w is Icon),
+      );
+      expect(parts, findsWidgets);
+      for (final part in parts.evaluate()) {
+        final box = part.renderObject! as RenderBox;
+        final r = box.localToGlobal(Offset.zero) & box.size;
+        expect(
+          r.left >= view.left && r.right <= view.right,
+          isTrue,
+          reason: '${part.widget} at $r, view $view',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    }
+
+    testWidgets('a wide column spells everything out', (tester) async {
+      await mount(tester, width: 800);
+      expect(find.text('Previous'), findsOneWidget);
+      expect(find.text('+100 XP on completion'), findsOneWidget);
+      expect(find.text('Try it yourself'), findsOneWidget);
+      expect(find.byTooltip('Previous'), findsNothing);
+      expectInside(tester);
+      await unmount(tester);
+    });
+
+    testWidgets('narrower, the XP caption goes first', (tester) async {
+      await mount(tester, width: 560);
+      expect(find.textContaining('XP on completion'), findsNothing);
+      expect(find.text('Previous'), findsOneWidget);
+      expect(find.text('Try it yourself'), findsOneWidget);
+      expectInside(tester);
+      await unmount(tester);
+    });
+
+    testWidgets('narrower still, the paging buttons keep their words in a '
+        'tooltip, and still page', (tester) async {
+      await mount(tester, width: 400);
+      expect(find.text('Previous'), findsNothing);
+      expect(find.byTooltip('Previous'), findsOneWidget);
+      expect(find.text('Try it yourself'), findsOneWidget);
+      expectInside(tester);
+
+      await tester.tap(find.byTooltip('Previous'));
+      await settlePage(tester);
+      expect(shownLesson(), contains('lesson-one'));
+      expect(find.byTooltip('Next'), findsOneWidget);
+      expectInside(tester);
+
+      await tester.tap(find.byTooltip('Next'));
+      await settlePage(tester);
+      expect(shownLesson(), contains('lesson-three'));
+      expect(find.byTooltip('Next'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('narrowest, Try it yourself is its arrow, and still opens '
+        'practice', (tester) async {
+      await mount(tester, width: 200);
+      expect(find.text('Try it yourself'), findsNothing);
+      expect(find.byTooltip('Previous'), findsOneWidget);
+      expect(find.byTooltip('Try it yourself'), findsOneWidget);
+      expectInside(tester);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ExplainView)),
+      );
+      await tester.tap(find.byTooltip('Try it yourself'));
+      await tester.pump();
+      expect(container.read(modeProvider), SessionMode.practice);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a long goal title ends in an ellipsis before the counter', (
+      tester,
+    ) async {
+      final longRoot = Goal(
+        id: 'r1',
+        title: 'Be able to write and understand very basic Python scripts',
+        order: 1000,
+      );
+      await mount(tester, width: 400, rootGoal: longRoot);
+      expect(tester.takeException(), isNull);
+      final view = tester.getRect(find.byType(ExplainView));
+      final counter = tester.getRect(find.text('3 / 4'));
+      expect(counter.right, lessThanOrEqualTo(view.right));
+      final pill = tester.getRect(find.text(longRoot.title.toUpperCase()));
+      expect(pill.right, lessThan(counter.left));
       await unmount(tester);
     });
   });

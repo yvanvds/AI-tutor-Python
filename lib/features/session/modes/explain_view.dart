@@ -12,6 +12,7 @@ import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/translation/translations_provider.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/first_that_fits.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,6 +185,7 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
                 : const _MissingContent(),
           ),
           _ChromeFooter(
+            key: const Key('explain-footer'),
             onPrevious: previous == null
                 ? null
                 : () => setState(() => _viewingId = previous.id),
@@ -396,27 +398,37 @@ class _ChromeHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s,
-              vertical: 3,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              pill,
-              style: TextStyle(
-                color: AppColors.accent,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.6,
+          // A long goal title ends in an ellipsis next to the counter rather
+          // than running past a narrow lesson column (#259).
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  pill,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
+                  ),
+                ),
               ),
             ),
           ),
-          const Spacer(),
-          if (showCounter)
+          if (showCounter) ...[
+            const SizedBox(width: AppSpacing.m),
             Text(
               '${idx + 1} / $total',
               style: AppMono.tnum(
@@ -425,6 +437,7 @@ class _ChromeHeader extends ConsumerWidget {
                 color: AppColors.fgFaint,
               ),
             ),
+          ],
         ],
       ),
     );
@@ -433,6 +446,7 @@ class _ChromeHeader extends ConsumerWidget {
 
 class _ChromeFooter extends ConsumerWidget {
   const _ChromeFooter({
+    super.key,
     required this.onPrevious,
     required this.onNext,
     required this.onNewestPage,
@@ -453,6 +467,8 @@ class _ChromeFooter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
+    void tryIt() =>
+        ref.read(modeProvider.notifier).state = SessionMode.practice;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xxxl,
@@ -460,45 +476,96 @@ class _ChromeFooter extends ConsumerWidget {
         AppSpacing.xxxl,
         AppSpacing.xl,
       ),
-      child: Row(
-        children: [
-          _GhostButton(
-            label: l.session_explain_prev_button,
-            icon: Icons.arrow_back,
-            onTap: onPrevious,
-          ),
-          if (onNext != null) ...[
-            const SizedBox(width: AppSpacing.xs),
-            _GhostButton(
-              label: l.session_explain_next_button,
-              icon: Icons.arrow_forward,
-              iconAfterLabel: true,
-              onTap: onNext,
-            ),
-          ],
-          const Spacer(),
-          if (onNewestPage) ...[
-            Text(
-              // The number the shell actually awards for finishing a
-              // subgoal, not a hard-coded one (#116).
-              l.session_explain_completeXp(kXpPerSubgoal),
-              style: TextStyle(
-                color: AppColors.fgFaint,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+      // The richest form that fits the lesson column (#259): next to an
+      // open chat in a narrow window, or while the chat slides shut after
+      // the window was made narrow, the full row does not.
+      child: LayoutBuilder(
+        builder: (context, constraints) => FirstThatFits(
+          children: [
+            for (final density in _FooterDensity.values)
+              ConstrainedBox(
+                // At least the room there is, so the form on screen puts
+                // its two groups at the two edges. A form that needs more
+                // is one FirstThatFits passes over.
+                constraints: BoxConstraints(
+                  minWidth: constraints.hasBoundedWidth
+                      ? constraints.maxWidth
+                      : 0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _GhostButton(
+                          label: l.session_explain_prev_button,
+                          icon: Icons.arrow_back,
+                          withLabel: density.pagingLabels,
+                          onTap: onPrevious,
+                        ),
+                        if (onNext != null) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          _GhostButton(
+                            label: l.session_explain_next_button,
+                            icon: Icons.arrow_forward,
+                            iconAfterLabel: true,
+                            withLabel: density.pagingLabels,
+                            onTap: onNext,
+                          ),
+                        ],
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: AppSpacing.m),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onNewestPage && density.xpCaption) ...[
+                            Text(
+                              // The number the shell actually awards for
+                              // finishing a subgoal, not a hard-coded one
+                              // (#116).
+                              l.session_explain_completeXp(kXpPerSubgoal),
+                              style: TextStyle(
+                                color: AppColors.fgFaint,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.m),
+                          ],
+                          _AccentButton(
+                            label: l.session_explain_tryItYourself,
+                            withLabel: density.tryItLabel,
+                            onTap: tryIt,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.m),
           ],
-          _AccentButton(
-            label: l.session_explain_tryItYourself,
-            onTap: () =>
-                ref.read(modeProvider.notifier).state = SessionMode.practice,
-          ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// How much of the footer is spelled out, from all of it to the least
+/// (#259). First the XP caption goes, then the words on the paging buttons,
+/// then the words on "Try it yourself"; a button without its words keeps
+/// them in a tooltip.
+enum _FooterDensity {
+  full,
+  noXpCaption,
+  noPagingLabels,
+  noLabels;
+
+  bool get xpCaption => index < noXpCaption.index;
+  bool get pagingLabels => index < noPagingLabels.index;
+  bool get tryItLabel => index < noLabels.index;
 }
 
 class _GhostButton extends StatefulWidget {
@@ -507,6 +574,7 @@ class _GhostButton extends StatefulWidget {
     required this.icon,
     required this.onTap,
     this.iconAfterLabel = false,
+    this.withLabel = true,
   });
   final String label;
   final IconData icon;
@@ -516,6 +584,10 @@ class _GhostButton extends StatefulWidget {
 
   /// Puts the icon on the trailing side, for a "forward" affordance.
   final bool iconAfterLabel;
+
+  /// Whether [label] is written next to the icon; without it, it is the
+  /// icon's tooltip (#259).
+  final bool withLabel;
 
   @override
   State<_GhostButton> createState() => _GhostButtonState();
@@ -535,7 +607,7 @@ class _GhostButtonState extends State<_GhostButton> {
       widget.label,
       style: TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w500),
     );
-    return MouseRegion(
+    final button = MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: (_) {
         if (enabled) setState(() => _hovering = true);
@@ -554,22 +626,38 @@ class _GhostButtonState extends State<_GhostButton> {
             color: _hovering && enabled ? AppColors.ink2 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.inputLarge),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: widget.iconAfterLabel
-                ? [label, const SizedBox(width: 6), icon]
-                : [icon, const SizedBox(width: 6), label],
-          ),
+          child: !widget.withLabel
+              ? icon
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: widget.iconAfterLabel
+                      ? [label, const SizedBox(width: 6), icon]
+                      : [icon, const SizedBox(width: 6), label],
+                ),
         ),
       ),
+    );
+    if (widget.withLabel) return button;
+    return Tooltip(
+      message: widget.label,
+      waitDuration: const Duration(milliseconds: 400),
+      child: button,
     );
   }
 }
 
 class _AccentButton extends StatefulWidget {
-  const _AccentButton({required this.label, required this.onTap});
+  const _AccentButton({
+    required this.label,
+    required this.onTap,
+    this.withLabel = true,
+  });
   final String label;
   final VoidCallback onTap;
+
+  /// Whether [label] is written before the arrow; without it, it is the
+  /// arrow's tooltip (#259).
+  final bool withLabel;
 
   @override
   State<_AccentButton> createState() => _AccentButtonState();
@@ -580,7 +668,8 @@ class _AccentButtonState extends State<_AccentButton> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
+    final arrow = Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0);
+    final button = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
@@ -602,23 +691,31 @@ class _AccentButtonState extends State<_AccentButton> {
                 : AppColors.accent,
             borderRadius: BorderRadius.circular(AppRadius.inputLarge),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: AppColors.ink0,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+          child: !widget.withLabel
+              ? arrow
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: AppColors.ink0,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    arrow,
+                  ],
                 ),
-              ),
-              const SizedBox(width: 6),
-              Icon(Icons.arrow_forward, size: 14, color: AppColors.ink0),
-            ],
-          ),
         ),
       ),
+    );
+    if (widget.withLabel) return button;
+    return Tooltip(
+      message: widget.label,
+      waitDuration: const Duration(milliseconds: 400),
+      child: button,
     );
   }
 }

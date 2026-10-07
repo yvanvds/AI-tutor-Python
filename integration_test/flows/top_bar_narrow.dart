@@ -97,9 +97,8 @@ void main() {
 
   testWidgets('at 700 px the top bar stays inside the window on Session and '
       'on the learning path', (tester) async {
-    // Started at 700 px rather than resized down to it: a wide window folds
-    // its chat on the way down, and the theory view under the bar overflows
-    // during that slide (#259) — not this flow's subject.
+    // Started at 700 px; the window made narrow under a running session is
+    // session_narrow.dart's subject (#259).
     final harness = AppHarness(
       windowSize: Size(_narrow, kRunnerWindowSize.height),
     );
@@ -119,19 +118,19 @@ void main() {
       expect(find.byTooltip('0 / 500'), findsOneWidget);
     }
 
-    // The switcher still works in its narrower bar. Playground, not
-    // Practice: next to Practice's 460 px chat the editor's own toolbar
-    // does not fit 700 px yet (#259).
+    // The switcher still works in its narrower bar, and Practice fits
+    // under it next to its chat (#259).
     await tester.tap(
-      find.descendant(of: modes, matching: find.text('Playground')),
+      find.descendant(of: modes, matching: find.text('Practice')),
     );
     await pumpUntil(
       tester,
-      () => harness.container.read(modeProvider) == SessionMode.playground,
-      reason: 'a tap on Playground in the $_narrow px bar did nothing',
+      () => harness.container.read(modeProvider) == SessionMode.practice,
+      reason: 'a tap on Practice in the $_narrow px bar did nothing',
     );
-    await tester.pump(const Duration(milliseconds: 300));
-    expectLaidOut(tester, 'Playground at $_narrow px');
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.takeException(), isNull, reason: 'Practice at $_narrow px');
+    expectLaidOut(tester, 'Practice at $_narrow px');
 
     // The learning path: no switcher, and its place goes to the strip.
     await tester.tap(find.byTooltip('Learning path'));

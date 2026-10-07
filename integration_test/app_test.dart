@@ -71,6 +71,7 @@ import 'flows/question_bank_serving.dart' as question_bank_serving;
 import 'flows/question_id.dart' as question_id;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
+import 'flows/session_narrow.dart' as session_narrow;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
 import 'flows/stuck_advance_progress.dart' as stuck_advance_progress;
@@ -176,6 +177,7 @@ void main() {
   my_reports_tab.main();
   sidebar_rail.main();
   top_bar_narrow.main();
+  session_narrow.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();
