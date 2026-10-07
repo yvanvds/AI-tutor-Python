@@ -1,5 +1,6 @@
-// A translation of Dutch source text (#206): a lesson from `content`, or the
-// title and description of a goal from `goals`, in one other language.
+// A translation of Dutch source text (#206): a lesson from `content`, the
+// title and description of a goal from `goals`, or the statement of one of a
+// subgoal's learning objectives (#243), in one other language.
 //
 // Translations live in their own container, `translations`, partitioned on
 // `/language` (see `CosmosPaths.translations`), never inside the `content`
@@ -20,6 +21,7 @@ import 'dart:convert';
 
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
@@ -70,6 +72,12 @@ enum TranslationKind {
 
   /// A goal or subgoal: a `goals` doc's `title` and `description`.
   goal,
+
+  /// A learning objective's `statement` (the "Je kan …" sentence), one entry
+  /// of a subgoal's `objectives` in its `goals` doc (#243). Its own doc per
+  /// LO, not a field on the subgoal's `goal_` doc: the goal editor writes
+  /// that doc whole and would wipe the statements.
+  objective,
 }
 
 @immutable
@@ -120,19 +128,44 @@ class Translation {
          updatedAt: updatedAt,
        );
 
+  /// The translation of the statement of the learning objective [loId] of
+  /// the subgoal [subgoalId] (#243). It has no title: the statement is its
+  /// [text].
+  const Translation.objective({
+    required String language,
+    required String subgoalId,
+    required String loId,
+    required String statement,
+    required String sourceHash,
+    DateTime? updatedAt,
+  }) : this(
+         language: language,
+         kind: TranslationKind.objective,
+         refId: '$subgoalId.$loId',
+         title: '',
+         text: statement,
+         sourceHash: sourceHash,
+         updatedAt: updatedAt,
+       );
+
   /// Language code (`en`, …): the partition key. Never [kSourceLanguage].
   final String language;
 
   final TranslationKind kind;
 
-  /// The id of the translated doc: a `content` id or a goal id.
+  /// The id of the translated doc: a `content` id or a goal id; for
+  /// [TranslationKind.objective] the subgoal id and the LO id joined by a
+  /// dot ([objectiveRefId]).
   final String refId;
 
+  /// Empty, and not stored, for [TranslationKind.objective].
   final String title;
 
   /// The lesson's HTML body fragment (as in `Content.body`) for
   /// [TranslationKind.content]; the goal's description for
-  /// [TranslationKind.goal]. Stored as `body` or `description`.
+  /// [TranslationKind.goal]; the LO's statement for
+  /// [TranslationKind.objective]. Stored as `body`, `description` or
+  /// `statement`.
   final String text;
 
   /// [translationSourceHash] of the Dutch text this was translated from.
@@ -151,6 +184,15 @@ class Translation {
       docId(TranslationKind.content, contentId);
 
   static String goalDocId(String goalId) => docId(TranslationKind.goal, goalId);
+
+  /// The [refId] of the learning objective [loId] of the subgoal
+  /// [subgoalId]: an LO id is unique only within its subgoal.
+  static String objectiveRefId(String subgoalId, String loId) =>
+      '$subgoalId.$loId';
+
+  /// `objective_${subgoalId}.${loId}`.
+  static String objectiveDocId(String subgoalId, String loId) =>
+      docId(TranslationKind.objective, objectiveRefId(subgoalId, loId));
 
   /// Whether the Dutch text has changed since this was translated from it:
   /// [currentSourceHash] is the hash of the Dutch text as it is now.
@@ -176,7 +218,7 @@ class Translation {
     'language': language,
     'kind': kind.name,
     'refId': refId,
-    'title': title,
+    if (kind != TranslationKind.objective) 'title': title,
     _textField(kind): text,
     'sourceHash': sourceHash,
     if (updatedAt != null) 'updatedAt': updatedAt!.toUtc().toIso8601String(),
@@ -190,6 +232,7 @@ class Translation {
     final kind = switch (doc['kind']) {
       'content' => TranslationKind.content,
       'goal' => TranslationKind.goal,
+      'objective' => TranslationKind.objective,
       _ => null,
     };
     if (kind == null) return null;
@@ -210,6 +253,7 @@ class Translation {
   static String _textField(TranslationKind kind) => switch (kind) {
     TranslationKind.content => 'body',
     TranslationKind.goal => 'description',
+    TranslationKind.objective => 'statement',
   };
 
   static String _string(Object? raw) => raw is String ? raw : '';
@@ -255,5 +299,10 @@ String contentSourceHash(Content content) =>
 /// absent description counts as empty).
 String goalSourceHash(Goal goal) =>
     translationSourceHash(goal.title, goal.description ?? '');
+
+/// [translationSourceHash] of a learning objective's Dutch statement (#243),
+/// with an empty title: `source_hash('', statement)` in the tooling.
+String objectiveSourceHash(LearningObjective objective) =>
+    translationSourceHash('', objective.statement);
 
 String _lf(String s) => s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');

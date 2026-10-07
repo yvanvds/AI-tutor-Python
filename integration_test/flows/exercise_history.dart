@@ -7,6 +7,10 @@
 // can avoid repeating itself. A grade goes out with its own exercise: the
 // question the student answered, and nothing of the exercises before.
 //
+// #244: a line shows the shape of the question's code before its prompt —
+// texts as `"…"`, no comments — so the same exercise in another story reads
+// as the same code.
+//
 // Real app, real navigation, real practice view and editor, real
 // TutorService → question formatter → connector history bookkeeping. Only
 // the model is scripted (`ScriptedLlm`, raw assistant text through the
@@ -32,7 +36,7 @@ import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
 
 const String kFirst = 'print(___)';
-const String kSecond = 'naam = ___\nprint(naam)';
+const String kSecond = '# Jouw naam\nnaam = ___\nprint("Hallo, " + naam)';
 const String kThird = 'som = 1 + ___';
 
 void main() {
@@ -104,9 +108,10 @@ void main() {
       expect(llm.sentHistories[i], isEmpty, reason: 'question request $i');
     }
     expect(sent(0).containsKey('recent_questions'), isFalse);
-    const firstLine = 'complete_code | lo-print | Toon een groet. `print(___)`';
+    const firstLine = 'complete_code | lo-print | print(___) | Toon een groet.';
     const secondLine =
-        'complete_code | lo-print | Toon je naam. `naam = ___; print(naam)`';
+        'complete_code | lo-print | naam = ___; print("…" + naam) | '
+        'Toon je naam.';
     expect(sent(2)['recent_questions'], [firstLine]);
     expect(sent(4)['recent_questions'], [firstLine, secondLine]);
 

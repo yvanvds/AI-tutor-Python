@@ -112,8 +112,8 @@ void main() {
   test('every question request carries the recent questions, oldest first, '
       'and omits the block when there are none (#184)', () {
     const recent = [
-      'complete_code | lo-print | Vul aan. `print(___)`',
-      'multiple_choice | lo-var | Wat toont dit? `x = 3; print(x)`',
+      'complete_code | lo-print | print(___) | Vul aan.',
+      'multiple_choice | lo-var | x = 3; print(x) | Wat toont dit?',
     ];
     final builders = <String, String Function(List<String> recentQuestions)>{
       'socratic_question': (r) => QuestionFormatter.socraticQuestion(

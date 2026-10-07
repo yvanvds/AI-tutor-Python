@@ -1,6 +1,6 @@
 {
   "language": "en",
-  "about": "English title and description of every goal and subgoal (#209), next to the live Dutch text they were translated from. tooling/translations/push_translations.py writes them to the Cosmos container `translations` as `goal_<id>` docs, with the sourceHash of the Dutch text; it refuses an entry whose Dutch text no longer matches the live goal. Glossary: ../../lessons/glossary-en.md.",
+  "about": "English title and description of every goal and subgoal (#209), and the English statement of every learning objective of a subgoal (#250), each next to the live Dutch text it was translated from. tooling/translations/translations.py writes them to the Cosmos container `translations` as `goal_<id>` and `objective_<subgoalId>.<loId>` docs, with the sourceHash of the Dutch text; it refuses an entry whose Dutch text no longer matches the live goal or learning objective. Glossary: ../../lessons/glossary-en.md.",
   "goals": [
     {
       "id": "eenvoudige-python-scripts",
@@ -24,7 +24,34 @@
       "en": {
         "title": "Output with print",
         "description": "You can use print() to show strings and numbers on the screen, and you recognize the difference between what is in the source code and what appears as output."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_print_output",
+          "nl": "Je kan voorspellen wat een print()-aanroep op het scherm toont.",
+          "en": "You can predict what a print() call shows on the screen."
+        },
+        {
+          "id": "write_print_value",
+          "nl": "Je kan een print()-aanroep schrijven die een gegeven waarde toont.",
+          "en": "You can write a print() call that shows a given value."
+        },
+        {
+          "id": "write_print_multi",
+          "nl": "Je kan een print()-aanroep schrijven die meerdere waarden tegelijk toont, gescheiden door komma's.",
+          "en": "You can write a print() call that shows several values at once, separated by commas."
+        },
+        {
+          "id": "predict_comma_vs_plus",
+          "nl": "Je kan het verschil in uitvoer voorspellen tussen print met komma's en print met plustekens.",
+          "en": "You can predict the difference in output between print with commas and print with plus signs."
+        },
+        {
+          "id": "recall_quotes_for_strings",
+          "nl": "Je kan aangeven wanneer aanhalingstekens nodig zijn rond een waarde.",
+          "en": "You can indicate when quotation marks are needed around a value."
+        }
+      ]
     },
     {
       "id": "variabelen",
@@ -36,7 +63,34 @@
       "en": {
         "title": "Variables",
         "description": "You can assign a value to a variable with =, choose a valid name, use the variable in expressions and in print, and reassign its value."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_assignment",
+          "nl": "Je kan een waarde toekennen aan een variabele met =.",
+          "en": "You can assign a value to a variable with =."
+        },
+        {
+          "id": "predict_variable_value",
+          "nl": "Je kan voorspellen welke waarde een variabele heeft na een reeks toekenningen, inclusief herwijzen.",
+          "en": "You can predict which value a variable has after a series of assignments, including reassignment."
+        },
+        {
+          "id": "write_use_variable",
+          "nl": "Je kan een variabele gebruiken in een print-aanroep of in een expressie.",
+          "en": "You can use a variable in a print call or in an expression."
+        },
+        {
+          "id": "recall_naming_rules",
+          "nl": "Je kan geldige variabelenamen herkennen volgens de regels van Python.",
+          "en": "You can recognize valid variable names according to Python's rules."
+        },
+        {
+          "id": "recall_string_vs_number",
+          "nl": "Je kan herkennen of een waarde tekst (string) of een getal is op basis van de aanhalingstekens.",
+          "en": "You can recognize from the quotation marks whether a value is text (a string) or a number."
+        }
+      ]
     },
     {
       "id": "rekenen-getallen",
@@ -48,7 +102,34 @@
       "en": {
         "title": "Calculating with numbers",
         "description": "You can write and evaluate arithmetic expressions with the standard operators (+, -, *, /, //, %, **), apply the order of operations, and recognize the difference between int and float."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_arithmetic_expression",
+          "nl": "Je kan een rekenkundige expressie schrijven met +, -, *, /, //, %, en **.",
+          "en": "You can write an arithmetic expression with +, -, *, /, //, % and **."
+        },
+        {
+          "id": "predict_expression_value",
+          "nl": "Je kan voorspellen wat een rekenkundige expressie oplevert, inclusief de volgorde van bewerkingen.",
+          "en": "You can predict what an arithmetic expression gives, taking the order of operations into account."
+        },
+        {
+          "id": "predict_int_vs_float_result",
+          "nl": "Je kan voorspellen of het resultaat van een expressie een int of een float is.",
+          "en": "You can predict whether the result of an expression is an int or a float."
+        },
+        {
+          "id": "predict_div_vs_floordiv",
+          "nl": "Je kan voorspellen wat het verschil is tussen / en // voor twee gegeven getallen.",
+          "en": "You can predict the difference between / and // for two given numbers."
+        },
+        {
+          "id": "recall_python_operators",
+          "nl": "Je kan de Python-operatoren voor de standaardbewerkingen benoemen, inclusief ** voor machtsverheffing.",
+          "en": "You can name the Python operators for the standard operations, including ** for exponentiation."
+        }
+      ]
     },
     {
       "id": "invoer-input",
@@ -60,7 +141,34 @@
       "en": {
         "title": "Input with input",
         "description": "You can use input() to ask the user for a value with a clear prompt, store the result in a variable, and convert the input to int or float when you need to calculate with it."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_input_call",
+          "nl": "Je kan een input()-aanroep schrijven met een duidelijke prompt en het resultaat opslaan in een variabele.",
+          "en": "You can write an input() call with a clear prompt and store the result in a variable."
+        },
+        {
+          "id": "recall_input_returns_string",
+          "nl": "Je kan benoemen dat input() altijd een string teruggeeft, ook als de gebruiker een getal typt.",
+          "en": "You can state that input() always gives back a string, even when the user types a number."
+        },
+        {
+          "id": "write_input_with_conversion",
+          "nl": "Je kan invoer omzetten naar een int of float wanneer er met de waarde gerekend moet worden.",
+          "en": "You can convert input to an int or float when you need to calculate with the value."
+        },
+        {
+          "id": "predict_unconverted_input_bug",
+          "nl": "Je kan voorspellen wat er gebeurt als rauwe input zonder conversie in een rekenkundige expressie wordt gebruikt.",
+          "en": "You can predict what happens when raw input is used in an arithmetic expression without conversion."
+        },
+        {
+          "id": "predict_conversion_error",
+          "nl": "Je kan voorspellen wanneer int() of float() een ValueError geeft op gebruikersinvoer.",
+          "en": "You can predict when int() or float() gives a ValueError on user input."
+        }
+      ]
     },
     {
       "id": "klein-script",
@@ -72,7 +180,29 @@
       "en": {
         "title": "Putting together a small script",
         "description": "You can combine the building blocks covered so far — input, variables, calculations, print — into a small, working Python script that solves a problem described in plain language, and you can read, trace and debug such a script."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_simple_script",
+          "nl": "Je kan een klein script schrijven dat één of meerdere invoeren ophaalt, een berekening uitvoert, en het resultaat toont.",
+          "en": "You can write a small script that asks for one or more inputs, does a calculation and shows the result."
+        },
+        {
+          "id": "predict_script_output",
+          "nl": "Je kan voorspellen wat een gegeven klein script als uitvoer geeft voor een specifieke gebruikersinvoer.",
+          "en": "You can predict the output of a given small script for a specific user input."
+        },
+        {
+          "id": "predict_script_runtime_error",
+          "nl": "Je kan voorspellen wanneer een klein script tijdens uitvoering een fout zal geven.",
+          "en": "You can predict when a small script will give an error while it runs."
+        },
+        {
+          "id": "fix_simple_script_bug",
+          "nl": "Je kan een veelvoorkomende fout in een klein script herkennen en oplossen.",
+          "en": "You can recognize and fix a common error in a small script."
+        }
+      ]
     },
     {
       "id": "condities",
@@ -96,7 +226,34 @@
       "en": {
         "title": "Comparisons and booleans",
         "description": "You can use comparison operators (==, !=, <, >, <=, >=) to write expressions that give True or False, store that result in a variable, and predict what a comparison gives."
-      }
+      },
+      "objectives": [
+        {
+          "id": "recall_comparison_operators",
+          "nl": "Je kan de vergelijkingsoperatoren benoemen: ==, !=, <, >, <= en >=.",
+          "en": "You can name the comparison operators: ==, !=, <, >, <= and >=."
+        },
+        {
+          "id": "predict_comparison_result",
+          "nl": "Je kan voorspellen of een vergelijking True of False oplevert voor gegeven waarden.",
+          "en": "You can predict whether a comparison gives True or False for given values."
+        },
+        {
+          "id": "write_comparison_from_dutch",
+          "nl": "Je kan een voorwaarde in natuurlijke taal omzetten naar een Python-vergelijking.",
+          "en": "You can turn a condition in plain language into a Python comparison."
+        },
+        {
+          "id": "predict_bool_variable",
+          "nl": "Je kan voorspellen welke waarde een variabele heeft nadat het resultaat van een vergelijking eraan is toegekend.",
+          "en": "You can predict which value a variable has after the result of a comparison is assigned to it."
+        },
+        {
+          "id": "reason_assign_vs_equals",
+          "nl": "Je kan uitleggen waarom = en == verschillende dingen doen.",
+          "en": "You can explain why = and == do different things."
+        }
+      ]
     },
     {
       "id": "beslissingen-if-else",
@@ -108,7 +265,34 @@
       "en": {
         "title": "Decisions with if and else",
         "description": "You can write an if statement that runs code when a condition is true, add an else branch to choose between two blocks, and predict which branch runs."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_branch_from_comparison",
+          "nl": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een numerieke vergelijking is zoals x > 0.",
+          "en": "You can predict which branch runs when the condition is a numeric comparison such as x > 0."
+        },
+        {
+          "id": "predict_branch_from_boolean",
+          "nl": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een booleaanse variabele is.",
+          "en": "You can predict which branch runs when the condition is a boolean variable."
+        },
+        {
+          "id": "write_if_only",
+          "nl": "Je kan een if-statement schrijven dat één blok uitvoert als de voorwaarde waar is.",
+          "en": "You can write an if statement that runs one block when the condition is true."
+        },
+        {
+          "id": "write_if_else",
+          "nl": "Je kan een if/else schrijven dat kiest tussen twee blokken op basis van een voorwaarde.",
+          "en": "You can write an if/else that chooses between two blocks based on a condition."
+        },
+        {
+          "id": "explain_indent_role",
+          "nl": "Je kan uitleggen waarom de insprong bepaalt welke code bij de if-tak hoort.",
+          "en": "You can explain why the indentation decides which code belongs to the if branch."
+        }
+      ]
     },
     {
       "id": "elif-samengestelde-voorwaarden",
@@ -120,7 +304,34 @@
       "en": {
         "title": "More choices with elif, and, or and not",
         "description": "You can tell several cases apart with an if/elif/else chain and combine conditions with and, or and not."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_elif_branch",
+          "nl": "Je kan voorspellen welke tak van een if/elif/else-keten uitgevoerd wordt voor gegeven waarden.",
+          "en": "You can predict which branch of an if/elif/else chain runs for given values."
+        },
+        {
+          "id": "write_elif_chain",
+          "nl": "Je kan een if/elif/else-keten schrijven die drie of meer gevallen onderscheidt.",
+          "en": "You can write an if/elif/else chain that tells three or more cases apart."
+        },
+        {
+          "id": "reason_elif_order",
+          "nl": "Je kan uitleggen waarom de volgorde van voorwaarden in een elif-keten het resultaat kan veranderen.",
+          "en": "You can explain why the order of the conditions in an elif chain can change the result."
+        },
+        {
+          "id": "predict_compound_result",
+          "nl": "Je kan voorspellen of een samengestelde voorwaarde met and, or of not True of False oplevert.",
+          "en": "You can predict whether a compound condition with and, or, or not gives True or False."
+        },
+        {
+          "id": "write_compound_condition",
+          "nl": "Je kan een samengestelde voorwaarde schrijven met and, or en not.",
+          "en": "You can write a compound condition with and, or and not."
+        }
+      ]
     },
     {
       "id": "tekenen-turtle",
@@ -132,7 +343,29 @@
       "en": {
         "title": "Drawing with turtle",
         "description": "You can program a drawing with the turtle module: create a turtle, move and turn it, set the pen and the color, and use conditions to decide what gets drawn."
-      }
+      },
+      "objectives": [
+        {
+          "id": "recall_turtle_commands",
+          "nl": "Je kan de turtle-basiscommando's benoemen om te bewegen, te draaien en de pen in te stellen.",
+          "en": "You can name the basic turtle commands to move, turn and set the pen."
+        },
+        {
+          "id": "predict_turtle_drawing",
+          "nl": "Je kan voorspellen welke figuur een gegeven turtle-script tekent.",
+          "en": "You can predict which shape a given turtle script draws."
+        },
+        {
+          "id": "write_turtle_figure",
+          "nl": "Je kan een turtle-script schrijven dat een eenvoudige figuur tekent, zoals een vierkant of driehoek.",
+          "en": "You can write a turtle script that draws a simple shape, such as a square or a triangle."
+        },
+        {
+          "id": "write_turtle_with_condition",
+          "nl": "Je kan een turtle-script schrijven waarin een conditie bepaalt wat er getekend wordt, zoals de kleur of de vorm.",
+          "en": "You can write a turtle script in which a condition decides what gets drawn, such as the color or the shape."
+        }
+      ]
     },
     {
       "id": "herhaling",
@@ -156,7 +389,34 @@
       "en": {
         "title": "Repeating with for and range",
         "description": "You can write a for loop with range to repeat an operation a fixed number of times, predict the output of such a loop, build up a result in a variable, and draw regular shapes with turtle."
-      }
+      },
+      "objectives": [
+        {
+          "id": "recall_range_bounds",
+          "nl": "Je kan benoemen welke getallen range(n) en range(a, b) opleveren.",
+          "en": "You can name the numbers that range(n) and range(a, b) give."
+        },
+        {
+          "id": "predict_for_output",
+          "nl": "Je kan voorspellen wat een for-lus met range als uitvoer geeft.",
+          "en": "You can predict the output of a for loop with range."
+        },
+        {
+          "id": "write_for_loop",
+          "nl": "Je kan een for-lus schrijven die een bewerking een vast aantal keer herhaalt.",
+          "en": "You can write a for loop that repeats an operation a fixed number of times."
+        },
+        {
+          "id": "write_for_accumulator",
+          "nl": "Je kan een for-lus schrijven die een resultaat opbouwt in een variabele, zoals een som of een teller.",
+          "en": "You can write a for loop that builds up a result in a variable, such as a sum or a counter."
+        },
+        {
+          "id": "write_turtle_polygon",
+          "nl": "Je kan met een for-lus en turtle een regelmatige veelhoek of ster tekenen.",
+          "en": "You can draw a regular polygon or a star with a for loop and turtle."
+        }
+      ]
     },
     {
       "id": "herhalen-while",
@@ -168,7 +428,34 @@
       "en": {
         "title": "Repeating with while",
         "description": "You can write a while loop that repeats as long as a condition is true, predict when such a loop stops, recognize infinite loops, and use a loop to validate input."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_while_output",
+          "nl": "Je kan voorspellen wat een while-lus als uitvoer geeft en wanneer hij stopt.",
+          "en": "You can predict the output of a while loop and when it stops."
+        },
+        {
+          "id": "write_while_loop",
+          "nl": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is.",
+          "en": "You can write a while loop that repeats as long as a condition is true."
+        },
+        {
+          "id": "predict_infinite_loop",
+          "nl": "Je kan herkennen wanneer een while-lus nooit zal stoppen.",
+          "en": "You can recognize when a while loop will never stop."
+        },
+        {
+          "id": "write_input_validation",
+          "nl": "Je kan een while-lus schrijven die invoer blijft opvragen tot de gebruiker iets geldigs typt.",
+          "en": "You can write a while loop that keeps asking for input until the user types something valid."
+        },
+        {
+          "id": "reason_for_vs_while",
+          "nl": "Je kan uitleggen wanneer je een for-lus dan wel een while-lus kiest.",
+          "en": "You can explain when you choose a for loop and when a while loop."
+        }
+      ]
     },
     {
       "id": "testen-debuggen",
@@ -180,7 +467,29 @@
       "en": {
         "title": "Testing and debugging",
         "description": "You can test a program systematically by trying out different test cases, choose meaningful test cases including edge cases, interpret error messages, and find and fix errors."
-      }
+      },
+      "objectives": [
+        {
+          "id": "choose_test_cases",
+          "nl": "Je kan zinvolle testgevallen kiezen voor een programma, inclusief randgevallen.",
+          "en": "You can choose meaningful test cases for a program, including edge cases."
+        },
+        {
+          "id": "predict_testcase_output",
+          "nl": "Je kan voorspellen wat een programma doet voor een gegeven testgeval.",
+          "en": "You can predict what a program does for a given test case."
+        },
+        {
+          "id": "diagnose_from_error",
+          "nl": "Je kan uit een foutmelding afleiden waar en waarom een programma faalt.",
+          "en": "You can work out from an error message where and why a program fails."
+        },
+        {
+          "id": "fix_bug_via_testing",
+          "nl": "Je kan een fout in een programma opsporen en verbeteren door testgevallen uit te proberen.",
+          "en": "You can find and fix an error in a program by trying out test cases."
+        }
+      ]
     },
     {
       "id": "probleem-naar-programma",
@@ -192,7 +501,29 @@
       "en": {
         "title": "From problem to program",
         "description": "You can break a more complex problem down into steps and translate it into a working Python program that combines conditions, loops and possibly turtle, and find and fix logic errors in it."
-      }
+      },
+      "objectives": [
+        {
+          "id": "decompose_problem",
+          "nl": "Je kan een probleemstelling opdelen in stappen (invoer, verwerking, herhaling, uitvoer) voor je begint te programmeren.",
+          "en": "You can break a problem down into steps (input, processing, repetition, output) before you start programming."
+        },
+        {
+          "id": "write_program_from_problem",
+          "nl": "Je kan een complexere probleemstelling vertalen naar een werkend Python-programma met condities en lussen.",
+          "en": "You can translate a more complex problem into a working Python program with conditions and loops."
+        },
+        {
+          "id": "predict_program_behavior",
+          "nl": "Je kan van een programma met condities en lussen voorspellen wat het doet voor een concrete invoer.",
+          "en": "You can predict what a program with conditions and loops does for a concrete input."
+        },
+        {
+          "id": "fix_logic_error",
+          "nl": "Je kan een logische fout in een groter programma opsporen en verbeteren.",
+          "en": "You can find and fix a logic error in a larger program."
+        }
+      ]
     },
     {
       "id": "lijsten-tuples",
@@ -216,7 +547,34 @@
       "en": {
         "title": "Lists, strings and indexes",
         "description": "You can create a list, get and change elements by their index (including a negative one), take out a part with slicing, and index a string the same way, as a sequence of characters."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_index_value",
+          "nl": "Je kan voorspellen welk element lijst[i] oplevert, ook bij een negatieve index.",
+          "en": "You can predict which element my_list[i] gives, including with a negative index."
+        },
+        {
+          "id": "predict_index_error",
+          "nl": "Je kan met len() bepalen welke indexen geldig zijn en herkennen wanneer een index een IndexError geeft.",
+          "en": "You can use len() to work out which indexes are valid and recognize when an index gives an IndexError."
+        },
+        {
+          "id": "write_modify_by_index",
+          "nl": "Je kan een element van een lijst vervangen via zijn index.",
+          "en": "You can replace an element of a list using its index."
+        },
+        {
+          "id": "write_slice",
+          "nl": "Je kan een slice schrijven die een gevraagd deel uit een lijst of string haalt.",
+          "en": "You can write a slice that takes a requested part out of a list or string."
+        },
+        {
+          "id": "predict_string_index",
+          "nl": "Je kan voorspellen welk teken of stuk je krijgt als je een string indexeert of slicet.",
+          "en": "You can predict which character or piece you get when you index or slice a string."
+        }
+      ]
     },
     {
       "id": "lijsten-aanpassen",
@@ -228,7 +586,39 @@
       "en": {
         "title": "Changing lists with methods",
         "description": "You can make a list grow and shrink with append, insert, remove and pop, check with in whether a value is in it, and use sum, min, max and sort."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_list_after_methods",
+          "nl": "Je kan voorspellen hoe een lijst eruitziet na een reeks append-, insert-, remove- en pop-aanroepen.",
+          "en": "You can predict what a list looks like after a series of append, insert, remove and pop calls."
+        },
+        {
+          "id": "write_list_methods",
+          "nl": "Je kan de juiste methode kiezen en schrijven om een element toe te voegen, in te voegen of te verwijderen.",
+          "en": "You can choose and write the right method to add, insert or remove an element."
+        },
+        {
+          "id": "recall_remove_vs_pop",
+          "nl": "Je kan het verschil benoemen tussen remove (verwijdert een waarde) en pop (verwijdert op een positie).",
+          "en": "You can name the difference between remove (removes a value) and pop (removes at a position)."
+        },
+        {
+          "id": "predict_in_membership",
+          "nl": "Je kan voorspellen of waarde in lijst True of False oplevert.",
+          "en": "You can predict whether value in my_list gives True or False."
+        },
+        {
+          "id": "write_list_builtins",
+          "nl": "Je kan sum(), min(), max() en len() gebruiken om een lijst samen te vatten, bijvoorbeeld tot een gemiddelde.",
+          "en": "You can use sum(), min(), max() and len() to summarize a list, for example into an average."
+        },
+        {
+          "id": "predict_sort_in_place",
+          "nl": "Je kan voorspellen dat lijst.sort() de lijst zelf sorteert en niets teruggeeft.",
+          "en": "You can predict that my_list.sort() sorts the list itself and gives back nothing."
+        }
+      ]
     },
     {
       "id": "lijsten-doorlopen",
@@ -240,7 +630,39 @@
       "en": {
         "title": "Looping over lists and strings",
         "description": "You can use a for loop to process every element of a list or string, choose between a loop over the elements and a loop over the indexes, build a new list by filtering or transforming, and draw with turtle based on a list."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_for_over_list",
+          "nl": "Je kan voorspellen wat een for-lus over een lijst of string als uitvoer geeft.",
+          "en": "You can predict the output of a for loop over a list or string."
+        },
+        {
+          "id": "write_index_loop",
+          "nl": "Je kan een lus over range(len(lijst)) schrijven wanneer je de index nodig hebt, bijvoorbeeld om elementen aan te passen of buren te vergelijken.",
+          "en": "You can write a loop over range(len(my_list)) when you need the index, for example to change elements or compare neighbors."
+        },
+        {
+          "id": "write_build_new_list",
+          "nl": "Je kan in een lus een nieuwe lijst opbouwen door elementen te filteren of om te zetten.",
+          "en": "You can build a new list in a loop by filtering or transforming elements."
+        },
+        {
+          "id": "predict_loop_variable_copy",
+          "nl": "Je kan voorspellen dat het aanpassen van x in for x in lijst de lijst zelf niet verandert.",
+          "en": "You can predict that changing x in for x in my_list does not change the list itself."
+        },
+        {
+          "id": "reason_element_vs_index_loop",
+          "nl": "Je kan uitleggen wanneer je over de elementen loopt en wanneer over de indexen.",
+          "en": "You can explain when you loop over the elements and when over the indexes."
+        },
+        {
+          "id": "write_turtle_from_list",
+          "nl": "Je kan met turtle een figuur tekenen waarbij elke zijde haar lengte of kleur uit een lijst haalt.",
+          "en": "You can draw a shape with turtle in which each side takes its length or color from a list."
+        }
+      ]
     },
     {
       "id": "lijstpatronen",
@@ -252,7 +674,39 @@
       "en": {
         "title": "Classic list patterns",
         "description": "You can write common algorithms over a list yourself: find the largest or smallest element without max() or min(), count what meets a condition, search whether and where a value occurs, and swap two elements."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_find_max_manual",
+          "nl": "Je kan zonder max() of min() een lus schrijven die het grootste of kleinste element vindt.",
+          "en": "You can write a loop without max() or min() that finds the largest or smallest element."
+        },
+        {
+          "id": "predict_bad_initial_value",
+          "nl": "Je kan voorspellen wat er misloopt als de beginwaarde slecht gekozen is, zoals grootste = 0 bij enkel negatieve getallen.",
+          "en": "You can predict what goes wrong when the starting value is badly chosen, such as largest = 0 with only negative numbers."
+        },
+        {
+          "id": "write_count_matching",
+          "nl": "Je kan een lus schrijven die telt hoeveel elementen aan een voorwaarde voldoen.",
+          "en": "You can write a loop that counts how many elements meet a condition."
+        },
+        {
+          "id": "write_search",
+          "nl": "Je kan een lus schrijven die zoekt naar een element dat aan een voorwaarde voldoet en onthoudt of en waar het gevonden werd.",
+          "en": "You can write a loop that searches for an element that meets a condition and remembers whether and where it was found."
+        },
+        {
+          "id": "write_swap_elements",
+          "nl": "Je kan twee elementen van een lijst wisselen met een hulpvariabele.",
+          "en": "You can swap two elements of a list with a temporary variable."
+        },
+        {
+          "id": "predict_swap_without_temp",
+          "nl": "Je kan voorspellen wat er misloopt als je twee elementen wisselt zonder hulpvariabele.",
+          "en": "You can predict what goes wrong when you swap two elements without a temporary variable."
+        }
+      ]
     },
     {
       "id": "tuples",
@@ -264,7 +718,34 @@
       "en": {
         "title": "Tuples and immutability",
         "description": "You can create, index and unpack tuples (also to swap values or to loop over a list of pairs), explain why tuples and strings can't be changed, and predict what happens when two names refer to the same list."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_immutable_error",
+          "nl": "Je kan herkennen dat toewijzen aan een index van een tuple of string een fout geeft.",
+          "en": "You can recognize that assigning to an index of a tuple or string gives an error."
+        },
+        {
+          "id": "write_tuple_unpacking",
+          "nl": "Je kan een tuple uitpakken in afzonderlijke variabelen, ook om twee waarden te wisselen met a, b = b, a.",
+          "en": "You can unpack a tuple into separate variables, also to swap two values with a, b = b, a."
+        },
+        {
+          "id": "write_loop_over_pairs",
+          "nl": "Je kan een lijst van tuples doorlopen met for x, y in punten.",
+          "en": "You can loop over a list of tuples with for x, y in points."
+        },
+        {
+          "id": "predict_list_aliasing",
+          "nl": "Je kan voorspellen dat na b = a een wijziging via b ook in a te zien is.",
+          "en": "You can predict that after b = a, a change through b also shows in a."
+        },
+        {
+          "id": "reason_tuple_vs_list",
+          "nl": "Je kan uitleggen wanneer een tuple beter past dan een lijst.",
+          "en": "You can explain when a tuple is a better fit than a list."
+        }
+      ]
     },
     {
       "id": "geneste-lussen",
@@ -276,7 +757,34 @@
       "en": {
         "title": "Nested loops and lists of lists",
         "description": "You can write a loop inside a loop to go through pairs from a list, predict how often the inner loop runs, and loop through and change a grid as a list of lists with grid[r][c]."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_nested_loop_output",
+          "nl": "Je kan voorspellen welke uitvoer een geneste lus geeft en hoe vaak de binnenste lus loopt.",
+          "en": "You can predict the output of a nested loop and how often the inner loop runs."
+        },
+        {
+          "id": "write_all_pairs",
+          "nl": "Je kan een geneste lus schrijven die paren elementen uit een lijst vergelijkt.",
+          "en": "You can write a nested loop that compares pairs of elements from a list."
+        },
+        {
+          "id": "reason_unique_pairs",
+          "nl": "Je kan uitleggen waarom range(i + 1, len(lijst)) in de binnenste lus elk paar maar één keer oplevert.",
+          "en": "You can explain why range(i + 1, len(my_list)) in the inner loop gives each pair only once."
+        },
+        {
+          "id": "predict_grid_index",
+          "nl": "Je kan voorspellen welk element rooster[r][k] oplevert in een lijst van lijsten.",
+          "en": "You can predict which element grid[r][c] gives in a list of lists."
+        },
+        {
+          "id": "write_grid_traversal",
+          "nl": "Je kan een lijst van lijsten rij per rij doorlopen, bijvoorbeeld om een raster af te drukken of een totaal te berekenen.",
+          "en": "You can loop through a list of lists row by row, for example to print a grid or to calculate a total."
+        }
+      ]
     },
     {
       "id": "functies",
@@ -300,7 +808,34 @@
       "en": {
         "title": "Writing and calling a function",
         "description": "You can use def to write a function that takes in a value through a parameter and gives back a result with return, call it, and store the result, print it or use it further in an expression."
-      }
+      },
+      "objectives": [
+        {
+          "id": "recall_function_parts",
+          "nl": "Je kan in een functiedefinitie en een aanroep de naam, de parameter, het argument en de teruggegeven waarde aanwijzen.",
+          "en": "You can point out the name, the parameter, the argument and the value given back in a function definition and a call."
+        },
+        {
+          "id": "predict_return_value",
+          "nl": "Je kan voorspellen welke waarde een aanroep zoals dubbel(4) oplevert en wat een expressie met die aanroep als resultaat geeft.",
+          "en": "You can predict which value a call such as double(4) gives and what result an expression with that call gives."
+        },
+        {
+          "id": "write_function_with_return",
+          "nl": "Je kan een functie met één parameter schrijven die een resultaat berekent en teruggeeft met return.",
+          "en": "You can write a function with one parameter that calculates a result and gives it back with return."
+        },
+        {
+          "id": "write_use_call_result",
+          "nl": "Je kan een gegeven functie aanroepen en het resultaat opslaan in een variabele, afdrukken of in een expressie gebruiken.",
+          "en": "You can call a given function and store the result in a variable, print it or use it in an expression."
+        },
+        {
+          "id": "predict_def_and_calls",
+          "nl": "Je kan voorspellen wat een script toont als het een functie definieert en die nul, één of meerdere keren aanroept.",
+          "en": "You can predict what a script shows when it defines a function and calls it zero, one or more times."
+        }
+      ]
     },
     {
       "id": "parameters-argumenten",
@@ -312,7 +847,39 @@
       "en": {
         "title": "Parameters and arguments",
         "description": "You can give a function several parameters, call it with the right arguments in the right order, predict which value each parameter gets, and generalize a calculation you need more than once into a function."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_argument_binding",
+          "nl": "Je kan voorspellen welke waarde elke parameter krijgt bij een aanroep met meerdere argumenten en wat de functie daardoor teruggeeft.",
+          "en": "You can predict which value each parameter gets in a call with several arguments and what the function then gives back."
+        },
+        {
+          "id": "write_function_with_params",
+          "nl": "Je kan een functie met meerdere parameters schrijven die een resultaat teruggeeft.",
+          "en": "You can write a function with several parameters that gives back a result."
+        },
+        {
+          "id": "write_call_with_arguments",
+          "nl": "Je kan een gegeven functie aanroepen met waarden, variabelen of expressies als argument, in de juiste volgorde.",
+          "en": "You can call a given function with values, variables or expressions as arguments, in the right order."
+        },
+        {
+          "id": "predict_arg_count_error",
+          "nl": "Je kan herkennen wanneer een aanroep een TypeError geeft omdat het aantal argumenten niet overeenkomt met het aantal parameters.",
+          "en": "You can recognize when a call gives a TypeError because the number of arguments does not match the number of parameters."
+        },
+        {
+          "id": "write_extract_function",
+          "nl": "Je kan een berekening die meerdere keren in een script voorkomt met andere waarden onderbrengen in een functie en de herhalingen vervangen door aanroepen.",
+          "en": "You can move a calculation that appears several times in a script with different values into a function and replace the repetitions with calls."
+        },
+        {
+          "id": "predict_default_parameter",
+          "nl": "Je kan voorspellen welke waarde een parameter met een standaardwaarde krijgt als het argument weggelaten wordt.",
+          "en": "You can predict which value a parameter with a default value gets when the argument is left out."
+        }
+      ]
     },
     {
       "id": "return-waarden",
@@ -324,7 +891,39 @@
       "en": {
         "title": "A closer look at return",
         "description": "You can predict what goes wrong when a function prints instead of giving back a value and fix that, predict that a function stops at the first return, write functions that give back True or False, and recognize when a function does something, such as drawing, instead of calculating something."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_print_vs_return",
+          "nl": "Je kan voorspellen dat het resultaat van een functie die afdrukt in plaats van teruggeeft None is.",
+          "en": "You can predict that the result of a function that prints instead of giving back a value is None."
+        },
+        {
+          "id": "fix_print_to_return",
+          "nl": "Je kan een functie die haar resultaat afdrukt herschrijven zodat ze het teruggeeft en de aanroeper het afdrukt.",
+          "en": "You can rewrite a function that prints its result so that it gives the result back and the caller prints it."
+        },
+        {
+          "id": "reason_print_vs_return",
+          "nl": "Je kan uitleggen waarom een functie haar resultaat beter teruggeeft dan afdrukt.",
+          "en": "You can explain why it is better for a function to give back its result than to print it."
+        },
+        {
+          "id": "predict_return_ends_function",
+          "nl": "Je kan voorspellen dat een functie stopt bij de eerste return die uitgevoerd wordt, ook midden in een if of een lus.",
+          "en": "You can predict that a function stops at the first return that runs, even in the middle of an if or a loop."
+        },
+        {
+          "id": "write_boolean_function",
+          "nl": "Je kan een functie schrijven die True of False teruggeeft, zodat je ze als voorwaarde in een if of while kan gebruiken.",
+          "en": "You can write a function that gives back True or False, so that you can use it as a condition in an if or while."
+        },
+        {
+          "id": "write_turtle_function",
+          "nl": "Je kan een turtle-functie met parameters schrijven die iets tekent en niets teruggeeft, zoals een veelhoek waarvan je het aantal zijden en de lengte meegeeft.",
+          "en": "You can write a turtle function with parameters that draws something and gives back nothing, such as a polygon whose number of sides and length you pass in."
+        }
+      ]
     },
     {
       "id": "lokale-variabelen",
@@ -336,7 +935,34 @@
       "en": {
         "title": "Local variables",
         "description": "You can predict which variables exist inside and outside a function, what happens to a variable from outside when the function assigns a value to a variable with the same name, and explain why a function should get its data through parameters and give it back through return."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_local_not_visible",
+          "nl": "Je kan voorspellen dat een parameter of een variabele die binnen een functie gemaakt wordt, buiten die functie niet bestaat en daar een NameError geeft.",
+          "en": "You can predict that a parameter or a variable created inside a function does not exist outside that function and gives a NameError there."
+        },
+        {
+          "id": "predict_global_unchanged",
+          "nl": "Je kan voorspellen dat een toekenning binnen een functie een variabele met dezelfde naam buiten de functie ongemoeid laat.",
+          "en": "You can predict that an assignment inside a function leaves a variable with the same name outside the function unchanged."
+        },
+        {
+          "id": "predict_list_argument_mutation",
+          "nl": "Je kan voorspellen dat een functie die een lijst-argument aanpast met een methode of via een index, ook de lijst van de aanroeper verandert.",
+          "en": "You can predict that a function that changes a list argument with a method or through an index also changes the caller's list."
+        },
+        {
+          "id": "fix_function_returns_result",
+          "nl": "Je kan een functie die een variabele van buitenaf probeert aan te passen herschrijven zodat ze het resultaat teruggeeft en de aanroeper het opslaat.",
+          "en": "You can rewrite a function that tries to change a variable from outside so that it gives back the result and the caller stores it."
+        },
+        {
+          "id": "reason_parameters_over_globals",
+          "nl": "Je kan uitleggen waarom een functie haar gegevens beter via parameters krijgt dan via variabelen van buitenaf.",
+          "en": "You can explain why it is better for a function to get its data through parameters than through variables from outside."
+        }
+      ]
     },
     {
       "id": "wiskundige-functies",
@@ -348,7 +974,39 @@
       "en": {
         "title": "Mathematical functions and tables of values",
         "description": "You can translate a rule from math, physics or economics into a Python function, use the math module, make a table of values with a loop, and work out something about the function from those values, such as where it is smallest or changes sign."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_formula_function",
+          "nl": "Je kan een voorschrift of formule, zoals f(x) = x² - 4x + 3, vertalen naar een Python-functie met parameters en return.",
+          "en": "You can translate a rule or formula, such as f(x) = x² - 4x + 3, into a Python function with parameters and return."
+        },
+        {
+          "id": "write_math_module_call",
+          "nl": "Je kan na import math functies en constanten zoals math.sqrt en math.pi gebruiken in een berekening.",
+          "en": "You can use functions and constants such as math.sqrt and math.pi in a calculation after import math."
+        },
+        {
+          "id": "predict_table_x_values",
+          "nl": "Je kan voorspellen welke x-waarden een lus voor een waardetabel doorloopt, inclusief de eerste en de laatste.",
+          "en": "You can predict which x values a loop for a table of values goes through, including the first and the last."
+        },
+        {
+          "id": "write_value_table",
+          "nl": "Je kan een lus schrijven die een waardetabel van een functie toont of in een lijst bewaart, ook met een stap kleiner dan 1.",
+          "en": "You can write a loop that shows a table of values of a function or keeps it in a list, also with a step smaller than 1."
+        },
+        {
+          "id": "write_search_function_values",
+          "nl": "Je kan een lus schrijven die in een reeks functiewaarden een bijzonder punt zoekt, zoals de kleinste waarde of een tekenwissel.",
+          "en": "You can write a loop that searches a series of function values for a special point, such as the smallest value or a sign change."
+        },
+        {
+          "id": "reason_step_size",
+          "nl": "Je kan uitleggen waarom een waardetabel met een te grote stap een nulpunt of een extremum kan missen.",
+          "en": "You can explain why a table of values with too large a step can miss a zero or an extremum."
+        }
+      ]
     },
     {
       "id": "functies-combineren",
@@ -360,7 +1018,39 @@
       "en": {
         "title": "Splitting a problem into functions",
         "description": "You can split a bigger problem into functions that each have one task, write functions that call other functions or work with lists, and test a function with well-chosen calls."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_nested_calls",
+          "nl": "Je kan voorspellen wat een script oplevert waarin een functie een andere functie aanroept of waarin aanroepen in elkaar genest zijn.",
+          "en": "You can predict the result of a script in which a function calls another function or in which calls are nested inside each other."
+        },
+        {
+          "id": "write_function_with_helper",
+          "nl": "Je kan een functie schrijven die een andere zelfgeschreven functie als hulpfunctie aanroept.",
+          "en": "You can write a function that calls another function you wrote yourself as a helper function."
+        },
+        {
+          "id": "write_list_function",
+          "nl": "Je kan een functie schrijven die een lijst als parameter krijgt en een waarde of een nieuwe lijst teruggeeft.",
+          "en": "You can write a function that gets a list as a parameter and gives back a value or a new list."
+        },
+        {
+          "id": "decompose_into_functions",
+          "nl": "Je kan voor een probleem aangeven welke functies je nodig hebt, met voor elke functie haar parameters en wat ze teruggeeft.",
+          "en": "You can indicate which functions you need for a problem, with each function's parameters and what it gives back."
+        },
+        {
+          "id": "choose_function_tests",
+          "nl": "Je kan voor een functie aanroepen kiezen die haar goed testen, inclusief randgevallen, en zeggen welk resultaat je bij elke aanroep verwacht.",
+          "en": "You can choose calls that test a function well, including edge cases, and say which result you expect for each call."
+        },
+        {
+          "id": "fix_function_bug",
+          "nl": "Je kan een fout in een functie opsporen en verbeteren aan de hand van een aanroep die een verkeerd resultaat geeft.",
+          "en": "You can find and fix an error in a function using a call that gives a wrong result."
+        }
+      ]
     },
     {
       "id": "toeval-simulatie",
@@ -384,7 +1074,39 @@
       "en": {
         "title": "Making random numbers",
         "description": "You can make random values with the random module: a whole number between two limits, a decimal number between 0 and 1 or a random element from a list, make an event happen with a given probability, and predict which output of such a script is possible."
-      }
+      },
+      "objectives": [
+        {
+          "id": "recall_random_ranges",
+          "nl": "Je kan aangeven welke waarden random.randint(a, b) en random.random() kunnen opleveren, inclusief de grenzen.",
+          "en": "You can indicate which values random.randint(a, b) and random.random() can give, including the limits."
+        },
+        {
+          "id": "predict_possible_outputs",
+          "nl": "Je kan van een kort script met toevalsgetallen voorspellen welke uitvoer mogelijk is en welke niet.",
+          "en": "You can predict for a short script with random numbers which output is possible and which is not."
+        },
+        {
+          "id": "write_random_value",
+          "nl": "Je kan met random.randint, random.random of random.choice een toevallige waarde maken die bij een beschrijving past, zoals een dobbelsteenworp of een willekeurige naam uit een lijst.",
+          "en": "You can use random.randint, random.random or random.choice to make a random value that fits a description, such as a roll of a die or a random name from a list."
+        },
+        {
+          "id": "write_event_with_chance",
+          "nl": "Je kan een voorwaarde schrijven die met een gegeven kans waar is, zoals random.random() < 0.3 voor 30 procent.",
+          "en": "You can write a condition that is true with a given probability, such as random.random() < 0.3 for 30 percent."
+        },
+        {
+          "id": "predict_two_calls_differ",
+          "nl": "Je kan voorspellen wat er misloopt als een script twee keer een toevalsgetal opvraagt waar het twee keer dezelfde waarde nodig heeft.",
+          "en": "You can predict what goes wrong when a script asks for a random number twice where it needs the same value twice."
+        },
+        {
+          "id": "write_random_function",
+          "nl": "Je kan een functie schrijven die bij elke aanroep een nieuwe toevallige waarde teruggeeft, zoals de som van twee dobbelstenen.",
+          "en": "You can write a function that gives back a new random value on every call, such as the sum of two dice."
+        }
+      ]
     },
     {
       "id": "kans-schatten",
@@ -396,7 +1118,39 @@
       "en": {
         "title": "Estimating a probability by repeating",
         "description": "You can repeat a random experiment many times, count how often an event occurs and so estimate its probability, keep track of how often each outcome comes up, and explain why more repetitions give a more reliable estimate."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_estimate_chance",
+          "nl": "Je kan een functie schrijven die een experiment een gegeven aantal keer herhaalt, de successen telt en het aandeel successen teruggeeft.",
+          "en": "You can write a function that repeats an experiment a given number of times, counts the successes and gives back the share of successes."
+        },
+        {
+          "id": "predict_estimate_value",
+          "nl": "Je kan van een script dat de kans op een eenvoudige gebeurtenis schat voorspellen rond welke waarde de uitvoer ligt en dat die bij elke run een beetje verschilt.",
+          "en": "You can predict roughly which value a script that estimates the probability of a simple event outputs, and that the output differs a little on every run."
+        },
+        {
+          "id": "reason_more_repetitions",
+          "nl": "Je kan uitleggen waarom een schatting met veel herhalingen betrouwbaarder is dan een met weinig herhalingen.",
+          "en": "You can explain why an estimate with many repetitions is more reliable than one with few repetitions."
+        },
+        {
+          "id": "write_frequency_list",
+          "nl": "Je kan met een lijst van tellers bijhouden hoe vaak elke uitkomst van een experiment voorkomt.",
+          "en": "You can use a list of counters to keep track of how often each outcome of an experiment occurs."
+        },
+        {
+          "id": "reason_model_the_mechanism",
+          "nl": "Je kan uitleggen waarom je de som van twee dobbelstenen naspeelt met twee worpen en niet met één toevalsgetal van 2 tot 12.",
+          "en": "You can explain why you act out the sum of two dice with two rolls and not with one random number from 2 to 12."
+        },
+        {
+          "id": "fix_estimate_bug",
+          "nl": "Je kan een fout in een schattingsscript opsporen en verbeteren, zoals een teller die binnen de lus opnieuw op nul gezet wordt of een deling door het verkeerde aantal.",
+          "en": "You can find and fix an error in an estimation script, such as a counter that is set back to zero inside the loop or a division by the wrong number."
+        }
+      ]
     },
     {
       "id": "oppervlakte-schatten",
@@ -408,7 +1162,34 @@
       "en": {
         "title": "Estimating an area with random points",
         "description": "You can make random points inside a rectangle, check whether a point is inside a shape, and estimate the area of that shape from the share of hits, such as a circle or the area under a graph."
-      }
+      },
+      "objectives": [
+        {
+          "id": "write_random_point",
+          "nl": "Je kan een toevallig punt binnen een gegeven rechthoek maken met random.uniform voor elke coördinaat.",
+          "en": "You can make a random point inside a given rectangle with random.uniform for each coordinate."
+        },
+        {
+          "id": "predict_point_is_hit",
+          "nl": "Je kan voor een gegeven punt voorspellen of een voorwaarde het als treffer binnen de figuur telt.",
+          "en": "You can predict for a given point whether a condition counts it as a hit inside the shape."
+        },
+        {
+          "id": "write_region_condition",
+          "nl": "Je kan een voorwaarde schrijven die nagaat of een punt binnen een figuur ligt, zoals een cirkel of het gebied onder de grafiek van een functie.",
+          "en": "You can write a condition that checks whether a point is inside a shape, such as a circle or the area under the graph of a function."
+        },
+        {
+          "id": "write_area_estimate",
+          "nl": "Je kan een oppervlakte schatten door het aandeel treffers te vermenigvuldigen met de oppervlakte van de rechthoek.",
+          "en": "You can estimate an area by multiplying the share of hits by the area of the rectangle."
+        },
+        {
+          "id": "reason_share_is_area",
+          "nl": "Je kan uitleggen waarom het aandeel toevallige punten binnen een figuur haar oppervlakte benadert.",
+          "en": "You can explain why the share of random points inside a shape approximates its area."
+        }
+      ]
     },
     {
       "id": "toevalswandeling",
@@ -420,7 +1201,39 @@
       "en": {
         "title": "Random walks",
         "description": "You can program a random walk in which a position changes randomly at every step, keep the path in a list, make a walk stop at a limit, and explain what many repeated walks show that one walk does not."
-      }
+      },
+      "objectives": [
+        {
+          "id": "predict_reachable_positions",
+          "nl": "Je kan voorspellen welke posities een toevalswandeling na een gegeven aantal stappen kan bereiken en welke niet.",
+          "en": "You can predict which positions a random walk can reach after a given number of steps and which it cannot."
+        },
+        {
+          "id": "write_random_walk",
+          "nl": "Je kan een functie schrijven die een toevalswandeling van een gegeven aantal stappen uitvoert en de eindpositie teruggeeft.",
+          "en": "You can write a function that carries out a random walk of a given number of steps and gives back the end position."
+        },
+        {
+          "id": "write_walk_history",
+          "nl": "Je kan alle posities van een toevalswandeling in een lijst bewaren en die lijst teruggeven.",
+          "en": "You can keep all the positions of a random walk in a list and give back that list."
+        },
+        {
+          "id": "write_walk_until_boundary",
+          "nl": "Je kan een toevalswandeling schrijven die stopt zodra een grens bereikt is, zoals een speler die blut is of zijn doel haalt.",
+          "en": "You can write a random walk that stops as soon as a limit is reached, such as a player who is broke or reaches their goal."
+        },
+        {
+          "id": "reason_position_vs_distance",
+          "nl": "Je kan uitleggen waarom de gemiddelde eindpositie van vele eerlijke wandelingen rond nul ligt terwijl de gemiddelde afstand tot het startpunt groeit met het aantal stappen.",
+          "en": "You can explain why the average end position of many fair walks is around zero while the average distance from the starting point grows with the number of steps."
+        },
+        {
+          "id": "write_turtle_random_walk",
+          "nl": "Je kan met turtle een toevalswandeling tekenen waarbij de richting bij elke stap toevallig gekozen wordt.",
+          "en": "You can draw a random walk with turtle in which the direction is chosen randomly at every step."
+        }
+      ]
     },
     {
       "id": "situatie-simuleren",
@@ -432,7 +1245,39 @@
       "en": {
         "title": "From situation to simulation",
         "description": "You can translate a described situation with randomness into a simulation: decide what one experiment is, write that experiment as a function, repeat it many times to estimate a probability or an average, and check the simulation with a case whose answer you know."
-      }
+      },
+      "objectives": [
+        {
+          "id": "decompose_simulation",
+          "nl": "Je kan voor een beschreven situatie aangeven wat één experiment is, wat je telt of meet, en hoe vaak je het herhaalt.",
+          "en": "You can indicate for a described situation what one experiment is, what you count or measure, and how often you repeat it."
+        },
+        {
+          "id": "write_experiment_function",
+          "nl": "Je kan één experiment met meerdere toevallige stappen schrijven als functie die True of False of een getal teruggeeft.",
+          "en": "You can write one experiment with several random steps as a function that gives back True or False, or a number."
+        },
+        {
+          "id": "predict_experiment_for_given_draws",
+          "nl": "Je kan van een experimentfunctie voorspellen wat ze teruggeeft als je weet welke toevalswaarden getrokken worden.",
+          "en": "You can predict what an experiment function gives back when you know which random values are drawn."
+        },
+        {
+          "id": "write_repeat_until_event",
+          "nl": "Je kan een experiment schrijven dat doorgaat tot een gebeurtenis zich voordoet en het aantal pogingen teruggeeft.",
+          "en": "You can write an experiment that goes on until an event occurs and gives back the number of attempts."
+        },
+        {
+          "id": "write_average_of_experiment",
+          "nl": "Je kan een gemiddelde schatten door een experiment dat een getal teruggeeft vele keren te herhalen.",
+          "en": "You can estimate an average by repeating an experiment that gives back a number many times."
+        },
+        {
+          "id": "choose_sanity_check",
+          "nl": "Je kan een simulatie controleren met een geval waarvan je het antwoord kent, zoals een kans van 0 of 1 of een eerlijke munt.",
+          "en": "You can check a simulation with a case whose answer you know, such as a probability of 0 or 1 or a fair coin."
+        }
+      ]
     }
   ]
 }

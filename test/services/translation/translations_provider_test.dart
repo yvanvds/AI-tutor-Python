@@ -3,6 +3,9 @@
 // `appLocaleProvider`, and `localizedContent` / `localizedGoal` give the text
 // to show with whether it is the Dutch fallback or a stale translation. A
 // missing `translations` container shows Dutch; Dutch fetches nothing.
+//
+// Issue #243 — a learning objective's statement the same way, through
+// `localizedObjective`.
 
 import 'dart:ui';
 
@@ -11,6 +14,7 @@ import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
@@ -36,6 +40,12 @@ final _goal = Goal(
   order: 1000,
 );
 
+const _lo = LearningObjective(
+  id: 'lo-var',
+  statement: 'Je kan een waarde in een variabele bewaren.',
+  kind: LoKind.apply,
+);
+
 /// Stands in for the Options language switch.
 final _locale = StateProvider<Locale>((_) => const Locale('en'));
 
@@ -57,6 +67,13 @@ void main() {
         title: 'Variables',
         description: 'Keeping values.',
         sourceHash: goalSourceHash(_goal),
+      ).toMap(),
+      Translation.objective(
+        language: 'en',
+        subgoalId: 's1',
+        loId: 'lo-var',
+        statement: 'You can keep a value in a variable.',
+        sourceHash: objectiveSourceHash(_lo),
       ).toMap(),
     ]);
   });
@@ -181,6 +198,47 @@ void main() {
     expect(byId(_goal).title, 'Variables');
     expect(byId(untranslated).title, 'Lijsten');
     expect(byId(untranslated).isFallback, isTrue);
+  });
+
+  test('an LO statement (#243): the translation, stale after a Dutch edit, '
+      'else the Dutch statement, flagged', () async {
+    final container = containerFor(cosmos.container);
+    await settle();
+    final translations = container.read(translationsProvider);
+
+    expect(translations.objectiveFor('s1', 'lo-var')!.text, contains('You'));
+    expect(
+      localizedObjective('s1', _lo, translations),
+      const LocalizedObjective(
+        subgoalId: 's1',
+        loId: 'lo-var',
+        language: 'en',
+        statement: 'You can keep a value in a variable.',
+      ),
+    );
+
+    const edited = LearningObjective(
+      id: 'lo-var',
+      statement: 'Je kan een waarde in een variabele opslaan.',
+      kind: LoKind.apply,
+    );
+    final stale = localizedObjective('s1', edited, translations);
+    expect(stale.isStale, isTrue);
+    expect(stale.statement, 'You can keep a value in a variable.');
+
+    // The same LO id under another subgoal is another LO.
+    final elsewhere = localizedObjective('s2', _lo, translations);
+    expect(elsewhere.isFallback, isTrue);
+    expect(elsewhere.language, kSourceLanguage);
+    expect(elsewhere.statement, _lo.statement);
+
+    final nl = localizedObjective(
+      's1',
+      _lo,
+      const LanguageTranslations.source(),
+    );
+    expect(nl.isFallback, isFalse);
+    expect(nl.statement, _lo.statement);
   });
 
   test('Dutch shows the source, unflagged, and fetches nothing', () async {

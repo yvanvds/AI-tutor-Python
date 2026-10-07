@@ -2428,6 +2428,20 @@ class AppLocalizationsNl extends AppLocalizations {
   String get leerpad_card_button_continue => 'Verder';
 
   @override
+  String leerpad_child_demonstrated(int demonstrated, int total) {
+    return '$demonstrated van $total aangetoond';
+  }
+
+  @override
+  String get leerpad_objective_demonstrated => 'aangetoond';
+
+  @override
+  String get leerpad_objective_notYetDemonstrated => 'nog niet aangetoond';
+
+  @override
+  String get leerpad_objective_optional => 'optioneel';
+
+  @override
   String get goalTile_button_faster => 'Ga sneller';
 
   @override

@@ -6,13 +6,22 @@
     python tooling/evaluation/evaluate.py apply    <draft>.json [--force]
     python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b [--mijlpaal ...]
     python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>] [--klas 6WEWI]
+    python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam> ...] [--apply [--force]]
 
 `draft` writes two files outside the repo (default `C:\\Users\\yvan\\ai-tutor-evaluaties`):
 a Markdown draft to discuss, and a JSON sidecar that `apply` reads. The
 JSON is the source of truth for what gets written; the Markdown is for
 people. `what-if` prints the number `rules.score` gives with the named LOs
 counted as demonstrated: what a teacher's adjustment comes to by the rule.
-Nothing is written to Cosmos by `draft`, `validate`, `what-if` or `trace`.
+Nothing is written to Cosmos by `draft`, `validate`, `what-if` or `trace`,
+nor by `replay-beliefs` without `--apply`.
+
+`replay-beliefs` (#242) replays `lo_beliefs` from `turn_history` with the
+replay `validate` compares them to, and restores four fields on the docs
+there: α and β, the stamp `firstMasteredAt` (the earliest of stored and
+replayed by oefening, never cleared) and `highestPositiveDifficulty` (the
+highest of the two, never lowered). A dry run by default; `--apply` backs
+up first, refuses in the class's lesson time, and writes with `If-Match`.
 
 `trace` prints one student's oefeningen of one day (Belgian time) as they
 happened (#228): per oefening the time, LO, type, level and grade from
@@ -29,6 +38,7 @@ the Reports page, which copies signed-off proposals only.
 from __future__ import annotations
 
 import argparse
+import bisect
 import datetime as dt
 import json
 import re
@@ -476,6 +486,21 @@ def _render_json(milestone, klas, per_student, now) -> dict:
 # ---- validate ----------------------------------------------------------------
 
 
+def _replay_student(uid: str, goals: dict) -> tuple[list[dict], dict, dict]:
+    """One student's turn log, `lo_beliefs` docs and the replay `validate`
+    compares them to: `rules.replay` with the provenance the app recorded,
+    so with the weight the app wrote the docs with. `replay-beliefs` writes
+    this same replay (#242), so `validate` reads its docs back as matching."""
+    turns = cosmos.turns(uid)
+    return turns, cosmos.beliefs(uid), rules.replay(turns, goals)
+
+
+def _last_build(turns: list[dict]) -> str:
+    """The `clientVersion` on the last oefening (#165); `oud` for a build
+    without the field, `geen` without oefeningen."""
+    return (turns[-1].get("clientVersion") or "oud") if turns else "geen"
+
+
 def cmd_validate(args) -> None:
     """Replays with the rules the app computes with now and compares to
     `lo_beliefs`. A student whose client computes the same, on docs no older
@@ -502,9 +527,7 @@ def cmd_validate(args) -> None:
     students = cosmos.accounts(args.klas)
     print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}{'laatste build':>16}")
     for a in students:
-        turns = cosmos.turns(a["uid"])
-        stored = cosmos.beliefs(a["uid"])
-        st = rules.replay(turns, goals)
+        turns, stored, st = _replay_student(a["uid"], goals)
         n = off = rat = 0
         for key, b in stored.items():
             s = st.get(key)
@@ -515,7 +538,7 @@ def cmd_validate(args) -> None:
                 off += 1
             if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != s.ratchet:
                 rat += 1
-        build = (turns[-1].get("clientVersion") or "oud") if turns else "geen"
+        build = _last_build(turns)
         print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>24}{build:>16}")
     print(
         f"\nHerspeeld met de regels van de app sinds #167 en #169 ({rules.RULES_VERSION}), zoals het concept."
@@ -632,6 +655,213 @@ def cmd_apply(args) -> None:
     skipped = [s["name"] for s in data["students"] if s.get("skip")]
     print(f"\ngeschreven {written}, conflicten {conflicts}, overgeslagen {len(skipped)}" + (f" ({', '.join(skipped)})" if skipped else ""))
     print("Vrijgeven naar de leerlingen gebeurt in de app: Rapporten → Vrijgeven.")
+
+
+# ---- replay-beliefs (#242) ---------------------------------------------------
+
+# What `replay-beliefs` writes on a `lo_beliefs` doc. Every other field —
+# `lastUpdatedAt`, `lastProbedAt`, `regressedAt`, the calibration clock —
+# stays as the app wrote it.
+BELIEF_FIELDS = ("alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty")
+# α and β within this of the stored ones are the same numbers computed
+# twice: the app decays to the moment it writes, a second or so after
+# `turnAt`, and Dart and Python round apart in the last bits. On 6EWI
+# (2026-10-07) that stayed under 1e-5, and every real deviation was over
+# 1e-2. The doc keeps its own.
+BELIEF_TOLERANCE = 1e-4
+
+
+def _app_iso(at: dt.datetime) -> str:
+    """[at] as the app stores a moment (`DateTime.toUtc().toIso8601String()`):
+    milliseconds always, microseconds only when there are any, and `Z`."""
+    utc = at.replace(tzinfo=dt.timezone.utc) if at.tzinfo is None else at.astimezone(dt.timezone.utc)
+    micro = utc.microsecond % 1000
+    return f"{utc:%Y-%m-%dT%H:%M:%S}.{utc.microsecond // 1000:03d}" + (f"{micro:03d}" if micro else "") + "Z"
+
+
+def _stored_at(raw) -> dt.datetime | None:
+    """A moment on a stored doc; None where the app would read none
+    (`DateTime.tryParse` on a missing or unreadable value)."""
+    if not isinstance(raw, str):
+        return None
+    try:
+        at = rules.parse_at(raw)
+    except ValueError:
+        return None
+    return at.replace(tzinfo=dt.timezone.utc) if at.tzinfo is None else at
+
+
+def _stored_number(raw) -> float:
+    """α or β on a stored doc; the prior where the app would read it so."""
+    return float(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) else rules.PRIOR
+
+
+def _on_a_later_oefening(replayed: dt.datetime, stored: dt.datetime, oefening_times: list[dt.datetime]) -> bool:
+    """Whether the stored stamp fell on a later oefening than the replayed
+    one: an oefening began after the replayed stamp and no later than the
+    stored one. The replay stamps at the oefening's `turnAt`, the app when it
+    writes the doc, a second or so later: on the same oefening the two differ
+    without one being earlier."""
+    i = bisect.bisect_right(oefening_times, replayed)
+    return i < len(oefening_times) and oefening_times[i] <= stored
+
+
+def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.datetime]) -> dict:
+    """[stored] with the four fields the replay restores (#242), and nothing
+    else changed. [oefening_times] are the student's oefeningen, by
+    `turnAt`, sorted.
+
+    - α and β: the replay's, unless they are the stored ones to within
+      `BELIEF_TOLERANCE`;
+    - `firstMasteredAt`: the earliest of the stored and the replayed stamp,
+      by oefening — on the same oefening the app's own stamp stays
+      (`_on_a_later_oefening`). Never cleared: a stamp the replay does not
+      reach stays, and without either the field stays away;
+    - `highestPositiveDifficulty`: the highest of the stored and the
+      replayed level. Never lowered; an unknown stored level reads as none,
+      as the app reads it.
+
+    The stamp and the level are one-way in the app too (#168, #103): this
+    restores what an old build never wrote, and takes nothing away."""
+    doc = dict(stored)
+    alpha, beta = _stored_number(stored.get("alpha")), _stored_number(stored.get("beta"))
+    if abs(state.alpha - alpha) > BELIEF_TOLERANCE or abs(state.beta - beta) > BELIEF_TOLERANCE:
+        doc["alpha"], doc["beta"] = state.alpha, state.beta
+    replayed, stamp = state.first_mastered_at, _stored_at(stored.get("firstMasteredAt"))
+    if replayed is not None and (
+        stamp is None or (replayed < stamp and _on_a_later_oefening(replayed, stamp, oefening_times))
+    ):
+        doc["firstMasteredAt"] = _app_iso(replayed)
+    level = stored.get("highestPositiveDifficulty")
+    rank = rules.DIFF_ORDER.get(level, -1) if isinstance(level, str) else -1
+    if rules.DIFF_ORDER[state.ratchet] > rank:
+        doc["highestPositiveDifficulty"] = state.ratchet
+    return doc
+
+
+def belief_changes(stored: dict, new: dict) -> set[str]:
+    """What [new] changes on [stored]: `alpha/beta`, `stamp gained` (there was
+    none), `stamp earlier`, `level raised`. Empty: nothing to write."""
+    changes = set()
+    if new.get("alpha") != stored.get("alpha") or new.get("beta") != stored.get("beta"):
+        changes.add("alpha/beta")
+    if new.get("firstMasteredAt") != stored.get("firstMasteredAt"):
+        changes.add("stamp earlier" if _stored_at(stored.get("firstMasteredAt")) else "stamp gained")
+    if new.get("highestPositiveDifficulty") != stored.get("highestPositiveDifficulty"):
+        changes.add("level raised")
+    return changes
+
+
+def _class_at_work(students: list[dict], klas: str) -> list[str]:
+    """Why a write to `lo_beliefs` now would race the class: its lesson time
+    by the timetable (#219, the 10-minute margin included), or a student
+    active in the last minutes, as `apply` refuses."""
+    reasons = []
+    if rules.during_lesson(rules.lessons_of(cosmos.classes(), klas), _now()):
+        reasons.append(f"{klas} heeft nu les volgens het lesrooster")
+    busy = _lesson_in_progress(students)
+    if busy:
+        reasons.append("de laatste minuten actief: " + ", ".join(busy))
+    return reasons
+
+
+def cmd_replay_beliefs(args) -> None:
+    """Replays `lo_beliefs` from `turn_history` and restores α, β, the stamp
+    and the highest level on the docs there (#242): for students whose
+    client wrote docs without `firstMasteredAt` and `highestPositiveDifficulty`
+    and whom the one-time rewrite of 2026-09-23 passed by.
+
+    The replay is the one `validate` compares to (`_replay_student`), so
+    `validate` shows no deviation on a doc this wrote. It only updates docs
+    that exist: a replayed LO without a doc gets none (the app creates it on
+    the next write), and a doc the replay does not reach stays as it is.
+
+    A dry run unless `--apply`. With it: refuses in the lesson time of the
+    class or while a student works (`--force` to go on), backs up every
+    `lo_beliefs` and `grade_proposals` doc of the students it writes for to
+    `BACKUP_DIR`, then upserts each changed doc with `If-Match` on the etag
+    it was planned from — a doc the app wrote in between is skipped and
+    named. Run it again for those."""
+    goals = cosmos.goals()
+    in_class = cosmos.accounts(args.klas)
+    if not in_class:
+        sys.exit(f"geen leerlingen met className={args.klas!r}")
+    students = in_class
+    if args.leerling:
+        picked = [_pick_student(in_class, name, args.klas) for name in args.leerling]
+        students = [a for a in in_class if any(p["uid"] == a["uid"] for p in picked)]
+
+    print(
+        f"{'leerling':26}{'docs':>6}{'herspeeld':>11}{'te schrijven':>14}{'stempel erbij':>15}"
+        f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'laatste build':>16}"
+    )
+    planned: list[tuple[dict, dict, dict]] = []  # (student, stored doc, new doc)
+    totals = {"stamp gained": 0, "stamp earlier": 0, "level raised": 0, "alpha/beta": 0}
+    old_build = []
+    for a in students:
+        turns, stored, st = _replay_student(a["uid"], goals)
+        oefening_times = sorted(rules.parse_at(t["turnAt"]) for t in turns if not rules.is_audit(t))
+        replayed = mine = 0
+        counts = dict.fromkeys(totals, 0)
+        for key in sorted(stored):
+            state = st.get(key)
+            if state is None:
+                continue
+            replayed += 1
+            new = replayed_belief(stored[key], state, oefening_times)
+            changes = belief_changes(stored[key], new)
+            if not changes:
+                continue
+            mine += 1
+            planned.append((a, stored[key], new))
+            for c in changes:
+                counts[c] += 1
+                totals[c] += 1
+        build = _last_build(turns)
+        if build == "oud":
+            old_build.append(_full_name(a))
+        print(
+            f"{_full_name(a):26}{len(stored):>6}{replayed:>11}{mine:>14}{counts['stamp gained']:>15}"
+            f"{counts['stamp earlier']:>17}{counts['level raised']:>14}{counts['alpha/beta']:>12}{build:>16}"
+        )
+    writers = {a["uid"] for a, _, _ in planned}
+    print(
+        f"\nte schrijven: {len(planned)} documenten bij {len(writers)} leerling(en) — stempel erbij"
+        f" {totals['stamp gained']}, stempel vroeger {totals['stamp earlier']}, hoogste niveau hoger"
+        f" {totals['level raised']}, α/β anders {totals['alpha/beta']}."
+    )
+    print(
+        f"Herspeeld met {rules.RULES_VERSION}, zoals validate: een oefening weegt alleen als 'onder toezicht'"
+        " als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit leeg) en"
+        " highestPositiveDifficulty (het hoogste) veranderen; een leerdoel zonder document krijgt er geen."
+    )
+    if old_build:
+        print(
+            "let op: de laatste oefening kwam van een build zonder clientVersion, die nog met de oude regels"
+            " schrijft: " + ", ".join(old_build)
+        )
+    if not args.apply:
+        print("\nDroge run: er is niets geschreven. Schrijven met --apply, buiten de lesuren.")
+        return
+    if not planned:
+        print("\nNiets te schrijven.")
+        return
+    busy = _class_at_work(students, args.klas)
+    if busy and not args.force:
+        sys.exit("De klas werkt; niets geschreven. Wacht, of --force:\n  " + "\n  ".join(busy))
+    path = _backup([a for a in students if a["uid"] in writers], None, BACKUP_DIR, f"{_slug(args.klas)}_replay-beliefs")
+    print(f"\nback-up: {path}")
+
+    written = conflicts = 0
+    for a, stored, new in planned:
+        try:
+            cosmos.upsert("lo_beliefs", new, a["uid"], etag=stored.get("_etag"))
+            written += 1
+        except cosmos.Conflict:
+            conflicts += 1
+            print(f"  {_full_name(a)}: {stored['subgoalId']}/{stored['loId']} veranderde intussen — niet geschreven")
+    print(f"geschreven {written}, conflicten {conflicts}" + (" (draai het opnieuw voor die)" if conflicts else ""))
+    print(f"Controleer met: evaluate.py validate --klas {args.klas}")
 
 
 # ---- what-if -----------------------------------------------------------------
@@ -866,8 +1096,15 @@ def main() -> None:
     w.add_argument("--tel", required=True, help="leerdoelen, komma-gescheiden: lo_id of subdoel/lo_id"); w.add_argument("--mijlpaal")
     t = sub.add_parser("trace"); t.add_argument("--leerling", required=True); t.add_argument("--dag", required=True, help="JJJJ-MM-DD, Belgische tijd")
     t.add_argument("--subdoel"); t.add_argument("--klas", help="zoek de leerling alleen in deze klas")
+    r = sub.add_parser("replay-beliefs"); r.add_argument("--klas", required=True)
+    r.add_argument("--leerling", action="append", help="alleen deze leerling (naam, deel ervan of uid); herhaalbaar")
+    r.add_argument("--apply", action="store_true", help="na een back-up echt schrijven, buiten de lesuren")
+    r.add_argument("--force", action="store_true", help="ook schrijven als de klas les heeft of werkt")
     args = ap.parse_args()
-    commands = {"draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply, "what-if": cmd_what_if, "trace": cmd_trace}
+    commands = {
+        "draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply,
+        "what-if": cmd_what_if, "trace": cmd_trace, "replay-beliefs": cmd_replay_beliefs,
+    }
     commands[args.cmd](args)
 
 

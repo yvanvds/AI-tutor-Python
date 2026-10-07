@@ -1,6 +1,7 @@
 """Tests for the translation tooling (#209): the `sourceHash` against the
-app's own test vectors, the docs it would write, create-only pushing, and
-the lesson checker. Standard library only:
+app's own test vectors, the docs it would write (lessons, goals and, since
+#250, learning-objective statements), create-only pushing, and the lesson
+checker. Standard library only:
 
     python -m unittest discover -s tooling/translations/tests
 
@@ -43,9 +44,20 @@ EN_BODY = "<p>A list.</p>\r\n<pre><code>x = [1, 2]\r\nprint(x)</code></pre>\r\n<
 LIVE_CONTENT = [
     {"id": "lijsten", "type": "content", "title": "Lijsten", "body": NL_BODY, "updatedAt": "2026-09-23T20:04:51Z"},
 ]
+FOR_LOOP_NL = "Je kan een for-lus schrijven die een bewerking een vast aantal keer herhaalt."
 LIVE_GOALS = [
     {"id": "root", "title": "Hoofddoel", "description": None, "parentId": None},
-    {"id": "lijsten", "title": "Lijsten", "description": "Je kan een lijst maken.", "parentId": "root"},
+    {
+        "id": "lijsten",
+        "title": "Lijsten",
+        "description": "Je kan een lijst maken.",
+        "parentId": "root",
+        "objectives": [
+            {"id": "predict_index_value", "statement": "Je kan voorspellen welk element lijst[i] oplevert.",
+             "kind": "predict", "weight": 1.0, "optional": False},
+            {"id": "write_for_loop", "statement": FOR_LOOP_NL, "kind": "apply", "weight": 1.0, "optional": False},
+        ],
+    },
 ]
 TEXTS = [
     {"id": "root", "nl": {"title": "Hoofddoel", "description": ""}, "en": {"title": "Main goal", "description": ""}},
@@ -53,8 +65,15 @@ TEXTS = [
         "id": "lijsten",
         "nl": {"title": "Lijsten", "description": "Je kan een lijst maken."},
         "en": {"title": "Lists", "description": "You can make a list."},
+        "objectives": [
+            {"id": "predict_index_value", "nl": "Je kan voorspellen welk element lijst[i] oplevert.",
+             "en": "You can predict which element my_list[i] gives."},
+            {"id": "write_for_loop", "nl": FOR_LOOP_NL,
+             "en": "You can write a for loop that repeats an operation a fixed number of times."},
+        ],
     },
 ]
+OBJECTIVE_IDS = ["objective_lijsten.predict_index_value", "objective_lijsten.write_for_loop"]
 
 
 class _Exists(Exception):
@@ -111,6 +130,12 @@ class SourceHashTest(unittest.TestCase):
             translations.source_hash("Lussen H", "erhalen met for."),
             translations.source_hash("Lussen", "Herhalen met for."),
         )
+
+    def test_an_lo_statement_hashes_with_an_empty_title(self):
+        """`objectiveSourceHash` (#243): `source_hash('', statement)`."""
+        want = "62df92465cc34d981136db5f95321525b64e6c4379cf2eb594e8424f55b9335c"
+        self.assertEqual(translations.objective_hash(FOR_LOOP_NL), want)
+        self.assertEqual(translations.source_hash("", FOR_LOOP_NL), want)
 
 
 class _Repo(unittest.TestCase):
@@ -202,31 +227,176 @@ class BuildDocsTest(_Repo):
         self.assertIn("goal extra: live goal without an English text", problems)
 
 
+class ObjectiveDocsTest(_Repo):
+    """#250: one `objective_<subgoal>.<lo>` doc per learning objective."""
+
+    build = BuildDocsTest.build
+
+    def test_an_lo_doc_has_exactly_the_fields_translation_objective_writes(self):
+        docs, problems = self.build()
+        self.assertEqual(problems, [])
+        by_id = {d["id"]: d for d in docs}
+        # Field for field `Translation.objective(...).toMap()`: no title.
+        self.assertEqual(
+            by_id["objective_lijsten.write_for_loop"],
+            {
+                "id": "objective_lijsten.write_for_loop",
+                "language": "en",
+                "kind": "objective",
+                "refId": "lijsten.write_for_loop",
+                "statement": "You can write a for loop that repeats an operation a fixed number of times.",
+                "sourceHash": "62df92465cc34d981136db5f95321525b64e6c4379cf2eb594e8424f55b9335c",
+                "updatedAt": "2026-09-30T17:00:00.000Z",
+            },
+        )
+        self.assertEqual(sorted(i for i in by_id if i.startswith("objective_")), OBJECTIVE_IDS)
+
+    def test_the_hash_is_of_the_live_statement_line_endings_normalised(self):
+        crlf = "Je kan een lijst\r\nmaken."
+        live = [LIVE_GOALS[0], dict(LIVE_GOALS[1], objectives=[{"id": "make", "statement": crlf}])]
+        texts = [TEXTS[0], dict(TEXTS[1], objectives=[{"id": "make", "nl": "Je kan een lijst\nmaken.", "en": "x"}])]
+        docs, problems = self.build(goals=live, texts=texts)
+        self.assertEqual(problems, [])
+        doc = next(d for d in docs if d["kind"] == "objective")
+        self.assertEqual(doc["sourceHash"], translations.source_hash("", "Je kan een lijst\nmaken."))
+
+    def test_an_lo_whose_dutch_statement_drifted_is_left_out(self):
+        first, second = LIVE_GOALS[1]["objectives"]
+        los = [dict(first), dict(second, statement="Je kan een for-lus schrijven.")]
+        live = [LIVE_GOALS[0], dict(LIVE_GOALS[1], objectives=los)]
+        docs, problems = self.build(goals=live)
+        ids = [d["id"] for d in docs]
+        self.assertNotIn("objective_lijsten.write_for_loop", ids)
+        self.assertIn("objective_lijsten.predict_index_value", ids, "the other LO is not held back")
+        self.assertIn("goal_lijsten", ids, "nor is the subgoal's own text")
+        self.assertIn(
+            "objective lijsten.write_for_loop: the Dutch statement in goal-texts.json differs from the live one",
+            problems,
+        )
+
+    def test_a_drifted_subgoal_text_does_not_hold_back_its_los(self):
+        live = [LIVE_GOALS[0], dict(LIVE_GOALS[1], description="Je kan een lijst aanpassen.")]
+        docs, _ = self.build(goals=live)
+        ids = [d["id"] for d in docs]
+        self.assertNotIn("goal_lijsten", ids)
+        self.assertTrue(set(OBJECTIVE_IDS) <= set(ids))
+
+    def test_missing_extra_and_empty_statements_are_reported(self):
+        los = LIVE_GOALS[1]["objectives"] + [{"id": "new_lo", "statement": "Je kan iets nieuws."}]
+        live = [LIVE_GOALS[0], dict(LIVE_GOALS[1], objectives=los)]
+        objs = [dict(TEXTS[1]["objectives"][0], en="  "), TEXTS[1]["objectives"][1],
+                {"id": "gone_lo", "nl": "Je kan iets ouds.", "en": "You can do something old."}]
+        texts = [TEXTS[0], dict(TEXTS[1], objectives=objs)]
+        docs, problems = self.build(goals=live, texts=texts)
+        self.assertEqual([d["id"] for d in docs if d["kind"] == "objective"], ["objective_lijsten.write_for_loop"])
+        self.assertEqual(
+            sorted(p for p in problems if p.startswith("objective")),
+            [
+                "objective lijsten.gone_lo: not in the live goals",
+                "objective lijsten.new_lo: live learning objective without an English statement",
+                "objective lijsten.predict_index_value: no English statement",
+            ],
+        )
+
+    def test_the_same_lo_id_in_two_subgoals_gives_two_docs(self):
+        lo = {"id": "write_for_loop", "statement": FOR_LOOP_NL}
+        obj = {"id": "write_for_loop", "nl": FOR_LOOP_NL, "en": "You can write a for loop."}
+        live = [{"id": "a", "title": "A", "description": ""}, {"id": "b", "title": "B", "description": ""}]
+        live = [dict(g, objectives=[lo]) for g in live]
+        texts = [{"id": g["id"], "nl": {"title": g["title"], "description": ""},
+                  "en": {"title": g["title"], "description": ""}, "objectives": [obj]} for g in live]
+        docs, problems = self.build(goals=live, texts=texts)
+        self.assertEqual(problems, [])
+        self.assertEqual(
+            sorted(d["id"] for d in docs if d["kind"] == "objective"),
+            ["objective_a.write_for_loop", "objective_b.write_for_loop"],
+        )
+
+    def test_current_hashes_include_every_live_lo(self):
+        hashes = translations.current_hashes(LIVE_CONTENT, LIVE_GOALS)
+        self.assertEqual(
+            hashes["objective_lijsten.write_for_loop"],
+            "62df92465cc34d981136db5f95321525b64e6c4379cf2eb594e8424f55b9335c",
+        )
+        self.assertEqual(sorted(i for i in hashes if i.startswith("objective_")), OBJECTIVE_IDS)
+
+
 class PushTest(_Repo):
     def test_plan_writes_nothing(self):
         cosmos = _fake_cosmos()
         out = io.StringIO()
         docs, _ = translations.plan(cosmos, out)
-        self.assertEqual(len(docs), 3)
+        self.assertEqual(len(docs), 5)
         self.assertEqual(cosmos.creates, [])
         self.assertNotIn("<p>", out.getvalue(), "the dry run prints no bodies")
+        self.assertNotIn("You can", out.getvalue(), "nor statements")
+        self.assertIn("5 docs for `translations`, partition `en` (1 content, 2 goal, 2 objective)", out.getvalue())
 
     def test_push_creates_and_keeps_an_existing_translation(self):
         teacher = {"id": "goal_lijsten", "language": "en", "kind": "goal", "refId": "lijsten",
                    "title": "Lists (teacher)", "description": "Typed in the goal editor.", "sourceHash": "x"}
         cosmos = _fake_cosmos({"en/goal_lijsten": teacher})
         r = translations.push(cosmos, io.StringIO())
-        self.assertEqual(sorted(r["created"]), ["content_lijsten", "goal_root"])
+        self.assertEqual(sorted(r["created"]), ["content_lijsten", "goal_root"] + OBJECTIVE_IDS)
         self.assertEqual(r["exists"], ["goal_lijsten"])
         self.assertEqual(cosmos.store["en/goal_lijsten"], teacher, "a 409 leaves the teacher's text alone")
-        self.assertEqual(r["stored"], 3)
+        self.assertEqual(r["stored"], 5)
         self.assertEqual(r["stale"], ["goal_lijsten"], "its hash is not the live one")
+
+    def test_push_keeps_an_existing_lo_translation(self):
+        mine = {"id": "objective_lijsten.write_for_loop", "language": "en", "kind": "objective",
+                "refId": "lijsten.write_for_loop", "statement": "Mine.", "sourceHash": "x"}
+        cosmos = _fake_cosmos({"en/objective_lijsten.write_for_loop": mine})
+        r = translations.push(cosmos, io.StringIO())
+        self.assertEqual(r["exists"], ["objective_lijsten.write_for_loop"])
+        self.assertEqual(cosmos.store["en/objective_lijsten.write_for_loop"], mine)
+        self.assertEqual(r["stale"], ["objective_lijsten.write_for_loop"])
 
     def test_verify_after_a_clean_push_finds_everything_current(self):
         cosmos = _fake_cosmos()
         translations.push(cosmos, io.StringIO())
         r = translations.verify(cosmos, io.StringIO())
-        self.assertEqual((r["stored"], len(r["current"]), r["stale"], r["missing"]), (3, 3, [], []))
+        self.assertEqual((r["stored"], len(r["current"]), r["stale"], r["unknown"], r["missing"]), (5, 5, [], [], []))
+
+    def test_verify_knows_the_source_of_an_lo_doc(self):
+        """Before #250 every `objective_` doc came out as NO SOURCE."""
+        doc = {"id": "objective_lijsten.write_for_loop", "language": "en", "kind": "objective",
+               "refId": "lijsten.write_for_loop", "statement": "You can write a for loop.",
+               "sourceHash": translations.source_hash("", FOR_LOOP_NL)}
+        cosmos = _fake_cosmos({"en/objective_lijsten.write_for_loop": doc})
+        out = io.StringIO()
+        r = translations.verify(cosmos, out)
+        self.assertEqual((r["current"], r["unknown"]), (["objective_lijsten.write_for_loop"], []))
+        self.assertIn("MISSING   objective_lijsten.predict_index_value", out.getvalue())
+        self.assertNotIn("NO SOURCE", out.getvalue())
+
+    def test_verify_flags_an_lo_doc_whose_dutch_statement_changed(self):
+        doc = {"id": "objective_lijsten.write_for_loop", "language": "en", "kind": "objective",
+               "refId": "lijsten.write_for_loop", "statement": "You can write a for loop.",
+               "sourceHash": translations.source_hash("", "Je kan een for-lus schrijven.")}
+        cosmos = _fake_cosmos({"en/objective_lijsten.write_for_loop": doc})
+        r = translations.verify(cosmos, io.StringIO())
+        self.assertEqual(r["stale"], ["objective_lijsten.write_for_loop"])
+
+
+class RepoGoalTextsTest(unittest.TestCase):
+    """The committed `goals/en/goal-texts.json` (#250): every LO entry is
+    complete, and the file is what `build_docs` reads."""
+
+    def test_every_objective_entry_is_complete(self):
+        texts = translations.goal_texts()
+        seen = 0
+        for entry in texts:
+            ids = [o["id"] for o in entry.get("objectives") or []]
+            self.assertEqual(len(ids), len(set(ids)), f"{entry['id']}: an LO id twice")
+            for o in entry.get("objectives") or []:
+                seen += 1
+                where = f"{entry['id']}.{o['id']}"
+                self.assertEqual(set(o), {"id", "nl", "en"}, where)
+                self.assertTrue(o["nl"].startswith("Je kan "), where)
+                self.assertTrue(o["en"].startswith("You can "), where)
+                self.assertTrue(o["en"].endswith("."), where)
+        self.assertGreater(seen, 0)
 
 
 class CheckLessonsTest(unittest.TestCase):

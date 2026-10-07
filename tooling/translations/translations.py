@@ -1,5 +1,5 @@
-"""Writes the English lessons and goal texts in the repo to the Cosmos
-container `translations` (#206, #209).
+"""Writes the English lessons, goal texts and learning-objective statements
+in the repo to the Cosmos container `translations` (#206, #209, #250).
 
 The translations live in the repo so the teacher can review them and a diff
 exists:
@@ -7,13 +7,20 @@ exists:
 - a lesson: `lessons/<module>/en/<NN-id>.html`, next to the Dutch file, as a
   full document like the Dutch one (the app's upload takes the `<body>`);
 - every goal and subgoal: one file, `goals/en/goal-texts.json`, each entry
-  with the Dutch title and description it was translated from.
+  with the Dutch title and description it was translated from;
+- every learning objective (LO): in the same file, the `objectives` list of
+  its subgoal's entry, each `{id, nl, en}` with the live Dutch "Je kan ..."
+  statement it was translated from. The app reads it from a doc of its own,
+  `objective_<subgoalId>.<loId>` (an LO id is unique only within its
+  subgoal), with the English `statement` and no title (#243).
 
 Every doc gets the `sourceHash` of the live Dutch text, computed exactly as
-`translationSourceHash` in `lib/services/translation/translation.dart`. A
+`translationSourceHash` in `lib/services/translation/translation.dart`; an
+LO's is `source_hash("", statement)`, as `objectiveSourceHash`. A
 translation is only written when the Dutch text it was made from (the Dutch
-lesson file, the `nl` block of a goal entry) still equals the live Dutch
-text; otherwise it would carry the hash of a text it does not translate.
+lesson file, the `nl` block of a goal entry, the `nl` of an LO) still equals
+the live Dutch text; otherwise it would carry the hash of a text it does not
+translate.
 
     python tooling/translations/translations.py plan     # dry run: ids, partition, fields
     python tooling/translations/translations.py push     # create only, then verify
@@ -21,7 +28,8 @@ text; otherwise it would carry the hash of a text it does not translate.
 
 `push` uses create, never upsert: a translation that is already there — for
 instance one the teacher typed in the goal editor — is kept and listed.
-`content` and `goals` are only read.
+`content` and `goals` are only read: an English LO statement never goes on
+the `goals` doc, which the goal editor writes whole.
 
 Standard library only; the Cosmos client is `tooling/evaluation/cosmos.py`.
 """
@@ -34,6 +42,7 @@ import hashlib
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,6 +114,17 @@ def goal_texts(path: Path | None = None) -> list[dict]:
     return json.loads((path or GOAL_TEXTS).read_text(encoding="utf-8"))["goals"]
 
 
+def objective_ref(subgoal_id: str, lo_id: str) -> str:
+    """`Translation.objectiveRefId`: an LO id is unique only within its
+    subgoal, so the subgoal id goes in front."""
+    return f"{subgoal_id}.{lo_id}"
+
+
+def objective_hash(statement: str) -> str:
+    """`objectiveSourceHash`: the statement hashed with an empty title."""
+    return source_hash("", statement)
+
+
 # ---- the docs ------------------------------------------------------------------
 
 
@@ -124,7 +144,8 @@ def build_docs(
 
     Field for field what `Translation.toMap` writes (`TranslationService.
     upsert` stamps `updatedAt`): `id`, `language`, `kind`, `refId`, `title`,
-    `body` or `description`, `sourceHash`, `updatedAt`.
+    `body` or `description`, `sourceHash`, `updatedAt`; an LO's doc has
+    `statement` and no `title`.
     """
     now = now or _now()
     docs: list[dict] = []
@@ -190,14 +211,59 @@ def build_docs(
         )
     for gid in sorted(set(live) - {e["id"] for e in texts}):
         problems.append(f"goal {gid}: live goal without an English text")
+
+    # Learning objectives (#250): each against its own live statement, apart
+    # from its subgoal's title and description.
+    for entry in texts:
+        gid = entry["id"]
+        live_los = {lo.get("id"): lo for lo in (live.get(gid) or {}).get("objectives") or []}
+        for obj in entry.get("objectives") or []:
+            ref = objective_ref(gid, obj["id"])
+            lo = live_los.get(obj["id"])
+            if lo is None:
+                problems.append(f"objective {ref}: not in the live goals")
+                continue
+            live_statement = lo.get("statement") or ""
+            if norm(obj.get("nl") or "") != norm(live_statement):
+                problems.append(f"objective {ref}: the Dutch statement in goal-texts.json differs from the live one")
+                continue
+            if not (obj.get("en") or "").strip():
+                problems.append(f"objective {ref}: no English statement")
+                continue
+            docs.append(
+                {
+                    "id": f"objective_{ref}",
+                    "language": LANGUAGE,
+                    "kind": "objective",
+                    "refId": ref,
+                    "statement": obj["en"],
+                    "sourceHash": objective_hash(live_statement),
+                    "updatedAt": now,
+                }
+            )
+    in_texts = {objective_ref(e["id"], o["id"]) for e in texts for o in e.get("objectives") or []}
+    for g in live_goals:
+        for lo in g.get("objectives") or []:
+            ref = objective_ref(g["id"], lo.get("id"))
+            if ref not in in_texts:
+                problems.append(f"objective {ref}: live learning objective without an English statement")
     return docs, problems
 
 
 def current_hashes(live_content: list[dict], live_goals: list[dict]) -> dict[str, str]:
-    """Doc id -> the hash of the live Dutch text it should carry."""
+    """Doc id -> the hash of the live Dutch text it should carry: of every
+    lesson, goal and learning objective."""
     out = {f"content_{c['id']}": source_hash(c.get("title") or "", c.get("body") or "") for c in live_content}
     out.update(
         {f"goal_{g['id']}": source_hash(g.get("title") or "", g.get("description") or "") for g in live_goals}
+    )
+    out.update(
+        {
+            f"objective_{objective_ref(g['id'], lo['id'])}": objective_hash(lo.get("statement") or "")
+            for g in live_goals
+            for lo in g.get("objectives") or []
+            if lo.get("id")
+        }
     )
     return out
 
@@ -214,10 +280,12 @@ def _live(cosmos):
 def plan(cosmos, out=sys.stdout) -> tuple[list[dict], list[str]]:
     content, goals = _live(cosmos)
     docs, problems = build_docs(content, goals, lessons("nl"), lessons(LANGUAGE), goal_texts())
+    width = max((len(d["id"]) for d in docs), default=0)
     for d in docs:
         fields = [k for k in d if k not in ("id", "language")]
-        print(f"{d['id']:40} partition={d['language']}  fields: {', '.join(fields)}", file=out)
-    print(f"\n{len(docs)} docs for `{CONTAINER}`, partition `{LANGUAGE}`", file=out)
+        print(f"{d['id']:{width}} partition={d['language']}  fields: {', '.join(fields)}", file=out)
+    per_kind = ", ".join(f"{n} {k}" for k, n in Counter(d["kind"] for d in docs).items())
+    print(f"\n{len(docs)} docs for `{CONTAINER}`, partition `{LANGUAGE}` ({per_kind})", file=out)
     for p in problems:
         print(f"LEFT OUT  {p}", file=out)
     return docs, problems
@@ -259,7 +327,7 @@ def verify(cosmos, out=sys.stdout) -> dict:
     print(
         f"\nread back: {len(stored)} docs in `{CONTAINER}`/{LANGUAGE}; "
         f"{len(current)} current, {len(stale)} stale, {len(unknown)} without a live source; "
-        f"{len(missing)} live lessons/goals without a translation",
+        f"{len(missing)} live lessons/goals/learning objectives without a translation",
         file=out,
     )
     for i in stale:

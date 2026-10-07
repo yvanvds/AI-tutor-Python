@@ -1,7 +1,9 @@
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dart';
+import 'package:ai_tutor_python/features/progress/widgets/leerpad_objectives_panel.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
+import 'package:ai_tutor_python/services/student_state/mastery_stamps.dart';
 import 'package:ai_tutor_python/services/translation/localized_text.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -10,9 +12,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Single root goal card on the Leerpad. Active = tinted bg + accent border
 /// + horizontal row of child chips + "Verder" CTA. Completed = check badge,
-/// "voltooid" caption. The root's title and description are in the app
+/// "voltooid" caption, and the same row of child chips (#243). Tapping a
+/// chip opens the list of its learning objectives under the row, each
+/// demonstrated or not yet. The root's title and description are in the app
 /// language when there is a translation, else in Dutch (#210).
-class LeerpadCard extends ConsumerWidget {
+///
+/// The bars count the mastery stamp the grade reads ([stamps], #243): a
+/// chip's bar is its share of non-optional LOs with the stamp, the root's
+/// the average over its non-optional subgoals. While [stamps] is `null`
+/// (loading, or unreadable) a bar falls back on the cached `progress`, as
+/// does a subgoal without non-optional LOs.
+class LeerpadCard extends ConsumerStatefulWidget {
   const LeerpadCard({
     super.key,
     required this.index,
@@ -21,6 +31,7 @@ class LeerpadCard extends ConsumerWidget {
     required this.progressById,
     required this.isActive,
     required this.onContinue,
+    this.stamps,
   });
 
   final int index;
@@ -30,15 +41,42 @@ class LeerpadCard extends ConsumerWidget {
   final bool isActive;
   final VoidCallback onContinue;
 
+  /// The student's mastery stamps; `null` while they load or when they
+  /// could not be read.
+  final MasteryStamps? stamps;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LeerpadCard> createState() => _LeerpadCardState();
+}
+
+class _LeerpadCardState extends ConsumerState<LeerpadCard> {
+  /// The subgoal whose learning objectives are open under the chips.
+  String? _openChildId;
+
+  DemonstratedCount? _countOf(Goal child) {
+    final count = widget.stamps?.countFor(child);
+    return (count == null || count.total == 0) ? null : count;
+  }
+
+  double _barOf(Goal child) =>
+      _countOf(child)?.fraction ??
+      widget.progressById[child.id]?.progress ??
+      0.0;
+
+  void _toggle(String childId) =>
+      setState(() => _openChildId = _openChildId == childId ? null : childId);
+
+  @override
+  Widget build(BuildContext context) {
+    final root = widget.root;
+    final children = widget.children;
+    final progressById = widget.progressById;
+    final isActive = widget.isActive;
     final shown = ref.watch(localizedGoalOf(root));
     final required = children.where((c) => !c.optional).toList();
     final progress = required.isEmpty
         ? 0.0
-        : (required
-                      .map((c) => progressById[c.id]?.progress ?? 0)
-                      .fold<double>(0, (a, b) => a + b) /
+        : (required.map(_barOf).fold<double>(0, (a, b) => a + b) /
                   required.length)
               .clamp(0.0, 1.0);
     // Finished means every required subgoal was advanced past (#161); the
@@ -46,6 +84,10 @@ class LeerpadCard extends ConsumerWidget {
     final completed =
         required.isNotEmpty &&
         required.every((c) => progressById[c.id]?.isAdvanced ?? false);
+    final showChildren = (isActive || completed) && children.isNotEmpty;
+    final open = showChildren
+        ? children.where((c) => c.id == _openChildId).firstOrNull
+        : null;
 
     final bg = isActive
         ? AppColors.accent.withValues(alpha: 0.06)
@@ -66,7 +108,7 @@ class LeerpadCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CardHeader(
-            index: index,
+            index: widget.index,
             title: shown.title,
             description: shown.description,
             isActive: isActive,
@@ -74,15 +116,37 @@ class LeerpadCard extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.m),
           _ProgressRow(value: progress, completed: completed),
-          if (isActive && children.isNotEmpty) ...[
+          if (showChildren) ...[
             const SizedBox(height: AppSpacing.lg),
-            _ChildrenRow(children: children, progressById: progressById),
+            _ChildrenRow(
+              children: children,
+              progressById: progressById,
+              barOf: _barOf,
+              countOf: _countOf,
+              openChildId: open?.id,
+              onTap: _toggle,
+            ),
+            AnimatedSize(
+              duration: AppDurations.modeFade,
+              curve: AppCurves.layout,
+              alignment: Alignment.topCenter,
+              child: open == null
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.m),
+                      child: LeerpadObjectivesPanel(
+                        key: ValueKey(open.id),
+                        subgoal: open,
+                        stamps: widget.stamps,
+                      ),
+                    ),
+            ),
           ],
           if (isActive) ...[
             const SizedBox(height: AppSpacing.lg),
             Align(
               alignment: Alignment.centerRight,
-              child: _VerderButton(onTap: onContinue),
+              child: _VerderButton(onTap: widget.onContinue),
             ),
           ],
         ],
@@ -250,10 +314,21 @@ class _ProgressRow extends StatelessWidget {
 }
 
 class _ChildrenRow extends StatelessWidget {
-  const _ChildrenRow({required this.children, required this.progressById});
+  const _ChildrenRow({
+    required this.children,
+    required this.progressById,
+    required this.barOf,
+    required this.countOf,
+    required this.openChildId,
+    required this.onTap,
+  });
 
   final List<Goal> children;
   final Map<String, Progress> progressById;
+  final double Function(Goal) barOf;
+  final DemonstratedCount? Function(Goal) countOf;
+  final String? openChildId;
+  final void Function(String childId) onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -266,8 +341,11 @@ class _ChildrenRow extends StatelessWidget {
               padding: const EdgeInsets.only(right: AppSpacing.s),
               child: LeerpadChildChip(
                 goal: c,
-                progress: progressById[c.id]?.progress ?? 0.0,
+                progress: barOf(c),
                 completed: progressById[c.id]?.isAdvanced ?? false,
+                demonstrated: countOf(c),
+                selected: c.id == openChildId,
+                onTap: c.objectives.isEmpty ? null : () => onTap(c.id),
               ),
             ),
         ],

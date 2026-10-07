@@ -7,14 +7,19 @@ import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
 import 'package:ai_tutor_python/services/progress/teacher_signals.dart';
+import 'package:ai_tutor_python/services/student_state/mastery_stamps.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Student "Leerpad" — a vertical list of root goal cards, with the
-/// currently-active root expanded to show its children. Replaces the older
-/// `StudentProgressList` view for the student-facing path.
+/// currently-active root and every completed one showing their children.
+/// Replaces the older `StudentProgressList` view for the student-facing path.
+///
+/// The bars and the "x van y aangetoond" under each subgoal count the
+/// mastery stamps (`masteryStampsProvider`, #243), read once per visit; the
+/// "finished" marks and the active root come from the `progress` docs.
 class LeerpadPage extends ConsumerWidget {
   const LeerpadPage({super.key});
 
@@ -90,6 +95,9 @@ class _LeerpadBody extends ConsumerWidget {
       progressAll: progress,
       childrenByParent: childrenByParent,
     );
+    // `null` until the read is back, and on a failed read: the bars then
+    // show the cached `progress`, and no count.
+    final stamps = ref.watch(masteryStampsProvider).valueOrNull;
 
     return ListView(
       padding: const EdgeInsets.symmetric(
@@ -117,6 +125,7 @@ class _LeerpadBody extends ConsumerWidget {
                   progressById: progressById,
                   isActive: roots[i].id == activeRootId,
                   onContinue: () => _continueRoot(ref, roots[i]),
+                  stamps: stamps,
                 ),
               ),
             ),

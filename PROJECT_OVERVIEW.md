@@ -122,9 +122,9 @@ lib/
 │   │   └── content_service.dart          # cachedAll / watchAll / watchById / upsert / delete; reassign moves the lesson's translations too (#206); upsert patches the cache (#208)
 │   │
 │   ├── translation/             # NEW (#206) — translations of lessons and goal texts, `translations` container
-│   │   ├── translation.dart              # Translation model (content_/goal_ doc ids), kSourceLanguage 'nl', kTranslationLanguages / kContentLanguages, sourceHash helpers, TranslationStatus (missing / current / stale, #208)
+│   │   ├── translation.dart              # Translation model (content_/goal_/objective_ doc ids), kSourceLanguage 'nl', kTranslationLanguages / kContentLanguages, sourceHash helpers, TranslationStatus (missing / current / stale, #208)
 │   │   ├── translation_service.dart      # watchLanguage / listLanguage (tolerant) + upsert / delete / moveContent (throw)
-│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor); languageTranslationsProvider(language) for the teacher's editors, with put / remove, and contentTranslationStatuses (#208) / goalTranslationStatuses (#210)
+│   │   ├── translations_provider.dart    # translationsProvider: LanguageTranslations of appLocaleProvider (contentFor / goalFor / objectiveFor); languageTranslationsProvider(language) for the teacher's editors, with put / remove, and contentTranslationStatuses (#208) / goalTranslationStatuses (#210)
 │   │   └── localized_text.dart           # localizedContent / localizedGoal → text + isFallback / isStale; localizedContentProvider(contentId) — the theory page and its content question (#207); localizedGoalOf(goal) — what the student-facing goal widgets watch (#210); localizedGoalByIdOf(goalId, title, description) — for a notice that kept only the goal's id and Dutch text: the goal-reached splash, the level-up subtitle, the warm-up / recheck chat pills (#211), the "new goal selected" pill (#212)
 │   │
 │   ├── module/                  # NEW — top-level grouping of root goals (v1: single 'python-basics')
@@ -141,6 +141,7 @@ lib/
 │   ├── student_state/           # NEW — per-student probabilistic mastery state
 │   │   ├── lo_belief.dart                # Beta(α, β) per (uid, subgoalId, loId) + lastQuestionType + lastPositiveAtCalibratedAt + recentNegativesAtCalibrated
 │   │   ├── lo_beliefs_service.dart       # Cosmos `lo_beliefs` container; get/upsert/deleteAllForCurrentUser
+│   │   ├── mastery_stamps.dart           # NEW (#243) — MasteryStamps (LOs with `firstMasteredAt`), DemonstratedCount per subgoal; masteryStampsProvider, read once per Leerpad visit
 │   │   ├── student_calibration.dart      # StudentCalibration + CalibrationAnswer (embedded on Account doc)
 │   │   ├── turn_record.dart              # PersistedTurnRecord, TurnLoSignal, TurnAppliedSignal, TurnLoStatus, TurnSignalEvent (kind + severity)
 │   │   ├── turn_history_service.dart     # Append-only `turn_history`; watchStrongUnacknowledgedFor; listEventsFor; acknowledgeAllFor; listSubgoalSince (#107)
@@ -225,8 +226,9 @@ lib/
 │   │
 │   ├── progress/
 │   │   ├── leerpad_page.dart           # Student "Leerpad" — vertical stack of root-goal cards
-│   │   ├── widgets/leerpad_card.dart   # Single root card (active expands to child chips + "Verder")
-│   │   ├── widgets/leerpad_child_chip.dart  # Per-child chip with progress dot
+│   │   ├── widgets/leerpad_card.dart   # Single root card (active and completed show child chips; active adds "Verder")
+│   │   ├── widgets/leerpad_child_chip.dart  # Per-child chip: bar + "x of y demonstrated" (#243); tap opens its LOs
+│   │   ├── widgets/leerpad_objectives_panel.dart  # NEW (#243) — a subgoal's LO statements, demonstrated or not yet
 │   │   ├── student_progress_list.dart  # Older list view; still used in teacher's read-only drawer
 │   │   └── goal_tile.dart              # Optional `readOnly`; carries Progress? for teacher view
 │   │

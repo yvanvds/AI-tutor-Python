@@ -4015,6 +4015,30 @@ abstract class AppLocalizations {
   /// **'Continue'**
   String get leerpad_card_button_continue;
 
+  /// Under a subgoal tile on the learning path (#243): how many of the subgoal's non-optional learning objectives the student has demonstrated (the mastery stamp the grade reads), out of how many.
+  ///
+  /// In en, this message translates to:
+  /// **'{demonstrated} of {total} demonstrated'**
+  String leerpad_child_demonstrated(int demonstrated, int total);
+
+  /// Under a learning objective's 'You can …' sentence in the list a subgoal tile opens on the learning path (#243): the student has demonstrated it.
+  ///
+  /// In en, this message translates to:
+  /// **'demonstrated'**
+  String get leerpad_objective_demonstrated;
+
+  /// Under a learning objective's 'You can …' sentence in the list a subgoal tile opens on the learning path (#243): the student has not demonstrated it yet. No advice and no retry: the app picks the exercises.
+  ///
+  /// In en, this message translates to:
+  /// **'not yet demonstrated'**
+  String get leerpad_objective_notYetDemonstrated;
+
+  /// After the status of an optional learning objective in the list a subgoal tile opens on the learning path (#243), separated by a dot: it does not count in the tile's 'x of y demonstrated'.
+  ///
+  /// In en, this message translates to:
+  /// **'optional'**
+  String get leerpad_objective_optional;
+
   /// No description provided for @goalTile_button_faster.
   ///
   /// In en, this message translates to:

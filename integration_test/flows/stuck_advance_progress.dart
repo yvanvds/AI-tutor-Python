@@ -1,6 +1,9 @@
 // End-to-end (#161): the progress of a subgoal the conductor advanced past
 // with a stuck LO stays at the honest mastered fraction, and the leerpad
-// shows it that way — finished (check mark) at 50%, not 100%.
+// shows it that way — finished (check mark) with one of its two LOs
+// demonstrated and its bar at half, not full. Since #243 the leerpad
+// counts the mastery stamps the grade reads: the grade stamps `lo-var`,
+// not `lo-cast`.
 //
 // The teacher saw a student at 100% on every subgoal of a goal while the
 // grade proposal named five core LOs as not mastered. Both were right by
@@ -227,17 +230,32 @@ void main() {
     );
     expect(samples.map((d) => d['progress']).toList(), [0.5]);
 
-    // The leerpad shows it that way: "Variables" finished, at 50%.
+    // The leerpad shows it that way: "Variables" finished, one of its two
+    // LOs demonstrated — the one the grade stamped — and its bar at half.
+    expect(
+      harness
+          .cosmos['lo_beliefs']
+          .docs['${kStudentUid}_s2_lo-var']!['firstMasteredAt'],
+      isA<String>(),
+    );
     await tester.tap(find.byTooltip('Learning path'));
     await pumpUntilFound(tester, find.byType(LeerpadPage));
     await pumpUntil(
       tester,
-      () => inChip('s2', find.text('50%')).evaluate().isNotEmpty,
+      () =>
+          inChip('s2', find.text('1 of 2 demonstrated')).evaluate().isNotEmpty,
       timeout: const Duration(seconds: 30),
-      reason: 'the "Variables" chip never read 50%',
+      reason: 'the "Variables" chip never read "1 of 2 demonstrated"',
     );
     expect(inChip('s2', find.byIcon(Icons.check_circle)), findsOneWidget);
-    expect(inChip('s2', find.text('100%')), findsNothing);
+    expect(
+      tester
+          .widget<FractionallySizedBox>(
+            inChip('s2', find.byType(FractionallySizedBox)),
+          )
+          .widthFactor,
+      closeTo(0.5, 1e-9),
+    );
     // "Print" still reads finished from its pre-stamp doc; "Loops" is open;
     // the goal as a whole is not completed.
     expect(inChip('s1', find.byIcon(Icons.check_circle)), findsOneWidget);

@@ -57,13 +57,27 @@ Inputs:
   | socraticQuestion | guidingQuestion`. Picked by policy.
 - `recentQuestions` (`recent_questions` in the request, #184) — the last
   12 questions asked this session, oldest first, one line each:
-  `type | loId | core`, where `core` is the question's prompt with its
-  code on one line, cut at 160 characters (`RecentQuestions`). Omitted
-  before the first question. Generation carries no conversation history
-  (see "Conversation history"), so this block is what the model knows
-  about what it asked before; the teacher-authored question instructions
-  point at it for "do not repeat yourself". Kept by the app, dropped on
-  sign-out.
+  `type | loId | code | prompt` (#244, `RecentQuestions`). `code` is the
+  shape of the code shown with the question: on one line (its lines
+  joined with `; `), every string literal as `"…"`, comments left out,
+  cut at 200 characters; `-` when the question has no code. `prompt` is
+  the question's text on one line, cut at 100 characters — 160 when there
+  is no code (`write_code`, a socratic question). `loId` is `-` when the
+  question had no target LO. Omitted before the first question.
+  Generation carries no conversation history (see "Conversation
+  history"), so this block is what the model knows about what it asked
+  before; the teacher-authored question instructions point at it for "do
+  not repeat yourself" and say what counts as a repeat: the same exercise
+  with other names, texts or numbers is one (section "05 Variety" of each
+  question doc, its text in `instructions-export.md`, #244). Kept by the
+  app, dropped on sign-out.
+
+  Through 2.8.0 a line was `type | loId | core`: the prompt followed by the
+  code, cut at 160 characters together. A prompt is mostly the story
+  around the exercise and usually filled those 160 on its own, so the
+  model saw a new story and none of the code, and the same exercise with
+  other names passed for a new one (#244). The code now comes first,
+  without the texts a new story changes, and the prompt has its own cap.
 
 Outputs: same envelope as today, the META payload matches the existing
 per-question-type schema (MCQ options, code snippet, prompt text, etc.).
