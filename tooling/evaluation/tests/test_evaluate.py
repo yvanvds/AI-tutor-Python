@@ -1588,5 +1588,284 @@ class TraceSignalsTest(unittest.TestCase):
         self.assertEqual([s["status"] for s in dx.trace_signals(None, content)], ["weggegooid", "telt"])
 
 
+# #242: a class of two made-up students for `replay-beliefs`. Rik ran a
+# build from before #108 until 09-15: it wrote no stamp and no highest level,
+# and computed the old way. recall_a1: four right on 09-10, the replay stamps
+# the second; on 09-22, on 2.8.0, one more right, and the new build stamped
+# the doc then. write_a2: one weak right at `easy`, no stamp either way.
+# predict_b1: wrong and then three right at `hard` on 09-15 — the old build
+# weighed the wrong one ×1.4, so μ 0.71 and no stamp; the replay weighs it
+# ×0.6 and stamps the last. One of those turns names fix_a3 neutral from the
+# side, which that build wrote at the prior and the replay does not reach.
+# Sara is on the current build throughout: her doc is the replay, stamped
+# by the app a second after the oefening's `turnAt`.
+KLAS_REPLAY = "6HERSPEEL"
+ACCOUNTS += [
+    {"uid": "u-rik", "firstName": "Rik", "lastName": "Herspeel", "className": KLAS_REPLAY,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "hard"}},
+    {"uid": "u-sara", "firstName": "Sara", "lastName": "Gelijk", "className": KLAS_REPLAY,
+     "updatedAt": "2026-09-22T10:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+_NEW_BUILD = {"clientVersion": "2.8.0+25"}
+TURNS["u-rik"] = [
+    *[_turn(f"2026-09-10T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-rik") for i in range(4)],
+    _turn("2026-09-12T09:00:00.000Z", "sg-a", "write_a2", uid="u-rik", difficulty="easy",
+          loSignals=[_sig("sg-a", "write_a2", "weak")]),
+    _turn("2026-09-15T09:00:00.000Z", "sg-b", "predict_b1", uid="u-rik", overallQuality="wrong", **_HARD,
+          loSignals=[_sig("sg-b", "predict_b1", signal="negative"), _sig("sg-a", "fix_a3", "weak", "neutral")]),
+    *[_turn(f"2026-09-15T09:{m}:00.000Z", "sg-b", "predict_b1", uid="u-rik", **_HARD) for m in ("05", "10", "15")],
+    _turn("2026-09-22T09:00:00.000Z", "sg-a", "recall_a1", uid="u-rik", **_NEW_BUILD),
+]
+TURNS["u-sara"] = [
+    _turn(f"2026-09-10T09:0{i}:00.000Z", "sg-a", "recall_a1", uid="u-sara", **_NEW_BUILD) for i in range(4)
+]
+
+
+def _belief_doc(uid: str, key: tuple[str, str], alpha: float, beta: float, **fields) -> dict:
+    sg, lo = key
+    return {
+        "id": f"{uid}_{sg}_{lo}", "type": "lo_belief", "uid": uid, "subgoalId": sg, "loId": lo,
+        "alpha": alpha, "beta": beta, "recentNegativesAtCalibrated": 0, "_etag": f'"etag-{uid}-{lo}"', **fields,
+    }
+
+
+def _replay_stored() -> dict[str, dict[tuple[str, str], dict]]:
+    now = rules.replay(TURNS["u-rik"], GOALS)
+    old = rules.replay(TURNS["u-rik"][:-1], GOALS, asymmetric=False, drop_incidental_negatives=False)
+    sara = rules.replay(TURNS["u-sara"], GOALS)
+    recall, write, predict, fix = (
+        ("sg-a", "recall_a1"), ("sg-a", "write_a2"), ("sg-b", "predict_b1"), ("sg-a", "fix_a3")
+    )
+    return {
+        "u-rik": {
+            # The new build went on from the old doc: right answers at
+            # `medium` weigh the same both ways. It stamped on its own write.
+            recall: _belief_doc("u-rik", recall, now[recall].alpha, now[recall].beta,
+                                lastUpdatedAt="2026-09-22T09:00:01.250Z", lastProbedAt="2026-09-22T09:00:01.250Z",
+                                firstMasteredAt="2026-09-22T09:00:01.250Z", highestPositiveDifficulty="medium"),
+            write: _belief_doc("u-rik", write, now[write].alpha, now[write].beta,
+                               lastUpdatedAt="2026-09-12T09:00:01.000Z", lastQuestionType="mcQuestion"),
+            predict: _belief_doc("u-rik", predict, old[predict].alpha, old[predict].beta,
+                                 lastUpdatedAt="2026-09-15T09:15:01.000Z",
+                                 lastPositiveAtCalibratedAt="2026-09-15T09:15:01.000Z"),
+            fix: _belief_doc("u-rik", fix, 1.0, 1.0, lastUpdatedAt="2026-09-15T09:00:01.000Z"),
+        },
+        "u-sara": {
+            # The app's numbers, a few millionths apart, and its stamp a
+            # second after the replay's: the same oefening.
+            recall: _belief_doc("u-sara", recall, sara[recall].alpha + 3e-6, sara[recall].beta,
+                                lastUpdatedAt="2026-09-10T09:03:01.200Z",
+                                firstMasteredAt="2026-09-10T09:01:01.200Z", highestPositiveDifficulty="medium"),
+        },
+    }
+
+
+REPLAY_STORED = _replay_stored()
+
+
+class ReplayedBeliefTest(unittest.TestCase):
+    """The merge `replay-beliefs` writes (#242): the stamp is the earliest,
+    and never cleared; the level the highest; only four fields change."""
+
+    AT = dt.datetime(2026, 9, 15, 9, 15, tzinfo=dt.timezone.utc)
+    OEFENINGEN = [AT - dt.timedelta(minutes=5), AT, AT + dt.timedelta(minutes=5), AT + dt.timedelta(days=7)]
+
+    def stored(self, **fields) -> dict:
+        return _belief_doc("u-x", ("sg-b", "predict_b1"), 9.4, 2.2, lastUpdatedAt="2026-09-22T09:00:01.000Z",
+                           lastProbedAt="2026-09-22T09:00:01.000Z", regressedAt="2026-09-20T09:00:00.000Z",
+                           lastPositiveAtCalibratedAt="2026-09-15T09:15:01.000Z", **fields)
+
+    def merged(self, stored: dict, stamp=None, level=None, alpha=9.4, beta=2.2) -> dict:
+        state = rules.LoState(alpha=alpha, beta=beta, first_mastered_at=stamp, ratchet=level)
+        return evaluate.replayed_belief(stored, state, self.OEFENINGEN)
+
+    def test_a_stamp_is_gained(self):
+        new = self.merged(self.stored(), stamp=self.AT)
+        self.assertEqual(new["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
+        self.assertEqual(evaluate.belief_changes(self.stored(), new), {"stamp gained"})
+
+    def test_a_stamp_on_a_later_oefening_moves_to_the_replayed_one(self):
+        stored = self.stored(firstMasteredAt="2026-09-22T09:15:01.250Z")
+        new = self.merged(stored, stamp=self.AT)
+        self.assertEqual(new["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
+        self.assertEqual(evaluate.belief_changes(stored, new), {"stamp earlier"})
+
+    def test_the_apps_stamp_on_the_same_oefening_stays(self):
+        # The app stamps when it writes, a second or so after `turnAt`.
+        stored = self.stored(firstMasteredAt="2026-09-15T09:15:01.250Z")
+        self.assertEqual(self.merged(stored, stamp=self.AT), stored)
+
+    def test_an_earlier_stored_stamp_stays(self):
+        stored = self.stored(firstMasteredAt="2026-09-01T08:00:00.000Z")
+        self.assertEqual(self.merged(stored, stamp=self.AT), stored)
+
+    def test_the_stamp_is_never_cleared(self):
+        stored = self.stored(firstMasteredAt="2026-09-15T09:20:01.000Z")
+        self.assertEqual(self.merged(stored, stamp=None), stored)
+        # Without either, the field stays away: no null on the doc.
+        self.assertNotIn("firstMasteredAt", self.merged(self.stored(), stamp=None))
+
+    def test_the_level_is_the_highest_of_the_two(self):
+        for stored_level, replayed, expected in (
+            (None, "easy", "easy"),
+            ("medium", "hard", "hard"),
+            ("hard", "medium", "hard"),
+            ("hard", None, "hard"),
+            ("weird", "easy", "easy"),  # an unknown level reads as none, as in the app
+        ):
+            with self.subTest(stored=stored_level, replayed=replayed):
+                fields = {"highestPositiveDifficulty": stored_level} if stored_level else {}
+                self.assertEqual(self.merged(self.stored(**fields), level=replayed)["highestPositiveDifficulty"], expected)
+        self.assertNotIn("highestPositiveDifficulty", self.merged(self.stored(), level=None))
+
+    def test_alpha_and_beta_come_from_the_replay(self):
+        new = self.merged(self.stored(), alpha=9.4, beta=3.8)
+        self.assertEqual((new["alpha"], new["beta"]), (9.4, 3.8))
+        self.assertEqual(evaluate.belief_changes(self.stored(), new), {"alpha/beta"})
+
+    def test_the_same_numbers_computed_twice_are_no_change(self):
+        stored = self.stored()
+        self.assertEqual(self.merged(stored, alpha=9.4 + 4e-6, beta=2.2 - 4e-6), stored)
+
+    def test_only_the_four_fields_change(self):
+        stored = self.stored(firstMasteredAt="2026-09-22T09:15:01.250Z", highestPositiveDifficulty="medium")
+        new = self.merged(stored, stamp=self.AT, level="hard", alpha=10.0, beta=3.8)
+        self.assertEqual(set(new), set(stored))
+        self.assertEqual({k for k in new if new[k] != stored[k]}, set(evaluate.BELIEF_FIELDS))
+        self.assertEqual(stored["firstMasteredAt"], "2026-09-22T09:15:01.250Z")  # the stored doc is not touched
+
+    def test_a_stamp_is_written_as_the_app_writes_a_moment(self):
+        at = dt.datetime(2026, 10, 7, 9, 4, 11, 818589, tzinfo=dt.timezone.utc)
+        self.assertEqual(evaluate._app_iso(at), "2026-10-07T09:04:11.818589Z")
+        self.assertEqual(evaluate._app_iso(at.replace(microsecond=818000)), "2026-10-07T09:04:11.818Z")
+        self.assertEqual(evaluate._app_iso(at.replace(microsecond=0)), "2026-10-07T09:04:11.000Z")
+
+
+class ReplayBeliefsTest(_CommandTest):
+    """`replay-beliefs` (#242) against the fake Cosmos: dry by default; with
+    `--apply` a backup first, `If-Match`, and not in the lesson time."""
+
+    def setUp(self):
+        super().setUp()
+        self.cosmos.beliefs = lambda uid: {k: dict(v) for k, v in REPLAY_STORED.get(uid, {}).items()}
+
+    def row(self, stdout: str, name: str) -> list[str]:
+        """docs · replayed · to write · stamps gained · earlier · level raised · α/β · last build"""
+        line = next(line for line in stdout.splitlines() if line.startswith(name))
+        return line.split()[-8:]
+
+    def written(self) -> dict[str, dict]:
+        return {doc["loId"]: doc for coll, doc, _, _ in self.cosmos.upserts if coll == "lo_beliefs"}
+
+    def backups(self) -> list[Path]:
+        return sorted((self.tmp / "backups").glob("*.json"))
+
+    def test_a_dry_run_counts_and_writes_nothing(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY)
+
+        self.assertEqual(self.row(stdout, "Rik Herspeel"), ["4", "3", "3", "1", "1", "2", "1", "2.8.0+25"])
+        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "2.8.0+25"])
+        self.assertIn("te schrijven: 3 documenten bij 1 leerling(en)", stdout)
+        self.assertIn("Droge run: er is niets geschreven", stdout)
+        self.assertEqual(self.cosmos.upserts, [])
+        self.assertEqual(self.backups(), [])
+
+    def test_apply_backs_up_first_and_writes_only_the_four_fields(self):
+        backed_up_before = []
+        upsert = self.cosmos.upsert
+
+        def watched(coll, doc, pk, etag=None):
+            backed_up_before.append(bool(self.backups()))
+            return upsert(coll, doc, pk, etag)
+
+        self.cosmos.upsert = watched
+
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply")
+
+        self.assertEqual(backed_up_before, [True, True, True])
+        backup = json.loads(self.backups()[0].read_text(encoding="utf-8"))
+        self.assertIn("replay-beliefs", self.backups()[0].name)
+        self.assertEqual(len(backup["lo_beliefs"]), 4)  # every doc of the student it writes for
+        written = self.written()
+        self.assertEqual(sorted(written), ["predict_b1", "recall_a1", "write_a2"])
+        stored = REPLAY_STORED["u-rik"]
+        for coll, doc, pk, etag in self.cosmos.upserts:
+            before = stored[(doc["subgoalId"], doc["loId"])]
+            self.assertEqual((coll, pk, etag), ("lo_beliefs", "u-rik", before["_etag"]))
+            self.assertLessEqual(set(before), set(doc))  # nothing taken away
+            self.assertLessEqual({k for k in doc if doc[k] != before.get(k)}, set(evaluate.BELIEF_FIELDS))
+        replay = rules.replay(TURNS["u-rik"], GOALS)
+        predict = written["predict_b1"]
+        self.assertEqual((predict["alpha"], predict["beta"]), (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+        self.assertEqual(predict["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
+        self.assertEqual(predict["highestPositiveDifficulty"], "hard")
+        self.assertEqual(written["recall_a1"]["firstMasteredAt"], "2026-09-10T09:01:00.000Z")
+        self.assertEqual(written["recall_a1"]["lastProbedAt"], "2026-09-22T09:00:01.250Z")
+        self.assertEqual(written["write_a2"]["highestPositiveDifficulty"], "easy")
+        self.assertNotIn("firstMasteredAt", written["write_a2"])
+        self.assertIn("geschreven 3, conflicten 0", stdout)
+
+    def test_validate_reads_the_written_docs_as_matching(self):
+        before = self.run_cli("validate", "--klas", KLAS_REPLAY)
+        self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply")
+        after_apply = {k: dict(v) for k, v in REPLAY_STORED["u-rik"].items()}
+        after_apply.update({(d["subgoalId"], d["loId"]): d for d in self.written().values()})
+        self.cosmos.beliefs = lambda uid: after_apply if uid == "u-rik" else {}
+
+        after = self.run_cli("validate", "--klas", KLAS_REPLAY)
+
+        rik = lambda out: next(line for line in out.splitlines() if line.startswith("Rik Herspeel")).split()[-5:]  # noqa: E731
+        self.assertEqual(rik(before), ["4", "3", "1", "0", "2.8.0+25"])
+        self.assertEqual(rik(after), ["4", "3", "0", "0", "2.8.0+25"])
+
+    def test_one_student(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara")
+
+        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "2.8.0+25"])
+        self.assertNotIn("Rik Herspeel", stdout)
+
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara", "--apply")
+        self.assertIn("Niets te schrijven.", stdout)
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+    def test_it_refuses_in_the_lesson_time_of_the_class(self):
+        # NOW is Thursday 24 September, 14:00 in Belgium: inside the ten
+        # minutes before the lesson, which count as lesson time.
+        self.cosmos.classes = lambda: {
+            "classes": [{"name": KLAS_REPLAY, "lessons": [{"weekday": 4, "start": "14:05", "end": "15:00"}]}]
+        }
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply")
+        self.assertIn(f"{KLAS_REPLAY} heeft nu les volgens het lesrooster", str(stop.exception.code))
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+        self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply", "--force")
+        self.assertEqual(len(self.written()), 3)
+
+    def test_it_refuses_while_a_student_works(self):
+        rik, sara = (next(a for a in ACCOUNTS if a["uid"] == uid) for uid in ("u-rik", "u-sara"))
+        working = {**rik, "updatedAt": "2026-09-24T11:55:00Z"}  # five minutes before NOW
+        self.cosmos.accounts = lambda klas: [working, sara] if klas == KLAS_REPLAY else []
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply")
+        self.assertIn("de laatste minuten actief: Rik Herspeel", str(stop.exception.code))
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+    def test_a_doc_the_app_wrote_in_between_is_named_and_left(self):
+        upsert = self.cosmos.upsert
+
+        def racing(coll, doc, pk, etag=None):
+            if doc["loId"] == "predict_b1":
+                raise self.cosmos.Conflict(doc["id"])
+            return upsert(coll, doc, pk, etag)
+
+        self.cosmos.upsert = racing
+
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--apply")
+
+        self.assertIn("Rik Herspeel: sg-b/predict_b1 veranderde intussen", stdout)
+        self.assertIn("geschreven 2, conflicten 1 (draai het opnieuw voor die)", stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

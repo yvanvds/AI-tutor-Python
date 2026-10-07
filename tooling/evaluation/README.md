@@ -25,6 +25,9 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
 - **Niets wordt geschreven zonder bespreking.** `draft`, `validate` en
   `what-if` lezen alleen. `apply` maakt eerst een back-up, weigert als
   de klas nu werkt, weigert zonder verantwoording, en gebruikt `If-Match`.
+  `replay-beliefs` leest alleen, behalve met `--apply`: dan eerst een
+  back-up, niet in de lestijd, met `If-Match`, en alleen vier velden van
+  `lo_beliefs` (#242).
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
   repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek:
   ook een issue, PR of commit noemt geen echte leerling (#190).
@@ -38,6 +41,7 @@ python tooling/evaluation/evaluate.py backup   --klas 6WEWI            # volledi
 python tooling/evaluation/evaluate.py apply    ~/ai-tutor-evaluaties/<...>.json
 python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b   # punt als die doelen meetellen
 python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>]   # een dag, oefening per oefening
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam>] [--apply]   # lo_beliefs herstellen uit de herspeling
 ```
 
 `trace` (#228) toont de oefeningen van één leerling op één dag (Belgische
@@ -67,7 +71,7 @@ tellingen, en pas na een "go" `apply`.
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`); de inhoud van de oefeningen van een leerling (`turn_contents`, #228) |
 | `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel, het verloop van een dag (`trace`, #228) |
-| `evaluate.py` | de zes commando's; rendert concept, sidecar en `trace` |
+| `evaluate.py` | de zeven commando's; rendert concept, sidecar en `trace` |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 
 ## Mee op het voorstel
@@ -330,9 +334,9 @@ te laat, nooit te vroeg. `LoState.last_direct_at` is dezelfde klok,
 herspeeld uit `turn_history`.
 
 Het aanvullen hoort bij de eenmalige herspeling van `lo_beliefs` na de
-release, die de gebruiker zelf draait (#195). `evaluate.py` krijgt er geen
-commando voor: deze tooling schrijft alleen naar `grade_proposals`, en
-alleen na een "go". Voor die herspeling geldt:
+release, die de gebruiker zelf draait (#195). `replay-beliefs`
+(hieronder) schrijft het niet: dat schrijft alleen α, β, de stempel en het
+hoogste niveau (#242). Voor het aanvullen geldt:
 
 - kies de weging van de oefeningen van vóór #219. `rules.replay` weegt
   standaard zoals de app ze bewaarde (alles thuis, ×1,0), zoals
@@ -390,13 +394,69 @@ Een afwijking betekent dus:
 
 - een oude build schreef het document na de herschrijving (laatste build
   `oud`), of een client van vóór #108, die nog niet herschreven is
-  (Grenzen);
+  (Grenzen; `replay-beliefs` herschrijft het, hieronder);
 - het document werd met een oudere herspeling herschreven. De
   herschrijving van 2026-09-23 gebruikte `eval2`, dat een opfrisvraag
   anders las dan `eval3` (#195) en neutrale signalen oversloeg (#202).
   Zulke documenten kunnen afwijken tot de herspeling na de release, met
   `eval4` of later (hierboven);
 - iets wat de log niet draagt: een signaal meer of minder dan gelogd.
+
+## `replay-beliefs`: `lo_beliefs` herstellen uit de herspeling
+
+Een build van vóór #108 schreef leerdoelen zonder `firstMasteredAt` en
+`highestPositiveDifficulty`, en rekende met de oude regels (symmetrische
+factor, incidentele negatieven als bewijs). De eenmalige herschrijving van
+2026-09-23 sloeg de leerlingen op zo'n build over, en haar script stond in
+een scratchpad dat niet meer bestaat. `replay-beliefs` (#242) doet die
+herschrijving opnieuw, als commando:
+
+```
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI                        # droog: wat zou veranderen
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --leerling <naam> ...  # een of meer leerlingen
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --apply               # schrijven, buiten de lesuren
+```
+
+Het herspeelt met dezelfde `rules.replay` als `validate`: een oefening
+weegt alleen als onder toezicht als de app ze zo bewaarde. Zo toont
+`validate` daarna geen afwijking meer op die documenten. Op elk document
+in `lo_beliefs` dat de herspeling bereikt, schrijft het vier velden, en
+niets anders:
+
+- `alpha` en `beta`: die van de herspeling. Liggen ze binnen 1e-4 van de
+  opgeslagen, dan blijven die staan: het zijn dezelfde getallen, twee keer
+  berekend (de app laat vervallen tot het moment waarop ze schrijft, een
+  seconde of zo na `turnAt`). Op 6EWI bleef dat onder 1e-5, en lag elke
+  echte afwijking boven 1e-2;
+- `firstMasteredAt`: de vroegste van de opgeslagen en de herspeelde
+  stempel, per oefening. De herspeling stempelt op `turnAt`, de app
+  wanneer ze schrijft: op dezelfde oefening blijft de stempel van de app.
+  Nooit leeg: een stempel die de herspeling niet haalt, blijft staan;
+- `highestPositiveDifficulty`: het hoogste van opgeslagen en herspeeld,
+  nooit lager.
+
+Stempel en hoogste niveau zijn ook in de app eenrichting (#168): dit vult
+aan wat een oude build nooit schreef, en neemt niets weg. Alle andere
+velden blijven zoals de app ze schreef, ook `lastUpdatedAt` en
+`lastProbedAt`. Een document dat de herspeling niet bereikt (een neutraal
+signaal van opzij, geschreven door een build van vóór #204) blijft staan;
+een herspeeld leerdoel zonder document krijgt er geen, dat maakt de app
+bij de volgende schrijving.
+
+De droge run toont per leerling de documenten, hoeveel de herspeling er
+bereikt en hoeveel er zouden veranderen: stempel erbij, stempel vroeger,
+hoogste niveau hoger, α/β anders, met de laatste build zoals in
+`validate`. Werkt een leerling nog op een build zonder `clientVersion`,
+dan staat dat erbij: die build schrijft weer met de oude regels.
+
+`--apply` weigert in de lestijd van de klas (het lesrooster, 10 minuten
+marge) en als een leerling de laatste 10 minuten actief was, zoals
+`apply`; `--force` schrijft toch. Het maakt eerst een back-up van alle
+`lo_beliefs` en `grade_proposals` van de leerlingen waarvoor het schrijft
+(`~/ai-tutor-backups`), en schrijft elk document met `If-Match` op de
+etag waarmee het gepland werd. Schreef de app intussen, dan blijft dat
+document staan en noemt de uitvoer het: draai het dan opnieuw. Daarna
+`validate --klas`.
 
 ## Grenzen
 
