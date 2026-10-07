@@ -83,6 +83,7 @@ import 'flows/students_view_prefs_persist.dart' as students_view_prefs_persist;
 import 'flows/subgoal_segments.dart' as subgoal_segments;
 import 'flows/teacher_badges.dart' as teacher_badges;
 import 'flows/token_usage.dart' as token_usage;
+import 'flows/top_bar_narrow.dart' as top_bar_narrow;
 import 'flows/transfer_credit.dart' as transfer_credit;
 import 'flows/turn_content.dart' as turn_content;
 import 'flows/turtle_run_notice.dart' as turtle_run_notice;
@@ -172,6 +173,7 @@ void main() {
   grade_proposal.main();
   my_reports_tab.main();
   sidebar_rail.main();
+  top_bar_narrow.main();
   goals_row_highlight.main();
   instructions_row_highlight.main();
   update_prompt.main();

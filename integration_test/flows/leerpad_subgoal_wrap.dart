@@ -108,17 +108,16 @@ void main() {
     // 1280 px: the card is 760 wide, room for three tiles on a line.
     await everyTileInReach(tester, 'runner window');
 
-    // A narrower window: the card shrinks with it, the tiles stay whole.
-    // Not narrower than 860 px for now: under ~820 px the top bar's stat
-    // strip overflows on its own (#258), whatever the Leerpad does.
+    // A narrow window: the card shrinks with it, the tiles stay whole. 700
+    // px, now the top bar fits it too (#258).
     tester.view.physicalSize =
-        Size(860, kRunnerWindowSize.height) * tester.view.devicePixelRatio;
+        Size(700, kRunnerWindowSize.height) * tester.view.devicePixelRatio;
     await pumpUntil(
       tester,
       () => tester.getSize(card('r1')).width < 760,
       reason: 'the card never narrowed with the window',
     );
-    await everyTileInReach(tester, '860 px');
+    await everyTileInReach(tester, '700 px');
 
     await harness.dispose(tester);
   });
