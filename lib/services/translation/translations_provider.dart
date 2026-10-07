@@ -1,6 +1,7 @@
 // The translations of the language the app runs in (#206): what the
 // student-facing widgets read lesson and goal texts through, together with
-// `localizedContent` / `localizedGoal` (`localized_text.dart`).
+// `localizedContent` / `localizedGoal` / `localizedObjective`
+// (`localized_text.dart`).
 //
 // Follows `appLocaleProvider`: switching language in Options drops the old
 // language's translations at once and fetches the new one's. Dutch fetches
@@ -51,6 +52,11 @@ class LanguageTranslations {
 
   /// The translation of the goal [goalId]'s title and description, or `null`.
   Translation? goalFor(String goalId) => _byId[Translation.goalDocId(goalId)];
+
+  /// The translation of the statement of the learning objective [loId] of
+  /// the subgoal [subgoalId] (#243), or `null`.
+  Translation? objectiveFor(String subgoalId, String loId) =>
+      _byId[Translation.objectiveDocId(subgoalId, loId)];
 
   /// Every translation into [language].
   Iterable<Translation> get all => _byId.values;

@@ -712,6 +712,10 @@
   "leerpad_header_subtitle_default": "Python — beginnersreis",
   "leerpad_card_completed": "voltooid",
   "leerpad_card_button_continue": "Verder",
+  "leerpad_child_demonstrated": "{demonstrated} van {total} aangetoond",
+  "leerpad_objective_demonstrated": "aangetoond",
+  "leerpad_objective_notYetDemonstrated": "nog niet aangetoond",
+  "leerpad_objective_optional": "optioneel",
   "goalTile_button_faster": "Ga sneller",
   "goalTile_button_workOn": "Werk hieraan",
 

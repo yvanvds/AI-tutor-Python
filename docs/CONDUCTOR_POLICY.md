@@ -1672,8 +1672,12 @@ trouble." Log to the student's record for teacher audit. Passive
 surfacing — the student experience is fine. (Section 8 details.)
 
 **The bar in the session shows a display state, not the cached share
-(#230).** The cached fraction above is what the Leerpad, the teacher's
-overview, the report and the XP read, and it stays exactly that. The
+(#230).** The cached fraction above is what the teacher's overview, the
+report and the XP read, and it stays exactly that. The Leerpad counts
+the `firstMasteredAt` stamps instead, the reading the grade uses (#243):
+"3 of 4 demonstrated" per subgoal, its bar that share, the root's the
+average over its non-optional subgoals; the check marks and the active
+root still come from the progress docs. The
 bar the student watches while practising — under the subgoal in the
 objective banner, and the 2px line at the top of the window — shows
 instead one segment per non-optional LO of the active subgoal (an

@@ -2403,6 +2403,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leerpad_card_button_continue => 'Continue';
 
   @override
+  String leerpad_child_demonstrated(int demonstrated, int total) {
+    return '$demonstrated of $total demonstrated';
+  }
+
+  @override
+  String get leerpad_objective_demonstrated => 'demonstrated';
+
+  @override
+  String get leerpad_objective_notYetDemonstrated => 'not yet demonstrated';
+
+  @override
+  String get leerpad_objective_optional => 'optional';
+
+  @override
   String get goalTile_button_faster => 'Go faster';
 
   @override

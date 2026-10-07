@@ -1374,6 +1374,26 @@
   "leerpad_header_subtitle_default": "Python — beginner's journey",
   "leerpad_card_completed": "completed",
   "leerpad_card_button_continue": "Continue",
+  "leerpad_child_demonstrated": "{demonstrated} of {total} demonstrated",
+  "@leerpad_child_demonstrated": {
+    "description": "Under a subgoal tile on the learning path (#243): how many of the subgoal's non-optional learning objectives the student has demonstrated (the mastery stamp the grade reads), out of how many.",
+    "placeholders": {
+      "demonstrated": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "leerpad_objective_demonstrated": "demonstrated",
+  "@leerpad_objective_demonstrated": {
+    "description": "Under a learning objective's 'You can …' sentence in the list a subgoal tile opens on the learning path (#243): the student has demonstrated it."
+  },
+  "leerpad_objective_notYetDemonstrated": "not yet demonstrated",
+  "@leerpad_objective_notYetDemonstrated": {
+    "description": "Under a learning objective's 'You can …' sentence in the list a subgoal tile opens on the learning path (#243): the student has not demonstrated it yet. No advice and no retry: the app picks the exercises."
+  },
+  "leerpad_objective_optional": "optional",
+  "@leerpad_objective_optional": {
+    "description": "After the status of an optional learning objective in the list a subgoal tile opens on the learning path (#243), separated by a dot: it does not count in the tile's 'x of y demonstrated'."
+  },
   "goalTile_button_faster": "Go faster",
   "goalTile_button_workOn": "Work on this",
 

@@ -3,10 +3,15 @@
 // outside Dart (Python's hashlib, the recipe in `translationSourceHash`'s
 // doc comment), because the tooling that writes the first translations
 // (#209) computes it in Python: the two must agree to the byte.
+//
+// Issue #243 — a learning objective's statement is a translation of its
+// own: one `objective_${subgoalId}.${loId}` doc per LO, the statement
+// stored as `statement`, no title, hashed with an empty title.
 
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
+import 'package:ai_tutor_python/services/goal/learning_objective.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,6 +47,26 @@ void main() {
         ),
         expected,
       );
+    });
+
+    test('an LO statement hashes with an empty title (#243)', () {
+      // hashlib.sha256(('' + '\0' + statement).encode('utf-8'))
+      const expected =
+          '62df92465cc34d981136db5f95321525b64e6c4379cf2eb594e8424f55b9335c';
+      const statement =
+          'Je kan een for-lus schrijven die een bewerking een vast aantal '
+          'keer herhaalt.';
+      expect(
+        objectiveSourceHash(
+          const LearningObjective(
+            id: 'write_for_loop',
+            statement: statement,
+            kind: LoKind.apply,
+          ),
+        ),
+        expected,
+      );
+      expect(translationSourceHash('', statement), expected);
     });
 
     test('any change to the title or the text changes it', () {
@@ -99,6 +124,33 @@ void main() {
       expect(doc['kind'], 'goal');
       expect(doc['description'], 'Repeat with for.');
       expect(doc.containsKey('body'), isFalse);
+      expect(Translation.tryFromCosmos(doc), t);
+    });
+
+    test('an LO translation (#243) stores its statement, no title, under '
+        'the subgoal and LO id', () {
+      final t = Translation.objective(
+        language: 'en',
+        subgoalId: 'herhalen-for',
+        loId: 'write_for_loop',
+        statement: 'You can write a for loop that repeats a step.',
+        sourceHash: 'abc',
+        updatedAt: DateTime.utc(2026, 10, 7, 8),
+      );
+      final doc = t.toMap();
+      expect(doc, {
+        'id': 'objective_herhalen-for.write_for_loop',
+        'language': 'en',
+        'kind': 'objective',
+        'refId': 'herhalen-for.write_for_loop',
+        'statement': 'You can write a for loop that repeats a step.',
+        'sourceHash': 'abc',
+        'updatedAt': '2026-10-07T08:00:00.000Z',
+      });
+      expect(
+        t.id,
+        Translation.objectiveDocId('herhalen-for', 'write_for_loop'),
+      );
       expect(Translation.tryFromCosmos(doc), t);
     });
 
