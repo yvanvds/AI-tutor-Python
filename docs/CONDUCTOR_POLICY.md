@@ -952,7 +952,11 @@ asked (3.2).
 needs an answer key that is one of its options (stored as option text,
 since the options are shuffled) and that no grading ever contradicted or
 called wrong (#198) — `graderDisagreesWithKey`, the warning on the
-Questions page: a key the grader doubted is not one to grade by.
+Questions page: a key the grader doubted is not one to grade by. Nor one
+with two options that look the same in a tile (#254,
+`MultipleChoice.hasLookAlikeOptions`: the same text but for whitespace at
+the end of a line or empty lines at the end), which a fresh question would
+have had merged or been asked again for.
 
 **New to the student.** Never the same question twice for one student: not
 one on their turn records (`questionId`, 8.1, read once per subgoal per

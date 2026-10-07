@@ -4435,6 +4435,12 @@ abstract class AppLocalizations {
   /// **'That exercise had nothing left to fill in. Fetching a new one.'**
   String get chat_notice_exerciseWithoutBlank;
 
+  /// No description provided for @chat_notice_optionsLookAlike.
+  ///
+  /// In en, this message translates to:
+  /// **'Two answers in that question looked the same. Fetching a new one.'**
+  String get chat_notice_optionsLookAlike;
+
   /// No description provided for @chat_notice_subgoalDeletedRedirect.
   ///
   /// In en, this message translates to:

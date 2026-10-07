@@ -321,6 +321,30 @@ void main() {
       );
     });
 
+    test('a multiple-choice question with two options that look the same '
+        'is not served (#254)', () {
+      // The same text but for an empty line at the end: one option in a
+      // tile. A fresh question would have had them merged.
+      expect(
+        BankChoice.servable(
+          _mcq('look-alike', options: const ['2', '11', '11\n', 'Error']),
+        ),
+        isFalse,
+      );
+      expect(
+        BankChoice.servable(
+          _mcq('twins', options: const ['2', '2', '11', 'Error']),
+        ),
+        isFalse,
+      );
+      expect(
+        BankChoice.servable(
+          _mcq('distinct', options: const ['2', '11', '1 1', 'Error']),
+        ),
+        isTrue,
+      );
+    });
+
     test('a code question needs a payload a handler takes', () {
       expect(BankChoice.servable(_completeCode('ok')), isTrue);
       expect(

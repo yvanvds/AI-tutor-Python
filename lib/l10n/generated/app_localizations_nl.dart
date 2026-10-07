@@ -2692,6 +2692,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.';
 
   @override
+  String get chat_notice_optionsLookAlike =>
+      'Twee antwoorden in die vraag zagen er hetzelfde uit. Ik haal een nieuwe op.';
+
+  @override
   String get chat_notice_subgoalDeletedRedirect =>
       'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
 

@@ -2663,6 +2663,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'That exercise had nothing left to fill in. Fetching a new one.';
 
   @override
+  String get chat_notice_optionsLookAlike =>
+      'Two answers in that question looked the same. Fetching a new one.';
+
+  @override
   String get chat_notice_subgoalDeletedRedirect =>
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
