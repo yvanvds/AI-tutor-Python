@@ -5,8 +5,9 @@
 // split its width in two halves around the mode switcher, the switcher kept
 // its ~220 px even where it was invisible (outside Session), and the strip
 // did not shrink. Now the switcher gives its place back outside Session,
-// and the strip drops the word "days" first and then the XP count — both
-// still in a tooltip — when it has less room.
+// and the strip drops the word "days" first, then the word of the
+// difficulty chip (#256) and then the XP count — all still in a tooltip —
+// when it has less room.
 //
 // What only a full-app run pins: the real font (the test font makes every
 // part wider, see test/features/shell/top_bar_test.dart), the real sidebar
@@ -40,6 +41,14 @@ void main() {
   final modes = find.byType(ModeSwitcher);
   final stats = find.byType(StatStrip);
   final greeting = find.text('Hi Sam,');
+  final difficulty = find.descendant(
+    of: stats,
+    matching: find.byType(DifficultyChip),
+  );
+
+  /// The difficulty chip's tooltip (#256): the seeded account's calibration,
+  /// as no exercise is on screen in this flow.
+  const difficultyTooltip = 'Your difficulty level: medium';
 
   /// What is on screen in the strip: the form that fits, and nothing else.
   Finder inStrip(String text) =>
@@ -56,7 +65,7 @@ void main() {
 
   /// The greeting, the switcher (when there is one) and the strip inside the
   /// bar's padding, in that order and apart; every word in the strip whole,
-  /// inside the strip and inside the window.
+  /// inside the strip and inside the window, and so is the difficulty chip.
   void expectLaidOut(WidgetTester tester, String where) {
     final b = tester.getRect(bar);
     expect(inside(window(tester), b), isTrue, reason: '$where: bar $b');
@@ -80,6 +89,10 @@ void main() {
       expect(inside(s, r), isTrue, reason: '$where: "$text" at $r');
       expect(inside(window(tester), r), isTrue, reason: '$where: "$text"');
     }
+    expect(difficulty, findsOneWidget, reason: where);
+    final d = tester.getRect(difficulty);
+    expect(inside(s, d), isTrue, reason: '$where: difficulty chip at $d');
+    expect(find.byTooltip(difficultyTooltip), findsOneWidget, reason: where);
   }
 
   testWidgets('at 700 px the top bar stays inside the window on Session and '
@@ -99,6 +112,7 @@ void main() {
     expectLaidOut(tester, 'Session at $_narrow px');
     expect(modes, findsOneWidget);
     expect(inStrip('days'), findsNothing);
+    expect(inStrip('medium'), findsNothing);
     expect(inStrip('$streak'), findsOneWidget);
     expect(find.byTooltip('$streak days'), findsOneWidget);
     if (inStrip('0 / 500').evaluate().isEmpty) {
@@ -126,6 +140,7 @@ void main() {
     expect(find.text('Explain'), findsNothing);
     await pumpUntilFound(tester, inStrip('days'));
     expectLaidOut(tester, 'Learning path at $_narrow px');
+    expect(inStrip('medium'), findsOneWidget);
     expect(inStrip('0 / 500'), findsOneWidget);
     expect(inStrip('Level 1'), findsOneWidget);
 
@@ -141,6 +156,7 @@ void main() {
     await pumpUntilFound(tester, inStrip('days'));
     await tester.pump(const Duration(milliseconds: 300));
     expectLaidOut(tester, 'Session at 1280 px');
+    expect(inStrip('medium'), findsOneWidget);
     expect(inStrip('0 / 500'), findsOneWidget);
     expect(
       tester.getRect(modes).center.dx,

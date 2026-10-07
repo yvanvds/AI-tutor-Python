@@ -957,6 +957,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String topBar_difficulty_exercise(String difficulty) {
+    return 'This exercise: $difficulty';
+  }
+
+  @override
+  String topBar_difficulty_notchDrop(String difficulty) {
+    return 'This exercise: $difficulty, one level lower for this learning objective';
+  }
+
+  @override
+  String topBar_difficulty_followUp(String difficulty) {
+    return 'Follow-up question: $difficulty';
+  }
+
+  @override
+  String topBar_difficulty_calibration(String difficulty) {
+    return 'Your difficulty level: $difficulty';
+  }
+
+  @override
   String get auth_signIn_appBarTitle => 'Sign in';
 
   @override

@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/tutor/exercise_difficulty.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/first_that_fits.dart';
@@ -412,15 +414,18 @@ class _ModeButtonState extends State<_ModeButton> {
 /// How much the stat strip spells out, richest first (#258).
 ///
 /// With less room the strip drops one detail at a time: first the word
-/// "days" after the streak, then the XP count in the level pill. What is
-/// dropped stays in the chip's tooltip. The strip shows the first density
-/// that fits; the top bar makes room for the last one.
+/// "days" after the streak, then the word of the difficulty chip (#256),
+/// then the XP count in the level pill. What is dropped stays in the chip's
+/// tooltip. The strip shows the first density that fits; the top bar makes
+/// room for the last one.
 enum StatStripDensity {
   full,
   noDaysWord,
+  noDifficultyWord,
   noXpCount;
 
   bool get daysWord => index < noDaysWord.index;
+  bool get difficultyWord => index < noDifficultyWord.index;
   bool get xpCount => index < noXpCount.index;
 }
 
@@ -430,12 +435,18 @@ class StatStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = ref.watch(profileProvider);
+    final difficulty = ref.watch(exerciseDifficultyProvider);
     return FirstThatFits(
       children: [
         for (final density in StatStripDensity.values)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              DifficultyChip(
+                difficulty: difficulty,
+                withWord: density.difficultyWord,
+              ),
+              const SizedBox(width: AppSpacing.s),
               _StreakChip(streak: p.streak, withWord: density.daysWord),
               const SizedBox(width: AppSpacing.s),
               _XpPill(
@@ -496,6 +507,128 @@ class _StreakChip extends StatelessWidget {
       ),
     );
     return withWord ? chip : Tooltip(message: '$streak $word', child: chip);
+  }
+}
+
+/// The level of the exercise on screen (#256), next to the streak and in its
+/// style: one to three bars and the word ("makkelijk", "gemiddeld",
+/// "moeilijk"). That is the level the question was asked at — a notch-drop
+/// shows as the lower level it is, a follow-up as `medium` — and without an
+/// exercise on screen the account's calibration, dimmed.
+///
+/// The tooltip says which of those it is, and carries the word when the
+/// chip has dropped it ([withWord] false).
+class DifficultyChip extends StatelessWidget {
+  const DifficultyChip({
+    super.key,
+    required this.difficulty,
+    required this.withWord,
+  });
+
+  final ExerciseDifficulty difficulty;
+
+  /// The word after the bars; without it, it is in the tooltip.
+  final bool withWord;
+
+  /// The word for [d]: the labels the chat's "difficulty changed" notice
+  /// and the question bank use.
+  static String wordFor(AppLocalizations l, QuestionDifficulty d) =>
+      switch (d) {
+        QuestionDifficulty.easy => l.difficulty_easy,
+        QuestionDifficulty.medium => l.difficulty_medium,
+        QuestionDifficulty.hard => l.difficulty_hard,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final word = wordFor(l, difficulty.difficulty);
+    final tooltip = switch (difficulty.source) {
+      DifficultySource.calibration => l.topBar_difficulty_calibration(word),
+      DifficultySource.plan => l.topBar_difficulty_exercise(word),
+      DifficultySource.notchDrop => l.topBar_difficulty_notchDrop(word),
+      DifficultySource.followUp => l.topBar_difficulty_followUp(word),
+    };
+    final dimmed = !difficulty.onScreen;
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.ink1,
+        border: Border.all(color: AppColors.ink2),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DifficultyBars(
+            filled: difficulty.difficulty.index + 1,
+            color: dimmed ? AppColors.fgMute : AppColors.accent,
+          ),
+          if (withWord) ...[
+            const SizedBox(width: 4),
+            Text(
+              word,
+              // The line of the streak's number (tnum 12.5 at 1.2), so the
+              // two chips stand as tall.
+              strutStyle: const StrutStyle(
+                fontSize: 12.5,
+                height: 1.2,
+                forceStrutHeight: true,
+              ),
+              style: TextStyle(
+                fontSize: 11,
+                color: dimmed ? AppColors.fgMute : AppColors.fg,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    return Tooltip(message: tooltip, child: chip);
+  }
+}
+
+/// One to three rising bars, [filled] of them in [color] and the rest in
+/// the chip's own ink: the level at a glance (#256). As wide as the streak's
+/// flame and as tall as its number.
+class DifficultyBars extends StatelessWidget {
+  const DifficultyBars({super.key, required this.filled, required this.color});
+
+  /// 1 for easy, 2 for medium, 3 for hard.
+  final int filled;
+  final Color color;
+
+  static const List<double> _heights = [5, 8, 11];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 14,
+      height: 15,
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < _heights.length; i++) ...[
+              if (i > 0) const SizedBox(width: 1.5),
+              Container(
+                width: 3,
+                height: _heights[i],
+                decoration: BoxDecoration(
+                  color: i < filled ? color : AppColors.ink3,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

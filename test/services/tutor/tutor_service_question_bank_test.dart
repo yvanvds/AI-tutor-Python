@@ -5,7 +5,8 @@
 // the bank is best-effort: without its container, or when it does not
 // answer at all, the student's exercise goes on as if it were not there.
 // And #216: the question on screen carries the bank id it has or would
-// have, for its short ID in the exercise header.
+// have, for its short ID in the exercise header — and #256 its level, for
+// the top bar.
 //
 // The real `TutorService` and the real `QuestionBankService` over an
 // in-memory `questions` container; the connector replays canned chunks, the
@@ -36,6 +37,7 @@ import 'package:ai_tutor_python/services/student_state/turn_history_service.dart
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
+import 'package:ai_tutor_python/services/tutor/exercise_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
@@ -175,14 +177,25 @@ TurnOutcome _outcome(AnswerQuality quality) => TurnOutcome(
   hadFallback: false,
 );
 
-QuestionPlan _plan(ChatRequestType type, {WarmUpReview? warmUp}) =>
-    QuestionPlan(
-      type: type,
-      difficulty: QuestionDifficulty.hard,
-      targetLOs: const [_lo],
-      reason: _reason,
-      warmUp: warmUp,
-    );
+QuestionPlan _plan(
+  ChatRequestType type, {
+  WarmUpReview? warmUp,
+  QuestionDifficulty difficulty = QuestionDifficulty.hard,
+  bool notchDrop = false,
+}) => QuestionPlan(
+  type: type,
+  difficulty: difficulty,
+  targetLOs: const [_lo],
+  reason: notchDrop
+      ? const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: true,
+          notchDropRules: [NotchDropRule.strongNegatives],
+        )
+      : _reason,
+  warmUp: warmUp,
+);
 
 List<StreamChunk> _reply(ChatResponse response, {CallUsage? usage}) => [
   const StreamTextDelta('…'),
@@ -425,6 +438,82 @@ void main() {
     await advancing;
     expect(connector.scripts, isEmpty, reason: 'the socratic question came');
     expect(shown(), isNull);
+  });
+
+  test("the question on screen carries its level for the top bar (#256): "
+      "its plan's when it comes in, a notch-drop as the lower level it is, "
+      'medium for a follow-up; none from when the next question is planned '
+      'until it comes in, or once the quiz is dismissed', () async {
+    final bank = await boot();
+    ExerciseDifficulty? shown() => pc!.read(shownQuestionDifficultyProvider);
+    expect(shown(), isNull, reason: 'before the first question');
+
+    // A question at the calibration.
+    planNext(_plan(ChatRequestType.mcQuestion));
+    connector.scripts.add(_reply(_mcq()));
+    await tutor().requestExercise();
+    expect(
+      shown(),
+      const ExerciseDifficulty(QuestionDifficulty.hard, DifficultySource.plan),
+    );
+
+    // Its grade asks a follow-up: medium, whatever the question was.
+    connector.scripts.add(
+      _reply(
+        McqFeedback(
+          type: 'mcq_feedback',
+          quality: AnswerQuality.wrong,
+          prompt: 'Nee.',
+          followUp: const FollowUp(question: 'En print("1" + "1")?'),
+        ),
+      ),
+    );
+    await tutor().submitMcqAnswer('11');
+    expect(tutor().state, TutorState.idle);
+    expect(shown(), ExerciseDifficulty.followUp);
+
+    // The follow-up's grade asks for the next exercise, which the conductor
+    // plans a notch lower for this LO.
+    planNext(
+      _plan(
+        ChatRequestType.socraticQuestion,
+        difficulty: QuestionDifficulty.medium,
+        notchDrop: true,
+      ),
+    );
+    connector.scripts
+      ..add(_reply(_socraticGrade('Nee, dat wordt 11.')))
+      ..add(_reply(_socratic('Wat doet str()?')));
+    await tutor().handleStudentMessage('Ook 2.');
+    await bank.idle;
+    expect(connector.scripts, isEmpty, reason: 'the next question came');
+    expect(
+      shown(),
+      const ExerciseDifficulty(
+        QuestionDifficulty.medium,
+        DifficultySource.notchDrop,
+      ),
+    );
+
+    // The next question is planned and never arrives: the level of the one
+    // before is gone with it.
+    planNext(_plan(ChatRequestType.mcQuestion));
+    await tutor().requestExercise();
+    expect(shown(), isNull);
+
+    // A quiz, then "Next": its level goes when it does.
+    connector.scripts.add(_reply(_mcq()));
+    await tutor().requestExercise();
+    expect(shown()?.source, DifficultySource.plan);
+    connector.scripts.add(_reply(_mcqGrade(AnswerQuality.correct, 'Ja.')));
+    await tutor().submitMcqAnswer('2');
+    await bank.idle;
+    final planned = Completer<QuestionPlan>();
+    when(() => conductor.planNext()).thenAnswer((_) => planned.future);
+    final advancing = tutor().advanceFromMcq();
+    expect(shown(), isNull);
+    planned.complete(_plan(ChatRequestType.mcQuestion));
+    await advancing;
   });
 
   test('a wrong or a partial first answer stores nothing; the turn record '

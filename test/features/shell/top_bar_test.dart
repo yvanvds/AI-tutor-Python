@@ -1,15 +1,18 @@
 // #258 — the top bar stays inside narrow windows: its greeting, mode
 // switcher and stat strip never overlap and never run past the bar. Outside
 // Session the mode switcher gives its place back; the stat strip drops the
-// word "days" first and then the XP count when it has less room.
+// word "days" first, then the word of the difficulty chip (#256) and then
+// the XP count when it has less room.
 //
 // Under the test font (Ahem, every glyph a full em) the parts are wider than
 // in the app, so the widths here are not the app's; the real font and the
 // real shell are in `integration_test/flows/top_bar_narrow.dart`.
 
+import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
+import 'package:ai_tutor_python/services/tutor/exercise_difficulty.dart';
 import 'package:ai_tutor_python/widgets/first_that_fits.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,6 +82,9 @@ void main() {
       overrides: [
         profileProvider.overrideWithValue(_student),
         ambientProgressProvider.overrideWithValue(0),
+        calibrationDifficultyProvider.overrideWithValue(
+          QuestionDifficulty.medium,
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -89,8 +95,18 @@ void main() {
   final greeting = find.text('Hi Sam,');
   final modes = find.byType(ModeSwitcher);
   final stats = find.byType(StatStrip);
+  final difficulty = find.byType(DifficultyChip);
 
-  /// Inside the bar's padding, in order, a gap apart.
+  /// The difficulty chip's word, when it is on screen (#256): the account's
+  /// calibration, with no exercise in these tests.
+  final difficultyWord = find.descendant(
+    of: difficulty,
+    matching: find.text('medium'),
+  );
+  const difficultyTooltip = 'Your difficulty level: medium';
+
+  /// Inside the bar's padding, in order, a gap apart; the difficulty chip
+  /// inside the strip.
   void expectLaidOut(WidgetTester tester, String where) {
     expect(tester.takeException(), isNull, reason: where);
     final b = rectOf(tester, bar);
@@ -98,6 +114,9 @@ void main() {
     final s = rectOf(tester, stats);
     expect(g.left, moreOrLessEquals(b.left + _padding), reason: where);
     expect(s.right, moreOrLessEquals(b.right - _padding), reason: where);
+    final d = rectOf(tester, difficulty);
+    expect(d.left, greaterThanOrEqualTo(s.left - 0.01), reason: where);
+    expect(d.right, lessThanOrEqualTo(s.right + 0.01), reason: where);
     if (modes.evaluate().isEmpty) {
       expect(g.right + _gap, lessThanOrEqualTo(s.left + 0.01), reason: where);
     } else {
@@ -119,8 +138,11 @@ void main() {
     await pumpBar(tester, 1400);
     expectLaidOut(tester, '1400 px');
     expect(find.text('days'), findsOneWidget);
+    expect(difficultyWord, findsOneWidget);
     expect(find.text('0 / 500'), findsOneWidget);
     expect(find.text('Level 1'), findsOneWidget);
+    // One tooltip: the hidden forms' are not there to hover.
+    expect(find.byTooltip(difficultyTooltip), findsOneWidget);
     final b = rectOf(tester, bar);
     expect(rectOf(tester, modes).center.dx, moreOrLessEquals(b.center.dx));
   });
@@ -141,18 +163,22 @@ void main() {
     }
   });
 
-  testWidgets('at 700 px the strip drops "days" and then the count in '
-      'Session, and has them back where the switcher gave its place back', (
-    tester,
-  ) async {
+  testWidgets('at 700 px the strip drops "days", the difficulty word and '
+      'then the count in Session, and has them back where the switcher gave '
+      'its place back', (tester) async {
     await pumpBar(tester, 700);
     expect(modes, findsOneWidget);
     expect(find.text('days'), findsNothing);
+    expect(difficultyWord, findsNothing);
     expect(find.text('0 / 500'), findsNothing);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('Level 1'), findsOneWidget);
+    // The chip itself stays, its bars and all.
+    expect(difficulty, findsOneWidget);
+    expect(find.byType(DifficultyBars), findsOneWidget);
     // What is dropped is still there to hover.
     expect(find.byTooltip('3 days'), findsOneWidget);
+    expect(find.byTooltip(difficultyTooltip), findsOneWidget);
     expect(find.byTooltip('0 / 500'), findsOneWidget);
 
     container.read(sectionProvider.notifier).state = Section.map;
@@ -160,6 +186,7 @@ void main() {
     expect(modes, findsNothing);
     expect(find.text('Explain'), findsNothing);
     expect(find.text('days'), findsOneWidget);
+    expect(difficultyWord, findsOneWidget);
     expect(find.text('0 / 500'), findsOneWidget);
     expectLaidOut(tester, 'Learning path at 700 px');
   });

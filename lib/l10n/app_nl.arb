@@ -281,6 +281,10 @@
   "topBar_subline_withTopic": "aan de slag met {topic}",
   "topBar_streak_days": "dagen",
   "topBar_xp_level": "Level {level}",
+  "topBar_difficulty_exercise": "Deze oefening: {difficulty}",
+  "topBar_difficulty_notchDrop": "Deze oefening: {difficulty}, een niveau lager voor dit leerdoel",
+  "topBar_difficulty_followUp": "Vervolgvraag: {difficulty}",
+  "topBar_difficulty_calibration": "Je niveau: {difficulty}",
 
   "auth_signIn_appBarTitle": "Aanmelden",
   "auth_signIn_prompt": "Meld je aan met je school-Microsoft-account om verder te gaan.",

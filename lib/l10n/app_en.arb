@@ -528,6 +528,34 @@
       "level": { "type": "int" }
     }
   },
+  "topBar_difficulty_exercise": "This exercise: {difficulty}",
+  "@topBar_difficulty_exercise": {
+    "description": "Tooltip of the difficulty chip in the top bar while an exercise is on screen, at the student's level. {difficulty} is difficulty_easy/medium/hard.",
+    "placeholders": {
+      "difficulty": { "type": "String" }
+    }
+  },
+  "topBar_difficulty_notchDrop": "This exercise: {difficulty}, one level lower for this learning objective",
+  "@topBar_difficulty_notchDrop": {
+    "description": "Tooltip of the difficulty chip when the exercise on screen is asked one level below the student's level for its learning objective (a notch-drop).",
+    "placeholders": {
+      "difficulty": { "type": "String" }
+    }
+  },
+  "topBar_difficulty_followUp": "Follow-up question: {difficulty}",
+  "@topBar_difficulty_followUp": {
+    "description": "Tooltip of the difficulty chip while a follow-up question is on screen; a follow-up is always medium.",
+    "placeholders": {
+      "difficulty": { "type": "String" }
+    }
+  },
+  "topBar_difficulty_calibration": "Your difficulty level: {difficulty}",
+  "@topBar_difficulty_calibration": {
+    "description": "Tooltip of the dimmed difficulty chip when no exercise is on screen: the level the tutor asks the student's questions at.",
+    "placeholders": {
+      "difficulty": { "type": "String" }
+    }
+  },
 
   "auth_signIn_appBarTitle": "Sign in",
   "auth_signIn_prompt": "Sign in with your school Microsoft account to continue.",

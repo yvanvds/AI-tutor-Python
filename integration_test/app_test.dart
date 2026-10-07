@@ -28,6 +28,7 @@ import 'flows/classes_tab.dart' as classes_tab;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
+import 'flows/difficulty_chip.dart' as difficulty_chip;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
@@ -128,6 +129,7 @@ void main() {
   difficulty_ratchet.main();
   difficulty_asymmetry.main();
   notch_drop_attempts.main();
+  difficulty_chip.main();
   legacy_ratchet.main();
   transfer_credit.main();
   cross_subgoal_signal.main();

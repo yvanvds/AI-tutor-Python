@@ -49,6 +49,7 @@ import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/bank_choice.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
+import 'package:ai_tutor_python/services/tutor/exercise_difficulty.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
@@ -582,7 +583,7 @@ class TutorService extends Notifier<TutorState> {
     _currentExerciseGoalId = null;
     _inFlightPlan = null;
     _setInFlightQuestion(null);
-    ref.read(shownQuestionIdProvider.notifier).state = null;
+    _clearShownQuestion();
     _followUpInFlight = null;
     _chat.clear();
 
@@ -798,9 +799,17 @@ class TutorService extends Notifier<TutorState> {
     _hintsAsked = 0;
     // A new question replaces the one in flight, also when it never
     // arrives — and the ID of the one before leaves the exercise header
-    // (#216).
+    // (#216), its level the top bar (#256).
     _setInFlightQuestion(null);
+    _clearShownQuestion();
+  }
+
+  /// The question on screen is gone: its ID leaves the exercise header
+  /// (#216) and its level the top bar, which shows the calibration until
+  /// the next one comes in (#256).
+  void _clearShownQuestion() {
     ref.read(shownQuestionIdProvider.notifier).state = null;
+    ref.read(shownQuestionDifficultyProvider.notifier).state = null;
   }
 
   /// Notes what the student hands in with a grading call, or that they
@@ -1519,6 +1528,10 @@ class TutorService extends Notifier<TutorState> {
   }) {
     _chat.addTutorMessage(question.question);
     unawaited(ref.read(soundServiceProvider).askQuestion());
+    // The follow-up is the question on screen now, and always `medium`
+    // (CONDUCTOR_POLICY §6.2) — whatever level the question before it was.
+    ref.read(shownQuestionDifficultyProvider.notifier).state =
+        ExerciseDifficulty.followUp;
     _followUpInFlight = _FollowUpInFlight(
       originalPlan: plan,
       depth: depth,
@@ -1608,8 +1621,9 @@ class TutorService extends Notifier<TutorState> {
   Future<void> advanceFromMcq() async {
     ref.read(activeMcqProvider.notifier).state = null;
     // Its ID goes with it (#216): the strip above the editor, back in view,
-    // must not show it while the next exercise is on its way.
-    ref.read(shownQuestionIdProvider.notifier).state = null;
+    // must not show it while the next exercise is on its way. So does its
+    // level in the top bar (#256).
+    _clearShownQuestion();
     if (_pendingExplainAfterMcqAdvance) {
       _pendingExplainAfterMcqAdvance = false;
       ref.read(modeProvider.notifier).state = SessionMode.explain;
@@ -1890,6 +1904,12 @@ class TutorService extends Notifier<TutorState> {
       _bankQuestion(response);
     }
     _showQuestionId(response);
+    // Its level in the top bar (#256): the plan's — a notch-drop shows as
+    // the lower level it is.
+    final plan = _inFlightPlan;
+    ref.read(shownQuestionDifficultyProvider.notifier).state = plan == null
+        ? null
+        : ExerciseDifficulty.ofPlan(plan);
   }
 
   /// Puts the ID of [response], the question that just came in, in the
