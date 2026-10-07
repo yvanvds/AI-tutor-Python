@@ -231,7 +231,7 @@ void main() {
     expect(
       (jsonDecode(llm.sentInputs[2])
           as Map<String, dynamic>)['recent_questions'],
-      ['complete_code | lo-print | Even opwarmen: toon een tekst. `print(___)`'],
+      ['complete_code | lo-print | print(___) | Even opwarmen: toon een tekst.'],
     );
 
     await harness.dispose(tester);

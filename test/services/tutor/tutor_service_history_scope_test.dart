@@ -265,11 +265,11 @@ void main() {
 
     expect(connector.sent[2].scope, PreviousInputs.newSession);
     expect(request(2)['recent_questions'], [
-      'socratic_question | lo-1 | Wat doet een for-lus?',
+      'socratic_question | lo-1 | - | Wat doet een for-lus?',
     ]);
     expect(request(3)['recent_questions'], [
-      'socratic_question | lo-1 | Wat doet een for-lus?',
-      'socratic_question | lo-1 | Wanneer stopt een while-lus?',
+      'socratic_question | lo-1 | - | Wat doet een for-lus?',
+      'socratic_question | lo-1 | - | Wanneer stopt een while-lus?',
     ], reason: 'oldest first; the grade in between is not a question');
   });
 
@@ -294,7 +294,7 @@ void main() {
     expect(request(4)['request_type'], 'socratic_question');
     expect(connector.sent[4].scope, PreviousInputs.newSession);
     expect(request(4)['recent_questions'], [
-      'socratic_question | lo-1 | Wat doet een for-lus?',
+      'socratic_question | lo-1 | - | Wat doet een for-lus?',
     ], reason: 'the hint and the report are not questions');
   });
 

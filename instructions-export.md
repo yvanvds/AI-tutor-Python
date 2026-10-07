@@ -86,6 +86,21 @@ Only include one exercise per response.
 - TEXT must not contain a code block or inline snippet of the exercise — the code lives only in META.code
 - META.code MUST contain at least one `___` placeholder marking the gap the student fills in. NEVER write the solution into META.code; the placeholder is the deliverable to the student
 
+## 05 Variety
+
+### VARIETY
+
+The request may carry `recent_questions`: the questions this student got most recently in this session, oldest first, one line each with the question type, the learning objective it was asked for, the code shown with it (texts in strings shortened to "…", "-" when there was no code) and the start of its prompt.
+
+When a target learning objective already appears in `recent_questions`, write a different exercise, not the same exercise in other words. Other variable names, other texts, other numbers or another story around the same code do NOT make an exercise different: the student recognises it and answers from memory, and the answer no longer shows whether they master the objective. The same goes for a program to write: the same program about other things is the same exercise.
+
+Compare the code and what is asked, not the wording. Look at every earlier line on the same learning objective and change at least one of these:
+- what it tests: another kind of mistake or another line of reasoning (for a bug: another kind of bug, not the same bug in other code);
+- where it happens: another place in the program (the condition, the body of a loop, before or after it, the output), in code that is built differently;
+- how it asks: another form of question within the requested question type (predict the output, find the mistake, make the code give a certain output, choose the code that does something).
+
+Vary how the objective is tested, not what is tested: stay within the target learning objectives, the teaching tips and the requested difficulty.
+
 # contentQuestion
 
 ## 00 Start
@@ -267,6 +282,21 @@ Only include one exercise per response.
 
 - If you refer to code, it is displayed on the left
 - Never include line numbers before lines of code
+
+## 05 Variety
+
+### VARIETY
+
+The request may carry `recent_questions`: the questions this student got most recently in this session, oldest first, one line each with the question type, the learning objective it was asked for, the code shown with it (texts in strings shortened to "…", "-" when there was no code) and the start of its prompt.
+
+When a target learning objective already appears in `recent_questions`, write a different exercise, not the same exercise in other words. Other variable names, other texts, other numbers or another story around the same code do NOT make an exercise different: the student recognises it and answers from memory, and the answer no longer shows whether they master the objective. The same goes for a program to write: the same program about other things is the same exercise.
+
+Compare the code and what is asked, not the wording. Look at every earlier line on the same learning objective and change at least one of these:
+- what it tests: another kind of mistake or another line of reasoning (for a bug: another kind of bug, not the same bug in other code);
+- where it happens: another place in the program (the condition, the body of a loop, before or after it, the output), in code that is built differently;
+- how it asks: another form of question within the requested question type (predict the output, find the mistake, make the code give a certain output, choose the code that does something).
+
+Vary how the objective is tested, not what is tested: stay within the target learning objectives, the teaching tips and the requested difficulty.
 
 # followUpAnswer
 
@@ -515,6 +545,21 @@ Only include one exercise per response.
 - Option labels may span multiple lines — use `\n` inside the option string to separate lines (e.g. multi-line `print` output). Keep each option visually compact; prefer ≤ 4 lines per option.
 - Never prefix option text with `A:`, `B:`, `1.`, etc. The letter badge is rendered by the UI from position; a prefix duplicates it.
 
+## 05 Variety
+
+### VARIETY
+
+The request may carry `recent_questions`: the questions this student got most recently in this session, oldest first, one line each with the question type, the learning objective it was asked for, the code shown with it (texts in strings shortened to "…", "-" when there was no code) and the start of its prompt.
+
+When a target learning objective already appears in `recent_questions`, write a different exercise, not the same exercise in other words. Other variable names, other texts, other numbers or another story around the same code do NOT make an exercise different: the student recognises it and answers from memory, and the answer no longer shows whether they master the objective. The same goes for a program to write: the same program about other things is the same exercise.
+
+Compare the code and what is asked, not the wording. Look at every earlier line on the same learning objective and change at least one of these:
+- what it tests: another kind of mistake or another line of reasoning (for a bug: another kind of bug, not the same bug in other code);
+- where it happens: another place in the program (the condition, the body of a loop, before or after it, the output), in code that is built differently;
+- how it asks: another form of question within the requested question type (predict the output, find the mistake, make the code give a certain output, choose the code that does something).
+
+Vary how the objective is tested, not what is tested: stay within the target learning objectives, the teaching tips and the requested difficulty.
+
 # requestHint
 
 ## 00 Start
@@ -708,6 +753,21 @@ Question must match the student's current subgoal and the listed target LOs.
 Prompt should be clear, short, motivating. May occasionally be funny if not far-fetched.
 Output must be under ~600 tokens.
 Only include one question per response.
+
+## 05 Variety
+
+### VARIETY
+
+The request may carry `recent_questions`: the questions this student got most recently in this session, oldest first, one line each with the question type, the learning objective it was asked for, the code shown with it (texts in strings shortened to "…", "-" when there was no code) and the start of its prompt.
+
+When a target learning objective already appears in `recent_questions`, write a different exercise, not the same exercise in other words. Other variable names, other texts, other numbers or another story around the same code do NOT make an exercise different: the student recognises it and answers from memory, and the answer no longer shows whether they master the objective. The same goes for a program to write: the same program about other things is the same exercise.
+
+Compare the code and what is asked, not the wording. Look at every earlier line on the same learning objective and change at least one of these:
+- what it tests: another kind of mistake or another line of reasoning (for a bug: another kind of bug, not the same bug in other code);
+- where it happens: another place in the program (the condition, the body of a loop, before or after it, the output), in code that is built differently;
+- how it asks: another form of question within the requested question type (predict the output, find the mistake, make the code give a certain output, choose the code that does something).
+
+Vary how the objective is tested, not what is tested: stay within the target learning objectives, the teaching tips and the requested difficulty.
 
 # status
 
@@ -988,3 +1048,18 @@ Exercise must match the student's current subgoal and the listed target LOs.
 Prompt should be clear, short, motivating.
 Output must be under ~600 tokens.
 Only include one exercise per response.
+
+## 05 Variety
+
+### VARIETY
+
+The request may carry `recent_questions`: the questions this student got most recently in this session, oldest first, one line each with the question type, the learning objective it was asked for, the code shown with it (texts in strings shortened to "…", "-" when there was no code) and the start of its prompt.
+
+When a target learning objective already appears in `recent_questions`, write a different exercise, not the same exercise in other words. Other variable names, other texts, other numbers or another story around the same code do NOT make an exercise different: the student recognises it and answers from memory, and the answer no longer shows whether they master the objective. The same goes for a program to write: the same program about other things is the same exercise.
+
+Compare the code and what is asked, not the wording. Look at every earlier line on the same learning objective and change at least one of these:
+- what it tests: another kind of mistake or another line of reasoning (for a bug: another kind of bug, not the same bug in other code);
+- where it happens: another place in the program (the condition, the body of a loop, before or after it, the output), in code that is built differently;
+- how it asks: another form of question within the requested question type (predict the output, find the mistake, make the code give a certain output, choose the code that does something).
+
+Vary how the objective is tested, not what is tested: stay within the target learning objectives, the teaching tips and the requested difficulty.
