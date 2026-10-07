@@ -354,6 +354,17 @@ print(totaal)</code></pre>
 
 <p>De regel <code>totaal = totaal + i</code> is dezelfde constructie als <code>x = x + 1</code> uit de les over variabelen: rechts wordt eerst de huidige waarde plus <code>i</code> uitgerekend, en dat resultaat wordt de nieuwe <code>totaal</code>. Zo groeit de som doorloop na doorloop: 1, 3, 6, 10, 15.</p>
 
+<p>Een variabele bijwerken komt zo vaak voor dat Python er een kortere schrijfwijze voor heeft: <code>totaal += i</code> doet precies hetzelfde als <code>totaal = totaal + i</code>. Voor aftrekken is er <code>-=</code>:</p>
+
+<pre><code>teller = 10
+teller -= 3
+teller += 1
+print(teller)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>8</code></pre>
+
+<p>Lees <code>teller -= 3</code> als de lange vorm <code>teller = teller - 3</code>. Welke vorm je zelf schrijft, mag je kiezen.</p>
+
 <p>Let op waar de <code>print</code> staat: die begint weer vooraan en hoort dus niet bij het blok. Hij toont het eindresultaat één keer, na de lus.</p>
 
 <h2>Veelhoeken met turtle</h2>

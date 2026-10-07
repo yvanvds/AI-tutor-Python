@@ -73,7 +73,7 @@ CASES: dict[str, dict[int, dict]] = {
         1: {"turtle": {"segments": 4, "closed": True}},
         2: {"stdin": {"nl": ["rood"], "en": ["red"]}, "turtle": {"colors": ["red"]}},
     },
-    "herhalen-for": {2: {"turtle": {"segments": 4, "closed": True}}},
+    "herhalen-for": {3: {"turtle": {"segments": 4, "closed": True}}},
     "herhalen-while": {
         1: {"infinite": True},
         2: {"stdin": ["12", "5"], "expect": {"nl": "Gekozen: 5", "en": "Chosen: 5"}},

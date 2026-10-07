@@ -354,6 +354,17 @@ print(total)</code></pre>
 
 <p>The line <code>total = total + i</code> is the same construction as <code>x = x + 1</code> from the lesson on variables: on the right, the current value plus <code>i</code> is worked out first, and that result becomes the new <code>total</code>. That is how the sum grows iteration by iteration: 1, 3, 6, 10, 15.</p>
 
+<p>Updating a variable is so common that Python has a shorter way to write it: <code>total += i</code> does exactly the same as <code>total = total + i</code>. For subtracting there is <code>-=</code>:</p>
+
+<pre><code>counter = 10
+counter -= 3
+counter += 1
+print(counter)</code></pre>
+<p>Output:</p>
+<pre><code>8</code></pre>
+
+<p>Read <code>counter -= 3</code> as the long form <code>counter = counter - 3</code>. Which form you write yourself is up to you.</p>
+
 <p>Watch where the <code>print</code> is: it starts at the front again, so it does not belong to the block. It shows the final result once, after the loop.</p>
 
 <h2>Polygons with turtle</h2>

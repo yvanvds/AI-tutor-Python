@@ -167,7 +167,9 @@ beoordelen, een functie testen met een geval waarvan je het antwoord kent.
 
 Omdat de AI geen lijst van voorkennis krijgt, staat in de teachingTips van
 elk subdoel wat mag en wat nog niet gezien is. Vanaf doel 6 zijn dat twee
-vaste alinea's per subdoel:
+vaste alinea's per subdoel (doel 1 tot 4 kregen de Python-alinea achteraf,
+als laatste tip die met "Python:" begint, nadat *Testen en debuggen*
+oefeningen met functies en lijsten gaf, #241):
 
 - **Python:** welke nieuwe functies mogen, en wat niet (zie de lijst
   hieronder). Altijd ook: functies geven hun resultaat terug en bevatten
@@ -185,11 +187,12 @@ doel 6 erom vraagt.
 
 ### Nog niet gezien na doel 6
 
-f-strings, `break`, `+=`, `range` met een stap, stringmethodes,
+f-strings, `break`, `range` met een stap, stringmethodes,
 `try`/`except`, `global`, recursie, `lambda`, list comprehensions,
 dictionaries, sets, een functie als argument, numpy en matplotlib.
 
-Wel gezien, naast doel 1 tot 4: `def` en `return`, standaardwaarden,
+Wel gezien, naast doel 1 tot 4 (daarin ook `+=` en `-=`, sinds de les over
+`for` in doel 3): `def` en `return`, standaardwaarden,
 `import math` (`math.sqrt`, `math.pi`, `math.sin`, `math.cos`), `round`,
 `abs`, en uit `random` alleen `randint`, `random`, `choice` en `uniform`.
 
