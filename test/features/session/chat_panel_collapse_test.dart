@@ -11,6 +11,10 @@
 // it. A stored choice wins on any window; a stored "open" stays open on a
 // small screen.
 //
+// Issue #259 — in a window too narrow for it, the full panel takes half the
+// session area rather than 460 px, and a fold that starts from a wider
+// panel (the window was just made narrow) never takes more than that half.
+//
 // This mounts the real `ModeSwitcher` over the real `SessionView` (all three
 // mode views plus the chat panel), drives the fold through the real header
 // and strip buttons and the mode through the real top-bar pills, sizes the
@@ -21,6 +25,7 @@
 
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
@@ -60,6 +65,10 @@ const _profile = Profile(
 /// A wide window and a narrow one, either side of [kChatFoldWindowWidth].
 const double _window = 1400;
 const double _narrow = 1000;
+
+/// A 700 px window less the 72 px sidebar (#259): too narrow for the full
+/// 460 px panel next to anything.
+const double _tiny = 628;
 
 final _panel = find.byKey(const Key('chat-panel'));
 final _showChat = find.byTooltip('Show chat');
@@ -302,6 +311,54 @@ void main() {
     await settle(tester);
     expect(panelWidth(tester), chatCollapsedWidth);
     expect(prefs.getBool(kChatCollapsedPrefsKey), isTrue);
+
+    await unmount(tester);
+  });
+
+  // #259 — in a 700 px window (628 px next to the sidebar) the 460 px panel
+  // left the exercise and the lesson 168 px: the row above the editor and
+  // the lesson's footer ran past it. The full panel now takes at most half
+  // the session area.
+  testWidgets('in a window too narrow for 460 px the full panel takes half '
+      'the area, in practice and in an open theory view', (tester) async {
+    SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: false});
+    await mount(tester, width: _tiny);
+
+    expect(chatPanelFullWidth(_tiny), _tiny / 2);
+    expect(panelWidth(tester), _tiny / 2);
+    expect(lessonWidth(tester), _tiny / 2);
+    expect(_hideChat, findsOneWidget);
+
+    await tester.tap(find.text('Practice'));
+    await settle(tester);
+    expect(panelWidth(tester), _tiny / 2);
+    expect(tester.getSize(find.byType(PracticeView)).width, _tiny / 2);
+    expect(tester.takeException(), isNull);
+
+    // Wide enough again, and the panel is its own 460 px.
+    resize(tester, _window);
+    await settle(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+
+    await unmount(tester);
+  });
+
+  testWidgets('a window made narrow folds the chat without the slide ever '
+      'taking more than half the area from the lesson', (tester) async {
+    await mount(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+
+    resize(tester, _tiny);
+    await tester.pump();
+    var frames = 0;
+    while (panelWidth(tester) != chatCollapsedWidth) {
+      expect(frames++, lessThan(100), reason: 'the panel never folded');
+      expect(panelWidth(tester), lessThanOrEqualTo(_tiny / 2));
+      expect(lessonWidth(tester), greaterThanOrEqualTo(_tiny / 2));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(lessonWidth(tester), _tiny - chatCollapsedWidth);
+    expect(tester.takeException(), isNull);
 
     await unmount(tester);
   });

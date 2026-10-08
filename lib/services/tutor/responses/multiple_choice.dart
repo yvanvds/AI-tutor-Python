@@ -75,6 +75,59 @@ class MultipleChoice implements ChatResponse {
     return null;
   }
 
+  /// The fewest options a question may keep once options that look the same
+  /// are merged ([withLookAlikesMerged], #254). Fewer, and the student is
+  /// left guessing between two.
+  static const int minOptionsAfterMerge = 3;
+
+  /// [option] as a tile shows it (#254): whitespace at the end of a line and
+  /// empty lines at the end do not show, so `"omee\nt t\n"` and
+  /// `"omee\nt t"` are the same option to a student. Two options are told
+  /// apart in this form.
+  static String normalizedOption(String option) {
+    final lines = option.split('\n').map((l) => l.trimRight()).toList();
+    while (lines.isNotEmpty && lines.last.isEmpty) {
+      lines.removeLast();
+    }
+    return lines.join('\n');
+  }
+
+  /// Whether two of [options] look the same ([normalizedOption]).
+  static bool hasLookAlikeOptions(List<String> options) =>
+      options.map(normalizedOption).toSet().length < options.length;
+
+  /// This question with the options that look the same ([normalizedOption])
+  /// merged into the first of them, and the key on what is left of its own
+  /// (#254) — or `null` when the question cannot be asked: the key looks the
+  /// same as a distractor (two right answers, or a key that names the wrong
+  /// one), or merging left fewer than [minOptionsAfterMerge] options. A
+  /// question whose options all look different comes back as it is.
+  ///
+  /// Done before the handler shuffles the options and before anything
+  /// records the question, so the tiles, the exercise's history and the
+  /// question bank all get the merged options.
+  MultipleChoice? withLookAlikesMerged() {
+    if (!hasLookAlikeOptions(options)) return this;
+    final kept = <String, String>{};
+    for (final option in options) {
+      kept.putIfAbsent(normalizedOption(option), () => option);
+    }
+    final key = correct;
+    final keyForm = key == null ? null : normalizedOption(key);
+    if (keyForm != null &&
+        options.where((o) => normalizedOption(o) == keyForm).length > 1) {
+      return null;
+    }
+    if (kept.length < minOptionsAfterMerge) return null;
+    return MultipleChoice(
+      type: type,
+      prompt: prompt,
+      code: code,
+      options: kept.values.toList(),
+      correct: keyForm == null ? null : kept[keyForm],
+    );
+  }
+
   @override
   Map<String, dynamic> toJson() => {
     'type': type,

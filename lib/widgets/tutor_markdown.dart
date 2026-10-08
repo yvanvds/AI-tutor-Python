@@ -13,7 +13,9 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 /// model uses them.
 ///
 /// Surfaces that should NOT use this widget:
-/// - MCQ option labels (short, code-y, letter badge handles emphasis)
+/// - MCQ option labels (short, code-y, letter badge handles emphasis; an
+///   option that is a sentence draws its code spans with [TutorInlineCode],
+///   #254)
 /// - System pills / chips (single short word)
 /// - Streaming chat bubbles (already use `instantMarkdown` from
 ///   `flyer_chat_text_stream_message`)
@@ -36,7 +38,7 @@ class TutorMarkdown extends StatelessWidget {
         text,
         style: base,
         highlightBuilder: (context, span, _) =>
-            _InlineCode(text: span, base: base),
+            TutorInlineCode(span, fontSize: base.fontSize ?? 14),
         codeBuilder: (context, language, code, closed) =>
             _CodeBlock(code: code, language: language),
       ),
@@ -44,21 +46,33 @@ class TutorMarkdown extends StatelessWidget {
   }
 }
 
-class _InlineCode extends StatelessWidget {
-  const _InlineCode({required this.text, required this.base});
+/// Inline `` `code` `` as tutor copy shows it: monospace on a small chip.
+/// [TutorMarkdown] draws a code span with it, and so does a quiz option
+/// that is a sentence with code in it (#254), so the two look the same.
+class TutorInlineCode extends StatelessWidget {
+  const TutorInlineCode(this.text, {super.key, this.fontSize = 14, this.color});
+
   final String text;
-  final TextStyle base;
+
+  /// The size of the text around the code, which is drawn half a point
+  /// smaller.
+  final double fontSize;
+
+  /// The colour of the code; the palette's foreground when null.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final size = (base.fontSize ?? 14) - 0.5;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
         color: AppColors.ink2,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(text, style: AppMono.code(size: size)),
+      child: Text(
+        text,
+        style: AppMono.code(size: fontSize - 0.5, color: color),
+      ),
     );
   }
 }

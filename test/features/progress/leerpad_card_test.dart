@@ -18,6 +18,10 @@
 // Issue #210 — the card's root title and description and its chips' titles
 // are in the app language when the goal has a translation, and in Dutch,
 // without a notice, when it has none. Dutch fetches no translations.
+//
+// Issue #252 — the chips wrap onto the next line instead of scrolling
+// sideways: in a narrow window every tile is whole in the card and opens
+// its list, which opens under all of them.
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
@@ -431,6 +435,66 @@ void main() {
       expect(tester.widget<LeerpadChildChip>(_chip('s3')).onTap, isNull);
       expect(_bar(tester, _chip('s3')), closeTo(0.5, 1e-9));
       expect(find.textContaining('demonstrated'), findsNothing);
+    });
+  });
+
+  group('a narrow window (#252)', () {
+    final many = [
+      for (var i = 1; i <= 6; i++)
+        Goal(
+          id: 'w$i',
+          title: 'Step $i',
+          parentId: 'r',
+          order: i,
+          objectives: [_lo('lo-w$i', 'Je kan stap $i zetten.')],
+        ),
+    ];
+
+    bool inside(Rect outer, Rect inner) =>
+        inner.left >= outer.left &&
+        inner.top >= outer.top &&
+        inner.right <= outer.right &&
+        inner.bottom <= outer.bottom;
+
+    testWidgets('six subgoals wrap onto the next lines, each tile whole in '
+        'the card, and each one opens its list under all of them', (
+      tester,
+    ) async {
+      // A 460 px window: room for two tiles on a line, where the six of
+      // them on one line take 1128.
+      tester.view.physicalSize = const Size(460, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _card(const {}, children: many, stamps: _stamps(const [])),
+      );
+      await tester.pumpAndSettle();
+
+      final card = find.byType(LeerpadCard);
+      // Nothing to discover by scrolling sideways.
+      expect(
+        find.descendant(of: card, matching: find.byType(Scrollable)),
+        findsNothing,
+      );
+      final cardRect = tester.getRect(card);
+      final lines = <double>{};
+      var lowest = 0.0;
+      for (final g in many) {
+        final rect = tester.getRect(_chip(g.id));
+        expect(inside(cardRect, rect), isTrue, reason: '${g.id} at $rect');
+        expect(rect.width, 180, reason: g.id);
+        lines.add(rect.top);
+        if (rect.bottom > lowest) lowest = rect.bottom;
+      }
+      expect(lines, hasLength(3));
+
+      for (final g in many) {
+        await tester.tap(_chip(g.id));
+        await tester.pumpAndSettle();
+        expect(find.text(g.objectives.single.statement), findsOneWidget);
+        expect(_panel, findsOneWidget);
+        expect(tester.getRect(_panel).top, greaterThan(lowest), reason: g.id);
+      }
     });
   });
 

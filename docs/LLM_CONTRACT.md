@@ -93,6 +93,19 @@ question on the exercise's history does not. A letter past the last
 option, or a value that is neither a letter nor an option's text, is no
 key.
 
+The options must look different in a tile (#254). The app compares them
+as a tile shows them — whitespace at the end of a line and empty lines at
+the end do not show — once the key is resolved and before the options are
+shuffled. Options that look the same are merged into the first of them,
+and the key stays on its option. When the key looks the same as a
+distractor, or merging leaves fewer than three options, the question is
+not asked: the parser returns an `ErrorResponse` (`optionsLookAlike`) and
+the one retry asks again, as for a `complete_code` without a blank (#78).
+A question that came with two options that look different is taken as it
+is. An option may be a sentence with code between backticks; the tile then
+draws it in the app font with the code as inline code. An option without
+backticks is drawn monospace, as output or code.
+
 A question served from the bank (#186, conductor policy 2.7) makes no
 generation call at all. A multiple-choice pick on one is graded by its key
 on the student's machine; the one `mcqAnswer` call it can still cost — for

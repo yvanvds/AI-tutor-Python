@@ -281,6 +281,10 @@
   "topBar_subline_withTopic": "aan de slag met {topic}",
   "topBar_streak_days": "dagen",
   "topBar_xp_level": "Level {level}",
+  "topBar_difficulty_exercise": "Deze oefening: {difficulty}",
+  "topBar_difficulty_notchDrop": "Deze oefening: {difficulty}, een niveau lager voor dit leerdoel",
+  "topBar_difficulty_followUp": "Vervolgvraag: {difficulty}",
+  "topBar_difficulty_calibration": "Je niveau: {difficulty}",
 
   "auth_signIn_appBarTitle": "Aanmelden",
   "auth_signIn_prompt": "Meld je aan met je school-Microsoft-account om verder te gaan.",
@@ -790,6 +794,7 @@
   "chat_notice_unknownResponseType": "Onbekend antwoordtype: {type}",
   "chat_notice_unknownResponse": "Onbekend antwoord ontvangen.",
   "chat_notice_exerciseWithoutBlank": "In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.",
+  "chat_notice_optionsLookAlike": "Twee antwoorden in die vraag zagen er hetzelfde uit. Ik haal een nieuwe op.",
   "chat_notice_subgoalDeletedRedirect": "Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.",
   "chat_notice_subgoalSaturated": "Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?",
   "chat_notice_noGoalsLeft": "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",

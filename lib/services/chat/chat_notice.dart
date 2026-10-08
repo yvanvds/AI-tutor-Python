@@ -64,6 +64,12 @@ enum ChatNoticeKind {
   /// the student to fill in, so there is no exercise (#78).
   exerciseWithoutBlank,
 
+  /// A `multiple_choice` question had options that look the same in a tile
+  /// — the same text but for whitespace or empty lines at the end — and
+  /// could not be asked: the key looked the same as a distractor, or too
+  /// few options were left once they were merged (#254).
+  optionsLookAlike,
+
   subgoalDeletedRedirect,
   subgoalSaturated,
   noGoalsLeft,

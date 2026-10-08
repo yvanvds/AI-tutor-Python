@@ -1639,6 +1639,30 @@ abstract class AppLocalizations {
   /// **'Level {level}'**
   String topBar_xp_level(int level);
 
+  /// Tooltip of the difficulty chip in the top bar while an exercise is on screen, at the student's level. {difficulty} is difficulty_easy/medium/hard.
+  ///
+  /// In en, this message translates to:
+  /// **'This exercise: {difficulty}'**
+  String topBar_difficulty_exercise(String difficulty);
+
+  /// Tooltip of the difficulty chip when the exercise on screen is asked one level below the student's level for its learning objective (a notch-drop).
+  ///
+  /// In en, this message translates to:
+  /// **'This exercise: {difficulty}, one level lower for this learning objective'**
+  String topBar_difficulty_notchDrop(String difficulty);
+
+  /// Tooltip of the difficulty chip while a follow-up question is on screen; a follow-up is always medium.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up question: {difficulty}'**
+  String topBar_difficulty_followUp(String difficulty);
+
+  /// Tooltip of the dimmed difficulty chip when no exercise is on screen: the level the tutor asks the student's questions at.
+  ///
+  /// In en, this message translates to:
+  /// **'Your difficulty level: {difficulty}'**
+  String topBar_difficulty_calibration(String difficulty);
+
   /// No description provided for @auth_signIn_appBarTitle.
   ///
   /// In en, this message translates to:
@@ -4434,6 +4458,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That exercise had nothing left to fill in. Fetching a new one.'**
   String get chat_notice_exerciseWithoutBlank;
+
+  /// No description provided for @chat_notice_optionsLookAlike.
+  ///
+  /// In en, this message translates to:
+  /// **'Two answers in that question looked the same. Fetching a new one.'**
+  String get chat_notice_optionsLookAlike;
 
   /// No description provided for @chat_notice_subgoalDeletedRedirect.
   ///

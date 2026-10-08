@@ -31,7 +31,23 @@ class ChatResponseFactory {
       case 'socratic_question':
         return SocraticQuestion.fromMap(map);
       case 'multiple_choice':
-        return MultipleChoice.fromMap(map);
+        final mcq = MultipleChoice.fromMap(map);
+        // Two options that look the same in a tile (#254) are one option:
+        // merged here, before the handler shuffles them and before the
+        // question is recorded. When the key looks the same as a distractor,
+        // or too few options are left, the question is rejected like a
+        // blank-less exercise (#78), and the retry fetches a new one.
+        final merged = mcq.withLookAlikesMerged();
+        if (merged == null) {
+          return ErrorResponse(
+            type: 'error',
+            message:
+                'multiple_choice with options that look the same: '
+                '${mcq.options} (key: ${mcq.correct})',
+            notice: const ChatNotice(ChatNoticeKind.optionsLookAlike),
+          );
+        }
+        return merged;
       case 'explain_code':
         return ExplainCode.fromMap(map);
       case 'complete_code':

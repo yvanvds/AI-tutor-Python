@@ -16,6 +16,7 @@ import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
+import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 
 /// The school's mix (#186): how many fitting, unseen questions the bank must
 /// hold for an ordinary plan ([minimum], N) and the chance that such a plan
@@ -105,7 +106,10 @@ class BankChoice {
   /// a handler takes and, for multiple choice, an answer key that is one of
   /// its options and that the grader never contradicted
   /// (`graderDisagreesWithKey`) — a key the grading doubted is not one to
-  /// grade by. The teacher sees those on the Questions page.
+  /// grade by. The teacher sees those on the Questions page. Nor a question
+  /// with two options that look the same in a tile (#254,
+  /// `MultipleChoice.hasLookAlikeOptions`): a fresh one would have had them
+  /// merged, or been asked again.
   static bool servable(BankQuestion q) {
     if (q.toChatResponse() == null) return false;
     if (!q.isMultipleChoice) return true;
@@ -113,6 +117,7 @@ class BankChoice {
     return key != null &&
         q.options.length >= 2 &&
         q.options.contains(key) &&
+        !MultipleChoice.hasLookAlikeOptions(q.options) &&
         !q.graderDisagreesWithKey;
   }
 

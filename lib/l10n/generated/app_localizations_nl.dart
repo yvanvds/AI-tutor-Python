@@ -965,6 +965,26 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String topBar_difficulty_exercise(String difficulty) {
+    return 'Deze oefening: $difficulty';
+  }
+
+  @override
+  String topBar_difficulty_notchDrop(String difficulty) {
+    return 'Deze oefening: $difficulty, een niveau lager voor dit leerdoel';
+  }
+
+  @override
+  String topBar_difficulty_followUp(String difficulty) {
+    return 'Vervolgvraag: $difficulty';
+  }
+
+  @override
+  String topBar_difficulty_calibration(String difficulty) {
+    return 'Je niveau: $difficulty';
+  }
+
+  @override
   String get auth_signIn_appBarTitle => 'Aanmelden';
 
   @override
@@ -2690,6 +2710,10 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get chat_notice_exerciseWithoutBlank =>
       'In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.';
+
+  @override
+  String get chat_notice_optionsLookAlike =>
+      'Twee antwoorden in die vraag zagen er hetzelfde uit. Ik haal een nieuwe op.';
 
   @override
   String get chat_notice_subgoalDeletedRedirect =>

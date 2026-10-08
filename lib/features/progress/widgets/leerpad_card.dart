@@ -11,11 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Single root goal card on the Leerpad. Active = tinted bg + accent border
-/// + horizontal row of child chips + "Verder" CTA. Completed = check badge,
-/// "voltooid" caption, and the same row of child chips (#243). Tapping a
-/// chip opens the list of its learning objectives under the row, each
-/// demonstrated or not yet. The root's title and description are in the app
-/// language when there is a translation, else in Dutch (#210).
+/// + the child chips + "Verder" CTA. Completed = check badge, "voltooid"
+/// caption, and the same child chips (#243). The chips wrap onto the next
+/// line rather than scroll sideways, so every one is in view however narrow
+/// the window (#252). Tapping a chip opens the list of its learning
+/// objectives under the chips, each demonstrated or not yet. The root's
+/// title and description are in the app language when there is a
+/// translation, else in Dutch (#210).
 ///
 /// The bars count the mastery stamp the grade reads ([stamps], #243): a
 /// chip's bar is its share of non-optional LOs with the stamp, the root's
@@ -330,26 +332,25 @@ class _ChildrenRow extends StatelessWidget {
   final String? openChildId;
   final void Function(String childId) onTap;
 
+  // A wrap, not a sideways scroll (#252): Flutter does not drag a
+  // scroll view with the mouse, and shows no bar, so tiles past the edge
+  // were out of reach for a student without a touchpad.
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final c in children)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.s),
-              child: LeerpadChildChip(
-                goal: c,
-                progress: barOf(c),
-                completed: progressById[c.id]?.isAdvanced ?? false,
-                demonstrated: countOf(c),
-                selected: c.id == openChildId,
-                onTap: c.objectives.isEmpty ? null : () => onTap(c.id),
-              ),
-            ),
-        ],
-      ),
+    return Wrap(
+      spacing: AppSpacing.s,
+      runSpacing: AppSpacing.s,
+      children: [
+        for (final c in children)
+          LeerpadChildChip(
+            goal: c,
+            progress: barOf(c),
+            completed: progressById[c.id]?.isAdvanced ?? false,
+            demonstrated: countOf(c),
+            selected: c.id == openChildId,
+            onTap: c.objectives.isEmpty ? null : () => onTap(c.id),
+          ),
+      ],
     );
   }
 }

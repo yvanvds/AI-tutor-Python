@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
@@ -9,7 +11,16 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// The full chat panel's width in a window wide enough for it.
 const double chatPanelWidth = 460;
+
+/// The full chat panel's width in a session area [sessionWidth] wide:
+/// [chatPanelWidth], but never more than half the area (#259). In a window
+/// under ~990 px the 460 px panel would leave the exercise or the lesson next
+/// to it less room than itself — 168 px in a 700 px window, where the row
+/// above the editor and the lesson's footer no longer fit.
+double chatPanelFullWidth(double sessionWidth) =>
+    math.min(chatPanelWidth, sessionWidth / 2);
 
 /// Width of the edge strip the chat panel folds to in the theory view
 /// (#131): room for one 28 px button and the panel's own 1 px border.
@@ -17,14 +28,19 @@ const double chatCollapsedWidth = 32;
 
 /// Workspace shown when [Section.session] is active. Houses the three mode
 /// views in the left panel and the chat panel on the right; the chat panel
-/// width animates between 0, [chatCollapsedWidth] and [chatPanelWidth]
+/// width animates between 0, [chatCollapsedWidth] and the full width
+/// ([chatPanelFullWidth]: 460 px, or half the area in a narrow window, #259)
 /// depending on [chatPanelLayoutProvider]: Free hides the chat, an MCQ being
 /// rendered inside `PracticeView` hides it so the student can focus on the
 /// question, and in the theory view the student can fold it to a strip
 /// (#131) — which a window under 1200 px starts with until they choose
 /// (#138). Whatever the width, `ChatWidget` stays laid out at full width
 /// under an `OverflowBox`, so nothing inside the chat reflows and the mode
-/// view on the left is the only thing that changes size.
+/// view on the left is the only thing that changes size. The panel is never
+/// wider than the full width, not even mid-slide: a window made narrow
+/// re-folds the chat in the theory view, and the slide starts from where the
+/// panel was, which the cap holds to half the area instead of squeezing the
+/// lesson under its own footer.
 class SessionView extends ConsumerWidget {
   const SessionView({super.key});
 
@@ -36,56 +52,64 @@ class SessionView extends ConsumerWidget {
     // and counting — from the first frame of the workspace, not from the
     // first frame the strip happens to be on screen.
     final unread = ref.watch(chatUnreadProvider);
-    final width = switch (layout) {
-      ChatPanelLayout.hidden => 0.0,
-      ChatPanelLayout.collapsed => chatCollapsedWidth,
-      ChatPanelLayout.full => chatPanelWidth,
-    };
 
-    return Row(
-      children: [
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: AppDurations.modeSwap,
-            switchInCurve: AppCurves.layout,
-            switchOutCurve: AppCurves.layout,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            child: KeyedSubtree(key: ValueKey(mode), child: _viewFor(mode)),
-          ),
-        ),
-        ClipRect(
-          child: AnimatedContainer(
-            key: const Key('chat-panel'),
-            duration: AppDurations.chatSlide,
-            curve: AppCurves.layout,
-            width: width,
-            child: Stack(
-              children: [
-                OverflowBox(
-                  minWidth: chatPanelWidth,
-                  maxWidth: chatPanelWidth,
-                  alignment: Alignment.centerLeft,
-                  child: const SizedBox(
-                    width: chatPanelWidth,
-                    child: _ChatPanel(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final full = chatPanelFullWidth(constraints.maxWidth);
+        final width = switch (layout) {
+          ChatPanelLayout.hidden => 0.0,
+          ChatPanelLayout.collapsed => chatCollapsedWidth,
+          ChatPanelLayout.full => full,
+        };
+        return Row(
+          children: [
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: AppDurations.modeSwap,
+                switchInCurve: AppCurves.layout,
+                switchOutCurve: AppCurves.layout,
+                transitionBuilder: (child, animation) =>
+                    FadeTransition(opacity: animation, child: child),
+                child: KeyedSubtree(key: ValueKey(mode), child: _viewFor(mode)),
+              ),
+            ),
+            // The cap: a slide that starts from a wider panel than the
+            // window now allows shows only the part that fits.
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: full),
+              child: ClipRect(
+                child: AnimatedContainer(
+                  key: const Key('chat-panel'),
+                  duration: AppDurations.chatSlide,
+                  curve: AppCurves.layout,
+                  width: width,
+                  child: Stack(
+                    children: [
+                      OverflowBox(
+                        minWidth: full,
+                        maxWidth: full,
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(width: full, child: const _ChatPanel()),
+                      ),
+                      // The strip rides the panel's left edge while the chat
+                      // slides out underneath it, and is what is left once
+                      // it has.
+                      if (layout == ChatPanelLayout.collapsed)
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: chatCollapsedWidth,
+                          child: _CollapsedChatStrip(unread: unread),
+                        ),
+                    ],
                   ),
                 ),
-                // The strip rides the panel's left edge while the chat slides
-                // out underneath it, and is what is left once it has.
-                if (layout == ChatPanelLayout.collapsed)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: chatCollapsedWidth,
-                    child: _CollapsedChatStrip(unread: unread),
-                  ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 

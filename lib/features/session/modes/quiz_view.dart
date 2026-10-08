@@ -305,12 +305,7 @@ class _OptionRowState extends State<_Option> {
                 ),
               ),
               const SizedBox(width: AppSpacing.m),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: AppMono.code(color: visuals.fg, size: 13.5),
-                ),
-              ),
+              Expanded(child: OptionLabel(widget.label, color: visuals.fg)),
             ],
           ),
         ),
@@ -364,6 +359,59 @@ class _OptionVisuals {
   final Color fg;
   final Color badgeBg;
   final Color badgeFg;
+}
+
+/// The text of an option tile (#254). An option without backticks is output
+/// or code, and stays monospace. One with code between backticks is a
+/// sentence with code in it: the normal font, with the code as inline code
+/// — as the feedback under the options draws it — and not the backticks
+/// themselves.
+class OptionLabel extends StatelessWidget {
+  const OptionLabel(this.text, {super.key, required this.color});
+
+  final String text;
+
+  /// The tile's foreground, which follows its state.
+  final Color color;
+
+  static final RegExp _codeSpan = RegExp(r'`([^`\n]+)`');
+
+  /// Size of a sentence option; the code in it is half a point smaller.
+  static const double _proseSize = 14;
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = _codeSpan.allMatches(text).toList();
+    if (spans.isEmpty) {
+      return Text(text, style: AppMono.code(color: color, size: 13.5));
+    }
+    final children = <InlineSpan>[];
+    var at = 0;
+    for (final span in spans) {
+      if (span.start > at) {
+        children.add(TextSpan(text: text.substring(at, span.start)));
+      }
+      children.add(
+        // Middle, not baseline: the option rows are `IntrinsicHeight`, and
+        // a paragraph cannot give its intrinsic size with a baseline-aligned
+        // widget in it.
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: TutorInlineCode(
+            span.group(1)!,
+            fontSize: _proseSize,
+            color: color,
+          ),
+        ),
+      );
+      at = span.end;
+    }
+    if (at < text.length) children.add(TextSpan(text: text.substring(at)));
+    return Text.rich(
+      TextSpan(children: children),
+      style: TextStyle(color: color, fontSize: _proseSize, height: 1.5),
+    );
+  }
 }
 
 class _FeedbackPanel extends StatelessWidget {
