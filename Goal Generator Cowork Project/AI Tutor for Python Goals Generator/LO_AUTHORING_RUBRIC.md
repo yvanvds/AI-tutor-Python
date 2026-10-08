@@ -256,6 +256,35 @@ Aim for **2-4 teachingTips per subgoal**. Each tip should be one
 sentence, concrete, actionable for the LLM. Subgoals with zero
 teachingTips are flagged; one is acceptable but borderline.
 
+### A tip that probes one LO names it (#253)
+
+The question generator gets the target LO and *all* teachingTips of the
+subgoal, and its instructions tell it to use only the tips that apply to
+the target LO. A tip that probes, warns about or leans on one LO
+therefore starts with that LO's id:
+
+- Good: *"For `predict_index_error`: Lean on `lijst[len(lijst)]` raising
+  an IndexError."*
+- Bad: *"Lean on `lijst[len(lijst)]` raising an IndexError."* — the
+  generator cannot tell which LO this belongs to, treats it as general,
+  and stacks the pitfall into a question about another LO. Before #253
+  that is how a first question on a new subgoal ended up testing three
+  LOs at once.
+
+Rules:
+
+- A **general** tip has no prefix: the "Python:" scope paragraph, the
+  subject-knowledge paragraph, contexts, tone, question forms that hold
+  for the whole subgoal.
+- A tip that serves two LOs equally may name both: *"For `a`, `b`: …"*.
+  It applies when either is the target; it does not ask to combine them.
+  Prefer the single best LO.
+- Never ask to combine the pitfalls of two LOs in one question ("pair it
+  with …", "contrast X with Y" where X and Y belong to different LOs).
+  Write one tip per LO instead.
+- The id is the LO's `id` exactly, in backticks, as the generator sees
+  it in its target-LO list (`- (kind) lo_id: statement`).
+
 ## Self-critique pass
 
 After eliciting all LOs across all subgoals — and before emitting JSON —
@@ -295,11 +324,13 @@ the rubric advises, the teacher decides.
 |13 | LO statement is similar to one in another subgoal             |
 |14 | Subgoal has only one `teachingTips` entry                     |
 |15 | Three or more `reason` LOs in one subgoal                     |
+|16 | A tip probes one LO without its `For <lo_id>:` prefix, or asks to combine two LOs' pitfalls |
 
 Items 1–4 are hard authoring mistakes; the skill flags them prominently
 and proposes rewrites, but if the teacher confirms the LO as-is, the
 skill emits. Items 5–11 are pedagogical concerns. Items 12–15 are
-informational.
+informational. Item 16 is a hard mistake: the skill proposes the prefix
+(or the split) for every such tip.
 
 ## Worked examples
 
@@ -345,8 +376,8 @@ informational.
     }
   ],
   "teachingTips": [
-    "Novices often think the condition needs to print or assign — probe whether they treat it as a question.",
-    "Watch for confusion between = and ==; lean on this if a student writes if x = 5.",
+    "For `predict_branch_from_comparison`: Novices often think the condition needs to print or assign — probe whether they treat it as a question.",
+    "For `write_if_only`, `write_if_else`: Watch for confusion between = and ==; lean on this if a student writes if x = 5.",
     "Prefer concrete numeric comparisons over abstract bool variables for first probes."
   ],
   "allowChains": true
@@ -356,7 +387,9 @@ informational.
 Five LOs. Mix of predict (2), apply (2), reason (1). No `recall` because
 nothing memorizable here isn't already covered upstream. `allowChains:
 true` because of the `reason` LO and the conceptual subtlety around
-indentation. Three teachingTips, each pointing at a real misconception.
+indentation. Three teachingTips: two point at a real misconception and
+name the LO they probe, the third is a rule for every first probe and has
+no prefix.
 
 ### Bad: same subgoal, common authoring mistakes
 

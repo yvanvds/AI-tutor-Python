@@ -20,9 +20,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the last-valid-index off-by-one: lean on `lijst[len(lijst)]` raising an IndexError.",
-        "Tie slice bounds to `range(a, b)` from the loops goal: the end is excluded — probe the length of a slice like `lijst[1:3]`.",
-        "Watch for students who think a negative index is an error; contrast `lijst[-1]` with `lijst[len(lijst) - 1]`.",
+        "For `predict_index_error`: Probe the last-valid-index off-by-one: lean on `lijst[len(lijst)]` raising an IndexError.",
+        "For `write_slice`, `predict_string_index`: Tie slice bounds to `range(a, b)` from the loops goal: the end is excluded — probe the length of a slice like `lijst[1:3]`.",
+        "For `predict_index_value`: Watch for students who think a negative index is an error; in the feedback, contrast `lijst[-1]` with `lijst[len(lijst) - 1]` (not as a second pitfall in the question).",
         "Present strings as sequences of characters with the same indexing and slicing; do not probe assigning to a string index or string methods here — immutability belongs to the tuples subgoal.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`. List methods and tuples come in later subgoals. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],
@@ -75,9 +75,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe remove-vs-pop confusion with lists whose values overlap with valid indexes, so the two readings give different results.",
-        "Lean on `lijst = lijst.append(x)` and `lijst = lijst.sort()` as probes: these methods change the list in place and return None.",
-        "Probe that remove deletes only the first occurrence and raises a ValueError when the value is missing; pair it with `in` as a guard.",
+        "For `recall_remove_vs_pop`: Probe remove-vs-pop confusion with lists whose values overlap with valid indexes, so the two readings give different results.",
+        "For `predict_sort_in_place`: Lean on `lijst = lijst.append(x)` and `lijst = lijst.sort()` as probes: these methods change the list in place and return None.",
+        "For `predict_list_after_methods`: Probe that remove deletes only the first occurrence and raises a ValueError when the value is missing; in the feedback, mention `in` as a guard (not as a second pitfall in the question).",
         "Keep sorted(), extend, index() and count() out of scope; a `for i in range(n)` loop with append is fine, but looping over the list itself belongs to the next subgoal.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],
@@ -137,9 +137,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Watch for `for i in lijst` followed by `lijst[i]` — the student treats the element as an index; use meaningful loop-variable names in examples.",
-        "Probe in-place changes: `x = x * 2` inside an element loop leaves the list unchanged, an index loop with `lijst[i] = ...` does not.",
-        "When building a new list, watch for the empty result list being initialised inside the loop.",
+        "For `reason_element_vs_index_loop`: Watch for `for i in lijst` followed by `lijst[i]` — the student treats the element as an index; use meaningful loop-variable names in examples.",
+        "For `predict_loop_variable_copy`: Probe in-place changes: `x = x * 2` inside an element loop leaves the list unchanged, an index loop with `lijst[i] = ...` does not.",
+        "For `write_build_new_list`: When building a new list, watch for the empty result list being initialised inside the loop.",
         "Vary between lists of numbers, lists of words and strings; for turtle, stay within t.forward, t.left, t.right and t.pencolor — no goto.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],
@@ -199,10 +199,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the choice of initial value: starting from the first element is safer than 0 — lists with only negative numbers expose the bug.",
-        "break has not been introduced: searches use a boolean flag or a while loop with an index; watch for 'niet gevonden' being printed inside the loop at every mismatch.",
-        "Probe the lost-value bug when swapping without a temporary variable.",
-        "Once the manual version works, contrast it with the built-ins max(), min() and in.",
+        "For `predict_bad_initial_value`: Probe the choice of initial value: starting from the first element is safer than 0 — lists with only negative numbers expose the bug.",
+        "For `write_search`: break has not been introduced: searches use a boolean flag or a while loop with an index; watch for 'niet gevonden' being printed inside the loop at every mismatch.",
+        "For `predict_swap_without_temp`: Probe the lost-value bug when swapping without a temporary variable.",
+        "For `write_find_max_manual`, `write_search`: Once the manual version works, contrast it with the built-ins max(), min() and in.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],
       "allowChains": false,
@@ -261,10 +261,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Connect immutability back to strings from the first subgoal: probe what `punt[0] = 5` and `woord[0] = 'K'` do.",
-        "Probe aliasing with `b = a`, then `b.append(...)` and `print(a)`; show `a[:]` (slicing) as a real copy.",
-        "Watch for the belief that parentheses make a tuple: the comma does, and `(5)` is just an int.",
-        "Frame tuple-vs-list as a fixed-shape record (coordinate, RGB colour) versus a collection that grows or shrinks.",
+        "For `predict_immutable_error`: Connect immutability back to strings from the first subgoal: probe what `punt[0] = 5` and `woord[0] = 'K'` do.",
+        "For `predict_list_aliasing`: Probe aliasing with `b = a`, then `b.append(...)` and `print(a)`; show `a[:]` (slicing) as a real copy.",
+        "For `write_tuple_unpacking`: Watch for the belief that parentheses make a tuple: the comma does, and `(5)` is just an int.",
+        "For `reason_tuple_vs_list`: Frame tuple-vs-list as a fixed-shape record (coordinate, RGB colour) versus a collection that grows or shrinks.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`, plus tuples, unpacking and copying a list with `[:]`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],
       "allowChains": true,
@@ -316,9 +316,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe iteration counts by tracing small lists and counting, not with a formula.",
-        "Watch for rows and columns being swapped: in `rooster[r][k]` the first index selects the row.",
-        "Probe pairing an element with itself when both loops start at 0, and contrast with an inner loop starting at `i + 1`.",
+        "For `predict_nested_loop_output`: Probe iteration counts by tracing small lists and counting, not with a formula.",
+        "For `predict_grid_index`: Watch for rows and columns being swapped: in `rooster[r][k]` the first index selects the row.",
+        "For `write_all_pairs`, `reason_unique_pairs`: Probe pairing an element with itself when both loops start at 0, and contrast with an inner loop starting at `i + 1`.",
         "Build grids with literals or with append in a loop; avoid `[[0]*n]*m` — list repetition has not been introduced and it hides an aliasing trap.",
         "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`, plus tuples, nested loops and lists of lists. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
       ],

@@ -22,7 +22,7 @@
       "teachingTips": [
         "Present a function the way students know it from maths: something goes in, something comes out. `def dubbel(x): return 2 * x` is f(x) = 2x with a better name, and a call like `dubbel(4)` is an expression with a value, just like `2 + 3`.",
         "Every function in this goal returns its result: never put `print` or `input` inside a function body. Printing happens in the main script, on the returned value (`print(dubbel(4))`).",
-        "Probe that `def` only defines: a script that defines a function and never calls it shows nothing, a bare `dubbel(4)` line computes a value that is thrown away, and a call placed above the definition raises a NameError.",
+        "For `predict_def_and_calls`: Probe that `def` only defines: a script that defines a function and never calls it shows nothing, a bare `dubbel(4)` line computes a value that is thrown away, and a call placed above the definition raises a NameError.",
         "Use descriptive Dutch names instead of f and g (`dubbel`, `kwadraat`, `naar_fahrenheit`, `btw`), so that several functions in one script stay apart.",
         "Stay with one parameter and a single `return` at the end of the body here — several parameters come in the next subgoal, early returns later. No docstrings, type hints, f-strings, default values or lambda."
       ],
@@ -75,9 +75,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe positional binding with a function where swapping the arguments changes the result (`verschil(a, b)`, `macht(grondtal, exponent)`), and with caller variables whose names differ from — or are deliberately swapped against — the parameter names.",
-        "Watch for students who overwrite a parameter inside the body (`def btw(prijs): prijs = 100`) or ask for it with input(): the value comes from the call.",
-        "For the extraction LO, show a script in which the same formula appears two or three times with different numbers; the numbers that vary become the parameters.",
+        "For `predict_argument_binding`: Probe positional binding with a function where swapping the arguments changes the result (`verschil(a, b)`, `macht(grondtal, exponent)`), and with caller variables whose names differ from — or are deliberately swapped against — the parameter names.",
+        "For `write_function_with_params`: Watch for students who overwrite a parameter inside the body (`def btw(prijs): prijs = 100`) or ask for it with input(): the value comes from the call.",
+        "For `write_extract_function`: For the extraction LO, show a script in which the same formula appears two or three times with different numbers; the numbers that vary become the parameters.",
         "Use a default value only when targeting that LO, and then a single trailing one (`def korting(prijs, procent=10)`).",
         "Functions return their result and contain no `print` or `input`; no keyword arguments, `*args`, type hints, docstrings or f-strings."
       ],
@@ -137,10 +137,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Students will meet functions that print in examples elsewhere: treat it as a bug to diagnose, not a style to practise. Lean on `resultaat = toon_dubbel(4)` followed by `print(resultaat)` showing None, and on `print(toon_dubbel(4))` showing the number and then None.",
-        "For the reason LO, press on reuse: a returned value can be stored, compared, summed or passed on to another function; a printed one is gone.",
-        "Probe early return: a `return` inside a for-loop ends the whole function at the first hit — contrast a correct search (`return True` inside the loop, `return False` after it) with the buggy if/else that already returns in the first iteration.",
-        "For True/False functions, watch for `if is_even(x) == True` and for an if/else that returns the literals; show `return getal % 2 == 0` once the long version works.",
+        "For `predict_print_vs_return`: Students will meet functions that print in examples elsewhere: treat it as a bug to diagnose, not a style to practise. Lean on `resultaat = toon_dubbel(4)` followed by `print(resultaat)` showing None, and on `print(toon_dubbel(4))` showing the number and then None.",
+        "For `reason_print_vs_return`: For the reason LO, press on reuse: a returned value can be stored, compared, summed or passed on to another function; a printed one is gone.",
+        "For `predict_return_ends_function`: Probe early return: a `return` inside a for-loop ends the whole function at the first hit — contrast a correct search (`return True` inside the loop, `return False` after it) with the buggy if/else that already returns in the first iteration.",
+        "For `write_boolean_function`: For True/False functions, watch for `if is_even(x) == True` and for an if/else that returns the literals; show `return getal % 2 == 0` once the long version works.",
         "A function that draws with turtle is the legitimate case of a function that does something instead of computing something: it returns nothing and its call stands alone on a line. Create `t` once at the top of the script, use it inside the function, and reuse the 360/n rule from the loops goal. Returning tuples, a bare `return`, recursion and f-strings are out of scope."
       ],
       "allowChains": true,
@@ -200,9 +200,9 @@
       "contentId": null,
       "teachingTips": [
         "Frame each call as getting its own fresh workspace: parameters and variables made inside exist only while the call runs, and are gone afterwards.",
-        "Probe shadowing with the same name inside and outside (`x = 10`, then a function that does `x = 5`, then `print(x)`), and with a parameter that is reassigned (`def verhoog(getal): getal = getal + 1`).",
-        "Lean on `teller = teller + 1` inside a function crashing with UnboundLocalError as the motivation for 'geef terug en sla op': `teller = verhoog(teller)`.",
-        "Contrast with lists, tying back to aliasing from the tuples subgoal: `lijst.append(x)` or `lijst[0] = x` inside a function changes the caller's list, but `lijst = []` inside does not.",
+        "For `predict_global_unchanged`: Probe shadowing with the same name inside and outside (`x = 10`, then a function that does `x = 5`, then `print(x)`), and with a parameter that is reassigned (`def verhoog(getal): getal = getal + 1`).",
+        "For `fix_function_returns_result`: Lean on `teller = teller + 1` inside a function crashing with UnboundLocalError as the motivation for 'geef terug en sla op': `teller = verhoog(teller)`.",
+        "For `predict_list_argument_mutation`: Contrast with lists, tying back to aliasing from the tuples subgoal: `lijst.append(x)` or `lijst[0] = x` inside a function changes the caller's list, but `lijst = []` inside does not.",
         "Do not introduce the `global` keyword; reading a variable from outside (like the turtle `t`) is fine, changing one goes through return. Functions return their result and contain no `print` — printing happens in the main script."
       ],
       "allowChains": true,
@@ -255,9 +255,11 @@
       "contentId": null,
       "teachingTips": [
         "Take formulas from mathematics, physics and economics in turn — a quadratic, distance s = v*t + a*t**2/2, kinetic energy, compound interest K*(1 + r)**n, cost and revenue functions — and always state the formula in the question: the student translates it, they do not have to know it.",
-        "Watch for math notation leaking into code: `2x` for `2 * x`, `x^2` for `x ** 2`, and `f(x) = ...` instead of `def f(x):` with `return`.",
-        "For a step smaller than 1, compute x from the loop index (`x = start + i * stap`): `range` with a step argument or with floats has not been introduced. Probe how many rows the table has and whether the end value is included. The function only computes and returns; the loop in the main script prints the rows or collects them in a list.",
-        "Link the search questions to the list patterns goal: the smallest function value is the manual-minimum pattern, a sign change is a comparison of two neighbouring values. For the step-size LO, use a function whose two zeros or whose minimum fall between two rows of a coarse table.",
+        "For `write_formula_function`: Watch for math notation leaking into code: `2x` for `2 * x`, `x^2` for `x ** 2`, and `f(x) = ...` instead of `def f(x):` with `return`.",
+        "For a step smaller than 1, compute x from the loop index (`x = start + i * stap`): `range` with a step argument or with floats has not been introduced. The function only computes and returns; the loop in the main script prints the rows or collects them in a list.",
+        "For `predict_table_x_values`: Probe how many rows the table has and whether the end value is included.",
+        "For `write_search_function_values`: Link the search questions to the list patterns goal: the smallest function value is the manual-minimum pattern, a sign change is a comparison of two neighbouring values.",
+        "For `reason_step_size`: For the step-size LO, use a function whose two zeros or whose minimum fall between two rows of a coarse table.",
         "From math use only `math.sqrt` and `math.pi`, plus `math.sin`/`math.cos` (radians) when the formula needs them; `round(waarde, 2)` may tidy output but avoid values ending in exactly 5. No numpy, matplotlib, lambda or f-strings, and do not pass a function as an argument — the table loop calls the function by its name."
       ],
       "allowChains": true,
@@ -316,9 +318,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Elicit the plan before code on larger tasks: which functions, what goes in (parameters), what comes out (return) — probe decomposition separately from coding, as in probleem-naar-programma.",
-        "Build on functions with one clear task that feed each other: `is_priem(n)` used by `tel_priemgetallen(grens)`, `gemiddelde(lijst)` used by `boven_gemiddelde(lijst)`; watch for helper logic being copy-pasted instead of called.",
-        "For list functions, reuse the patterns from the lists goal (largest, count, filter, search) and have the function return the result instead of printing it; build and return a new list rather than changing the argument.",
+        "For `decompose_into_functions`: Elicit the plan before code on larger tasks: which functions, what goes in (parameters), what comes out (return) — probe decomposition separately from coding, as in probleem-naar-programma.",
+        "For `write_function_with_helper`: Build on functions with one clear task that feed each other: `is_priem(n)` used by `tel_priemgetallen(grens)`, `gemiddelde(lijst)` used by `boven_gemiddelde(lijst)`; watch for helper logic being copy-pasted instead of called.",
+        "For `write_list_function`: For list functions, reuse the patterns from the lists goal (largest, count, filter, search) and have the function return the result instead of printing it; build and return a new list rather than changing the argument.",
         "Turtle compositions are welcome (`teken_huis(grootte)` calling `teken_vierkant` and `teken_driehoek`); returning two values as a tuple and unpacking them is allowed here.",
         "Introduce no new mechanics: no recursion, lambda, `global`, try/except, `break` or f-strings. Apart from turtle drawing functions, every function returns its result and only the main script prints."
       ],

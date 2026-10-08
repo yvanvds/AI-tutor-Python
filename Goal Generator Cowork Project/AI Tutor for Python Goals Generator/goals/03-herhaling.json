@@ -20,10 +20,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the range off-by-one two ways: how many times does the body run, and what is the loop variable's last value — these are separate failure modes.",
-        "Trace the loop variable inside the body: probe whether the student sees that it takes a new value each iteration rather than only its final value.",
-        "For turtle polygons, lean on the exterior-angle mistake: for a triangle students turn 60 degrees (the interior angle) instead of 120 — eliciting the 360/n rule is the deliverable.",
-        "Tie the accumulator pattern back to `x = x + 1` from the variables subgoal; probe right-to-left reading of `totaal = totaal + getal`. The lesson then shows `+=` and `-=` as shorthand for the same update; both forms may appear from here on, and when a student misreads the shorthand, have them write it out in the long form.",
+        "For `recall_range_bounds`: Probe the range off-by-one two ways: how many times does the body run, and what is the loop variable's last value — these are separate failure modes.",
+        "For `predict_for_output`: Trace the loop variable inside the body: probe whether the student sees that it takes a new value each iteration rather than only its final value.",
+        "For `write_turtle_polygon`: For turtle polygons, lean on the exterior-angle mistake: for a triangle students turn 60 degrees (the interior angle) instead of 120 — eliciting the 360/n rule is the deliverable.",
+        "For `write_for_accumulator`: Tie the accumulator pattern back to `x = x + 1` from the variables subgoal; probe right-to-left reading of `totaal = totaal + getal`. The lesson then shows `+=` and `-=` as shorthand for the same update; both forms may appear from here on, and when a student misreads the shorthand, have them write it out in the long form.",
         "Python: goals 1 and 2 plus `for` with `range(n)` or `range(a, b)`, and `+=`/`-=`. A `for` loops over a `range`, not over a list or a string. Not seen yet: `while`, `range` with a step, `break`, lists and tuples, indexing, `len`, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
       ],
       "allowChains": false,
@@ -75,10 +75,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe infinite-loop recognition with a counter that never updates inside the body; the update line is the load-bearing insight.",
-        "Students negate conditions wrongly when the task says 'stop wanneer' — probe translation of 'totdat' phrasing into a 'zolang' condition.",
-        "Surface that the condition is checked only at the top of each iteration, not continuously — probe with a script that makes the condition false mid-body.",
-        "For input validation, combine while with the int/float conversion from goal 1; keep try/except out of scope.",
+        "For `predict_infinite_loop`: Probe infinite-loop recognition with a counter that never updates inside the body; the update line is the load-bearing insight.",
+        "For `write_while_loop`, `write_input_validation`: Students negate conditions wrongly when the task says 'stop wanneer' — probe translation of 'totdat' phrasing into a 'zolang' condition.",
+        "For `predict_while_output`: Surface that the condition is checked only at the top of each iteration, not continuously — probe with a script that makes the condition false mid-body.",
+        "For `write_input_validation`: For input validation, combine while with the int/float conversion from goal 1; keep try/except out of scope.",
         "Python: goals 1 and 2 plus `for` with `range`, `while`, and `+=`/`-=`. Not seen yet: `break`, `range` with a step, lists and tuples, indexing, `len`, functions (`def`, `return`), f-strings, string methods such as `isdigit()`, and `try`/`except`: an input check converts with `int()` and compares the number."
       ],
       "allowChains": false,
@@ -130,9 +130,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe whether the student tests only the happy path — push for 0, negative numbers and boundary values as test cases.",
-        "Have the student predict the output for a test case before running it; the mismatch between prediction and actual output is the teaching moment.",
-        "Distinguish syntax errors, runtime errors and logic errors — probe with one example of each on similar code.",
+        "For `choose_test_cases`: Probe whether the student tests only the happy path — push for 0, negative numbers and boundary values as test cases.",
+        "For `predict_testcase_output`: Have the student predict the output for a test case before running it; the mismatch between prediction and actual output is the teaching moment.",
+        "For `diagnose_from_error`: Distinguish syntax errors, runtime errors and logic errors — probe with one example of each on similar code.",
         "Use programs with conditions and loops from earlier subgoals as debugging material. Python: only what goals 1 to 3 introduced — `print`, variables, arithmetic, `input` with `int`/`float`, `if`/`elif`/`else`, `and`/`or`/`not`, `for` with `range`, `while`, `+=`/`-=` and turtle. Not seen yet: functions (`def`, `return`), lists and tuples (so no list of test cases either), indexing, `len`, string methods, `break`, f-strings and `try`/`except`. A test case is a different input on a new run, or a different start value for a variable at the top of the program; to cover several test cases in one exercise, name the values in the question text or run the code inside a `for` loop over a `range`."
       ],
       "allowChains": true,
@@ -177,10 +177,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Elicit a plan in Dutch (stappen: invoer, verwerking, herhaling, uitvoer) before any code on larger tasks; probe decomposition separately from coding.",
+        "For `decompose_problem`: Elicit a plan in Dutch (stappen: invoer, verwerking, herhaling, uitvoer) before any code on larger tasks; probe decomposition separately from coding.",
         "Combine building blocks from both goals — input with conversion, conditions, loops, turtle — but introduce no new mechanics (see the Python tip).",
         "Turtle capstone exercises are welcome, e.g. a drawing whose colour, size or shape depends on user input, drawn with a loop.",
-        "When the program is wrong, resist giving the fix — direct the student to choose a test case that exposes the bug, linking back to the testen-debuggen subgoal.",
+        "For `fix_logic_error`: When the program is wrong, resist giving the fix — direct the student to choose a test case that exposes the bug, linking back to the testen-debuggen subgoal.",
         "Python: only what goals 1 to 3 introduced — `print`, variables, arithmetic, `input` with `int`/`float`, `if`/`elif`/`else`, `and`/`or`/`not`, `for` with `range`, `while`, `+=`/`-=` and turtle. Not seen yet: functions (`def`, `return`), lists and tuples, indexing, `len`, string methods, `break`, `range` with a step, f-strings and `try`/`except`."
       ],
       "allowChains": true,

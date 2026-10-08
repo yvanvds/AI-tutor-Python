@@ -29,7 +29,7 @@ Goal: help student master the targeted learning objectives.
 ### CONTEXT
 
 Base exercise on the requested difficulty.
-Follow teaching tips.
+Follow the teaching tips that apply to this question. A tip that starts with `For <lo_id>:` is only for a question whose target LOs include that LO; a tip without that prefix applies to every question of this subgoal.
 Generate examples that promote understanding, not memorisation.
 The exercise must probe the listed `target LOs`. The rest of the goal scope (other LOs in the same subgoal or earlier subgoals of this root goal) is fair background but not the focus.
 Do NOT require knowledge from outside this root goal's scope.
@@ -37,6 +37,11 @@ Calibrate the size of the gap to fill in to the requested difficulty:
 - easy = a single token
 - medium = a short expression
 - hard = a short block
+The gap is where the target LO is tested. The code around it holds no second pitfall.
+
+### ONE IDEA PER QUESTION
+
+A question tests one idea: the target LO. A student who masters the target LO and the earlier subgoals must be able to answer it correctly. Other LOs of this subgoal may appear only in their plainest use, never as a second pitfall: use only the pitfalls of the target LO, also at hard. When the tips name several pitfalls of the target LO, pick one for this question.
 
 ## 02 Current Goal
 
@@ -233,11 +238,16 @@ Goal: help student master the targeted learning objectives via dialogue.
 ### CONTEXT
 
 Base exercise on the requested difficulty.
-Follow teaching tips.
+Follow the teaching tips that apply to this question. A tip that starts with `For <lo_id>:` is only for a question whose target LOs include that LO; a tip without that prefix applies to every question of this subgoal.
 Generate examples that promote understanding, not memorisation.
 The exercise must probe the listed `target LOs`. Other LOs in this root goal's scope may incidentally appear but should not be the focus.
 Do NOT require knowledge from outside this root goal's scope.
-Calibrate the snippet's complexity to the requested difficulty.
+Calibrate the snippet's complexity to the requested difficulty. A harder snippet makes the target LO's point less obvious; it does not add pitfalls of other LOs. What the student has to explain is about the target LO.
+
+### ONE IDEA PER QUESTION
+
+A question tests one idea: the target LO. A student who masters the target LO and the earlier subgoals must be able to answer it correctly. Other LOs of this subgoal may appear only in their plainest use, never as a second pitfall: use only the pitfalls of the target LO, also at hard. When the tips name several pitfalls of the target LO, pick one for this question.
+Check before you answer: take away the target LO's pitfall. If something tricky is left, remove it.
 
 ## 02 Current Goal
 
@@ -482,11 +492,16 @@ Goal: help student master the targeted learning objectives.
 ### CONTEXT
 
 Base exercise on the requested difficulty.
-Follow teaching tips.
+Follow the teaching tips that apply to this question. A tip that starts with `For <lo_id>:` is only for a question whose target LOs include that LO; a tip without that prefix applies to every question of this subgoal.
 Generate examples that promote understanding, not memorisation.
 The exercise must probe the listed `target LOs`. The rest of the goal scope is fair background but not the focus.
 Do NOT require knowledge from outside this root goal's scope.
-Calibrate the trickiness of the distractors to the requested difficulty.
+Calibrate the trickiness of the distractors to the requested difficulty. A harder question hides the target LO's pitfall better and has closer distractors; it is not a longer program with more pitfalls.
+
+### ONE IDEA PER QUESTION
+
+A question tests one idea: the target LO. A student who masters the target LO and the earlier subgoals must be able to answer it correctly. Other LOs of this subgoal may appear only in their plainest use, never as a second pitfall: use only the pitfalls of the target LO, also at hard. When the tips name several pitfalls of the target LO, pick one for this question.
+Check before you answer: take away the target LO's pitfall. If something tricky is left, remove it.
 
 ## 02 Current Goal
 
@@ -544,6 +559,8 @@ Only include one exercise per response.
 - Never include line numbers before lines of code
 - Option labels may span multiple lines — use `\n` inside the option string to separate lines (e.g. multi-line `print` output). Keep each option visually compact; prefer ≤ 4 lines per option.
 - Never prefix option text with `A:`, `B:`, `1.`, etc. The letter badge is rendered by the UI from position; a prefix duplicates it.
+- Options must look different on screen. A space or an empty line at the end of an option is invisible, so two options that differ only there are the same option to the student. Never build a distractor on a difference the student cannot see.
+- An option that is output or code is shown exactly as written, in a monospace font: no backticks around it. An option that is a sentence may put code in backticks; that part is shown as inline code.
 
 ## 05 Variety
 
@@ -709,11 +726,16 @@ Goal: help student master the targeted learning objectives via dialogue.
 ## 01 Context
 
 Base question on the requested difficulty.
-Follow teaching tips.
+Follow the teaching tips that apply to this question. A tip that starts with `For <lo_id>:` is only for a question whose target LOs include that LO; a tip without that prefix applies to every question of this subgoal.
 Generate a question that promotes understanding, not memorisation.
 The question must probe the listed `target LOs`. Other LOs in this root goal's scope may incidentally appear but should not be the focus.
 Do NOT require knowledge from outside this root goal's scope.
 Calibrate how abstract or open-ended the question is to the requested difficulty.
+
+### ONE IDEA PER QUESTION
+
+A question tests one idea: the target LO. A student who masters the target LO and the earlier subgoals must be able to answer it correctly. Other LOs of this subgoal may appear only in their plainest use, never as a second pitfall: use only the pitfalls of the target LO, also at hard. When the tips name several pitfalls of the target LO, pick one for this question.
+Check before you answer: take away the target LO's pitfall. If something tricky is left, remove it.
 
 ## 02 Current Goal
 
@@ -1001,12 +1023,16 @@ Goal: help student master the targeted learning objectives via an exercise.
 ### CONTEXT
 
 Base exercise on the requested difficulty.
-Follow teaching tips.
+Follow the teaching tips that apply to this question. A tip that starts with `For <lo_id>:` is only for a question whose target LOs include that LO; a tip without that prefix applies to every question of this subgoal.
 This question type must ask the student to write code, without providing any.
 The exercise must probe the listed `target LOs`. The rest of the goal scope is fair background but not the focus.
 Do NOT require knowledge from outside this root goal's scope.
-Calibrate the scope (number of lines, branches, nesting) to the requested difficulty.
+Calibrate the scope (number of lines, branches, nesting) to the requested difficulty. The exercise asks for one new skill, the target LO. Everything else it needs comes from earlier subgoals, or from other LOs of this subgoal in their plainest use.
 The student may be either practicing or being checked for prior knowledge — the prompt should be a fair, representative exercise for the subgoal either way; do not assume mastery.
+
+### ONE IDEA PER QUESTION
+
+A question tests one idea: the target LO. A student who masters the target LO and the earlier subgoals must be able to answer it correctly. Other LOs of this subgoal may appear only in their plainest use, never as a second pitfall: use only the pitfalls of the target LO, also at hard. When the tips name several pitfalls of the target LO, pick one for this question.
 
 ## 02 Current Goal
 

@@ -20,9 +20,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the = vs == distinction before if is introduced: show `x = 5` and `x == 5` side by side and ask what each does — assignment stores, comparison asks.",
-        "Probe string-vs-number comparison via input: `input()` returns a string, so `'5' == 5` is False — tie this back to the conversion rule from the invoer-input subgoal.",
-        "Watch for lowercase `true`/`false`; contrast with Python's capitalized `True`/`False` and note there are exactly two boolean values.",
+        "For `reason_assign_vs_equals`: Probe the = vs == distinction before if is introduced: show `x = 5` and `x == 5` side by side and ask what each does — assignment stores, comparison asks.",
+        "For `predict_comparison_result`: Probe string-vs-number comparison via input: `input()` returns a string, so `'5' == 5` is False — tie this back to the conversion rule from the invoer-input subgoal.",
+        "For `predict_bool_variable`: Watch for lowercase `true`/`false`; contrast with Python's capitalized `True`/`False` and note there are exactly two boolean values.",
         "Frame a comparison as an expression with a value, like `2 + 3` — it can be printed and stored in a variable, not only used later inside an if.",
         "Do not only use = and ==. Very comparisons in exercises and don't skip !=",
         "Do not include concepts like combining conditions (and, or) or if, elif. Students do not know those at this point.",
@@ -77,9 +77,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Novices often think the condition needs to print or assign something — probe whether they read it as a question with a True/False answer.",
-        "Watch for confusion between = and == inside conditions; lean on `if x = 5` as a probe.",
-        "Probe block boundaries with a dedented line after the if-block: whether the student sees that it always runs, regardless of the condition, is the indentation deliverable.",
+        "For `predict_branch_from_comparison`: Novices often think the condition needs to print or assign something — probe whether they read it as a question with a True/False answer.",
+        "For `write_if_only`, `write_if_else`: Watch for confusion between = and == inside conditions; lean on `if x = 5` as a probe.",
+        "For `explain_indent_role`: Probe block boundaries with a dedented line after the if-block: whether the student sees that it always runs, regardless of the condition, is the indentation deliverable.",
         "Prefer concrete numeric comparisons over abstract boolean variables for first probes; bring in boolean variables only once comparisons sit.",
         "Only if and else are to be used at this time. Do not use elif at this point.",
         "Python: goal 1 plus comparisons, `True`/`False` and `if`/`else`. Not seen yet: `elif`, `and`/`or`/`not`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
@@ -133,10 +133,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the all-true-branches-run misconception: give a chain where two conditions are true and ask what prints — only the first true branch runs.",
-        "Contrast an if/elif/else-keten with a series of separate if-statements on the same example; the behavioral difference is the deliverable.",
-        "Watch for `x == 5 or 6`-style conditions: students translate Dutch 'of' literally; surface that `6` is always truthy and show the correct `x == 5 or x == 6`.",
-        "Probe boundary off-by-ones in grade-style chains (`>= 90` vs `> 90`); boundary values make good test inputs.",
+        "For `predict_elif_branch`: Probe the all-true-branches-run misconception: give a chain where two conditions are true and ask what prints — only the first true branch runs.",
+        "For `predict_elif_branch`: Contrast an if/elif/else-keten with a series of separate if-statements on the same example; the behavioral difference is the deliverable.",
+        "For `write_compound_condition`: Watch for `x == 5 or 6`-style conditions: students translate Dutch 'of' literally; surface that `6` is always truthy and show the correct `x == 5 or x == 6`.",
+        "For `predict_elif_branch`: Probe boundary off-by-ones in grade-style chains (`>= 90` vs `> 90`); boundary values make good test inputs.",
         "Don't overdo it with combining conditions. 3 conditions in one if statement are the absolute maximum.",
         "Python: goal 1 plus comparisons, `True`/`False`, `if`/`elif`/`else` and `and`/`or`/`not`. Not seen yet: loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
       ],
@@ -189,11 +189,13 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Use the object style consistently: `import turtle` then `t = turtle.Turtle()`, calling methods on `t` — probe whether the student sets this up rather than calling bare functions.",
-        "Turns are relative to the turtle's current heading, not to screen directions — probe with a script that mixes left and right; students who track absolute compass directions mispredict.",
-        "Angles are in degrees; prefer 90-degree square figures for first probes, and use the triangle's 120-degree exterior turn as a harder probe of the turn-angle model.",
+        "Use the object style consistently: `import turtle` then `t = turtle.Turtle()`, calling methods on `t`.",
+        "For `write_turtle_figure`: probe whether the student sets this up rather than calling bare functions.",
+        "For `predict_turtle_drawing`: Turns are relative to the turtle's current heading, not to screen directions — probe with a script that mixes left and right; students who track absolute compass directions mispredict.",
+        "For `write_turtle_figure`: Angles are in degrees; prefer 90-degree square figures for first probes, and use the triangle's 120-degree exterior turn as a harder probe of the turn-angle model.",
         "Stay within t.forward, t.backward, t.left, t.right, t.penup, t.pendown and t.pencolor here — drawing with loops belongs in the next goal.",
-        "Every turtle script must end with `turtle.done()` — without it the window misbehaves; the window then stays open until the student closes it manually. Treat a missing done() as a bug worth probing, not an afterthought.",
+        "Every turtle script must end with `turtle.done()` — without it the window misbehaves; the window then stays open until the student closes it manually.",
+        "For `write_turtle_figure`: Treat a missing done() as a bug worth probing, not an afterthought.",
         "Python: goals 1 and 2 plus `import turtle` and the turtle methods above. Not seen yet: loops (a square takes four separate pairs of lines here), `+=`, lists, functions (`def`, `return`), `random`, f-strings and string methods."
       ],
       "allowChains": false,

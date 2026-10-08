@@ -20,9 +20,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe whether the student understands that quotes are what turn text into a string — without them, `print(hello)` makes Python look for something called `hello` and raise an error. Frame the contrast as 'met aanhalingstekens = tekst' vs. 'zonder aanhalingstekens = Python zoekt iets dat zo heet'. Do NOT use the word `variabele` or `variable name` — variables are not introduced until the next subgoal.",
-        "When testing multi-argument print, contrast it directly with the `+` form on the same content; the comma-inserts-space behavior is the deliverable.",
-        "probe for whether the student conflates string concatenation with addition.",
+        "For `recall_quotes_for_strings`: Probe whether the student understands that quotes are what turn text into a string — without them, `print(hello)` makes Python look for something called `hello` and raise an error. Frame the contrast as 'met aanhalingstekens = tekst' vs. 'zonder aanhalingstekens = Python zoekt iets dat zo heet'. Do NOT use the word `variabele` or `variable name` — variables are not introduced until the next subgoal.",
+        "For `predict_comma_vs_plus`: When testing multi-argument print, contrast it directly with the `+` form on the same content; the comma-inserts-space behavior is the deliverable.",
+        "For `predict_print_output`: probe for whether the student conflates string concatenation with addition.",
         "Stay within bare `print` calls in this subgoal — escape sequences, `end=`, `sep=`, and Python 2 `print` syntax belong later.",
         "Python: only `print` with texts in quotes and numbers, separated by commas or joined with `+`. Not seen yet: variables, `input`, comparisons, `if`, loops, lists, functions (`def`, `return`), f-strings and string methods."
       ],
@@ -75,10 +75,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Treat `=` as 'put the right side into the name on the left' — if the student reads it as math-equals, surface directionality directly; they'll trip on `x = x + 1` otherwise.",
-        "Belgian students write decimals with a comma; `pi = 3,14` silently becomes the tuple `(3, 14)`. Probe with a comma-form value at first exposure and explain the tuple outcome, not just 'wrong'.",
-        "Probe right-to-left reading on self-reference like `x = x + 1` — a working mental model of assignment shows up here, not on bare first-time assignment.",
-        "When testing naming rules, mix valid and invalid candidates (`2name`, `for`, `my-var`, `Name`); case sensitivity is a separate failure mode from rule violations and warrants its own probe.",
+        "For `write_assignment`: Treat `=` as 'put the right side into the name on the left' — if the student reads it as math-equals, surface directionality directly; they'll trip on `x = x + 1` otherwise.",
+        "For `predict_variable_value`: Belgian students write decimals with a comma; `pi = 3,14` silently becomes the tuple `(3, 14)`. Probe with a comma-form value at first exposure and explain the tuple outcome, not just 'wrong'.",
+        "For `predict_variable_value`: Probe right-to-left reading on self-reference like `x = x + 1` — a working mental model of assignment shows up here, not on bare first-time assignment.",
+        "For `recall_naming_rules`: When testing naming rules, mix valid and invalid candidates (`2name`, `for`, `my-var`, `Name`); case sensitivity is a separate failure mode from rule violations and warrants its own probe.",
         "Python: `print`, texts and numbers, and variables with `=`, including `x = x + 1`. Not seen yet: `input`, comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings and string methods."
       ],
       "allowChains": false,
@@ -130,10 +130,10 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Belgian students write decimals with a comma; `3,14 * 2` parses as `(3, 14) * 2` and yields a tuple, not multiplication. Surface this directly the first time float arithmetic is probed.",
-        "Probe whether the student expects `8 / 2` to be `int` — Python 3's `/` always returns `float`, and this surprises novices who haven't been told.",
-        "When testing precedence, prefer expressions where left-to-right and correct-precedence give different results (`2 + 3 * 4`); equal-result expressions don't probe the misconception.",
-        "If the student writes `2^3` for 'two to the third', correct to `**` and note that `^` is bitwise XOR in Python — leave XOR for later.",
+        "For `write_arithmetic_expression`: Belgian students write decimals with a comma; `3,14 * 2` parses as `(3, 14) * 2` and yields a tuple, not multiplication. Surface this directly the first time float arithmetic is probed.",
+        "For `predict_int_vs_float_result`: Probe whether the student expects `8 / 2` to be `int` — Python 3's `/` always returns `float`, and this surprises novices who haven't been told.",
+        "For `predict_expression_value`: When testing precedence, prefer expressions where left-to-right and correct-precedence give different results (`2 + 3 * 4`); equal-result expressions don't probe the misconception.",
+        "For `recall_python_operators`: If the student writes `2^3` for 'two to the third', correct to `**` and note that `^` is bitwise XOR in Python — leave XOR for later.",
         "Python: `print`, variables and the operators `+`, `-`, `*`, `/`, `//`, `%` and `**`, with parentheses. Not seen yet: `input`, comparisons, `if`, loops, `+=`, `round`, the `math` module, lists, functions (`def`, `return`) and f-strings."
       ],
       "allowChains": false,
@@ -185,9 +185,9 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "When probing the return type of `input()`, set up the question so the student commits to a prediction before seeing the runtime answer — the 'input always returns a string' shock is the load-bearing insight here.",
-        "Belgian students will type `3,14` at a `float()` prompt and hit `ValueError`; expose this case explicitly when calibration warrants and tie it to the same comma-vs-dot rule from the variables and arithmetic subgoals.",
-        "Probe the missing-conversion bug with two-input addition (`a = input(); b = input(); print(a + b)`); the visible string concatenation ('53' for inputs 5 and 3) is more diagnostic than a hard `TypeError` because the student has to explain why it's not 8.",
+        "For `recall_input_returns_string`: When probing the return type of `input()`, set up the question so the student commits to a prediction before seeing the runtime answer — the 'input always returns a string' shock is the load-bearing insight here.",
+        "For `predict_conversion_error`: Belgian students will type `3,14` at a `float()` prompt and hit `ValueError`; expose this case explicitly when calibration warrants and tie it to the same comma-vs-dot rule from the variables and arithmetic subgoals.",
+        "For `predict_unconverted_input_bug`: Probe the missing-conversion bug with two-input addition (`a = input(); b = input(); print(a + b)`); the visible string concatenation ('53' for inputs 5 and 3) is more diagnostic than a hard `TypeError` because the student has to explain why it's not 8.",
         "Stay within bare `input` + `int`/`float` conversion in this subgoal — `try`/`except`, validation loops, and `split()` belong later.",
         "Python: `print`, variables, arithmetic, and `input` with `int()` or `float()`. Not seen yet: comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods such as `split()`, and `try`/`except`."
       ],
@@ -240,8 +240,8 @@
       "optional": false,
       "contentId": null,
       "teachingTips": [
-        "Probe the silent-wrong-output bug in script context: a script where `print(a + b)` on raw input yields string concatenation rather than a sum is the canonical diagnostic — harder to spot than the same bug in isolation.",
-        "When the script-writing prompt is in natural Dutch ('het gemiddelde van twee getallen'), expect translation errors at the operator level — `a + b / 2` instead of `(a + b) / 2`. Probe the parentheses issue separately when the student gets the structure right but the precedence wrong.",
+        "For `fix_simple_script_bug`: Probe the silent-wrong-output bug in script context: a script where `print(a + b)` on raw input yields string concatenation rather than a sum is the canonical diagnostic — harder to spot than the same bug in isolation.",
+        "For `write_simple_script`: When the script-writing prompt is in natural Dutch ('het gemiddelde van twee getallen'), expect translation errors at the operator level — `a + b / 2` instead of `(a + b) / 2`. Probe the parentheses issue separately when the student gets the structure right but the precedence wrong.",
         "Don't introduce any new mechanics in this subgoal — the integrative skill is composing print, variables, arithmetic and input cleanly. Python: only `print`, variables, the arithmetic operators and `input` with `int()` or `float()`. Not seen yet: comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
       ],
       "allowChains": false,

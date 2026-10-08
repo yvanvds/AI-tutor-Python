@@ -70,7 +70,7 @@ all its LOs crosses a threshold.
 - `order` — int
 - `optional` — bool
 - `contentId` — string?, references `content/{id}` (from Phase A — the authored Uitleg)
-- `teachingTips` — `string[]`. Free-form prose hints to the LLM about how to approach this subgoal. (Renamed from current `suggestions` for clarity. Stays unstructured deliberately.)
+- `teachingTips` — `string[]`. Free-form prose hints to the LLM about how to approach this subgoal. (Renamed from current `suggestions` for clarity. Stays unstructured deliberately.) One convention (#253): a tip that probes one LO starts with ``For `lo_id`:``, so the question generator uses it only when that LO is the target; a tip without the prefix applies to every question of the subgoal (see `LO_AUTHORING_RUBRIC.md`).
 - `allowChains` — bool, default `false`. Enables follow-up chains up to depth 2 within this subgoal. Off by default — appropriate for procedural/foundational subgoals where chained dialogue is mostly noise. Set to `true` for conceptually rich subgoals (math, physics, edge-case reasoning) where deeper dialogue is pedagogically valuable. The flag *enables* chains; it doesn't force them. See conductor policy section 6.
 - `objectives` — ordered list of LOs (see below)
 

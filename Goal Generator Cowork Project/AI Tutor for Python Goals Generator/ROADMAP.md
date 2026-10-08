@@ -185,6 +185,18 @@ oefeningen toch buiten de lijntjes gaan, is dat het signaal dat de app zelf
 een voorkennislijst moet meesturen. Dat wordt pas gebouwd als de proef met
 doel 6 erom vraagt.
 
+### Een tip over één leerdoel noemt dat leerdoel (#253)
+
+De AI krijgt bij een oefening alle teachingTips van het subdoel, en moet
+alleen de tips gebruiken die bij het leerdoel van de oefening horen. Een tip
+die een valkuil van één leerdoel beschrijft, begint daarom met de id van dat
+leerdoel: "For `predict_index_error`: Lean on …". De twee vaste alinea's
+(Python, vakkennis en vraagvorm) en andere algemene tips krijgen geen
+voorvoegsel. Een tip vraagt nooit om de valkuilen van twee leerdoelen in één
+oefening te combineren. Zonder die afspraak stapelde de AI alle valkuilen
+van een subdoel in één vraag, ook op easy. Zie LO_AUTHORING_RUBRIC.md
+(checklist punt 16).
+
 ### Nog niet gezien na doel 6
 
 f-strings, `break`, `range` met een stap, stringmethodes,
