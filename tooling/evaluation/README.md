@@ -23,8 +23,10 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
 - **Een aanpassing is een beslissing van de leerkracht**, met een reden
   in `adjustmentNote`. Dat is het bestaande model van #99.
 - **Niets wordt geschreven zonder bespreking.** `draft`, `validate` en
-  `what-if` lezen alleen. `apply` maakt eerst een back-up, weigert als
-  de klas nu werkt, weigert zonder verantwoording, en gebruikt `If-Match`.
+  `what-if` lezen alleen. `apply` maakt eerst een back-up, weigert zonder
+  verantwoording, en gebruikt `If-Match`. Het mag tijdens de les: de
+  leerlingen-app opent `grade_proposals` nooit, dus een leerling die
+  oefent, raakt het voorstel niet.
   `replay-beliefs` leest alleen, behalve met `--apply`: dan eerst een
   back-up, niet in de lestijd, met `If-Match`, en alleen vier velden van
   `lo_beliefs` (#242).
@@ -450,8 +452,9 @@ hoogste niveau hoger, α/β anders, met de laatste build zoals in
 dan staat dat erbij: die build schrijft weer met de oude regels.
 
 `--apply` weigert in de lestijd van de klas (het lesrooster, 10 minuten
-marge) en als een leerling de laatste 10 minuten actief was, zoals
-`apply`; `--force` schrijft toch. Het maakt eerst een back-up van alle
+marge) en als een leerling de laatste 10 minuten actief was; `--force`
+schrijft toch. Anders dan `apply`: de app schrijft `lo_beliefs` terwijl
+een leerling oefent. Het maakt eerst een back-up van alle
 `lo_beliefs` en `grade_proposals` van de leerlingen waarvoor het schrijft
 (`~/ai-tutor-backups`), en schrijft elk document met `If-Match` op de
 etag waarmee het gepland werd. Schreef de app intussen, dan blijft dat

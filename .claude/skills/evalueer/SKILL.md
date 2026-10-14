@@ -41,8 +41,11 @@ welke volgorde, en wat je níet doet.
   leerling", "bij twee leerlingen", of een voorbeeldnaam die aan niemand
   gelinkt is; klasnamen (6WEWI) mogen. Het gesprek met de leerkracht en
   het concept mogen namen hebben: die zijn niet publiek.
-- **Niet tijdens een les.** `apply` weigert als leerlingen de laatste
-  minuten actief waren; probeer dat niet te omzeilen.
+- **Tijdens een les mag `apply`.** De leerlingen-app opent
+  `grade_proposals` nooit, dus schrijven terwijl de klas oefent, raakt
+  niets wat een leerling doet. `replay-beliefs --apply` weigert wel in
+  de lestijd, want de app schrijft `lo_beliefs` terwijl een leerling
+  oefent; probeer dat niet te omzeilen.
 - **Woorden, ook in het gesprek met de leerkracht.** Een turn uit
   `turn_history` is een *oefening*, nooit een beurt. Een directe vraag
   over een leerdoel is een *vraag*, niet een meting. Het hoogste niveau
@@ -288,7 +291,7 @@ python tooling/evaluation/evaluate.py apply ~/ai-tutor-evaluaties/<bestand>.json
 ```
 
 Het script maakt eerst een back-up van de bestaande voorstellen, weigert
-als de klas werkt of als een rapporttekst ontbreekt, waarschuwt als een
+als een rapporttekst ontbreekt, waarschuwt als een
 tekst een van de twee koppen mist, slaat al afgetekende voorstellen over,
 en meldt per leerling wat er geschreven is. Een `CONFLICT` betekent dat
 het doc intussen veranderde: meld het, schrijf niet opnieuw zonder overleg.

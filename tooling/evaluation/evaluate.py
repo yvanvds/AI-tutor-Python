@@ -31,8 +31,9 @@ were dropped, with why. To the terminal only; it writes no file.
 
 `apply` backs up the target `grade_proposals` docs first, then upserts one
 signed-off proposal per student that is not marked `skip`, guarded by
-`If-Match`. Publishing to students stays in the app: press "Vrijgeven" on
-the Reports page, which copies signed-off proposals only.
+`If-Match`. It may run during a lesson: the student app never opens
+`grade_proposals`. Publishing to students stays in the app: press
+"Vrijgeven" on the Reports page, which copies signed-off proposals only.
 """
 
 from __future__ import annotations
@@ -591,10 +592,9 @@ def cmd_apply(args) -> None:
     students = cosmos.accounts(data["klas"])
     by_uid = {a["uid"]: a for a in students}
 
-    busy = _lesson_in_progress(students)
-    if busy and not args.force:
-        sys.exit("Deze leerlingen waren de laatste minuten actief — de klas werkt. Wacht, of --force:\n  " + ", ".join(busy))
-
+    # No lesson guard, unlike `replay-beliefs`: the student app never opens
+    # `grade_proposals`, so a write in the lesson collides with nothing a
+    # student does, and a teacher editing the same proposal meets If-Match.
     todo = [s for s in data["students"] if not s.get("skip")]
     missing = [s["name"] for s in todo if not s.get("justification")]
     if missing and not args.force:

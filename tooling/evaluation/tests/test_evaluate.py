@@ -572,6 +572,21 @@ class ApplyTest(_CommandTest):
         self.assertIn("die velden blijven weg in plaats van 0", stdout)
         self.assertIn("Anna Peeters", stdout)
 
+    def test_it_writes_while_the_class_works(self):
+        # The student app never opens grade_proposals: a lesson in progress
+        # is no reason to wait, unlike for replay-beliefs.
+        _, json_path, _ = self.draft()
+        self.sign(json_path)
+        accounts = self.cosmos.accounts
+        self.cosmos.accounts = lambda klas: [
+            {**a, "updatedAt": "2026-09-24T11:55:00Z"} for a in accounts(klas)  # five minutes before NOW
+        ]
+
+        stdout = self.run_cli("apply", str(json_path))
+
+        self.assertEqual([d["id"] for d in self.written()], ["u-anna_ms-1"])
+        self.assertIn("geschreven 1, conflicten 0", stdout)
+
 
 class OffSubgoalDraftTest(_CommandTest):
     """#195: a warm-up or recheck asks about an LO of another subgoal; the
