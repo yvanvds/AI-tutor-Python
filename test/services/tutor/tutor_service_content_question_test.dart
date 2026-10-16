@@ -104,6 +104,7 @@ class _RecordingGenerator extends InstructionGenerator {
     Goal? subgoalOverride,
     Goal? goalOverride,
     bool quizOpen = false,
+    bool codeExerciseOpen = false,
   }) async {
     asked.add((type: type, override: subgoalOverride, goal: goalOverride));
     return 'system prompt';

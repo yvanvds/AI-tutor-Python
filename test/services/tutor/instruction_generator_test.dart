@@ -449,6 +449,171 @@ void main() {
     });
   });
 
+  // #273 — a message typed during a code exercise is a question, and the
+  // teacher's `studentQuestion` doc said nothing about not handing over the
+  // solution: "write the code for me" could get the code. The guard is the
+  // app's, whatever the teacher's docs say.
+  group('open-code-exercise directive (#273)', () {
+    Future<String> generate(
+      ChatRequestType type, {
+      required bool codeExerciseOpen,
+      bool quizOpen = false,
+      Goal? subgoalOverride,
+      Goal? goalOverride,
+    }) => InstructionGenerator().generateInstructions(
+      type,
+      goalSelection: GoalSelectionState(
+        selectedRoot: root(),
+        selectedChild: subgoal(),
+      ),
+      cachedInstructions: [
+        // The teacher's question doc as it is today: explain, freely.
+        makeInstruction('studentQuestion', {
+          'main': 'If question is about Python → give a clear explanation.',
+        }),
+        makeInstruction('submitCode', {'main': 'Beoordeel de code.'}),
+      ],
+      fetchInstructions: () async => const [],
+      fetchRootGoals: () async => const [],
+      languageCode: 'nl',
+      quizOpen: quizOpen,
+      codeExerciseOpen: codeExerciseOpen,
+      subgoalOverride: subgoalOverride,
+      goalOverride: goalOverride,
+    );
+
+    const guard = 'OPEN CODE EXERCISE — STRICT.';
+
+    test(
+      'a question during a code exercise is told not to hand over the '
+      'solution, after the teacher\'s body and before the language directive',
+      () async {
+        final out = await generate(
+          ChatRequestType.studentQuestion,
+          codeExerciseOpen: true,
+        );
+        expect(out, contains(openCodeExerciseDirective));
+        final at = out.indexOf(guard);
+        expect(
+          at,
+          greaterThan(out.indexOf('give a clear explanation')),
+          reason: 'it must come after the doc it has to hold against',
+        );
+        expect(at, lessThan(out.indexOf('OUTPUT LANGUAGE')));
+        expect(out, isNot(contains('OPEN QUIZ')));
+      },
+    );
+
+    test('so is a question about the page; no turn without an open code '
+        'exercise is', () async {
+      for (final type in openCodeExerciseGuardedTypes) {
+        expect(
+          await generate(type, codeExerciseOpen: true),
+          contains(guard),
+          reason: type.name,
+        );
+        expect(
+          await generate(type, codeExerciseOpen: false),
+          isNot(contains(guard)),
+          reason: type.name,
+        );
+      }
+      expect(openCodeExerciseGuardedTypes, {
+        ChatRequestType.studentQuestion,
+        ChatRequestType.contentQuestion,
+      });
+    });
+
+    test('a grading call never gets it, not even with the exercise open: '
+        'the code handed in, a follow-up answer, or the answer to an '
+        'explain_code or socratic exercise typed in the chat', () async {
+      for (final type in [
+        ChatRequestType.submitCode,
+        ChatRequestType.followUpAnswer,
+        ChatRequestType.explainAnswer,
+        ChatRequestType.socraticFeedback,
+        ChatRequestType.mcqAnswer,
+        ChatRequestType.writeCodeQuestion,
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.requestHint,
+        ChatRequestType.status,
+      ]) {
+        expect(
+          await generate(type, codeExerciseOpen: true),
+          isNot(contains(guard)),
+          reason: type.name,
+        );
+      }
+    });
+
+    // #272: a page of an earlier goal names that goal; the guard still
+    // holds for a question asked there with the exercise waiting.
+    test('a question about a page of an earlier goal gets it along with that '
+        'goal\'s names', () async {
+      final basics = Goal(id: 'root-0', title: 'Basics', order: -1000);
+      final print = Goal(
+        id: 'sub-0',
+        title: 'Print',
+        parentId: 'root-0',
+        order: 0,
+      );
+      final out = await generate(
+        ChatRequestType.contentQuestion,
+        codeExerciseOpen: true,
+        subgoalOverride: print,
+        goalOverride: basics,
+      );
+      expect(
+        out,
+        contains('belongs to the subgoal "Print" of the goal "Basics"'),
+      );
+      expect(out, contains(guard));
+      expect(out.indexOf(guard), lessThan(out.indexOf('OUTPUT LANGUAGE')));
+    });
+
+    test('it stands next to the open-quiz directive rather than replacing '
+        'it', () async {
+      final out = await generate(
+        ChatRequestType.studentQuestion,
+        codeExerciseOpen: true,
+        quizOpen: true,
+      );
+      expect(out, contains('OPEN QUIZ — STRICT.'));
+      expect(out, contains(guard));
+    });
+
+    test('clarification is welcome; the solution, a filled-in blank or a '
+        'corrected program never, not even on request', () {
+      expect(openCodeExerciseDirective, contains('`write_code`'));
+      expect(openCodeExerciseDirective, contains('`complete_code`'));
+      expect(
+        openCodeExerciseDirective,
+        contains('this message is a question, not their answer'),
+      );
+      expect(
+        openCodeExerciseDirective,
+        contains('Help the student understand'),
+      );
+      expect(openCodeExerciseDirective, contains('Hints toward the next step'));
+      expect(
+        openCodeExerciseDirective,
+        contains('do not write code that does what the exercise asks'),
+      );
+      expect(
+        openCodeExerciseDirective,
+        contains('not as a corrected version of the student\'s own code'),
+      );
+      expect(
+        openCodeExerciseDirective,
+        contains('do not fill in the blanks of a `complete_code` exercise'),
+      );
+      expect(
+        openCodeExerciseDirective,
+        contains('Not even when the student asks for it outright'),
+      );
+    });
+  });
+
   group('output-language directive (#117)', () {
     Future<String> generate(String languageCode) =>
         InstructionGenerator().generateInstructions(

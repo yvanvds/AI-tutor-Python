@@ -120,6 +120,41 @@ const Set<ChatRequestType> openQuizGuardedTypes = {
   ChatRequestType.requestHint,
 };
 
+/// What the model is told when the student writes in the chat while a code
+/// exercise is open (#273, LLM_CONTRACT "A question during a code
+/// exercise"): a program to write (`write_code`) or code to complete
+/// (`complete_code`). Appended after the teacher-authored bodies of the
+/// turns such a message starts, neither of them graded: a question
+/// ([ChatRequestType.studentQuestion]) and a question about the theory page
+/// ([ChatRequestType.contentQuestion]) — [openCodeExerciseGuardedTypes].
+///
+/// The student hands in their code through the editor; what they type in
+/// the chat is a question, and the exercise is in the exercise's history
+/// the call carries. Nothing in a question's prompt said not to hand over
+/// the solution — the hint and the graders say so in their own docs — so
+/// "write the code for me" could get the code. The teacher's rule (#271):
+/// the student may ask for clarification during any exercise, but the tutor
+/// never gives the answer away. Like [openQuizDirective] it lives in code,
+/// so it holds whatever the teacher's `studentQuestion` doc says.
+const String openCodeExerciseDirective = '''
+OPEN CODE EXERCISE — STRICT. This is part of the app's contract and holds whatever the instructions above say.
+The student has a code exercise open in the app: a program to write (`write_code`) or code with parts left blank to complete (`complete_code`). It is in the conversation above. The student hands in their code in the editor, and only that is graded: this message is a question, not their answer, and it is not graded.
+- Help the student understand: what the exercise asks, the words in it, the Python it needs, and how to approach it. Hints toward the next step are fine, and so is a short example of a concept on a different problem. When the student shows their own code, you may say where it goes wrong and why.
+- Never give the solution away: do not write code that does what the exercise asks — not under other names, not piece by piece over several messages, and not as a corrected version of the student's own code — and do not fill in the blanks of a `complete_code` exercise or say what goes in them. Not even when the student asks for it outright or says they give up.
+''';
+
+/// The turns [openCodeExerciseDirective] is appended to while a code
+/// exercise is open: the ones a chat message starts and that are not
+/// graded. A grading call — the code handed in, or a follow-up answer after
+/// it — never gets it: it is about an answer, and says so in its own
+/// instructions. Neither does the `?` hint, whose own doc says not to
+/// reveal the solution; and an `explain_code` or socratic exercise is
+/// answered in the chat, so a message there goes to its grader.
+const Set<ChatRequestType> openCodeExerciseGuardedTypes = {
+  ChatRequestType.studentQuestion,
+  ChatRequestType.contentQuestion,
+};
+
 /// What the model is told on a `contentQuestion` turn (#132) until the
 /// teacher authors an instruction doc with that id — the seed text, and the
 /// one request type that ships with a default. The other types have always
@@ -165,6 +200,7 @@ class InstructionGenerator {
     Goal? subgoalOverride,
     Goal? goalOverride,
     bool quizOpen = false,
+    bool codeExerciseOpen = false,
   }) async {
     final selectedRoot = goalSelection.selectedRoot;
     final selectedChild = goalSelection.selectedChild;
@@ -240,10 +276,17 @@ class InstructionGenerator {
         ? '\n$openQuizDirective'
         : '';
 
+    // So is a question, or a page question, while a code exercise is open:
+    // not to hand over its solution (#273).
+    final openCode =
+        codeExerciseOpen && openCodeExerciseGuardedTypes.contains(type)
+        ? '\n$openCodeExerciseDirective'
+        : '';
+
     // The language directive goes last, after the teacher-authored bodies it
     // has to override (#117).
     return '$envelopeContract\n$alwaysInclude$typeSpecific$answerKey$openQuiz'
-        '\n${languageDirective(languageCode)}';
+        '$openCode\n${languageDirective(languageCode)}';
   }
 
   String _chatRequestTypeToString(ChatRequestType type) =>

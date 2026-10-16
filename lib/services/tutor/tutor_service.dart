@@ -708,6 +708,9 @@ class TutorService extends Notifier<TutorState> {
         // A question asked next to an open quiz, or while it waits behind
         // the theory, must not give its answer away (#271).
         quizOpen: ref.read(activeMcqProvider) != null,
+        // Nor a question asked during a code exercise, or while it waits
+        // behind the theory, hand over its solution (#273).
+        codeExerciseOpen: _codeExerciseOpen,
       );
 
       final request = await _buildRequestInput(
@@ -1799,6 +1802,14 @@ class TutorService extends Notifier<TutorState> {
     return quiz != null && quiz.selected == null;
   }
 
+  /// Whether the exercise in flight is one the student answers with code
+  /// in the editor — a program to write or code to complete — on screen in
+  /// practice, or behind the theory view (#273). What they type in the chat
+  /// meanwhile is a question, never that answer (`handleStudentMessage`).
+  bool get _codeExerciseOpen =>
+      _currentExerciseType == 'write_code' ||
+      _currentExerciseType == 'complete_code';
+
   /// The quiz the student has open, as the tutor is told it with a question
   /// or a hint asked next to it (#271): its text and code, its options
   /// under the letters on screen, and the letter picked once there is one.
@@ -1855,8 +1866,10 @@ class TutorService extends Notifier<TutorState> {
     } else if (_currentExerciseType == 'explain_code') {
       await queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
     } else {
-      // A code exercise, or a quiz already answered — its answer was the
-      // pick (#271): a question.
+      // A code exercise — its answer is the code handed in through the
+      // editor, and the question is told not to give that away (#273) — or
+      // a quiz already answered, whose answer was the pick (#271): a
+      // question.
       await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
   }

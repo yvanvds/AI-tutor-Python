@@ -25,6 +25,7 @@ import 'flows/chat_collapse.dart' as chat_collapse;
 import 'flows/chat_composer_growth.dart' as chat_composer_growth;
 import 'flows/class_podium.dart' as class_podium;
 import 'flows/classes_tab.dart' as classes_tab;
+import 'flows/code_exercise_chat.dart' as code_exercise_chat;
 import 'flows/content_question.dart' as content_question;
 import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
@@ -147,6 +148,7 @@ void main() {
   quiz_verdict_colors.main();
   playground_during_mcq.main();
   quiz_chat.main();
+  code_exercise_chat.main();
   turtle_run_notice.main();
   puntenformule_tab.main();
   options_panel.main();

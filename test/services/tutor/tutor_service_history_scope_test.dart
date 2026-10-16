@@ -101,6 +101,7 @@ class _Generator extends InstructionGenerator {
     Goal? subgoalOverride,
     Goal? goalOverride,
     bool quizOpen = false,
+    bool codeExerciseOpen = false,
   }) async => 'system prompt';
 }
 

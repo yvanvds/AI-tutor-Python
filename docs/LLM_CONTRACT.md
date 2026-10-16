@@ -360,6 +360,47 @@ out), and an answered quiz leaves the practice view when the next exercise
 is asked for, also when the grade of a follow-up asks for it rather than
 "Volgende".
 
+### A question during a code exercise (#273)
+
+A code exercise — a program to write (`write_code`) or code to complete
+(`complete_code`) — is answered by the code the student hands in through
+the editor (`submit_code`). What they type in the chat meanwhile is a
+`student_question` (`TutorService.handleStudentMessage`, its last branch),
+or a `content_question` when the theory page is on screen (#132); a
+follow-up the grader asked is still answered as a `follow_up_answer`. The
+exercise is on the exercise's history the call carries, and the teacher's
+`studentQuestion` doc says to explain Python questions clearly — nothing in
+the prompt said not to give the solution away, so "write the code for me"
+could get the code. The hint and the graders say so in their own docs.
+
+System prompt: `openCodeExerciseDirective` (`instruction_generator.dart`),
+appended after the teacher-authored body (and after `openQuizDirective`,
+when that is there too) and before the output-language directive,
+whenever the exercise in flight is a `write_code` or `complete_code` one
+(`TutorService._codeExerciseOpen`, on screen in practice or behind the
+theory view), to the turns such a message starts — `studentQuestion` and
+`contentQuestion` (`openCodeExerciseGuardedTypes`); a content question
+about a page of an earlier goal (#272) gets it too, with that goal in
+`{goal}`. It says the message is a question and is not graded — the code
+handed in through the editor is — that the model may clarify what the
+exercise asks, its words, the Python it needs and how to approach it, with
+hints toward the next step and a short example of a concept on a different
+problem, and may say where the student's own code goes wrong; and that it
+never writes code that does what the exercise asks — not under other
+names, not piece by piece, not as a corrected version of the student's
+code — nor fills in or names the blanks of a `complete_code` exercise, not
+even when the student asks outright or gives up. Like the open-quiz
+directive it lives in code, so it holds whatever the teacher's
+`studentQuestion` doc says.
+
+Not affected: a grading call never gets it (`submit_code`,
+`follow_up_answer`, and the answer to an `explain_code` or socratic
+exercise, which is what the student types in the chat there:
+`explain_answer`, `socratic_feedback`), nor does the `?` hint
+(`request_hint`, whose own doc says not to reveal the solution). Inputs
+and output are unchanged: the plain `answer` envelope, no `turn_history`
+record, no belief, calibration or XP change.
+
 ### Output language (#117)
 
 Both calls end with a fixed output-language directive, appended by
