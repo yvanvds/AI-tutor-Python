@@ -685,8 +685,11 @@ class TutorService extends Notifier<TutorState> {
       // the in-flight one is the warm-up or recheck then. A content
       // question (#132) is about the page on screen, which is an older
       // subgoal's when the student paged back.
-      final subgoalOverride = type == ChatRequestType.contentQuestion
+      final page = type == ChatRequestType.contentQuestion
           ? await _pageSubgoal(selection)
+          : null;
+      final subgoalOverride = type == ChatRequestType.contentQuestion
+          ? page?.subgoal
           : (plan ?? _inFlightPlan)?.offSubgoal;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
@@ -701,6 +704,7 @@ class TutorService extends Notifier<TutorState> {
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
         subgoalOverride: subgoalOverride,
+        goalOverride: page?.goal,
         // A question asked next to an open quiz, or while it waits behind
         // the theory, must not give its answer away (#271).
         quizOpen: ref.read(activeMcqProvider) != null,
@@ -1762,13 +1766,30 @@ class TutorService extends Notifier<TutorState> {
   /// `{teachingTips}` in the prompt should describe the page they are
   /// asking about — as they describe the older subgoal of a warm-up review
   /// (#102). `null` when the page is the active subgoal's own.
-  Future<Goal?> _pageSubgoal(GoalSelectionState selection) async {
+  ///
+  /// A page of an earlier goal (#272) comes with that goal, so `{goal}`
+  /// names the goal the page belongs to; [goal] is `null` for a page of the
+  /// active root.
+  Future<({Goal subgoal, Goal? goal})?> _pageSubgoal(
+    GoalSelectionState selection,
+  ) async {
     final id = ref.read(viewedContentIdProvider);
     final root = selection.activeRootGoal;
     if (id == null || root == null) return null;
     if (selection.activeChildGoal?.contentId == id) return null;
-    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
-    return subs.firstWhereOrNull((g) => g.contentId == id);
+    final goals = ref.read(goalsServiceProvider);
+    final subs = await goals.getChildrenOnce(root.id);
+    final sibling = subs.firstWhereOrNull((g) => g.contentId == id);
+    if (sibling != null) return (subgoal: sibling, goal: null);
+    final all = await goals.getAllGoalsOnce();
+    final earlier = all.firstWhereOrNull(
+      (g) => g.parentId != null && g.contentId == id,
+    );
+    if (earlier == null) return null;
+    return (
+      subgoal: earlier,
+      goal: all.firstWhereOrNull((g) => g.id == earlier.parentId),
+    );
   }
 
   /// Whether the quiz in practice still waits for the student's pick —

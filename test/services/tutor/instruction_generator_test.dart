@@ -116,19 +116,23 @@ void main() {
   });
 
   group('content question (#132)', () {
-    Future<String> generate(List<Instruction> docs, {Goal? override}) =>
-        InstructionGenerator().generateInstructions(
-          ChatRequestType.contentQuestion,
-          goalSelection: GoalSelectionState(
-            selectedRoot: root(),
-            selectedChild: subgoal(),
-          ),
-          cachedInstructions: docs,
-          fetchInstructions: () async => const [],
-          fetchRootGoals: () async => const [],
-          languageCode: 'nl',
-          subgoalOverride: override,
-        );
+    Future<String> generate(
+      List<Instruction> docs, {
+      Goal? override,
+      Goal? goal,
+    }) => InstructionGenerator().generateInstructions(
+      ChatRequestType.contentQuestion,
+      goalSelection: GoalSelectionState(
+        selectedRoot: root(),
+        selectedChild: subgoal(),
+      ),
+      cachedInstructions: docs,
+      fetchInstructions: () async => const [],
+      fetchRootGoals: () async => const [],
+      languageCode: 'nl',
+      subgoalOverride: override,
+      goalOverride: goal,
+    );
 
     test('a teacher-authored contentQuestion doc is the body, with its tags '
         'filled in', () async {
@@ -196,6 +200,36 @@ void main() {
       ], override: older);
       expect(authored, contains('page of Print; tips: Tip P'));
       expect(authored, isNot(contains('Loops')));
+    });
+
+    // #272: the theory view pages back into earlier goals, so the page can
+    // belong to another goal than the active one.
+    test('the page of an earlier goal: {goal} is that goal, in the built-in '
+        'body and in the always-include section', () async {
+      final basics = Goal(id: 'root-0', title: 'Basics', order: -1000);
+      final print = Goal(
+        id: 'sub-0',
+        title: 'Print',
+        parentId: 'root-0',
+        order: 0,
+        teachingTips: const ['Tip P'],
+      );
+      final out = await generate(
+        [
+          makeInstruction('alwaysInclude', {
+            'main': 'always: {goal} / {subgoal}',
+          }),
+        ],
+        override: print,
+        goal: basics,
+      );
+      expect(
+        out,
+        contains('belongs to the subgoal "Print" of the goal "Basics"'),
+      );
+      expect(out, contains('always: Basics / Print'));
+      expect(out, isNot(contains('Iteration')));
+      expect(out, isNot(contains('Loops')));
     });
 
     test('no other request type picks up a built-in body', () async {

@@ -163,6 +163,7 @@ class InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    Goal? goalOverride,
     bool quizOpen = false,
   }) async {
     final selectedRoot = goalSelection.selectedRoot;
@@ -177,7 +178,10 @@ class InstructionGenerator {
 
     String alwaysInclude = '';
     String typeSpecific = '';
-    final root = goalSelection.preferredRoot ?? selectedRoot;
+    // A content question about a page of an earlier goal (#272): `{goal}`
+    // is that page's goal, the one its `{subgoal}` belongs to.
+    final root = goalOverride ?? goalSelection.preferredRoot ?? selectedRoot;
+    final alwaysIncludeRoot = goalOverride ?? selectedRoot;
     // A warm-up review question (#102) is about an older subgoal of the same
     // root: `{subgoal}` and `{teachingTips}` then describe that one, so the
     // model writes and grades the question in its proper context.
@@ -200,7 +204,7 @@ class InstructionGenerator {
         for (final content in instruction.sections.entries) {
           final processed = _replaceTags(
             content.value,
-            selectedRoot,
+            alwaysIncludeRoot,
             alwaysIncludeSubgoal,
             targetLOs: targetLOs,
             goalScopeLOs: goalScopeLOs,

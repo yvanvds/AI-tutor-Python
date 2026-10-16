@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/goal/curriculum_order.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -78,15 +79,11 @@ class _LeerpadBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressById = {for (final p in progress) p.goalID: p};
-    final roots = goals.where((g) => g.parentId == null).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
-    final childrenByParent = <String, List<Goal>>{};
-    for (final g in goals.where((g) => g.parentId != null)) {
-      childrenByParent.putIfAbsent(g.parentId!, () => []).add(g);
-    }
-    for (final list in childrenByParent.values) {
-      list.sort((a, b) => a.order.compareTo(b.order));
-    }
+    // The theory view pages back through earlier goals in this same order
+    // (#272).
+    final curriculum = CurriculumOrder(goals);
+    final roots = curriculum.roots;
+    final childrenByParent = curriculum.childrenByParent;
 
     final activeRootId = _resolveActiveRoot(
       ref: ref,

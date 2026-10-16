@@ -321,9 +321,8 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('the first lesson of the root has nothing to page back to', (
-      tester,
-    ) async {
+    testWidgets('the first lesson of the first goal has nothing to page back '
+        'to', (tester) async {
       final first = Goal(
         id: 's1',
         title: 'Print',
@@ -596,6 +595,225 @@ void main() {
 
       expect(find.byType(LessonHtmlView), findsNothing);
       expect(container.read(viewedContentIdProvider), isNull);
+
+      await unmount(tester);
+    });
+  });
+
+  // #272: Previous used to stop at the first lesson of the active goal, so a
+  // student on goal 5 could not look up how goal 2 explained something.
+  // Now it goes on to the last lesson of the goal before it, and so on back
+  // through every earlier goal in the Leerpad's order — started or not, a
+  // goal without lessons skipped — and Next walks forward again. Still
+  // view-local; the header and the chat belong to the page on screen.
+  group('earlier goals', () {
+    /// Basics (r1, above) — Setup (no lessons) — Strings, where the student
+    /// is on "Methods" — Advanced, after it. By title "Advanced" would come
+    /// first; the Leerpad goes by `order`.
+    final strings = Goal(id: 'r2', title: 'Strings', order: 2000);
+    final methods = Goal(
+      id: 't2',
+      title: 'Methods',
+      parentId: 'r2',
+      order: 2000,
+      contentId: 'd2',
+    );
+
+    setUp(() {
+      for (final doc in [
+        _goalDoc(id: 'rx', title: 'Setup', order: 1500),
+        _goalDoc(id: 'x1', title: 'Install', parentId: 'rx', order: 1000),
+        _goalDoc(id: 'r2', title: 'Strings', order: 2000),
+        _goalDoc(
+          id: 't1',
+          title: 'Slicing',
+          parentId: 'r2',
+          order: 1000,
+          contentId: 'd1',
+        ),
+        _goalDoc(
+          id: 't2',
+          title: 'Methods',
+          parentId: 'r2',
+          order: 2000,
+          contentId: 'd2',
+        ),
+        _goalDoc(id: 'r3', title: 'Advanced', order: 3000),
+        _goalDoc(
+          id: 'a1',
+          title: 'Classes',
+          parentId: 'r3',
+          order: 1000,
+          contentId: 'e1',
+        ),
+      ]) {
+        goals.docs[doc['id'] as String] = doc;
+      }
+      for (final doc in [
+        _contentDoc('d1', '<p>lesson-slicing</p>'),
+        _contentDoc('d2', '<p>lesson-methods</p>'),
+        _contentDoc('e1', '<p>lesson-classes</p>'),
+        _contentDoc('x1', '<p>lesson-install</p>'),
+      ]) {
+        content.docs[doc['id'] as String] = doc;
+      }
+    });
+
+    Future<void> mountOnMethods(WidgetTester tester) =>
+        mount(tester, child: methods, rootGoal: strings);
+
+    Future<void> previous(WidgetTester tester) async {
+      await tester.tap(find.text('Previous'));
+      await settlePage(tester);
+    }
+
+    Future<void> next(WidgetTester tester) async {
+      await tester.tap(find.text('Next'));
+      await settlePage(tester);
+    }
+
+    /// The page on screen: its lesson, and the header's goal and counter.
+    void expectPage(String lesson, String goal, String counter) {
+      expect(shownLesson(), contains(lesson));
+      expect(find.text(goal), findsOneWidget);
+      expect(find.text(counter), findsOneWidget);
+    }
+
+    ProviderContainer containerOf(WidgetTester tester) =>
+        ProviderScope.containerOf(tester.element(find.byType(ExplainView)));
+
+    testWidgets('Previous on the first lesson of a goal goes on to the last '
+        'lesson of the goal before it, past a goal without lessons, back to '
+        'the first lesson of the first goal', (tester) async {
+      await mountOnMethods(tester);
+      expectPage('lesson-methods', 'STRINGS', '2 / 2');
+
+      await previous(tester);
+      expectPage('lesson-slicing', 'STRINGS', '1 / 2');
+      expect(enabled(tester, 'Previous'), isTrue);
+
+      // "Setup" has no lessons; the goal before it is "Basics".
+      await previous(tester);
+      expectPage('lesson-four', 'BASICS', '4 / 4');
+      expect(find.text('STRINGS'), findsNothing);
+
+      await previous(tester);
+      expectPage('lesson-three', 'BASICS', '3 / 4');
+
+      // "Side quest" is optional, so the page before "Variables" is "Print".
+      await previous(tester);
+      expectPage('lesson-one', 'BASICS', '1 / 4');
+      expect(enabled(tester, 'Previous'), isFalse);
+      expect(find.text('Next'), findsOneWidget);
+
+      // Nothing before the first goal: "Advanced" comes after "Strings".
+      await previous(tester);
+      expectPage('lesson-one', 'BASICS', '1 / 4');
+
+      await unmount(tester);
+    });
+
+    testWidgets('Next walks forward across goals back to the newest page, '
+        'where the XP caption is back and Next is gone', (tester) async {
+      await mountOnMethods(tester);
+      for (var i = 0; i < 4; i++) {
+        await previous(tester);
+      }
+      expectPage('lesson-one', 'BASICS', '1 / 4');
+      expect(find.textContaining('XP on completion'), findsNothing);
+
+      await next(tester);
+      expectPage('lesson-three', 'BASICS', '3 / 4');
+      await next(tester);
+      expectPage('lesson-four', 'BASICS', '4 / 4');
+      await next(tester);
+      expectPage('lesson-slicing', 'STRINGS', '1 / 2');
+      expect(find.textContaining('XP on completion'), findsNothing);
+
+      await next(tester);
+      expectPage('lesson-methods', 'STRINGS', '2 / 2');
+      expect(find.text('Next'), findsNothing);
+      expect(find.text('+100 XP on completion'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    testWidgets('paging into an earlier goal moves neither the goal nor the '
+        'subgoal the tutor works against, and publishes the page on '
+        'screen', (tester) async {
+      await mountOnMethods(tester);
+      final container = containerOf(tester);
+      ({String? root, String? child}) target() {
+        final s = container.read(goalSelectionProvider);
+        return (root: s.activeRootGoal?.id, child: s.activeChildGoal?.id);
+      }
+
+      expect(container.read(viewedContentIdProvider), 'd2');
+
+      await previous(tester);
+      await previous(tester);
+      expectPage('lesson-four', 'BASICS', '4 / 4');
+      expect(target(), (root: 'r2', child: 't2'));
+      expect(container.read(viewedContentIdProvider), 'c4');
+
+      await next(tester);
+      await next(tester);
+      expect(target(), (root: 'r2', child: 't2'));
+      expect(container.read(viewedContentIdProvider), 'd2');
+      // Paging is not a rebuild of the WebView.
+      expect(webviews.widgetsCreated, 1);
+      expect(webviews.widgetBuilds, 1);
+
+      await unmount(tester);
+    });
+
+    testWidgets('an unchanged poll of every goal does not rebuild the view; '
+        'a lesson added to an earlier goal lands', (tester) async {
+      await mountOnMethods(tester);
+      final before = tester.widget<LessonHtmlView>(find.byType(LessonHtmlView));
+
+      await tester.pump(kCosmosPollInterval);
+      await tester.pump();
+      await tester.pump(kCosmosPollInterval);
+      await tester.pump();
+      expect(
+        tester.widget<LessonHtmlView>(find.byType(LessonHtmlView)),
+        same(before),
+        reason: 'a poll with the same curriculum rebuilt the explain view',
+      );
+      expect(webviews.widgetBuilds, 1);
+
+      // The teacher writes a lesson for "Setup"'s only subgoal.
+      goals.docs['x1']!['contentId'] = 'x1';
+      await tester.pump(kCosmosPollInterval);
+      await tester.pump();
+      expect(webviews.widgetBuilds, 1);
+
+      await previous(tester);
+      expectPage('lesson-slicing', 'STRINGS', '1 / 2');
+      await previous(tester);
+      expectPage('lesson-install', 'SETUP', '1 / 1');
+      await previous(tester);
+      expectPage('lesson-four', 'BASICS', '4 / 4');
+
+      await unmount(tester);
+    });
+
+    testWidgets('a page of an earlier goal that leaves the curriculum falls '
+        'back to the newest page', (tester) async {
+      await mountOnMethods(tester);
+      await previous(tester);
+      await previous(tester);
+      expectPage('lesson-four', 'BASICS', '4 / 4');
+
+      // The teacher unlinks the lesson the student is reading.
+      goals.docs['s4']!['contentId'] = null;
+      await tester.pump(kCosmosPollInterval);
+      await settlePage(tester);
+
+      expectPage('lesson-methods', 'STRINGS', '2 / 2');
+      expect(find.text('Next'), findsNothing);
+      expect(containerOf(tester).read(viewedContentIdProvider), 'd2');
 
       await unmount(tester);
     });

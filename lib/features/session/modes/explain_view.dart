@@ -5,6 +5,7 @@ import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
+import 'package:ai_tutor_python/services/goal/curriculum_order.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
@@ -26,9 +27,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// The footer pages back and forth through the theory the student has
 /// already seen (#115): the earlier non-optional sibling subgoals that carry
-/// a `content` doc. Which page is shown is **view-local** state — paging
-/// never touches `goalSelectionProvider`, so the tutor keeps working against
-/// the same subgoal while the student re-reads an older explanation.
+/// a `content` doc, and before those the same pages of every earlier goal,
+/// in the Leerpad's order (#272). Which page is shown is **view-local**
+/// state — paging never touches `goalSelectionProvider`, so the tutor keeps
+/// working against the same subgoal while the student re-reads an older
+/// explanation. The header belongs to the page on screen: its own goal's
+/// title, and its place among that goal's subgoals.
 ///
 /// What the view shows is published to `viewedContentIdProvider` (#132), so
 /// a question typed in the chat can be about the page on screen — the one
@@ -45,11 +49,15 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
   /// newest page, i.e. the active subgoal itself.
   String? _viewingId;
 
-  /// Siblings of the active root, kept in a subscription rather than a
-  /// `StreamBuilder` so paging (a `setState`) doesn't resubscribe the poll
-  /// and blank the footer for a frame.
-  List<Goal> _siblings = const [];
-  String? _siblingsRootId;
+  /// The active root the view last saw. Another one puts the student back
+  /// on the newest page.
+  String? _rootId;
+
+  /// Every goal, in the Leerpad's order (#272) — one poll for all of them,
+  /// not one per root. Kept in a subscription rather than a `StreamBuilder`
+  /// so paging (a `setState`) doesn't resubscribe the poll and blank the
+  /// footer for a frame. `null` until the first poll is back.
+  CurriculumOrder? _curriculum;
   StreamSubscription<List<Goal>>? _sub;
 
   /// Where the page on screen is published (#132). Held from `initState`
@@ -65,7 +73,15 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
   void initState() {
     super.initState();
     _viewed = ref.read(viewedContentIdProvider.notifier);
-    _watchSiblings(ref.read(goalSelectionProvider).activeRootGoal?.id);
+    _rootId = ref.read(goalSelectionProvider).activeRootGoal?.id;
+    _sub = ref.read(goalsServiceProvider).streamAllGoals().listen((goals) {
+      // The poll emits every 5 s whether or not anything changed; only a
+      // real change is worth a rebuild of the whole view (#128).
+      final next = CurriculumOrder(goals);
+      if (mounted && !_sameCurriculum(_curriculum, next)) {
+        setState(() => _curriculum = next);
+      }
+    });
   }
 
   @override
@@ -89,49 +105,56 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
     });
   }
 
-  void _watchSiblings(String? rootId) {
-    if (rootId == _siblingsRootId) return;
-    _siblingsRootId = rootId;
-    _viewingId = null;
-    _siblings = const [];
-    _sub?.cancel();
-    _sub = null;
-    if (rootId == null) return;
-    _sub = ref.read(goalsServiceProvider).streamChildren(rootId).listen((list) {
-      // The poll emits every 5 s whether or not anything changed; only a
-      // real change is worth a rebuild of the whole view (#128).
-      if (mounted && !_sameSiblings(_siblings, list)) {
-        setState(() => _siblings = list);
-      }
-    });
-  }
-
-  /// Whether two sibling lists agree on everything this view reads from
-  /// them: the ids and their order (the header counter, [_seenPages]),
-  /// `optional` and `contentId` (which pages count as seen theory). `Goal`
-  /// has no value equality, so a fresh poll always hands back new
-  /// instances; comparing the projection is what tells "same curriculum"
-  /// from "the teacher changed something".
-  static bool _sameSiblings(List<Goal> a, List<Goal> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id ||
-          a[i].optional != b[i].optional ||
-          a[i].contentId != b[i].contentId) {
-        return false;
+  /// Whether two polls agree on everything this view reads from them: the
+  /// roots, their order and titles (the header pill of a page of an
+  /// earlier goal), and per root its subgoals' ids and order (the header
+  /// counter, [_seenPages]), `optional` and `contentId` (which pages count
+  /// as seen theory). `Goal` has no value equality, so a fresh poll always
+  /// hands back new instances; comparing the projection is what tells "same
+  /// curriculum" from "the teacher changed something".
+  static bool _sameCurriculum(CurriculumOrder? a, CurriculumOrder b) {
+    if (a == null || a.roots.length != b.roots.length) return false;
+    for (var i = 0; i < a.roots.length; i++) {
+      final ra = a.roots[i];
+      final rb = b.roots[i];
+      if (ra.id != rb.id || ra.title != rb.title) return false;
+      final ca = a.childrenOf(ra.id);
+      final cb = b.childrenOf(rb.id);
+      if (ca.length != cb.length) return false;
+      for (var j = 0; j < ca.length; j++) {
+        if (ca[j].id != cb[j].id ||
+            ca[j].optional != cb[j].optional ||
+            ca[j].contentId != cb[j].contentId) {
+          return false;
+        }
       }
     }
     return true;
   }
 
-  /// The theory pages before [active] that the student has already seen:
-  /// non-optional siblings carrying a `content` doc.
-  List<Goal> _seenPages(Goal active) {
-    final activeIdx = _siblings.indexWhere((g) => g.id == active.id);
-    if (activeIdx <= 0) return const [];
+  /// Whether [g] is a theory page the footer pages through: a non-optional
+  /// subgoal carrying a `content` doc.
+  static bool _isPage(Goal g) =>
+      !g.optional && (g.contentId?.isNotEmpty ?? false);
+
+  /// The theory pages before [active] that the student has already seen,
+  /// oldest first: the pages of every goal before [rootId] in the Leerpad's
+  /// order (#272), then those of [active]'s siblings before it. A goal
+  /// without any adds none. Nothing while [active] has no place in the
+  /// curriculum yet (the first poll is not back) or any more (the teacher
+  /// moved it).
+  List<Goal> _seenPages(Goal active, String? rootId) {
+    final curriculum = _curriculum;
+    if (curriculum == null || rootId == null) return const [];
+    final rootAt = curriculum.roots.indexWhere((r) => r.id == rootId);
+    if (rootAt < 0) return const [];
+    final siblings = curriculum.childrenOf(rootId);
+    final activeAt = siblings.indexWhere((g) => g.id == active.id);
+    if (activeAt < 0) return const [];
     return [
-      for (final g in _siblings.take(activeIdx))
-        if (!g.optional && (g.contentId?.isNotEmpty ?? false)) g,
+      for (final earlier in curriculum.roots.take(rootAt))
+        ...curriculum.childrenOf(earlier.id).where(_isPage),
+      ...siblings.take(activeAt).where(_isPage),
     ];
   }
 
@@ -139,7 +162,10 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
   Widget build(BuildContext context) {
     final selection = ref.watch(goalSelectionProvider);
     ref.listen(goalSelectionProvider, (_, next) {
-      _watchSiblings(next.activeRootGoal?.id);
+      final rootId = next.activeRootGoal?.id;
+      if (rootId == _rootId) return;
+      _rootId = rootId;
+      _viewingId = null;
     });
     final active = selection.activeChildGoal;
     final root = selection.activeRootGoal;
@@ -152,13 +178,21 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
       );
     }
 
-    final seen = _seenPages(active);
+    final seen = _seenPages(active, root?.id);
     // Where the student is: -1 is the newest page (the active subgoal). A
     // page that has since vanished from the curriculum falls back to it.
     final at = _viewingId == null
         ? -1
         : seen.indexWhere((g) => g.id == _viewingId);
     final viewing = at < 0 ? active : seen[at];
+    // The header belongs to the page on screen: a page of an earlier goal
+    // shows that goal and its place there, not "goal 5 · 3 / 7" (#272).
+    final viewingRoot = at < 0
+        ? root
+        : _curriculum?.roots.where((r) => r.id == viewing.parentId).firstOrNull;
+    final viewingSiblings = viewingRoot == null
+        ? const <Goal>[]
+        : (_curriculum?.childrenOf(viewingRoot.id) ?? const <Goal>[]);
 
     // Previous: one page back, or the last seen page when on the newest one.
     final Goal? previous = at < 0
@@ -178,7 +212,11 @@ class _ExplainViewState extends ConsumerState<ExplainView> {
       color: AppColors.ink0,
       child: Column(
         children: [
-          _ChromeHeader(child: viewing, root: root, siblings: _siblings),
+          _ChromeHeader(
+            child: viewing,
+            root: viewingRoot,
+            siblings: viewingSiblings,
+          ),
           Expanded(
             child: hasPage
                 ? _ContentWebView(contentId: viewing.contentId!)

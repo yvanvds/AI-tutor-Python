@@ -86,9 +86,10 @@ class _RecordingConnector extends OpenaiConnector {
   Stream<StreamChunk> resendRequestStream() => _next();
 }
 
-/// Records the type and the subgoal override of every prompt asked for.
+/// Records the type and the subgoal and goal overrides of every prompt
+/// asked for.
 class _RecordingGenerator extends InstructionGenerator {
-  final List<({ChatRequestType type, Goal? override})> asked = [];
+  final List<({ChatRequestType type, Goal? override, Goal? goal})> asked = [];
 
   @override
   Future<String> generateInstructions(
@@ -101,9 +102,10 @@ class _RecordingGenerator extends InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    Goal? goalOverride,
     bool quizOpen = false,
   }) async {
-    asked.add((type: type, override: subgoalOverride));
+    asked.add((type: type, override: subgoalOverride, goal: goalOverride));
     return 'system prompt';
   }
 }
@@ -269,6 +271,11 @@ void main() {
               body: '<p>Welkom bij Python.</p>',
             ),
             _print,
+            Content(
+              id: 'x1',
+              title: 'Install',
+              body: '<p>Installeer Python.</p>',
+            ),
           ]),
         ),
         soundServiceProvider.overrideWithValue(sound),
@@ -429,7 +436,47 @@ void main() {
     expect(sent['content'], 'Welkom bij Python.');
     expect(generator.asked.last.type, ChatRequestType.contentQuestion);
     expect(generator.asked.last.override?.id, 's0');
+    expect(
+      generator.asked.last.goal,
+      isNull,
+      reason: 'the page belongs to the active goal',
+    );
     // And the socratic question is still the one in flight.
+    expect(tutor().hasInFlightExercise(), isTrue);
+  });
+
+  // #272: the theory view pages back into the lessons of earlier goals, so
+  // the page on screen can belong to another goal than the active one. The
+  // prompt is written for that page's subgoal and for its goal.
+  test('a page of an earlier goal is sent, and the prompt is written for '
+      'its subgoal and that goal', () async {
+    final setup = Goal(id: 'r0', title: 'Setup', order: -1000);
+    final install = Goal(
+      id: 'x1',
+      title: 'Install',
+      parentId: 'r0',
+      order: 1000,
+      contentId: 'x1',
+    );
+    when(() => goals.getAllGoalsOnce())
+        .thenAnswer((_) async => [root, older, active, setup, install]);
+    await askSocratic();
+    showPage('x1');
+    connector.scripts.add(_answer('Zo installeer je Python.'));
+
+    await tutor().handleStudentMessage('Welke versie?');
+
+    final sent = request(1);
+    expect(sent['request_type'], 'content_question');
+    expect(sent['content_title'], 'Install');
+    expect(sent['content'], 'Installeer Python.');
+    expect(generator.asked.last.type, ChatRequestType.contentQuestion);
+    expect(generator.asked.last.override?.id, 'x1');
+    expect(generator.asked.last.goal?.id, 'r0');
+    // The tutor never moved, and the socratic question is still in flight.
+    final selection = pc.read(goalSelectionProvider);
+    expect(selection.activeRootGoal?.id, 'r1');
+    expect(selection.activeChildGoal?.id, 's1');
     expect(tutor().hasInFlightExercise(), isTrue);
   });
 

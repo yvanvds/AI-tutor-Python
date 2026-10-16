@@ -290,7 +290,9 @@ Inputs (`request_type: content_question`, built by
   teacher has authored one, else the built-in default
   (`defaultContentQuestionInstruction`), plus `alwaysInclude`; `{goal}`,
   `{subgoal}` and `{teachingTips}` describe the subgoal whose page is on
-  screen, as they describe the older subgoal of a warm-up review.
+  screen, as they describe the older subgoal of a warm-up review — and
+  `{goal}` its own goal when the student paged back into an earlier goal
+  (#272).
 
 Output: the plain `answer` envelope — TEXT is the answer, META is
 `{"type": "answer"}`. No `overallQuality`, no `loSignals`, no

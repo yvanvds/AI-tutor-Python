@@ -132,6 +132,7 @@ class _FakeInstructionGenerator extends InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    Goal? goalOverride,
     bool quizOpen = false,
   }) async => 'system prompt';
 }
