@@ -685,8 +685,11 @@ class TutorService extends Notifier<TutorState> {
       // the in-flight one is the warm-up or recheck then. A content
       // question (#132) is about the page on screen, which is an older
       // subgoal's when the student paged back.
-      final subgoalOverride = type == ChatRequestType.contentQuestion
+      final page = type == ChatRequestType.contentQuestion
           ? await _pageSubgoal(selection)
+          : null;
+      final subgoalOverride = type == ChatRequestType.contentQuestion
+          ? page?.subgoal
           : (plan ?? _inFlightPlan)?.offSubgoal;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
@@ -701,6 +704,13 @@ class TutorService extends Notifier<TutorState> {
         targetLOs: plan?.targetLOs ?? const [],
         goalScopeLOs: await _buildGoalScopeLOs(selection),
         subgoalOverride: subgoalOverride,
+        goalOverride: page?.goal,
+        // A question asked next to an open quiz, or while it waits behind
+        // the theory, must not give its answer away (#271).
+        quizOpen: ref.read(activeMcqProvider) != null,
+        // Nor a question asked during a code exercise, or while it waits
+        // behind the theory, hand over its solution (#273).
+        codeExerciseOpen: _codeExerciseOpen,
       );
 
       final request = await _buildRequestInput(
@@ -819,11 +829,9 @@ class TutorService extends Notifier<TutorState> {
       case ChatRequestType.submitCode:
         _answerInFlight = TurnContentAnswer(code: code);
       case ChatRequestType.mcqAnswer:
-        // A pick on the quiz, or text typed in the chat about it.
-        final picked = ref.read(activeMcqProvider)?.selected;
-        _answerInFlight = picked != null && picked == prompt
-            ? TurnContentAnswer(picked: prompt)
-            : TurnContentAnswer(text: prompt);
+        // Only ever the pick on the quiz: text typed in the chat while it
+        // is open is a question, never its answer (#271).
+        _answerInFlight = TurnContentAnswer(picked: prompt);
       case ChatRequestType.explainAnswer ||
           ChatRequestType.socraticFeedback ||
           ChatRequestType.followUpAnswer:
@@ -906,11 +914,25 @@ class TutorService extends Notifier<TutorState> {
 
       case ChatRequestType.requestHint:
         if (code == null) return null;
-        return _RequestInput(QuestionFormatter.requestHint(code));
+        final quiz = _openQuizFields();
+        return _RequestInput(
+          QuestionFormatter.requestHint(
+            // With a quiz open the editor is not the exercise: what it holds
+            // is left from the one before.
+            quiz == null ? code : '',
+            openQuiz: quiz,
+          ),
+        );
 
       case ChatRequestType.studentQuestion:
         if (prompt == null) return null;
-        return _RequestInput(QuestionFormatter.studentQuestion(prompt, code));
+        return _RequestInput(
+          QuestionFormatter.studentQuestion(
+            prompt,
+            code,
+            openQuiz: _openQuizFields(),
+          ),
+        );
 
       case ChatRequestType.contentQuestion:
         if (prompt == null) return null;
@@ -1567,6 +1589,16 @@ class TutorService extends Notifier<TutorState> {
   void _trackedSetExerciseType(String type) {
     final from = _currentExerciseType;
     _currentExerciseType = type;
+    // A quiz the student has picked on is done once the next question is
+    // in. "Volgende" clears it itself, and a next quiz takes its place; but
+    // the grade of a follow-up answered in the chat next to it (#271) asks
+    // for the next exercise without that click, and a code question must
+    // not arrive behind the old quiz — nor "Volgende" then ask for yet
+    // another one. A quiz still waiting for its pick is left alone.
+    if (type != 'multiple_choice' &&
+        ref.read(activeMcqProvider)?.selected != null) {
+      ref.read(activeMcqProvider.notifier).state = null;
+    }
     _currentExerciseGoalId = ref
         .read(goalSelectionProvider)
         .activeChildGoal
@@ -1605,9 +1637,15 @@ class TutorService extends Notifier<TutorState> {
   /// Records the student's MCQ pick and asks the tutor to grade it — or,
   /// for a bank question whose feedback on that pick is stored, grades it
   /// on the spot from the answer key (#186).
+  ///
+  /// Not while the tutor is busy — answering a question typed next to the
+  /// quiz, now that the chat stays open with one (#271): the grading call
+  /// would not go out, and the pick would hang on screen ungraded. The quiz
+  /// takes no pick until the tutor is done.
   Future<void> submitMcqAnswer(String picked) async {
     final current = ref.read(activeMcqProvider);
     if (current == null || current.selected != null) return;
+    if (state != TutorState.idle) return;
     ref.read(activeMcqProvider.notifier).state = current.copyWith(
       selected: picked,
     );
@@ -1731,13 +1769,63 @@ class TutorService extends Notifier<TutorState> {
   /// `{teachingTips}` in the prompt should describe the page they are
   /// asking about — as they describe the older subgoal of a warm-up review
   /// (#102). `null` when the page is the active subgoal's own.
-  Future<Goal?> _pageSubgoal(GoalSelectionState selection) async {
+  ///
+  /// A page of an earlier goal (#272) comes with that goal, so `{goal}`
+  /// names the goal the page belongs to; [goal] is `null` for a page of the
+  /// active root.
+  Future<({Goal subgoal, Goal? goal})?> _pageSubgoal(
+    GoalSelectionState selection,
+  ) async {
     final id = ref.read(viewedContentIdProvider);
     final root = selection.activeRootGoal;
     if (id == null || root == null) return null;
     if (selection.activeChildGoal?.contentId == id) return null;
-    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
-    return subs.firstWhereOrNull((g) => g.contentId == id);
+    final goals = ref.read(goalsServiceProvider);
+    final subs = await goals.getChildrenOnce(root.id);
+    final sibling = subs.firstWhereOrNull((g) => g.contentId == id);
+    if (sibling != null) return (subgoal: sibling, goal: null);
+    final all = await goals.getAllGoalsOnce();
+    final earlier = all.firstWhereOrNull(
+      (g) => g.parentId != null && g.contentId == id,
+    );
+    if (earlier == null) return null;
+    return (
+      subgoal: earlier,
+      goal: all.firstWhereOrNull((g) => g.id == earlier.parentId),
+    );
+  }
+
+  /// Whether the quiz in practice still waits for the student's pick —
+  /// on screen there, or behind the theory view (#271).
+  bool get _quizAwaitingPick {
+    final quiz = ref.read(activeMcqProvider);
+    return quiz != null && quiz.selected == null;
+  }
+
+  /// Whether the exercise in flight is one the student answers with code
+  /// in the editor — a program to write or code to complete — on screen in
+  /// practice, or behind the theory view (#273). What they type in the chat
+  /// meanwhile is a question, never that answer (`handleStudentMessage`).
+  bool get _codeExerciseOpen =>
+      _currentExerciseType == 'write_code' ||
+      _currentExerciseType == 'complete_code';
+
+  /// The quiz the student has open, as the tutor is told it with a question
+  /// or a hint asked next to it (#271): its text and code, its options
+  /// under the letters on screen, and the letter picked once there is one.
+  /// `null` while no quiz is open.
+  Map<String, dynamic>? _openQuizFields() {
+    final quiz = ref.read(activeMcqProvider);
+    if (quiz == null) return null;
+    final picked = quiz.selected == null
+        ? -1
+        : quiz.options.indexOf(quiz.selected!);
+    return QuestionFormatter.openQuizFields(
+      question: quiz.prompt,
+      code: quiz.code,
+      options: quiz.optionsByBadge,
+      picked: picked < 0 ? null : ActiveMcq.badgeFor(picked),
+    );
   }
 
   Future<void> handleStudentMessage(String message) async {
@@ -1749,9 +1837,22 @@ class TutorService extends Notifier<TutorState> {
       await queryTutor(type: ChatRequestType.contentQuestion, prompt: message);
       return;
     }
+    // A quiz is answered by the option the student picks, never by what
+    // they type (#271): next to a quiz that waits for its pick, a message
+    // is a question about it, as during any other exercise — with the quiz
+    // and the order of its options in the request, and the instruction not
+    // to give its answer away. Nothing else moves: the quiz, its plan and
+    // the exercise type are as they were. Ahead of the follow-up below: the
+    // quiz is the question in front of the student, so a follow-up still
+    // in flight is one of an exercise before it.
+    if (_currentExerciseType == 'multiple_choice' && _quizAwaitingPick) {
+      await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
+      return;
+    }
     // A pending follow-up takes precedence: the next student utterance is
     // the answer to the chained follow-up question, regardless of the
-    // exercise type that produced the original probe.
+    // exercise type that produced the original probe. After a quiz that is
+    // the follow-up its grader asked under the feedback.
     if (_followUpInFlight != null) {
       // Synthetic plan so the grader landing reuses the original probe's
       // target LO and gets the difficulty field. Conductor will treat the
@@ -1760,13 +1861,15 @@ class TutorService extends Notifier<TutorState> {
       await queryTutor(type: ChatRequestType.followUpAnswer, prompt: message);
       return;
     }
-    if (_currentExerciseType == 'multiple_choice') {
-      await queryTutor(type: ChatRequestType.mcqAnswer, prompt: message);
-    } else if (_currentExerciseType == 'socratic_question') {
+    if (_currentExerciseType == 'socratic_question') {
       await queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
     } else if (_currentExerciseType == 'explain_code') {
       await queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
     } else {
+      // A code exercise — its answer is the code handed in through the
+      // editor, and the question is told not to give that away (#273) — or
+      // a quiz already answered, whose answer was the pick (#271): a
+      // question.
       await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
     }
   }
@@ -2119,9 +2222,9 @@ class TutorService extends Notifier<TutorState> {
 
   /// The answer key an `mcqAnswer` call on [answer] carries (#197): the key
   /// of the quiz on screen, and only when [answer] is the student's pick on
-  /// it. Text typed in the chat is routed to the grader too while the
-  /// exercise type is still `multiple_choice`, but it is no pick, and the
-  /// key must not reach the model before the student has committed to one.
+  /// it: the key must not reach the model before the student has committed
+  /// to one. Text typed in the chat no longer reaches the grader of a quiz
+  /// at all (#271); the check stays, so that nothing but a pick ever could.
   String? _keyForPick(String answer) {
     final picked = ref.read(activeMcqProvider)?.selected;
     return picked != null && picked == answer ? _mcqKey : null;

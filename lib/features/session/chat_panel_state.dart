@@ -17,8 +17,10 @@
 //     not have to find the button once to get the lesson the room.
 //   - [chatPanelLayoutProvider] — what the panel is drawn as *right now*.
 //     The choice applies to the theory view only: practice keeps the panel
-//     (the tutor's questions live there), playground keeps hiding it, and
-//     an MCQ on screen keeps hiding it too (#122). Leaving explain always
+//     (the tutor's questions live there) and playground keeps hiding it. A
+//     pending MCQ hides nothing (#271): next to the quiz the student asks
+//     about it, in the theory view about the page, and the answer is still
+//     the option they pick. Leaving explain always
 //     shows the full panel, whatever the preference says; coming back
 //     re-applies it. With no choice stored, a window narrower than
 //     [kChatFoldWindowWidth] starts folded and a wider one open — and the
@@ -31,7 +33,6 @@
 
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
-import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,24 +106,28 @@ class _MetricsObserver with WidgetsBindingObserver {
 
 /// How the chat panel is drawn for the active mode.
 enum ChatPanelLayout {
-  /// Width zero — playground, or an MCQ on screen (#122).
+  /// Width zero — playground.
   hidden,
 
-  /// The slim strip with the expand button — explain, folded.
+  /// The slim strip with the tutor's avatar — explain, folded.
   collapsed,
 
   /// The full chat.
   full,
 }
 
-/// The panel's layout right now, from the mode, the MCQ state and the
-/// remembered choice — or, while there is none, the window width (#138).
-/// `hidden` wins over the choice: a folded chat in a mode that has no chat
-/// is still no chat.
+/// The panel's layout right now, from the mode and the remembered choice —
+/// or, while there is none, the window width (#138). `hidden` wins over the
+/// choice: a folded chat in a mode that has no chat is still no chat.
+///
+/// A pending MCQ is not part of it any more (#271). It used to hide the
+/// panel in every mode, so a student with an unanswered quiz had no chat at
+/// all — not even the strip in the theory view, where the quiz is not on
+/// screen. A message typed now is a question, never the quiz's answer
+/// (`TutorService.handleStudentMessage`).
 final chatPanelLayoutProvider = Provider<ChatPanelLayout>((ref) {
   final mode = ref.watch(modeProvider);
-  final mcqActive = ref.watch(activeMcqProvider) != null;
-  if (!mode.showsChatPanel || mcqActive) return ChatPanelLayout.hidden;
+  if (!mode.showsChatPanel) return ChatPanelLayout.hidden;
   if (mode != SessionMode.explain) return ChatPanelLayout.full;
   final collapsed =
       ref.watch(chatCollapsedProvider) ??
