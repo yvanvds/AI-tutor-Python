@@ -6,6 +6,8 @@
 // Issue #138 — until the student has chosen, the layout follows the window:
 // folded under 1200 px, open above, live across a resize; a stored choice
 // wins on any window, and a stored `false` means open on a small screen.
+//
+// Issue #271 — a pending MCQ no longer hides the panel in any mode.
 
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -226,13 +228,30 @@ void main() {
       expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.hidden);
     });
 
-    test('an MCQ on screen hides the panel even in a folded explain', () async {
-      final c = container();
-      await c.read(chatCollapsedProvider.notifier).collapse();
-      c.read(activeMcqProvider.notifier).state = _mcq;
-      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.hidden);
-      c.read(activeMcqProvider.notifier).state = null;
-      expect(c.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+    // #271 — a pending MCQ used to hide the panel in every mode, so a
+    // student with an unanswered quiz had no chat at all, not even the
+    // strip in the theory view. It hides nothing now.
+    test('a pending MCQ hides nothing: practice keeps the full panel next to '
+        'the quiz, explain keeps the strip or the panel, playground stays '
+        'hidden', () async {
+      final practice = container(mode: SessionMode.practice);
+      practice.read(activeMcqProvider.notifier).state = _mcq;
+      expect(practice.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+
+      final narrow = container(width: _narrow);
+      narrow.read(activeMcqProvider.notifier).state = _mcq;
+      expect(narrow.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+
+      final folded = container();
+      await folded.read(chatCollapsedProvider.notifier).collapse();
+      folded.read(activeMcqProvider.notifier).state = _mcq;
+      expect(folded.read(chatPanelLayoutProvider), ChatPanelLayout.collapsed);
+      await folded.read(chatCollapsedProvider.notifier).expand();
+      expect(folded.read(chatPanelLayoutProvider), ChatPanelLayout.full);
+
+      final playground = container(mode: SessionMode.playground);
+      playground.read(activeMcqProvider.notifier).state = _mcq;
+      expect(playground.read(chatPanelLayoutProvider), ChatPanelLayout.hidden);
     });
 
     test(

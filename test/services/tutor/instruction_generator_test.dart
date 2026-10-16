@@ -315,6 +315,106 @@ void main() {
     });
   });
 
+  // #271 — the chat stays open while a quiz is open: a question, a question
+  // about the page or a hint asked then must not give the quiz's answer
+  // away, whatever the teacher's docs say.
+  group('open-quiz directive (#271)', () {
+    Future<String> generate(ChatRequestType type, {required bool quizOpen}) =>
+        InstructionGenerator().generateInstructions(
+          type,
+          goalSelection: GoalSelectionState(
+            selectedRoot: root(),
+            selectedChild: subgoal(),
+          ),
+          cachedInstructions: [
+            makeInstruction('studentQuestion', {'main': 'Antwoord kort.'}),
+            makeInstruction('mcqAnswer', {'main': 'Leg kort uit waarom.'}),
+          ],
+          fetchInstructions: () async => const [],
+          fetchRootGoals: () async => const [],
+          languageCode: 'nl',
+          quizOpen: quizOpen,
+        );
+
+    test(
+      'a question next to an open quiz is told not to give its answer '
+      'away, after the teacher\'s body and before the language directive',
+      () async {
+        final out = await generate(
+          ChatRequestType.studentQuestion,
+          quizOpen: true,
+        );
+        expect(out, contains(openQuizDirective));
+        final at = out.indexOf('OPEN QUIZ — STRICT.');
+        expect(at, greaterThan(out.indexOf('Antwoord kort.')));
+        expect(at, lessThan(out.indexOf('OUTPUT LANGUAGE')));
+      },
+    );
+
+    test('so are a question about the page and a hint; no turn without an '
+        'open quiz is', () async {
+      for (final type in openQuizGuardedTypes) {
+        expect(
+          await generate(type, quizOpen: true),
+          contains('OPEN QUIZ'),
+          reason: type.name,
+        );
+        expect(
+          await generate(type, quizOpen: false),
+          isNot(contains('OPEN QUIZ')),
+          reason: type.name,
+        );
+      }
+      expect(openQuizGuardedTypes, {
+        ChatRequestType.studentQuestion,
+        ChatRequestType.contentQuestion,
+        ChatRequestType.requestHint,
+      });
+    });
+
+    test('a grading call never gets it, not even with the quiz open: the '
+        'pick\'s own, or a follow-up answer after it', () async {
+      for (final type in [
+        ChatRequestType.mcqAnswer,
+        ChatRequestType.followUpAnswer,
+        ChatRequestType.submitCode,
+        ChatRequestType.socraticFeedback,
+        ChatRequestType.explainAnswer,
+        ChatRequestType.mcQuestion,
+        ChatRequestType.status,
+      ]) {
+        expect(
+          await generate(type, quizOpen: true),
+          isNot(contains('OPEN QUIZ')),
+          reason: type.name,
+        );
+      }
+    });
+
+    test('a message is no answer and the answer is not given away, not even '
+        'after the pick; the key is never mentioned', () {
+      expect(openQuizDirective, contains('`open_quiz`'));
+      expect(openQuizDirective, contains('`picked`'));
+      expect(
+        openQuizDirective,
+        contains('This message is not an answer to the quiz'),
+      );
+      expect(
+        openQuizDirective,
+        contains('tell the student to pick their answer in the quiz'),
+      );
+      expect(
+        openQuizDirective,
+        contains('do not say or hint which option is right'),
+      );
+      expect(openQuizDirective, contains('Once they have picked'));
+      expect(
+        openQuizDirective,
+        contains('Never mention an answer key, `correct_option`'),
+      );
+    });
+  });
+
   group('output-language directive (#117)', () {
     Future<String> generate(String languageCode) =>
         InstructionGenerator().generateInstructions(

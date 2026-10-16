@@ -99,6 +99,7 @@ class _Generator extends InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    bool quizOpen = false,
   }) async => 'system prompt';
 }
 

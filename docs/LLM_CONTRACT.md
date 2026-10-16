@@ -198,9 +198,10 @@ from then on.
 **Only the grading call of a pick.** The key never reaches the model
 before the student has committed to an option. It is not on the exercise's
 history (`MultipleChoice.toJson` leaves it out), which every call on the
-exercise reads; and text typed in the chat that is routed to the grader
-while the exercise type is still `multiple_choice` is no pick and carries
-no key (`TutorService._keyForPick`). After the pick the grading input stays
+exercise reads; and text typed in the chat never reaches the grader of a
+quiz at all — it is a question (#271, see "A question during an open
+quiz"), and `TutorService._keyForPick` still gives the key only to the
+pick itself. After the pick the grading input stays
 on the exercise's history like any other turn. Nothing the app draws shows
 the key: the quiz knows the options, the pick and the verdict, not the key
 (`ActiveMcq`).
@@ -302,6 +303,60 @@ bug report show what was sent.
 Out of scope: questions about a *practice* question's code (still
 `student_question` with `code`) and multi-page context — only the page on
 screen is sent.
+
+### A question during an open quiz (#271)
+
+The chat used to be hidden while a multiple-choice question (a quiz,
+`ActiveMcq`) was open (#122), so nothing could be typed next to one. It
+stays open now, and a quiz is answered by the option the student picks and
+by nothing else: a message typed while one is open is never graded as its
+answer and never clears or replaces it.
+
+Routing (`TutorService.handleStudentMessage`):
+
+- Theory page on screen → `content_question`, as above (#132).
+- The exercise in flight is the quiz and it waits for its pick →
+  `student_question`, the same request a question during a code exercise
+  is. Ahead of a follow-up still in flight: that one belongs to an exercise
+  before the quiz.
+- After the pick, a follow-up the grader asked under the feedback is
+  answered in the chat as for any exercise (`follow_up_answer`, "Grading
+  follow-up answers" below). Any other message is a `student_question`.
+
+Inputs: a `student_question` — and a `request_hint` (the `?` shorthand) —
+asked while a quiz is open carries `open_quiz`, the quiz as it is on
+screen (`QuestionFormatter.openQuizFields`):
+
+- `question` — the quiz's text; `code` — its code, when it has any.
+- `options` — the options keyed by the letter the quiz shows them under,
+  in screen order. The options are shuffled for display, so the order on
+  the exercise's history does not tell the model what "B" is.
+- `picked` — the letter the student picked, once they have.
+
+Never the key: `correct_option` stays the grading call's alone. A hint
+asked next to a quiz sends `current_code` empty — the editor is not the
+exercise then; what it holds is left from the one before.
+
+System prompt: `openQuizDirective` (`instruction_generator.dart`),
+appended after the teacher-authored body and before the output-language
+directive, whenever a quiz is open, to the turns that are not graded —
+`studentQuestion`, `contentQuestion`, `requestHint`
+(`openQuizGuardedTypes`). It says the message is no answer and is not
+graded (one that reads like an answer is sent back to the quiz), that the
+model may clarify the question, its words, its code and the Python behind
+it, and that it never gives the answer away — which option is right or
+wrong, or the output or value asked for — not even after the pick beyond
+what the feedback said, and never mentions an answer key. A grading call
+never gets it. Like the answer-key directive it lives in code, so it holds
+whatever the teacher's `studentQuestion` doc says.
+
+Output: the plain `answer` envelope. Nothing on the conductor side moves —
+no `turn_history` record, no belief, calibration or XP change — and the
+quiz, its plan and the exercise type are as they were. The quiz takes no
+pick while the tutor is still answering (the grading call could not go
+out), and an answered quiz leaves the practice view when the next exercise
+is asked for, also when the grade of a follow-up asks for it rather than
+"Volgende".
 
 ### Output language (#117)
 

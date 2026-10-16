@@ -43,6 +43,7 @@ import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
+import 'package:ai_tutor_python/services/tutor/responses/answer.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/code_feedback.dart';
 import 'package:ai_tutor_python/services/tutor/responses/grader_payload.dart';
@@ -54,7 +55,7 @@ import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:mocktail/mocktail.dart' hide Answer;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
@@ -108,6 +109,7 @@ class _Generator extends InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    bool quizOpen = false,
   }) async => 'system prompt';
 }
 
@@ -830,19 +832,34 @@ void main() {
       expect(pc!.read(activeMcqProvider)!.feedback, _wrongText);
     });
 
-    test('text typed while the exercise is a quiz goes to the grader too, but '
-        'it is no pick: no key', () async {
-      await boot(share: 0);
+    test('text typed while the quiz waits for its pick is a question, not an '
+        'answer (#271): no key and no grade; the pick that follows carries '
+        'the key', () async {
+      final bank = await boot(share: 0);
       planNext(_plan(ChatRequestType.mcQuestion));
       connector.scripts.add(_reply(fresh()));
       await tutor().requestExercise();
 
-      connector.scripts.add(grade(AnswerQuality.wrong, 'Kies een optie.'));
+      connector.scripts.add(
+        _reply(Answer(type: 'answer', prompt: 'Kijk goed naar de +.')),
+      );
       await tutor().handleStudentMessage('Welke is het?');
 
-      expect(input(1)['request_type'], 'mcq_answer');
-      expect(input(1)['answer'], 'Welke is het?');
+      expect(input(1)['request_type'], 'student_question');
+      expect(input(1)['question'], 'Welke is het?');
+      expect(input(1).containsKey('answer'), isFalse);
       expect(input(1).containsKey('correct_option'), isFalse);
+      expect(graded, isEmpty, reason: 'a question is not graded');
+      expect(history.records, isEmpty);
+      expect(pc!.read(activeMcqProvider)!.selected, isNull);
+
+      connector.scripts.add(grade(AnswerQuality.correct, _rightText));
+      await tutor().submitMcqAnswer(_key);
+      await bank.idle;
+      expect(input(2)['request_type'], 'mcq_answer');
+      expect(input(2)['answer'], _key);
+      expect(input(2)['correct_option'], _key);
+      expect(history.records, hasLength(1));
     });
 
     test('a question without a key sends none — also after one that had '
@@ -1028,35 +1045,16 @@ void main() {
       expect(pc!.read(activeMcqProvider)!.prompt, 'Vers');
     });
 
-    test('a key the grader was not told is not one it can dispute: text '
-        'typed in the chat, and a question without a key', () async {
+    test('a key the grader was not told is not one it can dispute: a '
+        'question without a key', () async {
+      // (Text typed in the chat is never graded as the quiz's answer
+      // (#271), so a pick is the only call that could carry a key.)
       final bank = await boot(share: 0);
       planNext(_plan(ChatRequestType.mcQuestion));
-      connector.scripts.add(_reply(fresh()));
+      connector.scripts.add(_reply(fresh(correct: null)));
       await tutor().requestExercise();
 
-      // Typed, not picked: no key went out, so the field means nothing.
-      // (Graded right, so the question is stored and the bank can be read.)
-      connector.scripts.add(
-        disputing(quality: AnswerQuality.correct, text: 'Ja, 2.'),
-      );
-      await tutor().handleStudentMessage('Het is 2.');
-      await bank.idle;
-      expect(
-        jsonDecode(connector.sent[1].input).containsKey('correct_option'),
-        isFalse,
-      );
-      var q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
-      expect(q.answeredCount, 1);
-      expect(q.keyDisputedCount, 0);
-      expect(q.graderDisagreesWithKey, isFalse);
-
-      // A question without a key: the pick carries none either. (Same
-      // options and code, so the same bank doc: start that afresh.)
-      store.docs.clear();
-      graded.clear();
-      connector.scripts.add(_reply(fresh(correct: null)));
-      await tutor().advanceFromMcq();
+      // Graded right, so the question is stored and the bank can be read.
       connector.scripts.add(disputing(quality: AnswerQuality.correct));
       await tutor().submitMcqAnswer('Error');
       await bank.idle;
@@ -1064,8 +1062,10 @@ void main() {
         jsonDecode(connector.sent.last.input).containsKey('correct_option'),
         isFalse,
       );
-      q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      final q = BankQuestion.tryFromCosmos(store.docs.values.single)!;
+      expect(q.answeredCount, 1);
       expect(q.keyDisputedCount, 0);
+      expect(q.graderDisagreesWithKey, isFalse);
     });
   });
 

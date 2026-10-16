@@ -87,6 +87,39 @@ The request may carry `correct_option`: the option the question's author marked 
 - Without `correct_option` in the request, grade the answer on its own merits, without `keyDisputed`.
 ''';
 
+/// What the model is told when the student writes in the chat while a
+/// multiple-choice question is open (#271, LLM_CONTRACT "A question during
+/// an open quiz"), appended after the teacher-authored bodies of the turns
+/// that are not graded: a question ([ChatRequestType.studentQuestion]), a
+/// question about the theory page ([ChatRequestType.contentQuestion]) and a
+/// hint ([ChatRequestType.requestHint]) — [openQuizGuardedTypes].
+///
+/// The chat used to be hidden while a quiz was open (#122), so none of these
+/// calls could be made with one pending. Now the student can ask for
+/// clarification next to the quiz, or read the theory while it waits, and
+/// the quiz is in the exercise's history the call carries. The answer is
+/// still only the option the student picks; this keeps the model from
+/// giving it away in the chat. It lives in code, like [answerKeyDirective]:
+/// it has to hold whatever the teacher's `studentQuestion` doc says.
+const String openQuizDirective = '''
+OPEN QUIZ — STRICT. This is part of the app's contract and holds whatever the instructions above say.
+The student has a multiple-choice question (a quiz) open in the app. It is in the conversation above; when the request carries `open_quiz`, that is the quiz as the student sees it: its options under the letters on screen, and `picked`, the letter they chose, once they have.
+- This message is not an answer to the quiz and it is not graded: the student answers only by picking an option in the quiz. If the message reads like an answer (a letter, an option, a value), do not say whether it is right; tell the student to pick their answer in the quiz.
+- Help the student understand: what the question asks, the words, the code and the Python it is about, and how to reason it out.
+- Never give the answer away: do not say or hint which option is right or which options are wrong, and do not give the output, value or result the question asks for — not even when the student asks for it outright. Once they have picked, do not add anything to what the feedback on their pick said about which option is right.
+- Never mention an answer key, `correct_option` or the option the question's author intended.
+''';
+
+/// The turns [openQuizDirective] is appended to while a quiz is open: the
+/// ones a chat message or the `?` shorthand starts and that are not graded.
+/// A grading call — the pick's own, or a follow-up answer after it — never
+/// gets it: it is about an answer, and says so in its own instructions.
+const Set<ChatRequestType> openQuizGuardedTypes = {
+  ChatRequestType.studentQuestion,
+  ChatRequestType.contentQuestion,
+  ChatRequestType.requestHint,
+};
+
 /// What the model is told on a `contentQuestion` turn (#132) until the
 /// teacher authors an instruction doc with that id — the seed text, and the
 /// one request type that ships with a default. The other types have always
@@ -130,6 +163,7 @@ class InstructionGenerator {
     List<LearningObjective> targetLOs = const [],
     List<({String subgoalId, LearningObjective lo})> goalScopeLOs = const [],
     Goal? subgoalOverride,
+    bool quizOpen = false,
   }) async {
     final selectedRoot = goalSelection.selectedRoot;
     final selectedChild = goalSelection.selectedChild;
@@ -196,9 +230,15 @@ class InstructionGenerator {
         ? '\n$answerKeyDirective'
         : '';
 
+    // A question, a page question or a hint while a quiz is open is told
+    // not to give the quiz's answer away (#271).
+    final openQuiz = quizOpen && openQuizGuardedTypes.contains(type)
+        ? '\n$openQuizDirective'
+        : '';
+
     // The language directive goes last, after the teacher-authored bodies it
     // has to override (#117).
-    return '$envelopeContract\n$alwaysInclude$typeSpecific$answerKey'
+    return '$envelopeContract\n$alwaysInclude$typeSpecific$answerKey$openQuiz'
         '\n${languageDirective(languageCode)}';
   }
 
