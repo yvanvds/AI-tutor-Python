@@ -117,16 +117,51 @@ class QuestionFormatter {
     ),
   );
 
-  static String requestHint(String currentCode) => _encodeRequest(
+  /// [openQuiz], when given, is the quiz the student has open (#271): see
+  /// [openQuizFields].
+  static String requestHint(
+    String currentCode, {
+    Map<String, dynamic>? openQuiz,
+  }) => _encodeRequest(
     "request_hint",
-    additionalFields: {"current_code": currentCode},
+    additionalFields: {
+      "current_code": currentCode,
+      if (openQuiz != null) "open_quiz": openQuiz,
+    },
   );
 
-  static String studentQuestion(String question, String? code) =>
-      _encodeRequest(
-        "student_question",
-        additionalFields: {"question": question, "code": code ?? ""},
-      );
+  /// [openQuiz], when given, is the quiz the student has open (#271): see
+  /// [openQuizFields].
+  static String studentQuestion(
+    String question,
+    String? code, {
+    Map<String, dynamic>? openQuiz,
+  }) => _encodeRequest(
+    "student_question",
+    additionalFields: {
+      "question": question,
+      "code": code ?? "",
+      if (openQuiz != null) "open_quiz": openQuiz,
+    },
+  );
+
+  /// The multiple-choice question the student has open while they write in
+  /// the chat (#271, LLM_CONTRACT "A question during an open quiz"), as it
+  /// is on screen: its text, its code, and its options keyed by the letter
+  /// the quiz shows them under — shuffled, so the order in the exercise's
+  /// history does not tell the model what "B" is — plus the letter picked,
+  /// once there is one. Never the answer key.
+  static Map<String, dynamic> openQuizFields({
+    required String question,
+    required String code,
+    required Map<String, String> options,
+    String? picked,
+  }) => {
+    "question": question,
+    if (code.isNotEmpty) "code": code,
+    "options": options,
+    if (picked != null) "picked": picked,
+  };
 
   /// A question about the theory page on screen (#132, LLM_CONTRACT
   /// "Content question"): the question plus the page itself — its title and

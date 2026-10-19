@@ -15,6 +15,11 @@
 // session area rather than 460 px, and a fold that starts from a wider
 // panel (the window was just made narrow) never takes more than that half.
 //
+// Issue #271 — students did not read the strip's `<` as "the chat": the
+// strip's button is the tutor's avatar now, the unread dot on it. And a
+// pending MCQ no longer hides the panel: the strip stays in the theory view,
+// and in practice the quiz sits next to the full chat.
+//
 // This mounts the real `ModeSwitcher` over the real `SessionView` (all three
 // mode views plus the chat panel), drives the fold through the real header
 // and strip buttons and the mode through the real top-bar pills, sizes the
@@ -23,15 +28,18 @@
 // not be re-created by a chat-width change (#128). The end-to-end version,
 // over the real WebView, lives in `integration_test/flows/chat_collapse.dart`.
 
+import 'package:ai_tutor_python/features/chat/widgets/tutor_avatar.dart';
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,6 +82,13 @@ final _panel = find.byKey(const Key('chat-panel'));
 final _showChat = find.byTooltip('Show chat');
 final _hideChat = find.byTooltip('Hide chat');
 final _unreadDot = find.byKey(const Key('chat-unread-dot'));
+final _expand = find.byKey(const Key('chat-expand'));
+
+const _mcq = ActiveMcq(
+  prompt: 'What does this print?',
+  code: 'print(1 + 1)',
+  options: ['2', '11'],
+);
 
 void main() {
   late OutputService output;
@@ -382,6 +397,73 @@ void main() {
     await tester.tap(_hideChat);
     await settle(tester);
     expect(_unreadDot, findsNothing);
+
+    await unmount(tester);
+  });
+
+  testWidgets('the strip is the tutor: its avatar, not a chevron, with the '
+      'unread dot on it and "Show chat" on hover', (tester) async {
+    SharedPreferences.setMockInitialValues({kChatCollapsedPrefsKey: true});
+    await mount(tester);
+
+    final avatar = find.descendant(
+      of: _expand,
+      matching: find.byType(TutorAvatar),
+    );
+    expect(avatar, findsOneWidget);
+    expect(tester.getSize(avatar), const Size.square(chatStripAvatarSize));
+    expect(
+      find.descendant(of: _panel, matching: find.byIcon(Icons.chevron_left)),
+      findsNothing,
+    );
+    expect(_showChat, findsOneWidget);
+    // Inside the strip, clear of the panel's 1 px border.
+    final strip = tester.getRect(_panel);
+    final face = tester.getRect(avatar);
+    expect(face.left, greaterThan(strip.left + 1));
+    expect(face.right, lessThanOrEqualTo(strip.right));
+
+    chat.addTutorMessage('Have a look at the second paragraph.');
+    await tester.pump();
+    expect(find.descendant(of: _expand, matching: _unreadDot), findsOneWidget);
+    final dot = tester.getRect(_unreadDot);
+    expect(face.overlaps(dot), isTrue, reason: 'the dot sits on the avatar');
+    expect(dot.right, lessThanOrEqualTo(strip.right));
+
+    await tester.tap(avatar);
+    await settle(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+    expect(pc.read(chatCollapsedProvider), isFalse);
+
+    await unmount(tester);
+  });
+
+  testWidgets('a pending MCQ hides nothing: the strip stays in the theory '
+      'view, and in practice the quiz sits next to the full chat', (
+    tester,
+  ) async {
+    pc.read(activeMcqProvider.notifier).state = _mcq;
+    await mount(tester, width: _narrow);
+
+    // The theory view on a small laptop: folded, as without a quiz.
+    expect(pc.read(modeProvider), SessionMode.explain);
+    expect(panelWidth(tester), chatCollapsedWidth);
+    expect(_expand, findsOneWidget);
+    await tester.tap(_expand);
+    await settle(tester);
+    expect(panelWidth(tester), chatPanelWidth);
+
+    // Practice: the quiz, and the chat beside it.
+    await tester.tap(find.text('Practice'));
+    await settle(tester);
+    expect(find.byType(QuizView), findsOneWidget);
+    expect(panelWidth(tester), chatPanelWidth);
+    expect(
+      tester.getSize(find.byType(PracticeView)).width,
+      _narrow - chatPanelWidth,
+    );
+    expect(tester.takeException(), isNull);
+    expect(pc.read(activeMcqProvider), same(_mcq), reason: 'still pending');
 
     await unmount(tester);
   });

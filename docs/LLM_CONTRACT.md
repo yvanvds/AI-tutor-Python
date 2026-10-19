@@ -198,9 +198,10 @@ from then on.
 **Only the grading call of a pick.** The key never reaches the model
 before the student has committed to an option. It is not on the exercise's
 history (`MultipleChoice.toJson` leaves it out), which every call on the
-exercise reads; and text typed in the chat that is routed to the grader
-while the exercise type is still `multiple_choice` is no pick and carries
-no key (`TutorService._keyForPick`). After the pick the grading input stays
+exercise reads; and text typed in the chat never reaches the grader of a
+quiz at all — it is a question (#271, see "A question during an open
+quiz"), and `TutorService._keyForPick` still gives the key only to the
+pick itself. After the pick the grading input stays
 on the exercise's history like any other turn. Nothing the app draws shows
 the key: the quiz knows the options, the pick and the verdict, not the key
 (`ActiveMcq`).
@@ -289,7 +290,9 @@ Inputs (`request_type: content_question`, built by
   teacher has authored one, else the built-in default
   (`defaultContentQuestionInstruction`), plus `alwaysInclude`; `{goal}`,
   `{subgoal}` and `{teachingTips}` describe the subgoal whose page is on
-  screen, as they describe the older subgoal of a warm-up review.
+  screen, as they describe the older subgoal of a warm-up review — and
+  `{goal}` its own goal when the student paged back into an earlier goal
+  (#272).
 
 Output: the plain `answer` envelope — TEXT is the answer, META is
 `{"type": "answer"}`. No `overallQuality`, no `loSignals`, no
@@ -302,6 +305,101 @@ bug report show what was sent.
 Out of scope: questions about a *practice* question's code (still
 `student_question` with `code`) and multi-page context — only the page on
 screen is sent.
+
+### A question during an open quiz (#271)
+
+The chat used to be hidden while a multiple-choice question (a quiz,
+`ActiveMcq`) was open (#122), so nothing could be typed next to one. It
+stays open now, and a quiz is answered by the option the student picks and
+by nothing else: a message typed while one is open is never graded as its
+answer and never clears or replaces it.
+
+Routing (`TutorService.handleStudentMessage`):
+
+- Theory page on screen → `content_question`, as above (#132).
+- The exercise in flight is the quiz and it waits for its pick →
+  `student_question`, the same request a question during a code exercise
+  is. Ahead of a follow-up still in flight: that one belongs to an exercise
+  before the quiz.
+- After the pick, a follow-up the grader asked under the feedback is
+  answered in the chat as for any exercise (`follow_up_answer`, "Grading
+  follow-up answers" below). Any other message is a `student_question`.
+
+Inputs: a `student_question` — and a `request_hint` (the `?` shorthand) —
+asked while a quiz is open carries `open_quiz`, the quiz as it is on
+screen (`QuestionFormatter.openQuizFields`):
+
+- `question` — the quiz's text; `code` — its code, when it has any.
+- `options` — the options keyed by the letter the quiz shows them under,
+  in screen order. The options are shuffled for display, so the order on
+  the exercise's history does not tell the model what "B" is.
+- `picked` — the letter the student picked, once they have.
+
+Never the key: `correct_option` stays the grading call's alone. A hint
+asked next to a quiz sends `current_code` empty — the editor is not the
+exercise then; what it holds is left from the one before.
+
+System prompt: `openQuizDirective` (`instruction_generator.dart`),
+appended after the teacher-authored body and before the output-language
+directive, whenever a quiz is open, to the turns that are not graded —
+`studentQuestion`, `contentQuestion`, `requestHint`
+(`openQuizGuardedTypes`). It says the message is no answer and is not
+graded (one that reads like an answer is sent back to the quiz), that the
+model may clarify the question, its words, its code and the Python behind
+it, and that it never gives the answer away — which option is right or
+wrong, or the output or value asked for — not even after the pick beyond
+what the feedback said, and never mentions an answer key. A grading call
+never gets it. Like the answer-key directive it lives in code, so it holds
+whatever the teacher's `studentQuestion` doc says.
+
+Output: the plain `answer` envelope. Nothing on the conductor side moves —
+no `turn_history` record, no belief, calibration or XP change — and the
+quiz, its plan and the exercise type are as they were. The quiz takes no
+pick while the tutor is still answering (the grading call could not go
+out), and an answered quiz leaves the practice view when the next exercise
+is asked for, also when the grade of a follow-up asks for it rather than
+"Volgende".
+
+### A question during a code exercise (#273)
+
+A code exercise — a program to write (`write_code`) or code to complete
+(`complete_code`) — is answered by the code the student hands in through
+the editor (`submit_code`). What they type in the chat meanwhile is a
+`student_question` (`TutorService.handleStudentMessage`, its last branch),
+or a `content_question` when the theory page is on screen (#132); a
+follow-up the grader asked is still answered as a `follow_up_answer`. The
+exercise is on the exercise's history the call carries, and the teacher's
+`studentQuestion` doc says to explain Python questions clearly — nothing in
+the prompt said not to give the solution away, so "write the code for me"
+could get the code. The hint and the graders say so in their own docs.
+
+System prompt: `openCodeExerciseDirective` (`instruction_generator.dart`),
+appended after the teacher-authored body (and after `openQuizDirective`,
+when that is there too) and before the output-language directive,
+whenever the exercise in flight is a `write_code` or `complete_code` one
+(`TutorService._codeExerciseOpen`, on screen in practice or behind the
+theory view), to the turns such a message starts — `studentQuestion` and
+`contentQuestion` (`openCodeExerciseGuardedTypes`); a content question
+about a page of an earlier goal (#272) gets it too, with that goal in
+`{goal}`. It says the message is a question and is not graded — the code
+handed in through the editor is — that the model may clarify what the
+exercise asks, its words, the Python it needs and how to approach it, with
+hints toward the next step and a short example of a concept on a different
+problem, and may say where the student's own code goes wrong; and that it
+never writes code that does what the exercise asks — not under other
+names, not piece by piece, not as a corrected version of the student's
+code — nor fills in or names the blanks of a `complete_code` exercise, not
+even when the student asks outright or gives up. Like the open-quiz
+directive it lives in code, so it holds whatever the teacher's
+`studentQuestion` doc says.
+
+Not affected: a grading call never gets it (`submit_code`,
+`follow_up_answer`, and the answer to an `explain_code` or socratic
+exercise, which is what the student types in the chat there:
+`explain_answer`, `socratic_feedback`), nor does the `?` hint
+(`request_hint`, whose own doc says not to reveal the solution). Inputs
+and output are unchanged: the plain `answer` envelope, no `turn_history`
+record, no belief, calibration or XP change.
 
 ### Output language (#117)
 

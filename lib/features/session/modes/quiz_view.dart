@@ -60,6 +60,10 @@ class QuizView extends ConsumerWidget {
                   options: mcq.options,
                   selected: mcq.selected,
                   feedbackQuality: mcq.feedbackQuality,
+                  // Not while the tutor answers a question typed in the
+                  // chat next to the quiz (#271): the pick would not be
+                  // graded.
+                  enabled: tutorState == TutorState.idle,
                   onPick: (option) => ref
                       .read(tutorServiceProvider.notifier)
                       .submitMcqAnswer(option),
@@ -157,15 +161,17 @@ class _OptionGrid extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.feedbackQuality,
+    required this.enabled,
     required this.onPick,
   });
 
   final List<String> options;
   final String? selected;
   final AnswerQuality? feedbackQuality;
-  final void Function(String) onPick;
 
-  static const _badges = ['A', 'B', 'C', 'D', 'E', 'F'];
+  /// Whether a pick is taken now.
+  final bool enabled;
+  final void Function(String) onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -195,11 +201,11 @@ class _OptionGrid extends StatelessWidget {
 
   Widget _buildOption(int i) {
     return _Option(
-      badge: i < _badges.length ? _badges[i] : '${i + 1}',
+      badge: ActiveMcq.badgeFor(i),
       label: options[i],
       state: _stateFor(options[i]),
       verdict: feedbackQuality,
-      onTap: () => onPick(options[i]),
+      onTap: enabled ? () => onPick(options[i]) : null,
     );
   }
 
@@ -253,7 +259,9 @@ class _Option extends StatefulWidget {
   /// The grade on the pick, null while it is being assessed. Only read in
   /// the [_OptionState.chosen] state.
   final AnswerQuality? verdict;
-  final VoidCallback onTap;
+
+  /// `null` while no pick is taken (the tutor is busy).
+  final VoidCallback? onTap;
 
   @override
   State<_Option> createState() => _OptionRowState();
@@ -264,8 +272,8 @@ class _OptionRowState extends State<_Option> {
 
   @override
   Widget build(BuildContext context) {
-    final visuals = _visualsFor(widget.state, _hovering);
-    final disabled = widget.state != _OptionState.idle;
+    final disabled = widget.state != _OptionState.idle || widget.onTap == null;
+    final visuals = _visualsFor(widget.state, _hovering && !disabled);
 
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
