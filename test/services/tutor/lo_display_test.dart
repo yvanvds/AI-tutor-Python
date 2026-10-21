@@ -41,7 +41,8 @@ LoDisplayState _state(
 
 void main() {
   group('the state of a segment from the belief', () {
-    test('the prior is empty: one right answer on hard leaves μ at 0.79', () {
+    test('the prior is empty: one right answer on hard leaves μ at 0.79 and '
+        'the evidence under 5.75', () {
       expect(_state(_prior, atCalibration: false), LoDisplayState.empty);
       expect(
         oneRightAnswerMasters(
@@ -61,7 +62,7 @@ void main() {
     });
 
     test('on medium the first right answer gives half too; on easy it takes '
-        'two', () {
+        'three', () {
       const medium = QuestionDifficulty.medium;
       expect(
         _state(_afterRight(_prior, medium), calibration: medium),
@@ -71,8 +72,11 @@ void main() {
       const easy = QuestionDifficulty.easy;
       final once = _afterRight(_prior, easy);
       expect(_state(once, calibration: easy), LoDisplayState.empty);
+      // Two on easy: (3.4, 1); a third would reach only evidence 5.6 (#276).
+      final twice = _afterRight(once, easy);
+      expect(_state(twice, calibration: easy), LoDisplayState.empty);
       expect(
-        _state(_afterRight(once, easy), calibration: easy),
+        _state(_afterRight(twice, easy), calibration: easy),
         LoDisplayState.half,
       );
     });
@@ -91,7 +95,7 @@ void main() {
 
     test('a belief over the bar without a right answer at the student\'s '
         'level is half: that answer is the one missing condition', () {
-      const snap = BeliefSnapshot(4.5, 1);
+      const snap = BeliefSnapshot(5, 1);
       expect(meetsMasteryMeanAndEvidence(snap), isTrue);
       expect(_state(snap, atCalibration: false), LoDisplayState.half);
       expect(_state(snap), LoDisplayState.full);
@@ -106,9 +110,9 @@ void main() {
     });
 
     test('stuck is full', () {
-      // Classic: evidence 8.2, μ 0.49 — clear of the evidence floor of 8
-      // (#239).
-      const classic = BeliefSnapshot(4.05, 4.15);
+      // Classic: evidence 10.2, μ 0.50 — clear of the evidence floor of 10
+      // (#239, #276).
+      const classic = BeliefSnapshot(5.05, 5.15);
       expect(isStuck(classic), isTrue);
       expect(_state(classic, atCalibration: false), LoDisplayState.full);
       // Saturated: evidence 19, μ 0.68.

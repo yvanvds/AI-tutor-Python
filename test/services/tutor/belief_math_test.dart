@@ -498,23 +498,78 @@ void main() {
   });
 
   group('mastery & stuck predicates', () {
-    test('mean ≥ 0.8 AND evidence ≥ 4 → mastery condition met', () {
-      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(4, 1)), isTrue);
+    test('mean ≥ 0.8 AND evidence ≥ 5.75 → mastery condition met', () {
+      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(5, 1)), isTrue);
       // Just one signal short on mean.
-      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(3, 1)), isFalse);
-      // Just one short on evidence.
+      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(4, 2)), isFalse);
+      // Mean over the bar, short on evidence: (4, 1) was mastery at the old
+      // bar of 4 (#276), and (4.5, 1) is one right answer on hard in the
+      // lesson time.
       expect(
-        meetsMasteryMeanAndEvidence(const BeliefSnapshot(2.4, 0.6)),
+        meetsMasteryMeanAndEvidence(const BeliefSnapshot(4.5, 1)),
         isFalse,
       );
+      expect(meetsMasteryMeanAndEvidence(const BeliefSnapshot(4, 1)), isFalse);
     });
 
-    test('stuck: ≥ 8 evidence and mean < 0.6', () {
-      expect(isStuck(const BeliefSnapshot(3, 6)), isTrue);
+    test('#276: one right answer on hard in the lesson time is not mastery '
+        'from the prior; two are', () {
+      final one = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.hard,
+        provenance: EvidenceProvenance.supervised,
+      );
+      // (4.5, 1): μ 0.82 but evidence 5.5 — at the old bar of 4, mastery.
+      final after1 = applyEvidence(
+        alpha: PolicyConstants.prior,
+        beta: PolicyConstants.prior,
+        alphaDelta: one.alphaDelta,
+        betaDelta: one.betaDelta,
+      );
+      expect(after1.mean, greaterThan(PolicyConstants.masteryMeanThreshold));
+      expect(meetsMasteryMeanAndEvidence(after1), isFalse);
+      final after2 = applyEvidence(
+        alpha: after1.alpha,
+        beta: after1.beta,
+        alphaDelta: one.alphaDelta,
+        betaDelta: one.betaDelta,
+      );
+      expect(meetsMasteryMeanAndEvidence(after2), isTrue);
+    });
+
+    test('stuck: ≥ 10 evidence and mean < 0.6', () {
+      expect(isStuck(const BeliefSnapshot(3, 7)), isTrue);
       // Above the stuck mean ceiling — not stuck.
       expect(isStuck(const BeliefSnapshot(7, 3)), isFalse);
-      // Not enough evidence yet.
-      expect(isStuck(const BeliefSnapshot(2, 4)), isFalse);
+      // Not enough evidence yet: (3, 6) was stuck at the old bar of 8.
+      expect(isStuck(const BeliefSnapshot(3, 6)), isFalse);
+    });
+
+    test('#276: four wrong answers on hard in the lesson time are not yet '
+        'stuck', () {
+      final wrong = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.hard,
+        provenance: EvidenceProvenance.supervised,
+      );
+      var snap = const BeliefSnapshot(
+        PolicyConstants.prior,
+        PolicyConstants.prior,
+      );
+      for (var i = 0; i < 4; i++) {
+        snap = applyEvidence(
+          alpha: snap.alpha,
+          beta: snap.beta,
+          alphaDelta: wrong.alphaDelta,
+          betaDelta: wrong.betaDelta,
+        );
+      }
+      // (1, 7): evidence 8 — stuck at the old bar, before the attempts
+      // rule (§2.3, #227) could ask a notch lower.
+      expect(snap.evidence, closeTo(8, 1e-9));
+      expect(isStuck(snap), isFalse);
     });
 
     test('stuck (saturated): at evidence cap and mean < mastery', () {

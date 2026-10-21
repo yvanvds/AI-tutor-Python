@@ -61,10 +61,12 @@ the magnitude of `α + β`.
 An LO is considered mastered when both:
 
 - belief mean ≥ threshold (e.g. 0.8)
-- total evidence ≥ minimum (e.g. `α + β ≥ 4`)
+- total evidence ≥ minimum (`α + β ≥ 5.75` since #276; it was 4)
 
 Exact values are policy and live in part 4. The minimum-evidence floor
-is what prevents a single easy correct answer from declaring mastery.
+is what prevents a single correct answer from declaring mastery — since
+#276 even a hard one in the lesson time, which the supervised weight
+(×1.25, #219) had made enough on its own.
 
 #### Evidence cap
 

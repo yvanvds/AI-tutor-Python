@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
 **Versie 1.0 (concept)** — nog niet van kracht; wordt eerst getoetst in een
-schaduwperiode (zie §4). Laatste wijziging: 2026-10-07.
+schaduwperiode (zie §4). Laatste wijziging: 2026-10-21.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is geschreven voor
@@ -105,6 +105,13 @@ tellen ook mee, maar afgetopt op sterkte *zwak* (0,5) en gerekend als
 moeilijkheid *gemiddeld*. Ze zijn echt bewijs, maar de vraag was niet als
 gekalibreerde meting ontworpen.
 
+Een signaal op een **ander leerdoel van het subdoel waaraan je werkt**
+telt mee met het gewicht van de vraag, maar toont dat leerdoel niet aan
+(voorwaarde 3 van §1.5, en de ratel van §2.5): de moeilijkheid was
+gekozen voor het leerdoel dat bevraagd werd. Daarvoor is een vraag over
+dat leerdoel zelf nodig, en die stelt de tutor vanzelf zolang het niet
+beheerst is (sinds v1.0.23).
+
 De grader mag een antwoord ook laten meetellen voor een leerdoel uit een
 **eerder subdoel** van hetzelfde hoofddoel. Wat daarmee gebeurt, hangt
 af van het teken. Een **positief** signaal (het antwoord toont dat een
@@ -169,10 +176,16 @@ oud bewijs blijven drijven.
 Een leerdoel geldt als **beheerst** wanneer alle drie tegelijk waar zijn:
 
 1. **μ ≥ 0,8** — het systeem is er redelijk zeker van;
-2. **n = α + β ≥ 4** — die zekerheid steunt op echt bewijs, niet op één
-   gelukstreffer (minstens ±2 punten bewijs bovenop de start);
+2. **n = α + β ≥ 5,75** — die zekerheid steunt op minstens twee juiste
+   antwoorden, niet op één gelukstreffer. Eén antwoord voegt hoogstens
+   3,5 toe (sterk, moeilijk, in de les: 2,0 × 1,4 × 1,25), dus vanuit de
+   start (1, 1) kom je met één antwoord op 5,5. Twee juiste antwoorden
+   op gemiddeld geven 6. Een juiste vervolgvraag telt als tweede
+   antwoord. Tot v1.0.22 was de grens 4, en sinds v1.0.19 volstond in de
+   les zo één juist antwoord op moeilijk;
 3. **je hebt dit leerdoel minstens één keer positief aangetoond op het
-   moeilijkheidsniveau waarop je toen gekalibreerd stond, of hoger.**
+   moeilijkheidsniveau waarop je toen gekalibreerd stond, of hoger, in
+   een vraag over dat leerdoel zelf.**
 
 Voorwaarde 3 sluit het "makkelijke-vragen-farmen" af: wie alleen op
 makkelijk juist antwoordt, haalt de beheersing niet, hoe hoog μ ook klimt.
@@ -679,6 +692,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.20 | 2026-10-04 | Geen wijziging aan M, P of de metingen eronder. §2.7: de bevestiging of tegenspraak van thuiswerk door het latere werk in de les wordt nu ook zichtbaar voor de leerkracht. Antwoord je op één leerdoel thuis vooral juist en in de les daarna vooral fout, dan krijgt je leerkracht een melding — pas met minstens drie antwoorden aan elke kant over de laatste zes weken, en alleen met lessen ná het thuiswerk. De melding verandert niets aan je overtuigingen, aan het gewicht van je antwoorden of aan je punt, en je ziet ze zelf niet. §3.3 en bijlage A volgen. Zuinig omdat er erg weinig thuiswerk is: in september zou ze niet één keer gegeven zijn (#107). |
 | 1.0.21 | 2026-10-05 | Geen wijziging aan M, P of de metingen eronder. §1.7: het balkje onder je huidige subdoel bestaat tijdens het oefenen uit één stuk per niet-optioneel leerdoel, leeg, half of vol. Half betekent dat één goed antwoord op jouw niveau het leerdoel beheerst maakt; vol dat je het beheerst, ooit beheerste of erop vastliep. Een half stuk wordt alleen weer leeg na een antwoord dat niet juist is op een vraag over dat leerdoel zelf, een vol stuk blijft vol, en bij een nieuwe sessie volgen de stukken weer je overtuigingen. Reden: één goed antwoord op moeilijk brengt een leerdoel op μ 0,79, net onder de grens van 0,80, en de tutor vraagt eerst elk leerdoel één keer; het oude balkje bleef daardoor bij de start van een subdoel lang op 0 staan en sprong dan plots vooruit, wat leerlingen ontmoedigde. Het leerpad, het overzicht van de leerkracht en het rapport tonen nog altijd het aandeel beheerste leerdoelen (#230). |
 | 1.0.22 | 2026-10-07 | Geen wijziging aan M, P of de metingen eronder. §1.7: het leerpad telt voortaan de stempel die het punt leest (§2.2). Onder elk subdoel staat hoeveel van zijn niet-optionele leerdoelen je aangetoond hebt ("3 van 4 aangetoond"), de balkjes van subdoel en hoofddoel tellen hetzelfde, en een afgerond hoofddoel toont dezelfde rij subdoelen als het hoofddoel waaraan je werkt. Tik je op een subdoel, dan zie je zijn leerdoelen als hun "Je kan …"-zin, elk met aangetoond of nog niet aangetoond; er staat geen oefenadvies bij en geen knop om het opnieuw te proberen, want de tutor kiest zelf de oefeningen. Het balkje in stukken tijdens het oefenen (v1.0.21) blijft zoals het is. Reden: leerlingen zagen "voltooid" naast een balkje dat niet vol stond, zonder te kunnen zien wat er ontbrak, en vroegen zich af hoe ze hun punt nog konden verbeteren. Dat was geen uitzondering: van de 7 leerlingen die *Testen en debuggen* afrondden, lieten er 6 minstens één leerdoel open. Het oude balkje toonde bovendien de fractie van het moment waarop je het subdoel verliet, en bij een subdoel dat vóór v1.0.15 afgerond werd stond het op 100%, ook met leerdoelen open (#243). |
+| 1.0.23 | 2026-10-21 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen. §1.5: een leerdoel is pas beheerst na minstens twee juiste antwoorden. Sinds v1.0.19 telt een antwoord in de les 25% zwaarder, en daardoor was één juist antwoord op een moeilijke vraag in de les al genoeg: μ 0,82 met bewijs 5,5, terwijl hetzelfde antwoord thuis net onder de grens bleef (0,79). Zo was het niet bedoeld. Het bewijsminimum gaat van 4 naar 5,75: hoger dan wat één antwoord kan geven (5,5), lager dan twee juiste antwoorden op gemiddeld (6). Een juiste vervolgvraag telt als tweede antwoord. §1.2: een signaal op een ander leerdoel van het subdoel waaraan je werkt, telt nog mee met het gewicht van de vraag, maar toont dat leerdoel niet aan; daarvoor is een vraag over dat leerdoel zelf nodig. §1.7: vastgelopen vraagt bewijs 10 in plaats van 8, om dezelfde reden: ook een fout in de les weegt 25% zwaarder, en op moeilijk stond je zo al na vier fouten vast, nog voor de tutor de vraag een niveau lager kon stellen. Een stempel van vóór deze versie blijft staan (§2.2). De evaluatie buiten de app herspeelt elke oefening met de regels van de app die ze schreef (#276). |
 | 1.0.16 | 2026-09-23 | **Structuurwijziging aan P.** §2.6: het puntvoorstel is de beheersingsscore, P = M; de groeiscore G (§2.4) vervalt, en daarmee M_start, de momentopname bij de periodestart (v1.0.7) en de overgangsregel uit de voortgangshistoriek (v1.0.5). §4: de open parameter w_M / w_G vervalt; bijlage A en B volgen. §2.9: "Mijn rapporten" toont M, k, u en d, geen beginscore of groei meer. §3.1 en §3.3 steunen niet langer op G: een trage start laat in M geen spoor na omdat de stempel van §2.2 niet vraagt wanneer je iets aantoonde. Reden: de app rekende 60/40 met G, terwijl de evaluatie buiten de app (regelset `1.0.10-eval1`, kader 4) al P = M schreef in dezelfde puntvoorstellen — wie in de app op "Opnieuw berekenen" drukte, kreeg een ander getal dan wat er stond; en G hing af van een momentopname die het ene keer exact en het andere keer een schatting was. De container `period_start_snapshots` wordt niet meer geschreven of gelezen; oude voorstellen en rapporten met `mStart` en `g` blijven leesbaar en worden niet herschreven (#191). |
 | 1.0.5 | 2026-09-02 | Geen structuurwijziging. Deel 2 staat nu in de code (#99): mijlpalen met Angoff-splitsing en verwacht niveau (§2.1), het puntvoorstel P uit M en G met de voorlopige gewichten van bijlage B (§4), de verantwoording door de AI rond het vaste getal, en de aanpassing en aftekening door de leerkracht. Nieuw in §2.4: de regel waarmee M_start uit de opgeslagen historiek gelezen wordt (fractie per subdoel op de periodestart, toegekend aan elk leerdoel; d_start = 0). Bijlage A: de nieuwe constanten en hun vindplaats. |
 
@@ -708,16 +722,16 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | controlevraag: band | 0,70 ≤ μ < 0,80 (voorlopig, §4) | "net onder de grens", met decay zoals de tutor ze leest (§2.8) |
 | controlevraag: recent werk | ≥ 0,75, niveaugewogen over een vol kalibratievenster (voorlopig, §4) | juist × positieve factor, half/fout × negatieve factor van §1.2 (§2.8) |
 | controlevraag: tussenruimte | ≥ 5 gewone oefeningen (voorlopig, §4) | tussen twee vragen over een ander subdoel, controle- of opfrisvraag (§2.8) |
-| controlevraag boven de grens | μ ≥ 0,8 en α + β ≥ 4 met decay, zonder positief op gekalibreerd niveau of zonder trapinformatie; klok als hierboven, of meteen als nooit rechtstreeks bevraagd; geen voorwaarde op recent werk (voorlopig, §4) | "gekend" volgens de overtuiging, maar niet rechtstreeks bevestigd (§2.8, sinds v1.0.18); na de controlevragen net onder de grens aan de beurt |
+| controlevraag boven de grens | μ ≥ 0,8 en α + β ≥ 5,75 met decay, zonder positief op gekalibreerd niveau of zonder trapinformatie; klok als hierboven, of meteen als nooit rechtstreeks bevraagd; geen voorwaarde op recent werk (voorlopig, §4) | "gekend" volgens de overtuiging, maar niet rechtstreeks bevestigd (§2.8, sinds v1.0.18); na de controlevragen net onder de grens aan de beurt |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
-| beheersing: bewijsminimum | α + β ≥ 4 | voorwaarde 2 (§1.5) |
+| beheersing: bewijsminimum | α + β ≥ 5,75 (tot v1.0.22: 4) | voorwaarde 2 (§1.5) |
 | kalibratievenster | 10 antwoorden | §1.6 |
 | promotie | ≥ 4 op niveau, ≥ 75% juist | §1.6 |
 | demotie | ≥ 3 op niveau, ≥ 60% fout/half | §1.6 |
 | per-LO trapverlaging | 2 sterk-fout op niveau, zonder tussentijds positief | §1.6 |
-| vastgelopen (klassiek) | α + β ≥ 8 én μ < 0,6 | telt voor doorstroming, niet als beheerst (§1.7) |
+| vastgelopen (klassiek) | α + β ≥ 10 én μ < 0,6 (tot v1.0.22: 8) | telt voor doorstroming, niet als beheerst (§1.7) |
 | vastgelopen (verzadigd) | α + β ≥ 18 én μ < 0,75 | idem, bij vol bewijsplafond (§1.7) |
 | C(k) | k | curve onder de 50 (§2.3; voorlopig, §4) |
 | w_u / w_d | 0,6 / 0,4 | uitbreiding vs. moeilijkheid boven de 50 (§2.3; voorlopig, §4) |

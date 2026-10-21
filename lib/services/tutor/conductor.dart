@@ -1583,12 +1583,19 @@ class Conductor {
       // target LO, so a hard loop exercise must not certify `print()` at
       // hard, nor strike it.
       final isCalibratedProbeOfThisLo = !answer.isFollowUp && !isCrossSubgoal;
+      // The ratchets also need the question to be *about* this LO (#276,
+      // the narrow #257): a signal on another LO of the active subgoal is a
+      // direct write — weight, strike counter and probe clock as above — but
+      // the difficulty was chosen for the target, so it certifies nothing.
+      // Without this, two side mentions in the lesson time stamped an LO
+      // nobody asked.
+      final movesRatchets = isCalibratedProbeOfThisLo && isTarget;
       final newPositiveAtCalibrated =
-          (isCalibratedProbeOfThisLo && hasPositive && atOrAbove) ? now : null;
+          (movesRatchets && hasPositive && atOrAbove) ? now : null;
       // #103 three-level ratchet: absolute, not calibration-relative — the
       // difficulty actually asked (a notch-dropped probe at easy counts as
       // easy).
-      final nextHighestPositiveDifficulty = isCalibratedProbeOfThisLo
+      final nextHighestPositiveDifficulty = movesRatchets
           ? ratchetHighestPositiveDifficulty(
               current: existing?.highestPositiveDifficulty,
               kind: sig.kind,

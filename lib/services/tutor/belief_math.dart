@@ -143,6 +143,10 @@ double baseWeight(LoSignalStrength s) {
 /// evidence conditions and the calibrated-positive ratchet is set, the LO
 /// was mastered the last time it was probed. Decay since then does not
 /// matter — that is exactly the gap transfer credit is meant to close.
+/// The evidence bar is today's (`masteryEvidenceMin`, #276), not the 4 an
+/// old build wrote under: the conductor applies this reading to every doc
+/// without a stamp, so the old bar would stamp a new doc between 4 and
+/// 5.75.
 bool everMastered({
   required DateTime? firstMasteredAt,
   required double alpha,
