@@ -20,8 +20,16 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.19-eval6` = PUNTENFORMULE v1.0.19, replayed from the turn
-log. `eval6` (#219) weighs supervised evidence ×1.25, as the app does
+Rule set `1.0.23-eval7` = PUNTENFORMULE v1.0.23, replayed from the turn
+log. `eval7` (#276) follows the app's stamp from the build that fixed it
+(`STAMP_RULES_276_FROM`, by the turn's `clientVersion`): mastery needs
+evidence ≥ 5.75 instead of 4 (two right answers, not one — in the lesson
+time one strong positive at hard reached 5.5 and a stamp), and a signal on
+another LO of the active subgoal than the question's target moves no
+ratchet. A turn from an earlier build replays as that build wrote it, so
+every stamp from before stays where the app put it, as in the app (#168).
+
+`eval6` (#219) weighs supervised evidence ×1.25, as the app does
 (`PolicyConstants.supervisedWeightFactor`): every signal of an oefening in
 the lesson time of the student's class, 10 minutes before and after each
 lesson included, and its transfer credits. Supervision used to wait on
@@ -97,7 +105,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.0.19-eval6"
+RULES_VERSION = "1.0.23-eval7"
 
 PRIOR = 1.0
 EVIDENCE_CAP = 20.0
@@ -119,7 +127,13 @@ SUPERVISED_WEIGHT_FACTOR = 1.25
 LESSON_MARGIN_MINUTES = 10
 
 MASTERY_MEAN = 0.80
-MASTERY_EVIDENCE = 4.0
+# `PolicyConstants.masteryEvidenceMin` since #276: two right answers, not one.
+MASTERY_EVIDENCE = 5.75
+# What the builds before #276 stamped on, and how they moved the ratchets:
+# a turn without `clientVersion`, or from a build before this one, replays
+# with these (`stamp_rules_276`).
+MASTERY_EVIDENCE_BEFORE_276 = 4.0
+STAMP_RULES_276_FROM = (2, 12, 0)
 
 WEIGHT_EXTENSION = 0.6
 WEIGHT_DIFFICULTY = 0.4
@@ -245,6 +259,24 @@ def by_timetable(lessons: list[Lesson]) -> Callable[[dict], bool]:
     return supervised
 
 
+def build_version(turn: dict) -> tuple[int, ...] | None:
+    """The `clientVersion` of the build that wrote [turn] (#165), as
+    numbers without the build suffix: "2.12.0+29" is (2, 12, 0). None for a
+    turn without it, or one that does not parse."""
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", turn.get("clientVersion") or "")
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def stamp_rules_276(turn: dict) -> bool:
+    """Whether the build that wrote [turn] stamps as the app does since
+    #276: evidence ≥ `MASTERY_EVIDENCE`, and ratchets only for the
+    question's target. Older builds, and turns without `clientVersion`,
+    stamped at `MASTERY_EVIDENCE_BEFORE_276` and moved the ratchets on
+    every direct signal."""
+    v = build_version(turn)
+    return v is not None and v >= STAMP_RULES_276_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -321,11 +353,12 @@ class LoState:
         """The questions answered right."""
         return sum(1 for d in self.direct_signals if d.signal == "positive")
 
-    @property
-    def mastered_now(self) -> bool:
+    def mastered_at(self, evidence_min: float = MASTERY_EVIDENCE) -> bool:
+        """The three conditions of CONDUCTOR_POLICY §4.1, with the evidence
+        bar of the build that wrote the turn (`stamp_rules_276`)."""
         return (
             self.mean >= MASTERY_MEAN
-            and self.evidence >= MASTERY_EVIDENCE
+            and self.evidence >= evidence_min
             and self.positive_at_calibrated_at is not None
         )
 
@@ -472,6 +505,8 @@ def replay(
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
         s_factor = SUPERVISED_WEIGHT_FACTOR if supervised(t) else 1.0
+        rules_276 = stamp_rules_276(t)
+        evidence_min = MASTERY_EVIDENCE if rules_276 else MASTERY_EVIDENCE_BEFORE_276
         for s in t.get("loSignals") or []:
             kind = s.get("signal")
             if kind not in ("positive", "negative", "neutral"):
@@ -534,12 +569,14 @@ def replay(
                     asked_as = "warmup"
                 by_key = target and t.get("gradedByKey") is True
                 lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key))
-                if kind == "positive":
+                # #276: since then only the question's target moves the
+                # ratchets; another LO of the active subgoal takes the weight.
+                if kind == "positive" and (target or not rules_276):
                     if DIFF_ORDER[diff] >= DIFF_ORDER[cal]:
                         lo.positive_at_calibrated_at = now
                     if DIFF_ORDER[diff] > DIFF_ORDER[lo.ratchet]:
                         lo.ratchet = diff
-            if lo.first_mastered_at is None and lo.mastered_now:
+            if lo.first_mastered_at is None and lo.mastered_at(evidence_min):
                 lo.first_mastered_at = now
         if apply_transfer_credits:
             # Transfer credit (#101, CONDUCTOR_POLICY §3.7). After the turn's
@@ -558,7 +595,7 @@ def replay(
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1
-                if lo.first_mastered_at is None and lo.mastered_now:
+                if lo.first_mastered_at is None and lo.mastered_at(evidence_min):
                     lo.first_mastered_at = now
     return st
 

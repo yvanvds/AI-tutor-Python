@@ -1219,6 +1219,124 @@ void main() {
     });
   });
 
+  // ---- #276 one right answer in the lesson time is no stamp --------------
+  group('#276 the stamp in the lesson time', () {
+    const lo1 = LearningObjective(
+      id: 'lo1',
+      statement: 'one',
+      kind: LoKind.apply,
+    );
+    const lo2 = LearningObjective(
+      id: 'lo2',
+      statement: 'two',
+      kind: LoKind.apply,
+    );
+
+    Future<({Conductor c, _Fakes f})> setup() async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 0,
+        objectives: const [lo1, lo2],
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.hard,
+      );
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    /// A question on [target] at hard, in the lesson time, answered right,
+    /// with a strong positive on each of [signalsOn].
+    Future<void> rightInLesson(
+      Conductor c,
+      LearningObjective target,
+      List<String> signalsOn,
+    ) async {
+      final plan = QuestionPlan(
+        type: ChatRequestType.completeCodeQuestion,
+        difficulty: QuestionDifficulty.hard,
+        targetLOs: [target],
+        reason: const TurnSelectionReason(
+          candidateLOs: [],
+          chosenReason: 'test',
+          notchDropFired: false,
+        ),
+      );
+      c.notePlannedQuestion(plan);
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          provenance: EvidenceProvenance.supervised,
+          signals: [
+            for (final id in signalsOn)
+              GradedSignal(
+                subgoalId: 's',
+                loId: id,
+                kind: LoSignalKind.positive,
+                strength: LoSignalStrength.strong,
+              ),
+          ],
+        ),
+      );
+    }
+
+    LoBelief belief(_Fakes f, String id) => f.beliefs[f._key('s', id)]!;
+
+    test('one right answer on hard is over the mean bar but no stamp; the '
+        'second is', () async {
+      final s = await setup();
+      await rightInLesson(s.c, lo1, ['lo1']);
+      final once = belief(s.f, 'lo1');
+      // (4.5, 1): μ 0.82, evidence 5.5 — a stamp at the old bar of 4.
+      expect(once.alpha, closeTo(4.5, 1e-6));
+      expect(once.lastPositiveAtCalibratedAt, isNotNull);
+      expect(once.firstMasteredAt, isNull);
+
+      await rightInLesson(s.c, lo1, ['lo1']);
+      expect(belief(s.f, 'lo1').firstMasteredAt, isNotNull);
+    });
+
+    test('a side signal on another LO of the subgoal moves no ratchet, so two '
+        'of them do not stamp it; its own question then does', () async {
+      final s = await setup();
+      await rightInLesson(s.c, lo1, ['lo1', 'lo2']);
+      await rightInLesson(s.c, lo1, ['lo1', 'lo2']);
+
+      final side = belief(s.f, 'lo2');
+      // The weight is the question's, as before: (8, 1), μ 0.89.
+      expect(side.alpha, closeTo(8, 1e-6));
+      expect(
+        meetsMasteryMeanAndEvidence(BeliefSnapshot(side.alpha, side.beta)),
+        isTrue,
+      );
+      // Nothing certifies it: the difficulty was chosen for lo1.
+      expect(side.lastPositiveAtCalibratedAt, isNull);
+      expect(side.highestPositiveDifficulty, isNull);
+      expect(side.firstMasteredAt, isNull);
+      // Still a direct write: the probe clock moves (§2.6).
+      expect(side.lastProbedAt, isNotNull);
+      // lo1, the question's target, is stamped.
+      expect(belief(s.f, 'lo1').firstMasteredAt, isNotNull);
+
+      await rightInLesson(s.c, lo2, ['lo2']);
+      final asked = belief(s.f, 'lo2');
+      expect(asked.firstMasteredAt, isNotNull);
+      expect(asked.highestPositiveDifficulty, QuestionDifficulty.hard);
+    });
+  });
+
   // ---- #101 transfer credit ----------------------------------------------
   group('#101 transfer credit', () {
     const printLo = LearningObjective(
@@ -1841,9 +1959,9 @@ void main() {
         selectedRoot: root,
         selectedChild: subgoal,
       );
-      // Pre-seed: `mastered` already mastered (mean ≥ 0.8, evidence ≥ 4,
+      // Pre-seed: `mastered` already mastered (mean ≥ 0.8, evidence ≥ 5.75,
       // ratchet set); `stucky` already in stuck range (mean < 0.6,
-      // evidence ≥ 8). A subsequent answer mastering `mastered` again
+      // evidence ≥ 10). A subsequent answer mastering `mastered` again
       // triggers subgoal mastery via the stuck-rule.
       final now = DateTime.now().toUtc();
       f.beliefs[f._key('s', 'mastered')] = LoBelief(
@@ -1858,7 +1976,7 @@ void main() {
         subgoalId: 's',
         loId: 'stucky',
         alpha: 2,
-        beta: 7, // mean 0.22, evidence 9 → stuck
+        beta: 9, // mean 0.18, evidence 11 → stuck
         lastUpdatedAt: now,
       );
       f.calibration = const StudentCalibration(
@@ -1928,7 +2046,7 @@ void main() {
           subgoalId: 's',
           loId: 'lo',
           alpha: 2,
-          beta: 5,
+          beta: 7,
           lastUpdatedAt: DateTime.now().toUtc(),
         );
         f.calibration = const StudentCalibration(
@@ -1950,7 +2068,7 @@ void main() {
           ),
         );
         c.notePlannedQuestion(plan);
-        // Push evidence past stuck threshold (β += 2.0 → α=2, β=7).
+        // Push evidence past stuck threshold (β += 2.0 → α=2, β=9).
         final outcome = await c.integrateAnswer(
           plan: plan,
           answer: GradedAnswer(
@@ -1997,7 +2115,7 @@ void main() {
         subgoalId: 's',
         loId: 'lo',
         alpha: 2,
-        beta: 7, // already stuck
+        beta: 9, // already stuck
         lastUpdatedAt: DateTime.now().toUtc(),
       );
       final c = Conductor(deps: _buildDeps(f));
@@ -3959,7 +4077,7 @@ void main() {
               subgoalId: 's',
               loId: 'stucky',
               alpha: 2,
-              beta: 7, // mean 0.22, evidence 9 → stuck
+              beta: 9, // mean 0.18, evidence 11 → stuck
               lastUpdatedAt: now,
             )
           : LoBelief(
@@ -4901,7 +5019,8 @@ void main() {
         f.beliefs[f._key('s2', 'lo-var')] = LoBelief(
           subgoalId: 's2',
           loId: 'lo-var',
-          alpha: 3,
+          // (4, 1): μ 0.8 but evidence 5, under the bar of 5.75 (#276).
+          alpha: 4,
           beta: 1,
           lastUpdatedAt: now,
           lastPositiveAtCalibratedAt: now,
@@ -5454,10 +5573,10 @@ void main() {
     test('stuck is full, and stays full when a right answer lifts the LO off '
         'the stuck rule without mastering it', () async {
       final f = onHard();
-      // Evidence 8.2, μ 0.49: stuck (§4.4), clear of the evidence floor
-      // of 8 that decay would take it under (#239), and under lo-b's 0.5,
-      // so the question goes to lo-a.
-      seed(f, 'lo-a', 4.05, 4.15, atCalibration: false);
+      // Evidence 10.2, μ 0.50: stuck (§4.4), clear of the evidence floor
+      // of 10 that decay would take it under (#239, #276), and under lo-b's
+      // 0.5, so the question goes to lo-a.
+      seed(f, 'lo-a', 5.05, 5.15, atCalibration: false);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
       expect(states(f)['lo-a'], LoDisplayState.full);
@@ -5466,11 +5585,11 @@ void main() {
         sig('lo-a', LoSignalKind.positive),
       ]);
 
-      // μ 0.62: off the stuck rule (≥ 0.6), not mastered, and not one
-      // answer from mastery either (+2.8 makes 0.70).
+      // μ 0.60: off the stuck rule (≥ 0.6), not mastered, and not one
+      // answer from mastery either (+2.8 makes 0.67).
       final b = f.beliefs[f._key('s1', 'lo-a')]!;
       final after = BeliefSnapshot(b.alpha, b.beta);
-      expect(after.mean, closeTo(0.62, 0.01));
+      expect(after.mean, closeTo(0.604, 0.005));
       expect(isStuck(after), isFalse);
       expect(meetsMasteryMeanAndEvidence(after), isFalse);
       expect(fresh(f, 'lo-a'), LoDisplayState.empty);

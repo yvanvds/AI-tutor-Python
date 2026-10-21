@@ -101,11 +101,28 @@ class PolicyConstants {
   /// Per-LO mastery: belief mean ≥ this.
   static const double masteryMeanThreshold = 0.8;
 
-  /// Per-LO mastery: `α + β ≥ this` (beyond the prior).
-  static const double masteryEvidenceMin = 4.0;
+  /// Per-LO mastery: `α + β ≥ this`, the prior's 2 included.
+  ///
+  /// 5.75, not 4, since #276: two right answers, not one. In the lesson
+  /// time (×`supervisedWeightFactor`, #219) one strong positive at hard
+  /// lifts the prior to (4.5, 1) — μ 0.82, evidence 5.5, the most one answer
+  /// can give — and at 4 that alone was mastery, as were two moderate
+  /// in-subgoal side signals. At home the same answer gives μ 0.79, just
+  /// under the bar, which is what §4.5 relied on. Two strong positives on
+  /// medium at home give exactly 6; the decay between them takes that a
+  /// hair lower, hence 5.75 and not 6. A right follow-up (§6.2) after the
+  /// first answer counts as the second. One threshold everywhere, the
+  /// legacy reading of [everMastered] included: a separate one there would
+  /// stamp a new doc between 4 and 5.75 at its next write.
+  static const double masteryEvidenceMin = 5.75;
 
   /// Stuck rule: `α + β ≥ this` AND mean < `stuckMeanCeiling` → stuck.
-  static const double stuckEvidenceMin = 8.0;
+  ///
+  /// 10, not 8, since #276: 8 × `supervisedWeightFactor`. Negatives in the
+  /// lesson weigh ×1.25 too (#219), so 8 came after a quarter fewer wrong
+  /// answers — on hard at the fourth, before the attempts rule (§2.3, #227)
+  /// could ask a notch lower.
+  static const double stuckEvidenceMin = 10.0;
   static const double stuckMeanCeiling = 0.6;
 
   /// "Practiceable" — `α + β < cap - this` is fresh enough to probe.

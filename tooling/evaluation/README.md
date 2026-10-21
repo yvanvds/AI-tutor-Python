@@ -103,6 +103,28 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
+## Regelversie `1.0.23-eval7`
+
+PUNTENFORMULE v1.0.23, herspeeld uit `turn_history`. `eval7`
+(2026-10-21, #276) volgt de stempel van de app vanaf de build die hem
+herstelde (2.12.0, `rules.STAMP_RULES_276_FROM`): een leerdoel is
+aangetoond vanaf **bewijs 5,75** in plaats van 4, dus na twee juiste
+antwoorden in plaats van één, en een signaal op een **ander leerdoel van
+het actieve subdoel** dan het doel van de vraag beweegt geen ratchet meer
+(voorwaarde 3 en het hoogste niveau). Het gewicht van zo'n signaal blijft.
+Sinds `eval6` weegt een oefening in de les ×1,25, en daarmee gaf één
+sterk juist antwoord op moeilijk al μ 0,82 en bewijs 5,5: een stempel op
+één vraag. Herspeeld op 21-10 viel 57% van de stempels sinds 05-10 op het
+eerste signaal, tegen 13% ervoor.
+
+Welke regel geldt, hangt af van de build die de oefening schreef
+(`clientVersion`, `rules.stamp_rules_276`), niet van de datum: een
+oefening van een oudere build, of zonder `clientVersion`, herspeelt zoals
+die build stempelde. Zo blijft elke stempel van vóór de release staan,
+zoals in de app (#168), en `validate` vergelijkt met wat de app schreef.
+M en P kunnen voor nieuwe oefeningen lager uitvallen: een leerdoel met
+één juist antwoord telt niet meer.
+
 ## Regelversie `1.0.19-eval6`
 
 PUNTENFORMULE v1.0.19, herspeeld uit `turn_history`. `eval6`

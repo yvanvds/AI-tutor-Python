@@ -924,7 +924,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.0.19-eval6", stdout)
+        self.assertIn("1.0.23-eval7", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1082,6 +1082,59 @@ class SupervisedWeightTest(unittest.TestCase):
         timetable = rules.reliability([], {}, turns, start, end, supervised=rules.by_timetable(self.LESSON))
         self.assertEqual((recorded.supervised_turns, recorded.home_turns), (1, 2))
         self.assertEqual((timetable.supervised_turns, timetable.home_turns), (2, 1))
+
+
+class StampRules276Test(unittest.TestCase):
+    """#276: since 2.12.0 the stamp needs evidence ≥ 5.75 — two right
+    answers — and only the question's target moves the ratchets. The replay
+    follows the build that wrote each turn (`clientVersion`), so a stamp an
+    older build set stays."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.12.0+29"}
+    OLD = {"clientVersion": "2.11.0+28"}
+
+    def right_on_hard(self, at: str, build: dict, **extra) -> dict:
+        return _turn(at, "sg-b", "predict_b1", uid="u-x", difficulty="hard",
+                     calibrationBefore="hard", calibrationAfter="hard",
+                     provenance="supervised", **build, **extra)
+
+    def test_one_right_answer_in_the_lesson_stamped_before_and_not_since(self):
+        old = rules.replay([self.right_on_hard("2026-10-14T09:00:00Z", self.OLD)], GOALS)[self.KEY]
+        new = rules.replay([self.right_on_hard("2026-10-28T09:00:00Z", self.NEW)], GOALS)[self.KEY]
+        for lo in (old, new):
+            self.assertAlmostEqual(lo.alpha, 4.5)  # 1 + 2.0 × 1.4 × 1.25
+        self.assertIsNotNone(old.first_mastered_at)
+        self.assertIsNone(new.first_mastered_at)
+
+    def test_the_second_right_answer_stamps(self):
+        turns = [self.right_on_hard("2026-10-28T09:00:00Z", self.NEW),
+                 self.right_on_hard("2026-10-28T09:05:00Z", self.NEW)]
+        lo = rules.replay(turns, GOALS)[self.KEY]
+        self.assertEqual(lo.first_mastered_at, rules.parse_at("2026-10-28T09:05:00Z"))
+
+    def test_a_turn_without_client_version_replays_as_before(self):
+        lo = rules.replay([self.right_on_hard("2026-09-20T09:00:00Z", {})], GOALS)[self.KEY]
+        self.assertIsNotNone(lo.first_mastered_at)
+
+    def test_a_side_signal_moves_no_ratchet_since(self):
+        # predict_b2: another LO of the active subgoal; the replay reads the
+        # subgoal, not the goal tree's list of its LOs.
+        side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
+        key = ("sg-b", "predict_b2")
+        old = rules.replay([self.right_on_hard("2026-10-14T09:00:00Z", self.OLD, loSignals=side)], GOALS)[key]
+        new = rules.replay([self.right_on_hard("2026-10-28T09:00:00Z", self.NEW, loSignals=side)], GOALS)[key]
+        self.assertEqual(old.ratchet, "hard")
+        self.assertIsNotNone(old.positive_at_calibrated_at)
+        self.assertAlmostEqual(new.alpha, old.alpha)  # the weight stays
+        self.assertIsNone(new.ratchet)
+        self.assertIsNone(new.positive_at_calibrated_at)
+
+    def test_the_build_version_reads_the_numbers_without_the_suffix(self):
+        self.assertEqual(rules.build_version({"clientVersion": "2.12.0+29"}), (2, 12, 0))
+        self.assertIsNone(rules.build_version({}))
+        self.assertFalse(rules.stamp_rules_276({"clientVersion": "2.11.0+28"}))
+        self.assertTrue(rules.stamp_rules_276({"clientVersion": "2.12.1+30"}))
 
 
 class NotchDropReplayTest(unittest.TestCase):

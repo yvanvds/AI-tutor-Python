@@ -640,6 +640,18 @@ A `writeCode` question targeting `for_loop_structure` may reveal the
 student handles `indentation_defines_block`; that signal lands in the
 indentation LO's belief.
 
+**But only the target is certified (#276, the narrow #257).** A signal
+on another LO of the active subgoal is a direct write: the question's
+difficulty and provenance in its weight, the strike counter (2.3), the
+probe clock (2.6). It moves neither ratchet (`lastPositiveAtCalibratedAt`,
+`highestPositiveDifficulty`, 4.3): the difficulty was chosen for the
+target, so a hard loop exercise does not show `indentation_defines_block`
+at hard. Mastery condition 3 for that LO waits for a question about it,
+which 2.1 asks anyway — an LO not mastered stays in the selection. Until
+#276 it moved both, and in the lesson time (3.2) two `moderate` side
+mentions — 2 × 1.0 × 1.4 × 1.25 = 3.5 on hard — stamped an LO nobody
+asked: 24 LOs in the week of 13–21 October.
+
 **Cross-subgoal incidental signals reach the earlier LO too (#108,
 #167).** The contract's scope for `loSignals` is the whole root goal,
 and the grading instructions ask for a signal on an *earlier* subgoal's
@@ -1306,11 +1318,12 @@ State after first 4 questions:
 
 | LO | α | β | mean | evidence |
 | --- | --- | --- | --- | --- |
-| `predict_branch` | 4 | 1 | 0.80 | 5 |
+| `predict_branch` | 5 | 1 | 0.83 | 6 |
 | `write_if_only` | 3 | 2 | 0.60 | 5 |
 | `write_if_else` | 1 | 1 | 0.50 | 2 |
 
-`predict_branch` formally meets mastery (mean ≥ 0.8, evidence ≥ 4).
+`predict_branch` formally meets mastery (mean ≥ 0.8, evidence ≥ 5.75):
+two strong positives at medium.
 
 **Q5: target `write_if_else`** (lowest mean unmastered), type
 `completeCode`, difficulty medium.
@@ -1319,7 +1332,7 @@ Answer correct. LLM emits strong-positive on `write_if_else`,
 weak-positive on `predict_branch` (incidental).
 
 - `write_if_else`: `α += 2.0 × 1.0 = 2.0` → `(3, 1)`, mean 0.75.
-- `predict_branch`: `α += 0.5 × 1.0 = 0.5` → `(4.5, 1)`, mean 0.82.
+- `predict_branch`: `α += 0.5 × 1.0 = 0.5` → `(5.5, 1)`, mean 0.85.
 
 **Q6: target `write_if_only`** (now lowest at 0.60), type `writeCode`
 (least-recently-used), difficulty medium.
@@ -1459,8 +1472,16 @@ An LO is mastered when **all three** conditions hold:
 
 1. **Belief mean ≥ 0.8.** The conductor is confident the student has
    it.
-2. **`α + β ≥ 4`.** That confidence is grounded in evidence beyond
-   the prior, not just one signal.
+2. **`α + β ≥ 5.75`.** That confidence is grounded in evidence beyond
+   the prior, not just one signal: two right answers, not one. The most
+   one answer can add is 3.5 (strong, hard, in the lesson time: 2.0 ×
+   1.4 × 1.25), which takes the prior to evidence 5.5; two strong right
+   answers on medium at home give 6, a hair less after the decay between
+   them. Until #276 the bar was 4, and since #219 weighs the lesson time
+   ×1.25 (3.2) one strong right answer on hard there was mastery on its
+   own — μ 0.82, evidence 5.5 — where at home it leaves μ at 0.79 (4.5).
+   57% of the stamps after 5 October fell on the first signal, against
+   13% before.
 3. **At least one positive signal contributing to current belief was
    at the student's calibration *at the time of the answer*, or
    higher.** This is the E.1 fix (see 4.3).
@@ -1511,8 +1532,9 @@ once for mastery to stick.
 
 **Tracking.** Add field `lastPositiveAtCalibratedAt: timestamp?` to
 `lo_beliefs`. Set whenever a positive signal arrives at the student's
-calibration *at the time of the answer*, or higher. Mastery
-condition 3 = field is non-null.
+calibration *at the time of the answer*, or higher, on a question about
+this LO — not from the side on another LO's question (2.4, #276).
+Mastery condition 3 = field is non-null.
 
 **Calibration changes don't invalidate old timestamps.** A student
 who was at `medium` and got demoted to `easy` retains the meaning of
@@ -1538,7 +1560,7 @@ touch it. Negatives, neutrals and follow-up grading (6.2) leave it
 alone, exactly like `lastPositiveAtCalibratedAt`. So does transfer
 credit (3.7): a credit is not a probe of the LO at any difficulty, so
 neither ratchet moves — only a direct, non-follow-up positive on the LO
-itself is ratchet-worthy. A warm-up review or recheck positive (1.5,
+itself, as the question's target (2.4, #276), is ratchet-worthy. A warm-up review or recheck positive (1.5,
 2.6) *is* one: the question was generated for that LO at a difficulty
 chosen for it, so
 both ratchets move exactly as on an active-subgoal probe. The conductor does
@@ -1573,14 +1595,18 @@ students who get genuinely stuck on specific things, damaging
 motivation and burning the calibration system. Pure "advance after
 N attempts" treats unmastered as mastered, which it isn't.
 
-**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 8` AND
+**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 10` AND
 mean < 0.6. A subgoal advances when all non-optional LOs are either
 **mastered or stuck**.
 
 Numbers:
 
-- `α + β ≥ 8` is the "tried enough" threshold. Doubles the mastery
-  evidence minimum (4) — meaningful effort.
+- `α + β ≥ 10` is the "tried enough" threshold — meaningful effort. It
+  was 8 until #276: 8 × 1.25, because a wrong answer in the lesson time
+  weighs ×1.25 too (3.2, #219). At 8 four strong wrong answers on hard in
+  the lesson made an LO stuck, the very answer at which the attempts rule
+  (2.3, #227) would have asked it a notch lower; with a follow-up or a
+  side signal, three did. At 10 the student gets the lower notch first.
 - mean < 0.6 is "still not getting it." Above 0.6 is on the upswing —
   keep probing.
 
@@ -1699,7 +1725,8 @@ optional LO gets none), each in one of three states:
   "student-side invisibility").
 
 The shape it replaces: from the prior one strong positive on hard
-leaves μ at 0.79, just under 0.8, and 2.1 asks every LO once before
+leaves μ at 0.79, just under 0.8 (and since #276 the evidence under
+5.75 in the lesson time too), and 2.1 asks every LO once before
 it asks one twice — so the cached share sat on 0 for the first round
 and then jumped. In the class data of 2026-10-04 half the subgoals
 started from cold kept the bar on 0 for at least 41% of their
@@ -1731,11 +1758,11 @@ Continuing from 3.6, end of Q9:
 
 | LO | α | β | mean | evidence | mastered? | stuck? |
 | --- | --- | --- | --- | --- | --- | --- |
-| `predict_branch` | 4.5 | 1 | 0.82 | 5.5 | yes | no |
+| `predict_branch` | 5.5 | 1 | 0.85 | 6.5 | yes | no |
 | `write_if_only` | 4.2 | 6 | 0.41 | 10.2 | no | **yes** |
 | `write_if_else` | 3 | 1 | 0.75 | 4 | no | no |
 
-`write_if_only` is stuck (`α + β = 10.2 ≥ 8`, mean 0.41 < 0.6).
+`write_if_only` is stuck (`α + β = 10.2 ≥ 10`, mean 0.41 < 0.6).
 
 **Q10: target `write_if_else`** (lowest-mean unmastered). Type
 rotates. Difficulty `medium` (calibrated).

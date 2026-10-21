@@ -60,7 +60,10 @@ LoDisplayState loDisplayStateOf({
 /// Condition 3 that answer meets itself: it is a positive at calibration.
 ///
 /// From the prior that is never true — one strong positive at hard leaves
-/// μ at 0.79 — and after one right answer on hard or medium it is.
+/// μ at 0.79 and the evidence at 4.8, under 5.75 (#276) — and after one
+/// right answer on hard or medium it is. In the lesson time the first right
+/// answer gives half and the second full: the home factor here is the
+/// lower bound.
 bool oneRightAnswerMasters({
   required BeliefSnapshot snap,
   required QuestionDifficulty calibration,
