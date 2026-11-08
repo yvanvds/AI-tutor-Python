@@ -4513,6 +4513,12 @@ abstract class AppLocalizations {
   /// **'In between: one check question on {title}, so you can show you\'ve got it now.'**
   String chat_notice_recheck(String title);
 
+  /// No description provided for @chat_notice_recheckAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'One more check question on {title}: you got the last one right.'**
+  String chat_notice_recheckAgain(String title);
+
   /// No description provided for @chat_notice_difficultyChanged.
   ///
   /// In en, this message translates to:

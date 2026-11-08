@@ -958,4 +958,34 @@ void main() {
       });
     });
   });
+
+  group('#275 isThinStamp', () {
+    LoBelief doc({DateTime? stamp, int? right, int? nonMcq}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 4,
+      beta: 1,
+      lastUpdatedAt: DateTime.utc(2026, 10, 1),
+      lastPositiveAtCalibratedAt: DateTime.utc(2026, 10, 1),
+      firstMasteredAt: stamp,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+    final stamp = DateTime.utc(2026, 10, 1);
+
+    test('a stamp on fewer than two right own questions, by the counts', () {
+      expect(isThinStamp(doc(stamp: stamp, right: 0, nonMcq: 0)), isTrue);
+      expect(isThinStamp(doc(stamp: stamp, right: 1, nonMcq: 0)), isTrue);
+      // Two picks are not thin by this rule: "minder dan twee juiste eigen
+      // vragen", the non-pick count plays no part.
+      expect(isThinStamp(doc(stamp: stamp, right: 2, nonMcq: 0)), isFalse);
+      expect(isThinStamp(doc(stamp: stamp, right: 3, nonMcq: 1)), isFalse);
+    });
+
+    test('no stamp, or no counts on the doc (a stamp from before they were '
+        'kept, until the release fills them): not thin', () {
+      expect(isThinStamp(doc(right: 0, nonMcq: 0)), isFalse);
+      expect(isThinStamp(doc(stamp: stamp)), isFalse);
+    });
+  });
 }

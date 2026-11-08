@@ -304,6 +304,11 @@ enum NotchDropRule {
   /// this session — the question or a follow-up on it — without a single
   /// `correct`.
   attemptsWithoutCorrect,
+
+  /// #275: a stuck LO (§4.4) that a recheck brings back (§2.6) comes back
+  /// one notch below the calibration first; the questions after it in the
+  /// same session are at calibration.
+  stuckReturn,
 }
 
 class TurnSelectionReason {
@@ -355,6 +360,13 @@ class PersistedTurnRecord {
   /// §2.6): like a warm-up, `subgoalId` and `targetLOIds` name an earlier
   /// subgoal and its LO. Omitted from the doc when false.
   final bool isRecheck;
+
+  /// Why a recheck brought its LO back (#275): the name of the conductor's
+  /// `RecheckRule` — `open` (a core LO without a stamp), `nearGoal`,
+  /// `unconfirmed`, `stuck` or `thin` (a thin stamp from before formula
+  /// 1.1) — so the evaluation can tell them apart. `null`, and omitted, on
+  /// every other turn and on rechecks written before the field.
+  final String? recheckRule;
 
   /// The subgoal the student was practising when the turn was about
   /// another one (a warm-up or a recheck); `null` — and omitted — on every
@@ -479,6 +491,7 @@ class PersistedTurnRecord {
     this.reviewFlags = const [],
     this.isWarmUp = false,
     this.isRecheck = false,
+    this.recheckRule,
     this.activeSubgoalId,
     this.clientVersion,
     this.usage,
@@ -505,6 +518,7 @@ class PersistedTurnRecord {
     'chainDepth': chainDepth,
     if (isWarmUp) 'isWarmUp': true,
     if (isRecheck) 'isRecheck': true,
+    if (recheckRule != null) 'recheckRule': recheckRule,
     if (activeSubgoalId != null) 'activeSubgoalId': activeSubgoalId,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
@@ -599,6 +613,7 @@ class PersistedTurnRecord {
       chainDepth: (doc['chainDepth'] as num?)?.toInt() ?? 0,
       isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
       isRecheck: (doc['isRecheck'] as bool?) ?? false,
+      recheckRule: doc['recheckRule'] as String?,
       activeSubgoalId: doc['activeSubgoalId'] as String?,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),

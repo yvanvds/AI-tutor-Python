@@ -11,6 +11,7 @@ import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+import 'package:ai_tutor_python/services/grading/milestone.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
@@ -53,6 +54,11 @@ class _Fakes {
 
   /// The debug events the conductor recorded, name and payload (#204).
   final List<(String, Map<String, Object?>?)> debugEvents = [];
+
+  /// The grading milestones the recheck slot reads (#275); with
+  /// [milestonesFail] the read throws.
+  final List<Milestone> milestones = [];
+  bool milestonesFail = false;
 
   String _key(String subgoalId, String loId) => '${subgoalId}__$loId';
 }
@@ -111,6 +117,10 @@ ConductorDeps _buildDeps(_Fakes f) {
       f.beliefs[f._key(b.subgoalId, b.loId)] = b;
     },
     appendTurnHistory: (record) async => f.turnHistory.add(record),
+    getMilestones: () async {
+      if (f.milestonesFail) throw StateError('milestones unavailable');
+      return f.milestones;
+    },
   );
 }
 
@@ -4731,8 +4741,8 @@ void main() {
     });
 
     test(
-      'the review clears the flag whichever way it went, and a failed '
-      'review does not re-flag: the LO is back on the staleness clock',
+      'the review clears the flag whichever way it went; a failed review '
+      'does not re-flag, but brings the LO back at the next session (#275)',
       () async {
         final s = await setup([older('lo-print', regressedAt: aMinuteAgo)]);
         final plan = await s.c.planNext();
@@ -4750,7 +4760,24 @@ void main() {
         // A direct probe debits honestly, at full weight.
         expect(after.beta, greaterThan(1.0));
         expect(after.regressedAt, isNull);
-        // Fresh and unflagged: no review next session.
+        // #275: not right, so back at the next session instead of after
+        // another 30 days — "in plaats van na 7 of 30 dagen".
+        expect(after.returnWrongAt, after.lastUpdatedAt);
+        await s.c.setTarget();
+        final again = await s.c.planNext();
+        expect(again.isWarmUp, isTrue);
+        expect(again.targetLOs.single.id, 'lo-print');
+        expect(again.reason.chosenReason, contains('not right'));
+        s.c.notePlannedQuestion(again);
+        await s.c.integrateAnswer(
+          plan: again,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.correct,
+            signals: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
+          ),
+        );
+        // Right this time: settled, and on the staleness clock again.
+        expect(stored(s.f, 'lo-print').returnWrongAt, isNull);
         await s.c.setTarget();
         expect((await s.c.planNext()).isWarmUp, isFalse);
       },
@@ -5475,7 +5502,9 @@ void main() {
       expect((await s.c.planNext()).isRecheck, isTrue);
       final first = await s.c.planNext();
       expect(first.targetLOs.single.id, 'lo-input');
-      await grade(s, first);
+      // Not right (#275): no question after it in this session, and the
+      // LO is back at the next one.
+      await grade(s, first, quality: AnswerQuality.wrong);
 
       for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
         final plan = _expectQuestion(await s.c.planNext());
@@ -5489,6 +5518,9 @@ void main() {
 
       s.c.notePlannedQuestion(second);
       expect((await s.c.planNext()).isRecheck, isFalse);
+      // A new session opens the slot again. "lo-input" is due again too
+      // (#275), but its wrong answer took it under the near-goal window;
+      // a core LO would come back (the #275 group).
       await s.c.setTarget();
       expect((await s.c.planNext()).targetLOs.single.id, 'lo-print');
     });
@@ -5873,6 +5905,12 @@ void main() {
         expect(first.targetLOs.single.id, 'lo-print');
         expect(first.reason.candidateLOs, hasLength(2));
         await grade(s, first);
+        // Right, and not mastered yet (#275): the next question is on it
+        // again, past the spacing. Fired; the spacing counts from it.
+        final again = await s.c.planNext();
+        expect(again.recheck!.chained, isTrue);
+        expect(again.targetLOs.single.id, 'lo-print');
+        s.c.notePlannedQuestion(again);
         for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
           s.c.notePlannedQuestion(_expectQuestion(await s.c.planNext()));
         }
@@ -5915,8 +5953,8 @@ void main() {
         },
       );
 
-      test('a wrong answer that leaves the belief high restarts the clock: no '
-          'recheck for a week, then it comes back', () async {
+      test('a wrong answer that leaves the belief high restarts the clock: not '
+          'again in this session, back at the next one (#275)', () async {
         // (18.6, 1): one strong wrong answer leaves μ at 0.81 after
         // forgetting (#278); from (18.6, 1.4) it would be 0.799.
         final s = await setup([high('lo-print', beta: 1.0)]);
@@ -5931,12 +5969,16 @@ void main() {
         expect(after.lastPositiveAtCalibratedAt, isNull);
         expect(after.firstMasteredAt, isNull);
         expect(after.lastProbedAt, after.lastUpdatedAt);
-        await s.c.setTarget();
+        expect(after.returnWrongAt, after.lastUpdatedAt);
+        for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
+          final plan = _expectQuestion(await s.c.planNext());
+          expect(plan.isRecheck, isFalse, reason: 'question ${i + 1}');
+          s.c.notePlannedQuestion(plan);
+        }
         expect((await s.c.planNext()).isRecheck, isFalse);
 
-        s.f.beliefs[s.f._key('s0', 'lo-print')] = after.copyWith(
-          lastProbedAt: daysAgo(8),
-        );
+        // "Fout: het leerdoel komt in de volgende sessie terug, in plaats
+        // van na 7 of 30 dagen."
         await s.c.setTarget();
         expect((await s.c.planNext()).recheck?.rule, RecheckRule.unconfirmed);
       });
@@ -6625,6 +6667,581 @@ void main() {
         expect(f.selection.activeChildGoal?.id, 's2');
         expect(f.loDisplay!.subgoalId, 's2');
         expect(states(f), {'lo-v': LoDisplayState.empty});
+      },
+    );
+  });
+
+  // ---- #275 what comes back: stuck, open and thin -------------------------
+  group('#275 what comes back: stuck LOs, open core LOs (earlier roots too), '
+      'thin stamps from before 1.1', () {
+    const oldLo = LearningObjective(
+      id: 'lo-old',
+      statement: 'old',
+      kind: LoKind.apply,
+    );
+    const extLo = LearningObjective(
+      id: 'lo-ext',
+      statement: 'ext',
+      kind: LoKind.apply,
+    );
+    const printLo = LearningObjective(
+      id: 'lo-print',
+      statement: 'print',
+      kind: LoKind.apply,
+    );
+    const varLo = LearningObjective(
+      id: 'lo-var',
+      statement: 'variables',
+      kind: LoKind.apply,
+    );
+    // An earlier root, all its subgoals finished, and the active root:
+    // "Print" left behind, "Variables" active.
+    final earlierRoot = Goal(id: 'r0', title: 'Earlier', order: 0);
+    final activeRoot = Goal(id: 'r1', title: 'Now', order: 1000);
+    final oldGoal = Goal(
+      id: 'e0',
+      title: 'Old topic',
+      parentId: 'r0',
+      order: 0,
+      objectives: const [oldLo, extLo],
+    );
+    final printGoal = Goal(
+      id: 's0',
+      title: 'Print',
+      parentId: 'r1',
+      order: 0,
+      objectives: const [printLo],
+    );
+    final active = Goal(
+      id: 's1',
+      title: 'Variables',
+      parentId: 'r1',
+      order: 1000,
+      objectives: const [varLo],
+    );
+    final now = DateTime.now().toUtc();
+    DateTime daysAgo(int d) => now.subtract(Duration(days: d));
+
+    /// A full calibration window: [correct] of 10 right at [at].
+    List<CalibrationAnswer> window(
+      QuestionDifficulty at, {
+      int correct = PolicyConstants.calibrationWindow,
+    }) => [
+      for (var i = 0; i < PolicyConstants.calibrationWindow; i++)
+        CalibrationAnswer(
+          quality: i < correct ? AnswerQuality.correct : AnswerQuality.wrong,
+          difficulty: at,
+          at: daysAgo(1),
+        ),
+    ];
+
+    /// A milestone over [subgoalIds] whose deadline is [dueInDays] from
+    /// now (negative: passed), counting [core] (`subgoal/lo`) as core.
+    Milestone milestone(
+      String id, {
+      required List<String> subgoalIds,
+      required Set<String> core,
+      int dueInDays = 10,
+    }) => Milestone(
+      id: id,
+      title: id,
+      periodStart: daysAgo(60),
+      dueAt: now.add(Duration(days: dueInDays)),
+      expectedDifficulty: QuestionDifficulty.medium,
+      subgoalIds: subgoalIds,
+      coreLoKeys: core,
+    );
+
+    /// A belief without a stamp: (α, β), [own] own questions, last asked
+    /// directly [probedAt] (ten days ago by default), with the counts of
+    /// #279 kept.
+    LoBelief belief(
+      String subgoalId,
+      String loId, {
+      double alpha = 3,
+      double beta = 3,
+      int own = 3,
+      DateTime? probedAt,
+      int right = 1,
+      int nonMcq = 1,
+      DateTime? firstMasteredAt,
+      DateTime? lastPositiveAtCalibratedAt,
+      DateTime? returnWrongAt,
+      bool counts = true,
+    }) {
+      final probed = probedAt ?? daysAgo(10);
+      return LoBelief(
+        subgoalId: subgoalId,
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: probed,
+        lastQuestionType: 'completeCodeQuestion',
+        lastPositiveAtCalibratedAt: lastPositiveAtCalibratedAt,
+        highestPositiveDifficulty: lastPositiveAtCalibratedAt == null
+            ? null
+            : QuestionDifficulty.medium,
+        firstMasteredAt: firstMasteredAt,
+        lastProbedAt: probed,
+        ownQuestions: own,
+        ownQuestionsRight: counts ? right : null,
+        ownQuestionsRightNonMcq: counts ? nonMcq : null,
+        returnWrongAt: returnWrongAt,
+      );
+    }
+
+    /// Stuck: μ 2/7 ≈ 0.29 on six own questions (§4.4).
+    LoBelief stuckBelief(String subgoalId, String loId) =>
+        belief(subgoalId, loId, alpha: 2, beta: 5, own: 6, right: 0, nonMcq: 0);
+
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LoBelief> beliefs, {
+      List<Milestone> milestones = const [],
+      QuestionDifficulty calibration = QuestionDifficulty.medium,
+      List<CalibrationAnswer>? recent,
+      bool milestonesFail = false,
+    }) async {
+      final f = _Fakes();
+      f.roots.addAll([earlierRoot, activeRoot]);
+      f.children[earlierRoot.id] = [oldGoal];
+      f.children[activeRoot.id] = [printGoal, active];
+      f.progressById['e0'] = Progress(
+        goalID: 'e0',
+        progress: 0.5,
+        advancedAt: daysAgo(30),
+      );
+      f.progressById['r0'] = Progress(goalID: 'r0', progress: 0.5);
+      f.progressById['s0'] = Progress(
+        goalID: 's0',
+        progress: 0.0,
+        advancedAt: daysAgo(10),
+      );
+      f.milestones.addAll(milestones);
+      f.milestonesFail = milestonesFail;
+      f.calibration = StudentCalibration(
+        difficulty: calibration,
+        recentAnswers: recent ?? window(calibration),
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(f.selection.activeChildGoal?.id, 's1');
+      expect(f.selection.activeRootGoal?.id, 'r1');
+      return (c: c, f: f);
+    }
+
+    LoBelief stored(_Fakes f, String subgoalId, String loId) =>
+        f.beliefs[f._key(subgoalId, loId)]!;
+
+    /// Fires [plan] and grades it: the target's own signal plus [extra].
+    Future<TurnOutcome> grade(
+      ({Conductor c, _Fakes f}) s,
+      QuestionPlan plan, {
+      AnswerQuality quality = AnswerQuality.correct,
+      List<GradedSignal> extra = const [],
+      List<GradedTransfer> transferLOs = const [],
+    }) {
+      s.c.notePlannedQuestion(plan);
+      return s.c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: [
+            GradedSignal(
+              subgoalId: plan.targetSubgoalIdOr('s1')!,
+              loId: plan.targetLOs.single.id,
+              kind: quality == AnswerQuality.correct
+                  ? LoSignalKind.positive
+                  : LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+            ...extra,
+          ],
+          transferLOs: transferLOs,
+        ),
+      );
+    }
+
+    /// Plans and fires [n] questions, none of them a recheck.
+    Future<void> ordinary(({Conductor c, _Fakes f}) s, int n) async {
+      for (var i = 0; i < n; i++) {
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isRecheck, isFalse, reason: 'question ${i + 1}');
+        s.c.notePlannedQuestion(plan);
+      }
+    }
+
+    final openMilestone = milestone(
+      'm-open',
+      subgoalIds: const ['e0', 's0'],
+      core: const {'e0/lo-old', 's0/lo-print'},
+    );
+
+    test('an open core LO of an earlier root comes back at any mean under '
+        'the bar: a recheck under that root, at the calibration', () async {
+      final s = await setup(
+        [belief('e0', 'lo-old')],
+        milestones: [openMilestone],
+      );
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.isRecheck, isTrue);
+      expect(plan.recheck!.rule, RecheckRule.open);
+      expect(plan.recheck!.subgoal.id, 'e0');
+      expect(plan.recheck!.root?.id, 'r0');
+      expect(plan.offRoot?.id, 'r0');
+      expect(plan.recheck!.chained, isFalse);
+      expect(plan.targetLOs.single.id, 'lo-old');
+      expect(plan.difficulty, QuestionDifficulty.medium);
+      expect(plan.reason.notchDropFired, isFalse);
+      expect(plan.reason.chosenReason, contains('open core'));
+
+      // A recheck of the active root has no root of its own.
+      final same = await setup(
+        [belief('s0', 'lo-print')],
+        milestones: [openMilestone],
+      );
+      final samePlan = await same.c.planNext();
+      expect(samePlan.recheck!.rule, RecheckRule.open);
+      expect(samePlan.recheck!.root, isNull);
+    });
+
+    test('only a core LO: one no milestone counts as core keeps the near-goal '
+        'window — at μ 0.5 nothing, at 0.76 a near goal; a core LO in the '
+        'window is open', () async {
+      expect(
+        (await (await setup([belief('e0', 'lo-old')])).c.planNext()).isRecheck,
+        isFalse,
+      );
+      final near = belief('e0', 'lo-old', alpha: 7.7, beta: 2.3);
+      expect(
+        (await (await setup([near])).c.planNext()).recheck?.rule,
+        RecheckRule.nearGoal,
+      );
+      expect(
+        (await (await setup(
+          [near],
+          milestones: [openMilestone],
+        )).c.planNext()).recheck?.rule,
+        RecheckRule.open,
+      );
+    });
+
+    test('the clock and the brake: a week without a direct probe, or never '
+        'one; good recent work', () async {
+      Future<RecheckRule?> ruleOf(
+        LoBelief b, {
+        List<CalibrationAnswer>? recent,
+      }) async => (await (await setup(
+        [b],
+        milestones: [openMilestone],
+        recent: recent,
+      )).c.planNext()).recheck?.rule;
+
+      expect(
+        await ruleOf(belief('e0', 'lo-old', probedAt: daysAgo(3))),
+        isNull,
+      );
+      // Touched from the side only: never asked directly, due at once.
+      expect(
+        await ruleOf(
+          LoBelief(
+            subgoalId: 'e0',
+            loId: 'lo-old',
+            alpha: 2,
+            beta: 1,
+            lastUpdatedAt: daysAgo(1),
+          ),
+        ),
+        RecheckRule.open,
+      );
+      expect(
+        await ruleOf(
+          belief('e0', 'lo-old'),
+          recent: window(QuestionDifficulty.medium, correct: 6),
+        ),
+        isNull,
+      );
+      expect(
+        await ruleOf(
+          stuckBelief('e0', 'lo-old'),
+          recent: window(QuestionDifficulty.medium, correct: 6),
+        ),
+        isNull,
+      );
+    });
+
+    test('its grade is a direct probe of that LO, not one outside the active '
+        'root; another LO of that subgoal is dropped, and so is a transfer '
+        'credit there', () async {
+      final s = await setup(
+        [
+          belief('e0', 'lo-old'),
+          belief(
+            'e0',
+            'lo-ext',
+            alpha: 5,
+            beta: 1,
+            firstMasteredAt: daysAgo(40),
+            lastPositiveAtCalibratedAt: daysAgo(40),
+            probedAt: daysAgo(40),
+          ).copyWith(lastUpdatedAt: daysAgo(1)),
+        ],
+        milestones: [openMilestone],
+      );
+      final plan = await s.c.planNext();
+      expect(plan.targetLOs.single.id, 'lo-old');
+      final outcome = await grade(
+        s,
+        plan,
+        extra: const [
+          GradedSignal(
+            subgoalId: 'e0',
+            loId: 'lo-ext',
+            kind: LoSignalKind.positive,
+            strength: LoSignalStrength.strong,
+          ),
+        ],
+        transferLOs: const [GradedTransfer(subgoalId: 'e0', loId: 'lo-ext')],
+      );
+      expect(outcome.appliedSignals.single.subgoalId, 'e0');
+      expect(outcome.appliedSignals.single.loId, 'lo-old');
+      expect(outcome.transferCredits, isEmpty);
+      expect(
+        outcome.droppedSignals.map((d) => (d.signal.loId, d.reason)),
+        contains(('lo-ext', SignalDropReason.outsideActiveRoot)),
+      );
+      final after = stored(s.f, 'e0', 'lo-old');
+      expect(after.ownQuestions, 4);
+      expect(after.ownQuestionsRight, 2);
+      expect(after.lastProbedAt, after.lastUpdatedAt);
+      expect(after.lastPositiveAtCalibratedAt, after.lastUpdatedAt);
+      expect(stored(s.f, 'e0', 'lo-ext').alpha, 5);
+    });
+
+    test('order: a milestone whose deadline has not passed first, then the '
+        'rest; the deadline day itself still counts', () async {
+      final closed = milestone(
+        'm-closed',
+        subgoalIds: const ['e0'],
+        core: const {'e0/lo-old'},
+        dueInDays: -20,
+      );
+      final open = milestone(
+        'm-open',
+        subgoalIds: const ['s0'],
+        core: const {'s0/lo-print'},
+      );
+      final s = await setup(
+        [
+          // Waited longer, but its milestone is closed.
+          belief('e0', 'lo-old', probedAt: daysAgo(30)),
+          belief('s0', 'lo-print'),
+        ],
+        milestones: [closed, open],
+      );
+      final first = await s.c.planNext();
+      expect(first.targetLOs.single.id, 'lo-print');
+      expect(first.reason.candidateLOs.map((c) => c.loId), contains('lo-old'));
+
+      final today = DateTime.now();
+      Milestone dueOn(DateTime day) => milestone(
+        'm',
+        subgoalIds: const [],
+        core: const {},
+      ).copyWith(dueAt: DateTime(day.year, day.month, day.day));
+      expect(Conductor.isMilestoneOpen(dueOn(today), now), isTrue);
+      expect(
+        Conductor.isMilestoneOpen(
+          dueOn(today.subtract(const Duration(days: 1))),
+          now,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a stuck LO comes back a notch lower first: a notch drop, no '
+        'positive at calibration; at easy it stays easy', () async {
+      final s = await setup([stuckBelief('s0', 'lo-print')]);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.recheck!.rule, RecheckRule.stuck);
+      expect(plan.difficulty, QuestionDifficulty.easy);
+      expect(plan.reason.notchDropFired, isTrue);
+      expect(plan.reason.notchDropRules, [NotchDropRule.stuckReturn]);
+      expect(plan.reason.chosenReason, contains('stuck'));
+      await grade(s, plan);
+      final after = stored(s.f, 's0', 'lo-print');
+      expect(after.lastPositiveAtCalibratedAt, isNull);
+      expect(after.highestPositiveDifficulty, QuestionDifficulty.easy);
+      expect(after.ownQuestions, 7);
+
+      final easy = await setup([
+        stuckBelief('e0', 'lo-old'),
+      ], calibration: QuestionDifficulty.easy);
+      final easyPlan = await easy.c.planNext();
+      expect(easyPlan.recheck!.rule, RecheckRule.stuck);
+      expect(easyPlan.difficulty, QuestionDifficulty.easy);
+      expect(easyPlan.reason.notchDropFired, isFalse);
+      expect(easyPlan.reason.notchDropRules, isEmpty);
+    });
+
+    test('right: the next question on that LO comes in the same session, '
+        'past the spacing, at the calibration, of another type — until an '
+        'answer is not right', () async {
+      final s = await setup([stuckBelief('s0', 'lo-print')]);
+      final first = await s.c.planNext();
+      expect(first.type, ChatRequestType.completeCodeQuestion);
+      await grade(s, first);
+
+      final second = _expectQuestion(await s.c.planNext());
+      expect(second.isRecheck, isTrue);
+      expect(second.recheck!.chained, isTrue);
+      expect(second.recheck!.rule, RecheckRule.stuck);
+      expect(second.targetLOs.single.id, 'lo-print');
+      expect(second.difficulty, QuestionDifficulty.medium);
+      expect(second.reason.notchDropFired, isFalse);
+      expect(second.type, ChatRequestType.writeCodeQuestion);
+      expect(second.reason.chosenReason, contains('again after a right'));
+      // Planning stays repeatable until it is fired.
+      expect((await s.c.planNext()).recheck?.chained, isTrue);
+      await grade(s, second);
+      expect(
+        stored(s.f, 's0', 'lo-print').lastPositiveAtCalibratedAt,
+        isNotNull,
+      );
+
+      final third = await s.c.planNext();
+      expect(third.recheck?.chained, isTrue);
+      expect(third.type, ChatRequestType.completeCodeQuestion);
+      await grade(s, third, quality: AnswerQuality.wrong);
+
+      // Not right: the run ends, and the spacing counts from it.
+      expect(stored(s.f, 's0', 'lo-print').returnWrongAt, isNotNull);
+      await ordinary(s, PolicyConstants.recheckSpacing);
+      expect((await s.c.planNext()).isRecheck, isFalse);
+    });
+
+    test('a right answer that masters the LO ends the run: no question after '
+        'it', () async {
+      // μ ≈ 0.77 on seven own questions, one right non-pick on record: one
+      // right answer at medium takes it over the bar with its second.
+      final s = await setup(
+        [belief('s0', 'lo-print', alpha: 8.5, beta: 2.2, own: 7)],
+        milestones: [openMilestone],
+      );
+      final plan = await s.c.planNext();
+      expect(plan.recheck!.rule, RecheckRule.open);
+      await grade(s, plan);
+      expect(stored(s.f, 's0', 'lo-print').firstMasteredAt, isNotNull);
+      final next = _expectQuestion(await s.c.planNext());
+      expect(next.isRecheck, isFalse);
+      expect(next.targetLOs.single.id, 'lo-var');
+    });
+
+    test('not right: not again in this session, back at the next — whatever '
+        'its clock, and before an LO that waited longer', () async {
+      final s = await setup(
+        [
+          belief('e0', 'lo-old'),
+          belief('s0', 'lo-print', probedAt: daysAgo(30)),
+        ],
+        milestones: [openMilestone],
+      );
+      final first = await s.c.planNext();
+      expect(first.targetLOs.single.id, 'lo-print');
+      await grade(s, first, quality: AnswerQuality.wrong);
+      final after = stored(s.f, 's0', 'lo-print');
+      expect(after.returnWrongAt, after.lastUpdatedAt);
+      expect(after.lastProbedAt, after.lastUpdatedAt);
+
+      // The slot opens again: the other LO, not this one.
+      await ordinary(s, PolicyConstants.recheckSpacing);
+      final second = await s.c.planNext();
+      expect(second.targetLOs.single.id, 'lo-old');
+      s.c.notePlannedQuestion(second);
+
+      // The next session: it comes back first, asked minutes ago or not.
+      await s.c.setTarget();
+      final again = await s.c.planNext();
+      expect(again.isRecheck, isTrue);
+      expect(again.targetLOs.single.id, 'lo-print');
+      await grade(s, again);
+      expect(stored(s.f, 's0', 'lo-print').returnWrongAt, isNull);
+
+      // And the brake still holds for it.
+      final struggling = await setup(
+        [
+          belief(
+            's0',
+            'lo-print',
+            probedAt: daysAgo(1),
+            returnWrongAt: daysAgo(1),
+          ),
+        ],
+        milestones: [openMilestone],
+        recent: window(QuestionDifficulty.medium, correct: 5),
+      );
+      expect((await struggling.c.planNext()).isRecheck, isFalse);
+    });
+
+    test('a thin stamp from before 1.1 gets one check a week after its last '
+        'probe; the stamp stays whatever the answer, and it is not asked '
+        'as thin again', () async {
+      final stamped = daysAgo(20);
+      LoBelief thin({bool counts = true, int right = 1, DateTime? probedAt}) =>
+          belief(
+            's0',
+            'lo-print',
+            alpha: 3.8,
+            beta: 2.2,
+            right: right,
+            counts: counts,
+            probedAt: probedAt,
+            firstMasteredAt: stamped,
+            lastPositiveAtCalibratedAt: stamped,
+          );
+      Future<RecheckRule?> ruleOf(LoBelief b) async =>
+          (await (await setup([b])).c.planNext()).recheck?.rule;
+
+      expect(await ruleOf(thin()), RecheckRule.thin);
+      // Without the counts the stamp is not thin: it came before them.
+      expect(await ruleOf(thin(counts: false)), isNull);
+      expect(await ruleOf(thin(right: 2)), isNull);
+      expect(await ruleOf(thin(probedAt: daysAgo(3))), isNull);
+
+      final s = await setup([thin()]);
+      final plan = await s.c.planNext();
+      expect(plan.recheck!.rule, RecheckRule.thin);
+      expect(plan.difficulty, QuestionDifficulty.medium);
+      expect(plan.reason.chosenReason, contains('thin'));
+      await grade(s, plan, quality: AnswerQuality.wrong);
+      final after = stored(s.f, 's0', 'lo-print');
+      expect(after.firstMasteredAt, stamped);
+      expect(after.thinCheckedAt, after.lastUpdatedAt);
+      expect(after.returnWrongAt, isNull);
+      // No question after it, and none in a later session either.
+      expect((await s.c.planNext()).isRecheck, isFalse);
+      s.f.beliefs[s.f._key('s0', 'lo-print')] = after.copyWith(
+        lastProbedAt: daysAgo(8),
+      );
+      await s.c.setTarget();
+      expect((await s.c.planNext()).isRecheck, isFalse);
+    });
+
+    test(
+      'the milestones cannot be read: the slot works without them',
+      () async {
+        final s = await setup(
+          [belief('s0', 'lo-print', alpha: 7.7, beta: 2.3)],
+          milestones: [openMilestone],
+          milestonesFail: true,
+        );
+        expect((await s.c.planNext()).recheck?.rule, RecheckRule.nearGoal);
+        expect(
+          s.f.debugEvents.map((e) => e.$1),
+          contains('conductor.milestones_unread'),
+        );
       },
     );
   });

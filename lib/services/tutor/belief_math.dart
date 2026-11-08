@@ -459,6 +459,20 @@ bool needsNonMcqQuestion({
       );
 }
 
+/// A thin stamp (#275, formula 1.1, CONDUCTOR_POLICY §2.6): a stamp
+/// (`firstMasteredAt`) on fewer than `masteryRightOwnQuestionsMin` right own
+/// questions, by the counts of #279. Only a stamp from before 1.1 can be
+/// one — since 1.1 the stamp wants those questions (condition 4 of §4.1).
+/// A doc without the counts ([LoBelief.hasRightCounts]) is no thin stamp:
+/// its stamp came before they were kept, and the conductor leaves them
+/// missing until the release fills them from `turn_history` (#281), so the
+/// old stamps do not all come back at once. The non-pick count plays no
+/// part: the teacher's rule is "minder dan twee juiste eigen vragen".
+bool isThinStamp(LoBelief b) =>
+    b.firstMasteredAt != null &&
+    b.hasRightCounts &&
+    (b.ownQuestionsRight ?? 0) < PolicyConstants.masteryRightOwnQuestionsMin;
+
 /// Stuck rule (CONDUCTOR_POLICY 4.4, #278). Computed live, never stored.
 ///
 /// Stuck = tried enough, and still not getting it: at least

@@ -121,6 +121,22 @@ class LoBelief {
   /// [ownQuestionsRight] is (`LoState.own_right_open` in the tooling).
   final int? ownQuestionsRightNonMcq;
 
+  /// When a question that brought this LO back — a warm-up review (§1.5) or
+  /// a recheck (§2.6), not the one check of a thin stamp — was last
+  /// answered not right (#275, formula 1.1): the LO is due again at the
+  /// next session, whatever its clock, instead of after 7 or 30 days. Set
+  /// by that answer, cleared by the LO's next own question that is not such
+  /// a miss (a right one, or any question on its own subgoal); a follow-up,
+  /// a side signal and a transfer credit leave it. Missing: not due early.
+  final DateTime? returnWrongAt;
+
+  /// When this LO's thin stamp got its one check question (#275, formula
+  /// 1.1): a stamp from before 1.1 on fewer than two right own questions
+  /// (`belief_math.isThinStamp`) gets one recheck a week after its last
+  /// direct probe, and the stamp stays whatever the answer. Set by that
+  /// check's write; while set, the LO is not checked as thin again.
+  final DateTime? thinCheckedAt;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -137,6 +153,8 @@ class LoBelief {
     this.ownQuestions = 0,
     this.ownQuestionsRight,
     this.ownQuestionsRightNonMcq,
+    this.returnWrongAt,
+    this.thinCheckedAt,
   });
 
   /// Whether the doc keeps the counts of #279 ([ownQuestionsRight],
@@ -152,8 +170,9 @@ class LoBelief {
   DateTime? get lastDirectProbeAt =>
       lastProbedAt ?? (lastQuestionType != null ? lastUpdatedAt : null);
 
-  /// [regressedAt] is the one field that legitimately goes back to `null`
-  /// (a review clears it), hence the explicit [clearRegressedAt].
+  /// [regressedAt] and [returnWrongAt] are the fields that legitimately go
+  /// back to `null` (a review, or a right answer, clears them), hence the
+  /// explicit [clearRegressedAt] and [clearReturnWrongAt].
   LoBelief copyWith({
     double? alpha,
     double? beta,
@@ -169,6 +188,9 @@ class LoBelief {
     int? ownQuestions,
     int? ownQuestionsRight,
     int? ownQuestionsRightNonMcq,
+    DateTime? returnWrongAt,
+    bool clearReturnWrongAt = false,
+    DateTime? thinCheckedAt,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -190,6 +212,10 @@ class LoBelief {
       ownQuestionsRight: ownQuestionsRight ?? this.ownQuestionsRight,
       ownQuestionsRightNonMcq:
           ownQuestionsRightNonMcq ?? this.ownQuestionsRightNonMcq,
+      returnWrongAt: clearReturnWrongAt
+          ? null
+          : (returnWrongAt ?? this.returnWrongAt),
+      thinCheckedAt: thinCheckedAt ?? this.thinCheckedAt,
     );
   }
 
@@ -226,6 +252,10 @@ class LoBelief {
     if (ownQuestionsRight != null) 'ownQuestionsRight': ownQuestionsRight,
     if (ownQuestionsRightNonMcq != null)
       'ownQuestionsRightNonMcq': ownQuestionsRightNonMcq,
+    if (returnWrongAt != null)
+      'returnWrongAt': returnWrongAt!.toUtc().toIso8601String(),
+    if (thinCheckedAt != null)
+      'thinCheckedAt': thinCheckedAt!.toUtc().toIso8601String(),
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -275,6 +305,12 @@ class LoBelief {
         final num n => n.toInt(),
         _ => null,
       },
+      returnWrongAt: doc['returnWrongAt'] is String
+          ? DateTime.tryParse(doc['returnWrongAt'] as String)
+          : null,
+      thinCheckedAt: doc['thinCheckedAt'] is String
+          ? DateTime.tryParse(doc['thinCheckedAt'] as String)
+          : null,
     );
   }
 }

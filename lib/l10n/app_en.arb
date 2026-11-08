@@ -1556,6 +1556,10 @@
   "@chat_notice_recheck": {
     "placeholders": { "title": { "type": "String" } }
   },
+  "chat_notice_recheckAgain": "One more check question on {title}: you got the last one right.",
+  "@chat_notice_recheckAgain": {
+    "placeholders": { "title": { "type": "String" } }
+  },
   "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",
   "@chat_notice_difficultyChanged": {
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }

@@ -26,6 +26,7 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+import 'package:ai_tutor_python/services/grading/milestone_service.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
@@ -553,6 +554,8 @@ class TutorService extends Notifier<TutorState> {
       upsertLoBelief: (b) => ref.read(loBeliefsServiceProvider).upsert(b),
       appendTurnHistory: (record) =>
           ref.read(turnHistoryServiceProvider).append(record),
+      // The recheck slot's core LOs and order (#275).
+      getMilestones: () => ref.read(milestoneServiceProvider).getAllOnce(),
     );
   }
 
@@ -681,9 +684,15 @@ class TutorService extends Notifier<TutorState> {
       final page = type == ChatRequestType.contentQuestion
           ? await _pageSubgoal(selection)
           : null;
+      final offPlan = plan ?? _inFlightPlan;
       final subgoalOverride = type == ChatRequestType.contentQuestion
           ? page?.subgoal
-          : (plan ?? _inFlightPlan)?.offSubgoal;
+          : offPlan?.offSubgoal;
+      // A recheck of an earlier root (#275) is prompted under that goal,
+      // as a page of an earlier goal is (#272).
+      final goalOverride = type == ChatRequestType.contentQuestion
+          ? page?.goal
+          : offPlan?.offRoot;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
         goalSelection: selection,
@@ -695,9 +704,12 @@ class TutorService extends Notifier<TutorState> {
         // so switching language changes the very next question.
         languageCode: ref.read(appLocaleProvider).languageCode,
         targetLOs: plan?.targetLOs ?? const [],
-        goalScopeLOs: await _buildGoalScopeLOs(selection),
+        goalScopeLOs: await _buildGoalScopeLOs(
+          selection,
+          offSubgoal: offPlan?.offSubgoal,
+        ),
         subgoalOverride: subgoalOverride,
-        goalOverride: page?.goal,
+        goalOverride: goalOverride,
         // A question asked next to an open quiz, or while it waits behind
         // the theory, must not give its answer away (#271).
         quizOpen: ref.read(activeMcqProvider) != null,
@@ -842,15 +854,18 @@ class TutorService extends Notifier<TutorState> {
   }
 
   Future<List<({String subgoalId, LearningObjective lo})>> _buildGoalScopeLOs(
-    GoalSelectionState selection,
-  ) async {
+    GoalSelectionState selection, {
+    Goal? offSubgoal,
+  }) async {
     // Returns subgoalId × LearningObjective entries for every subgoal in
     // the active root, used by the grader's `goal_scope_los` payload (per
     // LLM_CONTRACT). Wrapped in a record list to keep the public surface
-    // import-free.
+    // import-free. [offSubgoal] is the subgoal of a warm-up review or a
+    // recheck; when it lies under another root (#275) it joins the scope,
+    // so the grader can file the signal on the asked LO.
     final root = selection.activeRootGoal;
     if (root == null) return const [];
-    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
+    final subs = await _scopeSubgoals(root, offSubgoal: offSubgoal);
     final out = <({String subgoalId, LearningObjective lo})>[];
     for (final sub in subs) {
       for (final o in sub.objectives) {
@@ -858,6 +873,18 @@ class TutorService extends Notifier<TutorState> {
       }
     }
     return out;
+  }
+
+  /// The grading scope's subgoals (LLM_CONTRACT part 3): the active
+  /// [root]'s, plus [offSubgoal] when a recheck asks about a subgoal of an
+  /// earlier root (#275) — that one subgoal, not its root: its other LOs
+  /// stay out of the conductor's reach (`outsideActiveRoot`).
+  Future<List<Goal>> _scopeSubgoals(Goal root, {Goal? offSubgoal}) async {
+    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
+    if (offSubgoal == null || subs.any((g) => g.id == offSubgoal.id)) {
+      return subs;
+    }
+    return [...subs, offSubgoal];
   }
 
   Future<_RequestInput?> _buildRequestInput({
@@ -994,7 +1021,7 @@ class TutorService extends Notifier<TutorState> {
   Future<List<({String subgoalId, LearningObjective lo})>> _buildGradingScope(
     GoalSelectionState selection,
   ) async {
-    return _buildGoalScopeLOs(selection);
+    return _buildGoalScopeLOs(selection, offSubgoal: _inFlightPlan?.offSubgoal);
   }
 
   /// A question request goes out without history — it opens a new
@@ -1166,7 +1193,7 @@ class TutorService extends Notifier<TutorState> {
     final activeChild = selection.activeChildGoal;
     final scopeSubgoals = activeRoot == null
         ? const <Goal>[]
-        : await ref.read(goalsServiceProvider).getChildrenOnce(activeRoot.id);
+        : await _scopeSubgoals(activeRoot, offSubgoal: plan.offSubgoal);
 
     final priorFollowUp = _followUpInFlight;
     final isFollowUpGrading = priorFollowUp != null;
@@ -1280,6 +1307,8 @@ class TutorService extends Notifier<TutorState> {
       chainDepth: chainDepthOnAnswer,
       isWarmUp: plan.isWarmUp,
       isRecheck: plan.isRecheck,
+      // Why the recheck brought its LO back (#275).
+      recheckRule: plan.recheck?.rule.name,
       // Which subgoal the student was on when the turn was about another
       // one: what a replay needs to read the signals as the conductor did.
       activeSubgoalId: plan.isOffSubgoal ? activeChild?.id : null,
@@ -1925,10 +1954,13 @@ class TutorService extends Notifier<TutorState> {
     final recheck = plan.recheck;
     if (recheck != null) {
       // So is a recheck (#187): one question on an older topic in the
-      // middle of practice needs a reason on screen.
+      // middle of practice needs a reason on screen — and the one after a
+      // right answer on it (#275), which says why it comes again.
       _chat.addSystemNotice(
         ChatNotice(
-          ChatNoticeKind.recheck,
+          recheck.chained
+              ? ChatNoticeKind.recheckAgain
+              : ChatNoticeKind.recheck,
           args: [recheck.subgoal.title],
           goalId: recheck.subgoal.id,
         ),

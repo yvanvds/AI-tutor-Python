@@ -164,6 +164,31 @@ juiste eigen vragen van vóór de release, de app niet. Met de rest van 1.1
 is het de variant `min_own_right=2, min_open_right=1, mcq_positive=0.5` van
 de herspeling (#248).
 
+En **#275**, ook in dezelfde regelversie, verandert welke vragen de app
+stelt, niet wat een antwoord met een overtuiging doet: vastgelopen
+leerdoelen, open kernleerdoelen (ook van eerdere hoofddoelen) en dunne
+stempels van vóór 1.1 komen terug als controlevraag, een vastgelopen
+leerdoel eerst een niveau lager. Elke herspeelde beurt zegt al wat er
+gevraagd werd (`difficulty`, `calibrationBefore`, `subgoalId`,
+`activeSubgoalId`), dus de herspeling heeft er geen eigen regel voor. Een
+controlevraag over een ander hoofddoel leest ze zoals de app: het doel-LO
+rechtstreeks, de andere signalen van dat hoofddoel vallen weg
+(`TurnScope.reading`). Wat erbij komt:
+
+- `DirectAnswer.recheck_rule`: waarom de controlevraag het leerdoel
+  terugbracht (`recheckRule` op de beurt: `open`, `nearGoal`,
+  `unconfirmed`, `stuck` of `thin`; leeg voor een andere vraag en voor een
+  controlevraag van vóór het veld).
+- `rules.is_stuck(lo, now=None)`: de regel van de app voor vastgelopen
+  (`rules.STUCK_OWN_QUESTIONS_MIN` eigen vragen en μ onder
+  `rules.STUCK_MEAN`, met decay tot `now` als je dat meegeeft).
+- `rules.is_thin_stamp(lo)`: een stempel op minder dan
+  `rules.STAMP_OWN_RIGHT_MIN` juiste eigen vragen. In de herspeling zijn
+  de tellingen altijd bekend; in de app is een document zonder tellingen
+  geen dunne stempel, tot `replay-beliefs` ze aanvult (#281). De droge run
+  van #281 telt met deze twee hoeveel leerdoelen vastgelopen of dun
+  aangetoond worden.
+
 ## Regelversie `1.0.23-eval7`
 
 PUNTENFORMULE v1.0.23, herspeeld uit `turn_history`. `eval7`
@@ -420,9 +445,10 @@ te laat, nooit te vroeg. `LoState.last_direct_at` is dezelfde klok,
 herspeeld uit `turn_history`.
 
 Het aanvullen hoort bij de eenmalige herspeling van `lo_beliefs` na de
-release, die de gebruiker zelf draait (#195). `replay-beliefs`
-(hieronder) schrijft het niet: dat schrijft alleen α, β, de stempel en het
-hoogste niveau (#242). Voor het aanvullen geldt:
+release, die de gebruiker zelf draait (#195). Sinds #275 doet
+`replay-beliefs` (hieronder) het mee: de controlevraag reikt nu ook tot
+eerdere hoofddoelen, waar de documenten zonder het veld liggen (bij 6 van
+de 8 gevallen van #247). Daarbij geldt:
 
 - kies de weging van de oefeningen van vóór #219. `rules.replay` weegt
   standaard zoals de app ze bewaarde (alles thuis, ×1,0), zoals
@@ -506,8 +532,8 @@ python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --apply        
 Het herspeelt met dezelfde `rules.replay` als `validate`: een oefening
 weegt alleen als onder toezicht als de app ze zo bewaarde. Zo toont
 `validate` daarna geen afwijking meer op die documenten. Op elk document
-in `lo_beliefs` dat de herspeling bereikt, schrijft het vier velden, en
-niets anders:
+in `lo_beliefs` dat de herspeling bereikt, schrijft het deze velden
+(`BELIEF_FIELDS`), en niets anders:
 
 - `alpha` en `beta`: die van de herspeling. Liggen ze binnen 1e-4 van de
   opgeslagen, dan blijven die staan: het zijn dezelfde getallen, twee keer
@@ -519,20 +545,23 @@ niets anders:
   wanneer ze schrijft: op dezelfde oefening blijft de stempel van de app.
   Nooit leeg: een stempel die de herspeling niet haalt, blijft staan;
 - `highestPositiveDifficulty`: het hoogste van opgeslagen en herspeeld,
-  nooit lager.
+  nooit lager;
+- `lastProbedAt` (sinds #275): de laatste rechtstreekse vraag van de
+  herspeling (`LoState.last_direct_at`), alleen op een document zonder
+  het veld, en niet als de herspeling er geen heeft (zie hierboven).
 
 Stempel en hoogste niveau zijn ook in de app eenrichting (#168): dit vult
 aan wat een oude build nooit schreef, en neemt niets weg. Alle andere
-velden blijven zoals de app ze schreef, ook `lastUpdatedAt` en
-`lastProbedAt`. Een document dat de herspeling niet bereikt (een neutraal
+velden blijven zoals de app ze schreef, ook `lastUpdatedAt` en een
+`lastProbedAt` dat er al stond. Een document dat de herspeling niet bereikt (een neutraal
 signaal van opzij, geschreven door een build van vóór #204) blijft staan;
 een herspeeld leerdoel zonder document krijgt er geen, dat maakt de app
 bij de volgende schrijving.
 
 De droge run toont per leerling de documenten, hoeveel de herspeling er
 bereikt en hoeveel er zouden veranderen: stempel erbij, stempel vroeger,
-hoogste niveau hoger, α/β anders, met de laatste build zoals in
-`validate`. Werkt een leerling nog op een build zonder `clientVersion`,
+hoogste niveau hoger, α/β anders, klok erbij, met de laatste build zoals
+in `validate`. Werkt een leerling nog op een build zonder `clientVersion`,
 dan staat dat erbij: die build schrijft weer met de oude regels.
 
 `--apply` weigert in de lestijd van de klas (het lesrooster, 10 minuten

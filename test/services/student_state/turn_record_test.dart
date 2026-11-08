@@ -19,6 +19,7 @@ PersistedTurnRecord _record({
   List<TurnAppliedSignal> appliedSignals = const [],
   bool isWarmUp = false,
   bool isRecheck = false,
+  String? recheckRule,
   String? activeSubgoalId,
   bool keyDisputed = false,
   DateTime? askedAt,
@@ -35,6 +36,7 @@ PersistedTurnRecord _record({
   reviewFlags: reviewFlags,
   isWarmUp: isWarmUp,
   isRecheck: isRecheck,
+  recheckRule: recheckRule,
   activeSubgoalId: activeSubgoalId,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
@@ -132,6 +134,20 @@ void main() {
       final back = PersistedTurnRecord.fromCosmos(map);
       expect(back.isRecheck, isTrue);
       expect(back.activeSubgoalId, 's3');
+    });
+
+    test('#275: why the recheck brought the LO back is written and read '
+        'back; an older recheck has none', () {
+      final map = _record(
+        isRecheck: true,
+        recheckRule: 'stuck',
+        activeSubgoalId: 's3',
+      ).toMap(uid: 'u1');
+      expect(map['recheckRule'], 'stuck');
+      expect(PersistedTurnRecord.fromCosmos(map).recheckRule, 'stuck');
+      final older = _record(isRecheck: true).toMap(uid: 'u1');
+      expect(older.containsKey('recheckRule'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(older).recheckRule, isNull);
     });
   });
 

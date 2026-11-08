@@ -44,6 +44,19 @@ them over the whole log, every build (`LoState.own_right`,
 the release, so `validate` agrees on a doc the release filled (#281). It
 is `Variant(min_own_right=2, min_open_right=1, mcq_positive=0.5)` of #248.
 
+#275, in the same build and rule set, changes which questions the app asks,
+not what an answer does to a belief: stuck LOs, open core LOs (of earlier
+roots too) and thin stamps from before 1.1 come back as rechecks, a stuck
+one a notch lower first (`difficulty` on the record says so), and every
+replayed turn already says what was asked. So the replay needs no rule of
+its own for it. It reads why a recheck came (`recheckRule` on the turn,
+`DirectAnswer.recheck_rule`), and it offers the two judgements the app
+makes on a doc: `is_stuck` (at least `STUCK_OWN_QUESTIONS_MIN` own
+questions and μ under `STUCK_MEAN`) and `is_thin_stamp` (a stamp on fewer
+than `STAMP_OWN_RIGHT_MIN` right own questions). On the replay the counts
+are always known; in the app a doc from before 1.1 keeps them missing, and
+so is no thin stamp, until the release fills them (#281).
+
 `eval7` (#276) follows the app's stamp from the build that fixed it
 (`STAMP_RULES_276_FROM`, by the turn's `clientVersion`): mastery needs
 evidence ≥ 5.75 instead of 4 (two right answers, not one — in the lesson
@@ -146,6 +159,11 @@ RULES_11_FROM = (2, 13, 0)
 MCQ_POSITIVE = 0.5
 STAMP_OWN_RIGHT_MIN = 2
 STAMP_OWN_RIGHT_NON_MCQ_MIN = 1
+# The stuck rule since #278 (`PolicyConstants.stuckOwnQuestionsMin`,
+# `stuckMeanCeiling`): at least this many own questions and a decayed mean
+# under this. Since #275 a stuck LO comes back as a recheck.
+STUCK_OWN_QUESTIONS_MIN = 6
+STUCK_MEAN = 0.6
 DECAY_HALF_LIFE_DAYS = 60.0  # the conductor decays on every write; replay must too
 
 WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
@@ -348,6 +366,10 @@ class DirectAnswer(NamedTuple):
     # The question bank's answer key decided, not the grader (`gradedByKey`,
     # #186): a multiple-choice pick on a bank question, its target LO only.
     by_key: bool = False
+    # Why the recheck brought the LO back (`recheckRule`, #275): "open",
+    # "nearGoal", "unconfirmed", "stuck" or "thin"; "" for any other
+    # question, and for a recheck written before the field.
+    recheck_rule: str = ""
 
 
 @dataclass
@@ -722,7 +744,8 @@ def replay(
                 elif target and t.get("isWarmUp"):
                     asked_as = "warmup"
                 by_key = target and t.get("gradedByKey") is True
-                lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key))
+                recheck_rule = (t.get("recheckRule") or "") if asked_as == "recheck" else ""
+                lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key, recheck_rule))
                 # #276: since then only the question's target moves the
                 # ratchets; another LO of the active subgoal takes the weight.
                 if kind == "positive" and (target or not rules_276):
@@ -754,6 +777,25 @@ def replay(
                 if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                     lo.first_mastered_at = now
     return st
+
+
+def is_stuck(lo: LoState, now: dt.datetime | None = None) -> bool:
+    """The app's stuck rule since #278 (`belief_math.isStuck`): at least
+    `STUCK_OWN_QUESTIONS_MIN` own questions and a mean under `STUCK_MEAN` —
+    decayed to [now] as the app reads it, or as stored without [now].
+    Since #275 such an LO comes back as a recheck, a notch lower first."""
+    a, b = (lo.alpha, lo.beta) if now is None else _decay(lo.alpha, lo.beta, lo.last_at, now)
+    return lo.own_questions >= STUCK_OWN_QUESTIONS_MIN and a / (a + b) < STUCK_MEAN
+
+
+def is_thin_stamp(lo: LoState) -> bool:
+    """A thin stamp (#275, `belief_math.isThinStamp`): a stamp on fewer than
+    `STAMP_OWN_RIGHT_MIN` right own questions, counted over the whole log.
+    Only a stamp from before 1.1 can be one; the app gives it one recheck a
+    week after its last direct probe, and the stamp stays. In the app a doc
+    without the counts is no thin stamp until the release fills them
+    (#281); on the replay the counts are always there."""
+    return lo.demonstrated and lo.own_right < STAMP_OWN_RIGHT_MIN
 
 
 @dataclass

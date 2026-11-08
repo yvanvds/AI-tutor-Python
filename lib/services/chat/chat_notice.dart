@@ -91,6 +91,11 @@ enum ChatNoticeKind {
   /// title, [ChatNotice.goalId] its id.
   recheck,
 
+  /// The next check question on the same LO, after a right answer on the
+  /// one before (#275, CONDUCTOR_POLICY §2.6). `args[0]` and
+  /// [ChatNotice.goalId] as for [recheck].
+  recheckAgain,
+
   /// `args[0]` / `args[1]` are `QuestionDifficulty` names (before / after).
   difficultyChanged,
 
@@ -114,7 +119,8 @@ class ChatNotice {
 
   /// For a notice about a goal whose `args[0]` is that goal's Dutch title
   /// ([ChatNoticeKind.warmUpReview], [ChatNoticeKind.recheck],
-  /// [ChatNoticeKind.newGoalSelected]): the goal's id, so the chat pill
+  /// [ChatNoticeKind.recheckAgain], [ChatNoticeKind.newGoalSelected]): the
+  /// goal's id, so the chat pill
   /// names it in the app language (#211, #212) — and in a new language
   /// after a switch, like the rest of the pill.
   final String? goalId;

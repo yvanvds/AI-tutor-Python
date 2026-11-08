@@ -233,16 +233,22 @@ class PolicyConstants {
   /// review lands right where decay starts to read as "forgotten". Any
   /// write resets the clock, including a transfer credit (§3.7), which is
   /// how LOs that recur in later work stay out of the warm-up pool. An LO
-  /// flagged `regressedAt` (#112) is due regardless of this clock.
+  /// flagged `regressedAt` (#112) is due regardless of this clock, and so is
+  /// one whose last warm-up was not answered right (`returnWrongAt`, #275):
+  /// it comes back at the next session.
   static const Duration warmUpStaleAfter = Duration(days: 30);
 
   // ---- Recheck slot (CONDUCTOR_POLICY §2.6, #187, #188) --------------------
 
   /// How long a not-yet-demonstrated LO of an earlier subgoal must go
   /// without a *direct* probe (`LoBelief.lastDirectProbeAt`) before a
-  /// recheck rule asks it again — the near goal (#187) and the unconfirmed
-  /// high belief (#188) alike; the latter is due at once when the LO was
-  /// never asked directly. A week: long enough that the student has
+  /// recheck rule asks it again — every rule alike (the open core LO, the
+  /// near goal, the unconfirmed high belief, the stuck LO and the thin
+  /// stamp, #187, #188, #275); the unconfirmed one, an open one and a thin
+  /// stamp are due at once when the LO was never asked directly. A question
+  /// that brought the LO back and was not answered right makes it due at
+  /// the next session instead (`LoBelief.returnWrongAt`, #275), whatever
+  /// this clock says. A week: long enough that the student has
   /// moved on and the answer says something new, short enough to land
   /// inside a three-week report period — the 30-day warm-up clock never
   /// does (#187). Same value as the evaluation tooling's fossil rule

@@ -659,10 +659,11 @@ def cmd_apply(args) -> None:
 
 # ---- replay-beliefs (#242) ---------------------------------------------------
 
-# What `replay-beliefs` writes on a `lo_beliefs` doc. Every other field —
-# `lastUpdatedAt`, `lastProbedAt`, `regressedAt`, the calibration clock —
-# stays as the app wrote it.
-BELIEF_FIELDS = ("alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty")
+# What `replay-beliefs` writes on a `lo_beliefs` doc; `lastProbedAt` only
+# where the doc has none (#275: "neem het mee"). Every other field —
+# `lastUpdatedAt`, `regressedAt`, the calibration clock — stays as the app
+# wrote it.
+BELIEF_FIELDS = ("alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt")
 # α and β within this of the stored ones are the same numbers computed
 # twice: the app decays to the moment it writes, a second or so after
 # `turnAt`, and Dart and Python round apart in the last bits. On 6EWI
@@ -707,8 +708,8 @@ def _on_a_later_oefening(replayed: dt.datetime, stored: dt.datetime, oefening_ti
 
 
 def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.datetime]) -> dict:
-    """[stored] with the four fields the replay restores (#242), and nothing
-    else changed. [oefening_times] are the student's oefeningen, by
+    """[stored] with the fields the replay restores (#242, `BELIEF_FIELDS`),
+    and nothing else changed. [oefening_times] are the student's oefeningen, by
     `turnAt`, sorted.
 
     - α and β: the replay's, unless they are the stored ones to within
@@ -719,7 +720,13 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
       reach stays, and without either the field stays away;
     - `highestPositiveDifficulty`: the highest of the stored and the
       replayed level. Never lowered; an unknown stored level reads as none,
-      as the app reads it.
+      as the app reads it;
+    - `lastProbedAt` (#275, the backfill of #187 the README describes):
+      the replay's last direct probe, only on a doc without the field —
+      what the app wrote goes first — and not at all when the replay has
+      none (never asked directly, as the app already reads it). A doc
+      without it reads `lastUpdatedAt`, at worst late; since #275 the
+      recheck slot reaches earlier roots too, where those docs are.
 
     The stamp and the level are one-way in the app too (#168, #103): this
     restores what an old build never wrote, and takes nothing away."""
@@ -736,12 +743,15 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
     rank = rules.DIFF_ORDER.get(level, -1) if isinstance(level, str) else -1
     if rules.DIFF_ORDER[state.ratchet] > rank:
         doc["highestPositiveDifficulty"] = state.ratchet
+    if _stored_at(stored.get("lastProbedAt")) is None and state.last_direct_at is not None:
+        doc["lastProbedAt"] = _app_iso(state.last_direct_at)
     return doc
 
 
 def belief_changes(stored: dict, new: dict) -> set[str]:
     """What [new] changes on [stored]: `alpha/beta`, `stamp gained` (there was
-    none), `stamp earlier`, `level raised`. Empty: nothing to write."""
+    none), `stamp earlier`, `level raised`, `clock filled` (#275). Empty:
+    nothing to write."""
     changes = set()
     if new.get("alpha") != stored.get("alpha") or new.get("beta") != stored.get("beta"):
         changes.add("alpha/beta")
@@ -749,6 +759,8 @@ def belief_changes(stored: dict, new: dict) -> set[str]:
         changes.add("stamp earlier" if _stored_at(stored.get("firstMasteredAt")) else "stamp gained")
     if new.get("highestPositiveDifficulty") != stored.get("highestPositiveDifficulty"):
         changes.add("level raised")
+    if new.get("lastProbedAt") != stored.get("lastProbedAt"):
+        changes.add("clock filled")
     return changes
 
 
@@ -769,7 +781,9 @@ def cmd_replay_beliefs(args) -> None:
     """Replays `lo_beliefs` from `turn_history` and restores α, β, the stamp
     and the highest level on the docs there (#242): for students whose
     client wrote docs without `firstMasteredAt` and `highestPositiveDifficulty`
-    and whom the one-time rewrite of 2026-09-23 passed by.
+    and whom the one-time rewrite of 2026-09-23 passed by. And it fills the
+    direct-probe clock `lastProbedAt` on a doc without one (#275, the
+    backfill of #187).
 
     The replay is the one `validate` compares to (`_replay_student`), so
     `validate` shows no deviation on a doc this wrote. It only updates docs
@@ -793,10 +807,10 @@ def cmd_replay_beliefs(args) -> None:
 
     print(
         f"{'leerling':26}{'docs':>6}{'herspeeld':>11}{'te schrijven':>14}{'stempel erbij':>15}"
-        f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'laatste build':>16}"
+        f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'klok erbij':>12}{'laatste build':>16}"
     )
     planned: list[tuple[dict, dict, dict]] = []  # (student, stored doc, new doc)
-    totals = {"stamp gained": 0, "stamp earlier": 0, "level raised": 0, "alpha/beta": 0}
+    totals = {"stamp gained": 0, "stamp earlier": 0, "level raised": 0, "alpha/beta": 0, "clock filled": 0}
     old_build = []
     for a in students:
         turns, stored, st = _replay_student(a["uid"], goals)
@@ -822,18 +836,20 @@ def cmd_replay_beliefs(args) -> None:
             old_build.append(_full_name(a))
         print(
             f"{_full_name(a):26}{len(stored):>6}{replayed:>11}{mine:>14}{counts['stamp gained']:>15}"
-            f"{counts['stamp earlier']:>17}{counts['level raised']:>14}{counts['alpha/beta']:>12}{build:>16}"
+            f"{counts['stamp earlier']:>17}{counts['level raised']:>14}{counts['alpha/beta']:>12}"
+            f"{counts['clock filled']:>12}{build:>16}"
         )
     writers = {a["uid"] for a, _, _ in planned}
     print(
         f"\nte schrijven: {len(planned)} documenten bij {len(writers)} leerling(en) — stempel erbij"
         f" {totals['stamp gained']}, stempel vroeger {totals['stamp earlier']}, hoogste niveau hoger"
-        f" {totals['level raised']}, α/β anders {totals['alpha/beta']}."
+        f" {totals['level raised']}, α/β anders {totals['alpha/beta']}, klok erbij {totals['clock filled']}."
     )
     print(
         f"Herspeeld met {rules.RULES_VERSION}, zoals validate: een oefening weegt alleen als 'onder toezicht'"
-        " als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit leeg) en"
-        " highestPositiveDifficulty (het hoogste) veranderen; een leerdoel zonder document krijgt er geen."
+        " als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit leeg),"
+        " highestPositiveDifficulty (het hoogste) en lastProbedAt (alleen waar het ontbreekt) veranderen;"
+        " een leerdoel zonder document krijgt er geen."
     )
     if old_build:
         print(

@@ -255,7 +255,11 @@ graded and are out) whose belief doc:
      `lo_beliefs` (part 2) — an incidental cross-subgoal negative (2.4)
      suggested a gap in this once-mastered LO and no direct probe has
      happened since. The negative itself is not applied to the belief
-     (2.4); the flag is all it leaves behind.
+     (2.4); the flag is all it leaves behind;
+   - **missed last time (#275):** `returnWrongAt` set — the LO's last
+     warm-up review, in an earlier session, was not answered right, so it
+     comes back at the next session instead of after another 30 days
+     (2.6, "after the answer").
 
 There is no separate "not naturally recurring" test: any write bumps
 `lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
@@ -281,14 +285,19 @@ from the side does not answer the question the negative raised; the
 review does, and it is one short question. Orphaned belief docs (LO or
 subgoal deleted, 7.4) are skipped because they resolve to no live LO.
 
-Among candidates a **regressed LO wins over a stale one** — a suspected
-gap before suspected forgetting; among regressed LOs the oldest flag
-first — then the **most stale wins** (oldest `lastUpdatedAt`); ties go
-to the lowest decayed mean. Staleness order, not mean order, so the
-pool is rotated through predictably: once asked, an LO's clock resets,
-its flag clears, and it goes to the back of the queue. A *failed* review
-does not re-flag the LO (it was a direct probe), so a regressed LO comes
-back once it is stale again, not every session. The active subgoal's own
+Among candidates a **flagged LO wins over a stale one** — regressed, or
+missed last time: a suspected or shown gap before suspected forgetting;
+among flagged LOs the oldest flag first — then the **most stale wins**
+(oldest `lastUpdatedAt`); ties go to the lowest decayed mean. Staleness
+order, not mean order, so the pool is rotated through predictably: once
+asked, an LO's clock resets, its flag clears, and it goes to the back of
+the queue. A *failed* review does not re-flag the LO as regressed (it was
+a direct probe); until #275 a regressed LO then came back only once it
+was stale again. Since #275 a review that is not answered right (`wrong`
+or `partial`) sets `returnWrongAt`, and the LO comes back at the next
+session — the teacher's rule for every question that brought an LO back,
+"in plaats van na 7 of 30 dagen" (2.6). A right review clears it. The
+active subgoal's own
 LOs are never candidates — those are 1.2's business. An earlier LO that
 was *never* mastered is not review material either; the recheck slot
 (2.6) is its way back.
@@ -342,10 +351,11 @@ incidental under 2.4's rules (#108).
 **Audit.** The turn record (8.1) carries `isWarmUp: true`, names the old
 subgoal in `subgoalId` and the LO in `targetLOIds`; `selectionReason`
 lists the top candidates with their decayed stats under `chosenReason:
-"warm-up review: most stale mastered LO"` or `"warm-up review:
-regressed mastered LO"`, saying which rule picked it. The debug event
-`conductor.warm_up_planned` carries `regressed` and, when set, the
-flag's age.
+"warm-up review: most stale mastered LO"`, `"warm-up review:
+regressed mastered LO"` or (#275) `"warm-up review: again after an
+answer that was not right"`, saying which rule picked it. The debug event
+`conductor.warm_up_planned` carries `regressed`, `missed` and, when
+regressed, the flag's age.
 
 ### 1.6 What this section deliberately does not address
 
@@ -405,8 +415,9 @@ handle"). Cross-session decay handles forgetting; mastered LOs that
 later work keeps using are refreshed without being probed, by transfer
 credit (3.7); mastered LOs of *earlier* subgoals that nothing refreshes
 get one review question at the start of a session (1.5); LOs of earlier
-subgoals the student left *without* mastering get an occasional recheck
-question (2.6).
+subgoals the student left *without* mastering — since #275 of earlier
+root goals too, stuck ones included, and stamps from before 1.1 on one
+right own question — get an occasional recheck question (2.6).
 
 **Every unmastered LO is a candidate (#278).** Until formula 1.1 an LO
 at `α + β ≥ cap − 2` was filtered out as "not practiceable": at the cap
@@ -639,6 +650,16 @@ LO right half the time, four in a row without a correct one happens by
 chance about once in sixteen runs; with follow-ups, four attempts are
 often only two questions — the student in #227 had nine in 22 minutes.
 
+**A stuck LO's return (#275).** The recheck slot (2.6) brings a stuck LO
+(4.4) back one notch below the calibration first — at easy it stays easy
+— and asks the questions after it in the same session at the
+calibration. The lower question works as the two rules above do: weighed
+at the level asked, out of the calibration window (every recheck is),
+no `lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` at the level
+asked; the record says `notchDropFired: true` and `notchDropRules:
+[stuckReturn]`. The two rules above do not apply to a recheck: they read
+this session's attempts and the strike counter on the active subgoal.
+
 **No upward override.** If belief on a target LO is high but not yet
 mastered (e.g. mean 0.78, just below threshold), the policy does *not*
 bump a notch above calibration. Two reasons:
@@ -806,7 +827,7 @@ is tracked, how recency-of-types-on-this-LO is stored). Those are
 storage concerns: the per-LO recent activity in the student model
 (part 2 §3) carries the data we need.
 
-### 2.6 The recheck slot (#187, #188)
+### 2.6 The recheck slot (#187, #188, #275)
 
 2.1 only ever probes the active subgoal, and the warm-up review (1.5)
 only LOs that were once mastered. An LO the student left behind *without*
@@ -825,6 +846,21 @@ ratchet, so condition 3 of 4.1 stayed open with nothing left to close
 it. The recheck slot is that LO's way back: now and then, one direct
 question on it in the middle of practice.
 
+**What comes back since formula 1.1 (#275, with #247).** Until 1.1 the
+slot reached only the earlier subgoals of the active root goal, and under
+the bar only at μ 0.70–0.80. A stuck LO (4.4), at μ < 0.6, never came
+back; once the student moved on to the next root goal, nothing of the
+old one did; and a stamp from before 1.1 that fell on one right own
+question was never looked at again. In the week of 13–21 October 35 LOs
+of 22 finished subgoals stood on stuck, and on 23 September 70 core LOs
+of the first milestone had no stamp. The teacher decided (2026-11-08):
+stuck is "not now", not "never"; the open core LOs of a milestone come
+back, of earlier root goals too, the milestone still open first; a thin
+stamp from before 1.1 gets one check after a week and keeps its stamp.
+The brake stays as it was. The student can also take a subgoal up again
+themselves in the Leerpad (#280), so the app need not bring everything
+back.
+
 **The slot.** `planNext` checks it after the warm-up (1.5) and before
 2.1's selection, when it is *open*: at session entry, and again once
 `recheckSpacing` (5) ordinary questions have been fired since the last
@@ -835,30 +871,46 @@ per question. Planning stays repeatable: a found recheck changes nothing
 until the host fires it (`notePlannedQuestion`), like the warm-up's
 session-start plan-and-discard. The spacing spreads a backlog through the
 practice instead of stacking it; each candidate's own clock (below)
-keeps the same LO from coming back every few questions.
+keeps the same LO from coming back every few questions. The question
+after a right answer (below) is the one exception: it is not held by the
+spacing.
 
-**Candidates.** The LOs of the active root's subgoals *before* the active
-one — the grading scope, where a later subgoal would be a forward
-reference — with a belief doc that one of the slot's rules finds due.
-Each rule is one branch of `Conductor._recheckRuleFor` plus one
-`RecheckRule` value; the rules are the only part that differs per case,
-everything else about the question is shared. Two rules, whose mean
-bands do not overlap:
+**Candidates.** The LOs before the active subgoal in curriculum order:
+the earlier subgoals of the active root and, since #275, every subgoal of
+an earlier root goal (the roots in curriculum order, as the next-subgoal
+walk reads them). A later subgoal would be a forward reference. An LO
+needs a belief doc: one that was never asked or touched never came, so
+nothing brings it back. Each rule is one branch of
+`Conductor._recheckRuleFor` plus one `RecheckRule` value; the rules are
+the only part that differs per case, everything else about the question
+is shared. An LO gets the first rule that fits, in this order:
 
-- **Near goal (#187).** Not demonstrated (`everMastered` false, 3.7);
-  decayed mean in [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to
-  0.80, close enough that one or two good answers at the calibrated level
-  can earn the stamp (with forgetting, 3.4, from 0.76 one right answer
-  reaches 0.799, so a low near goal takes two, a week apart; and the
-  stamp wants its two right own questions, 4.1); no *direct* probe for `recheckAfter` (7 days); and
-  the student's recent work at their level is good: the calibration
-  window (section 5, ten answers) is full and its level-weighted share of correct
-  answers (`StudentCalibration.levelWeightedAccuracy`: a correct answer
-  weighs the positive difficulty factor, anything else the negative one,
-  as μ does since #169) is at least `recheckRecentAccuracy` (0.75). A
-  student who is struggling now is not sent back to old material. This is
-  the evaluation tooling's "fossil" (`tooling/evaluation/diagnostics.py`),
-  which the teacher otherwise has to settle by hand at report time.
+- **Open core LO (#275).** A core LO of a milestone
+  (`Milestone.coreLoKeys`, PUNTENFORMULE §2.1: the Angoff set K) without
+  a stamp (`everMastered` false, 3.7), under the bar (conditions 1 and 2
+  of 4.1 not both met) and not stuck (4.4), at any mean: the near goal's
+  window falls away for it, since with forgetting per answer (3.4, #278)
+  its mean moves again — from (3, 3), μ 0.5, four right answers in a
+  row at medium take it over the bar. No direct probe for `recheckAfter` (7 days), or never one
+  (a doc that only side signals wrote); and good recent work (the brake,
+  below).
+- **Near goal (#187).** Not demonstrated; decayed mean in
+  [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to 0.80, close
+  enough that one or two good answers at the calibrated level can earn
+  the stamp (with forgetting, 3.4, from 0.76 one right answer reaches
+  0.799, so a low near goal takes two; and the stamp wants its two right
+  own questions, 4.1); no *direct* probe for `recheckAfter`; and the
+  student's recent work at their level is good: the calibration window
+  (section 5, ten answers) is full and its level-weighted share of
+  correct answers (`StudentCalibration.levelWeightedAccuracy`: a correct
+  answer weighs the positive difficulty factor, anything else the
+  negative one, as μ does since #169) is at least `recheckRecentAccuracy`
+  (0.75). A student who is struggling now is not sent back to old
+  material. This is the evaluation tooling's "fossil"
+  (`tooling/evaluation/diagnostics.py`), which the teacher otherwise has
+  to settle by hand at report time. Since #275 it covers what the open
+  rule does not: an LO no milestone counts as core — an extension LO, or
+  one of a subgoal no milestone has yet.
 - **Unconfirmed (#188).** The belief says "known" — decayed mean and
   evidence meet the bar (`meetsMasteryMeanAndEvidence`, conditions 1 and
   2 of 4.1) — but no direct right answer backs it: no positive at
@@ -867,19 +919,50 @@ bands do not overlap:
   calibrated-positive flag: an old client's doc, #165, where the grade
   can only guess the level), or — without a stamp — fewer than two right
   own questions behind it, one of them no pick (condition 4 of 4.1, #279:
-  a belief a side signal lifted over the bar on one own question). A
-  stamp that is there stays: a stamp from before 1.1 on few own questions
-  is #275's to bring back. And no direct probe for `recheckAfter`, the
-  near goal's clock — or never one: an LO never asked directly is due at
-  once. There is no recent-work gate: the belief already says the student
-  has it; the question lets them show it. A right answer at the
-  calibrated level sets the positive, the ratchet at the level asked
-  (#164: the model records what was asked, never a guess) and — with 1
-  and 2 already met — the stamp. A wrong one debits the belief like any
-  probe; if it is still over the bar, the LO waits a week like any
-  rechecked LO, and a belief that drops under it follows the near-goal
-  rule from there. Near goals go first: they are few, gated and dated,
-  while old docs can form a backlog that must not hold them up.
+  a belief a side signal lifted over the bar on one own question). And no
+  direct probe for `recheckAfter` — or never one: an LO never asked
+  directly is due at once. There is no recent-work gate: the belief
+  already says the student has it; the question lets them show it. A
+  right answer at the calibrated level sets the positive, the ratchet at
+  the level asked (#164: the model records what was asked, never a
+  guess) and — with 1, 2 and 4 met — the stamp. A wrong one debits the
+  belief like any probe; the LO comes back at the next session (below),
+  and a belief that dropped under the bar follows the open or near-goal
+  rule from there.
+- **Stuck (#275).** Stuck (4.4: at least `stuckOwnQuestionsMin` (6) own
+  questions and μ under `stuckMeanCeiling` (0.6)) and no stamp. No direct
+  probe for `recheckAfter`, and good recent work. Its first question
+  comes a notch below the calibration (below).
+- **Thin stamp (#275).** A stamp on fewer than two right own questions
+  (`belief_math.isThinStamp`, by the counts of #279) — only a stamp from
+  before 1.1 can be one, since 1.1 stamps on two. A doc without the counts
+  is no thin stamp: its stamp came before they were kept, and the
+  conductor leaves them missing (4.1) until the release fills them from
+  `turn_history` (#281), so the old stamps do not all come back at once.
+  One check question a week after its last direct probe (or at once,
+  never asked directly), with good recent work; `thinCheckedAt` on the
+  doc then says it had it. The stamp stays whatever the answer
+  (PUNTENFORMULE §5).
+
+**Order.** Among candidates:
+
+1. **A milestone whose deadline has not passed first (#275)**: an LO of a
+   subgoal of a milestone whose `dueAt` is still ahead — its report day
+   counts, as the students work up to it that day. There a stamp still
+   counts for the report; a stamp after the release counts for the
+   learning, not for that report (PUNTENFORMULE §5). The rest after.
+2. **Missed in an earlier session (#275)**: an LO whose last return was
+   not answered right (below) — so it does come back in the next session.
+3. Rule priority, in the order above.
+4. The oldest direct probe — never asked directly first.
+5. The highest decayed mean — the one closest to the stamp.
+
+**The brake (#187; kept by #275).** At most one warm-up review at the
+start of a session (1.5), and one recheck per `recheckSpacing` ordinary
+oefeningen; the open, near-goal, stuck and thin rules only when the
+student's recent work is good (`recheckRecentAccuracy`). The dose per
+lesson hour was the one open question; the teacher kept the brake of
+now.
 
 The clock is the **last direct probe**, `lastProbedAt` on the belief doc
 (part 2): set on every write that may move the ratchets — the target of a
@@ -893,17 +976,23 @@ before the field existed reads `lastUpdatedAt` instead when the LO was
 ever the target of a question (`lastQuestionType` set) — never earlier
 than the real last probe, so an old doc is at worst due late, never
 early — and a non-probe write on such a doc stores that reading, so its
-own clock bump does not pass for a probe. An LO never asked directly has
-no clock: it is not a near goal, and an unconfirmed one is due at once.
-
-Among candidates: rule priority (enum order), then the oldest direct
-probe, then the highest decayed mean — the one closest to the stamp.
+own clock bump does not pass for a probe. The release can fill the field
+from `turn_history` (`replay-beliefs`, #275). An LO never asked directly
+has no clock: it is no near goal, and an unconfirmed or open one is due
+at once. After a return that was not answered right, the next session
+takes the place of the week (below).
 
 **The question and its answer: like a warm-up.** The gentlest acceptable
 type for the LO's kind at the student's calibrated difficulty, never
 notch-dropped (condition 3 of 4.1 wants a positive at calibration) — and
 no pick when a pick can no longer bring the LO to its stamp (2.2, #279):
-a recheck is that LO's way to the stamp. From
+a recheck is that LO's way to the stamp. **A stuck LO** (#275) is the
+exception: its first question comes one notch below the calibration, at
+easy it stays easy. That question works as a notch drop (2.3): out of the
+calibration window like every recheck, and asked under the calibration it
+sets no `lastPositiveAtCalibratedAt` — the questions after it are at the
+calibration, where condition 3 is earned. The record says
+`notchDropRules: [stuckReturn]` (8.1). From
 here on a recheck is handled exactly like a warm-up review (1.5) — the
 plan carries the other subgoal (`QuestionPlan.offSubgoal`) and every
 consumer reads that: prompted and graded in that subgoal's context; the
@@ -913,19 +1002,60 @@ clock and — when the answer completes the four conditions of 4.1 — the
 one-way stamp; no calibration window entry (5), no follow-up (6.3), no
 cache write or advancement for either subgoal; a transfer nomination on
 the target itself is dropped (3.7); other signals are incidental under
-2.4. Right, wrong or neutral (3.1), the probe clock restarts, so the LO waits another
-`recheckAfter` before it can come back. The chat announces it
-(`recheck` notice, naming the old subgoal). Like a warm-up, the question
-comes from the question bank whenever one fits (2.7).
+2.4. Right, wrong or neutral (3.1), the probe clock restarts. The chat
+announces it (`recheck` notice, naming the old subgoal). Like a warm-up,
+the question comes from the question bank whenever one fits (2.7).
+
+**An earlier root goal (#275).** The grader gets the active root as its
+scope (LLM_CONTRACT part 3). A question about another root's LO takes its
+context along, as an extension of `offSubgoal`, not a new mechanism: the
+plan names that root (`Recheck.root`, `QuestionPlan.offRoot`), `{goal}` in
+the prompt is that root and `{subgoal}` its subgoal, and that one subgoal
+joins the scope (`goal_scope_los` and the scope check), so the signal on
+the asked LO is no `targetSignalLost` (8.2) and lands as a direct probe —
+as for an earlier subgoal. Any other signal on that root is dropped as
+`outsideActiveRoot`, as before, and so is a transfer nomination on it:
+transfer credit (3.7) stays within the active root.
+
+**After the answer (#275).**
+
+- **Right** (`correct`), on an LO whose stamp is still to earn (every
+  rule but the thin stamp) and that is not mastered after it: the next
+  question is on that LO again, in the same session, not held by the
+  spacing — at the calibration, never notch-dropped, of another type than
+  the one before when the kind has one, announced as such
+  (`recheckAgain` notice: "Nog een controlevraag over …: de vorige was
+  juist."). So the two right own questions the stamp wants (4.1, #279)
+  can fall in one session; without it a run of returns would take weeks.
+  The run goes on while the answers are right and the LO is not mastered;
+  once it ends, the spacing counts from its last question.
+- **Not right** (`wrong` or `partial`): no question after it, and the LO
+  comes back at the *next* session instead of after `recheckAfter` (or
+  `warmUpStaleAfter` for a warm-up review, 1.5): the answer sets
+  `returnWrongAt` on its doc, which makes it due at a later session
+  whatever its clock, and first in the order above (under the open
+  milestone). In this session it does not come back. The LO's next own
+  question that is not such a miss clears it — a right return, or any
+  question on its own subgoal.
+- **A thin stamp's check**: one question. The stamp stays whatever the
+  answer; `thinCheckedAt` marks it as checked, nothing follows, and
+  `returnWrongAt` is not set.
 
 **Audit.** The turn record (8.1) carries `isRecheck: true`, names the old
-subgoal in `subgoalId`, the LO in `targetLOIds` and the subgoal the
-student was practising in `activeSubgoalId`; `selectionReason` lists the
-top candidates with the rule's `chosenReason`: `"recheck: near goal not
-asked for a week"` or `"recheck: high belief not confirmed by a direct
-right answer"`. The debug event `conductor.recheck_planned` carries the
-rule, the mean, the days since the last direct probe and the recent
-accuracy.
+subgoal in `subgoalId`, the LO in `targetLOIds`, the subgoal the student
+was practising in `activeSubgoalId`, and why the LO came back in
+`recheckRule` (#275: `open`, `nearGoal`, `unconfirmed`, `stuck` or
+`thin`), so the evaluation can tell them apart; `selectionReason` lists
+the top candidates with the rule's `chosenReason`: `"recheck: open core
+LO not asked for a week"`, `"recheck: near goal not asked for a week"`,
+`"recheck: high belief not confirmed by a direct right answer"`,
+`"recheck: stuck LO, a notch lower first"`, `"recheck: thin stamp from
+before formula 1.1"`, and for the question after a right answer
+`"recheck: again after a right answer"` (with the rule that brought the
+LO back). The debug event `conductor.recheck_planned` carries the rule,
+the mean, the days since the last direct probe, the recent accuracy, the
+root of an earlier root's LO, whether its milestone is open and whether
+it was missed — and `chained` for the question after a right answer.
 
 **Adding a rule.** A new case adds its `RecheckRule` value and its
 branch in `_recheckRuleFor`, its `chosenReason`, and its tests; the slot,
@@ -1512,9 +1642,12 @@ A nominated LO earns credit only when **all** of these hold:
 2. **The turn is a primary probe, not a follow-up (6.2), and not a
    fallback turn (7.2).** Dialogue is not a solution, and a response
    whose primary signals failed validation is not trusted for extras.
-3. **The LO is outside the active subgoal.** LOs inside it already get
-   ordinary incidental signals at full weight (2.4); a nomination there
-   is dropped.
+3. **The LO is outside the active subgoal, and inside the active
+   root.** LOs inside the subgoal already get ordinary incidental
+   signals at full weight (2.4); a nomination there is dropped. So is one
+   on another root's LO (#275): a recheck of an earlier root (2.6) puts
+   that one subgoal in the grader's scope for its asked LO, not for a
+   credit.
 4. **The LO was ever mastered by direct probing.** An LO that was never
    directly probed — or probed but never mastered — cannot be brought
    to mastery sideways. Tracked by the one-way `firstMasteredAt` stamp on
@@ -1798,6 +1931,14 @@ each LO as `mastered | stuck | neither` from the decayed mean and the
 stored count. No flag. The count only grows, so an LO leaves stuck
 when its mean climbs back to 0.6 — with forgetting a few right answers
 do that — and decay alone, which pulls the mean toward 0.5, does not.
+
+**Stuck is "not now", not "never" (#275).** Once its subgoal advanced, a
+stuck LO comes back as a recheck (2.6): a week after its last direct
+probe, when the student's recent work is good, a notch lower first (2.3);
+a right answer brings the next question on it in the same session, at the
+calibration, a wrong one brings it back at the next session. Until #275
+nothing brought it back: a stuck LO stood under the near goal's window
+for good.
 
 **Student-side invisibility.** The advance feels normal to the
 student. No "you didn't really master this but we're moving on"
@@ -2603,13 +2744,16 @@ TurnRecord {
   chainDepth: int                  // 0, 1, or 2
   isWarmUp: bool                   // section 1.5, #102; omitted when false
   isRecheck: bool                  // section 2.6, #187; omitted when false
+  recheckRule: string              // 2.6, #275: why the recheck brought the LO back —
+                                   // open | nearGoal | unconfirmed | stuck | thin; omitted
+                                   // on other turns and older rechecks
 
   // Why these were picked (section 2 decisions)
   selectionReason: {
     candidateLOs: [{loId, mean, evidence}]   // top 3
     chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …", "recheck: …"
     notchDropFired: bool
-    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; omitted when none fired
+    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; #275: stuckReturn (2.6); omitted when none fired
   }
 
   // What happened

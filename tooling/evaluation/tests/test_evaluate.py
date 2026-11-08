@@ -1398,6 +1398,72 @@ class Rules279Test(unittest.TestCase):
         self.assertAlmostEqual(self.lo(old[:1], as_11=True).alpha, 1 + 1.75)
 
 
+class Rules275Test(unittest.TestCase):
+    """#275, formula 1.1 from the same build: what comes back as a recheck.
+    It changes which questions the app asks, not what an answer does, so the
+    replay has no rule of its own for it; it reads why a recheck came, and
+    offers the app's two judgements for the dry run of #281: `is_stuck` and
+    `is_thin_stamp`."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.13.0+30"}
+
+    def answer(self, minute: int, quality: str = "correct", **extra) -> dict:
+        signal = "positive" if quality == "correct" else "negative"
+        return _turn(
+            f"2026-11-16T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+            questionType="completeCodeQuestion", overallQuality=quality,
+            loSignals=[_sig("sg-b", "predict_b1", signal=signal)], **{**self.NEW, **extra},
+        )
+
+    def test_is_stuck_is_the_apps_rule_in_own_questions(self):
+        wrong = [self.answer(m, "wrong") for m in range(6)]
+        self.assertFalse(rules.is_stuck(rules.replay(wrong[:5], GOALS)[self.KEY]))
+        stuck = rules.replay(wrong, GOALS)[self.KEY]
+        self.assertEqual(stuck.own_questions, rules.STUCK_OWN_QUESTIONS_MIN)
+        self.assertTrue(rules.is_stuck(stuck))
+        # Decay to a later moment pulls the mean toward 0.5, never over 0.6.
+        self.assertTrue(rules.is_stuck(stuck, dt.datetime(2027, 6, 1, tzinfo=dt.timezone.utc)))
+        # Right answers lift it off: with forgetting a few do it.
+        lifted = rules.replay(wrong + [self.answer(10 + m) for m in range(3)], GOALS)[self.KEY]
+        self.assertFalse(rules.is_stuck(lifted))
+
+    def test_is_thin_stamp_is_a_stamp_on_fewer_than_two_right_own_questions(self):
+        # A build before 1.1 stamped on one right own question (#276 asked
+        # for evidence 5.75: two right answers at hard did it, picks or not).
+        old = {"clientVersion": "2.12.0+29"}
+        one = rules.replay([self.answer(0, difficulty="hard", calibrationBefore="hard", **old),
+                            self.answer(1, difficulty="hard", calibrationBefore="hard", **old)], GOALS)[self.KEY]
+        self.assertTrue(one.demonstrated)
+        self.assertEqual(one.own_right, 2)
+        self.assertFalse(rules.is_thin_stamp(one))
+        # A stamp a side signal completed, on one right own question: thin.
+        side = _turn("2026-11-16T09:30:00Z", "sg-b", "write_b2", uid="u-x", **old,
+                     loSignals=[_sig("sg-b", "write_b2", "weak"), _sig("sg-b", "predict_b1", "strong")])
+        thin = rules.replay(
+            [self.answer(0, difficulty="hard", calibrationBefore="hard", **old), side], GOALS
+        )[self.KEY]
+        self.assertTrue(thin.demonstrated)
+        self.assertEqual(thin.own_right, 1)
+        self.assertTrue(rules.is_thin_stamp(thin))
+        # No stamp: never thin.
+        self.assertFalse(rules.is_thin_stamp(rules.LoState(own_right=0)))
+        self.assertTrue(rules.is_thin_stamp(rules.LoState(
+            first_mastered_at=dt.datetime(2026, 10, 1, tzinfo=dt.timezone.utc), own_right=1)))
+
+    def test_the_rule_a_recheck_came_by_is_on_its_direct_answer(self):
+        turns = [
+            self.answer(0, isRecheck=True, recheckRule="stuck", activeSubgoalId="sg-a", difficulty="easy"),
+            self.answer(1, isRecheck=True, activeSubgoalId="sg-a"),  # before the field
+            self.answer(2),
+        ]
+        signals = rules.replay(turns, GOALS)[self.KEY].direct_signals
+        self.assertEqual([d.asked_as for d in signals], ["recheck", "recheck", ""])
+        self.assertEqual([d.recheck_rule for d in signals], ["stuck", "", ""])
+        # The lower question is replayed at the level it was asked.
+        self.assertEqual(signals[0].difficulty, "easy")
+
+
 class NotchDropReplayTest(unittest.TestCase):
     """#227: a question the app asked a notch below the calibration
     (CONDUCTOR_POLICY §2.3, either rule) replays from the turn's own
@@ -1983,7 +2049,7 @@ def _replay_stored() -> dict[str, dict[tuple[str, str], dict]]:
             # The app's numbers, a few millionths apart, and its stamp a
             # second after the replay's: the same oefening.
             recall: _belief_doc("u-sara", recall, sara[recall].alpha + 3e-6, sara[recall].beta,
-                                lastUpdatedAt="2026-09-10T09:03:01.200Z",
+                                lastUpdatedAt="2026-09-10T09:03:01.200Z", lastProbedAt="2026-09-10T09:03:01.200Z",
                                 firstMasteredAt="2026-09-10T09:01:01.200Z", highestPositiveDifficulty="medium"),
         },
     }
@@ -2056,12 +2122,32 @@ class ReplayedBeliefTest(unittest.TestCase):
         stored = self.stored()
         self.assertEqual(self.merged(stored, alpha=9.4 + 4e-6, beta=2.2 - 4e-6), stored)
 
-    def test_only_the_four_fields_change(self):
+    def test_only_the_replays_fields_change(self):
         stored = self.stored(firstMasteredAt="2026-09-22T09:15:01.250Z", highestPositiveDifficulty="medium")
         new = self.merged(stored, stamp=self.AT, level="hard", alpha=10.0, beta=3.8)
         self.assertEqual(set(new), set(stored))
-        self.assertEqual({k for k in new if new[k] != stored[k]}, set(evaluate.BELIEF_FIELDS))
+        # The stored clock is the app's: it stays (#275).
+        self.assertEqual({k for k in new if new[k] != stored[k]}, set(evaluate.BELIEF_FIELDS) - {"lastProbedAt"})
         self.assertEqual(stored["firstMasteredAt"], "2026-09-22T09:15:01.250Z")  # the stored doc is not touched
+
+    def test_the_probe_clock_is_filled_only_where_the_doc_has_none(self):
+        # #275: the backfill of #187 the README describes — the replay's
+        # last direct probe, on a doc without the field.
+        probed = dt.datetime(2026, 9, 20, 9, 0, 1, 250000, tzinfo=dt.timezone.utc)
+        bare = {k: v for k, v in self.stored().items() if k != "lastProbedAt"}
+        state = rules.LoState(alpha=9.4, beta=2.2, last_direct_at=probed)
+        new = evaluate.replayed_belief(bare, state, self.OEFENINGEN)
+        self.assertEqual(new["lastProbedAt"], "2026-09-20T09:00:01.250Z")
+        self.assertEqual(evaluate.belief_changes(bare, new), {"clock filled"})
+        # What the app wrote goes first; an unreadable value is none.
+        self.assertEqual(evaluate.replayed_belief(self.stored(), state, self.OEFENINGEN), self.stored())
+        unreadable = {**bare, "lastProbedAt": "soon"}
+        self.assertEqual(
+            evaluate.replayed_belief(unreadable, state, self.OEFENINGEN)["lastProbedAt"], "2026-09-20T09:00:01.250Z"
+        )
+        # Never asked directly: the field stays away, as the app reads it.
+        never = evaluate.replayed_belief(bare, rules.LoState(alpha=9.4, beta=2.2), self.OEFENINGEN)
+        self.assertNotIn("lastProbedAt", never)
 
     def test_a_stamp_is_written_as_the_app_writes_a_moment(self):
         at = dt.datetime(2026, 10, 7, 9, 4, 11, 818589, tzinfo=dt.timezone.utc)
@@ -2079,9 +2165,10 @@ class ReplayBeliefsTest(_CommandTest):
         self.cosmos.beliefs = lambda uid: {k: dict(v) for k, v in REPLAY_STORED.get(uid, {}).items()}
 
     def row(self, stdout: str, name: str) -> list[str]:
-        """docs · replayed · to write · stamps gained · earlier · level raised · α/β · last build"""
+        """docs · replayed · to write · stamps gained · earlier · level raised · α/β · clock filled ·
+        last build"""
         line = next(line for line in stdout.splitlines() if line.startswith(name))
-        return line.split()[-8:]
+        return line.split()[-9:]
 
     def written(self) -> dict[str, dict]:
         return {doc["loId"]: doc for coll, doc, _, _ in self.cosmos.upserts if coll == "lo_beliefs"}
@@ -2092,14 +2179,16 @@ class ReplayBeliefsTest(_CommandTest):
     def test_a_dry_run_counts_and_writes_nothing(self):
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY)
 
-        self.assertEqual(self.row(stdout, "Rik Herspeel"), ["4", "3", "3", "1", "1", "2", "1", "2.8.0+25"])
-        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "2.8.0+25"])
+        # The two docs without a probe clock get the replay's (#275).
+        self.assertEqual(self.row(stdout, "Rik Herspeel"), ["4", "3", "3", "1", "1", "2", "1", "2", "2.8.0+25"])
+        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "2.8.0+25"])
         self.assertIn("te schrijven: 3 documenten bij 1 leerling(en)", stdout)
+        self.assertIn("klok erbij 2.", stdout)
         self.assertIn("Droge run: er is niets geschreven", stdout)
         self.assertEqual(self.cosmos.upserts, [])
         self.assertEqual(self.backups(), [])
 
-    def test_apply_backs_up_first_and_writes_only_the_four_fields(self):
+    def test_apply_backs_up_first_and_writes_only_the_replays_fields(self):
         backed_up_before = []
         upsert = self.cosmos.upsert
 
@@ -2132,6 +2221,10 @@ class ReplayBeliefsTest(_CommandTest):
         self.assertEqual(written["recall_a1"]["lastProbedAt"], "2026-09-22T09:00:01.250Z")
         self.assertEqual(written["write_a2"]["highestPositiveDifficulty"], "easy")
         self.assertNotIn("firstMasteredAt", written["write_a2"])
+        # #275: the probe clock where the doc had none — the replay's last
+        # direct probe — and the app's own where it had one.
+        self.assertEqual(written["write_a2"]["lastProbedAt"], "2026-09-12T09:00:00.000Z")
+        self.assertEqual(written["predict_b1"]["lastProbedAt"], "2026-09-15T09:15:00.000Z")
         self.assertIn("geschreven 3, conflicten 0", stdout)
 
     def test_validate_reads_the_written_docs_as_matching(self):
@@ -2150,7 +2243,7 @@ class ReplayBeliefsTest(_CommandTest):
     def test_one_student(self):
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara")
 
-        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "2.8.0+25"])
+        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "2.8.0+25"])
         self.assertNotIn("Rik Herspeel", stdout)
 
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara", "--apply")

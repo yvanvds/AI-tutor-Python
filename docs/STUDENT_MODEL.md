@@ -290,6 +290,17 @@ StudentLOBelief {
                                         // stamp, and leaves them missing
                                         // on one with a stamp until the
                                         // release fills them (#281).
+  returnWrongAt: string?                // ISO 8601, #275: a warm-up
+                                        // review or a recheck that brought
+                                        // the LO back was not answered
+                                        // right; due again at the next
+                                        // session whatever its clock.
+                                        // Cleared by its next own
+                                        // question that is no such miss.
+  thinCheckedAt: string?                // ISO 8601, #275: a thin stamp
+                                        // from before 1.1 got its one
+                                        // check question; not checked as
+                                        // thin again. The stamp stays.
 }
 ```
 
@@ -605,7 +616,19 @@ release pressed again for reports nobody touched rewrites nothing.
   late), and an indirect write on such a doc stores that reading instead
   of letting its own clock bump pass for a probe. A replay from
   `turn_history` can backfill it exactly (the last direct signal per
-  LO, a neutral one included: conductor policy 3.1, #202).
+  LO, a neutral one included: conductor policy 3.1, #202); since #275
+  `replay-beliefs` does, on docs without the field.
+- **`returnWrongAt` and `thinCheckedAt` are what a return leaves
+  behind** (#275, conductor policy 1.5, 2.6). A warm-up review or a
+  recheck that brought an LO back and was not answered right sets
+  `returnWrongAt`: the LO is due at the next session instead of after 7
+  or 30 days, and the slot does not ask it again in the same session.
+  The LO's next own question that is not such a miss clears it; a
+  follow-up, a side signal and a transfer credit leave it alone. A thin
+  stamp's one check sets `thinCheckedAt` instead, whatever the answer,
+  and leaves `returnWrongAt` alone: the stamp stays. Both missing on
+  older docs: nothing is due early, and a thin stamp has not been
+  checked.
 
 ## What this model deliberately does not do
 

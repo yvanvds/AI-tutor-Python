@@ -74,6 +74,13 @@ ChatNotice _recheck() => ChatNotice(
   goalId: _printen.id,
 );
 
+/// The check question after a right answer on the one before (#275).
+ChatNotice _recheckAgain() => ChatNotice(
+  ChatNoticeKind.recheckAgain,
+  args: [_printen.title],
+  goalId: _printen.id,
+);
+
 /// As the conductor raises it when it picks the subgoal (#212).
 ChatNotice _newGoal() => ChatNotice(
   ChatNoticeKind.newGoalSelected,
@@ -110,6 +117,7 @@ void main() {
     chat = ChatService();
     chat.addSystemNotice(_warmUp());
     chat.addSystemNotice(_recheck());
+    chat.addSystemNotice(_recheckAgain());
     chat.addSystemNotice(_newGoal());
   });
 
@@ -162,12 +170,17 @@ void main() {
       "In between: one check question on Printing, so you can show you've "
       'got it now.';
   const newGoalEn = 'New goal selected: Printing';
+  const recheckAgainEn =
+      'One more check question on Printing: you got the last one right.';
 
   testWidgets('English with a translation: every pill names the goal in '
       'English', (tester) async {
     await mount(tester, const Locale('en'));
 
-    expect(pills(tester), containsAll([warmUpEn, recheckEn, newGoalEn]));
+    expect(
+      pills(tester),
+      containsAll([warmUpEn, recheckEn, recheckAgainEn, newGoalEn]),
+    );
     expect(pills(tester), everyElement(isNot(contains('Printen'))));
 
     await unmount(tester);
@@ -210,6 +223,7 @@ void main() {
         'Eerst even opwarmen: één opfrisvraag over Printen.',
         'Tussendoor: één controlevraag over Printen, om te tonen dat je het '
             'nu kan.',
+        'Nog een controlevraag over Printen: de vorige was juist.',
         'Nieuw doel geselecteerd: Printen',
       ]),
     );

@@ -31,6 +31,7 @@ import 'flows/cross_subgoal_signal.dart' as cross_subgoal_signal;
 import 'flows/difficulty_asymmetry.dart' as difficulty_asymmetry;
 import 'flows/difficulty_chip.dart' as difficulty_chip;
 import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
+import 'flows/earlier_root_recheck.dart' as earlier_root_recheck;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
@@ -141,6 +142,7 @@ void main() {
   warm_up_review.main();
   near_goal_recheck.main();
   unconfirmed_recheck.main();
+  earlier_root_recheck.main();
   question_bank.main();
   question_bank_serving.main();
   question_id.main();

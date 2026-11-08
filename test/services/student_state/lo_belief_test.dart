@@ -391,4 +391,47 @@ void main() {
       expect(belief().copyWith(alpha: 3).hasRightCounts, isFalse);
     });
   });
+
+  group('LoBelief.returnWrongAt and thinCheckedAt (#275)', () {
+    LoBelief belief({DateTime? wrong, DateTime? checked}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 3,
+      beta: 2,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      returnWrongAt: wrong,
+      thinCheckedAt: checked,
+    );
+
+    test('are written and read back; missing on an older doc', () {
+      final at = DateTime.utc(2026, 11, 9, 10);
+      final map = belief(wrong: at, checked: at).toMap(uid: 'u');
+      expect(map['returnWrongAt'], '2026-11-09T10:00:00.000Z');
+      expect(map['thinCheckedAt'], '2026-11-09T10:00:00.000Z');
+      final back = LoBelief.fromCosmos(map);
+      expect(back.returnWrongAt, at);
+      expect(back.thinCheckedAt, at);
+
+      final old = LoBelief.fromCosmos(_doc());
+      expect(old.returnWrongAt, isNull);
+      expect(old.thinCheckedAt, isNull);
+      final oldMap = old.toMap(uid: 'u');
+      expect(oldMap.containsKey('returnWrongAt'), isFalse);
+      expect(oldMap.containsKey('thinCheckedAt'), isFalse);
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'returnWrongAt': 12}).returnWrongAt,
+        isNull,
+      );
+    });
+
+    test('copyWith keeps them unless given; returnWrongAt clears only on '
+        'request', () {
+      final at = DateTime.utc(2026, 11, 9, 10);
+      final b = belief(wrong: at, checked: at);
+      expect(b.copyWith(alpha: 4).returnWrongAt, at);
+      expect(b.copyWith(alpha: 4).thinCheckedAt, at);
+      expect(b.copyWith(clearReturnWrongAt: true).returnWrongAt, isNull);
+      expect(b.copyWith(clearReturnWrongAt: true).thinCheckedAt, at);
+    });
+  });
 }
