@@ -20,8 +20,19 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.23-eval7` = PUNTENFORMULE v1.0.23, replayed from the turn
-log. `eval7` (#276) follows the app's stamp from the build that fixed it
+Rule set `1.1-eval8` = PUNTENFORMULE v1.1, replayed from the turn log.
+`eval8` (#278) follows the app's forgetting per answer from the build that
+brought it (`RULES_11_FROM`, by the turn's `clientVersion`, `rules_11`):
+before evidence lands on an LO, what it holds above the prior shrinks by
+λ = 0.7 (`FORGET`), on every signal that carries weight — the question's,
+a follow-up, a side signal, a transfer credit. The cap of 20 stays as a
+backstop. It is `Variant(forget=0.7)` of #248, promoted; a turn from an
+earlier build replays as that build wrote it, and every stamp from before
+stays where the app put it (#168). The stuck rule moved to own questions
+(≥ 6 and μ < 0.6, CONDUCTOR_POLICY §4.4); stuck moves neither M nor P, so
+the replay only counts them (`LoState.own_questions`).
+
+`eval7` (#276) follows the app's stamp from the build that fixed it
 (`STAMP_RULES_276_FROM`, by the turn's `clientVersion`): mastery needs
 evidence ≥ 5.75 instead of 4 (two right answers, not one — in the lesson
 time one strong positive at hard reached 5.5 and a stamp), and a signal on
@@ -105,10 +116,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.0.23-eval7"
+RULES_VERSION = "1.1-eval8"
 
 PRIOR = 1.0
+# A backstop since #278: forgetting keeps the evidence under 14.
 EVIDENCE_CAP = 20.0
+# `PolicyConstants.forgetFactor` (λ, #278): the evidence above the prior
+# shrinks by this before every write that carries weight. From the build
+# that brought it (`rules_11`); the teacher chose 0.7 on the replay of #248.
+FORGET = 0.7
+RULES_11_FROM = (2, 13, 0)
 DECAY_HALF_LIFE_DAYS = 60.0  # the conductor decays on every write; replay must too
 
 WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
@@ -277,6 +294,14 @@ def stamp_rules_276(turn: dict) -> bool:
     return v is not None and v >= STAMP_RULES_276_FROM
 
 
+def rules_11(turn: dict) -> bool:
+    """Whether the build that wrote [turn] computes with formula 1.1
+    (#278): forgetting per answer (`FORGET`), and the stamp of #276. Older
+    builds, and turns without `clientVersion`, only shrank at the cap."""
+    v = build_version(turn)
+    return v is not None and v >= RULES_11_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -339,10 +364,13 @@ class LoState:
     # already set, cleared by every write that is not incidental (§2.4),
     # follow-ups and neutrals included.
     regressed_at: dt.datetime | None = None
-    # The LO's own questions (target, no follow-up) answered right — a
-    # `correct` answer with a positive signal on it — for a `Variant` (#246,
-    # #279): all of them, those that were no multiple choice, and the run of
-    # the streak.
+    # The LO's own questions (#278): a direct question with the LO as its
+    # target, no follow-up, once per question whichever way it went — what
+    # the app counts as `ownQuestions` for the stuck rule.
+    own_questions: int = 0
+    # The LO's own questions answered right — a `correct` answer with a
+    # positive signal on it — for a `Variant` (#246, #279): all of them,
+    # those that were no multiple choice, and the run of the streak.
     own_right: int = 0
     own_right_open: int = 0
     own_streak: int = 0
@@ -400,8 +428,10 @@ def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
 @dataclass(frozen=True)
 class Variant:
     """A candidate rule for formula 1.1 (#249), replayed beside the current
-    one to compare them (#248). No rule set: `RULES_VERSION` stays until the
-    teacher picks one and the app takes it over. `Variant()` changes nothing.
+    one to compare them (#248). No rule set of its own: `Variant()` is the
+    rule set of now, each turn by the build that wrote it. The chosen one,
+    `forget=0.7`, is that rule set since `eval8` (#278); `as_11` replays
+    every turn with it.
 
     An *own question* is a direct question with the LO as its target, no
     follow-up; it is *right* when the answer was `correct` and the signal on
@@ -411,9 +441,14 @@ class Variant:
     # it: what the candidate would have done on these answers, not what the
     # app did.
     as_276: bool = False
+    # Every turn replays with the rules of 1.1 (`rules_11`, the stamp of
+    # #276 with it), whatever build wrote it: what 1.1 would have made of
+    # the answers from before it.
+    as_11: bool = False
     # #278: before evidence lands on an LO, what it holds above the prior
     # shrinks by this factor (λ). The cap stays, as a backstop it hardly
-    # reaches. With `forget_own_only` only an own question shrinks.
+    # reaches. With `forget_own_only` only an own question shrinks. Set,
+    # it holds for every turn; unset, a turn of 1.1 forgets by `FORGET`.
     forget: float | None = None
     forget_own_only: bool = False
     # #246: this many own questions right in a row stamp the LO, whatever
@@ -565,8 +600,11 @@ def replay(
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
         s_factor = SUPERVISED_WEIGHT_FACTOR if supervised(t) else 1.0
-        rules_276 = stamp_rules_276(t) or variant.as_276
+        r11 = rules_11(t) or variant.as_11
+        rules_276 = stamp_rules_276(t) or variant.as_276 or r11
         evidence_min = MASTERY_EVIDENCE if rules_276 else MASTERY_EVIDENCE_BEFORE_276
+        forget = variant.forget if variant.forget is not None else (FORGET if r11 else None)
+        own_counted = False
         mcq = t.get("questionType") == "mcQuestion"
         right = t.get("overallQuality") == "correct"
         for s in t.get("loSignals") or []:
@@ -603,8 +641,8 @@ def replay(
             own = target and not follow_up and not incidental
             if kind == "positive" and mcq:
                 base *= variant.mcq_positive
-            if variant.forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
-                a, b = _shrink(a, b, variant.forget)
+            if forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
+                a, b = _shrink(a, b, forget)
             if kind == "positive":
                 a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
             elif kind == "negative":
@@ -626,6 +664,9 @@ def replay(
                 elif kind == "negative":
                     lo.n_follow_up_neg += 1
             direct = not follow_up and not incidental
+            if own and not own_counted:
+                lo.own_questions += 1  # once per question, should the grader name it twice
+                own_counted = True
             if own and kind == "positive" and right:
                 lo.own_right += 1
                 if not mcq:
@@ -667,8 +708,8 @@ def replay(
             for c in t.get("transferCredits") or []:
                 lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
-                if variant.forget is not None and not variant.forget_own_only:
-                    a, b = _shrink(a, b, variant.forget)
+                if forget is not None and not variant.forget_own_only:
+                    a, b = _shrink(a, b, forget)
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1

@@ -162,23 +162,19 @@ confidence is shakiest rather than where the *student's* belief has
 slipped. The student-intent reading is the right one for the
 top-up use case.
 
-**Saturation case.** If every LO has `α + β` close to the cap (rule of
-thumb: `α + β < cap - 2` is "practiceable"; if no LO meets this, the
-subgoal is "saturated"), the conductor declines to ask a question and
-surfaces a "verder?" prompt. The student can override the suggestion;
-the prompt is a soft nudge, not a wall.
+**No saturation case since #278.** Until formula 1.1 a subgoal whose
+LOs all sat near the evidence cap (`α + β ≥ cap − 2`, "not
+practiceable") was "saturated": the conductor declined to ask and
+surfaced a "verder?" prompt, since at the cap one more answer hardly
+moved the mean. With forgetting per answer (3.4) every answer moves the
+mean, and an old doc at the cap shrinks below it at its next write, so
+a mastered subgoal the student opens again is topped up like any other.
+That replaced an earlier "auto-advance on a fully-mastered subgoal"
+rule, which ignored student intent (they tapped *this* subgoal).
 
-This replaces an earlier "auto-advance on a fully-mastered subgoal"
-rule. Auto-advance was wrong because it ignores student intent (they
-tapped *this* subgoal). The saturation prompt respects intent while
-being honest that the system has nothing further to learn from this
-LO right now.
-
-**Conductor-driven entry to a saturated subgoal doesn't happen by
+**Conductor-driven entry to a mastered subgoal doesn't happen by
 construction.** The conductor's "next subgoal" selection skips
-mastered subgoals. If a saturated subgoal is reached via conductor
-flow due to data inconsistency, advance defensively to the next
-unmastered subgoal.
+mastered subgoals.
 
 ### 1.4 The unified entry algorithm
 
@@ -198,11 +194,7 @@ entry(subgoal, student):
     if unmastered is non-empty:
         target_lo = first unmastered LO in curriculum order
     else:
-        practiceable = LOs with (α + β) < cap - 2
-        if practiceable is empty:
-            surface "verder?" prompt; do not generate a question
-            return
-        target_lo = mastered LO with lowest mean
+        target_lo = mastered LO with lowest mean       # no saturation since #278
     type = gentlest acceptable type for target_lo.kind
     difficulty = student.calibration.difficulty
     last_question_type = null   // session reset
@@ -399,8 +391,9 @@ stronger weighting later (e.g. `weight × (1 − mean)` as the sort key);
 not now.
 
 **Mastered LOs are skipped during practice.** They re-enter the
-candidate pool only via decay (section 1.2) or the saturation revisit
-case (section 1.3). No within-session refresh of mastered LOs — that
+candidate pool only via decay (section 1.2), a new answer that takes
+them under the bar, or the top-up of a mastered subgoal (section 1.3).
+No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
 handle"). Cross-session decay handles forgetting; mastered LOs that
 later work keeps using are refreshed without being probed, by transfer
@@ -409,22 +402,17 @@ get one review question at the start of a session (1.5); LOs of earlier
 subgoals the student left *without* mastering get an occasional recheck
 question (2.6).
 
-**Saturated LOs are filtered out of the unmastered pool.** An LO at
-`α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
-the cap-then-shrink rule makes mean movement too slow for re-probing
-to flip mastery in any reasonable number of turns. The saturated-stuck
-rule (section 4.4) normally marks these LOs stuck so the subgoal can
-advance; the selection-side filter is the matching guarantee that
-during the same turn the conductor doesn't preferentially target a
-dead-zone LO over a practiceable one with similar mean.
-
-**Fallback: all unmastered LOs saturated.** Rare, but possible when
-every remaining LO sits in the purgatory zone (saturated, mean in
-`[stuckSaturatedMeanCeiling, masteryMeanThreshold)`). In that case
-the conductor picks the **highest** mean (closest to mastery) so the
-slow climb has the best chance of flipping one LO and unblocking the
-subgoal. `chosenReason` is logged as `all unmastered saturated:
-highest-mean fallback` for debug visibility.
+**Every unmastered LO is a candidate (#278).** Until formula 1.1 an LO
+at `α + β ≥ cap − 2` was filtered out as "not practiceable": at the cap
+one answer hardly moved the mean, and the saturated branch of the stuck
+rule (4.4) was to mark it stuck. When every unmastered LO was saturated
+but not stuck, the conductor fell back to the *highest* mean. In the
+class data of the first three milestones that purgatory held 47 of the
+73 core LOs without a stamp at μ 0.70–0.80: not stuck, not demonstrated, hardly ever
+asked again, and the teacher counted them by hand. Since forgetting per
+answer (3.4) the mean moves on every answer and the evidence stays far
+under the cap, so the filter, the fallback and the saturated branch are
+gone; an old doc at the cap shrinks below it at its next write.
 
 **Convergence with curriculum order.** Early in a subgoal, "first
 unmastered in order" (section 1) and "lowest mean unmastered" pick
@@ -1256,15 +1244,18 @@ the next read doesn't double-decay. `lastUpdatedAt` is bumped to
 
 No background job. Decay is part of the read path.
 
-### 3.4 Evidence cap
+### 3.4 Forgetting per answer and the evidence cap
 
-**`α + β ≤ 20`.** When new evidence would push past the cap, shrink
-existing evidence-above-prior proportionally to make room, then add
-new evidence at full weight.
+**Forgetting, λ = 0.7 (#278, formula 1.1).** Before new evidence
+lands, what the LO holds above the prior shrinks by a fixed factor,
+then the evidence is added:
 
 ```
 applyEvidence(α, β, w_α, w_β):
-    if α + β + w_α + w_β > CAP:
+    if w_α + w_β == 0: return (α, β)        // a neutral forgets nothing
+    α = 1 + (α - 1) × λ                     // forget
+    β = 1 + (β - 1) × λ
+    if α + β + w_α + w_β > CAP:             // the cap, a backstop
         excess_capacity = CAP - 2 - w_α - w_β   // 2 = prior contribution
         existing_excess = α + β - 2
         scale = excess_capacity / existing_excess
@@ -1273,22 +1264,72 @@ applyEvidence(α, β, w_α, w_β):
     return (α + w_α, β + w_β)
 ```
 
-Result: `α + β = CAP` after the update, mean approximately preserved
-through the shrink, new evidence direction faithfully applied.
+On every write that carries weight: the question's own signal, a
+follow-up (6.2), a side signal (2.4), a transfer credit (3.7).
+Symmetric in right and wrong, so the first answers weigh less the more
+answers follow — the teacher's wish: "de eerste antwoorden hebben nog
+niet zoveel impact, zowel de goede als de foute". The mean was in
+effect the average of every answer, which assumes the student was
+equally good all along; a student who learns is not. Five wrong and
+then four right is "has it now", not "can do it 45% of the time".
+Decay in time (3.3) stays as it was; forgetting is per answer, decay
+per day.
 
-**Property: at cap, new evidence still moves belief.** A capped
-`(18, 2)` (mean 0.9) receiving strong-negative `(0, 2)`:
+Strong answers on medium at home, μ after the series:
 
-1. Shrink existing-above-prior by `(20 - 2 - 2) / (20 - 2) = 16/18`:
-   `(α=1 + 17×8̄/9, β=1 + 1×8̄/9) ≈ (16.1, 1.89)`.
-2. Add new: `(16.1, 3.89)`. Mean 0.81. Evidence 20.
+| series | cap of 20 (until #278) | λ = 0.7 |
+| --- | --- | --- |
+| right, right, right (new LO) | 0.88, mastered at the 2nd | 0.84, mastered at the 3rd |
+| W W R W R R W R R R | 0.59 (stuck at the 9th, #245) | 0.75 |
+| 6 wrong, then 4 right | 0.42 | 0.72 |
+| 12 wrong, then 4 right | 0.39 | 0.70 |
+| 20 × alternating | 0.48 | 0.43 |
+| 10 right, then 1 wrong | 0.85 | 0.65 |
 
-One strong-negative drops mean from 0.9 to 0.81 — still mastered, but
-close. Two would demote. Right responsiveness.
+- **A new LO needs three right answers at home on medium, not two**
+  (4.1): the evidence grows slower, so 5.75 falls at the third. On
+  hard, and in the lesson time, two still do it.
+- **After many wrong answers the road to the stamp is bounded**,
+  however long the history.
+- **Alternating right and wrong stays around 0.45**: no stamp from
+  volume alone.
+- **μ moves more.** The stamp stays (one-way, 4.3), but the conductor
+  asks the LO again when it falls under the bar.
 
-**Cap value of 20** is the sweet spot found by sanity check. Smaller
-(10) makes belief jumpy; larger (50) makes it rigid and hard to
-recover from after decay or isolated bad answers.
+**The evidence stays bounded**: a steady weight `w` converges to
+`α + β = 2 + w / (1 − λ)`, at most 13.7 for the heaviest answer
+(strong, hard, in the lesson time: 3.5). Two consequences. A weight
+under `(5.75 − 2) × (1 − λ)` = 1.125 cannot carry an LO to the
+evidence bar of mastery (4.1) on its own: a weak signal, a moderate one
+on medium at home, a transfer credit (0.5). And a small positive on an
+LO with much more evidence lowers the mean: the old answers fade faster
+than the new one adds — a transfer credit on a `(7, 1)` LO leaves it at
+`(5.7, 1)`.
+
+λ = 0.7 is the teacher's choice on the replay of #248 (2026-11-08): it
+found 55 of the 68 LOs he had counted by hand in three evaluation
+rounds (λ = 0.8: 51), left the proposals he had accepted alone (+0.4)
+and cost no extra oefeningen against #276. Forgetting only on the LO's
+own questions found fewer (50 of 68) and stamped more often on side
+signals, which then keep adding up undiminished. Considered and not
+chosen: a run-in, where the first ~5 answers count partly and then
+everything in full — after thirty oefeningen old evidence weighs as
+much as new again.
+
+**The cap, `α + β ≤ 20`, stays as a backstop.** When new evidence would
+push past it, existing evidence-above-prior shrinks proportionally to
+make room. With forgetting a doc under the cap never reaches it again:
+after the shrink the most it holds is `2 + 18 × 0.7` = 14.6, plus at
+most 3.5. An old doc at the cap shrinks below it at its next write: a
+capped `(18, 2)` (μ 0.9) receiving a strong negative becomes
+`(12.9, 1.7) + (0, 2)` = `(12.9, 3.7)`, μ 0.78, where the cap alone made
+it `(16.1, 3.89)`, μ 0.81.
+
+Until #278 the cap was the only shrink. At the cap the mean hardly
+moved: in the class data of the first three milestones 47 of the 73
+core LOs without a stamp at μ 0.70–0.80 sat at `α + β ≥ 18`, out of
+reach (2.1, 4.4), and from μ 0.60 a strong right answer at a time took
+8 answers to the stamp, a moderate one 15.
 
 ### 3.5 Edge cases in the update step
 
@@ -1312,51 +1353,62 @@ recover from after decay or isolated bad answers.
 
 ### 3.6 Worked example
 
-Sanity check, medium student, "use if/else" subgoal, three LOs.
+Sanity check, medium student at home, "use if/else" subgoal, three
+LOs. Every write that carries weight forgets first (3.4, λ = 0.7); decay
+between the questions is left out.
 
-State after first 4 questions:
+State after the first five questions:
 
 | LO | α | β | mean | evidence |
 | --- | --- | --- | --- | --- |
-| `predict_branch` | 5 | 1 | 0.83 | 6 |
-| `write_if_only` | 3 | 2 | 0.60 | 5 |
+| `predict_branch` | 5.38 | 1 | 0.84 | 6.38 |
+| `write_if_only` | 2.4 | 2 | 0.55 | 4.4 |
 | `write_if_else` | 1 | 1 | 0.50 | 2 |
 
 `predict_branch` formally meets mastery (mean ≥ 0.8, evidence ≥ 5.75):
-two strong positives at medium.
+three strong positives at medium — `(3, 1)`, `(4.4, 1)`, `(5.38, 1)`;
+after two the evidence was 5.4. `write_if_only` had a strong positive,
+`(3, 1)`, then a moderate negative: forgotten to `(2.4, 1)`, `β += 1.0`.
 
-**Q5: target `write_if_else`** (lowest mean unmastered), type
+**Q6: target `write_if_else`** (lowest mean unmastered), type
 `completeCode`, difficulty medium.
 
 Answer correct. LLM emits strong-positive on `write_if_else`,
-weak-positive on `predict_branch` (incidental).
+moderate-positive on `predict_branch` (incidental).
 
-- `write_if_else`: `α += 2.0 × 1.0 = 2.0` → `(3, 1)`, mean 0.75.
-- `predict_branch`: `α += 0.5 × 1.0 = 0.5` → `(5.5, 1)`, mean 0.85.
+- `write_if_else`: nothing to forget at the prior; `α += 2.0 × 1.0 =
+  2.0` → `(3, 1)`, mean 0.75.
+- `predict_branch`: forgotten to `(4.07, 1)`, `α += 1.0 × 1.0` →
+  `(5.07, 1)`, mean 0.84, evidence 6.07. A weak positive here (0.5)
+  would have left evidence 5.57, under the bar again (3.4).
 
-**Q6: target `write_if_only`** (now lowest at 0.60), type `writeCode`
+**Q7: target `write_if_only`** (now lowest at 0.55), type `writeCode`
 (least-recently-used), difficulty medium.
 
 Answer wrong. Strong-negative.
 
-- `write_if_only`: `β += 2.0 × 1.0 = 2.0` → `(3, 4)`, mean 0.43.
+- `write_if_only`: forgotten to `(1.98, 1.7)`, `β += 2.0 × 1.0` →
+  `(1.98, 3.7)`, mean 0.35.
 
-**Q7: target `write_if_else`** (`write_if_only` excluded by recency
-guard; `write_if_else` is unmastered).
+**Q8: target `write_if_else`** (`write_if_only` excluded by recency
+guard; `write_if_else` is unmastered). Partly right; the grader's signal
+is neutral, so nothing is added and nothing forgotten (3.1).
 
-**Q8: target `write_if_only` again.** Wrong again. Strong-negative.
+**Q9: target `write_if_only` again.** Wrong again. Strong-negative.
 
-- `write_if_only`: `β += 2.0` → `(3, 6)`, mean 0.33.
+- `write_if_only`: forgotten to `(1.69, 2.89)`, `β += 2.0` →
+  `(1.69, 4.89)`, mean 0.26.
 
 Now two negatives at calibrated medium on this LO.
 
-**Q9: target `write_if_only`** (recency guard relaxed; still lowest).
+**Q10: target `write_if_only`** (recency guard relaxed; still lowest).
 Notch-drop fires per section 2.3 → difficulty `easy`. Type rotates to
 `completeCode`.
 
-Answer correct. Strong-positive at easy: `α += 2.0 × 0.6 = 1.2`.
+Answer correct. Strong-positive at easy: forgotten to `(1.48, 3.72)`,
+`α += 2.0 × 0.6 = 1.2`.
 
-- `write_if_only`: `(4.2, 6)`, mean 0.41.
+- `write_if_only`: `(2.68, 3.72)`, mean 0.42.
 
 Override releases (positive received). Next probe of `write_if_only`
 goes back to medium.
@@ -1433,7 +1485,16 @@ it. Credits do not enter the calibration window (section 5).
 **Audit.** Every credit applied is listed on the turn record as
 `transferCredits: [{subgoalId, loId, alphaDelta}]` (8.1), next to the
 target's own `appliedSignals`; declined nominations are logged in the
-debug recorder with the reason.
+debug recorder with the reason. `alphaDelta` is the credit itself since
+#278; before, it was the change in α after the cap.
+
+**Forgetting (3.4, #278).** A credit forgets first, like every write
+that carries weight. Its weight (0.5 × s) is under what keeps an LO at
+the evidence bar, so on an LO with much evidence it lowers the mean — a
+`(7, 1)` LO becomes `(5.7, 1)` — and many credits in a row would settle
+at `(2.67, 1)` at home, μ 0.73. What the credit refreshes is the clock:
+`lastUpdatedAt`, which keeps a recurring LO out of the warm-up review.
+The stamp the grade reads stays (4.3).
 
 **Complement: warm-up review (1.5, #102).** LOs that naturally recur in
 later work are refreshed here for free; LOs that nothing later builds on
@@ -1481,7 +1542,10 @@ An LO is mastered when **all three** conditions hold:
    ×1.25 (3.2) one strong right answer on hard there was mastery on its
    own — μ 0.82, evidence 5.5 — where at home it leaves μ at 0.79 (4.5).
    57% of the stamps after 5 October fell on the first signal, against
-   13% before.
+   13% before. Since forgetting per answer (3.4, #278) the first answer
+   shrinks before the second lands, so on medium at home a new LO takes
+   three strong right answers (evidence 5.4 after two, 6.38 after three);
+   on hard, or in the lesson time, two still do it. The bar did not move.
 3. **At least one positive signal contributing to current belief was
    at the student's calibration *at the time of the answer*, or
    higher.** This is the E.1 fix (see 4.3).
@@ -1595,47 +1659,47 @@ students who get genuinely stuck on specific things, damaging
 motivation and burning the calibration system. Pure "advance after
 N attempts" treats unmastered as mastered, which it isn't.
 
-**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 10` AND
-mean < 0.6. A subgoal advances when all non-optional LOs are either
-**mastered or stuck**.
+**Compound rule, in own questions (#278):** an LO is *stuck* when it
+got **at least 6 own questions** AND its mean is < 0.6. A subgoal
+advances when all non-optional LOs are either **mastered or stuck**.
+
+An *own question* is a direct question with the LO as its target: an
+ordinary question on the active subgoal, or a warm-up review (1.5) or
+recheck (2.6) of it. Not a follow-up (6.2), and not a signal on the LO
+from a question about another one (2.4). One per question, whichever
+way the answer went, a neutral included; a question whose signal on its
+LO was lost (#225, 8.2) never reaches the doc and is not counted. The
+conductor keeps the count on the belief doc (`ownQuestions`,
+`stuckOwnQuestionsMin`); a doc from before formula 1.1 has none and
+reads 0, so its LO is stuck only after six new own questions.
 
 Numbers:
 
-- `α + β ≥ 10` is the "tried enough" threshold — meaningful effort. It
-  was 8 until #276: 8 × 1.25, because a wrong answer in the lesson time
-  weighs ×1.25 too (3.2, #219). At 8 four strong wrong answers on hard in
-  the lesson made an LO stuck, the very answer at which the attempts rule
-  (2.3, #227) would have asked it a notch lower; with a follow-up or a
-  side signal, three did. At 10 the student gets the lower notch first.
+- **6 own questions** is the "tried enough" threshold, the teacher's
+  choice (2026-11-08): the attempts rule (2.3, #227) asks a notch lower
+  after four attempts without a right answer, and six leaves two
+  questions at that level.
 - mean < 0.6 is "still not getting it." Above 0.6 is on the upswing —
-  keep probing.
+  keep probing. The mean reads the level (3.2): at hard 0.6 is about 39%
+  raw, at easy about 78%.
 
-**Second branch (saturated):** an LO is also stuck when
-`α + β ≥ cap − saturationSlack` AND mean < `stuckSaturatedMeanCeiling`
-(0.75). This handles the case where an early strong-negative pushed
-the LO's β up, evidence saturated at the cap before subsequent
-correct answers could pull mean back above the mastery threshold, and
-the cap-then-shrink rule in §3.4 now makes mean movement so slow that
-further probing wastes turns. Without this branch a non-practiceable
-LO with mean between the classic-stuck ceiling (0.6) and the
-saturated-stuck ceiling (0.75) sits in purgatory — not mastered, not
-stuck, blocks subgoal advance indefinitely.
-
-Numbers for the saturated branch:
-
-- `α + β ≥ cap − saturationSlack` = `α + β ≥ 18` with current
-  constants. Matches the `isPracticeable` boundary in §3.4 so the
-  selection-side filter (§2.1) and the stuck-side rule agree.
-- mean < 0.75 leaves a one-strong-positive buffer to mastery
-  (`masteryMeanThreshold` = 0.8). LOs within that buffer are not
-  written off as stuck, even though the selection filter still skips
-  them; the highest-mean fallback in §2.1 keeps probing them.
+**Why in questions.** Until #278 the rule was `α + β ≥ 10` (8 until
+#276) AND mean < 0.6, with a second, saturated branch: `α + β ≥ 18`
+AND mean < 0.75, for an LO stuck at the cap where the cap-then-shrink
+rule made the mean too slow to move. With forgetting per answer (3.4)
+the evidence stays bounded, so `α + β` no longer says how often the
+student tried, and nothing saturates. The evidence rule also wrote
+students off while they were getting it (#245): on the series wrong,
+wrong, right, wrong, right, right, wrong, right, right, right the old
+rule made the LO stuck at the ninth answer, μ 0.55 on evidence 20, and
+around 40% of the stuck-advances in the class came after at least two
+right answers in a row. With forgetting μ ends that series at 0.75.
 
 **Stuck is computed live, not stored.** Every mastery check evaluates
-each LO as `mastered | stuck | neither`. No flag, no persistence.
-Decay naturally rescues an LO from stuck status because evidence
-shrinks toward the prior — on a future revisit, a previously-stuck
-LO can be probed afresh.
+each LO as `mastered | stuck | neither` from the decayed mean and the
+stored count. No flag. The count only grows, so an LO leaves stuck
+when its mean climbs back to 0.6 — with forgetting a few right answers
+do that — and decay alone, which pulls the mean toward 0.5, does not.
 
 **Student-side invisibility.** The advance feels normal to the
 student. No "you didn't really master this but we're moving on"
@@ -1716,9 +1780,10 @@ optional LO gets none), each in one of three states:
 - **empty**;
 - **half**: one right answer would master the LO. A `(positive,
   strong)` signal at the student's calibration, with the home factor
-  (×1.0), applied to the current decayed `(α, β)` with the cap (3.4),
-  meets conditions 1 and 2 of 4.1; condition 3 that answer meets
-  itself;
+  (×1.0), applied to the current decayed `(α, β)` as every answer is —
+  forgetting, then the cap (3.4) — meets conditions 1 and 2 of 4.1;
+  condition 3 that answer meets itself. Since #278 on medium at home
+  that is after the second right answer, not the first;
 - **full**: mastered now, mastered once (`firstMasteredAt`, the
   one-way reading the grade uses), or stuck (4.4). Stuck looks full to
   the student, as the advance it allows looks normal (4.4,
@@ -1754,24 +1819,31 @@ the plain bar of the cached share.
 
 ### 4.6 Worked example
 
-Continuing from 3.6, end of Q9:
+Continuing from 3.6, end of Q10:
 
-| LO | α | β | mean | evidence | mastered? | stuck? |
-| --- | --- | --- | --- | --- | --- | --- |
-| `predict_branch` | 5.5 | 1 | 0.85 | 6.5 | yes | no |
-| `write_if_only` | 4.2 | 6 | 0.41 | 10.2 | no | **yes** |
-| `write_if_else` | 3 | 1 | 0.75 | 4 | no | no |
+| LO | α | β | mean | evidence | own questions | mastered? | stuck? |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `predict_branch` | 5.07 | 1 | 0.84 | 6.07 | 3 | yes | no |
+| `write_if_only` | 2.68 | 3.72 | 0.42 | 6.4 | 5 | no | no |
+| `write_if_else` | 3 | 1 | 0.75 | 4 | 2 | no | no |
 
-`write_if_only` is stuck (`α + β = 10.2 ≥ 10`, mean 0.41 < 0.6).
+`write_if_only` is not stuck yet: mean 0.42 < 0.6, but five own
+questions (Q4, Q5, Q7, Q9, Q10), one short of six (4.4).
 
-**Q10: target `write_if_else`** (lowest-mean unmastered). Type
-rotates. Difficulty `medium` (calibrated).
+**Q11: target `write_if_else`** (`write_if_only` excluded by the
+recency guard). Type rotates. Difficulty `medium` (calibrated). Answer
+correct, strong-positive: forgotten to `(2.4, 1)`, `α += 2.0` →
+`(4.4, 1)`, mean 0.81 but evidence 5.4 — not yet (4.1).
 
-Answer correct. Strong-positive at medium: `α += 2.0 × 1.0 = 2.0`.
+**Q12: target `write_if_only`** (lowest mean; back at medium, the
+override released). Answer wrong, strong-negative: forgotten to
+`(2.18, 2.9)`, `β += 2.0` → `(2.18, 4.9)`, mean 0.31. Its sixth own
+question: **stuck** (6 ≥ 6, mean 0.31 < 0.6).
 
-`write_if_else`: `(5, 1)`, mean 0.83, evidence 6. Condition 1 ✓,
-condition 2 ✓, condition 3 ✓ (positive at calibrated medium →
-`lastPositiveAtCalibratedAt` now set). **Mastered.**
+**Q13: target `write_if_else`.** Answer correct, strong-positive at
+medium: forgotten to `(3.38, 1)`, `α += 2.0` → `(5.38, 1)`, mean 0.84,
+evidence 6.38. Condition 1 ✓, condition 2 ✓, condition 3 ✓ (positive at
+calibrated medium → `lastPositiveAtCalibratedAt` set). **Mastered.**
 
 Subgoal mastery check:
 - `predict_branch`: mastered ✓
@@ -1782,10 +1854,10 @@ All non-optional LOs are mastered or stuck → **subgoal mastered.**
 Advancement triggers.
 
 Student advances to "use elif and combine conditions logically."
-`write_if_only`'s `(4.2, 6)` belief persists in the student model;
-on manual revisit, decay will have softened it and re-probing
-becomes meaningful. Teacher dashboard flags `write_if_only` as a
-stuck LO at advancement (section 8).
+`write_if_only`'s `(2.18, 4.9)` belief and its six own questions
+persist in the student model; on manual revisit its mean can move with
+every answer (3.4). Teacher dashboard flags `write_if_only` as a stuck
+LO at advancement (section 8).
 
 ### 4.7 What this section deliberately does not address
 
@@ -2441,9 +2513,9 @@ TurnRecord {
   overallQuality: string            // wrong | partial | correct
   loSignals: [{subgoalId, loId, signal, strength}]
   hadFallback: bool                 // grader response was unparseable
-  appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals)
+  appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals); since #278 the evidence added, not the change in (α, β), which forgetting (3.4) folds in
   provenance: string                // home | supervised (3.2, #100); absent on older docs = home
-  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
+  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none; alphaDelta the credit since #278
   reviewFlags: [{subgoalId, loId}]  // 2.4, #167: earlier LOs an incidental negative flagged for review instead of debiting; omitted when none
 
   // Calibration impact
@@ -2699,9 +2771,11 @@ an LO finished at home).
 ordinary question, a follow-up, a warm-up review or a recheck — not
 incidental signals on other LOs and not transfer credits. Each counts
 by the sign of its belief delta (`alphaDelta − betaDelta`); the size
-is left out, because at the evidence cap (3.4) a delta is mostly the
-shrink toward the prior, and the supervised factor would make class
-answers look heavier. A turn is supervised when it was recorded so or
+is left out, because the supervised factor would make class answers
+look heavier, and on a turn from before #278 a delta at the evidence
+cap (3.4) was mostly the shrink toward the prior. Since #278 the delta
+is the evidence the signal added, without the forgetting, so its sign
+is the signal's. A turn is supervised when it was recorded so or
 falls in a lesson of the student's class (#219) — the turns graded
 before the timetable was the source are all `home` on the record, and
 the grade proposal's tally reads them the same way.

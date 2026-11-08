@@ -17,8 +17,34 @@ class PolicyConstants {
   /// Beta prior; an unprobed LO starts at (1, 1).
   static const double prior = 1.0;
 
+  /// Forgetting per answer (λ, #278, formula 1.1): before new evidence lands
+  /// on an LO, what it holds above the prior shrinks by this factor —
+  /// `α ← 1 + (α − 1)·λ`, `β ← 1 + (β − 1)·λ` — then the evidence is added
+  /// (`belief_math.applyEvidence`). On every signal that changes `(α, β)`:
+  /// the question's own, a follow-up, a side signal, a transfer credit; a
+  /// neutral shrinks nothing. Symmetric, so the first answers weigh less the
+  /// more answers follow, right and wrong alike: a student who learns —
+  /// five wrong, then four right — reads as having it now, not as 45%.
+  ///
+  /// The evidence stays bounded at `2 + w / (1 − λ)` for a steady weight
+  /// `w`: at most 13.7 (strong, hard, in the lesson), so the cap below is
+  /// hardly reached any more. A weight under `(masteryEvidenceMin − 2)·(1 −
+  /// λ)` = 1.125 cannot carry an LO to the evidence bar on its own — a weak
+  /// signal, a moderate one at home on medium, a transfer credit — and a
+  /// small positive on an LO with far more evidence lowers μ: the old
+  /// answers fade faster than the new one adds.
+  ///
+  /// 0.7, chosen by the teacher on the replay (#248, 2026-11-08): it found
+  /// 55 of the 68 LOs he had counted by hand (0.8: 51), left the control
+  /// group's grades alone (+0.4) and cost no extra oefeningen against #276.
+  /// Until #278 the only shrink was the cap's, at `α + β` = 20, where 47 of
+  /// 73 near goals of the first three milestones sat out of reach (§4.4).
+  static const double forgetFactor = 0.7;
+
   /// Cap on `α + β`. Beyond this, existing evidence shrinks toward the prior
-  /// before new evidence is applied (see `belief_math.applyEvidence`).
+  /// before new evidence is applied (see `belief_math.applyEvidence`). Since
+  /// #278 a backstop: forgetting ([forgetFactor]) keeps the evidence under
+  /// 14, and an old doc at the cap shrinks to below it at its next write.
   static const double evidenceCap = 20.0;
 
   /// Decay half-life. `α_eff = 1 + (α - 1) * 0.5^(elapsed_days/halfLife)`.
@@ -114,29 +140,30 @@ class PolicyConstants {
   /// first answer counts as the second. One threshold everywhere, the
   /// legacy reading of [everMastered] included: a separate one there would
   /// stamp a new doc between 4 and 5.75 at its next write.
+  ///
+  /// Since #278 forgetting ([forgetFactor]) shrinks the first answer before
+  /// the second lands, so a new LO takes three strong right answers on
+  /// medium at home (evidence 5.4 after two, 6.38 after three) and still
+  /// two on hard or in the lesson time. The bar itself did not move.
   static const double masteryEvidenceMin = 5.75;
 
-  /// Stuck rule: `α + β ≥ this` AND mean < `stuckMeanCeiling` → stuck.
+  /// Stuck rule (§4.4, #278): at least this many own questions on the LO
+  /// (`LoBelief.ownQuestions`: a direct question with the LO as its target,
+  /// not a follow-up) AND mean < [stuckMeanCeiling] → stuck.
   ///
-  /// 10, not 8, since #276: 8 × `supervisedWeightFactor`. Negatives in the
-  /// lesson weigh ×1.25 too (#219), so 8 came after a quarter fewer wrong
-  /// answers — on hard at the fourth, before the attempts rule (§2.3, #227)
-  /// could ask a notch lower.
-  static const double stuckEvidenceMin = 10.0;
+  /// Counted in questions since formula 1.1: with forgetting
+  /// ([forgetFactor]) the evidence stays bounded, so "tried enough" can no
+  /// longer be read from `α + β`. Six, the teacher's choice: the attempts
+  /// rule (§2.3, #227) asks a notch lower after four attempts without a
+  /// right answer, and that leaves two questions at the lower level. Until
+  /// #278 the rule was `α + β ≥ 10`, with a second, saturated branch at the
+  /// cap (`α + β ≥ 18` and mean < 0.75). On the series wrong, wrong, right,
+  /// wrong, right, right, wrong, right, right, right (strong, medium) the
+  /// old rule made the LO stuck at the ninth answer, μ 0.55 on evidence 20,
+  /// while the student was getting it (#245); with forgetting μ ends at
+  /// 0.75.
+  static const int stuckOwnQuestionsMin = 6;
   static const double stuckMeanCeiling = 0.6;
-
-  /// "Practiceable" — `α + β < cap - this` is fresh enough to probe.
-  /// Used for the saturation-detection branch on a fully-mastered subgoal.
-  static const double saturationSlack = 2.0;
-
-  /// Saturated-stuck rule: a non-practiceable LO whose mean is below this
-  /// ceiling is also stuck. The cap-then-shrink update in
-  /// `belief_math.applyEvidence` slows mean movement to a crawl once the
-  /// LO is at the evidence cap, so re-probing rarely catches up; the
-  /// student is better served by advancing. Set just below
-  /// `masteryMeanThreshold` so LOs within one good probe of mastery are
-  /// not prematurely written off.
-  static const double stuckSaturatedMeanCeiling = 0.75;
 
   /// Cap on the cascade-skip when advancing through pre-mastered subgoals.
   /// At most this many subgoals can auto-skip in a row.

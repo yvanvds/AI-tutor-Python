@@ -2720,10 +2720,6 @@ class AppLocalizationsNl extends AppLocalizations {
       'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
 
   @override
-  String get chat_notice_subgoalSaturated =>
-      'Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?';
-
-  @override
   String get chat_notice_noGoalsLeft =>
       'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!';
 

@@ -127,15 +127,16 @@ List<Map<String, dynamic>> nextGoal() => [
 ];
 
 /// One strong positive short of mastery, calibrated positive on record:
-/// (3, 1) reads 0.75 on evidence 4; the grade adds 2.0 to α at medium and
-/// (5, 1) reads 0.83 on 6 — mastered, and "Variables" advances.
+/// (4.4, 1) reads 0.81 on evidence 5.4; the grade forgets (#278) and adds
+/// 2.0 to α at medium, and (5.38, 1) reads 0.84 on 6.38 — mastered, and
+/// "Variables" advances.
 Map<String, dynamic> varBelief(DateTime at) => {
   'id': '${kStudentUid}_s2_lo-var',
   'type': 'lo_belief',
   'uid': kStudentUid,
   'subgoalId': 's2',
   'loId': 'lo-var',
-  'alpha': 3.0,
+  'alpha': 4.4,
   'beta': 1.0,
   'lastUpdatedAt': at.toIso8601String(),
   'lastQuestionType': 'completeCodeQuestion',

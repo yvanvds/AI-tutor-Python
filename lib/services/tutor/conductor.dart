@@ -84,7 +84,6 @@ class QuestionPlan {
   final List<LearningObjective> targetLOs;
   final TurnSelectionReason reason;
   final bool blockedEmptyObjectives;
-  final bool blockedSaturated;
 
   /// Set when [Conductor] is in degraded mode (CONDUCTOR_POLICY §7.3) and
   /// declines to plan anything. The conductor already surfaced its own
@@ -108,7 +107,6 @@ class QuestionPlan {
     required this.targetLOs,
     required this.reason,
     this.blockedEmptyObjectives = false,
-    this.blockedSaturated = false,
     this.blockedDegraded = false,
     this.warmUp,
     this.recheck,
@@ -165,20 +163,6 @@ class QuestionPlan {
         notchDropFired: false,
       ),
       blockedEmptyObjectives: true,
-    );
-  }
-
-  factory QuestionPlan.saturated() {
-    return const QuestionPlan(
-      type: ChatRequestType.noResult,
-      difficulty: QuestionDifficulty.medium,
-      targetLOs: [],
-      reason: TurnSelectionReason(
-        candidateLOs: [],
-        chosenReason: 'saturated',
-        notchDropFired: false,
-      ),
-      blockedSaturated: true,
     );
   }
 }
@@ -665,73 +649,51 @@ class Conductor {
     String chosenReason;
 
     if (unmastered.isNotEmpty) {
-      // Prefer practiceable LOs: saturated ones can't move mean fast enough
-      // for re-probing to help, and the saturated-stuck rule (CONDUCTOR_POLICY
-      // §4.4) will normally have marked them stuck so the subgoal advances.
-      // Falling back to the full unmastered pool only matters for the
-      // purgatory case where every unmastered LO is saturated but sits in
-      // [stuckSaturatedMeanCeiling, masteryMeanThreshold).
-      final practiceable = unmastered
-          .where((lo) => isPracticeable(snapshots[lo.id]!))
+      // Lowest mean, weight as tiebreaker (CONDUCTOR_POLICY §2.1). Every
+      // unmastered LO is a candidate: since forgetting per answer (#278) an
+      // LO's mean moves on every answer, so there is no saturated LO left
+      // to filter out and no highest-mean fallback for one — an old doc at
+      // the cap shrinks to below it at its next write.
+      // Recency guard skips the previously-probed LO if alternatives exist.
+      var pool = unmastered
+          .where((lo) => lo.id != _lastTargetLoId)
           .toList(growable: false);
-      if (practiceable.isNotEmpty) {
-        // Among practiceable: pick lowest mean, weight as tiebreaker.
-        // Recency guard skips the previously-probed LO if alternatives exist.
-        var pool = practiceable
-            .where((lo) => lo.id != _lastTargetLoId)
-            .toList(growable: false);
-        if (pool.isEmpty) pool = practiceable;
-        pool = pool.toList()
-          ..sort((a, b) {
-            final ma = snapshots[a.id]!.mean;
-            final mb = snapshots[b.id]!.mean;
-            if (ma != mb) return ma.compareTo(mb);
-            // Higher weight wins on near-equal means.
-            return b.weight.compareTo(a.weight);
-          });
-        target = pool.first;
-        // Curriculum-order short-circuit during cold start: if every
-        // snapshot is the prior, "lowest mean" ties on every LO — pick the
-        // first in authoring order (CONDUCTOR_POLICY §1.1).
-        final allFresh = unmastered.every((lo) {
-          final snap = snapshots[lo.id]!;
-          return snap.alpha == PolicyConstants.prior &&
-              snap.beta == PolicyConstants.prior;
+      if (pool.isEmpty) pool = unmastered;
+      pool = pool.toList()
+        ..sort((a, b) {
+          final ma = snapshots[a.id]!.mean;
+          final mb = snapshots[b.id]!.mean;
+          if (ma != mb) return ma.compareTo(mb);
+          // Higher weight wins on near-equal means.
+          return b.weight.compareTo(a.weight);
         });
-        if (allFresh) {
-          target = unmastered.first;
-          chosenReason = 'cold start: first LO in order';
-        } else if (pool.length < practiceable.length) {
-          chosenReason = 'lowest mean (recency relaxed)';
-        } else {
-          chosenReason = 'lowest mean unmastered';
-        }
+      target = pool.first;
+      // Curriculum-order short-circuit during cold start: if every
+      // snapshot is the prior, "lowest mean" ties on every LO — pick the
+      // first in authoring order (CONDUCTOR_POLICY §1.1).
+      final allFresh = unmastered.every((lo) {
+        final snap = snapshots[lo.id]!;
+        return snap.alpha == PolicyConstants.prior &&
+            snap.beta == PolicyConstants.prior;
+      });
+      if (allFresh) {
+        target = unmastered.first;
+        chosenReason = 'cold start: first LO in order';
+      } else if (pool.length < unmastered.length) {
+        chosenReason = 'lowest mean (recency relaxed)';
       } else {
-        // Every unmastered LO is saturated but not stuck. Pick the one
-        // closest to mastery so the slow climb has the best chance to flip
-        // an LO and unblock subgoal advance.
-        final sorted = unmastered.toList()
-          ..sort(
-            (a, b) => snapshots[b.id]!.mean.compareTo(snapshots[a.id]!.mean),
-          );
-        target = sorted.first;
-        chosenReason = 'all unmastered saturated: highest-mean fallback';
+        chosenReason = 'lowest mean unmastered';
       }
     } else {
       // All mastered: top-up branch. Pick the mastered LO with the lowest
-      // mean among practiceable ones (CONDUCTOR_POLICY §1.3).
-      final practiceable = objectives
-          .where((lo) => isPracticeable(snapshots[lo.id]!))
-          .toList(growable: false);
-      if (practiceable.isEmpty) {
-        return QuestionPlan.saturated();
-      }
-      final sorted = practiceable.toList()
+      // mean (CONDUCTOR_POLICY §1.3). Every one of them can still move
+      // (#278), so there is no saturated subgoal to decline.
+      final sorted = objectives.toList()
         ..sort(
           (a, b) => snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean),
         );
       target = sorted.first;
-      chosenReason = 'all mastered: lowest-mean practiceable';
+      chosenReason = 'all mastered: lowest mean';
     }
 
     final type = _pickType(target, snapshots[target.id]!);
@@ -1426,6 +1388,9 @@ class Conductor {
     }
     // The root's subgoals, read on the first cross-subgoal signal only.
     List<Goal>? siblings;
+    // One own question per question (#278), should the grader name the
+    // target twice against the contract (§3.5).
+    var ownQuestionCounted = false;
     for (final sig in answer.signals) {
       final String signalSubgoalId;
       final LearningObjective? lo;
@@ -1588,8 +1553,11 @@ class Conductor {
       // direct write — weight, strike counter and probe clock as above — but
       // the difficulty was chosen for the target, so it certifies nothing.
       // Without this, two side mentions in the lesson time stamped an LO
-      // nobody asked.
+      // nobody asked. That is the LO's *own question* (#278): the count the
+      // stuck rule reads (§4.4), once per question.
       final movesRatchets = isCalibratedProbeOfThisLo && isTarget;
+      final countsAsOwnQuestion = movesRatchets && !ownQuestionCounted;
+      if (countsAsOwnQuestion) ownQuestionCounted = true;
       final newPositiveAtCalibrated =
           (movesRatchets && hasPositive && atOrAbove) ? now : null;
       // #103 three-level ratchet: absolute, not calibration-relative — the
@@ -1678,14 +1646,20 @@ class Conductor {
         lastProbedAt: isCalibratedProbeOfThisLo
             ? now
             : existing?.lastDirectProbeAt,
+        ownQuestions:
+            (existing?.ownQuestions ?? 0) + (countsAsOwnQuestion ? 1 : 0),
       );
       await _deps.upsertLoBelief(updated);
+      // The evidence this signal added, not the change in `(α, β)`: since
+      // #278 every write forgets first, so the change of a small positive
+      // on an LO with much evidence can be negative, and the direction the
+      // provenance-gap check reads (§8.2) would turn over.
       appliedSignals.add(
         TurnAppliedSignal(
           subgoalId: signalSubgoalId,
           loId: sig.loId,
-          alphaDelta: next.alpha - alpha,
-          betaDelta: next.beta - beta,
+          alphaDelta: deltas.alphaDelta,
+          betaDelta: deltas.betaDelta,
         ),
       );
       if (signalSubgoalId == subgoal.id) {
@@ -1732,7 +1706,7 @@ class Conductor {
       final isMastered =
           meetsMasteryMeanAndEvidence(snap) &&
           (b?.lastPositiveAtCalibratedAt != null);
-      final stuck = isStuck(snap);
+      final stuck = isStuck(snap, ownQuestions: b?.ownQuestions ?? 0);
       loStatus.add(
         TurnLoStatus(
           loId: lo.id,
@@ -2079,11 +2053,13 @@ class Conductor {
           lastProbedAt: existing.lastDirectProbeAt,
         ),
       );
+      // The credit itself, as `appliedSignals` (#278): forgetting would
+      // make the change in α of a credit on a well-evidenced LO negative.
       credits.add(
         TurnTransferCredit(
           subgoalId: ref.subgoalId,
           loId: ref.loId,
-          alphaDelta: next.alpha - snap.alpha,
+          alphaDelta: deltas.alphaDelta,
         ),
       );
     }
@@ -2354,6 +2330,7 @@ class Conductor {
           lastPositiveAtCalibratedAt: b?.lastPositiveAtCalibratedAt,
           firstMasteredAt: b?.firstMasteredAt,
           calibration: calibration,
+          ownQuestions: b?.ownQuestions ?? 0,
         ),
         askedAndNotRight: askedAndNotRight.contains(lo.id),
       );

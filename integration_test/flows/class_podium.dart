@@ -102,15 +102,15 @@ Map<String, dynamic> _printDone() => {
 };
 
 /// One strong positive short of mastery, calibrated positive on record:
-/// (3, 1) reads 0.75; the grade makes it (5, 1), 0.83 — mastered, and with
-/// it the subgoal.
+/// (4.4, 1) reads 0.81 on evidence 5.4; the grade forgets (#278) and makes
+/// it (5.38, 1), 0.84 on 6.38 — mastered, and with it the subgoal.
 Map<String, dynamic> _almostMastered(DateTime at) => {
   'id': '${kStudentUid}_s2_lo-var',
   'type': 'lo_belief',
   'uid': kStudentUid,
   'subgoalId': 's2',
   'loId': 'lo-var',
-  'alpha': 3,
+  'alpha': 4.4,
   'beta': 1,
   'lastUpdatedAt': at.toIso8601String(),
   'lastQuestionType': 'completeCodeQuestion',

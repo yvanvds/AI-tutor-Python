@@ -627,10 +627,6 @@ class TutorService extends Notifier<TutorState> {
       await _surfaceEmptyObjectivesBlock();
       return;
     }
-    if (plan.blockedSaturated) {
-      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
-      return;
-    }
     if (plan.blockedDegraded) {
       // The conductor already surfaced its own degraded-mode message at the
       // moment of degradation. Stay quiet on follow-up planNext calls.
@@ -1905,10 +1901,6 @@ class TutorService extends Notifier<TutorState> {
 
     if (plan.blockedEmptyObjectives) {
       await _surfaceEmptyObjectivesBlock();
-      return;
-    }
-    if (plan.blockedSaturated) {
-      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
       return;
     }
     if (plan.blockedDegraded) {

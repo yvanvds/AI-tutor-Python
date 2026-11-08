@@ -32,11 +32,13 @@ LoDisplayState _state(
   QuestionDifficulty calibration = QuestionDifficulty.hard,
   bool atCalibration = true,
   DateTime? firstMasteredAt,
+  int ownQuestions = 0,
 }) => loDisplayStateOf(
   snap: snap,
   lastPositiveAtCalibratedAt: atCalibration ? DateTime.utc(2026, 10, 1) : null,
   firstMasteredAt: firstMasteredAt,
   calibration: calibration,
+  ownQuestions: ownQuestions,
 );
 
 void main() {
@@ -61,30 +63,35 @@ void main() {
       expect(_state(once), LoDisplayState.half);
     });
 
-    test('on medium the first right answer gives half too; on easy it takes '
-        'three', () {
+    test('#278: on medium at home it takes two right answers for half, on '
+        'easy seven: forgetting shrinks each answer before the next lands', () {
       const medium = QuestionDifficulty.medium;
+      final once = _afterRight(_prior, medium);
+      // (3, 1); a second right answer takes it to (4.4, 1), evidence 5.4.
+      expect(_state(once, calibration: medium), LoDisplayState.empty);
       expect(
-        _state(_afterRight(_prior, medium), calibration: medium),
+        _state(_afterRight(once, medium), calibration: medium),
         LoDisplayState.half,
       );
 
+      // On easy a strong right answer weighs 1.2 at home: α climbs toward
+      // 1 + 1.2 / 0.3 = 5, and the evidence bar of 5.75 needs α ≥ 4.75.
       const easy = QuestionDifficulty.easy;
-      final once = _afterRight(_prior, easy);
-      expect(_state(once, calibration: easy), LoDisplayState.empty);
-      // Two on easy: (3.4, 1); a third would reach only evidence 5.6 (#276).
-      final twice = _afterRight(once, easy);
-      expect(_state(twice, calibration: easy), LoDisplayState.empty);
+      var snap = _prior;
+      for (var i = 0; i < 6; i++) {
+        snap = _afterRight(snap, easy);
+      }
+      expect(_state(snap, calibration: easy), LoDisplayState.empty);
       expect(
-        _state(_afterRight(twice, easy), calibration: easy),
+        _state(_afterRight(snap, easy), calibration: easy),
         LoDisplayState.half,
       );
     });
 
     test('the right answer is weighed at the student\'s calibration: the '
         'same belief is half on hard and empty on easy', () {
-      // μ 0.71: one strong right answer takes it to 0.84 on hard (+2.8),
-      // 0.79 on easy (+1.2).
+      // μ 0.71: one strong right answer takes it to 0.81 on hard (+2.8),
+      // 0.75 on easy (+1.2), forgetting first (#278).
       const snap = BeliefSnapshot(3.7, 1.5);
       expect(_state(snap), LoDisplayState.half);
       expect(
@@ -109,16 +116,24 @@ void main() {
       expect(_state(twice), LoDisplayState.full);
     });
 
-    test('stuck is full', () {
-      // Classic: evidence 10.2, μ 0.50 — clear of the evidence floor of 10
-      // (#239, #276).
-      const classic = BeliefSnapshot(5.05, 5.15);
-      expect(isStuck(classic), isTrue);
-      expect(_state(classic, atCalibration: false), LoDisplayState.full);
-      // Saturated: evidence 19, μ 0.68.
-      const saturated = BeliefSnapshot(13, 6);
-      expect(isStuck(saturated), isTrue);
-      expect(_state(saturated), LoDisplayState.full);
+    test('stuck is full: six own questions and μ under 0.6 (#278)', () {
+      const low = BeliefSnapshot(2.4, 5);
+      expect(isStuck(low, ownQuestions: 6), isTrue);
+      expect(
+        _state(low, atCalibration: false, ownQuestions: 6),
+        LoDisplayState.full,
+      );
+      // Five own questions: not yet stuck, and far from mastery.
+      expect(
+        _state(low, atCalibration: false, ownQuestions: 5),
+        LoDisplayState.empty,
+      );
+      // The saturated branch is gone: evidence 19 and μ 0.68 is no longer
+      // stuck, and one right answer on hard does not master it either.
+      expect(
+        _state(const BeliefSnapshot(13, 6), ownQuestions: 20),
+        LoDisplayState.empty,
+      );
     });
 
     test('an LO ever mastered is full, however far it fell since', () {

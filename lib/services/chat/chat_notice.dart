@@ -71,7 +71,6 @@ enum ChatNoticeKind {
   optionsLookAlike,
 
   subgoalDeletedRedirect,
-  subgoalSaturated,
   noGoalsLeft,
   emptyObjectives,
   preparingExercise,

@@ -32,7 +32,8 @@ enum LoDisplayState {
 }
 
 /// The segment an LO gets from its belief as it is now: [snap] is the
-/// decayed `(α, β)`, [calibration] the student's level.
+/// decayed `(α, β)`, [calibration] the student's level, [ownQuestions] the
+/// doc's count of own questions (`LoBelief.ownQuestions`, #278).
 ///
 /// Full when the LO was ever mastered ([firstMasteredAt], the one-way
 /// reading the grade uses, #168), is mastered now (§4.1) or is stuck
@@ -42,12 +43,13 @@ LoDisplayState loDisplayStateOf({
   required DateTime? lastPositiveAtCalibratedAt,
   required DateTime? firstMasteredAt,
   required QuestionDifficulty calibration,
+  required int ownQuestions,
 }) {
   if (firstMasteredAt != null) return LoDisplayState.full;
   if (lastPositiveAtCalibratedAt != null && meetsMasteryMeanAndEvidence(snap)) {
     return LoDisplayState.full;
   }
-  if (isStuck(snap)) return LoDisplayState.full;
+  if (isStuck(snap, ownQuestions: ownQuestions)) return LoDisplayState.full;
   if (oneRightAnswerMasters(snap: snap, calibration: calibration)) {
     return LoDisplayState.half;
   }
@@ -56,14 +58,16 @@ LoDisplayState loDisplayStateOf({
 
 /// Whether one right answer would master an LO at [snap]: a
 /// `(positive, strong)` at [calibration], with the home factor (× 1.0),
-/// applied to [snap] with the cap (§3.4), meets conditions 1 and 2 of §4.1.
-/// Condition 3 that answer meets itself: it is a positive at calibration.
+/// applied to [snap] as every answer is — forgetting, then the cap (§3.4,
+/// #278) — meets conditions 1 and 2 of §4.1. Condition 3 that answer meets
+/// itself: it is a positive at calibration.
 ///
 /// From the prior that is never true — one strong positive at hard leaves
-/// μ at 0.79 and the evidence at 4.8, under 5.75 (#276) — and after one
-/// right answer on hard or medium it is. In the lesson time the first right
-/// answer gives half and the second full: the home factor here is the
-/// lower bound.
+/// μ at 0.79 and the evidence at 4.8, under 5.75 (#276). After one right
+/// answer on hard, or on medium in the lesson time, it is; on medium at
+/// home only after two, since forgetting shrinks the first before the
+/// next lands (#278: three right answers master a new LO there). The home
+/// factor here is the lower bound.
 bool oneRightAnswerMasters({
   required BeliefSnapshot snap,
   required QuestionDifficulty calibration,

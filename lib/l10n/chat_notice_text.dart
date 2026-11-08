@@ -44,8 +44,6 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_optionsLookAlike;
       case ChatNoticeKind.subgoalDeletedRedirect:
         return chat_notice_subgoalDeletedRedirect;
-      case ChatNoticeKind.subgoalSaturated:
-        return chat_notice_subgoalSaturated;
       case ChatNoticeKind.noGoalsLeft:
         return chat_notice_noGoalsLeft;
       case ChatNoticeKind.emptyObjectives:

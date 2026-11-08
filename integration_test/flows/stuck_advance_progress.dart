@@ -108,6 +108,7 @@ Map<String, dynamic> belief({
   required double beta,
   required DateTime at,
   bool calibratedPositive = false,
+  int? ownQuestions,
 }) => {
   'id': '${kStudentUid}_s2_$loId',
   'type': 'lo_belief',
@@ -121,6 +122,7 @@ Map<String, dynamic> belief({
   if (calibratedPositive) 'lastPositiveAtCalibratedAt': at.toIso8601String(),
   if (calibratedPositive) 'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
+  if (ownQuestions != null) 'ownQuestions': ownQuestions,
 };
 
 void main() {
@@ -147,19 +149,22 @@ void main() {
         'progress': [printDone()],
         'lo_beliefs': [
           // One strong positive short of mastery, calibrated positive on
-          // record: (3, 1) reads 0.75 on evidence 4; the grade adds 2.0 to
-          // α at medium and (5, 1) reads 0.83 on 6 — mastered.
+          // record: (4.4, 1) reads 0.81 on evidence 5.4; the grade forgets
+          // (#278) and adds 2.0 to α at medium, and (5.38, 1) reads 0.84
+          // on 6.38 — mastered.
           belief(
             loId: 'lo-var',
-            alpha: 3,
+            alpha: 4.4,
             beta: 1,
             at: now,
             calibratedPositive: true,
           ),
-          // Saturated and low: (6, 12) reads 0.33 on evidence 18 — stuck
-          // under both §4.4 branches and no longer practiceable, so the
-          // planner targets `lo-var`, as it would for this student.
-          belief(loId: 'lo-cast', alpha: 6, beta: 12, at: now),
+          // Low after six own questions: (6, 12) reads 0.33 — stuck (§4.4,
+          // #278). The planner asks it, the lowest mean (since #278 no LO
+          // is passed over as saturated); the grade's signal on `lo-var`
+          // is a side signal of the subgoal, with its full weight, and
+          // `lo-cast` keeps its count.
+          belief(loId: 'lo-cast', alpha: 6, beta: 12, at: now, ownQuestions: 6),
         ],
       },
     );

@@ -191,9 +191,18 @@ DateTime? nextRegressedAt({
   return current;
 }
 
-/// Apply an evidence delta with the cap-then-add rule (CONDUCTOR_POLICY 3.4).
-/// When the resulting `α + β` would exceed `PolicyConstants.evidenceCap`,
-/// existing evidence-above-prior is shrunk proportionally to make room.
+/// Apply an evidence delta (CONDUCTOR_POLICY 3.4): forget, then
+/// cap-then-add.
+///
+/// Forgetting per answer (#278, formula 1.1): the evidence above the prior
+/// shrinks by `PolicyConstants.forgetFactor` before the new evidence is
+/// added, on every write that carries weight — the question's signal, a
+/// follow-up, a side signal, a transfer credit. A zero delta (a neutral)
+/// shrinks nothing.
+///
+/// Then the cap, a backstop since #278: when the resulting `α + β` would
+/// exceed `PolicyConstants.evidenceCap`, existing evidence-above-prior is
+/// shrunk proportionally to make room.
 BeliefSnapshot applyEvidence({
   required double alpha,
   required double beta,
@@ -203,6 +212,9 @@ BeliefSnapshot applyEvidence({
   if (alphaDelta == 0 && betaDelta == 0) {
     return BeliefSnapshot(alpha, beta);
   }
+  final forgotten = forgetBeforeEvidence(BeliefSnapshot(alpha, beta));
+  alpha = forgotten.alpha;
+  beta = forgotten.beta;
   final cap = PolicyConstants.evidenceCap;
   final priorMass = 2 * PolicyConstants.prior;
   final newDelta = alphaDelta + betaDelta;
@@ -221,6 +233,20 @@ BeliefSnapshot applyEvidence({
     }
   }
   return BeliefSnapshot(alpha + alphaDelta, beta + betaDelta);
+}
+
+/// The forgetting step of [applyEvidence] (#278): what [snap] holds above
+/// the prior, shrunk by `PolicyConstants.forgetFactor`. The prior itself
+/// stays, so an LO at `(1, 1)` is unchanged and the first answer lands in
+/// full; the mean moves toward one half, as with decay (§3.3), but per
+/// answer instead of per day.
+BeliefSnapshot forgetBeforeEvidence(BeliefSnapshot snap) {
+  const prior = PolicyConstants.prior;
+  const lambda = PolicyConstants.forgetFactor;
+  return BeliefSnapshot(
+    prior + (snap.alpha - prior) * lambda,
+    prior + (snap.beta - prior) * lambda,
+  );
 }
 
 /// The three-level difficulty ratchet (#103, PUNTENFORMULE §2.5): the
@@ -251,28 +277,16 @@ bool meetsMasteryMeanAndEvidence(BeliefSnapshot snap) {
       snap.evidence >= PolicyConstants.masteryEvidenceMin;
 }
 
-/// Stuck rule (CONDUCTOR_POLICY 4.4). Computed live, never stored.
+/// Stuck rule (CONDUCTOR_POLICY 4.4, #278). Computed live, never stored.
 ///
-/// Two ways an LO can be stuck:
-/// 1. Classic: enough evidence to be confident the student is not learning
-///    (`α + β ≥ stuckEvidenceMin` AND `mean < stuckMeanCeiling`).
-/// 2. Saturated: at the evidence cap but still below mastery
-///    (`α + β ≥ cap - saturationSlack` AND `mean < stuckSaturatedMeanCeiling`).
-///    The cap-then-shrink rule in `applyEvidence` makes mean movement too
-///    slow to catch up once here, so further probes mostly spin in place.
-bool isStuck(BeliefSnapshot snap) {
-  final classic =
-      snap.evidence >= PolicyConstants.stuckEvidenceMin &&
+/// Stuck = tried enough, and still not getting it: at least
+/// `stuckOwnQuestionsMin` own questions on the LO ([ownQuestions],
+/// `LoBelief.ownQuestions`) AND the decayed mean [snap] under
+/// `stuckMeanCeiling`. Counted in questions since formula 1.1: forgetting
+/// keeps `α + β` bounded, so the evidence no longer says how often the
+/// student tried. A doc from before the count reads 0, so its LO is stuck
+/// only after six new own questions.
+bool isStuck(BeliefSnapshot snap, {required int ownQuestions}) {
+  return ownQuestions >= PolicyConstants.stuckOwnQuestionsMin &&
       snap.mean < PolicyConstants.stuckMeanCeiling;
-  final saturated =
-      snap.evidence >=
-          PolicyConstants.evidenceCap - PolicyConstants.saturationSlack &&
-      snap.mean < PolicyConstants.stuckSaturatedMeanCeiling;
-  return classic || saturated;
-}
-
-/// Whether an LO can usefully be probed further given the cap.
-bool isPracticeable(BeliefSnapshot snap) {
-  return snap.evidence <
-      PolicyConstants.evidenceCap - PolicyConstants.saturationSlack;
 }

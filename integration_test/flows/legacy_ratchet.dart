@@ -138,8 +138,12 @@ void main() {
         harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s1_lo-print'];
     expect(belief, isNotNull, reason: 'the seeded belief doc went missing');
     // The turn reached the doc: the strong negative at medium landed on β
-    // (×1.0), α stayed ...
-    expect(belief!['alpha'], closeTo(3.0, 0.05));
+    // (×1.0), after the evidence above the prior was forgotten by λ
+    // (#278) ...
+    expect(
+      belief!['alpha'],
+      closeTo(1 + (3.0 - 1) * PolicyConstants.forgetFactor, 0.05),
+    );
     expect(belief['beta'], closeTo(1.0 + PolicyConstants.weightStrong, 0.05));
     // ... the old flag it came with is still the seeded one ...
     expect(

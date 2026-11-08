@@ -924,7 +924,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.0.23-eval7", stdout)
+        self.assertIn("1.1-eval8", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1213,6 +1213,101 @@ class VariantTest(unittest.TestCase):
                           clientVersion="2.11.0+28")
         self.assertIsNotNone(self.lo([old]).first_mastered_at)
         self.assertIsNone(self.lo([old], as_276=True).first_mastered_at)
+
+
+class Rules11Test(unittest.TestCase):
+    """#278, formula 1.1: from 2.13.0 the app forgets per answer — before
+    evidence lands on an LO, what it holds above the prior shrinks by
+    λ = 0.7 — on every signal that carries weight. The replay follows the
+    build that wrote each turn (`clientVersion`), so a turn from an older
+    build replays as that build computed it, and a stamp it set stays."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.13.0+30"}
+    OLD = {"clientVersion": "2.12.0+29"}
+
+    def answer(self, minute: int, quality: str = "correct", build: dict | None = None, **extra) -> dict:
+        signal = "positive" if quality == "correct" else "negative"
+        t = _turn(f"2026-11-16T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType="completeCodeQuestion", overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", "strong", signal)],
+                  **(self.NEW if build is None else build))
+        t.update(extra)
+        return t
+
+    def series(self, answers: str, build: dict | None = None) -> list[dict]:
+        """J right, F wrong, a minute apart."""
+        return [self.answer(m, "correct" if c == "J" else "wrong", build) for m, c in enumerate(answers)]
+
+    def test_the_rule_set_and_the_build_it_starts_from(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1-eval8")
+        self.assertEqual(rules.FORGET, 0.7)
+        self.assertTrue(rules.rules_11({"clientVersion": "2.13.0+30"}))
+        self.assertTrue(rules.rules_11({"clientVersion": "2.13.1+31"}))
+        self.assertFalse(rules.rules_11({"clientVersion": "2.12.0+29"}))
+        self.assertFalse(rules.rules_11({}))
+
+    def test_a_turn_of_1_1_forgets_the_old_answers_before_the_new_one(self):
+        new = rules.replay(self.series("FJ"), GOALS)[self.KEY]
+        self.assertAlmostEqual(new.beta, 1 + 2.0 * 0.7, places=3)  # and a minute of decay
+        self.assertAlmostEqual(new.alpha, 1 + 2.0)
+        old = rules.replay(self.series("FJ", self.OLD), GOALS)[self.KEY]
+        self.assertAlmostEqual(old.beta, 1 + 2.0, places=3)
+
+    def test_a_neutral_forgets_nothing(self):
+        turns = [self.answer(0), self.answer(1, overallQuality="partial",
+                                             loSignals=[_sig("sg-b", "predict_b1", "weak", "neutral")])]
+        self.assertAlmostEqual(rules.replay(turns, GOALS)[self.KEY].alpha, 3.0, places=3)
+
+    def test_the_series_of_the_issue(self):
+        # #245: under the cap the student read as 0.59 and stuck; with
+        # forgetting the last answers count.
+        self.assertAlmostEqual(rules.replay(self.series("FFJFJJFJJJ"), GOALS)[self.KEY].mean, 0.75, places=2)
+        self.assertAlmostEqual(rules.replay(self.series("FFJFJJFJJJ", self.OLD), GOALS)[self.KEY].mean, 0.59, places=2)
+        self.assertAlmostEqual(rules.replay(self.series("JF" * 10), GOALS)[self.KEY].mean, 0.43, places=2)
+
+    def test_a_new_lo_needs_three_right_answers_on_medium_at_home(self):
+        new = rules.replay(self.series("JJJ"), GOALS)[self.KEY]
+        self.assertEqual(new.first_mastered_at, rules.parse_at("2026-11-16T09:02:00Z"))
+        old = rules.replay(self.series("JJJ", self.OLD), GOALS)[self.KEY]
+        self.assertEqual(old.first_mastered_at, rules.parse_at("2026-11-16T09:01:00Z"))
+
+    def test_it_is_the_chosen_variant_and_as_11_replays_older_builds_with_it(self):
+        turns = self.series("FFJFJJFJJJ")
+        old_turns = self.series("FFJFJJFJJJ", self.OLD)
+        now = rules.replay(turns, GOALS)[self.KEY]
+        for lo in (
+            rules.replay(old_turns, GOALS, variant=rules.Variant(forget=0.7))[self.KEY],
+            rules.replay(old_turns, GOALS, variant=rules.Variant(as_11=True))[self.KEY],
+        ):
+            self.assertAlmostEqual(lo.alpha, now.alpha)
+            self.assertAlmostEqual(lo.beta, now.beta)
+            self.assertEqual(lo.first_mastered_at, now.first_mastered_at)
+        # as_11 brings the stamp of #276 with it, as the app has it.
+        before_276 = self.answer(0, difficulty="hard", calibrationBefore="hard", provenance="supervised",
+                                 build={"clientVersion": "2.11.0+28"})
+        self.assertIsNotNone(rules.replay([before_276], GOALS)[self.KEY].first_mastered_at)
+        self.assertIsNone(rules.replay([before_276], GOALS, variant=rules.Variant(as_11=True))[self.KEY].first_mastered_at)
+
+    def test_a_transfer_credit_forgets_too(self):
+        mastered = [_turn(f"2026-11-16T08:0{m}:00Z", "sg-a", "recall_a1", uid="u-x", **self.NEW) for m in range(3)]
+        before = rules.replay(mastered, GOALS)[("sg-a", "recall_a1")]
+        credit = self.answer(0, turnAt="2026-11-16T08:03:00Z",
+                             transferCredits=[{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.5}])
+        after = rules.replay(mastered + [credit], GOALS)[("sg-a", "recall_a1")]
+        self.assertAlmostEqual(after.alpha, 1 + (before.alpha - 1) * 0.7 + 0.5, places=3)
+        self.assertLess(after.mean, before.mean)  # a small credit on much evidence lowers μ
+
+    def test_own_questions_count_once_per_question_whichever_way_it_went(self):
+        neutral = self.answer(1, overallQuality="partial", loSignals=[_sig("sg-b", "predict_b1", "weak", "neutral")])
+        follow_up = self.answer(2, isFollowUp=True, chainDepth=1)
+        twice = self.answer(3, "wrong", loSignals=[_sig("sg-b", "predict_b1", "strong", "negative"),
+                                                   _sig("sg-b", "predict_b1", "weak", "negative")])
+        side = _turn("2026-11-16T09:04:00Z", "sg-b", "predict_b2", uid="u-x", **self.NEW,
+                     loSignals=[_sig("sg-b", "predict_b2"), _sig("sg-b", "predict_b1")])
+        st = rules.replay([self.answer(0), neutral, follow_up, twice, side], GOALS)
+        self.assertEqual(st[self.KEY].own_questions, 3)
+        self.assertEqual(st[("sg-b", "predict_b2")].own_questions, 1)
 
 
 class NotchDropReplayTest(unittest.TestCase):

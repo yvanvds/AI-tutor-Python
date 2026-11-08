@@ -11,8 +11,9 @@ import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'milestone.dart';
 
 /// Open parameters of PUNTENFORMULE §4. Every value here is the *v1
-/// placeholder* the document marks TBD-with-procedure: the period-1 shadow
-/// run fits them, version 1.1 of the document freezes them. Bijlage B's
+/// placeholder* the document marks TBD-with-procedure: the shadow run fits
+/// them, a version of the document freezes them (1.1 fixed only the
+/// belief update under them, λ and the stuck rule, #278). Bijlage B's
 /// worked example uses exactly these, so the unit tests reproduce it.
 class GradingConstants {
   GradingConstants._();
@@ -21,7 +22,7 @@ class GradingConstants {
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
   /// a signed grade was computed under.
-  static const String formulaVersion = '1.0.23';
+  static const String formulaVersion = '1.1';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).

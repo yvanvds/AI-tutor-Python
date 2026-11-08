@@ -181,14 +181,15 @@ void main() {
         ],
         'lo_beliefs': [
           // One strong positive short of mastery, calibrated positive on
-          // record: (3, 1) → (5, 1) on the grade, mastered.
+          // record: (4.4, 1) → (5.38, 1) on the grade, forgetting first
+          // (#278) — mastered.
           {
             'id': '${kStudentUid}_s2_lo-var',
             'type': 'lo_belief',
             'uid': kStudentUid,
             'subgoalId': 's2',
             'loId': 'lo-var',
-            'alpha': 3.0,
+            'alpha': 4.4,
             'beta': 1.0,
             'lastUpdatedAt': now.toIso8601String(),
             'lastQuestionType': 'completeCodeQuestion',

@@ -233,11 +233,11 @@ void main() {
       (turn['selectionReason'] as Map)['chosenReason'],
       allOf(contains('recheck'), contains('not confirmed')),
     );
-    // A direct probe of the old LO: decayed (α, β) plus the full weight of a
-    // strong positive at medium, through cap-then-add (the belief is at the
-    // cap) — the belief stays high, and now a right answer at the
-    // calibrated level backs it: the positive at calibration, the level
-    // asked, and the stamp the grade reads.
+    // A direct probe of the old LO: decayed (α, β), forgotten (#278) — which
+    // takes the old doc at the cap well under it — plus the full weight of a
+    // strong positive at medium. The belief stays high, and now a right
+    // answer at the calibrated level backs it: the positive at calibration,
+    // the level asked, and the stamp the grade reads.
     final print = storedPrint(harness);
     final writtenAt = DateTime.parse(print['lastUpdatedAt'] as String);
     expect(
@@ -258,12 +258,16 @@ void main() {
     );
     expect(print['alpha'], closeTo(expected.alpha, 1e-9));
     expect(print['beta'], closeTo(expected.beta, 1e-9));
+    expect(
+      expected.alpha + expected.beta,
+      lessThan(PolicyConstants.evidenceCap),
+    );
+    // The turn logs the evidence the answer added, not the change in α:
+    // forgetting took α down by more than the answer put back (#278).
     final applied = (turn['appliedSignals'] as List).cast<Map>();
     expect(applied.single['subgoalId'], 's1');
-    expect(
-      applied.single['alphaDelta'],
-      closeTo(expected.alpha - decayed.alpha, 1e-9),
-    );
+    expect(applied.single['alphaDelta'], closeTo(2.0, 1e-9));
+    expect(print['alpha'] as num, lessThan(decayed.alpha));
     final mean =
         (print['alpha'] as num) /
         ((print['alpha'] as num) + (print['beta'] as num));

@@ -4471,12 +4471,6 @@ abstract class AppLocalizations {
   /// **'Your previous topic was removed by your teacher. Continuing with the next one.'**
   String get chat_notice_subgoalDeletedRedirect;
 
-  /// No description provided for @chat_notice_subgoalSaturated.
-  ///
-  /// In en, this message translates to:
-  /// **'You already have a good grip on this subgoal. Ready to move on?'**
-  String get chat_notice_subgoalSaturated;
-
   /// No description provided for @chat_notice_noGoalsLeft.
   ///
   /// In en, this message translates to:

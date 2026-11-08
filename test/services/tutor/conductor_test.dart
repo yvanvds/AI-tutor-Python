@@ -59,7 +59,6 @@ class _Fakes {
 
 QuestionPlan _expectQuestion(QuestionPlan plan) {
   expect(plan.blockedEmptyObjectives, isFalse);
-  expect(plan.blockedSaturated, isFalse);
   expect(plan.type, isNot(ChatRequestType.noResult));
   return plan;
 }
@@ -1315,8 +1314,9 @@ void main() {
       await rightInLesson(s.c, lo1, ['lo1', 'lo2']);
 
       final side = belief(s.f, 'lo2');
-      // The weight is the question's, as before: (8, 1), μ 0.89.
-      expect(side.alpha, closeTo(8, 1e-6));
+      // The weight is the question's, as before, forgetting first (#278):
+      // (4.5, 1), then (1 + 3.5 × 0.7 + 3.5, 1) = (6.95, 1), μ 0.87.
+      expect(side.alpha, closeTo(6.95, 1e-6));
       expect(
         meetsMasteryMeanAndEvidence(BeliefSnapshot(side.alpha, side.beta)),
         isTrue,
@@ -1467,7 +1467,15 @@ void main() {
 
         final after = printAfter(s.f);
         // 1e-3: the fixture sits a minute in the past (see masteredPrint).
-        expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-3));
+        // The credit lands after forgetting, like every write (#278):
+        // (1 + 4 × 0.7, 1) + 0.5 — on this much evidence it lowers μ.
+        expect(
+          after.alpha,
+          closeTo(
+            1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
+            1e-3,
+          ),
+        );
         expect(after.beta, closeTo(1.0, 1e-6));
         expect(after.lastUpdatedAt.isAfter(before.lastUpdatedAt), isTrue);
         // Not a probe of this LO: no ratchet, no counter, no type rotation.
@@ -1506,8 +1514,15 @@ void main() {
       );
       await grade(s.c);
       final after = printAfter(s.f);
-      // (5, 1) after one half-life is (3, 1); plus the credit.
-      expect(after.alpha, closeTo(3.0 + PolicyConstants.weightWeak, 1e-3));
+      // (5, 1) after one half-life is (3, 1); forgotten to (2.4, 1), plus
+      // the credit (#278).
+      expect(
+        after.alpha,
+        closeTo(
+          1 + 2.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
+          1e-3,
+        ),
+      );
       expect(after.beta, closeTo(1.0, 1e-3));
       expect(
         DateTime.now().toUtc().difference(after.lastUpdatedAt),
@@ -1664,11 +1679,15 @@ void main() {
       // (3, 1): mean 0.75 — not yet.
       await positive();
       expect(print().firstMasteredAt, isNull);
-      // (5, 1): mean 0.83, evidence 6, ratchet set — mastered.
+      // (4.4, 1): mean 0.81, but evidence 5.4 — forgetting shrank the first
+      // answer before the second landed (#278).
+      await positive();
+      expect(print().firstMasteredAt, isNull);
+      // (5.38, 1): mean 0.84, evidence 6.38, ratchet set — mastered.
       await positive();
       final stamp = print().firstMasteredAt;
       expect(stamp, isNotNull);
-      // A third positive keeps the first stamp.
+      // A fourth positive keeps the first stamp.
       await positive();
       expect(print().firstMasteredAt, stamp);
     });
@@ -1929,6 +1948,293 @@ void main() {
     );
   });
 
+  // ---- #278 forgetting per answer, the stuck rule in own questions --------
+  group('#278 forgetting per answer and the stuck rule', () {
+    const loA = LearningObjective(
+      id: 'lo-a',
+      statement: 'a',
+      kind: LoKind.apply,
+    );
+    const loB = LearningObjective(
+      id: 'lo-b',
+      statement: 'b',
+      kind: LoKind.apply,
+    );
+    const loOld = LearningObjective(
+      id: 'lo-old',
+      statement: 'old',
+      kind: LoKind.apply,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 's0',
+      parentId: 'r',
+      order: 0,
+      objectives: const [loOld],
+    );
+    final subgoal = Goal(
+      id: 's',
+      title: 's',
+      parentId: 'r',
+      order: 1,
+      objectives: const [loA, loB],
+    );
+    final next = Goal(
+      id: 's2',
+      title: 's2',
+      parentId: 'r',
+      order: 2,
+      objectives: const [
+        LearningObjective(id: 'lo-n', statement: 'n', kind: LoKind.apply),
+      ],
+    );
+
+    Future<({Conductor c, _Fakes f})> setup(List<LoBelief> beliefs) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [earlier, subgoal, next];
+      // The earlier subgoal is done, so the session stays on [subgoal].
+      f.progressById['s0'] = Progress(goalID: 's0', progress: 1.0);
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    LoBelief seeded(
+      String loId,
+      double alpha,
+      double beta, {
+      String subgoalId = 's',
+      bool atCalibration = false,
+      int ownQuestions = 0,
+    }) {
+      final written = DateTime.now().toUtc().subtract(const Duration(hours: 1));
+      return LoBelief(
+        subgoalId: subgoalId,
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: written,
+        lastPositiveAtCalibratedAt: atCalibration ? written : null,
+        firstMasteredAt: atCalibration ? written : null,
+        ownQuestions: ownQuestions,
+      );
+    }
+
+    GradedSignal on(
+      String loId,
+      LoSignalKind kind, {
+      String subgoalId = 's',
+      LoSignalStrength strength = LoSignalStrength.strong,
+    }) => GradedSignal(
+      subgoalId: subgoalId,
+      loId: loId,
+      kind: kind,
+      strength: strength,
+    );
+
+    QuestionPlan planOn(LearningObjective lo, {WarmUpReview? warmUp}) =>
+        QuestionPlan(
+          type: ChatRequestType.writeCodeQuestion,
+          difficulty: QuestionDifficulty.medium,
+          targetLOs: [lo],
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'test',
+            notchDropFired: false,
+          ),
+          warmUp: warmUp,
+        );
+
+    Future<TurnOutcome> answer(
+      Conductor c,
+      QuestionPlan plan,
+      AnswerQuality quality,
+      List<GradedSignal> signals, {
+      bool isFollowUp = false,
+    }) {
+      c.notePlannedQuestion(plan);
+      return c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: signals,
+          isFollowUp: isFollowUp,
+          chainDepth: isFollowUp ? 1 : 0,
+        ),
+      );
+    }
+
+    LoBelief stored(_Fakes f, String loId, {String subgoalId = 's'}) =>
+        f.beliefs[f._key(subgoalId, loId)]!;
+
+    test(
+      'every write that carries weight forgets first: the question, a '
+      'side signal, a follow-up; the turn logs the evidence it added',
+      () async {
+        final s = await setup([seeded('lo-a', 7, 3), seeded('lo-b', 9, 1)]);
+        final outcome = await answer(s.c, planOn(loA), AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+          on('lo-b', LoSignalKind.positive, strength: LoSignalStrength.weak),
+        ]);
+        // Decayed an hour (5e-3: the seed's hour of decay), then
+        // (1 + 6 × 0.7, 1 + 2 × 0.7) + (2, 0).
+        expect(stored(s.f, 'lo-a').alpha, closeTo(7.2, 5e-3));
+        expect(stored(s.f, 'lo-a').beta, closeTo(2.4, 5e-3));
+        // A weak side positive on much evidence: (1 + 8 × 0.7, 1) + 0.5 —
+        // μ goes down while the signal was positive …
+        final b = stored(s.f, 'lo-b');
+        expect(b.alpha, closeTo(7.1, 5e-3));
+        expect(b.alpha / (b.alpha + b.beta), lessThan(0.9));
+        // … so the turn logs the evidence, not the change in (α, β).
+        final applied = {for (final a in outcome.appliedSignals) a.loId: a};
+        expect(applied['lo-a']!.alphaDelta, closeTo(2.0, 1e-9));
+        expect(applied['lo-b']!.alphaDelta, closeTo(0.5, 1e-9));
+        expect(applied['lo-b']!.betaDelta, 0);
+
+        // A follow-up forgets too, at its weak cap.
+        await answer(s.c, planOn(loA), AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-a').alpha, closeTo(1 + 6.2 * 0.7 + 0.5, 5e-3));
+      },
+    );
+
+    test('a neutral forgets nothing', () async {
+      final s = await setup([seeded('lo-a', 7, 3)]);
+      await answer(s.c, planOn(loA), AnswerQuality.partial, [
+        on('lo-a', LoSignalKind.neutral, strength: LoSignalStrength.weak),
+      ]);
+      // Only the seed's hour of decay.
+      expect(stored(s.f, 'lo-a').alpha, closeTo(7.0, 5e-3));
+      expect(stored(s.f, 'lo-a').beta, closeTo(3.0, 5e-3));
+    });
+
+    test('an own question counts once, whichever way it went; a side signal '
+        'and a follow-up do not count', () async {
+      final s = await setup([]);
+      await answer(s.c, planOn(loA), AnswerQuality.wrong, [
+        on('lo-a', LoSignalKind.negative),
+        on('lo-b', LoSignalKind.negative),
+      ]);
+      expect(stored(s.f, 'lo-a').ownQuestions, 1);
+      expect(stored(s.f, 'lo-b').ownQuestions, 0);
+      await answer(s.c, planOn(loA), AnswerQuality.partial, [
+        on('lo-a', LoSignalKind.neutral, strength: LoSignalStrength.weak),
+      ]);
+      expect(stored(s.f, 'lo-a').ownQuestions, 2);
+      await answer(s.c, planOn(loA), AnswerQuality.correct, [
+        on('lo-a', LoSignalKind.positive),
+      ], isFollowUp: true);
+      expect(stored(s.f, 'lo-a').ownQuestions, 2);
+      // The grader names the target twice, against the contract (§3.5):
+      // still one question.
+      await answer(s.c, planOn(loA), AnswerQuality.wrong, [
+        on('lo-a', LoSignalKind.negative),
+        on('lo-a', LoSignalKind.negative, strength: LoSignalStrength.weak),
+      ]);
+      expect(stored(s.f, 'lo-a').ownQuestions, 3);
+    });
+
+    test('a warm-up review is an own question of its target; its side '
+        'signal on the active subgoal is not', () async {
+      final s = await setup([
+        seeded('lo-old', 5, 1, subgoalId: 's0', atCalibration: true),
+      ]);
+      await answer(
+        s.c,
+        planOn(loOld, warmUp: WarmUpReview(subgoal: earlier)),
+        AnswerQuality.correct,
+        [
+          on('lo-old', LoSignalKind.positive, subgoalId: 's0'),
+          on('lo-a', LoSignalKind.positive),
+        ],
+      );
+      expect(stored(s.f, 'lo-old', subgoalId: 's0').ownQuestions, 1);
+      expect(stored(s.f, 'lo-a').ownQuestions, 0);
+    });
+
+    test('stuck after six own questions with μ under 0.6, not after five — '
+        'and not on evidence alone', () async {
+      // lo-b mastered; lo-a gets wrong answers. The fifth leaves the
+      // subgoal where it is; the sixth advances it on the stuck rule.
+      final s = await setup([seeded('lo-b', 9, 1, atCalibration: true)]);
+      for (var i = 1; i <= 5; i++) {
+        final outcome = await answer(s.c, planOn(loA), AnswerQuality.wrong, [
+          on('lo-a', LoSignalKind.negative),
+        ]);
+        expect(outcome.subgoalAdvanced, isFalse, reason: 'answer $i');
+        final status = outcome.loStatusAfter.firstWhere(
+          (l) => l.loId == 'lo-a',
+        );
+        expect(status.stuck, isFalse, reason: 'answer $i');
+      }
+      // μ 0.13 after five, on evidence 7.6: forgetting keeps the evidence
+      // from saying how often the student tried, the count says it.
+      expect(stored(s.f, 'lo-a').ownQuestions, 5);
+      final sixth = await answer(s.c, planOn(loA), AnswerQuality.wrong, [
+        on('lo-a', LoSignalKind.negative),
+      ]);
+      expect(
+        sixth.loStatusAfter.firstWhere((l) => l.loId == 'lo-a').stuck,
+        isTrue,
+      );
+      expect(sixth.subgoalAdvanced, isTrue);
+      expect(
+        sixth.signalEvents.map((e) => e.kind),
+        contains(TurnSignalEventKind.stuckLoAdvance),
+      );
+    });
+
+    test('a doc from before the count reads 0: low and heavy is not stuck '
+        'until six new own questions', () async {
+      // (3, 14): μ 0.18 on evidence 17 — stuck by the old rule.
+      final s = await setup([
+        seeded('lo-a', 3, 14),
+        seeded('lo-b', 9, 1, atCalibration: true),
+      ]);
+      final outcome = await answer(s.c, planOn(loA), AnswerQuality.wrong, [
+        on('lo-a', LoSignalKind.negative),
+      ]);
+      expect(outcome.subgoalAdvanced, isFalse);
+      expect(stored(s.f, 'lo-a').ownQuestions, 1);
+    });
+
+    test(
+      'no saturated LO is filtered out: the lowest mean is asked even at '
+      'the old cap, and a mastered subgoal at the cap is topped up',
+      () async {
+        // lo-a (14, 5): μ 0.74 on evidence 19 — not "practiceable" until
+        // #278, so lo-b at μ 0.75 was asked instead.
+        final s = await setup([seeded('lo-a', 14, 5), seeded('lo-b', 3, 1)]);
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.targetLOs.single.id, 'lo-a');
+        expect(plan.reason.chosenReason, 'lowest mean unmastered');
+
+        // Every LO mastered and at the cap: a question, not a "verder?"
+        // notice.
+        final full = await setup([
+          seeded('lo-a', 18, 2, atCalibration: true),
+          seeded('lo-b', 19, 1, atCalibration: true),
+        ]);
+        final topUp = _expectQuestion(await full.c.planNext());
+        expect(topUp.targetLOs.single.id, 'lo-a');
+        expect(topUp.reason.chosenReason, 'all mastered: lowest mean');
+      },
+    );
+  });
+
   // ---- §8.2 signalEvents ---------------------------------------------------
   group('§8.2 signalEvents emission', () {
     test('stuck-LO advance emits stuckLoAdvance + advances subgoal', () async {
@@ -1960,8 +2266,8 @@ void main() {
         selectedChild: subgoal,
       );
       // Pre-seed: `mastered` already mastered (mean ≥ 0.8, evidence ≥ 5.75,
-      // ratchet set); `stucky` already in stuck range (mean < 0.6,
-      // evidence ≥ 10). A subsequent answer mastering `mastered` again
+      // ratchet set); `stucky` already in stuck range (mean < 0.6, six own
+      // questions, #278). A subsequent answer mastering `mastered` again
       // triggers subgoal mastery via the stuck-rule.
       final now = DateTime.now().toUtc();
       f.beliefs[f._key('s', 'mastered')] = LoBelief(
@@ -1976,8 +2282,9 @@ void main() {
         subgoalId: 's',
         loId: 'stucky',
         alpha: 2,
-        beta: 9, // mean 0.18, evidence 11 → stuck
+        beta: 9, // mean 0.18 on six own questions → stuck
         lastUpdatedAt: now,
+        ownQuestions: 6,
       );
       f.calibration = const StudentCalibration(
         difficulty: QuestionDifficulty.medium,
@@ -2041,13 +2348,15 @@ void main() {
           selectedRoot: root,
           selectedChild: subgoal,
         );
-        // Seed near-stuck so the next answer crosses the threshold.
+        // Seed near-stuck so the next answer crosses the threshold: the
+        // sixth own question (#278).
         f.beliefs[f._key('s', 'lo')] = LoBelief(
           subgoalId: 's',
           loId: 'lo',
           alpha: 2,
           beta: 7,
           lastUpdatedAt: DateTime.now().toUtc(),
+          ownQuestions: 5,
         );
         f.calibration = const StudentCalibration(
           difficulty: QuestionDifficulty.medium,
@@ -2068,7 +2377,7 @@ void main() {
           ),
         );
         c.notePlannedQuestion(plan);
-        // Push evidence past stuck threshold (β += 2.0 → α=2, β=9).
+        // The sixth own question, wrong: (1.7, 5.2) + (0, 2), μ 0.19.
         final outcome = await c.integrateAnswer(
           plan: plan,
           answer: GradedAnswer(
@@ -2117,6 +2426,7 @@ void main() {
         alpha: 2,
         beta: 9, // already stuck
         lastUpdatedAt: DateTime.now().toUtc(),
+        ownQuestions: 6,
       );
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -2777,9 +3087,11 @@ void main() {
           now: after.lastUpdatedAt,
         );
         expect(decayed.alpha, lessThan(5));
-        // Strong positive at hard: 2.0 × 1.4.
-        expect(after.alpha, closeTo(decayed.alpha + 2.0 * 1.4, 1e-6));
-        expect(after.beta, closeTo(decayed.beta, 1e-6));
+        // Forgetting first (#278), then the strong positive at hard:
+        // 2.0 × 1.4.
+        final kept = forgetBeforeEvidence(decayed);
+        expect(after.alpha, closeTo(kept.alpha + 2.0 * 1.4, 1e-6));
+        expect(after.beta, closeTo(kept.beta, 1e-6));
         expect(after.subgoalId, 's0');
         expect(
           DateTime.now().toUtc().difference(after.lastUpdatedAt),
@@ -3082,7 +3394,14 @@ void main() {
         ],
       );
       final after = printAfter(s.f);
-      expect(after.alpha, closeTo(5.0 + PolicyConstants.weightStrong, 1e-3));
+      // Forgetting first, like every write (#278): (1 + 4 × 0.7, 1) + 2.
+      expect(
+        after.alpha,
+        closeTo(
+          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightStrong,
+          1e-3,
+        ),
+      );
       expect(after.beta, closeTo(1.0, 1e-3));
       expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
       expect(after.lastPositiveAtCalibratedAt, stamp);
@@ -3340,7 +3659,10 @@ void main() {
       );
       expect(
         printAfter(s.f).alpha,
-        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
+        closeTo(
+          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
+          1e-3,
+        ),
       );
     });
 
@@ -3411,7 +3733,10 @@ void main() {
       expect(outcome.transferCredits, isEmpty);
       expect(
         printAfter(s.f).alpha,
-        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
+        closeTo(
+          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
+          1e-3,
+        ),
       );
     });
 
@@ -3772,7 +4097,14 @@ void main() {
         transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
       );
       final after = stored(flagged.f, 'lo-print');
-      expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-3));
+      // Forgetting first (#278): (1 + 4 × 0.7, 1) + 0.5.
+      expect(
+        after.alpha,
+        closeTo(
+          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
+          1e-3,
+        ),
+      );
       expect(after.regressedAt, aMinuteAgo);
       await flagged.c.setTarget();
       expect((await flagged.c.planNext()).isWarmUp, isTrue);
@@ -3787,8 +4119,9 @@ void main() {
         extra: [onPrint(LoSignalKind.positive, LoSignalStrength.strong)],
       );
       final after = stored(s.f, 'lo-print');
-      // (7, 1): comfortably at mastery — and still due for review.
-      expect(after.alpha, closeTo(7.0, 1e-3));
+      // (5.8, 1) after forgetting (#278): comfortably at mastery — and
+      // still due for review.
+      expect(after.alpha, closeTo(5.8, 1e-3));
       expect(after.regressedAt, aMinuteAgo);
       await s.c.setTarget();
       expect((await s.c.planNext()).isWarmUp, isTrue);
@@ -4077,8 +4410,9 @@ void main() {
               subgoalId: 's',
               loId: 'stucky',
               alpha: 2,
-              beta: 9, // mean 0.18, evidence 11 → stuck
+              beta: 9, // mean 0.18 on six own questions → stuck (#278)
               lastUpdatedAt: now,
+              ownQuestions: 6,
             )
           : LoBelief(
               subgoalId: 's',
@@ -4592,10 +4926,13 @@ void main() {
       expect(next.targetLOs.single.id, 'lo-var');
     });
 
-    test('a right answer is a direct probe of the old LO: decayed α plus the '
-        'full weight, both ratchets, the probe clock — and the stamp, now '
-        'that the three conditions hold', () async {
-      final s = await setup([near('lo-print')]);
+    test('a right answer is a direct probe of the old LO: decayed and '
+        'forgotten α plus the full weight, both ratchets, the probe clock — '
+        'and the stamp, now that the three conditions hold', () async {
+      // μ 0.79 after ten days of decay. From the fixture's 0.76 one right
+      // answer reaches 0.799 since #278: forgetting shrinks the old
+      // evidence first, so a low near goal takes two.
+      final s = await setup([near('lo-print', alpha: 8.2, beta: 2.1)]);
       final windowBefore = s.f.calibration.recentAnswers;
       final plan = await s.c.planNext();
       expect(plan.isRecheck, isTrue);
@@ -4603,15 +4940,16 @@ void main() {
 
       final after = stored(s.f, 'lo-print');
       final decayed = applyDecay(
-        alpha: 7.7,
-        beta: 2.3,
+        alpha: 8.2,
+        beta: 2.1,
         lastUpdatedAt: tenDaysAgo,
         now: after.lastUpdatedAt,
       );
       expect(decayed.mean, lessThan(PolicyConstants.masteryMeanThreshold));
-      // Strong positive at medium: 2.0 × 1.0.
-      expect(after.alpha, closeTo(decayed.alpha + 2.0, 1e-6));
-      expect(after.beta, closeTo(decayed.beta, 1e-6));
+      // Forgetting (#278), then the strong positive at medium: 2.0 × 1.0.
+      final kept = forgetBeforeEvidence(decayed);
+      expect(after.alpha, closeTo(kept.alpha + 2.0, 1e-6));
+      expect(after.beta, closeTo(kept.beta, 1e-6));
       expect(
         after.alpha / (after.alpha + after.beta),
         greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
@@ -4658,7 +4996,17 @@ void main() {
       final s = await setup([near('lo-print')]);
       await grade(s, varProbe(), extra: const [sidePositive]);
       final after = stored(s.f, 'lo-print');
-      expect(after.alpha, greaterThan(7.0));
+      // Decayed, forgotten (#278), then the weak positive as medium.
+      final decayed = applyDecay(
+        alpha: 7.7,
+        beta: 2.3,
+        lastUpdatedAt: tenDaysAgo,
+        now: after.lastUpdatedAt,
+      );
+      expect(
+        after.alpha,
+        closeTo(forgetBeforeEvidence(decayed).alpha + 0.5, 1e-6),
+      );
       expect(
         DateTime.now().toUtc().difference(after.lastUpdatedAt),
         lessThan(const Duration(seconds: 5)),
@@ -4689,7 +5037,9 @@ void main() {
       const credit = [GradedTransfer(subgoalId: 's0', loId: 'lo-input')];
       final s = await setup([mastered.copyWith(lastProbedAt: daysAgo(20))]);
       await grade(s, varProbe(), transferLOs: credit);
-      expect(stored(s.f, 'lo-input').alpha, greaterThan(5.0));
+      // Credited after forgetting (#278): on this much evidence the weak
+      // credit takes α down, not up.
+      expect(stored(s.f, 'lo-input').alpha, lessThan(5.0));
       expect(stored(s.f, 'lo-input').lastProbedAt, daysAgo(20));
 
       final legacy = await setup([mastered]);
@@ -4724,11 +5074,12 @@ void main() {
         DateTime? lastPositiveAtCalibratedAt,
         QuestionDifficulty? highestPositiveDifficulty,
         DateTime? firstMasteredAt,
+        double beta = 1.4,
       }) => LoBelief(
         subgoalId: 's0',
         loId: loId,
         alpha: 18.6,
-        beta: 1.4,
+        beta: beta,
         lastUpdatedAt: daysAgo(2),
         lastQuestionType: asked ? 'completeCodeQuestion' : null,
         lastPositiveAtCalibratedAt: lastPositiveAtCalibratedAt,
@@ -4945,11 +5296,13 @@ void main() {
 
       test('a wrong answer that leaves the belief high restarts the clock: no '
           'recheck for a week, then it comes back', () async {
-        final s = await setup([high('lo-print')]);
+        // (18.6, 1): one strong wrong answer leaves μ at 0.81 after
+        // forgetting (#278); from (18.6, 1.4) it would be 0.799.
+        final s = await setup([high('lo-print', beta: 1.0)]);
         final plan = await s.c.planNext();
         await grade(s, plan, quality: AnswerQuality.wrong);
         final after = stored(s.f, 'lo-print');
-        expect(after.beta, greaterThan(1.4));
+        expect(after.beta, greaterThan(1.0));
         expect(
           after.alpha / (after.alpha + after.beta),
           greaterThanOrEqualTo(PolicyConstants.masteryMeanThreshold),
@@ -5360,6 +5713,7 @@ void main() {
       double beta, {
       bool atCalibration = true,
       DateTime? firstMasteredAt,
+      int ownQuestions = 0,
     }) {
       final written = DateTime.now().toUtc().subtract(const Duration(hours: 1));
       f.beliefs[f._key('s1', loId)] = LoBelief(
@@ -5370,6 +5724,7 @@ void main() {
         lastUpdatedAt: written,
         lastPositiveAtCalibratedAt: atCalibration ? written : null,
         firstMasteredAt: firstMasteredAt,
+        ownQuestions: ownQuestions,
       );
     }
 
@@ -5413,6 +5768,7 @@ void main() {
         lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
         firstMasteredAt: b.firstMasteredAt,
         calibration: f.calibration.difficulty,
+        ownQuestions: b.ownQuestions,
       );
     }
 
@@ -5573,10 +5929,9 @@ void main() {
     test('stuck is full, and stays full when a right answer lifts the LO off '
         'the stuck rule without mastering it', () async {
       final f = onHard();
-      // Evidence 10.2, μ 0.50: stuck (§4.4), clear of the evidence floor
-      // of 10 that decay would take it under (#239, #276), and under lo-b's
+      // Six own questions, μ 0.36: stuck (§4.4, #278), and under lo-b's
       // 0.5, so the question goes to lo-a.
-      seed(f, 'lo-a', 5.05, 5.15, atCalibration: false);
+      seed(f, 'lo-a', 2, 3.5, atCalibration: false, ownQuestions: 6);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
       expect(states(f)['lo-a'], LoDisplayState.full);
@@ -5585,12 +5940,13 @@ void main() {
         sig('lo-a', LoSignalKind.positive),
       ]);
 
-      // μ 0.60: off the stuck rule (≥ 0.6), not mastered, and not one
-      // answer from mastery either (+2.8 makes 0.67).
+      // μ 0.62: off the stuck rule (≥ 0.6), not mastered, and not one
+      // answer from mastery either (+2.8 after forgetting makes 0.74).
       final b = f.beliefs[f._key('s1', 'lo-a')]!;
       final after = BeliefSnapshot(b.alpha, b.beta);
-      expect(after.mean, closeTo(0.604, 0.005));
-      expect(isStuck(after), isFalse);
+      expect(after.mean, closeTo(0.621, 0.005));
+      expect(b.ownQuestions, 7);
+      expect(isStuck(after, ownQuestions: b.ownQuestions), isFalse);
       expect(meetsMasteryMeanAndEvidence(after), isFalse);
       expect(fresh(f, 'lo-a'), LoDisplayState.empty);
       // The hold keeps it full.

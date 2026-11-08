@@ -51,6 +51,12 @@ class TurnLoSignal {
 /// §2.4) lands on that subgoal's doc, not the active one's, and the audit
 /// trail has to say which. Docs written before the field existed have no
 /// `subgoalId` on their entries; nothing reads them back.
+///
+/// [alphaDelta] and [betaDelta] are the evidence the signal added — weight
+/// × difficulty × provenance — since formula 1.1 (#278). Before, they were
+/// the change in `(α, β)`, which at the cap included its shrink; since every
+/// write forgets first, that change no longer says which way the signal
+/// went.
 class TurnAppliedSignal {
   final String subgoalId;
   final String loId;
@@ -109,7 +115,8 @@ class TurnReviewFlag {
 /// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
 /// previously mastered LO in *another* subgoal that the working solution
 /// correctly used. Carries the subgoal because, unlike `appliedSignals`,
-/// the LO is not one of the active subgoal's.
+/// the LO is not one of the active subgoal's. [alphaDelta] is the credit
+/// (since #278; before, the change in α after the cap).
 class TurnTransferCredit {
   final String subgoalId;
   final String loId;

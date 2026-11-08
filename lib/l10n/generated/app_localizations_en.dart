@@ -2691,10 +2691,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
   @override
-  String get chat_notice_subgoalSaturated =>
-      'You already have a good grip on this subgoal. Ready to move on?';
-
-  @override
   String get chat_notice_noGoalsLeft =>
       'There are no goals left to work on. Congratulations!';
 

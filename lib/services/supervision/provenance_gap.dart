@@ -23,9 +23,11 @@
 // that turn's target LOs (the question was about it — an ordinary question,
 // a follow-up, a warm-up review or a recheck), not an incidental signal on
 // another LO and not a transfer credit. Its direction is the sign of the
-// belief delta `alphaDelta - betaDelta`; the size is left out — at the
-// evidence cap a delta is mostly the shrink toward the prior (§3.4), and
-// the supervised factor would make class answers look bigger. The check
+// belief delta `alphaDelta - betaDelta`; the size is left out — the
+// supervised factor would make class answers look bigger, and on a turn
+// from before #278 the delta at the evidence cap was mostly the shrink
+// toward the prior (§3.4). Since #278 the delta is the evidence the signal
+// added, without the forgetting, so its sign is the signal's. The check
 // compares the share of positive signals on each side.
 
 import 'package:ai_tutor_python/core/evidence_provenance.dart';

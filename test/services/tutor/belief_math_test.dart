@@ -320,11 +320,12 @@ void main() {
       expect((atHard - atMedium).abs(), lessThan(0.03));
     });
 
-    test('the saturated-stuck ceiling reads the level too: at hard it is '
-        '~57% raw, not 75%', () {
-      const ceiling = PolicyConstants.stuckSaturatedMeanCeiling;
-      expect(meanAt(QuestionDifficulty.hard, 0.5625), closeTo(ceiling, 1e-3));
-      expect(meanAt(QuestionDifficulty.medium, 0.75), closeTo(ceiling, 1e-9));
+    test('the stuck ceiling reads the level too: at hard it is ~39% raw, '
+        'at medium 60%, at easy ~78%', () {
+      const ceiling = PolicyConstants.stuckMeanCeiling;
+      expect(meanAt(QuestionDifficulty.hard, 0.3913), closeTo(ceiling, 1e-3));
+      expect(meanAt(QuestionDifficulty.medium, 0.60), closeTo(ceiling, 1e-9));
+      expect(meanAt(QuestionDifficulty.easy, 0.7778), closeTo(ceiling, 1e-3));
     });
   });
 
@@ -470,30 +471,106 @@ void main() {
   });
 
   group('applyEvidence', () {
-    test('below cap → simple addition', () {
-      final s = applyEvidence(alpha: 4, beta: 1, alphaDelta: 2, betaDelta: 0);
-      expect(s.alpha, 6);
+    test('#278: forgets, then adds — the evidence above the prior shrinks '
+        'by λ before the new evidence lands', () {
+      expect(PolicyConstants.forgetFactor, 0.7);
+      final s = applyEvidence(alpha: 4, beta: 2, alphaDelta: 2, betaDelta: 0);
+      // (1 + 3 × 0.7, 1 + 1 × 0.7) + (2, 0).
+      expect(s.alpha, closeTo(5.1, 1e-9));
+      expect(s.beta, closeTo(1.7, 1e-9));
+      final shrunk = forgetBeforeEvidence(const BeliefSnapshot(4, 2));
+      expect(shrunk.alpha, closeTo(3.1, 1e-9));
+      expect(shrunk.beta, closeTo(1.7, 1e-9));
+    });
+
+    test('#278: from the prior the first answer lands in full', () {
+      final s = applyEvidence(alpha: 1, beta: 1, alphaDelta: 2, betaDelta: 0);
+      expect(s.alpha, 3);
       expect(s.beta, 1);
     });
 
-    test('at cap, strong-negative shrinks mass and applies new evidence', () {
-      // (18, 2): mean 0.9, evidence 20 = cap.
+    test('zero-delta (a neutral) is a no-op: it forgets nothing', () {
+      final s = applyEvidence(alpha: 4, beta: 2, alphaDelta: 0, betaDelta: 0);
+      expect(s.alpha, 4);
+      expect(s.beta, 2);
+    });
+
+    test('#278: the evidence stays bounded at 2 + w / (1 − λ), under the '
+        'cap even for the heaviest answer', () {
+      // Strong, hard, in the lesson time: 2.0 × 1.4 × 1.25 = 3.5.
+      var snap = const BeliefSnapshot(1, 1);
+      for (var i = 0; i < 200; i++) {
+        snap = applyEvidence(
+          alpha: snap.alpha,
+          beta: snap.beta,
+          alphaDelta: 3.5,
+          betaDelta: 0,
+        );
+      }
+      expect(snap.evidence, closeTo(2 + 3.5 / 0.3, 1e-9));
+      expect(snap.evidence, lessThan(14));
+    });
+
+    test('#278: an old doc at the cap forgets below it at its next write, so '
+        'one wrong answer moves μ more than the cap let it', () {
+      // (18, 2): μ 0.9 at the cap. The cap alone shrank it to (16.1, 3.89),
+      // μ 0.81; forgetting gives (12.9, 1.7) + (0, 2), μ 0.78.
       final s = applyEvidence(
         alpha: 18,
         beta: 2,
         alphaDelta: 0,
         betaDelta: 2.0,
       );
-      // After shrink + add, α + β must equal cap.
-      expect(s.alpha + s.beta, closeTo(PolicyConstants.evidenceCap, 1e-9));
-      // Mean should drop materially below 0.9.
-      expect(s.mean, lessThan(0.85));
+      expect(s.alpha, closeTo(12.9, 1e-9));
+      expect(s.beta, closeTo(3.7, 1e-9));
+      expect(s.evidence, lessThan(PolicyConstants.evidenceCap));
+      expect(s.mean, closeTo(0.777, 1e-3));
     });
 
-    test('zero-delta is a no-op', () {
-      final s = applyEvidence(alpha: 4, beta: 2, alphaDelta: 0, betaDelta: 0);
-      expect(s.alpha, 4);
-      expect(s.beta, 2);
+    test('the cap stays as a backstop: a doc over it is brought to it', () {
+      final s = applyEvidence(
+        alpha: 25,
+        beta: 7,
+        alphaDelta: 2.0,
+        betaDelta: 0,
+      );
+      expect(s.evidence, closeTo(PolicyConstants.evidenceCap, 1e-9));
+    });
+
+    test('#278: the series of the issue, strong on medium at home', () {
+      final right = signalDeltas(
+        kind: LoSignalKind.positive,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+      );
+      final wrong = signalDeltas(
+        kind: LoSignalKind.negative,
+        strength: LoSignalStrength.strong,
+        difficulty: QuestionDifficulty.medium,
+      );
+      // J = right, F = wrong, in order.
+      BeliefSnapshot run(String series) {
+        var snap = const BeliefSnapshot(1, 1);
+        for (final c in series.split('')) {
+          final d = c == 'J' ? right : wrong;
+          snap = applyEvidence(
+            alpha: snap.alpha,
+            beta: snap.beta,
+            alphaDelta: d.alphaDelta,
+            betaDelta: d.betaDelta,
+          );
+        }
+        return snap;
+      }
+
+      expect(run('JJJ').mean, closeTo(0.84, 0.005));
+      // #245: under the cap 0.59, and stuck at the ninth answer.
+      expect(run('FFJFJJFJJJ').mean, closeTo(0.75, 0.005));
+      expect(run('FFFFFFJJJJ').mean, closeTo(0.72, 0.005));
+      expect(run('${'F' * 12}JJJJ').mean, closeTo(0.70, 0.005));
+      // Volume alone gives no stamp.
+      expect(run('JF' * 10).mean, closeTo(0.43, 0.005));
+      expect(run('${'J' * 10}F').mean, closeTo(0.65, 0.005));
     });
   });
 
@@ -538,16 +615,55 @@ void main() {
       expect(meetsMasteryMeanAndEvidence(after2), isTrue);
     });
 
-    test('stuck: ≥ 10 evidence and mean < 0.6', () {
-      expect(isStuck(const BeliefSnapshot(3, 7)), isTrue);
-      // Above the stuck mean ceiling — not stuck.
-      expect(isStuck(const BeliefSnapshot(7, 3)), isFalse);
-      // Not enough evidence yet: (3, 6) was stuck at the old bar of 8.
-      expect(isStuck(const BeliefSnapshot(3, 6)), isFalse);
+    test('#278: a new LO takes three strong right answers on medium at home, '
+        'two on hard', () {
+      BeliefSnapshot rightAnswers(int n, QuestionDifficulty level) {
+        final d = signalDeltas(
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.strong,
+          difficulty: level,
+        );
+        var snap = const BeliefSnapshot(1, 1);
+        for (var i = 0; i < n; i++) {
+          snap = applyEvidence(
+            alpha: snap.alpha,
+            beta: snap.beta,
+            alphaDelta: d.alphaDelta,
+            betaDelta: d.betaDelta,
+          );
+        }
+        return snap;
+      }
+
+      // (4.4, 1): μ 0.81 on evidence 5.4 — the first answer shrank first.
+      final two = rightAnswers(2, QuestionDifficulty.medium);
+      expect(two.alpha, closeTo(4.4, 1e-9));
+      expect(meetsMasteryMeanAndEvidence(two), isFalse);
+      expect(
+        meetsMasteryMeanAndEvidence(rightAnswers(3, QuestionDifficulty.medium)),
+        isTrue,
+      );
+      expect(
+        meetsMasteryMeanAndEvidence(rightAnswers(2, QuestionDifficulty.hard)),
+        isTrue,
+      );
     });
 
-    test('#276: four wrong answers on hard in the lesson time are not yet '
-        'stuck', () {
+    test('#278 stuck: ≥ 6 own questions and mean < 0.6', () {
+      expect(PolicyConstants.stuckOwnQuestionsMin, 6);
+      expect(isStuck(const BeliefSnapshot(3, 7), ownQuestions: 6), isTrue);
+      expect(isStuck(const BeliefSnapshot(3, 7), ownQuestions: 9), isTrue);
+      // Tried too little, whatever the evidence: (3, 7) was stuck at the
+      // old bar of α + β ≥ 10.
+      expect(isStuck(const BeliefSnapshot(3, 7), ownQuestions: 5), isFalse);
+      // At or above the stuck mean ceiling: on the upswing, keep probing.
+      expect(isStuck(const BeliefSnapshot(7, 3), ownQuestions: 12), isFalse);
+      expect(isStuck(const BeliefSnapshot(3, 2), ownQuestions: 12), isFalse);
+    });
+
+    test('#278: four wrong answers on hard in the lesson time are not yet '
+        'stuck — the attempts rule asks a notch lower, and two questions are '
+        'left there', () {
       final wrong = signalDeltas(
         kind: LoSignalKind.negative,
         strength: LoSignalStrength.strong,
@@ -566,35 +682,15 @@ void main() {
           betaDelta: wrong.betaDelta,
         );
       }
-      // (1, 7): evidence 8 — stuck at the old bar, before the attempts
-      // rule (§2.3, #227) could ask a notch lower.
-      expect(snap.evidence, closeTo(8, 1e-9));
-      expect(isStuck(snap), isFalse);
+      expect(snap.mean, lessThan(PolicyConstants.stuckMeanCeiling));
+      expect(isStuck(snap, ownQuestions: 4), isFalse);
+      expect(isStuck(snap, ownQuestions: 6), isTrue);
     });
 
-    test('stuck (saturated): at evidence cap and mean < mastery', () {
-      // (12, 6): mean 0.667, evidence 18 = cap - slack → saturated-stuck.
-      expect(isStuck(const BeliefSnapshot(12, 6)), isTrue);
-      // (14, 4): mean 0.778, evidence 18 → saturated but above the
-      // saturated-stuck ceiling (0.75), so NOT stuck.
-      expect(isStuck(const BeliefSnapshot(14, 4)), isFalse);
-      // (10, 5): mean 0.667 but evidence 15 < cap - slack → practiceable,
-      // not saturated, not stuck.
-      expect(isStuck(const BeliefSnapshot(10, 5)), isFalse);
-    });
-
-    test('practiceable: evidence < cap - slack', () {
-      expect(isPracticeable(const BeliefSnapshot(10, 5)), isTrue);
-      // Right at the threshold.
-      expect(
-        isPracticeable(
-          BeliefSnapshot(
-            PolicyConstants.evidenceCap - PolicyConstants.saturationSlack,
-            0,
-          ),
-        ),
-        isFalse,
-      );
+    test('#278: no saturated branch — an LO at the old cap with μ 0.67 is '
+        'not stuck, however often it was asked', () {
+      // (12, 6) was stuck by the saturated branch (α + β ≥ 18, μ < 0.75).
+      expect(isStuck(const BeliefSnapshot(12, 6), ownQuestions: 20), isFalse);
     });
   });
 }

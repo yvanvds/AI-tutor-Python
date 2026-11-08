@@ -81,18 +81,19 @@ String _statusReply() => llmEnvelope(
       '"common_issues":[],"last_exercise_type":"complete_code"}}',
 );
 
-/// The belief on `lo-print` one strong positive short of mastery. (3, 1)
-/// reads mean 0.75 on evidence 4; the grade adds 2.0 to α at medium, and
-/// (5, 1) reads mean 0.83 on evidence 6 — past both mastery thresholds
-/// (CONDUCTOR_POLICY §4), with the calibrated positive already on record.
-/// Written just now, so no decay moves it first.
+/// The belief on `lo-print` one strong positive short of mastery. (4.4, 1)
+/// reads mean 0.81 on evidence 5.4; the grade forgets (#278) and adds 2.0
+/// to α at medium, and (5.38, 1) reads mean 0.84 on evidence 6.38 — past
+/// both mastery thresholds (CONDUCTOR_POLICY §4), with the calibrated
+/// positive already on record. Written just now, so no decay moves it
+/// first.
 Map<String, dynamic> _almostMastered(DateTime now) => {
   'id': '${kStudentUid}_s1_lo-print',
   'type': 'lo_belief',
   'uid': kStudentUid,
   'subgoalId': 's1',
   'loId': 'lo-print',
-  'alpha': 3.0,
+  'alpha': 4.4,
   'beta': 1.0,
   'lastUpdatedAt': now.toIso8601String(),
   'lastQuestionType': 'completeCodeQuestion',

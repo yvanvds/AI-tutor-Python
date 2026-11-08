@@ -103,6 +103,41 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
+## Regelversie `1.1-eval8`
+
+PUNTENFORMULE v1.1, herspeeld uit `turn_history`. `eval8` (2026-11-08,
+#278) volgt het **vergeten per antwoord** van de app vanaf de build die het
+bracht (2.13.0, `rules.RULES_11_FROM`): vóór nieuw bewijs krimpt wat een
+leerdoel boven de prior heeft met λ = 0,7 (`rules.FORGET`), bij elk signaal
+dat gewicht heeft. Dat is de vraag zelf, een vervolgvraag, een signaal van
+opzij en transfer-krediet; een neutraal signaal krimpt niets. Het plafond
+van 20 blijft als vangnet, maar wordt bijna niet meer bereikt: het bewijs
+blijft onder 14. Het is de variant `forget=0.7` van de herspeling (#248),
+die de leerkracht op 2026-11-08 koos: ze vond 55 van de 68 leerdoelen die
+hij met de hand meetelde, zonder de controlegroep op te drijven.
+
+Wat dat doet met μ: de eerste antwoorden wegen minder naarmate er meer
+volgen, juist en fout. Vijf fout en dan vier juist is "heeft het nu door",
+niet "kan het voor 45%". Een nieuw leerdoel vraagt thuis op gemiddeld
+drie juiste antwoorden voor de stempel in plaats van twee, op moeilijk of
+in de les nog altijd twee.
+
+Zoals bij `eval7` hangt de regel af van de build die de oefening schreef
+(`clientVersion`, `rules.rules_11`): een oefening van een oudere build
+herspeelt zoals die build rekende, dus elke stempel van vóór de release
+blijft staan, en `validate` vergelijkt met wat de app schreef.
+`Variant(as_11=True)` herspeelt elke oefening met 1.1, ook die van
+vroeger: wat 1.1 met dezelfde antwoorden gemaakt zou hebben.
+
+Ook de regel voor **vastgelopen** veranderde (CONDUCTOR_POLICY §4.4):
+minstens 6 eigen vragen en μ < 0,6, in plaats van α + β ≥ 10 of de
+verzadigde tak bij het plafond. Vastgelopen raakt M en P niet, dus de
+herspeling rekent het niet. Ze telt wel de eigen vragen per leerdoel
+(`LoState.own_questions`), zoals de app ze bewaart (`ownQuestions` op
+`lo_beliefs`): een rechtstreekse vraag met het leerdoel als doel, geen
+vervolgvraag, één per vraag, welke kant het antwoord ook uitging.
+`replay-beliefs` schrijft die telling nog niet, en herspeelt de oefeningen van vóór 1.1 nog zonder vergeten (#281).
+
 ## Regelversie `1.0.23-eval7`
 
 PUNTENFORMULE v1.0.23, herspeeld uit `turn_history`. `eval7`
@@ -229,7 +264,8 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
    (#191) is het de regel: de groeiterm G en M_start zijn uit de formule,
    in de app net zo.
 
-Verder identiek aan de app: prior (1,1), plafond 20 met krimp-dan-optel,
+Verder identiek aan de app: prior (1,1), vergeten per antwoord met λ = 0,7
+voor een oefening van 1.1 (sinds `eval8`), plafond 20 met krimp-dan-optel,
 de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
@@ -487,15 +523,19 @@ document staan en noemt de uitvoer het: draai het dan opnieuw. Daarna
 
 `rules.replay(..., variant=rules.Variant(...))` herspeelt dezelfde
 antwoorden met een kandidaat-regel voor formule 1.1 (#249). Een variant is
-geen regelversie: `RULES_VERSION` blijft staan tot de leerkracht kiest en
-de app de regel overneemt. `Variant()` is de regel van nu.
+geen regelversie. `Variant()` is de regel van nu, per oefening die van de
+build die ze schreef. De gekozen kandidaat, `forget=0.7`, is sinds `eval8`
+die regel voor de oefeningen van een build met 1.1 (#278, hierboven).
 
 - `as_276`: elke beurt met de stempel van #276, welke build ze ook schreef;
   wat de kandidaat met deze antwoorden gedaan zou hebben, niet wat de app
   deed.
+- `as_11`: elke beurt met de regels van 1.1 (`rules.rules_11`), de stempel
+  van #276 inbegrepen, welke build ze ook schreef.
 - `forget` (λ, #278): vóór nieuw bewijs krimpt wat een leerdoel boven de
-  prior heeft met die factor; met `forget_own_only` alleen bij een eigen
-  vraag.
+  prior heeft met die factor, bij elke beurt; met `forget_own_only` alleen
+  bij een eigen vraag. Zonder `forget` vergeet een beurt van 1.1 met
+  `rules.FORGET`.
 - `streak` (#246): zoveel eigen vragen juist op rij geven de stempel,
   vanaf `streak_level`, meerkeuzevragen niet (tenzij `streak_counts_mcq`).
 - `min_own_right`, `min_open_right` en `mcq_positive` (#279): geen stempel

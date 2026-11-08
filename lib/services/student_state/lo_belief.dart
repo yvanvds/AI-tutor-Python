@@ -86,6 +86,20 @@ class LoBelief {
   /// read through [lastDirectProbeAt].
   final DateTime? lastProbedAt;
 
+  /// How many own questions this LO got (#278): direct questions with the
+  /// LO as their target — an ordinary question on the active subgoal, a
+  /// warm-up review or a recheck of it — not a follow-up, and not a signal
+  /// on it from a question about another LO. One per question, whichever
+  /// way the answer went, a neutral included; a question whose signal on
+  /// the LO was lost (#225) never reaches the doc and is not counted. The
+  /// stuck rule reads it (CONDUCTOR_POLICY §4.4: `stuckOwnQuestionsMin` and
+  /// a low mean), since forgetting keeps `α + β` from saying how often the
+  /// student tried. Missing on docs from before formula 1.1: read as 0, so
+  /// such an LO is stuck only after six new own questions; the release can
+  /// fill it from `turn_history` (`tooling/evaluation`,
+  /// `LoState.own_questions`, #281).
+  final int ownQuestions;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -99,6 +113,7 @@ class LoBelief {
     this.firstMasteredAt,
     this.regressedAt,
     this.lastProbedAt,
+    this.ownQuestions = 0,
   });
 
   /// When a direct probe last landed, as far as this doc can tell:
@@ -123,6 +138,7 @@ class LoBelief {
     DateTime? regressedAt,
     bool clearRegressedAt = false,
     DateTime? lastProbedAt,
+    int? ownQuestions,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -140,6 +156,7 @@ class LoBelief {
       firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
       regressedAt: clearRegressedAt ? null : (regressedAt ?? this.regressedAt),
       lastProbedAt: lastProbedAt ?? this.lastProbedAt,
+      ownQuestions: ownQuestions ?? this.ownQuestions,
     );
   }
 
@@ -172,6 +189,7 @@ class LoBelief {
       'regressedAt': regressedAt!.toUtc().toIso8601String(),
     if (lastProbedAt != null)
       'lastProbedAt': lastProbedAt!.toUtc().toIso8601String(),
+    'ownQuestions': ownQuestions,
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -208,6 +226,10 @@ class LoBelief {
       lastProbedAt: doc['lastProbedAt'] is String
           ? DateTime.tryParse(doc['lastProbedAt'] as String)
           : null,
+      ownQuestions: switch (doc['ownQuestions']) {
+        final num n => n.toInt(),
+        _ => 0,
+      },
     );
   }
 }

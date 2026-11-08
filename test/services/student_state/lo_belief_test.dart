@@ -302,4 +302,40 @@ void main() {
       expect(belief().lastDirectProbeAt, isNull);
     });
   });
+
+  group('LoBelief.ownQuestions (#278)', () {
+    LoBelief belief({int ownQuestions = 0}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 2.4,
+      beta: 5,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      ownQuestions: ownQuestions,
+    );
+
+    test('is written and read back', () {
+      final map = belief(ownQuestions: 6).toMap(uid: 'u');
+      expect(map['ownQuestions'], 6);
+      expect(LoBelief.fromCosmos(map).ownQuestions, 6);
+    });
+
+    test('a doc from before formula 1.1 reads 0, so its LO is stuck only '
+        'after six new own questions; a malformed value reads 0 too', () {
+      expect(LoBelief.fromCosmos(_doc()).ownQuestions, 0);
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestions': 'six'}).ownQuestions,
+        0,
+      );
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestions': 7.0}).ownQuestions,
+        7,
+      );
+    });
+
+    test('copyWith keeps it unless given one', () {
+      final b = belief(ownQuestions: 3);
+      expect(b.copyWith(alpha: 3).ownQuestions, 3);
+      expect(b.copyWith(ownQuestions: 4).ownQuestions, 4);
+    });
+  });
 }
