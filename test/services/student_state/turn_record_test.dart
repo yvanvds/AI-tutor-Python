@@ -20,6 +20,7 @@ PersistedTurnRecord _record({
   bool isWarmUp = false,
   bool isRecheck = false,
   String? recheckRule,
+  bool selfChosen = false,
   String? activeSubgoalId,
   bool keyDisputed = false,
   DateTime? askedAt,
@@ -37,6 +38,7 @@ PersistedTurnRecord _record({
   isWarmUp: isWarmUp,
   isRecheck: isRecheck,
   recheckRule: recheckRule,
+  selfChosen: selfChosen,
   activeSubgoalId: activeSubgoalId,
   id: 't1',
   turnAt: DateTime.utc(2026, 9, 2, 10),
@@ -148,6 +150,18 @@ void main() {
       final older = _record(isRecheck: true).toMap(uid: 'u1');
       expect(older.containsKey('recheckRule'), isFalse);
       expect(PersistedTurnRecord.fromCosmos(older).recheckRule, isNull);
+    });
+
+    test('#280: an oefening on a subgoal the student picked back up says '
+        'so, and is read back; any other leaves the field out', () {
+      final map = _record(selfChosen: true).toMap(uid: 'u1');
+      expect(map['selfChosen'], isTrue);
+      // The subgoal is the active one: no other subgoal to name.
+      expect(map.containsKey('activeSubgoalId'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).selfChosen, isTrue);
+      final other = _record().toMap(uid: 'u1');
+      expect(other.containsKey('selfChosen'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(other).selfChosen, isFalse);
     });
   });
 

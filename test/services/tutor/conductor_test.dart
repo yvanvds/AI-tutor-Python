@@ -7245,4 +7245,486 @@ void main() {
       },
     );
   });
+
+  group(
+    '#280 a subgoal the student picked back up from the Leerpad (§1.6)',
+    () {
+      LearningObjective lo(String id, {bool optional = false}) =>
+          LearningObjective(
+            id: id,
+            statement: id,
+            kind: LoKind.apply,
+            optional: optional,
+          );
+      // "Earlier" is finished; under "Now" the student has been moved past
+      // "Print" and "Variables", and "Loops" is the goal in progress.
+      final earlierRoot = Goal(id: 'r0', title: 'Earlier', order: 0);
+      final nowRoot = Goal(id: 'r1', title: 'Now', order: 1000);
+      final oldGoal = Goal(
+        id: 'e0',
+        title: 'Old topic',
+        parentId: 'r0',
+        order: 0,
+        objectives: [lo('lo-old'), lo('lo-ext')],
+      );
+      final printGoal = Goal(
+        id: 's0',
+        title: 'Print',
+        parentId: 'r1',
+        order: 0,
+        objectives: [lo('lo-print'), lo('lo-fmt')],
+      );
+      final varGoal = Goal(
+        id: 's1',
+        title: 'Variables',
+        parentId: 'r1',
+        order: 1000,
+        objectives: [
+          lo('lo-a'),
+          lo('lo-b'),
+          lo('lo-c'),
+          lo('lo-d', optional: true),
+        ],
+      );
+      final loopGoal = Goal(
+        id: 's2',
+        title: 'Loops',
+        parentId: 'r1',
+        order: 2000,
+        objectives: [lo('lo-loop')],
+      );
+      final now = DateTime.now().toUtc();
+      DateTime daysAgo(int d) => now.subtract(Duration(days: d));
+      final advancedAt = daysAgo(7);
+
+      LoBelief belief(
+        String subgoalId,
+        String loId, {
+        required double alpha,
+        required double beta,
+        bool stamped = false,
+        DateTime? updatedAt,
+        DateTime? probedAt,
+        int own = 3,
+        int right = 2,
+        int nonMcq = 2,
+        bool calibratedPositive = true,
+      }) => LoBelief(
+        subgoalId: subgoalId,
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: updatedAt ?? daysAgo(3),
+        lastQuestionType: 'completeCodeQuestion',
+        lastPositiveAtCalibratedAt: calibratedPositive ? daysAgo(3) : null,
+        highestPositiveDifficulty: calibratedPositive
+            ? QuestionDifficulty.medium
+            : null,
+        firstMasteredAt: stamped ? daysAgo(5) : null,
+        lastProbedAt: probedAt ?? updatedAt ?? daysAgo(3),
+        ownQuestions: own,
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
+      );
+
+      /// What would interrupt ordinary practice: a stamped LO of "Print" not
+      /// asked for forty days, for the warm-up review (§1.5) — or, without
+      /// it, a stuck one not asked for twenty, for the recheck slot (§2.6).
+      List<LoBelief> due({required bool warmUp}) => [
+        if (warmUp)
+          belief(
+            's0',
+            'lo-fmt',
+            alpha: 5,
+            beta: 1,
+            stamped: true,
+            updatedAt: daysAgo(40),
+          )
+        else
+          belief(
+            's0',
+            'lo-print',
+            alpha: 2,
+            beta: 5,
+            own: 6,
+            right: 0,
+            nonMcq: 0,
+            calibratedPositive: false,
+            updatedAt: daysAgo(20),
+          ),
+      ];
+
+      Future<({Conductor c, _Fakes f})> setup(List<LoBelief> beliefs) async {
+        final f = _Fakes();
+        f.roots.addAll([earlierRoot, nowRoot]);
+        f.children[earlierRoot.id] = [oldGoal];
+        f.children[nowRoot.id] = [printGoal, varGoal, loopGoal];
+        for (final id in ['e0', 's0']) {
+          f.progressById[id] = Progress(
+            goalID: id,
+            progress: 0.5,
+            advancedAt: advancedAt,
+          );
+        }
+        f.progressById['s1'] = Progress(
+          goalID: 's1',
+          progress: 1 / 3,
+          advancedAt: advancedAt,
+        );
+        f.progressById['r0'] = Progress(goalID: 'r0', progress: 0.5);
+        // A good window at medium: the recheck slot's brake is off.
+        f.calibration = StudentCalibration(
+          difficulty: QuestionDifficulty.medium,
+          recentAnswers: [
+            for (var i = 0; i < PolicyConstants.calibrationWindow; i++)
+              CalibrationAnswer(
+                quality: AnswerQuality.correct,
+                difficulty: QuestionDifficulty.medium,
+                at: daysAgo(1),
+              ),
+          ],
+          recentQuestionTypes: const ['completeCodeQuestion'],
+        );
+        for (final b in beliefs) {
+          f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+        }
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        expect(f.selection.activeChildGoal?.id, 's2');
+        return (c: c, f: f);
+      }
+
+      /// "Afmaken" / "Herhalen" on [child] of [root], and the session it
+      /// starts.
+      Future<void> pickUp(
+        ({Conductor c, _Fakes f}) s,
+        Goal root,
+        Goal child,
+      ) async {
+        s.f.selection = s.f.selection.copyWith(
+          preferredRoot: root,
+          preferredChild: child,
+          selfChosen: true,
+        );
+        await s.c.setTarget();
+      }
+
+      /// "Verder" on the goal in progress.
+      Future<void> backToTheGoalInProgress(({Conductor c, _Fakes f}) s) async {
+        s.f.selection = s.f.selection.copyWith(
+          preferredRoot: nowRoot,
+          clearPreferredChild: true,
+        );
+        await s.c.setTarget();
+      }
+
+      Future<TurnOutcome> grade(
+        ({Conductor c, _Fakes f}) s,
+        QuestionPlan plan, {
+        AnswerQuality quality = AnswerQuality.correct,
+        List<GradedSignal> extra = const [],
+      }) {
+        s.c.notePlannedQuestion(plan);
+        return s.c.integrateAnswer(
+          plan: plan,
+          answer: GradedAnswer(
+            overallQuality: quality,
+            signals: [
+              GradedSignal(
+                subgoalId: s.f.selection.activeChildGoal!.id,
+                loId: plan.targetLOs.single.id,
+                kind: quality == AnswerQuality.correct
+                    ? LoSignalKind.positive
+                    : LoSignalKind.negative,
+                strength: LoSignalStrength.strong,
+              ),
+              ...extra,
+            ],
+          ),
+        );
+      }
+
+      LoBelief stored(_Fakes f, String subgoalId, String loId) =>
+          f.beliefs[f._key(subgoalId, loId)]!;
+
+      for (final warmUp in [true, false]) {
+        final what = warmUp ? 'a warm-up review' : 'a recheck';
+        test('finish: the LOs not demonstrated yet first, the weakest first; '
+            '$what does not interrupt, though due', () async {
+          final s = await setup([
+            ...due(warmUp: warmUp),
+            // Stamped, and the weakest of all: it waits for the review.
+            belief('s1', 'lo-a', alpha: 2, beta: 4, stamped: true),
+            belief('s1', 'lo-b', alpha: 3, beta: 2),
+            belief('s1', 'lo-c', alpha: 2, beta: 3),
+          ]);
+          // On the goal in progress the session opens with it.
+          final control = await s.c.planNext();
+          expect(warmUp ? control.isWarmUp : control.isRecheck, isTrue);
+          expect(control.offSubgoal?.id, 's0');
+
+          s.f.notices.clear();
+          await pickUp(s, nowRoot, varGoal);
+          // The goal in progress stays the selection; the chat says what the
+          // oefeningen are on now — and no "new goal".
+          expect(s.f.selection.selectedChild?.id, 's2');
+          expect(s.f.selection.activeChildGoal?.id, 's1');
+          expect(s.f.notices.map((n) => n.kind), [
+            ChatNoticeKind.selfChosenSubgoal,
+          ]);
+          expect(s.f.notices.single.goalId, 's1');
+          expect(s.f.notices.single.args, ['Variables']);
+
+          final first = _expectQuestion(await s.c.planNext());
+          expect(first.selfChosen, isTrue);
+          expect(first.isWarmUp, isFalse);
+          expect(first.isRecheck, isFalse);
+          expect(first.isOffSubgoal, isFalse);
+          expect(first.targetLOs.single.id, 'lo-c');
+          expect(first.difficulty, QuestionDifficulty.medium);
+          expect(
+            first.reason.chosenReason,
+            'self-chosen: finish, weakest open LO',
+          );
+          expect(first.reason.candidateLOs.map((c) => c.loId), [
+            'lo-c',
+            'lo-b',
+          ]);
+          // The bar is the subgoal's picked.
+          expect(s.f.loDisplay?.subgoalId, 's1');
+
+          // Not the same LO twice in a row while another is open.
+          s.c.notePlannedQuestion(first);
+          final second = _expectQuestion(await s.c.planNext());
+          expect(second.selfChosen, isTrue);
+          expect(second.targetLOs.single.id, 'lo-b');
+          // Five oefeningen on: the recheck slot stays shut.
+          for (var i = 0; i < PolicyConstants.recheckSpacing; i++) {
+            final plan = _expectQuestion(await s.c.planNext());
+            expect(plan.isOffSubgoal, isFalse, reason: 'question ${i + 1}');
+            expect(plan.selfChosen, isTrue);
+            s.c.notePlannedQuestion(plan);
+          }
+        });
+      }
+
+      test('review: once each LO that counts is demonstrated, the weakest '
+          'stamped one first, on a tie the one asked longest ago; an optional '
+          'LO without a stamp is no review', () async {
+        final at = daysAgo(3);
+        final s = await setup([
+          belief(
+            's1',
+            'lo-a',
+            alpha: 5,
+            beta: 1,
+            stamped: true,
+            updatedAt: at,
+            probedAt: daysAgo(2),
+          ),
+          belief(
+            's1',
+            'lo-b',
+            alpha: 5,
+            beta: 1,
+            stamped: true,
+            updatedAt: at,
+            probedAt: daysAgo(20),
+          ),
+          belief('s1', 'lo-c', alpha: 6, beta: 1, stamped: true, updatedAt: at),
+          // `lo-d` is optional and has no doc: the prior, under them all.
+        ]);
+        await pickUp(s, nowRoot, varGoal);
+
+        final first = _expectQuestion(await s.c.planNext());
+        expect(first.selfChosen, isTrue);
+        expect(first.targetLOs.single.id, 'lo-b');
+        expect(first.reason.chosenReason, 'self-chosen: review, weakest LO');
+        s.c.notePlannedQuestion(first);
+        final second = _expectQuestion(await s.c.planNext());
+        expect(second.targetLOs.single.id, 'lo-a');
+      });
+
+      test('an answer counts in full on the LO it asked, stays out of the '
+          'calibration window, never advances or reopens the subgoal, and its '
+          'bar only rises; a wrong one leaves the stamp', () async {
+        final s = await setup([
+          belief('s1', 'lo-a', alpha: 6, beta: 1, stamped: true),
+          belief('s1', 'lo-b', alpha: 6, beta: 1, stamped: true),
+          // One right own question short of its stamp: (4.4, 1) at μ 0.81,
+          // one right own question on record.
+          belief('s1', 'lo-c', alpha: 4.4, beta: 1, right: 1, nonMcq: 1),
+        ]);
+        await pickUp(s, nowRoot, varGoal);
+        final calibrationBefore = s.f.calibration;
+
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.targetLOs.single.id, 'lo-c');
+        final outcome = await grade(s, plan);
+
+        // A direct probe of `lo-c`, its stamp included.
+        final c = stored(s.f, 's1', 'lo-c');
+        expect(c.alpha, greaterThan(4.4));
+        expect(c.firstMasteredAt, isNotNull);
+        expect(c.ownQuestions, 4);
+        expect(c.ownQuestionsRight, 2);
+        expect(c.lastDirectProbeAt!.isAfter(daysAgo(1)), isTrue);
+        expect(outcome.appliedSignals.single.loId, 'lo-c');
+        // Out of the calibration window, but an oefening all the same.
+        expect(outcome.calibrationAfter, QuestionDifficulty.medium);
+        expect(s.f.calibration.difficulty, calibrationBefore.difficulty);
+        expect(
+          s.f.calibration.recentAnswers.length,
+          calibrationBefore.recentAnswers.length,
+        );
+        expect(
+          s.f.calibration.recentQuestionTypes,
+          calibrationBefore.recentQuestionTypes,
+        );
+        expect(s.f.oefeningen, 1);
+        // Every LO that counts is mastered now, and still: no advance, no
+        // splash, no status report, and the goal in progress is untouched.
+        expect(outcome.subgoalAdvanced, isFalse);
+        expect(
+          outcome.loStatusAfter
+              .where((l) => l.loId != 'lo-d')
+              .map((l) => l.mastered),
+          everyElement(isTrue),
+        );
+        expect(s.f.goalsReached, isEmpty);
+        expect(s.c.takePendingStatusReportGoalId(), isNull);
+        expect(s.f.selection.isSelfChosen, isTrue);
+        expect(s.f.selection.activeChildGoal?.id, 's1');
+        expect(s.f.selection.selectedChild?.id, 's2');
+        // The bar rose with the new stamp; the subgoal stays finished.
+        expect(s.f.progressById['s1']!.progress, closeTo(1.0, 1e-9));
+        expect(s.f.progressById['s1']!.advancedAt, advancedAt);
+
+        // Review now. A wrong answer: the stamp stays, the bar stays where
+        // it was, and the subgoal stays finished.
+        final review = _expectQuestion(await s.c.planNext());
+        expect(review.reason.chosenReason, 'self-chosen: review, weakest LO');
+        final target = review.targetLOs.single.id;
+        final wrong = await grade(s, review, quality: AnswerQuality.wrong);
+        expect(stored(s.f, 's1', target).firstMasteredAt, isNotNull);
+        expect(wrong.subgoalAdvanced, isFalse);
+        expect(s.f.progressById['s1']!.progress, closeTo(1.0, 1e-9));
+        expect(s.f.progressById['s1']!.advancedAt, advancedAt);
+        expect(
+          s.f.calibration.recentAnswers.length,
+          calibrationBefore.recentAnswers.length,
+        );
+        expect(s.f.oefeningen, 2);
+      });
+
+      test(
+        'a dip on a subgoal with an open LO does not set its bar back',
+        () async {
+          final s = await setup([
+            belief('s1', 'lo-a', alpha: 5, beta: 1, stamped: true),
+            belief('s1', 'lo-b', alpha: 3, beta: 2),
+            belief('s1', 'lo-c', alpha: 2, beta: 3),
+          ]);
+          await pickUp(s, nowRoot, varGoal);
+          final plan = _expectQuestion(await s.c.planNext());
+          final outcome = await grade(s, plan, quality: AnswerQuality.wrong);
+          expect(outcome.subgoalAdvanced, isFalse);
+          expect(s.f.progressById['s1']!.progress, closeTo(1 / 3, 1e-9));
+          expect(s.f.progressById['s1']!.advancedAt, advancedAt);
+        },
+      );
+
+      test('a subgoal of an earlier root: its signals count there — the '
+          'target and another LO of it — and "Verder" brings the goal in '
+          'progress back, whose answers count and calibrate again', () async {
+        final s = await setup([
+          belief('e0', 'lo-old', alpha: 2, beta: 3),
+          belief('e0', 'lo-ext', alpha: 3, beta: 2),
+        ]);
+        await pickUp(s, earlierRoot, oldGoal);
+        expect(s.f.selection.activeRootGoal?.id, 'r0');
+
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.selfChosen, isTrue);
+        expect(plan.targetLOs.single.id, 'lo-old');
+        final oldBefore = stored(s.f, 'e0', 'lo-old').alpha;
+        final extBefore = stored(s.f, 'e0', 'lo-ext').alpha;
+        final outcome = await grade(
+          s,
+          plan,
+          extra: const [
+            GradedSignal(
+              subgoalId: 'e0',
+              loId: 'lo-ext',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.moderate,
+            ),
+            // The goal in progress lies under another root.
+            GradedSignal(
+              subgoalId: 's2',
+              loId: 'lo-loop',
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.weak,
+            ),
+          ],
+        );
+        expect(outcome.appliedSignals.map((a) => '${a.subgoalId}/${a.loId}'), [
+          'e0/lo-old',
+          'e0/lo-ext',
+        ]);
+        expect(
+          stored(s.f, 'e0', 'lo-old').alpha,
+          greaterThan(oldBefore * PolicyConstants.forgetFactor + 1),
+        );
+        expect(stored(s.f, 'e0', 'lo-ext').alpha, isNot(extBefore));
+        expect(
+          outcome.droppedSignals.single.reason,
+          SignalDropReason.outsideActiveRoot,
+        );
+        expect(s.f.beliefs.containsKey(s.f._key('s2', 'lo-loop')), isFalse);
+        // Out of the calibration window: no answer of today in it.
+        bool today(CalibrationAnswer a) => a.at.isAfter(daysAgo(1));
+        expect(s.f.calibration.recentAnswers.where(today), isEmpty);
+
+        await backToTheGoalInProgress(s);
+        expect(s.f.selection.isSelfChosen, isFalse);
+        expect(s.f.selection.activeRootGoal?.id, 'r1');
+        expect(s.f.selection.activeChildGoal?.id, 's2');
+        final back = _expectQuestion(await s.c.planNext());
+        expect(back.selfChosen, isFalse);
+        expect(back.targetLOs.single.id, 'lo-loop');
+        final ordinary = await grade(s, back);
+        expect(ordinary.appliedSignals.single.loId, 'lo-loop');
+        expect(s.f.calibration.recentAnswers.where(today), hasLength(1));
+      });
+
+      test('picked up before the app had a goal in progress: the walk reads '
+          'it without the "new goal" pill', () async {
+        final f = _Fakes();
+        f.roots.addAll([earlierRoot, nowRoot]);
+        f.children[earlierRoot.id] = [oldGoal];
+        f.children[nowRoot.id] = [printGoal, varGoal, loopGoal];
+        for (final id in ['e0', 's0', 's1']) {
+          f.progressById[id] = Progress(
+            goalID: id,
+            progress: 0.5,
+            advancedAt: advancedAt,
+          );
+        }
+        f.selection = GoalSelectionState(
+          preferredRoot: nowRoot,
+          preferredChild: varGoal,
+          selfChosen: true,
+        );
+        final c = Conductor(deps: _buildDeps(f));
+        await c.setTarget();
+        expect(f.selection.selectedRoot?.id, 'r1');
+        expect(f.selection.selectedChild?.id, 's2');
+        expect(f.selection.activeChildGoal?.id, 's1');
+        expect(f.notices.map((n) => n.kind), [
+          ChatNoticeKind.selfChosenSubgoal,
+        ]);
+      });
+    },
+  );
 }

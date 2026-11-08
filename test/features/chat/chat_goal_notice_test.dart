@@ -81,6 +81,14 @@ ChatNotice _recheckAgain() => ChatNotice(
   goalId: _printen.id,
 );
 
+/// As the conductor raises it when the student picked the subgoal back up
+/// from the Leerpad (#280).
+ChatNotice _selfChosen() => ChatNotice(
+  ChatNoticeKind.selfChosenSubgoal,
+  args: [_printen.title],
+  goalId: _printen.id,
+);
+
 /// As the conductor raises it when it picks the subgoal (#212).
 ChatNotice _newGoal() => ChatNotice(
   ChatNoticeKind.newGoalSelected,
@@ -118,6 +126,7 @@ void main() {
     chat.addSystemNotice(_warmUp());
     chat.addSystemNotice(_recheck());
     chat.addSystemNotice(_recheckAgain());
+    chat.addSystemNotice(_selfChosen());
     chat.addSystemNotice(_newGoal());
   });
 
@@ -172,6 +181,9 @@ void main() {
   const newGoalEn = 'New goal selected: Printing';
   const recheckAgainEn =
       'One more check question on Printing: you got the last one right.';
+  const selfChosenEn =
+      'You picked Printing: the exercises are on it now. Done? Continue in '
+      'the learning path takes you back to your current goal.';
 
   testWidgets('English with a translation: every pill names the goal in '
       'English', (tester) async {
@@ -179,7 +191,13 @@ void main() {
 
     expect(
       pills(tester),
-      containsAll([warmUpEn, recheckEn, recheckAgainEn, newGoalEn]),
+      containsAll([
+        warmUpEn,
+        recheckEn,
+        recheckAgainEn,
+        selfChosenEn,
+        newGoalEn,
+      ]),
     );
     expect(pills(tester), everyElement(isNot(contains('Printen'))));
 
@@ -224,6 +242,8 @@ void main() {
         'Tussendoor: één controlevraag over Printen, om te tonen dat je het '
             'nu kan.',
         'Nog een controlevraag over Printen: de vorige was juist.',
+        'Je koos zelf Printen: de oefeningen gaan nu daarover. Klaar? Met '
+            'Verder in het Leerpad ga je terug naar je huidige doel.',
         'Nieuw doel geselecteerd: Printen',
       ]),
     );

@@ -334,7 +334,8 @@ DROP_NL = {
 SESSION_START_NL = {
     "startup": "opstart",
     "continueLearningPath": "Verder in Leerpad",
-    "workOnGoal": "Werk hieraan",
+    # #280: "Afmaken" / "Herhalen" on a subgoal tile in the Leerpad.
+    "workOnGoal": "subdoel zelf gekozen in Leerpad",
     "restart": "herstart in de chat",
 }
 
@@ -408,6 +409,8 @@ def trace(turns: list[dict], contents: dict[str, dict], goals: dict) -> list[dic
                 "follow_up": bool(src.get("isFollowUp")),
                 "warm_up": bool((t or {}).get("isWarmUp")),
                 "recheck": bool((t or {}).get("isRecheck")),
+                # #280: on a subgoal the student picked back up in the Leerpad.
+                "self_chosen": bool((t or {}).get("selfChosen")),
                 "graded_by_key": bool((t or {}).get("gradedByKey")),
                 "has_turn": t is not None,
                 "has_content": c is not None,

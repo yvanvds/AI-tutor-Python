@@ -149,6 +149,14 @@ class QuestionPlan {
   /// for every other plan; never set together with [warmUp].
   final Recheck? recheck;
 
+  /// A question on a subgoal the student picked back up from the Leerpad
+  /// (#280, §1.6; `GoalSelectionState.isSelfChosen`): the active subgoal,
+  /// in its own order — the open LOs first, then the weakest. Its answer
+  /// stays out of the calibration window (§5), never advances or reopens
+  /// the subgoal, and the turn record says the student chose it. Never
+  /// set together with [warmUp] or [recheck].
+  final bool selfChosen;
+
   const QuestionPlan({
     required this.type,
     required this.difficulty,
@@ -158,6 +166,7 @@ class QuestionPlan {
     this.blockedDegraded = false,
     this.warmUp,
     this.recheck,
+    this.selfChosen = false,
   });
 
   bool get isWarmUp => warmUp != null;
@@ -613,9 +622,28 @@ class Conductor {
 
   /// Called on session entry / when the active subgoal changes externally.
   /// Picks the next subgoal if needed and resets per-subgoal state.
+  ///
+  /// A subgoal the student picked back up (#280, §1.6) is the active one
+  /// without a walk: the selection keeps the goal in progress, the one
+  /// "Verder" returns to — read now when the app had none yet, without the
+  /// "new goal" pill. The chat says what the oefeningen are about now, and
+  /// how to go back.
   Future<void> setTarget() async {
-    if (_deps.getGoalSelection().preferredChild == null) {
+    final selection = _deps.getGoalSelection();
+    if (selection.preferredChild == null) {
       await _setTargetGoal();
+    } else if (selection.isSelfChosen) {
+      if (selection.selectedChild == null) {
+        await _setTargetGoal(announce: false);
+      }
+      final chosen = selection.preferredChild!;
+      _deps.addSystemNotice(
+        ChatNotice(
+          ChatNoticeKind.selfChosenSubgoal,
+          args: [chosen.title],
+          goalId: chosen.id,
+        ),
+      );
     }
     final goal = _activeChildGoal;
     _lastTargetLoId = null;
@@ -659,6 +687,12 @@ class Conductor {
       });
       return QuestionPlan.emptyObjectives();
     }
+
+    // #280 (§1.6): a subgoal the student picked back up has its own order,
+    // and nothing interrupts it — no warm-up review, no recheck, no chained
+    // return. They wait until the student is back on the goal in progress:
+    // "Verder" starts a new session, which opens both slots again.
+    if (selection.isSelfChosen) return _planSelfChosen(subgoal);
 
     // §1.5: the session opens with one review question on a stale,
     // once-mastered LO from an older subgoal, when there is one.
@@ -818,6 +852,124 @@ class Conductor {
       difficulty: difficulty,
       targetLOs: [target],
       reason: reason,
+    );
+  }
+
+  /// The next question on a subgoal the student picked back up from the
+  /// Leerpad (#280, CONDUCTOR_POLICY §1.6), to finish it or to review it.
+  ///
+  /// Finish ("afmaken"): its non-optional LOs without the mastery stamp —
+  /// open or stuck — come first. Review ("herhalen"), once each of them
+  /// carries the stamp: the stamped LOs. In either group the weakest first
+  /// (the lowest decayed mean), on a tie the one asked longest ago
+  /// (`lastProbedAt`, never asked first), then authoring order; the LO of
+  /// the question before is skipped while the group has another. The type
+  /// as for any probe (§2.2), with #279's rule while the LO is not mastered
+  /// now, at the calibration and its notch drops (§2.3).
+  Future<QuestionPlan> _planSelfChosen(Goal subgoal) async {
+    final objectives = subgoal.objectives;
+    final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
+    final byId = {for (final b in beliefs) b.loId: b};
+    final now = DateTime.now().toUtc();
+    final calibration = _deps.getCalibration().difficulty;
+
+    // #230: the bar of the subgoal this question is about.
+    _publishLoDisplay(subgoal, byId, calibration: calibration);
+
+    final snapshots = <String, BeliefSnapshot>{
+      for (final lo in objectives)
+        lo.id: switch (byId[lo.id]) {
+          null => const BeliefSnapshot(
+            PolicyConstants.prior,
+            PolicyConstants.prior,
+          ),
+          final b => applyDecay(
+            alpha: b.alpha,
+            beta: b.beta,
+            lastUpdatedAt: b.lastUpdatedAt,
+            now: now,
+          ),
+        },
+    };
+    bool stamped(LearningObjective lo) => byId[lo.id]?.firstMasteredAt != null;
+
+    final open = objectives
+        .where((lo) => !lo.optional && !stamped(lo))
+        .toList(growable: false);
+    final finishing = open.isNotEmpty;
+    final reviewable = objectives.where(stamped).toList(growable: false);
+    // A subgoal of optional LOs only, none stamped, has neither: all of
+    // them then.
+    final group = finishing
+        ? open
+        : (reviewable.isNotEmpty ? reviewable : objectives);
+    final order = {
+      for (var i = 0; i < objectives.length; i++) objectives[i].id: i,
+    };
+    final sorted = group.toList()
+      ..sort((a, b) {
+        final byMean = snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean);
+        if (byMean != 0) return byMean;
+        final pa = byId[a.id]?.lastDirectProbeAt;
+        final pb = byId[b.id]?.lastDirectProbeAt;
+        if (pa != pb) {
+          if (pa == null) return -1;
+          if (pb == null) return 1;
+          final byAge = pa.compareTo(pb);
+          if (byAge != 0) return byAge;
+        }
+        return order[a.id]!.compareTo(order[b.id]!);
+      });
+    final others = sorted.where((lo) => lo.id != _lastTargetLoId).toList();
+    final target = others.isEmpty ? sorted.first : others.first;
+
+    final snap = snapshots[target.id]!;
+    final belief = byId[target.id];
+    final type = _pickType(
+      target,
+      snap,
+      // #279: no pick when one can no longer bring the LO to its stamp —
+      // only while it is not mastered now.
+      belief: belief == null || isMastered(snap, belief) ? null : belief,
+      calibration: calibration,
+    );
+    final notchDropRules = await _shouldDropNotch(
+      lo: target,
+      subgoalId: subgoal.id,
+      calibration: calibration,
+    );
+    final notchDrop = notchDropRules.isNotEmpty;
+
+    _deps.recordDebugEvent('conductor.self_chosen_planned', {
+      'subgoalId': subgoal.id,
+      'loId': target.id,
+      'finishing': finishing,
+      'mean': snap.mean,
+      'candidates': group.length,
+    });
+
+    return QuestionPlan(
+      type: type,
+      difficulty: notchDrop ? _stepDown(calibration) : calibration,
+      targetLOs: [target],
+      selfChosen: true,
+      reason: TurnSelectionReason(
+        candidateLOs: sorted
+            .take(3)
+            .map(
+              (lo) => CandidateLoStat(
+                loId: lo.id,
+                mean: snapshots[lo.id]!.mean,
+                evidence: snapshots[lo.id]!.evidence,
+              ),
+            )
+            .toList(growable: false),
+        chosenReason: finishing
+            ? 'self-chosen: finish, weakest open LO'
+            : 'self-chosen: review, weakest LO',
+        notchDropFired: notchDrop,
+        notchDropRules: notchDropRules,
+      ),
     );
   }
 
@@ -2131,7 +2283,8 @@ class Conductor {
     // A warm-up or recheck turn that touched no active-subgoal LO changes
     // nothing the active subgoal's cache, history or advancement should
     // react to (§1.5, §2.6): its status is still reported on the turn
-    // record, but not persisted.
+    // record, but not persisted. A subgoal the student picked back up
+    // (#280, §1.6) neither advances nor reopens: its cache only rises.
     final activeTouched = !plan.isOffSubgoal || touchedLoIds.isNotEmpty;
     final freshBeliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
     final freshById = {for (final b in freshBeliefs) b.loId: b};
@@ -2197,6 +2350,8 @@ class Conductor {
     bool advanced = false;
     if (!activeTouched) {
       // Nothing to persist or advance; fall through to the record.
+    } else if (plan.selfChosen) {
+      await _raiseSubgoalCache(subgoal, cached, quality: answer.overallQuality);
     } else if (subgoalMastered) {
       // §8.2 stuckLoAdvance: subgoal advanced with one or more stuck LOs.
       final stuckLoIds = <String>[];
@@ -2280,9 +2435,12 @@ class Conductor {
     // §1.5 / §2.6: neither do warm-up or recheck answers — a slip on older
     // material is forgetting, not miscalibration, and a question off the
     // active subgoal must not promote either. It would also feed the
-    // recheck gate its own answers (`levelWeightedAccuracy`).
+    // recheck gate its own answers (`levelWeightedAccuracy`). #280 (§1.6):
+    // nor an answer on a subgoal the student picked back up — a strong
+    // student must not climb on old material, nor one stuck on an LO sink,
+    // and find that in the goal in progress.
     final cal = _deps.getCalibration();
-    final updatedCal = answer.isFollowUp || plan.isOffSubgoal
+    final updatedCal = answer.isFollowUp || plan.isOffSubgoal || plan.selfChosen
         ? cal
         : _updateCalibration(
             current: cal,
@@ -2666,7 +2824,11 @@ class Conductor {
     }
   }
 
-  Future<bool> _setTargetGoal() async {
+  /// The next-subgoal walk: the first subgoal not advanced past, of the
+  /// first root not finished. [announce] off keeps the "new goal" pill out
+  /// of the chat — for the goal in progress read under a subgoal the
+  /// student picked back up (#280).
+  Future<bool> _setTargetGoal({bool announce = true}) async {
     _deps.setSelectedRoot(null);
     _deps.setSelectedChild(null);
 
@@ -2693,13 +2855,15 @@ class Conductor {
           _deps.setSelectedChild(targetChild);
           // The Dutch title plus the id: the chat pill names the subgoal in
           // the app language (#212).
-          _deps.addSystemNotice(
-            ChatNotice(
-              ChatNoticeKind.newGoalSelected,
-              args: [targetChild.title],
-              goalId: targetChild.id,
-            ),
-          );
+          if (announce) {
+            _deps.addSystemNotice(
+              ChatNotice(
+                ChatNoticeKind.newGoalSelected,
+                args: [targetChild.title],
+                goalId: targetChild.id,
+              ),
+            );
+          }
           return true;
         }
       }
@@ -2826,6 +2990,26 @@ class Conductor {
       quality: quality,
       recordHistory: recordHistory,
     );
+  }
+
+  /// The cached fraction of a subgoal the student picked back up (#280,
+  /// §1.6), written only when it rises: a new stamp shows, a dip does not
+  /// set the bar back, and the doc keeps its `advancedAt` — the subgoal
+  /// stays finished and the walk stays on the goal in progress.
+  Future<void> _raiseSubgoalCache(
+    Goal subgoal,
+    double cached, {
+    AnswerQuality? quality,
+  }) async {
+    final existing = await _deps.getProgressByGoalId(subgoal.id);
+    if (existing != null && cached <= existing.progress) return;
+    await _persistCacheFor(
+      subgoal.id,
+      cached,
+      quality: quality,
+      advancedAt: existing?.advancedAt,
+    );
+    await _recomputeRoot();
   }
 
   Future<void> _recomputeRoot() async {

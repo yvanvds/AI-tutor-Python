@@ -24,6 +24,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// the average over its non-optional subgoals. While [stamps] is `null`
 /// (loading, or unreadable) a bar falls back on the cached `progress`, as
 /// does a subgoal without non-optional LOs.
+///
+/// A chip of a subgoal the student has been moved past, with learning
+/// objectives, carries the button that picks it back up ([onPickUp], #280);
+/// the one the oefeningen are on now ([pickedUpChildId]) says so instead.
 class LeerpadCard extends ConsumerStatefulWidget {
   const LeerpadCard({
     super.key,
@@ -34,6 +38,8 @@ class LeerpadCard extends ConsumerStatefulWidget {
     required this.isActive,
     required this.onContinue,
     this.stamps,
+    this.onPickUp,
+    this.pickedUpChildId,
   });
 
   final int index;
@@ -42,6 +48,13 @@ class LeerpadCard extends ConsumerStatefulWidget {
   final Map<String, Progress> progressById;
   final bool isActive;
   final VoidCallback onContinue;
+
+  /// Picks a subgoal of this root back up (#280); `null`: no such buttons.
+  final void Function(Goal child)? onPickUp;
+
+  /// The subgoal the student picked back up, while the oefeningen are on
+  /// it (#280); `null` otherwise.
+  final String? pickedUpChildId;
 
   /// The student's mastery stamps; `null` while they load or when they
   /// could not be read.
@@ -127,6 +140,8 @@ class _LeerpadCardState extends ConsumerState<LeerpadCard> {
               countOf: _countOf,
               openChildId: open?.id,
               onTap: _toggle,
+              onPickUp: widget.onPickUp,
+              pickedUpChildId: widget.pickedUpChildId,
             ),
             AnimatedSize(
               duration: AppDurations.modeFade,
@@ -323,6 +338,8 @@ class _ChildrenRow extends StatelessWidget {
     required this.countOf,
     required this.openChildId,
     required this.onTap,
+    required this.onPickUp,
+    required this.pickedUpChildId,
   });
 
   final List<Goal> children;
@@ -331,6 +348,16 @@ class _ChildrenRow extends StatelessWidget {
   final DemonstratedCount? Function(Goal) countOf;
   final String? openChildId;
   final void Function(String childId) onTap;
+  final void Function(Goal child)? onPickUp;
+  final String? pickedUpChildId;
+
+  /// "Terug oppakken" (#280): a subgoal the student was moved past — the
+  /// goal in progress and the ones after it are what "Verder" is for — and
+  /// one with something to ask.
+  bool _canPickUp(Goal child) =>
+      onPickUp != null &&
+      child.objectives.isNotEmpty &&
+      (progressById[child.id]?.isAdvanced ?? false);
 
   // A wrap, not a sideways scroll (#252): Flutter does not drag a
   // scroll view with the mouse, and shows no bar, so tiles past the edge
@@ -349,6 +376,8 @@ class _ChildrenRow extends StatelessWidget {
             demonstrated: countOf(c),
             selected: c.id == openChildId,
             onTap: c.objectives.isEmpty ? null : () => onTap(c.id),
+            onPickUp: _canPickUp(c) ? () => onPickUp!(c) : null,
+            pickedUp: c.id == pickedUpChildId,
           ),
       ],
     );

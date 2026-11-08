@@ -15,15 +15,21 @@ class GoalSelectionState {
     this.editorSelectedRoot,
     this.editorSelectedGoal,
     this.cachedRoots = const [],
+    this._selfChosen = false,
   });
 
   /// Active root / child goal for the student flow.
   final Goal? selectedRoot;
   final Goal? selectedChild;
 
-  /// Preferred root / child goal overrides set by teacher or fast-forward.
+  /// Preferred root / child goal overrides set by teacher or fast-forward,
+  /// "Verder" on a root in the Leerpad, or a subgoal the student picked
+  /// back up there ([isSelfChosen], #280).
   final Goal? preferredRoot;
   final Goal? preferredChild;
+
+  /// Read through [isSelfChosen]: it holds only with a preferred child.
+  final bool _selfChosen;
 
   /// Goal selected in the teacher's goal editor.
   final Goal? editorSelectedRoot;
@@ -40,6 +46,13 @@ class GoalSelectionState {
   /// The root goal the conductor should work against.
   Goal? get activeRootGoal => preferredRoot ?? selectedRoot;
 
+  /// The student picked [preferredChild] back up from its chip in the
+  /// Leerpad, to finish or to review it (#280, CONDUCTOR_POLICY §1.6): the
+  /// conductor works on it — and on its root, [preferredRoot] — until the
+  /// student goes back with "Verder". [selectedRoot] and [selectedChild]
+  /// stay the goal in progress, the one "Verder" returns to.
+  bool get isSelfChosen => _selfChosen && preferredChild != null;
+
   GoalSelectionState copyWith({
     Goal? selectedRoot,
     Goal? selectedChild,
@@ -54,6 +67,7 @@ class GoalSelectionState {
     bool clearPreferredChild = false,
     bool clearEditorSelectedRoot = false,
     bool clearEditorSelectedGoal = false,
+    bool? selfChosen,
   }) {
     return GoalSelectionState(
       selectedRoot: clearSelectedRoot
@@ -75,6 +89,8 @@ class GoalSelectionState {
           ? null
           : (editorSelectedGoal ?? this.editorSelectedGoal),
       cachedRoots: cachedRoots ?? this.cachedRoots,
+      // A preference that goes, goes with its reason (#280).
+      selfChosen: clearPreferredChild ? false : (selfChosen ?? _selfChosen),
     );
   }
 }
@@ -102,10 +118,19 @@ class GoalSelectionNotifier extends Notifier<GoalSelectionState> {
     clearPreferredRoot: goal == null,
   );
 
+  /// A preferred child set here is not one the student chose
+  /// ([GoalSelectionState.isSelfChosen]); [chooseSubgoal] sets that one.
   void setPreferredChild(Goal? goal) => state = state.copyWith(
     preferredChild: goal,
     clearPreferredChild: goal == null,
+    selfChosen: false,
   );
+
+  /// The student picks [child] of [root] back up from the Leerpad (#280):
+  /// both become the preference, marked as the student's own choice. The
+  /// selection — the goal in progress — stays as it is.
+  void chooseSubgoal({required Goal root, required Goal child}) => state = state
+      .copyWith(preferredRoot: root, preferredChild: child, selfChosen: true);
 
   void setEditorSelectedRoot(Goal? goal) => state = state.copyWith(
     editorSelectedRoot: goal,

@@ -1322,6 +1322,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_objectiveBanner_pill => 'Huidig doel';
 
   @override
+  String get session_objectiveBanner_pillSelfChosen => 'Zelf gekozen';
+
+  @override
   String session_objectiveBanner_segments(int mastered, int almost, int todo) {
     String _temp0 = intl.Intl.pluralLogic(
       mastered,
@@ -2448,6 +2451,22 @@ class AppLocalizationsNl extends AppLocalizations {
   String get leerpad_card_button_continue => 'Verder';
 
   @override
+  String get leerpad_child_button_finish => 'Afmaken';
+
+  @override
+  String get leerpad_child_button_review => 'Herhalen';
+
+  @override
+  String get leerpad_child_button_practise => 'Oefenen';
+
+  @override
+  String get leerpad_child_button_tooltip =>
+      'Oefeningen over dit subdoel. Met Verder ga je terug naar je huidige doel.';
+
+  @override
+  String get leerpad_child_practising => 'nu bezig';
+
+  @override
   String leerpad_child_demonstrated(int demonstrated, int total) {
     return '$demonstrated van $total aangetoond';
   }
@@ -2753,6 +2772,11 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String chat_notice_recheckAgain(String title) {
     return 'Nog een controlevraag over $title: de vorige was juist.';
+  }
+
+  @override
+  String chat_notice_selfChosenSubgoal(String title) {
+    return 'Je koos zelf $title: de oefeningen gaan nu daarover. Klaar? Met Verder in het Leerpad ga je terug naar je huidige doel.';
   }
 
   @override

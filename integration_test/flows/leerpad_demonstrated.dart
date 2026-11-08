@@ -9,7 +9,10 @@
 // way the grade does not count it either. "Conditions" is the goal in
 // progress. The tiles of the finished goal read "1 of 1" and "1 of 2
 // demonstrated", the bar of "Variables" stands half full, and the list of
-// "Variables" says which one is open — with nothing to press. The statement
+// "Variables" says which one is open — with nothing to press in it; the
+// only thing to press in the finished goal is the button on each tile that
+// picks the subgoal back up (#280): "Review" on "Print", "Finish" on
+// "Variables". The statement
 // with an English translation shows in English, the other in Dutch.
 // Nederlands says it all in Dutch. Opening the Leerpad and the list writes
 // nothing: no belief, no stamp, no progress doc.
@@ -29,6 +32,7 @@ import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dart';
+import 'package:ai_tutor_python/features/progress/widgets/leerpad_objectives_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -194,10 +198,30 @@ void main() {
     expect(find.text(kConvert), findsOneWidget);
     expect(statusOf(kConvert, 'not yet demonstrated'), findsOneWidget);
     expect(find.text(kAssign), findsNothing);
-    // Nothing to press in the finished goal: no advice, no retry.
+    // Nothing to press in the list: no advice per LO. In the finished goal
+    // only the tiles' buttons that pick a subgoal back up (#280).
+    final panel = find.byType(LeerpadObjectivesPanel);
     for (final type in [ButtonStyleButton, IconButton, InkWell]) {
-      expect(inCard('r1', find.byType(type)), findsNothing);
+      expect(
+        find.descendant(of: panel, matching: find.byType(type)),
+        findsNothing,
+      );
     }
+    final pickUpS1 = find.byKey(const ValueKey('leerpad-pick-up-s1'));
+    final pickUpS2 = find.byKey(const ValueKey('leerpad-pick-up-s2'));
+    expect(
+      find.descendant(of: pickUpS1, matching: find.text('Review')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: pickUpS2, matching: find.text('Finish')),
+      findsOneWidget,
+    );
+    expect(
+      inCard('r1', find.byWidgetPredicate((w) => w is ButtonStyleButton)),
+      findsNWidgets(2),
+    );
+    expect(inCard('r1', find.byType(IconButton)), findsNothing);
 
     // Nederlands: the same, in Dutch.
     await tester.tap(find.byTooltip('Options'));

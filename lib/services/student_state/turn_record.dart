@@ -368,6 +368,15 @@ class PersistedTurnRecord {
   /// every other turn and on rechecks written before the field.
   final String? recheckRule;
 
+  /// True when the student picked the turn's subgoal back up from the
+  /// Leerpad (#280, CONDUCTOR_POLICY §1.6), to finish or to review it,
+  /// follow-ups on its questions included: `subgoalId` is that subgoal,
+  /// read by the conductor as the active one, and the answer stayed out of
+  /// the calibration window. The evaluation can tell these oefeningen
+  /// apart, and the teacher can see who uses the button. Omitted when
+  /// false.
+  final bool selfChosen;
+
   /// The subgoal the student was practising when the turn was about
   /// another one (a warm-up or a recheck); `null` — and omitted — on every
   /// other turn, where it equals `subgoalId`. A replay of `turn_history`
@@ -492,6 +501,7 @@ class PersistedTurnRecord {
     this.isWarmUp = false,
     this.isRecheck = false,
     this.recheckRule,
+    this.selfChosen = false,
     this.activeSubgoalId,
     this.clientVersion,
     this.usage,
@@ -519,6 +529,7 @@ class PersistedTurnRecord {
     if (isWarmUp) 'isWarmUp': true,
     if (isRecheck) 'isRecheck': true,
     if (recheckRule != null) 'recheckRule': recheckRule,
+    if (selfChosen) 'selfChosen': true,
     if (activeSubgoalId != null) 'activeSubgoalId': activeSubgoalId,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
@@ -614,6 +625,7 @@ class PersistedTurnRecord {
       isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
       isRecheck: (doc['isRecheck'] as bool?) ?? false,
       recheckRule: doc['recheckRule'] as String?,
+      selfChosen: doc['selfChosen'] == true,
       activeSubgoalId: doc['activeSubgoalId'] as String?,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),

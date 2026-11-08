@@ -1243,6 +1243,7 @@ def _render_trace_row(r: dict) -> list[str]:
             "vervolgvraag" if r["follow_up"] else None,
             "opwarmer" if r["warm_up"] else None,
             "hercontrole" if r["recheck"] else None,
+            "zelf gekozen" if r["self_chosen"] else None,
             "beoordeeld met de sleutel" if r["graded_by_key"] else None,
         )
         if x

@@ -202,8 +202,17 @@ class InstructionGenerator {
     bool quizOpen = false,
     bool codeExerciseOpen = false,
   }) async {
-    final selectedRoot = goalSelection.selectedRoot;
-    final selectedChild = goalSelection.selectedChild;
+    // A subgoal the student picked back up (#280) is what they work on:
+    // both sections describe it and its root, not the goal in progress
+    // the selection keeps for "Verder" — also for a student who has none
+    // left.
+    final chosen = goalSelection.isSelfChosen;
+    final selectedRoot = chosen
+        ? goalSelection.preferredRoot
+        : goalSelection.selectedRoot;
+    final selectedChild = chosen
+        ? goalSelection.preferredChild
+        : goalSelection.selectedChild;
     if (selectedRoot == null || selectedChild == null) return '';
 
     final instructions = cachedInstructions.isNotEmpty

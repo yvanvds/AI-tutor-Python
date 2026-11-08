@@ -21,6 +21,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// The bars and the "x van y aangetoond" under each subgoal count the
 /// mastery stamps (`masteryStampsProvider`, #243), read once per visit; the
 /// "finished" marks and the active root come from the `progress` docs.
+///
+/// A subgoal the student has been moved past can be picked back up from
+/// its tile, to finish or to review it (#280): the oefeningen go to that
+/// subgoal until the student goes back with "Verder", which stays on the
+/// card of the goal in progress meanwhile.
 class LeerpadPage extends ConsumerWidget {
   const LeerpadPage({super.key});
 
@@ -95,6 +100,10 @@ class _LeerpadBody extends ConsumerWidget {
     // `null` until the read is back, and on a failed read: the bars then
     // show the cached `progress`, and no count.
     final stamps = ref.watch(masteryStampsProvider).valueOrNull;
+    final selection = ref.watch(goalSelectionProvider);
+    final pickedUpChildId = selection.isSelfChosen
+        ? selection.preferredChild?.id
+        : null;
 
     return ListView(
       padding: const EdgeInsets.symmetric(
@@ -123,6 +132,8 @@ class _LeerpadBody extends ConsumerWidget {
                   isActive: roots[i].id == activeRootId,
                   onContinue: () => _continueRoot(ref, roots[i]),
                   stamps: stamps,
+                  onPickUp: (child) => _pickUp(ref, roots[i], child),
+                  pickedUpChildId: pickedUpChildId,
                 ),
               ),
             ),
@@ -139,7 +150,12 @@ class _LeerpadBody extends ConsumerWidget {
     required Map<String, List<Goal>> childrenByParent,
   }) {
     final selection = ref.watch(goalSelectionProvider);
-    final fromSelection = selection.activeRootGoal?.id;
+    // #280: while the oefeningen are on a subgoal the student picked back
+    // up, the goal in progress is the selection's — the one "Verder"
+    // returns to — not the root of the subgoal picked.
+    final fromSelection = selection.isSelfChosen
+        ? selection.selectedRoot?.id
+        : selection.activeRootGoal?.id;
     if (fromSelection != null && roots.any((r) => r.id == fromSelection)) {
       return fromSelection;
     }
@@ -187,6 +203,24 @@ class _LeerpadBody extends ConsumerWidget {
     mode.state = (!hasContent || hasProgress)
         ? SessionMode.practice
         : SessionMode.explain;
+  }
+
+  /// "Afmaken" / "Herhalen" on [child]'s tile (#280): the oefeningen go to
+  /// that subgoal, under its own [root], until "Verder". A subgoal the
+  /// student was moved past opens on practice; its lesson stays a tap away
+  /// in the mode switcher.
+  Future<void> _pickUp(WidgetRef ref, Goal root, Goal child) async {
+    // Handles first, as in [_continueRoot]: the section switch disposes
+    // this widget.
+    final sel = ref.read(goalSelectionProvider.notifier);
+    final section = ref.read(sectionProvider.notifier);
+    final tutor = ref.read(tutorServiceProvider.notifier);
+    final mode = ref.read(modeProvider.notifier);
+
+    sel.chooseSubgoal(root: root, child: child);
+    section.state = Section.session;
+    await tutor.startSession(SessionStart.workOnGoal);
+    mode.state = SessionMode.practice;
   }
 }
 

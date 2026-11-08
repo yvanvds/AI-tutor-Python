@@ -357,7 +357,73 @@ answer that was not right"`, saying which rule picked it. The debug event
 `conductor.warm_up_planned` carries `regressed`, `missed` and, when
 regressed, the flag's age.
 
-### 1.6 What this section deliberately does not address
+### 1.6 A subgoal the student picks back up (#280)
+
+The conductor brings LOs back by itself (1.5, 2.6), but the student can
+also do it: on the Leerpad, the tile of every subgoal they were moved past
+(`advancedAt`, under the root in progress or a finished one) carries a
+button — **"Afmaken"** while one of its non-optional LOs has no mastery
+stamp, **"Herhalen"** when all do. Decided by the teacher on 2026-11-08:
+it puts more of the responsibility with the student, and it lets a student
+who watches a milestone's deadline do something about an LO still open.
+It is not a rule of the formula (PUNTENFORMULE 1.1 is unchanged): a stamp
+earned this way counts like any other.
+
+**What changes.** The button makes the subgoal and its root the
+preference (`GoalSelectionNotifier.chooseSubgoal`,
+`GoalSelectionState.isSelfChosen`) and starts a session
+(`SessionStart.workOnGoal`). The selection keeps the goal in progress:
+`setTarget` walks nothing (it reads the goal in progress without the
+"new goal" pill when the app had none yet), and the chat says what the
+oefeningen are about now and how to go back (`selfChosenSubgoal`). The
+subgoal is the *active* one for everything else — the prompt (`{goal}`
+and `{subgoal}` in every section), the grading scope (its root's
+subgoals), the scope check and the signal reading of 2.4 — so the answer
+counts on its LOs as on any active subgoal's, also under a root that is
+not the one in progress. The banner says "Zelf gekozen" over it.
+
+**Which LO.** `Conductor._planSelfChosen`, instead of 2.1:
+
+- **Afmaken** first: the non-optional LOs without the stamp, open or
+  stuck.
+- **Herhalen** once each of them has it: the stamped LOs (an optional LO
+  without a stamp is no review).
+- In either group the weakest first (lowest decayed mean), on a tie the
+  one asked longest ago (`lastProbedAt`, never asked first), then
+  authoring order; the LO of the question before is skipped while the
+  group has another (2.1's recency guard). Type (2.2, with #279's rule
+  while the LO is not mastered now) and difficulty (2.3, notch drops
+  included) as for any probe.
+
+Nothing interrupts it: no warm-up review (1.5), no recheck (2.6), no
+chained return. The student chose what to practise; those wait until
+"Verder" starts a new session on the goal in progress, which opens both
+slots again.
+
+**What it does not do.**
+
+- **It reopens nothing.** A wrong answer leaves the stamp (it is one-way,
+  4.1). The subgoal never advances (4.5) — no splash, no status report,
+  no walk — and its cached `progress` is written only when it rises, with
+  its `advancedAt` kept (`_raiseSubgoalCache`): a new stamp shows, a dip
+  does not set the bar back, and the walk stays on the goal in progress.
+  An LO the teacher adds to it meanwhile does not reopen it either (7.4).
+- **It stays out of the calibration window** (5.3), like a warm-up or a
+  recheck: a strong student must not climb on old material, nor one
+  stuck on an LO sink, and find that in the goal in progress. It is an
+  oefening all the same (#217).
+- **It ends only when the student says so**: "Verder" on the card of the
+  goal in progress — which stays that card meanwhile — clears the
+  preference. A restart keeps it; an app start does not.
+
+**Audit.** The turn record (8.1) carries `selfChosen: true`, follow-ups
+on its questions included, so the evaluation can tell these oefeningen
+apart and the teacher can see who uses the button — also who escapes to
+old, easy material in the lesson. `chosenReason` is `"self-chosen: finish,
+weakest open LO"` or `"self-chosen: review, weakest LO"`; the debug event
+`conductor.self_chosen_planned`.
+
+### 1.7 What this section deliberately does not address
 
 - **Picking the next question after the first.** "Which LO next, given
   belief just updated?" is section 2.1. The entry algorithm above
@@ -2246,7 +2312,9 @@ from another subgoal, so a wrong answer says "forgotten", not "too hard",
 and a right one must not buy a promotion on the current topic. Neither
 the answer nor its question type is appended. For a recheck there is a
 second reason: the window is its own gate (`levelWeightedAccuracy`), and
-must not be fed by the questions it lets through.
+must not be fed by the questions it lets through. Nor do the answers on
+a subgoal the student picked back up (1.6, #280): the level holds across
+all goals, and old material must not move it.
 
 ### 5.4 Edge cases
 
@@ -2600,13 +2668,18 @@ previously-mastered subgoal can flip back to "in progress." This is
 correct behavior; the teacher decided this LO matters. Student
 returning to leerpad sees the chip slip from done back to
 in-progress. The section 1 entry algorithm picks up the new LO via
-"first unmastered in curriculum order" on next entry.
+"first unmastered in curriculum order" on next entry. Not for a subgoal
+the student picked back up (1.6, #280): practising it does not reopen
+it, so it keeps its finished mark like any finished subgoal the student
+is not on; the new LO is in its order (open, so first) from the next
+question.
 
 **Subgoal deleted.** If the conductor's current subgoal is deleted,
 surface a message ("Je vorige onderwerp is verwijderd door je
 leerkracht. Ga verder met het volgende.") and advance to the next
 unmastered subgoal in curriculum order. Logged for teacher
-dashboard.
+dashboard. A subgoal the student picked back up (1.6) that is deleted
+ends the choice: back to the goal in progress, as "Verder" would.
 
 **Flag toggles** (e.g. `allowChains`, `optional`): read fresh on
 each evaluation. No retroactive effect on chains already in
@@ -2747,6 +2820,9 @@ TurnRecord {
   recheckRule: string              // 2.6, #275: why the recheck brought the LO back —
                                    // open | nearGoal | unconfirmed | stuck | thin; omitted
                                    // on other turns and older rechecks
+  selfChosen: bool                 // 1.6, #280: on a subgoal the student picked back up
+                                   // in the Leerpad (the active subgoal then, and
+                                   // `subgoalId`); omitted when false
 
   // Why these were picked (section 2 decisions)
   selectionReason: {
@@ -2897,6 +2973,8 @@ TurnContent {
     selectedRootId, selectedChildId,
     preferredRootId, preferredChildId,
     sessionStart: startup | continueLearningPath | workOnGoal | restart
+                                          // workOnGoal: a subgoal picked
+                                          //   back up in the Leerpad (1.6)
   }
   hintCount: int              // hints since the question (or the last
                               //   graded answer) went up

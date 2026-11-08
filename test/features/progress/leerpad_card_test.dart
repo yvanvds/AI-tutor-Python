@@ -22,6 +22,13 @@
 // Issue #252 — the chips wrap onto the next line instead of scrolling
 // sideways: in a narrow window every tile is whole in the card and opens
 // its list, which opens under all of them.
+//
+// Issue #280 — a subgoal the student was moved past carries a button to
+// pick it back up: "Finish" while one of its learning objectives is not
+// demonstrated yet, "Review" when all are, "Practise" while that is not
+// known. The goal in progress and the subgoals after it have none, nor
+// does a subgoal without learning objectives. The button does not open the
+// list; the subgoal the oefeningen are on says "practising now" instead.
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
@@ -106,6 +113,8 @@ Widget _card(
   TranslationService? translations,
   MasteryStamps? stamps,
   bool isActive = true,
+  void Function(Goal child)? onPickUp,
+  String? pickedUpChildId,
 }) => ProviderScope(
   overrides: [
     appLocaleProvider.overrideWithValue(locale),
@@ -128,6 +137,8 @@ Widget _card(
           isActive: isActive,
           onContinue: () {},
           stamps: stamps,
+          onPickUp: onPickUp,
+          pickedUpChildId: pickedUpChildId,
         ),
       ),
     ),
@@ -611,6 +622,156 @@ void main() {
       expect(_in(_chip('s1'), find.text('Printen')), findsOneWidget);
       expect(find.text('Basics'), findsNothing);
       expect(service.fetched, isEmpty);
+    });
+  });
+
+  group('picking a subgoal back up (#280)', () {
+    final loops = Goal(
+      id: 's3',
+      title: 'Loops',
+      parentId: 'r',
+      order: 3,
+      objectives: [_lo('lo-loop', 'Je kan een lus schrijven.')],
+    );
+    final empty = Goal(id: 's4', title: 'Notes', parentId: 'r', order: 4);
+    // "Print" and "Variables" were advanced past, "Loops" is in progress,
+    // "Notes" has nothing to ask.
+    Map<String, Progress> progress() => {
+      's1': Progress(goalID: 's1', progress: 1.0, advancedAt: _stamp),
+      's2': Progress(goalID: 's2', progress: 0.5, advancedAt: _stamp),
+      's3': Progress(goalID: 's3', progress: 0.0),
+      's4': Progress(goalID: 's4', progress: 1.0, advancedAt: _stamp),
+    };
+    final children = [_print, _vars, loops, empty];
+    // Any button, `TextButton.icon` included: a subtype, which
+    // `find.byType` would not count.
+    final buttons = find.byWidgetPredicate((w) => w is ButtonStyleButton);
+    Finder button(String goalId) =>
+        find.byKey(ValueKey('leerpad-pick-up-$goalId'));
+
+    testWidgets('"Finish" on a subgoal with an LO not yet demonstrated, '
+        '"Review" on one with all of them; none on the goal in progress or '
+        'a subgoal without LOs; a tap picks it up without opening its '
+        'list', (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(
+        _card(
+          progress(),
+          children: children,
+          stamps: _stamps(['s1/lo-print', 's2/lo-var']),
+          onPickUp: (g) => picked.add(g.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_in(button('s1'), find.text('Review')), findsOneWidget);
+      expect(_in(button('s2'), find.text('Finish')), findsOneWidget);
+      expect(button('s3'), findsNothing);
+      expect(button('s4'), findsNothing);
+      expect(_in(_chip('s1'), button('s1')), findsOneWidget);
+      expect(_in(_chip('s2'), button('s2')), findsOneWidget);
+      expect(buttons, findsNWidgets(2));
+
+      await tester.tap(button('s2'));
+      await tester.pumpAndSettle();
+      expect(picked, ['s2']);
+      expect(_panel, findsNothing);
+      // The tile itself still opens its list.
+      await tester.tap(_in(_chip('s2'), find.text('Variables')));
+      await tester.pumpAndSettle();
+      expect(_panel, findsOneWidget);
+      expect(picked, ['s2']);
+    });
+
+    testWidgets('while the stamps are not known: "Practise"', (tester) async {
+      await tester.pumpWidget(
+        _card(progress(), children: children, onPickUp: (_) {}),
+      );
+      await tester.pumpAndSettle();
+      expect(_in(button('s1'), find.text('Practise')), findsOneWidget);
+      expect(_in(button('s2'), find.text('Practise')), findsOneWidget);
+    });
+
+    testWidgets('the subgoal the oefeningen are on says so, without a '
+        'button', (tester) async {
+      await tester.pumpWidget(
+        _card(
+          progress(),
+          children: children,
+          stamps: _stamps(['s1/lo-print']),
+          onPickUp: (_) {},
+          pickedUpChildId: 's2',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(button('s2'), findsNothing);
+      expect(_in(_chip('s2'), find.text('practising now')), findsOneWidget);
+      expect(_in(button('s1'), find.text('Review')), findsOneWidget);
+    });
+
+    testWidgets('without a way to pick up: no buttons', (tester) async {
+      await tester.pumpWidget(
+        _card(progress(), children: children, stamps: _stamps(const [])),
+      );
+      await tester.pumpAndSettle();
+      expect(buttons, findsNothing);
+    });
+
+    testWidgets('in Dutch: "Afmaken", "Herhalen", "nu bezig"', (tester) async {
+      await tester.pumpWidget(
+        _card(
+          {
+            ...progress(),
+            's3': Progress(goalID: 's3', progress: 0.0, advancedAt: _stamp),
+          },
+          children: children,
+          stamps: _stamps(['s1/lo-print', 's2/lo-var']),
+          onPickUp: (_) {},
+          pickedUpChildId: 's3',
+          locale: const Locale('nl'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(_in(button('s1'), find.text('Herhalen')), findsOneWidget);
+      expect(_in(button('s2'), find.text('Afmaken')), findsOneWidget);
+      expect(_in(_chip('s3'), find.text('nu bezig')), findsOneWidget);
+      // Its tooltip says where "Verder" takes the student.
+      expect(
+        find.byTooltip(
+          'Oefeningen over dit subdoel. Met Verder ga je terug naar je '
+          'huidige doel.',
+        ),
+        findsNWidgets(2),
+      );
+    });
+
+    testWidgets('in a narrow window the buttons stay whole inside their '
+        'tiles', (tester) async {
+      tester.view.physicalSize = const Size(460, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _card(
+          progress(),
+          children: children,
+          stamps: _stamps(['s1/lo-print', 's2/lo-var']),
+          onPickUp: (_) {},
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final id in ['s1', 's2']) {
+        final tile = tester.getRect(_chip(id));
+        final rect = tester.getRect(button(id));
+        expect(
+          rect.left >= tile.left &&
+              rect.right <= tile.right &&
+              rect.top >= tile.top &&
+              rect.bottom <= tile.bottom,
+          isTrue,
+          reason: '$id: $rect in $tile',
+        );
+      }
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -13,6 +13,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// aangetoond" (#243). Tapping it opens the list of those objectives in the
 /// card ([onTap]). The title is in the app language when there is a
 /// translation, else in Dutch (#210).
+///
+/// A subgoal the student has been moved past carries a button to pick it
+/// back up (#280, [onPickUp]): "Afmaken" while one of its learning
+/// objectives is not demonstrated yet, "Herhalen" when all are. While the
+/// oefeningen are on it, the tile says so instead ([pickedUp]).
 class LeerpadChildChip extends ConsumerWidget {
   const LeerpadChildChip({
     super.key,
@@ -22,6 +27,8 @@ class LeerpadChildChip extends ConsumerWidget {
     this.demonstrated,
     this.selected = false,
     this.onTap,
+    this.onPickUp,
+    this.pickedUp = false,
   });
 
   final Goal goal;
@@ -45,12 +52,22 @@ class LeerpadChildChip extends ConsumerWidget {
   /// Opens or closes the list of objectives; `null` when there is none.
   final VoidCallback? onTap;
 
+  /// Picks the subgoal back up, to finish or to review it (#280); `null`
+  /// when the tile has no such button.
+  final VoidCallback? onPickUp;
+
+  /// The student picked this subgoal back up and the oefeningen are on it
+  /// now (#280): the tile says so in place of the button.
+  final bool pickedUp;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final title = ref.watch(localizedGoalOf(goal)).title;
     final count = demonstrated;
     final value = progress.clamp(0.0, 1.0);
     final tap = onTap;
+    final pickUp = onPickUp;
 
     final Color borderColor;
     if (selected) {
@@ -124,8 +141,7 @@ class LeerpadChildChip extends ConsumerWidget {
           if (count != null) ...[
             const SizedBox(height: 5),
             Text(
-              AppLocalizations.of(context)
-                  .leerpad_child_demonstrated(count.demonstrated, count.total),
+              l.leerpad_child_demonstrated(count.demonstrated, count.total),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               // Green only when every one is demonstrated: a finished
@@ -137,6 +153,28 @@ class LeerpadChildChip extends ConsumerWidget {
                     ? AppColors.accent2
                     : AppColors.fgMute,
               ),
+            ),
+          ],
+          if (pickedUp) ...[
+            const SizedBox(height: 6),
+            Text(
+              l.leerpad_child_practising,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
+          ] else if (pickUp != null) ...[
+            const SizedBox(height: 6),
+            _PickUpButton(
+              key: ValueKey('leerpad-pick-up-${goal.id}'),
+              finish: count != null && count.demonstrated < count.total,
+              review: count != null && count.demonstrated >= count.total,
+              onPressed: pickUp,
             ),
           ],
         ],
@@ -153,6 +191,58 @@ class LeerpadChildChip extends ConsumerWidget {
           onTap: tap,
           behavior: HitTestBehavior.opaque,
           child: tile,
+        ),
+      ),
+    );
+  }
+}
+
+/// "Afmaken" ([finish]) or "Herhalen" ([review]) under a subgoal's bar
+/// (#280); "Oefenen" while it is not known which — the stamps loading, or
+/// unreadable. Its own tap: it does not open the list of objectives.
+class _PickUpButton extends StatelessWidget {
+  const _PickUpButton({
+    super.key,
+    required this.finish,
+    required this.review,
+    required this.onPressed,
+  });
+
+  final bool finish;
+  final bool review;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final label = finish
+        ? l.leerpad_child_button_finish
+        : review
+        ? l.leerpad_child_button_review
+        : l.leerpad_child_button_practise;
+    return Tooltip(
+      message: l.leerpad_child_button_tooltip,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(finish ? Icons.flag_outlined : Icons.replay, size: 14),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          backgroundColor: AppColors.accent.withValues(alpha: 0.12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s,
+            vertical: 2,
+          ),
+          minimumSize: const Size(0, 26),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
         ),
       ),
     );

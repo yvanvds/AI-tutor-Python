@@ -2215,6 +2215,12 @@ abstract class AppLocalizations {
   /// **'Current goal'**
   String get session_objectiveBanner_pill;
 
+  /// Banner header pill when the student picked the subgoal back up from the learning path (#280) — displayed uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'Your choice'**
+  String get session_objectiveBanner_pillSelfChosen;
+
   /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.
   ///
   /// In en, this message translates to:
@@ -4039,6 +4045,36 @@ abstract class AppLocalizations {
   /// **'Continue'**
   String get leerpad_card_button_continue;
 
+  /// Button on a subgoal tile in the learning path (#280): pick the subgoal back up to demonstrate the learning objectives still open
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get leerpad_child_button_finish;
+
+  /// Button on a subgoal tile in the learning path (#280): pick a subgoal whose learning objectives are all demonstrated back up to review it
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get leerpad_child_button_review;
+
+  /// Button on a subgoal tile in the learning path (#280) while it is not known yet how many of its learning objectives are demonstrated
+  ///
+  /// In en, this message translates to:
+  /// **'Practise'**
+  String get leerpad_child_button_practise;
+
+  /// Tooltip of the Finish / Review button on a subgoal tile (#280)
+  ///
+  /// In en, this message translates to:
+  /// **'Exercises on this subgoal. Continue takes you back to your current goal.'**
+  String get leerpad_child_button_tooltip;
+
+  /// On the tile of the subgoal the student picked back up, while the exercises are on it (#280)
+  ///
+  /// In en, this message translates to:
+  /// **'practising now'**
+  String get leerpad_child_practising;
+
   /// Under a subgoal tile on the learning path (#243): how many of the subgoal's non-optional learning objectives the student has demonstrated (the mastery stamp the grade reads), out of how many.
   ///
   /// In en, this message translates to:
@@ -4518,6 +4554,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'One more check question on {title}: you got the last one right.'**
   String chat_notice_recheckAgain(String title);
+
+  /// No description provided for @chat_notice_selfChosenSubgoal.
+  ///
+  /// In en, this message translates to:
+  /// **'You picked {title}: the exercises are on it now. Done? Continue in the learning path takes you back to your current goal.'**
+  String chat_notice_selfChosenSubgoal(String title);
 
   /// No description provided for @chat_notice_difficultyChanged.
   ///

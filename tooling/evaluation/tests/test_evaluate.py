@@ -1790,7 +1790,7 @@ TURNS["u-wout"] = [
           difficulty="hard", overallQuality="partial", hadFallback=True,
           loSignals=[_sig("sg-a", "write_a2", "weak", "neutral")]),
     _turn("2026-10-02T07:25:00.000Z", "sg-a", "write_a2", **_W, questionType="completeCodeQuestion",
-          isFollowUp=True, chainDepth=1, overallQuality="correct",
+          isFollowUp=True, chainDepth=1, overallQuality="correct", selfChosen=True,
           loSignals=[_sig("sg-a", "write_a2", "weak"), _sig("sg-b", "predict_b1", "weak", "negative")]),
     _audit("2026-10-02T08:30:00.000Z", "sg-a", "u-wout"),
     _turn("2026-10-02T22:30:00.000Z", "sg-a", "recall_a1", **_W),
@@ -1918,7 +1918,8 @@ class TraceTest(_CommandTest):
 
     def test_a_follow_up_with_a_forward_reference(self):
         block = self.block(self.trace(), "09:25")
-        self.assertIn("· code aanvullen · gewoon · juist · vervolgvraag\n", block)
+        # #280: on a subgoal the student picked back up in the Leerpad.
+        self.assertIn("· code aanvullen · gewoon · juist · vervolgvraag · zelf gekozen\n", block)
         self.assertIn("  vraag     Waarom werkt het nu?\n  antwoord  Omdat + optelt.\n", block)
         self.assertIn(
             "  signalen  telt        sg-a/write_a2 positief, zwak\n"

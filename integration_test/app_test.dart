@@ -47,6 +47,7 @@ import 'flows/grade_proposal.dart' as grade_proposal;
 import 'flows/instructions_row_highlight.dart' as instructions_row_highlight;
 import 'flows/language_switch.dart' as language_switch;
 import 'flows/leerpad_demonstrated.dart' as leerpad_demonstrated;
+import 'flows/leerpad_pick_up.dart' as leerpad_pick_up;
 import 'flows/leerpad_subgoal_wrap.dart' as leerpad_subgoal_wrap;
 import 'flows/legacy_ratchet.dart' as legacy_ratchet;
 import 'flows/level_up_gate.dart' as level_up_gate;
@@ -163,6 +164,7 @@ void main() {
   stuck_own_questions.main();
   subgoal_segments.main();
   leerpad_demonstrated.main();
+  leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();
   next_root_signal.main();
   turn_content.main();

@@ -96,6 +96,12 @@ enum ChatNoticeKind {
   /// [ChatNotice.goalId] as for [recheck].
   recheckAgain,
 
+  /// The oefeningen are on a subgoal the student picked back up from the
+  /// Leerpad (#280, CONDUCTOR_POLICY §1.6), and "Verder" there goes back to
+  /// the goal in progress. `args[0]` is the subgoal's Dutch title,
+  /// [ChatNotice.goalId] its id.
+  selfChosenSubgoal,
+
   /// `args[0]` / `args[1]` are `QuestionDifficulty` names (before / after).
   difficultyChanged,
 
@@ -119,8 +125,8 @@ class ChatNotice {
 
   /// For a notice about a goal whose `args[0]` is that goal's Dutch title
   /// ([ChatNoticeKind.warmUpReview], [ChatNoticeKind.recheck],
-  /// [ChatNoticeKind.recheckAgain], [ChatNoticeKind.newGoalSelected]): the
-  /// goal's id, so the chat pill
+  /// [ChatNoticeKind.recheckAgain], [ChatNoticeKind.newGoalSelected],
+  /// [ChatNoticeKind.selfChosenSubgoal]): the goal's id, so the chat pill
   /// names it in the app language (#211, #212) — and in a new language
   /// after a switch, like the rest of the pill.
   final String? goalId;

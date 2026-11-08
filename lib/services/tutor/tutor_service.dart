@@ -87,7 +87,9 @@ enum SessionStart {
   /// "Continue" on a goal in the learning path.
   continueLearningPath,
 
-  /// "Work on this" on a subgoal.
+  /// A subgoal picked back up from its tile in the learning path, to
+  /// finish or to review it (#280) — before May, "Work on this" on a
+  /// subgoal.
   workOnGoal,
 
   /// The restart button in the chat header.
@@ -444,6 +446,14 @@ class TutorService extends Notifier<TutorState> {
     _inFlightPlan = null;
     _setInFlightQuestion(null);
     _followUpInFlight = null;
+    // A subgoal the student picked back up (#280) that is gone: back to
+    // the goal in progress, as "Verder" would.
+    final selection = ref.read(goalSelectionProvider);
+    if (selection.isSelfChosen && selection.preferredChild?.id == deletedId) {
+      ref.read(goalSelectionProvider.notifier)
+        ..setPreferredRoot(null)
+        ..setPreferredChild(null);
+    }
     await _conductor.setTarget();
     await requestExercise();
   }
@@ -452,6 +462,10 @@ class TutorService extends Notifier<TutorState> {
     final selection = ref.read(goalSelectionProvider);
     final activeChild = selection.activeChildGoal;
     if (activeChild == null) return;
+    // A subgoal the student picked back up (#280) is not reopened by
+    // practising it: it keeps its finished mark, as every finished subgoal
+    // the student is not on does when an LO is added to it.
+    if (selection.isSelfChosen) return;
     final beliefs = await ref
         .read(loBeliefsServiceProvider)
         .getAllForSubgoal(activeChild.id);
@@ -1309,6 +1323,8 @@ class TutorService extends Notifier<TutorState> {
       isRecheck: plan.isRecheck,
       // Why the recheck brought its LO back (#275).
       recheckRule: plan.recheck?.rule.name,
+      // The student picked this subgoal back up (#280).
+      selfChosen: plan.selfChosen,
       // Which subgoal the student was on when the turn was about another
       // one: what a replay needs to read the signals as the conductor did.
       activeSubgoalId: plan.isOffSubgoal ? activeChild?.id : null,
