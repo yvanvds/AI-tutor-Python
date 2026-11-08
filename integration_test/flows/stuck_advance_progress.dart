@@ -15,6 +15,13 @@
 // and "finished" travels as the `advancedAt` stamp on the progress doc,
 // which is what the next-subgoal walk skips on.
 //
+// Two oefeningen get it there: the planner asks the stuck `lo-cast` first
+// (the lowest mean), answered wrong; then, past the recency guard,
+// `lo-var` itself, whose right answer is its second right own question —
+// what the stamp wants since formula 1.1 (#279, CONDUCTOR_POLICY §4.1). A
+// signal on `lo-var` from the side of a question on `lo-cast`, as this flow
+// had it until #282, no longer masters it.
+//
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → mastery → advance → progress
 // service → Cosmos → leerpad. Only the model is scripted (`ScriptedLlm`,
@@ -39,14 +46,29 @@ import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
 import '../harness/seed.dart';
 
+const String kCastExercise = 'getal = ___(input("Getal: "))\nprint(getal + 1)';
 const String kExercise = 'stad = ___\nprint("Welkom in " + stad)';
 const String kNextExercise = 'for i in range(___):\n    print(i)';
 
-/// The turns in the order the app asks for them: the exercise on
-/// "Variables", the grade that masters `lo-var` (which advances the subgoal
-/// past the stuck `lo-cast`), the status report the app requests on a
-/// finished subgoal, and the next subgoal's first exercise.
+/// The turns in the order the app asks for them: the exercise on the stuck
+/// `lo-cast` and its wrong grade, the exercise on `lo-var` and the grade
+/// that masters it (which advances the subgoal past the stuck `lo-cast`),
+/// the status report the app requests on a finished subgoal, and the next
+/// subgoal's first exercise.
 List<String> script() => [
+  completeCodeReply(text: 'Zet de invoer om.', code: kCastExercise),
+  codeFeedbackReply(
+    text: 'Nog niet: input() geeft tekst.',
+    quality: 'wrong',
+    loSignals: const [
+      {
+        'subgoalId': 's2',
+        'loId': 'lo-cast',
+        'signal': 'negative',
+        'strength': 'strong',
+      },
+    ],
+  ),
   completeCodeReply(text: 'Vul de stad in.', code: kExercise),
   codeFeedbackReply(
     text: 'Helemaal juist.',
@@ -109,6 +131,8 @@ Map<String, dynamic> belief({
   required DateTime at,
   bool calibratedPositive = false,
   int? ownQuestions,
+  int? ownQuestionsRight,
+  int? ownQuestionsRightNonMcq,
 }) => {
   'id': '${kStudentUid}_s2_$loId',
   'type': 'lo_belief',
@@ -123,6 +147,9 @@ Map<String, dynamic> belief({
   if (calibratedPositive) 'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
   if (ownQuestions != null) 'ownQuestions': ownQuestions,
+  if (ownQuestionsRight != null) 'ownQuestionsRight': ownQuestionsRight,
+  if (ownQuestionsRightNonMcq != null)
+    'ownQuestionsRightNonMcq': ownQuestionsRightNonMcq,
 };
 
 void main() {
@@ -151,19 +178,23 @@ void main() {
           // One strong positive short of mastery, calibrated positive on
           // record: (4.4, 1) reads 0.81 on evidence 5.4; the grade forgets
           // (#278) and adds 2.0 to α at medium, and (5.38, 1) reads 0.84
-          // on 6.38 — mastered.
+          // on 6.38. With one right own question on record, no pick, that
+          // answer is the second, which the stamp wants (#279): mastered.
           belief(
             loId: 'lo-var',
             alpha: 4.4,
             beta: 1,
             at: now,
             calibratedPositive: true,
+            ownQuestions: 1,
+            ownQuestionsRight: 1,
+            ownQuestionsRightNonMcq: 1,
           ),
           // Low after six own questions: (6, 12) reads 0.33 — stuck (§4.4,
-          // #278). The planner asks it, the lowest mean (since #278 no LO
-          // is passed over as saturated); the grade's signal on `lo-var`
-          // is a side signal of the subgoal, with its full weight, and
-          // `lo-cast` keeps its count.
+          // #278). The planner asks it first, the lowest mean (since #278
+          // no LO is passed over as saturated); answered wrong, it stays
+          // stuck, and the recency guard puts the next question on
+          // `lo-var`.
           belief(loId: 'lo-cast', alpha: 6, beta: 12, at: now, ownQuestions: 6),
         ],
       },
@@ -175,13 +206,28 @@ void main() {
     await pumpUntilFound(tester, find.byType(LeerpadPage));
     await tester.tap(find.text('Continue'));
     await pumpUntilFound(tester, find.byType(PracticeView));
+    // First the stuck `lo-cast`, answered wrong: no advance yet.
+    await pumpUntil(
+      tester,
+      () => editorText(tester) == kCastExercise,
+      timeout: const Duration(seconds: 30),
+      reason: 'the exercise on lo-cast never reached the editor',
+    );
+    await tester.tap(find.byTooltip('Send to tutor'));
+
+    // Then `lo-var` itself.
     await pumpUntil(
       tester,
       () => editorText(tester) == kExercise,
       timeout: const Duration(seconds: 30),
-      reason: 'the exercise never reached the editor',
+      reason: 'the exercise on lo-var never reached the editor',
     );
-
+    await pumpUntil(
+      tester,
+      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+      timeout: const Duration(seconds: 30),
+      reason: 'the tutor never went idle before the answer on lo-var',
+    );
     await tester.tap(find.byTooltip('Send to tutor'));
 
     // The grade advances "Variables" and the app celebrates. Tap it away,
@@ -219,8 +265,19 @@ void main() {
       harness.cosmos['progress'].docs['${kStudentUid}_r1']!['progress'],
       closeTo(0.5, 1e-9),
     );
-    // The turn record says the same and names the LO the student is stuck on.
-    final turn = harness.cosmos['turn_history'].docs.values.single;
+    // The turn records say the same: the wrong answer on `lo-cast` moved
+    // nothing on, and the right one on `lo-var` advanced the subgoal and
+    // names the LO the student is stuck on.
+    final turns = harness.cosmos['turn_history'].docs.values.toList()
+      ..sort(
+        (a, b) => (a['turnAt'] as String).compareTo(b['turnAt'] as String),
+      );
+    expect(turns.map((t) => t['targetLOIds']), [
+      ['lo-cast'],
+      ['lo-var'],
+    ]);
+    expect(turns.first['subgoalAdvanced'], isFalse);
+    final turn = turns.last;
     expect(turn['subgoalId'], 's2');
     expect(turn['subgoalAdvanced'], isTrue);
     expect(turn['subgoalProgressAfter'], closeTo(0.5, 1e-9));
@@ -229,20 +286,23 @@ void main() {
       (e) => e['kind'] == 'stuckLoAdvance',
     );
     expect((stuckAdvance['details'] as Map)['stuckLoIds'], ['lo-cast']);
-    // The history sample the §2.4 transition rule reads carries 0.5, not 1.0.
-    final samples = harness.cosmos['progress_history'].docs.values.where(
-      (d) => d['goalId'] == 's2',
-    );
-    expect(samples.map((d) => d['progress']).toList(), [0.5]);
+    // The history sample the §2.4 transition rule reads carries 0.5, not
+    // 1.0: after the wrong answer the share was 0, after the advance 0.5.
+    final samples =
+        harness.cosmos['progress_history'].docs.values
+            .where((d) => d['goalId'] == 's2')
+            .toList()
+          ..sort((a, b) => (a['at'] as String).compareTo(b['at'] as String));
+    expect(samples.map((d) => d['progress']).toList(), [0.0, 0.5]);
 
     // The leerpad shows it that way: "Variables" finished, one of its two
-    // LOs demonstrated — the one the grade stamped — and its bar at half.
-    expect(
-      harness
-          .cosmos['lo_beliefs']
-          .docs['${kStudentUid}_s2_lo-var']!['firstMasteredAt'],
-      isA<String>(),
-    );
+    // LOs demonstrated — the one the grade stamped, on its second right own
+    // question — and its bar at half.
+    final variable =
+        harness.cosmos['lo_beliefs'].docs['${kStudentUid}_s2_lo-var']!;
+    expect(variable['firstMasteredAt'], isA<String>());
+    expect(variable['ownQuestionsRight'], 2);
+    expect(variable['ownQuestionsRightNonMcq'], 2);
     await tester.tap(find.byTooltip('Learning path'));
     await pumpUntilFound(tester, find.byType(LeerpadPage));
     await pumpUntil(
