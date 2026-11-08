@@ -13,6 +13,7 @@ import and on every test. The data is made up: no real student is in here.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime as dt
 import io
 import json
@@ -2047,10 +2048,13 @@ def _replay_stored() -> dict[str, dict[tuple[str, str], dict]]:
         },
         "u-sara": {
             # The app's numbers, a few millionths apart, and its stamp a
-            # second after the replay's: the same oefening.
+            # second after the replay's: the same oefening. The counts of
+            # 1.1 as a release that filled them left them (#281).
             recall: _belief_doc("u-sara", recall, sara[recall].alpha + 3e-6, sara[recall].beta,
                                 lastUpdatedAt="2026-09-10T09:03:01.200Z", lastProbedAt="2026-09-10T09:03:01.200Z",
-                                firstMasteredAt="2026-09-10T09:01:01.200Z", highestPositiveDifficulty="medium"),
+                                firstMasteredAt="2026-09-10T09:01:01.200Z", highestPositiveDifficulty="medium",
+                                ownQuestions=sara[recall].own_questions, ownQuestionsRight=sara[recall].own_right,
+                                ownQuestionsRightNonMcq=sara[recall].own_right_open),
         },
     }
 
@@ -2058,17 +2062,76 @@ def _replay_stored() -> dict[str, dict[tuple[str, str], dict]]:
 REPLAY_STORED = _replay_stored()
 
 
+# #281: a class of one made-up student on a build from before formula 1.1
+# (2.12.0), with no multiple choice, for `--regels 1.1`. Wim's docs are what
+# that build wrote: the replay per build, a second after each `turnAt`, and
+# no counts. predict_b1: wrong then three right, four times over on 09-16 —
+# without forgetting μ hovers around 0.7 on the cap and never stamps; with
+# it the last answers count. write_a2: six wrong on 09-14, μ far under 0.6.
+# recall_a1: one right at `hard`, then a question on fix_a3 whose grader
+# names recall_a1 too — that build stamped on it, on one right own question.
+# That question came from a build before #276 (2.11.0), and its grader also
+# named write_a2 right: that build raised write_a2's highest level to
+# `hard`, which 1.1 would not have (only the target moves it).
+KLAS_REGELS = "6REGELS"
+ACCOUNTS += [
+    {"uid": "u-wim", "firstName": "Wim", "lastName": "Regel", "className": KLAS_REGELS,
+     "updatedAt": "2026-09-16T10:00:00Z", "calibration": {"difficulty": "hard"}},
+]
+_BUILD_12 = {"clientVersion": "2.12.0+29", "questionType": "completeCodeQuestion"}
+
+
+def _wim_answer(at: str, subgoal: str, lo: str, right: bool, **extra) -> dict:
+    signals = [_sig(subgoal, lo, signal="positive" if right else "negative")]
+    return _turn(at, subgoal, lo, uid="u-wim", overallQuality="correct" if right else "wrong",
+                 **{"loSignals": signals, **_BUILD_12, **extra})
+
+
+TURNS["u-wim"] = [
+    *[_wim_answer(f"2026-09-14T09:0{m}:00.000Z", "sg-a", "write_a2", False) for m in range(6)],
+    _wim_answer("2026-09-14T10:00:00.000Z", "sg-a", "recall_a1", True, **_HARD),
+    _wim_answer("2026-09-14T10:01:00.000Z", "sg-a", "fix_a3", True, **_HARD, clientVersion="2.11.0+28",
+                loSignals=[_sig("sg-a", "fix_a3"), _sig("sg-a", "recall_a1"), _sig("sg-a", "write_a2")]),
+    *[_wim_answer(f"2026-09-16T09:{m:02d}:00.000Z", "sg-b", "predict_b1", c == "J")
+      for m, c in enumerate("FJJJ" * 4 + "J")],
+]
+
+
+def _as_the_app_wrote(uid: str, key: tuple[str, str], s: rules.LoState) -> dict:
+    """The doc a build wrote for [s], a second after the oefening."""
+    at = lambda t: evaluate._app_iso(t + dt.timedelta(seconds=1))  # noqa: E731
+    fields = {"lastUpdatedAt": at(s.last_at), "lastQuestionType": "completeCodeQuestion"}
+    for name, value in (("lastProbedAt", s.last_direct_at), ("lastPositiveAtCalibratedAt", s.positive_at_calibrated_at),
+                        ("firstMasteredAt", s.first_mastered_at)):
+        if value is not None:
+            fields[name] = at(value)
+    if s.ratchet:
+        fields["highestPositiveDifficulty"] = s.ratchet
+    return _belief_doc(uid, key, s.alpha, s.beta, **fields)
+
+
+WIM_STORED = {key: _as_the_app_wrote("u-wim", key, s) for key, s in rules.replay(TURNS["u-wim"], GOALS).items()}
+
+
 class ReplayedBeliefTest(unittest.TestCase):
     """The merge `replay-beliefs` writes (#242): the stamp is the earliest,
-    and never cleared; the level the highest; only four fields change."""
+    and never cleared; the level the highest; the counts of 1.1 the larger
+    (#281); only `BELIEF_FIELDS` change."""
 
     AT = dt.datetime(2026, 9, 15, 9, 15, tzinfo=dt.timezone.utc)
     OEFENINGEN = [AT - dt.timedelta(minutes=5), AT, AT + dt.timedelta(minutes=5), AT + dt.timedelta(days=7)]
+    # The counts of formula 1.1 (#279): one right own question, so the doc
+    # does not read as mastered without its stamp (condition 4).
+    COUNTS = {"ownQuestions": 2, "ownQuestionsRight": 1, "ownQuestionsRightNonMcq": 1}
 
     def stored(self, **fields) -> dict:
-        return _belief_doc("u-x", ("sg-b", "predict_b1"), 9.4, 2.2, lastUpdatedAt="2026-09-22T09:00:01.000Z",
-                           lastProbedAt="2026-09-22T09:00:01.000Z", regressedAt="2026-09-20T09:00:00.000Z",
-                           lastPositiveAtCalibratedAt="2026-09-15T09:15:01.000Z", **fields)
+        base = {"lastUpdatedAt": "2026-09-22T09:00:01.000Z", "lastProbedAt": "2026-09-22T09:00:01.000Z",
+                "regressedAt": "2026-09-20T09:00:00.000Z", "lastPositiveAtCalibratedAt": "2026-09-15T09:15:01.000Z"}
+        return _belief_doc("u-x", ("sg-b", "predict_b1"), 9.4, 2.2, **{**base, **self.COUNTS, **fields})
+
+    def before_11(self, **fields) -> dict:
+        """[stored] as a build from before formula 1.1 wrote it: no counts."""
+        return {k: v for k, v in self.stored(**fields).items() if k not in self.COUNTS}
 
     def merged(self, stored: dict, stamp=None, level=None, alpha=9.4, beta=2.2) -> dict:
         state = rules.LoState(alpha=alpha, beta=beta, first_mastered_at=stamp, ratchet=level)
@@ -2123,12 +2186,80 @@ class ReplayedBeliefTest(unittest.TestCase):
         self.assertEqual(self.merged(stored, alpha=9.4 + 4e-6, beta=2.2 - 4e-6), stored)
 
     def test_only_the_replays_fields_change(self):
-        stored = self.stored(firstMasteredAt="2026-09-22T09:15:01.250Z", highestPositiveDifficulty="medium")
+        stored = self.stored(firstMasteredAt="2026-09-22T09:15:01.250Z", highestPositiveDifficulty="medium",
+                             returnWrongAt="2026-09-21T09:00:00.000Z", thinCheckedAt="2026-09-21T09:00:00.000Z")
         new = self.merged(stored, stamp=self.AT, level="hard", alpha=10.0, beta=3.8)
         self.assertEqual(set(new), set(stored))
-        # The stored clock is the app's: it stays (#275).
-        self.assertEqual({k for k in new if new[k] != stored[k]}, set(evaluate.BELIEF_FIELDS) - {"lastProbedAt"})
+        # The stored clock is the app's: it stays (#275); so do counts the
+        # replay does not exceed (#281), and the session state of #275.
+        self.assertEqual(
+            {k for k in new if new[k] != stored[k]},
+            set(evaluate.BELIEF_FIELDS) - {"lastProbedAt", *self.COUNTS},
+        )
         self.assertEqual(stored["firstMasteredAt"], "2026-09-22T09:15:01.250Z")  # the stored doc is not touched
+        # Every field of BELIEF_FIELDS, and nothing else, on a doc from
+        # before 1.1 without the probe clock.
+        bare = {k: v for k, v in self.before_11(firstMasteredAt="2026-09-22T09:15:01.250Z").items()
+                if k != "lastProbedAt"}
+        state = rules.LoState(alpha=10.0, beta=3.8, first_mastered_at=self.AT, ratchet="hard",
+                              last_direct_at=self.AT, own_questions=4, own_right=3, own_right_open=1)
+        new = evaluate.replayed_belief(bare, state, self.OEFENINGEN)
+        self.assertEqual({k for k in new if new.get(k) != bare.get(k)}, set(evaluate.BELIEF_FIELDS))
+        self.assertEqual(
+            evaluate.belief_changes(bare, new),
+            {"alpha/beta", "stamp earlier", "level raised", "clock filled", "counts"},
+        )
+
+    def test_the_counts_of_1_1_are_filled_on_a_doc_without_them(self):
+        # #281: what the app would have counted, from the whole log.
+        bare = self.before_11(lastPositiveAtCalibratedAt=None)
+        state = rules.LoState(alpha=9.4, beta=2.2, own_questions=7, own_right=3, own_right_open=1)
+        new = evaluate.replayed_belief(bare, state, self.OEFENINGEN)
+        self.assertEqual(
+            (new["ownQuestions"], new["ownQuestionsRight"], new["ownQuestionsRightNonMcq"]), (7, 3, 1)
+        )
+        self.assertEqual(evaluate.belief_changes(bare, new), {"counts"})
+
+    def test_each_count_is_the_larger_of_stored_and_replayed(self):
+        state = rules.LoState(alpha=9.4, beta=2.2, own_questions=5, own_right=1, own_right_open=1)
+        stored = self.stored(ownQuestions=9, ownQuestionsRight=4, ownQuestionsRightNonMcq=2)
+        self.assertEqual(evaluate.replayed_belief(stored, state, self.OEFENINGEN), stored)
+        stored = self.stored(ownQuestions=2, ownQuestionsRight=2, ownQuestionsRightNonMcq=0)
+        new = evaluate.replayed_belief(stored, state, self.OEFENINGEN)
+        self.assertEqual(
+            (new["ownQuestions"], new["ownQuestionsRight"], new["ownQuestionsRightNonMcq"]), (5, 2, 1)
+        )
+
+    def test_a_right_count_of_0_is_written_ownquestions_0_is_not(self):
+        # The app reads a missing `ownQuestions` as 0, and a missing right
+        # count as missing (#279): a doc that has them is one the rewrite
+        # filled, and a stamp on it can be thin (#275).
+        bare = self.before_11(lastPositiveAtCalibratedAt=None)
+        new = evaluate.replayed_belief(bare, rules.LoState(alpha=9.4, beta=2.2), self.OEFENINGEN)
+        self.assertNotIn("ownQuestions", new)
+        self.assertEqual((new["ownQuestionsRight"], new["ownQuestionsRightNonMcq"]), (0, 0))
+        self.assertEqual(evaluate.belief_changes(bare, new), {"counts"})
+
+    def test_the_stamp_the_app_reads_on_an_old_doc_is_written_before_the_counts_end_it(self):
+        # Over the bar with a positive at calibration and no `firstMasteredAt`:
+        # the app reads it as mastered (`everMasteredBelief`) and writes the
+        # stamp at `lastUpdatedAt` at its next write. With one right own
+        # question in the counts it would not any more.
+        old = self.before_11()
+        self.assertTrue(evaluate.app_ever_mastered(old))
+        state = rules.LoState(alpha=9.4, beta=2.2, own_questions=2, own_right=1, own_right_open=1)
+        new = evaluate.replayed_belief(old, state, self.OEFENINGEN)
+        self.assertEqual(new["firstMasteredAt"], "2026-09-22T09:00:01.000Z")
+        self.assertTrue(evaluate.app_ever_mastered(new))
+        self.assertEqual(evaluate.belief_changes(old, new), {"stamp kept", "counts"})
+        # A replayed stamp on an earlier oefening goes first, as everywhere.
+        earlier = evaluate.replayed_belief(old, dataclasses.replace(state, first_mastered_at=self.AT), self.OEFENINGEN)
+        self.assertEqual(earlier["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
+        self.assertEqual(evaluate.belief_changes(old, earlier), {"stamp earlier", "counts"})
+        # With the counts kept and condition 4 open, the doc reads as not
+        # mastered: no stamp to write.
+        self.assertFalse(evaluate.app_ever_mastered(self.stored()))
+        self.assertNotIn("firstMasteredAt", self.merged(self.stored()))
 
     def test_the_probe_clock_is_filled_only_where_the_doc_has_none(self):
         # #275: the backfill of #187 the README describes — the replay's
@@ -2156,6 +2287,50 @@ class ReplayedBeliefTest(unittest.TestCase):
         self.assertEqual(evaluate._app_iso(at.replace(microsecond=0)), "2026-10-07T09:04:11.000Z")
 
 
+class BeliefEffectsTest(unittest.TestCase):
+    """What the app reads differently of a rewritten doc (#281): off the
+    cap, stuck, a thin stamp — the dry run's last three columns."""
+
+    def doc(self, alpha: float, beta: float, **fields) -> dict:
+        return _belief_doc("u-x", ("sg-b", "predict_b1"), alpha, beta,
+                           lastUpdatedAt="2026-09-22T09:00:01.000Z", **fields)
+
+    def effects(self, stored: dict, **new) -> set[str]:
+        return evaluate.belief_effects(stored, {**stored, **new}, NOW)
+
+    def test_off_the_cap(self):
+        on_cap = self.doc(14.2, 3.8)  # α + β = 18: not practiceable before 1.1
+        self.assertEqual(self.effects(on_cap, alpha=6.0, beta=2.0), {"off the cap"})
+        self.assertEqual(self.effects(on_cap, alpha=15.0, beta=4.0), set())
+        self.assertEqual(self.effects(self.doc(12.0, 4.0), alpha=6.0, beta=2.0), set())
+
+    def test_stuck_once_the_own_questions_are_counted(self):
+        # A doc from before 1.1 reads 0 own questions: never stuck. With six
+        # filled in and μ under 0.6 it is, and comes back as a recheck.
+        low = self.doc(1.6, 7.6)
+        self.assertFalse(evaluate.app_stuck(low, NOW))
+        self.assertEqual(self.effects(low, ownQuestions=6), {"stuck"})
+        self.assertEqual(self.effects(low, ownQuestions=5), set())
+        self.assertEqual(self.effects(self.doc(5.0, 3.0), ownQuestions=6), set())  # μ 0.62
+        # A stamp is no stuck LO: it does not come back as one (#275).
+        stamped = self.doc(1.6, 7.6, firstMasteredAt="2026-09-01T09:00:00.000Z")
+        self.assertEqual(self.effects(stamped, ownQuestions=6, ownQuestionsRight=2, ownQuestionsRightNonMcq=1), set())
+        # The app decays to the moment it reads; a year on, μ is near ½.
+        later = NOW + dt.timedelta(days=365)
+        self.assertTrue(evaluate.app_stuck({**low, "ownQuestions": 6}, later))
+
+    def test_thin_once_the_right_counts_are_filled(self):
+        # The effect the teacher weighs at the release: without the counts a
+        # stamp is never thin, so filling them decides which ones are.
+        stamped = self.doc(9.0, 1.0, firstMasteredAt="2026-09-01T09:00:00.000Z")
+        self.assertFalse(evaluate.app_thin_stamp(stamped))
+        self.assertEqual(self.effects(stamped, ownQuestionsRight=1, ownQuestionsRightNonMcq=1), {"thin"})
+        self.assertEqual(self.effects(stamped, ownQuestionsRight=0, ownQuestionsRightNonMcq=0), {"thin"})
+        self.assertEqual(self.effects(stamped, ownQuestionsRight=2, ownQuestionsRightNonMcq=0), set())
+        # No stamp: never thin, whatever the counts.
+        self.assertEqual(self.effects(self.doc(9.0, 1.0), ownQuestionsRight=0, ownQuestionsRightNonMcq=0), set())
+
+
 class ReplayBeliefsTest(_CommandTest):
     """`replay-beliefs` (#242) against the fake Cosmos: dry by default; with
     `--apply` a backup first, `If-Match`, and not in the lesson time."""
@@ -2166,9 +2341,9 @@ class ReplayBeliefsTest(_CommandTest):
 
     def row(self, stdout: str, name: str) -> list[str]:
         """docs · replayed · to write · stamps gained · earlier · level raised · α/β · clock filled ·
-        last build"""
+        counts · off the cap · stuck · thin · last build"""
         line = next(line for line in stdout.splitlines() if line.startswith(name))
-        return line.split()[-9:]
+        return line.split()[-13:]
 
     def written(self) -> dict[str, dict]:
         return {doc["loId"]: doc for coll, doc, _, _ in self.cosmos.upserts if coll == "lo_beliefs"}
@@ -2179,11 +2354,18 @@ class ReplayBeliefsTest(_CommandTest):
     def test_a_dry_run_counts_and_writes_nothing(self):
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY)
 
-        # The two docs without a probe clock get the replay's (#275).
-        self.assertEqual(self.row(stdout, "Rik Herspeel"), ["4", "3", "3", "1", "1", "2", "1", "2", "2.8.0+25"])
-        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "2.8.0+25"])
+        # The two docs without a probe clock get the replay's (#275), the
+        # three the replay reaches the counts of 1.1 (#281).
+        self.assertEqual(
+            self.row(stdout, "Rik Herspeel"), ["4", "3", "3", "1", "1", "2", "1", "2", "3", "0", "0", "0", "2.8.0+25"]
+        )
+        self.assertEqual(
+            self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "2.8.0+25"]
+        )
         self.assertIn("te schrijven: 3 documenten bij 1 leerling(en)", stdout)
-        self.assertIn("klok erbij 2.", stdout)
+        self.assertIn("klok erbij 2, tellingen 3.", stdout)
+        self.assertIn("Daarna in de app: van het plafond 0", stdout)
+        self.assertNotIn("stempel vastgelegd", stdout)
         self.assertIn("Droge run: er is niets geschreven", stdout)
         self.assertEqual(self.cosmos.upserts, [])
         self.assertEqual(self.backups(), [])
@@ -2225,7 +2407,13 @@ class ReplayBeliefsTest(_CommandTest):
         # direct probe — and the app's own where it had one.
         self.assertEqual(written["write_a2"]["lastProbedAt"], "2026-09-12T09:00:00.000Z")
         self.assertEqual(written["predict_b1"]["lastProbedAt"], "2026-09-15T09:15:00.000Z")
+        # #281: the counts over the whole log; every question was a pick.
+        counts = lambda d: (d["ownQuestions"], d["ownQuestionsRight"], d["ownQuestionsRightNonMcq"])  # noqa: E731
+        self.assertEqual(counts(written["recall_a1"]), (5, 5, 0))
+        self.assertEqual(counts(written["predict_b1"]), (4, 3, 0))
+        self.assertEqual(counts(written["write_a2"]), (1, 1, 0))
         self.assertIn("geschreven 3, conflicten 0", stdout)
+        self.assertIn(f"Controleer met: evaluate.py validate --klas {KLAS_REPLAY}\n", stdout)
 
     def test_validate_reads_the_written_docs_as_matching(self):
         before = self.run_cli("validate", "--klas", KLAS_REPLAY)
@@ -2243,7 +2431,9 @@ class ReplayBeliefsTest(_CommandTest):
     def test_one_student(self):
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara")
 
-        self.assertEqual(self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "2.8.0+25"])
+        self.assertEqual(
+            self.row(stdout, "Sara Gelijk"), ["1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "2.8.0+25"]
+        )
         self.assertNotIn("Rik Herspeel", stdout)
 
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REPLAY, "--leerling", "sara", "--apply")
@@ -2287,6 +2477,99 @@ class ReplayBeliefsTest(_CommandTest):
 
         self.assertIn("Rik Herspeel: sg-b/predict_b1 veranderde intussen", stdout)
         self.assertIn("geschreven 2, conflicten 1 (draai het opnieuw voor die)", stdout)
+
+
+class ReplayBeliefsRules11Test(_CommandTest):
+    """`--regels 1.1` on `replay-beliefs` and `validate` (#281): every
+    oefening replayed with formula 1.1, the ones of a build from before it
+    too, and the dry run's count of what the app then reads differently."""
+
+    def setUp(self):
+        super().setUp()
+        self.cosmos.beliefs = lambda uid: {k: dict(v) for k, v in WIM_STORED.items()} if uid == "u-wim" else {}
+
+    def row(self, stdout: str, columns: int = 13) -> list[str]:
+        line = next(line for line in stdout.splitlines() if line.startswith("Wim Regel"))
+        return line.split()[-columns:]
+
+    def written(self) -> dict[str, dict]:
+        return {doc["loId"]: doc for coll, doc, _, _ in self.cosmos.upserts if coll == "lo_beliefs"}
+
+    def test_without_the_flag_each_oefening_replays_by_its_build(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REGELS)
+
+        # The docs are that replay: only the counts are new. Filling them
+        # makes write_a2 stuck (six own questions, μ 0.07) and the stamp of
+        # recall_a1 thin (one right own question).
+        self.assertEqual(self.row(stdout), ["4", "4", "4", "0", "0", "0", "0", "0", "4", "0", "1", "1", "2.12.0+29"])
+        self.assertIn("van het plafond 0", stdout)
+        self.assertIn("Door de tellingen aan te vullen beslist deze herschrijving welke stempels van vóór 1.1 dun zijn", stdout)
+        self.assertIn("Schrijven: dezelfde opdracht met --apply erbij", stdout)
+        self.assertNotIn("stempel erbij met --regels", stdout)
+        self.assertEqual(self.cosmos.upserts, [])
+
+    def test_with_the_flag_every_oefening_replays_with_1_1(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REGELS, "--regels", "1.1")
+
+        # predict_b1 comes off the cap, and 1.1 stamps it on its last answer;
+        # write_a2 and recall_a1 forget too, fix_a3 had one answer.
+        self.assertEqual(self.row(stdout), ["4", "4", "4", "1", "0", "0", "3", "0", "4", "1", "1", "1", "2.12.0+29"])
+        self.assertIn("van het plafond 1", stdout)
+        self.assertIn("vastgelopen 1", stdout)
+        self.assertIn("dun 1", stdout)
+        self.assertIn("stempel erbij met --regels 1.1", stdout)
+        self.assertIn("zoals validate --regels 1.1", stdout)
+        self.assertIn("Schrijven: dezelfde opdracht (met --regels 1.1) met --apply erbij", stdout)
+        self.assertEqual(self.cosmos.upserts, [])
+
+    def test_apply_with_the_flag_writes_the_replay_of_1_1_and_validate_with_it_matches(self):
+        before = self.run_cli("validate", "--klas", KLAS_REGELS, "--regels", "1.1")
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_REGELS, "--regels", "1.1", "--apply")
+
+        replay = rules.replay(TURNS["u-wim"], GOALS, variant=rules.Variant(as_11=True))
+        written = self.written()
+        self.assertEqual(sorted(written), ["fix_a3", "predict_b1", "recall_a1", "write_a2"])
+        predict = written["predict_b1"]
+        self.assertEqual((predict["alpha"], predict["beta"]),
+                         (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+        self.assertFalse(evaluate.on_the_cap(predict))
+        self.assertEqual(predict["firstMasteredAt"], "2026-09-16T09:16:00.000Z")
+        counts = lambda d: (d["ownQuestions"], d["ownQuestionsRight"], d["ownQuestionsRightNonMcq"])  # noqa: E731
+        self.assertEqual(counts(predict), (17, 13, 13))
+        self.assertEqual(counts(written["write_a2"]), (6, 0, 0))
+        self.assertTrue(evaluate.app_stuck(written["write_a2"], NOW))
+        # The level the old build raised from the side stays (#103), though
+        # 1.1 raises it on the target only; validate must not flag it.
+        self.assertEqual(written["write_a2"]["highestPositiveDifficulty"], "hard")
+        self.assertIsNone(replay[("sg-a", "write_a2")].ratchet)
+        # The stamp 1.1 would not give stays (#168), and is thin now.
+        self.assertEqual(written["recall_a1"]["firstMasteredAt"], "2026-09-14T10:01:01.000Z")
+        self.assertEqual(counts(written["recall_a1"]), (1, 1, 1))
+        self.assertTrue(evaluate.app_thin_stamp(written["recall_a1"]))
+        for doc in written.values():
+            self.assertNotIn("returnWrongAt", doc)
+            self.assertNotIn("thinCheckedAt", doc)
+        self.assertIn(f"Controleer met: evaluate.py validate --klas {KLAS_REGELS} --regels 1.1", stdout)
+
+        rewritten = {(d["subgoalId"], d["loId"]): d for d in written.values()}
+        self.cosmos.beliefs = lambda uid: rewritten if uid == "u-wim" else {}
+        after = self.run_cli("validate", "--klas", KLAS_REGELS, "--regels", "1.1")
+        by_build = self.run_cli("validate", "--klas", KLAS_REGELS)
+
+        self.assertEqual(self.row(before, 5), ["4", "4", "3", "0", "2.12.0+29"])
+        self.assertEqual(self.row(after, 5), ["4", "4", "0", "0", "2.12.0+29"])
+        # Replayed by build, the rewritten docs read as a deviation.
+        self.assertEqual(self.row(by_build, 5), ["4", "4", "3", "0", "2.12.0+29"])
+        self.assertIn("--regels 1.1: elke oefening herspeeld met de regels van 1.1", after)
+        self.assertNotIn("zoals het concept", after)
+        self.assertIn("vergelijk met --regels 1.1", by_build)
+
+    def test_the_flag_takes_only_rules_it_knows(self):
+        for command in ("replay-beliefs", "validate"):
+            err = io.StringIO()
+            with self.subTest(command=command), self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                self.run_cli(command, "--klas", KLAS_REGELS, "--regels", "1.0")
+            self.assertIn("argument --regels: invalid choice: '1.0'", err.getvalue())
 
 
 if __name__ == "__main__":

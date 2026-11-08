@@ -1,12 +1,12 @@
 """Evaluate a class on a milestone, outside the app.
 
     python tooling/evaluation/evaluate.py draft    --klas 6WEWI [--mijlpaal <id|titel>] [--out DIR]
-    python tooling/evaluation/evaluate.py validate --klas 6WEWI
+    python tooling/evaluation/evaluate.py validate --klas 6WEWI [--regels 1.1]
     python tooling/evaluation/evaluate.py backup   --klas 6WEWI [--out DIR]
     python tooling/evaluation/evaluate.py apply    <draft>.json [--force]
     python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b [--mijlpaal ...]
     python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>] [--klas 6WEWI]
-    python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam> ...] [--apply [--force]]
+    python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam> ...] [--regels 1.1] [--apply [--force]]
 
 `draft` writes two files outside the repo (default `C:\\Users\\yvan\\ai-tutor-evaluaties`):
 a Markdown draft to discuss, and a JSON sidecar that `apply` reads. The
@@ -17,11 +17,15 @@ Nothing is written to Cosmos by `draft`, `validate`, `what-if` or `trace`,
 nor by `replay-beliefs` without `--apply`.
 
 `replay-beliefs` (#242) replays `lo_beliefs` from `turn_history` with the
-replay `validate` compares them to, and restores four fields on the docs
-there: α and β, the stamp `firstMasteredAt` (the earliest of stored and
-replayed by oefening, never cleared) and `highestPositiveDifficulty` (the
-highest of the two, never lowered). A dry run by default; `--apply` backs
-up first, refuses in the class's lesson time, and writes with `If-Match`.
+replay `validate` compares them to, and restores the fields of
+`BELIEF_FIELDS` on the docs there: α and β, the stamp `firstMasteredAt`
+(the earliest of stored and replayed by oefening, never cleared),
+`highestPositiveDifficulty` (the highest of the two, never lowered),
+`lastProbedAt` where the doc has none (#275), and the own-question counts
+of formula 1.1 (the larger of the two, #281). A dry run by default;
+`--apply` backs up first, refuses in the class's lesson time, and writes
+with `If-Match`. `--regels 1.1`, on it and on `validate`, replays every
+oefening with formula 1.1, also those of a build from before it (#281).
 
 `trace` prints one student's oefeningen of one day (Belgian time) as they
 happened (#228): per oefening the time, LO, type, level and grade from
@@ -487,13 +491,31 @@ def _render_json(milestone, klas, per_student, now) -> dict:
 # ---- validate ----------------------------------------------------------------
 
 
-def _replay_student(uid: str, goals: dict) -> tuple[list[dict], dict, dict]:
+# `--regels` (#281): the rules every oefening replays with on `validate` and
+# `replay-beliefs`. Without it each oefening replays with the rules of the
+# build that wrote it (`rules.CURRENT`); `1.1` replays every one with
+# formula 1.1, the ones from before 2.13.0 too — what the one-time rewrite
+# at the release of 1.1 writes, if the teacher chooses it (#278).
+RULE_CHOICES = {"1.1": rules.Variant(as_11=True)}
+
+
+def _variant(args) -> rules.Variant:
+    return RULE_CHOICES[args.regels] if getattr(args, "regels", None) else rules.CURRENT
+
+
+def _rules_flag(args) -> str:
+    """The flag again, for a command line the output suggests."""
+    return f" --regels {args.regels}" if getattr(args, "regels", None) else ""
+
+
+def _replay_student(uid: str, goals: dict, variant: rules.Variant = rules.CURRENT) -> tuple[list[dict], dict, dict]:
     """One student's turn log, `lo_beliefs` docs and the replay `validate`
     compares them to: `rules.replay` with the provenance the app recorded,
-    so with the weight the app wrote the docs with. `replay-beliefs` writes
-    this same replay (#242), so `validate` reads its docs back as matching."""
+    so with the weight the app wrote the docs with, and with [variant]
+    (`--regels`). `replay-beliefs` writes this same replay (#242), so
+    `validate` with the same `--regels` reads its docs back as matching."""
     turns = cosmos.turns(uid)
-    return turns, cosmos.beliefs(uid), rules.replay(turns, goals)
+    return turns, cosmos.beliefs(uid), rules.replay(turns, goals, variant=variant)
 
 
 def _last_build(turns: list[dict]) -> str:
@@ -523,12 +545,21 @@ def cmd_validate(args) -> None:
     Unlike `draft`, it weighs a turn as supervised only where the app
     recorded it so (#219): that is what the app weighed when it wrote the
     doc. The turns from before #219, which `draft` reads by the timetable,
-    are all `home` here, as they are in `lo_beliefs`."""
+    are all `home` here, as they are in `lo_beliefs`.
+
+    With `--regels 1.1` (#281) every oefening replays with formula 1.1, the
+    ones of a build from before 2.13.0 too: the replay `replay-beliefs
+    --regels 1.1` writes. After that rewrite this is the comparison that
+    matches; without the flag every doc it rewrote reads as a deviation.
+    The highest level is compared to the higher of that replay's and the
+    replay by build (`_kept_level`): a rewrite never lowers it."""
     goals = cosmos.goals()
     students = cosmos.accounts(args.klas)
+    variant = _variant(args)
     print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}{'laatste build':>16}")
     for a in students:
-        turns, stored, st = _replay_student(a["uid"], goals)
+        turns, stored, st = _replay_student(a["uid"], goals, variant)
+        by_build = st if variant == rules.CURRENT else rules.replay(turns, goals)
         n = off = rat = 0
         for key, b in stored.items():
             s = st.get(key)
@@ -537,12 +568,13 @@ def cmd_validate(args) -> None:
             n += 1
             if abs(s.mean - b["alpha"] / (b["alpha"] + b["beta"])) > 0.01:
                 off += 1
-            if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != s.ratchet:
+            if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != _kept_level(s, by_build.get(key)):
                 rat += 1
         build = _last_build(turns)
         print(f"{a.get('firstName','')+' '+a.get('lastName',''):26}{len(stored):>6}{n:>12}{off:>14}{rat:>24}{build:>16}")
     print(
-        f"\nHerspeeld met de regels van de app sinds #167 en #169 ({rules.RULES_VERSION}), zoals het concept."
+        f"\nHerspeeld met de regels van de app sinds #167 en #169 ({rules.RULES_VERSION})"
+        + ("." if getattr(args, "regels", None) else ", zoals het concept.") +
         " Een afwijking wijst op een document dat een oude build schreef (laatste build 'oud': de laatste oefening"
         " kwam van een build zonder clientVersion, die nog met de oude rekenregels werkt), of op een document"
         " dat met een oudere herspeling herschreven werd."
@@ -550,6 +582,32 @@ def cmd_validate(args) -> None:
         " Anders dan in het concept weegt een oefening hier alleen als 'onder toezicht' (×1,25) als de app ze zo"
         " bewaarde, want zo schreef de app het document; het concept leest ook de oefeningen van vóór #219 volgens"
         " het lesrooster van de klas."
+    )
+    print(_rules_note(args))
+
+
+def _kept_level(state: rules.LoState, by_build: rules.LoState | None) -> str | None:
+    """The highest level a doc keeps after a rewrite with [state]'s replay:
+    the higher of it and the replay by build's ([by_build]). The level is
+    one-way (#103), so `replay-beliefs` never lowers it, and a build from
+    before #276 raised it on every direct signal, where 1.1 raises it only
+    on the question's target. Without `--regels` the two are the same."""
+    levels = [state.ratchet] + ([by_build.ratchet] if by_build is not None else [])
+    return max(levels, key=lambda level: rules.DIFF_ORDER[level])
+
+
+def _rules_note(args) -> str:
+    """What `--regels` did to the replay, for `validate` and `replay-beliefs`."""
+    if getattr(args, "regels", None):
+        return (
+            f"--regels {args.regels}: elke oefening herspeeld met de regels van {args.regels}, ook die van een build"
+            " van vóór 2.13.0 (vergeten per antwoord, een meerkeuzevraag weegt de helft, de vierde voorwaarde"
+            " voor de stempel), anders dan het concept, dat elke oefening met de regels van haar build herspeelt."
+            " Zo herschrijft replay-beliefs --regels 1.1 de documenten bij de release."
+        )
+    return (
+        "Elke oefening herspeeld met de regels van de build die ze schreef: een oefening van vóór 2.13.0 zonder"
+        " vergeten. Na een herschrijving met replay-beliefs --regels 1.1: vergelijk met --regels 1.1."
     )
 
 
@@ -660,10 +718,20 @@ def cmd_apply(args) -> None:
 # ---- replay-beliefs (#242) ---------------------------------------------------
 
 # What `replay-beliefs` writes on a `lo_beliefs` doc; `lastProbedAt` only
-# where the doc has none (#275: "neem het mee"). Every other field —
-# `lastUpdatedAt`, `regressedAt`, the calibration clock — stays as the app
-# wrote it.
-BELIEF_FIELDS = ("alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt")
+# where the doc has none (#275: "neem het mee"); the own-question counts of
+# formula 1.1 (#278, #279) as the larger of stored and replayed (#281).
+# Every other field — `lastUpdatedAt`, `regressedAt`, the calibration
+# clock, and the session state of #275, `returnWrongAt` and `thinCheckedAt`
+# (what the app did with a return, no belief a replay recomputes) — stays
+# as the app wrote it.
+BELIEF_FIELDS = (
+    "alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt",
+    "ownQuestions", "ownQuestionsRight", "ownQuestionsRightNonMcq",
+)
+# α + β from which an LO was "on the cap" until formula 1.1: not
+# practiceable any more (CONDUCTOR_POLICY §2.1, §3.4 before #278). The dry
+# run counts the docs a rewrite takes under it (#281).
+SATURATED_EVIDENCE = 18.0
 # α and β within this of the stored ones are the same numbers computed
 # twice: the app decays to the moment it writes, a second or so after
 # `turnAt`, and Dart and Python round apart in the last bits. On 6EWI
@@ -697,6 +765,84 @@ def _stored_number(raw) -> float:
     return float(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) else rules.PRIOR
 
 
+def _stored_count(raw) -> int | None:
+    """A count on a stored doc; None where the app reads none, a missing or
+    unreadable value: `ownQuestions` then reads 0, and the two right counts
+    stay missing, which is not 0 (#279, #275)."""
+    return int(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) else None
+
+
+# `LoBelief.fromCosmos` reads a doc without a readable `lastUpdatedAt` as
+# written in 1970.
+_APP_EPOCH = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+
+
+def _app_state(doc: dict) -> rules.LoState:
+    """[doc] as the app reads it, as a `rules.LoState` for the rules'
+    judgements. A missing count reads 0 here; `_has_right_counts` tells the
+    missing right counts apart."""
+    return rules.LoState(
+        alpha=_stored_number(doc.get("alpha")),
+        beta=_stored_number(doc.get("beta")),
+        last_at=_stored_at(doc.get("lastUpdatedAt")) or _APP_EPOCH,
+        positive_at_calibrated_at=_stored_at(doc.get("lastPositiveAtCalibratedAt")),
+        first_mastered_at=_stored_at(doc.get("firstMasteredAt")),
+        own_questions=_stored_count(doc.get("ownQuestions")) or 0,
+        own_right=_stored_count(doc.get("ownQuestionsRight")) or 0,
+        own_right_open=_stored_count(doc.get("ownQuestionsRightNonMcq")) or 0,
+    )
+
+
+def _has_right_counts(doc: dict) -> bool:
+    """`LoBelief.hasRightCounts`: false on a doc from before formula 1.1."""
+    return any(_stored_count(doc.get(f)) is not None for f in ("ownQuestionsRight", "ownQuestionsRightNonMcq"))
+
+
+def app_ever_mastered(doc: dict) -> bool:
+    """`belief_math.everMasteredBelief`: the stamp, or on a doc without it
+    the reading of an old one — conditions 1–3 of §4.1 on the stored
+    numbers, and condition 4 where the doc keeps the counts (#279)."""
+    s = _app_state(doc)
+    if s.first_mastered_at is not None:
+        return True
+    if not s.mastered_at():
+        return False
+    return not _has_right_counts(doc) or (
+        s.own_right >= rules.STAMP_OWN_RIGHT_MIN and s.own_right_open >= rules.STAMP_OWN_RIGHT_NON_MCQ_MIN
+    )
+
+
+def app_stamp(doc: dict) -> dt.datetime | None:
+    """The stamp the app reads on [doc]: `firstMasteredAt`, or on an old doc
+    without it that reads as mastered (`app_ever_mastered`) its
+    `lastUpdatedAt`, which the app writes as the stamp at its next write."""
+    at = _stored_at(doc.get("firstMasteredAt"))
+    if at is None and app_ever_mastered(doc):
+        at = _app_state(doc).last_at
+    return at
+
+
+def app_stuck(doc: dict, now: dt.datetime) -> bool:
+    """Stuck as #275 brings it back (`Conductor`, `RecheckRule.stuck`): no
+    stamp (`app_ever_mastered`), and `rules.is_stuck` on the doc decayed to
+    [now] — at least 6 own questions and μ under 0.6. A doc without
+    `ownQuestions` reads 0, so it is not stuck until the count is filled."""
+    return not app_ever_mastered(doc) and rules.is_stuck(_app_state(doc), now)
+
+
+def app_thin_stamp(doc: dict) -> bool:
+    """`belief_math.isThinStamp`: a stamp on fewer than two right own
+    questions, on a doc that keeps the counts. A stamp without them is no
+    thin one, so filling them decides which stamps from before 1.1 are."""
+    return _has_right_counts(doc) and rules.is_thin_stamp(_app_state(doc))
+
+
+def on_the_cap(doc: dict) -> bool:
+    """α + β at `SATURATED_EVIDENCE` or more: an LO the app did not ask any
+    more until formula 1.1."""
+    return _stored_number(doc.get("alpha")) + _stored_number(doc.get("beta")) >= SATURATED_EVIDENCE
+
+
 def _on_a_later_oefening(replayed: dt.datetime, stored: dt.datetime, oefening_times: list[dt.datetime]) -> bool:
     """Whether the stored stamp fell on a later oefening than the replayed
     one: an oefening began after the replayed stamp and no later than the
@@ -717,7 +863,12 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
     - `firstMasteredAt`: the earliest of the stored and the replayed stamp,
       by oefening — on the same oefening the app's own stamp stays
       (`_on_a_later_oefening`). Never cleared: a stamp the replay does not
-      reach stays, and without either the field stays away;
+      reach stays, and without either the field stays away. The stored
+      stamp is the one the app reads (`app_stamp`): on an old doc without
+      the field that reads as mastered, its `lastUpdatedAt`, which the app
+      writes as the stamp at its next write. Where the counts below, or new
+      α and β, would end that reading, it is written here, as the app
+      would;
     - `highestPositiveDifficulty`: the highest of the stored and the
       replayed level. Never lowered; an unknown stored level reads as none,
       as the app reads it;
@@ -726,42 +877,86 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
       what the app wrote goes first — and not at all when the replay has
       none (never asked directly, as the app already reads it). A doc
       without it reads `lastUpdatedAt`, at worst late; since #275 the
-      recheck slot reaches earlier roots too, where those docs are.
+      recheck slot reaches earlier roots too, where those docs are;
+    - `ownQuestions`, `ownQuestionsRight` and `ownQuestionsRightNonMcq`
+      (#281): each the larger of the stored and the replayed count
+      (`LoState.own_questions`, `own_right`, `own_right_open`). The replay
+      counts every oefening in `turn_history`, the ones the app counted
+      too. The two right counts are written together, also as 0 on a doc
+      without them: missing is not 0 for the app (#279). `ownQuestions`
+      reads 0 when missing, so a 0 leaves it away.
 
-    The stamp and the level are one-way in the app too (#168, #103): this
-    restores what an old build never wrote, and takes nothing away."""
+    The stamp, the level and the counts are one-way in the app too (#168,
+    #103, #279): this restores what an old build never wrote, and takes
+    nothing away. Filling the right counts does change one reading: a
+    stamp on a doc without them is no thin stamp (#275), and with them it
+    can be (`app_thin_stamp`)."""
     doc = dict(stored)
     alpha, beta = _stored_number(stored.get("alpha")), _stored_number(stored.get("beta"))
     if abs(state.alpha - alpha) > BELIEF_TOLERANCE or abs(state.beta - beta) > BELIEF_TOLERANCE:
         doc["alpha"], doc["beta"] = state.alpha, state.beta
-    replayed, stamp = state.first_mastered_at, _stored_at(stored.get("firstMasteredAt"))
+    replayed, stamp = state.first_mastered_at, app_stamp(stored)
     if replayed is not None and (
         stamp is None or (replayed < stamp and _on_a_later_oefening(replayed, stamp, oefening_times))
     ):
         doc["firstMasteredAt"] = _app_iso(replayed)
+    questions = _stored_count(stored.get("ownQuestions")) or 0
+    if state.own_questions > questions:
+        doc["ownQuestions"] = state.own_questions
+    right = (_stored_count(stored.get("ownQuestionsRight")), _stored_count(stored.get("ownQuestionsRightNonMcq")))
+    counts = (max(right[0] or 0, state.own_right), max(right[1] or 0, state.own_right_open))
+    if counts != right:
+        doc["ownQuestionsRight"], doc["ownQuestionsRightNonMcq"] = counts
     level = stored.get("highestPositiveDifficulty")
     rank = rules.DIFF_ORDER.get(level, -1) if isinstance(level, str) else -1
     if rules.DIFF_ORDER[state.ratchet] > rank:
         doc["highestPositiveDifficulty"] = state.ratchet
     if _stored_at(stored.get("lastProbedAt")) is None and state.last_direct_at is not None:
         doc["lastProbedAt"] = _app_iso(state.last_direct_at)
+    if stamp is not None and app_stamp(doc) is None:
+        # The stamp the app read on the old doc, which this write would end.
+        doc["firstMasteredAt"] = _app_iso(stamp)
     return doc
 
 
 def belief_changes(stored: dict, new: dict) -> set[str]:
-    """What [new] changes on [stored]: `alpha/beta`, `stamp gained` (there was
-    none), `stamp earlier`, `level raised`, `clock filled` (#275). Empty:
-    nothing to write."""
+    """What [new] changes on [stored]: `alpha/beta`, `stamp gained` (the app
+    read none), `stamp earlier`, `stamp kept` (the stamp the app read on an
+    old doc without the field, now written, `app_stamp`), `level raised`,
+    `clock filled` (#275), `counts` (#281). Empty: nothing to write."""
     changes = set()
     if new.get("alpha") != stored.get("alpha") or new.get("beta") != stored.get("beta"):
         changes.add("alpha/beta")
     if new.get("firstMasteredAt") != stored.get("firstMasteredAt"):
-        changes.add("stamp earlier" if _stored_at(stored.get("firstMasteredAt")) else "stamp gained")
+        before = app_stamp(stored)
+        if before is None:
+            changes.add("stamp gained")
+        else:
+            changes.add("stamp kept" if _stored_at(new.get("firstMasteredAt")) == before else "stamp earlier")
     if new.get("highestPositiveDifficulty") != stored.get("highestPositiveDifficulty"):
         changes.add("level raised")
     if new.get("lastProbedAt") != stored.get("lastProbedAt"):
         changes.add("clock filled")
+    if any(new.get(f) != stored.get(f) for f in ("ownQuestions", "ownQuestionsRight", "ownQuestionsRightNonMcq")):
+        changes.add("counts")
     return changes
+
+
+def belief_effects(stored: dict, new: dict, now: dt.datetime) -> set[str]:
+    """What the app reads differently of [new] than of [stored] at [now]
+    (#281, the dry run's last columns): `off the cap` (α + β was at
+    `SATURATED_EVIDENCE` or more, now under it: practiceable again),
+    `stuck` (`app_stuck`: comes back as a recheck, a notch lower first,
+    #275) and `thin` (`app_thin_stamp`: one check question a week after its
+    last direct probe; the stamp stays)."""
+    effects = set()
+    if on_the_cap(stored) and not on_the_cap(new):
+        effects.add("off the cap")
+    if app_stuck(new, now) and not app_stuck(stored, now):
+        effects.add("stuck")
+    if app_thin_stamp(new) and not app_thin_stamp(stored):
+        effects.add("thin")
+    return effects
 
 
 def _class_at_work(students: list[dict], klas: str) -> list[str]:
@@ -783,12 +978,20 @@ def cmd_replay_beliefs(args) -> None:
     client wrote docs without `firstMasteredAt` and `highestPositiveDifficulty`
     and whom the one-time rewrite of 2026-09-23 passed by. And it fills the
     direct-probe clock `lastProbedAt` on a doc without one (#275, the
-    backfill of #187).
+    backfill of #187), and the own-question counts of formula 1.1 (#281).
 
     The replay is the one `validate` compares to (`_replay_student`), so
-    `validate` shows no deviation on a doc this wrote. It only updates docs
+    `validate` with the same `--regels` shows no deviation on a doc this
+    wrote. `--regels 1.1` replays every oefening with formula 1.1 (#281):
+    the one-time rewrite the teacher can choose at the release, which takes
+    LOs off the cap at once (#278). It only updates docs
     that exist: a replayed LO without a doc gets none (the app creates it on
     the next write), and a doc the replay does not reach stays as it is.
+
+    The dry run also says what the app reads differently afterwards
+    (`belief_effects`): LOs off the cap, LOs stuck and stamps thin — the
+    last two come back as rechecks (#275), and filling the counts is what
+    makes them so.
 
     A dry run unless `--apply`. With it: refuses in the lesson time of the
     class or while a student works (`--force` to go on), backs up every
@@ -807,13 +1010,18 @@ def cmd_replay_beliefs(args) -> None:
 
     print(
         f"{'leerling':26}{'docs':>6}{'herspeeld':>11}{'te schrijven':>14}{'stempel erbij':>15}"
-        f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'klok erbij':>12}{'laatste build':>16}"
+        f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'klok erbij':>12}{'tellingen':>11}"
+        f"{'van plafond':>13}{'vastgelopen':>13}{'dun':>5}{'laatste build':>16}"
     )
+    variant, now = _variant(args), _now()
     planned: list[tuple[dict, dict, dict]] = []  # (student, stored doc, new doc)
-    totals = {"stamp gained": 0, "stamp earlier": 0, "level raised": 0, "alpha/beta": 0, "clock filled": 0}
+    totals = dict.fromkeys(
+        ("stamp gained", "stamp earlier", "stamp kept", "level raised", "alpha/beta", "clock filled", "counts",
+         "off the cap", "stuck", "thin"), 0,
+    )
     old_build = []
     for a in students:
-        turns, stored, st = _replay_student(a["uid"], goals)
+        turns, stored, st = _replay_student(a["uid"], goals, variant)
         oefening_times = sorted(rules.parse_at(t["turnAt"]) for t in turns if not rules.is_audit(t))
         replayed = mine = 0
         counts = dict.fromkeys(totals, 0)
@@ -828,7 +1036,7 @@ def cmd_replay_beliefs(args) -> None:
                 continue
             mine += 1
             planned.append((a, stored[key], new))
-            for c in changes:
+            for c in changes | belief_effects(stored[key], new, now):
                 counts[c] += 1
                 totals[c] += 1
         build = _last_build(turns)
@@ -837,27 +1045,59 @@ def cmd_replay_beliefs(args) -> None:
         print(
             f"{_full_name(a):26}{len(stored):>6}{replayed:>11}{mine:>14}{counts['stamp gained']:>15}"
             f"{counts['stamp earlier']:>17}{counts['level raised']:>14}{counts['alpha/beta']:>12}"
-            f"{counts['clock filled']:>12}{build:>16}"
+            f"{counts['clock filled']:>12}{counts['counts']:>11}{counts['off the cap']:>13}"
+            f"{counts['stuck']:>13}{counts['thin']:>5}{build:>16}"
         )
     writers = {a["uid"] for a, _, _ in planned}
     print(
         f"\nte schrijven: {len(planned)} documenten bij {len(writers)} leerling(en) — stempel erbij"
         f" {totals['stamp gained']}, stempel vroeger {totals['stamp earlier']}, hoogste niveau hoger"
-        f" {totals['level raised']}, α/β anders {totals['alpha/beta']}, klok erbij {totals['clock filled']}."
+        f" {totals['level raised']}, α/β anders {totals['alpha/beta']}, klok erbij {totals['clock filled']},"
+        f" tellingen {totals['counts']}."
+    )
+    if args.regels and totals["stamp gained"]:
+        print(
+            f"stempel erbij met --regels {args.regels}: de regels van {args.regels} op de oude antwoorden. De app leest"
+            " die leerdoelen daarna als aangetoond; het concept herspeelt elke oefening met de regels van haar build"
+            f" en telt een stempel die alleen {args.regels} geeft niet."
+        )
+    if totals["stamp kept"]:
+        print(
+            f"stempel vastgelegd {totals['stamp kept']}: een oud document zonder firstMasteredAt dat de app als"
+            " aangetoond leest, krijgt de stempel die de app er bij haar volgende schrijving op zet (lastUpdatedAt);"
+            " met de tellingen of de nieuwe alpha en beta zou ze hem niet meer zo lezen."
+        )
+    stuck_mean = f"{rules.STUCK_MEAN}".replace(".", ",")
+    print(
+        f"Daarna in de app: van het plafond {totals['off the cap']} (α + β was {SATURATED_EVIDENCE:.0f} of meer,"
+        f" nu minder: weer te oefenen, #278), vastgelopen {totals['stuck']} (geen stempel,"
+        f" {rules.STUCK_OWN_QUESTIONS_MIN} of meer eigen vragen en μ onder {stuck_mean}: komt terug als"
+        f" controlevraag, eerst een niveau lager, #275), dun {totals['thin']} (een stempel op minder dan"
+        f" {rules.STAMP_OWN_RIGHT_MIN} juiste eigen vragen: één controlevraag een week na de laatste rechtstreekse"
+        " vraag, de stempel blijft, #275)."
     )
     print(
-        f"Herspeeld met {rules.RULES_VERSION}, zoals validate: een oefening weegt alleen als 'onder toezicht'"
-        " als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit leeg),"
-        " highestPositiveDifficulty (het hoogste) en lastProbedAt (alleen waar het ontbreekt) veranderen;"
-        " een leerdoel zonder document krijgt er geen."
+        "Een stempel op een document zonder de tellingen van 1.1 is in de app nooit dun. Door de tellingen aan te"
+        " vullen beslist deze herschrijving welke stempels van vóór 1.1 dun zijn; zonder herschrijving krijgt geen"
+        " enkele een controlevraag. Een leerdoel zonder ownQuestions leest 0 eigen vragen en loopt pas na zes"
+        " nieuwe vast."
     )
+    print(
+        f"Herspeeld met {rules.RULES_VERSION}, zoals validate{_rules_flag(args)}: een oefening weegt alleen als"
+        " 'onder toezicht' als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit"
+        " leeg), highestPositiveDifficulty (het hoogste), lastProbedAt (alleen waar het ontbreekt) en de"
+        " tellingen ownQuestions, ownQuestionsRight en ownQuestionsRightNonMcq (de grootste van opgeslagen en"
+        " herspeeld) veranderen; een leerdoel zonder document krijgt er geen."
+    )
+    print(_rules_note(args))
     if old_build:
         print(
             "let op: de laatste oefening kwam van een build zonder clientVersion, die nog met de oude regels"
             " schrijft: " + ", ".join(old_build)
         )
     if not args.apply:
-        print("\nDroge run: er is niets geschreven. Schrijven met --apply, buiten de lesuren.")
+        keep = f" (met{_rules_flag(args)})" if args.regels else ""
+        print(f"\nDroge run: er is niets geschreven. Schrijven: dezelfde opdracht{keep} met --apply erbij, buiten de lesuren.")
         return
     if not planned:
         print("\nNiets te schrijven.")
@@ -877,7 +1117,7 @@ def cmd_replay_beliefs(args) -> None:
             conflicts += 1
             print(f"  {_full_name(a)}: {stored['subgoalId']}/{stored['loId']} veranderde intussen — niet geschreven")
     print(f"geschreven {written}, conflicten {conflicts}" + (" (draai het opnieuw voor die)" if conflicts else ""))
-    print(f"Controleer met: evaluate.py validate --klas {args.klas}")
+    print(f"Controleer met: evaluate.py validate --klas {args.klas}{_rules_flag(args)}")
 
 
 # ---- what-if -----------------------------------------------------------------
@@ -1105,7 +1345,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("draft"); d.add_argument("--klas", required=True); d.add_argument("--mijlpaal"); d.add_argument("--out")
-    v = sub.add_parser("validate"); v.add_argument("--klas", required=True)
+    regels = {
+        "choices": sorted(RULE_CHOICES),
+        "help": "herspeel elke oefening met deze regels, ook die van een oudere build (zonder: per build)",
+    }
+    v = sub.add_parser("validate"); v.add_argument("--klas", required=True); v.add_argument("--regels", **regels)
     b = sub.add_parser("backup"); b.add_argument("--klas", required=True); b.add_argument("--out")
     a = sub.add_parser("apply"); a.add_argument("draft"); a.add_argument("--force", action="store_true")
     w = sub.add_parser("what-if"); w.add_argument("--klas", required=True); w.add_argument("--leerling", required=True)
@@ -1114,6 +1358,7 @@ def main() -> None:
     t.add_argument("--subdoel"); t.add_argument("--klas", help="zoek de leerling alleen in deze klas")
     r = sub.add_parser("replay-beliefs"); r.add_argument("--klas", required=True)
     r.add_argument("--leerling", action="append", help="alleen deze leerling (naam, deel ervan of uid); herhaalbaar")
+    r.add_argument("--regels", **regels)
     r.add_argument("--apply", action="store_true", help="na een back-up echt schrijven, buiten de lesuren")
     r.add_argument("--force", action="store_true", help="ook schrijven als de klas les heeft of werkt")
     args = ap.parse_args()

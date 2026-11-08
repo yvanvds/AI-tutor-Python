@@ -28,8 +28,8 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
   leerlingen-app opent `grade_proposals` nooit, dus een leerling die
   oefent, raakt het voorstel niet.
   `replay-beliefs` leest alleen, behalve met `--apply`: dan eerst een
-  back-up, niet in de lestijd, met `If-Match`, en alleen vier velden van
-  `lo_beliefs` (#242).
+  back-up, niet in de lestijd, met `If-Match`, en alleen de velden van
+  `lo_beliefs` die de herspeling herstelt (`BELIEF_FIELDS`, #242, #281).
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
   repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek:
   ook een issue, PR of commit noemt geen echte leerling (#190).
@@ -38,12 +38,12 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
 
 ```
 python tooling/evaluation/evaluate.py draft    --klas 6WEWI            # concept + sidecar
-python tooling/evaluation/evaluate.py validate --klas 6WEWI            # replay vs. opslag
+python tooling/evaluation/evaluate.py validate --klas 6WEWI [--regels 1.1]   # replay vs. opslag
 python tooling/evaluation/evaluate.py backup   --klas 6WEWI            # volledige dump
 python tooling/evaluation/evaluate.py apply    ~/ai-tutor-evaluaties/<...>.json
 python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b   # punt als die doelen meetellen
 python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>]   # een dag, oefening per oefening
-python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam>] [--apply]   # lo_beliefs herstellen uit de herspeling
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam>] [--regels 1.1] [--apply]   # lo_beliefs herstellen uit de herspeling
 ```
 
 `trace` (#228) toont de oefeningen van één leerling op één dag (Belgische
@@ -136,7 +136,8 @@ herspeling rekent het niet. Ze telt wel de eigen vragen per leerdoel
 (`LoState.own_questions`), zoals de app ze bewaart (`ownQuestions` op
 `lo_beliefs`): een rechtstreekse vraag met het leerdoel als doel, geen
 vervolgvraag, één per vraag, welke kant het antwoord ook uitging.
-`replay-beliefs` schrijft die telling nog niet, en herspeelt de oefeningen van vóór 1.1 nog zonder vergeten (#281).
+`replay-beliefs` vult die telling aan, en herspeelt met `--regels 1.1`
+ook de oefeningen van vóór 1.1 met vergeten (#281, hieronder).
 
 Dezelfde build brengt **#279**, in dezelfde regelversie:
 
@@ -158,7 +159,7 @@ De herspeling telt de juiste eigen vragen over het hele logboek, elke build
 begint haar telling bij de release: een document zonder de tellingen leest
 ze als 0, en een document met een stempel maar zonder tellingen houdt ze
 weg, zodat #275 een stempel van vóór 1.1 niet voor een dunne aanziet. Tot
-`replay-beliefs` ze aanvult (#281), kan `validate` op een oefening van 1.1
+`replay-beliefs` ze aanvult (#281, hieronder), kan `validate` op een oefening van 1.1
 een stempel vroeger herspelen dan de app hem zette: de herspeling kent de
 juiste eigen vragen van vóór de release, de app niet. Met de rest van 1.1
 is het de variant `min_own_right=2, min_open_right=1, mcq_positive=0.5` van
@@ -186,8 +187,8 @@ rechtstreeks, de andere signalen van dat hoofddoel vallen weg
   `rules.STAMP_OWN_RIGHT_MIN` juiste eigen vragen. In de herspeling zijn
   de tellingen altijd bekend; in de app is een document zonder tellingen
   geen dunne stempel, tot `replay-beliefs` ze aanvult (#281). De droge run
-  van #281 telt met deze twee hoeveel leerdoelen vastgelopen of dun
-  aangetoond worden.
+  van `replay-beliefs` telt met dezelfde regels hoeveel leerdoelen
+  vastgelopen of dun aangetoond worden (hieronder).
 
 ## Regelversie `1.0.23-eval7`
 
@@ -514,6 +515,20 @@ Een afwijking betekent dus:
   `eval4` of later (hierboven);
 - iets wat de log niet draagt: een signaal meer of minder dan gelogd.
 
+**`--regels 1.1`** (#281) herspeelt elke oefening met de regels van 1.1,
+ook die van een build van vóór 2.13.0 (`rules.Variant(as_11=True)`): de
+herspeling die `replay-beliefs --regels 1.1` schrijft. Na zo'n
+herschrijving bij de release is dat de vergelijking die past. Zonder de
+vlag leest elk herschreven document als afwijking, want dan herspeelt een
+oefening van vóór 2.13.0 zonder vergeten. Het concept herspeelt altijd
+per build; de vlag bestaat alleen op `validate` en `replay-beliefs`.
+Het hoogste niveau vergelijkt `validate` dan met het hoogste van de
+herspeling met 1.1 en die per build: een build van vóór #276 hief het op
+elk rechtstreeks signaal, 1.1 alleen op het doel van de vraag, en
+`replay-beliefs` verlaagt het nooit. Op 6EWI en 6WEWI (2026-11-08) gaf
+een herschrijving in het geheugen zo geen enkele afwijking in μ, en in het
+hoogste niveau dezelfde twee als per build.
+
 ## `replay-beliefs`: `lo_beliefs` herstellen uit de herspeling
 
 Een build van vóór #108 schreef leerdoelen zonder `firstMasteredAt` en
@@ -526,14 +541,15 @@ herschrijving opnieuw, als commando:
 ```
 python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI                        # droog: wat zou veranderen
 python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --leerling <naam> ...  # een of meer leerlingen
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --regels 1.1           # droog, elke oefening met 1.1
 python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --apply               # schrijven, buiten de lesuren
 ```
 
-Het herspeelt met dezelfde `rules.replay` als `validate`: een oefening
-weegt alleen als onder toezicht als de app ze zo bewaarde. Zo toont
-`validate` daarna geen afwijking meer op die documenten. Op elk document
-in `lo_beliefs` dat de herspeling bereikt, schrijft het deze velden
-(`BELIEF_FIELDS`), en niets anders:
+Het herspeelt met dezelfde `rules.replay` als `validate`, met dezelfde
+`--regels`: een oefening weegt alleen als onder toezicht als de app ze zo
+bewaarde. Zo toont `validate` daarna geen afwijking meer op die
+documenten. Op elk document in `lo_beliefs` dat de herspeling bereikt,
+schrijft het deze velden (`BELIEF_FIELDS`), en niets anders:
 
 - `alpha` en `beta`: die van de herspeling. Liggen ze binnen 1e-4 van de
   opgeslagen, dan blijven die staan: het zijn dezelfde getallen, twee keer
@@ -543,26 +559,63 @@ in `lo_beliefs` dat de herspeling bereikt, schrijft het deze velden
 - `firstMasteredAt`: de vroegste van de opgeslagen en de herspeelde
   stempel, per oefening. De herspeling stempelt op `turnAt`, de app
   wanneer ze schrijft: op dezelfde oefening blijft de stempel van de app.
-  Nooit leeg: een stempel die de herspeling niet haalt, blijft staan;
+  Nooit leeg: een stempel die de herspeling niet haalt, blijft staan. Een
+  oud document zonder het veld dat de app als aangetoond leest
+  (`belief_math.everMasteredBelief`), krijgt bij haar volgende schrijving
+  de stempel op `lastUpdatedAt`. Zouden de tellingen hieronder of de
+  nieuwe α en β die lezing beëindigen, dan schrijft `replay-beliefs` die
+  stempel zelf, zoals de app (*stempel vastgelegd* in de uitvoer);
 - `highestPositiveDifficulty`: het hoogste van opgeslagen en herspeeld,
   nooit lager;
 - `lastProbedAt` (sinds #275): de laatste rechtstreekse vraag van de
   herspeling (`LoState.last_direct_at`), alleen op een document zonder
-  het veld, en niet als de herspeling er geen heeft (zie hierboven).
+  het veld, en niet als de herspeling er geen heeft (zie hierboven);
+- `ownQuestions`, `ownQuestionsRight` en `ownQuestionsRightNonMcq` (sinds
+  #281, de tellingen van 1.1): elk de grootste van de opgeslagen en de
+  herspeelde telling (`LoState.own_questions`, `own_right`,
+  `own_right_open`). De herspeling telt elke oefening in `turn_history`,
+  ook die de app al telde. De twee juiste tellingen gaan samen, ook als 0
+  op een document zonder: voor de app is een ontbrekende telling geen 0
+  (#279). Een ontbrekend `ownQuestions` leest de app als 0, dus een 0
+  blijft daar weg.
 
-Stempel en hoogste niveau zijn ook in de app eenrichting (#168): dit vult
-aan wat een oude build nooit schreef, en neemt niets weg. Alle andere
-velden blijven zoals de app ze schreef, ook `lastUpdatedAt` en een
-`lastProbedAt` dat er al stond. Een document dat de herspeling niet bereikt (een neutraal
+Stempel, hoogste niveau en tellingen zijn ook in de app eenrichting
+(#168, #279): dit vult aan wat een oude build nooit schreef, en neemt niets
+weg. Alle andere velden blijven zoals de app ze schreef, ook
+`lastUpdatedAt`, een `lastProbedAt` dat er al stond, en `returnWrongAt` en
+`thinCheckedAt` (#275): wat de app met een controlevraag deed, geen
+overtuiging die een herspeling uitrekent. Een document dat de herspeling niet bereikt (een neutraal
 signaal van opzij, geschreven door een build van vóór #204) blijft staan;
 een herspeeld leerdoel zonder document krijgt er geen, dat maakt de app
 bij de volgende schrijving.
 
 De droge run toont per leerling de documenten, hoeveel de herspeling er
 bereikt en hoeveel er zouden veranderen: stempel erbij, stempel vroeger,
-hoogste niveau hoger, α/β anders, klok erbij, met de laatste build zoals
-in `validate`. Werkt een leerling nog op een build zonder `clientVersion`,
-dan staat dat erbij: die build schrijft weer met de oude regels.
+hoogste niveau hoger, α/β anders, klok erbij, tellingen, met de laatste
+build zoals in `validate`. Werkt een leerling nog op een build zonder
+`clientVersion`, dan staat dat erbij: die build schrijft weer met de oude
+regels. Drie kolommen zeggen wat de app daarna anders leest
+(`evaluate.belief_effects`):
+
+- **van plafond**: α + β stond op 18 of meer, het oude plafond waarboven
+  een leerdoel niet meer gevraagd werd, en komt eronder (#278). Dat
+  gebeurt met `--regels 1.1`: zonder herspeelt een oefening van vóór 1.1
+  zonder vergeten;
+- **vastgelopen**: geen stempel, minstens 6 eigen vragen en μ onder 0,6
+  (`rules.is_stuck`, met decay tot nu). Het leerdoel komt terug als
+  controlevraag, eerst een niveau lager (#275). Een document zonder
+  `ownQuestions` leest 0 eigen vragen en loopt pas na zes nieuwe vast;
+- **dun**: een stempel op minder dan 2 juiste eigen vragen
+  (`rules.is_thin_stamp`). Het krijgt één controlevraag, een week na de
+  laatste rechtstreekse vraag; de stempel blijft (#275).
+
+**De herschrijving beslist wie dun is.** In de app is een stempel op een
+document zonder de tellingen van 1.1 nooit dun: de app laat de tellingen
+weg op een document met een stempel, zodat de oude stempels niet allemaal
+tegelijk terugkomen (CONDUCTOR_POLICY §2.6). Vult `replay-beliefs` ze aan,
+met of zonder `--regels`, dan zijn de stempels van vóór 1.1 op minder dan
+twee juiste eigen vragen in de hele log dun, en de kolom *dun* telt ze.
+Zonder herschrijving krijgt geen enkele zo'n controlevraag.
 
 `--apply` weigert in de lestijd van de klas (het lesrooster, 10 minuten
 marge) en als een leerling de laatste 10 minuten actief was; `--force`
@@ -573,6 +626,31 @@ een leerling oefent. Het maakt eerst een back-up van alle
 etag waarmee het gepland werd. Schreef de app intussen, dan blijft dat
 document staan en noemt de uitvoer het: draai het dan opnieuw. Daarna
 `validate --klas`.
+
+### `--regels 1.1`: herschrijven met 1.1 bij de release
+
+Zonder vlag herspeelt `replay-beliefs` elke oefening met de regels van de
+build die ze schreef, zoals het concept en `validate`. Met `--regels 1.1`
+(#281) herspeelt het elke oefening met 1.1 (`rules.Variant(as_11=True)`),
+ook die van vóór 2.13.0: vergeten per antwoord, een meerkeuzevraag die de
+helft weegt, en de vierde voorwaarde voor de stempel. Dat haalt de
+leerdoelen van het plafond, zodat ze meteen weer bewegen (#278). Wat de
+leerkracht daarbij afweegt:
+
+- *stempel erbij* telt dan ook stempels die alleen 1.1 op de oude
+  antwoorden geeft. De app leest die leerdoelen daarna als aangetoond; het
+  concept herspeelt per build en telt zo'n stempel niet;
+- een stempel die 1.1 niet zou geven, blijft staan (#168);
+- controleer daarna met `validate --regels 1.1`.
+
+Bij de release, buiten de lestijd, per klas: eerst droog, dan schrijven,
+dan controleren.
+
+```
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --regels 1.1
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --regels 1.1 --apply
+python tooling/evaluation/evaluate.py validate --klas 6EWI --regels 1.1
+```
 
 ## Varianten voor 1.1 (#248)
 
