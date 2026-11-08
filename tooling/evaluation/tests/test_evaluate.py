@@ -1137,6 +1137,84 @@ class StampRules276Test(unittest.TestCase):
         self.assertTrue(rules.stamp_rules_276({"clientVersion": "2.12.1+30"}))
 
 
+class VariantTest(unittest.TestCase):
+    """#248: the candidate rules for 1.1 replay beside the rule of now, on the
+    same answers. `Variant()` is the rule of now."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.12.0+29"}
+
+    def answer(self, minute: int, quality: str = "correct", **extra) -> dict:
+        signal = "positive" if quality == "correct" else "negative"
+        t = _turn(f"2026-10-28T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType="completeCodeQuestion", overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", "strong", signal)], **self.NEW)
+        t.update(extra)
+        return t
+
+    def lo(self, turns: list[dict], **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[self.KEY]
+
+    def test_the_default_is_the_rule_of_now(self):
+        turns = [self.answer(m, q) for m, q in enumerate(["wrong", "correct", "correct", "wrong", "correct"])]
+        now, default = rules.replay(turns, GOALS)[self.KEY], self.lo(turns)
+        self.assertEqual((now.alpha, now.beta, now.first_mastered_at), (default.alpha, default.beta, default.first_mastered_at))
+
+    def test_three_right_in_a_row_stamp_after_a_bad_start(self):
+        turns = [self.answer(m, "wrong") for m in range(6)] + [self.answer(m, "correct") for m in range(6, 9)]
+        self.assertIsNone(self.lo(turns).first_mastered_at)  # μ ≈ 0.42
+        lo = self.lo(turns, streak=3)
+        self.assertLess(lo.mean, rules.MASTERY_MEAN)
+        self.assertEqual(lo.first_mastered_at, rules.parse_at("2026-10-28T09:08:00Z"))
+
+    def test_the_streak_skips_multiple_choice_and_breaks_on_a_partial(self):
+        mcq = self.answer(10, questionType="mcQuestion")
+        partial = self.answer(11, overallQuality="partial")  # a positive signal, not right
+        turns = [self.answer(m, "wrong") for m in range(6)]
+        skipped = turns + [self.answer(6), self.answer(7), mcq, self.answer(12)]
+        broken = turns + [self.answer(6), self.answer(7), partial, self.answer(12)]
+        self.assertIsNotNone(self.lo(skipped, streak=3).first_mastered_at)
+        self.assertIsNone(self.lo(broken, streak=3).first_mastered_at)
+        mcqs = turns + [self.answer(6), self.answer(7, questionType="mcQuestion")]
+        self.assertIsNone(self.lo(mcqs, streak=3).first_mastered_at)
+        self.assertIsNone(self.lo(mcqs, streak=2).first_mastered_at)
+        self.assertIsNotNone(self.lo(mcqs, streak=2, streak_counts_mcq=True).first_mastered_at)
+
+    def test_no_stamp_on_multiple_choice_alone(self):
+        mcqs = [self.answer(m, questionType="mcQuestion") for m in range(3)]
+        self.assertIsNotNone(self.lo(mcqs).first_mastered_at)
+        self.assertIsNotNone(self.lo(mcqs, min_own_right=2).first_mastered_at)
+        self.assertIsNone(self.lo(mcqs, min_own_right=2, min_open_right=1).first_mastered_at)
+        lo = self.lo(mcqs + [self.answer(5)], min_own_right=2, min_open_right=1)
+        self.assertEqual(lo.first_mastered_at, rules.parse_at("2026-10-28T09:05:00Z"))
+
+    def test_a_side_signal_does_not_count_as_an_own_question(self):
+        side = _turn("2026-10-28T09:00:00Z", "sg-b", "predict_b2", uid="u-x",
+                     questionType="completeCodeQuestion", difficulty="hard",
+                     loSignals=[_sig("sg-b", "predict_b2"), _sig("sg-b", "predict_b1")], **self.NEW)
+        turns = [side, self.answer(5, difficulty="hard", calibrationBefore="hard")]
+        self.assertIsNotNone(self.lo(turns).first_mastered_at)
+        self.assertIsNone(self.lo(turns, min_own_right=2).first_mastered_at)
+
+    def test_a_multiple_choice_positive_weighs_the_factor(self):
+        lo = self.lo([self.answer(0, questionType="mcQuestion")], mcq_positive=0.5)
+        self.assertAlmostEqual(lo.alpha, 1 + 2.0 * 0.5)
+
+    def test_forgetting_shrinks_the_old_answers_before_the_new_one(self):
+        turns = [self.answer(0, "wrong"), self.answer(1)]
+        lo = self.lo(turns, forget=0.8)
+        self.assertAlmostEqual(lo.beta, 1 + 2.0 * 0.8, places=3)  # and a minute of decay
+        self.assertAlmostEqual(lo.alpha, 1 + 2.0)
+        many = [self.answer(m) for m in range(40)]
+        self.assertLess(self.lo(many, forget=0.8).evidence, 2 + 2.0 / (1 - 0.8) + 1e-9)
+
+    def test_as_276_replays_an_older_build_with_the_stamp_of_now(self):
+        old = self.answer(0, difficulty="hard", calibrationBefore="hard", provenance="supervised",
+                          clientVersion="2.11.0+28")
+        self.assertIsNotNone(self.lo([old]).first_mastered_at)
+        self.assertIsNone(self.lo([old], as_276=True).first_mastered_at)
+
+
 class NotchDropReplayTest(unittest.TestCase):
     """#227: a question the app asked a notch below the calibration
     (CONDUCTOR_POLICY §2.3, either rule) replays from the turn's own

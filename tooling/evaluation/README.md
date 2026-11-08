@@ -483,6 +483,32 @@ etag waarmee het gepland werd. Schreef de app intussen, dan blijft dat
 document staan en noemt de uitvoer het: draai het dan opnieuw. Daarna
 `validate --klas`.
 
+## Varianten voor 1.1 (#248)
+
+`rules.replay(..., variant=rules.Variant(...))` herspeelt dezelfde
+antwoorden met een kandidaat-regel voor formule 1.1 (#249). Een variant is
+geen regelversie: `RULES_VERSION` blijft staan tot de leerkracht kiest en
+de app de regel overneemt. `Variant()` is de regel van nu.
+
+- `as_276`: elke beurt met de stempel van #276, welke build ze ook schreef;
+  wat de kandidaat met deze antwoorden gedaan zou hebben, niet wat de app
+  deed.
+- `forget` (λ, #278): vóór nieuw bewijs krimpt wat een leerdoel boven de
+  prior heeft met die factor; met `forget_own_only` alleen bij een eigen
+  vraag.
+- `streak` (#246): zoveel eigen vragen juist op rij geven de stempel,
+  vanaf `streak_level`, meerkeuzevragen niet (tenzij `streak_counts_mcq`).
+- `min_own_right`, `min_open_right` en `mcq_positive` (#279): geen stempel
+  vóór zoveel juiste eigen vragen, waarvan zoveel geen meerkeuzevraag, en
+  het gewicht van een positief signaal op een meerkeuzevraag.
+
+Een *eigen vraag* is een rechtstreekse vraag met het leerdoel als doel,
+geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal.
+De vergelijking zelf draaide één keer, buiten de repo
+(`~/ai-tutor-evaluaties/analyse-2026-11-08`): een herspeling voegt geen
+vragen toe, dus een strengere regel toont daar alleen wat ze tegenhoudt, en
+de vragen die de conductor nog gesteld zou hebben, zijn een schatting.
+
 ## Grenzen
 
 - De replay leest `loSignals` en `transferCredits` (sinds `eval2`; `eval1`

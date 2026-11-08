@@ -339,6 +339,13 @@ class LoState:
     # already set, cleared by every write that is not incidental (§2.4),
     # follow-ups and neutrals included.
     regressed_at: dt.datetime | None = None
+    # The LO's own questions (target, no follow-up) answered right — a
+    # `correct` answer with a positive signal on it — for a `Variant` (#246,
+    # #279): all of them, those that were no multiple choice, and the run of
+    # the streak.
+    own_right: int = 0
+    own_right_open: int = 0
+    own_streak: int = 0
 
     @property
     def mean(self) -> float:
@@ -388,6 +395,55 @@ def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
         elif excess_capacity <= 0:
             a = b = PRIOR
     return a + da, b + db
+
+
+@dataclass(frozen=True)
+class Variant:
+    """A candidate rule for formula 1.1 (#249), replayed beside the current
+    one to compare them (#248). No rule set: `RULES_VERSION` stays until the
+    teacher picks one and the app takes it over. `Variant()` changes nothing.
+
+    An *own question* is a direct question with the LO as its target, no
+    follow-up; it is *right* when the answer was `correct` and the signal on
+    the LO positive. A `partial` with a positive signal is not right."""
+
+    # Every turn replays with the stamp rules of #276, whatever build wrote
+    # it: what the candidate would have done on these answers, not what the
+    # app did.
+    as_276: bool = False
+    # #278: before evidence lands on an LO, what it holds above the prior
+    # shrinks by this factor (λ). The cap stays, as a backstop it hardly
+    # reaches. With `forget_own_only` only an own question shrinks.
+    forget: float | None = None
+    forget_own_only: bool = False
+    # #246: this many own questions right in a row stamp the LO, whatever
+    # μ. Only an answer at `streak_level` or higher and no multiple choice
+    # (unless `streak_counts_mcq`) counts; a right one that does not count
+    # leaves the run alone, a neutral too, anything else ends it.
+    streak: int | None = None
+    streak_level: str = "medium"
+    streak_counts_mcq: bool = False
+    # #279: no stamp before this many own questions right, and this many of
+    # them no multiple choice.
+    min_own_right: int = 0
+    min_open_right: int = 0
+    # #279: the weight of a positive signal on a multiple-choice turn.
+    mcq_positive: float = 1.0
+
+
+CURRENT = Variant()
+
+
+def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
+    return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
+
+
+def _stamps(lo: LoState, evidence_min: float, v: Variant) -> bool:
+    if lo.own_right < v.min_own_right or lo.own_right_open < v.min_open_right:
+        return False
+    if v.streak and lo.own_streak >= v.streak:
+        return True
+    return lo.mastered_at(evidence_min)
 
 
 def same_root_backward(goals: dict, signal_sg: str, active_sg: str) -> bool:
@@ -473,8 +529,12 @@ def replay(
     drop_incidental_negatives: bool = True,
     apply_transfer_credits: bool = True,
     supervised: Callable[[dict], bool] = recorded_supervised,
+    variant: Variant = CURRENT,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
+
+    [variant] replays a candidate rule for 1.1 instead (#248); the default
+    is the rule of now.
 
     [supervised] says which turns weigh ×`SUPERVISED_WEIGHT_FACTOR`, every
     signal and transfer credit of the turn (PUNTENFORMULE §2.7). The default
@@ -505,8 +565,10 @@ def replay(
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
         s_factor = SUPERVISED_WEIGHT_FACTOR if supervised(t) else 1.0
-        rules_276 = stamp_rules_276(t)
+        rules_276 = stamp_rules_276(t) or variant.as_276
         evidence_min = MASTERY_EVIDENCE if rules_276 else MASTERY_EVIDENCE_BEFORE_276
+        mcq = t.get("questionType") == "mcQuestion"
+        right = t.get("overallQuality") == "correct"
         for s in t.get("loSignals") or []:
             kind = s.get("signal")
             if kind not in ("positive", "negative", "neutral"):
@@ -537,6 +599,12 @@ def replay(
                 strength = "weak"  # §6.2
             eff_diff = "medium" if (follow_up or incidental) else diff
             base = WEIGHT.get(strength, 1.0) * s_factor
+            target = sig_sg == scope.probed and s["loId"] == scope.target
+            own = target and not follow_up and not incidental
+            if kind == "positive" and mcq:
+                base *= variant.mcq_positive
+            if variant.forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
+                a, b = _shrink(a, b, variant.forget)
             if kind == "positive":
                 a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
             elif kind == "negative":
@@ -558,10 +626,17 @@ def replay(
                 elif kind == "negative":
                     lo.n_follow_up_neg += 1
             direct = not follow_up and not incidental
+            if own and kind == "positive" and right:
+                lo.own_right += 1
+                if not mcq:
+                    lo.own_right_open += 1
+                if (not mcq or variant.streak_counts_mcq) and DIFF_ORDER[diff] >= DIFF_ORDER[variant.streak_level]:
+                    lo.own_streak += 1
+            elif own and kind != "neutral":
+                lo.own_streak = 0
             if direct:
                 lo.n_direct += 1
                 lo.last_direct_at = now
-                target = sig_sg == scope.probed and s["loId"] == scope.target
                 asked_as = ""
                 if target and t.get("isRecheck"):
                     asked_as = "recheck"
@@ -576,7 +651,7 @@ def replay(
                         lo.positive_at_calibrated_at = now
                     if DIFF_ORDER[diff] > DIFF_ORDER[lo.ratchet]:
                         lo.ratchet = diff
-            if lo.first_mastered_at is None and lo.mastered_at(evidence_min):
+            if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
                 lo.first_mastered_at = now
         if apply_transfer_credits:
             # Transfer credit (#101, CONDUCTOR_POLICY §3.7). After the turn's
@@ -592,10 +667,12 @@ def replay(
             for c in t.get("transferCredits") or []:
                 lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
+                if variant.forget is not None and not variant.forget_own_only:
+                    a, b = _shrink(a, b, variant.forget)
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1
-                if lo.first_mastered_at is None and lo.mastered_at(evidence_min):
+                if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
                     lo.first_mastered_at = now
     return st
 
