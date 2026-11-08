@@ -32,6 +32,18 @@ stays where the app put it (#168). The stuck rule moved to own questions
 (≥ 6 and μ < 0.6, CONDUCTOR_POLICY §4.4); stuck moves neither M nor P, so
 the replay only counts them (`LoState.own_questions`).
 
+The same build brings #279, in the same rule set: a positive signal of a
+multiple-choice question weighs ×0.5 (`MCQ_POSITIVE`), from the bank's key
+or the grader, on the target and from the side — not on a follow-up on
+one, which is free text — and the stamp wants a fourth condition: at
+least two own questions answered right (`STAMP_OWN_RIGHT_MIN`), one of
+them no multiple choice (`STAMP_OWN_RIGHT_NON_MCQ_MIN`). The replay counts
+them over the whole log, every build (`LoState.own_right`,
+`LoState.own_right_open`), as the app keeps them (`ownQuestionsRight`,
+`ownQuestionsRightNonMcq` on `lo_beliefs`); the app starts its count at
+the release, so `validate` agrees on a doc the release filled (#281). It
+is `Variant(min_own_right=2, min_open_right=1, mcq_positive=0.5)` of #248.
+
 `eval7` (#276) follows the app's stamp from the build that fixed it
 (`STAMP_RULES_276_FROM`, by the turn's `clientVersion`): mastery needs
 evidence ≥ 5.75 instead of 4 (two right answers, not one — in the lesson
@@ -126,6 +138,14 @@ EVIDENCE_CAP = 20.0
 # that brought it (`rules_11`); the teacher chose 0.7 on the replay of #248.
 FORGET = 0.7
 RULES_11_FROM = (2, 13, 0)
+# #279, from the same build: a right pick weighs half
+# (`PolicyConstants.multipleChoicePositiveFactor`), and the stamp wants two
+# own questions answered right, one of them no multiple choice
+# (`PolicyConstants.masteryRightOwnQuestionsMin`,
+# `masteryRightNonMcqQuestionsMin`).
+MCQ_POSITIVE = 0.5
+STAMP_OWN_RIGHT_MIN = 2
+STAMP_OWN_RIGHT_NON_MCQ_MIN = 1
 DECAY_HALF_LIFE_DAYS = 60.0  # the conductor decays on every write; replay must too
 
 WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
@@ -295,9 +315,10 @@ def stamp_rules_276(turn: dict) -> bool:
 
 
 def rules_11(turn: dict) -> bool:
-    """Whether the build that wrote [turn] computes with formula 1.1
-    (#278): forgetting per answer (`FORGET`), and the stamp of #276. Older
-    builds, and turns without `clientVersion`, only shrank at the cap."""
+    """Whether the build that wrote [turn] computes with formula 1.1:
+    forgetting per answer (`FORGET`, #278), a pick at half weight and the
+    stamp's fourth condition (#279), and the stamp of #276. Older builds,
+    and turns without `clientVersion`, only shrank at the cap."""
     v = build_version(turn)
     return v is not None and v >= RULES_11_FROM
 
@@ -369,8 +390,10 @@ class LoState:
     # the app counts as `ownQuestions` for the stuck rule.
     own_questions: int = 0
     # The LO's own questions answered right — a `correct` answer with a
-    # positive signal on it — for a `Variant` (#246, #279): all of them,
-    # those that were no multiple choice, and the run of the streak.
+    # positive signal on it, once per question — all of them and those that
+    # were no multiple choice: the app's `ownQuestionsRight` and
+    # `ownQuestionsRightNonMcq`, the stamp's fourth condition since 1.1
+    # (#279). And the run of the streak, for a `Variant` (#246).
     own_right: int = 0
     own_right_open: int = 0
     own_streak: int = 0
@@ -429,9 +452,10 @@ def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
 class Variant:
     """A candidate rule for formula 1.1 (#249), replayed beside the current
     one to compare them (#248). No rule set of its own: `Variant()` is the
-    rule set of now, each turn by the build that wrote it. The chosen one,
-    `forget=0.7`, is that rule set since `eval8` (#278); `as_11` replays
-    every turn with it.
+    rule set of now, each turn by the build that wrote it. The chosen ones,
+    `forget=0.7` (#278) and `min_own_right=2, min_open_right=1,
+    mcq_positive=0.5` (#279), are that rule set since `eval8`; `as_11`
+    replays every turn with them.
 
     An *own question* is a direct question with the LO as its target, no
     follow-up; it is *right* when the answer was `correct` and the signal on
@@ -459,11 +483,14 @@ class Variant:
     streak_level: str = "medium"
     streak_counts_mcq: bool = False
     # #279: no stamp before this many own questions right, and this many of
-    # them no multiple choice.
-    min_own_right: int = 0
-    min_open_right: int = 0
-    # #279: the weight of a positive signal on a multiple-choice turn.
-    mcq_positive: float = 1.0
+    # them no multiple choice. Set, it holds for every turn; unset, a turn
+    # of 1.1 asks `STAMP_OWN_RIGHT_MIN` and `STAMP_OWN_RIGHT_NON_MCQ_MIN`.
+    min_own_right: int | None = None
+    min_open_right: int | None = None
+    # #279: the weight of a positive signal on a multiple-choice turn, not
+    # a follow-up on one. Set, it holds for every turn; unset, a turn of
+    # 1.1 weighs `MCQ_POSITIVE`.
+    mcq_positive: float | None = None
 
 
 CURRENT = Variant()
@@ -473,8 +500,8 @@ def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
     return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
 
 
-def _stamps(lo: LoState, evidence_min: float, v: Variant) -> bool:
-    if lo.own_right < v.min_own_right or lo.own_right_open < v.min_open_right:
+def _stamps(lo: LoState, evidence_min: float, v: Variant, min_right: int, min_open: int) -> bool:
+    if lo.own_right < min_right or lo.own_right_open < min_open:
         return False
     if v.streak and lo.own_streak >= v.streak:
         return True
@@ -604,8 +631,16 @@ def replay(
         rules_276 = stamp_rules_276(t) or variant.as_276 or r11
         evidence_min = MASTERY_EVIDENCE if rules_276 else MASTERY_EVIDENCE_BEFORE_276
         forget = variant.forget if variant.forget is not None else (FORGET if r11 else None)
+        min_right = variant.min_own_right if variant.min_own_right is not None else (
+            STAMP_OWN_RIGHT_MIN if r11 else 0)
+        min_open = variant.min_open_right if variant.min_open_right is not None else (
+            STAMP_OWN_RIGHT_NON_MCQ_MIN if r11 else 0)
         own_counted = False
         mcq = t.get("questionType") == "mcQuestion"
+        # #279: a pick weighs half; a follow-up on one is free text (§6.2).
+        pick = mcq and not follow_up
+        mcq_factor = variant.mcq_positive if variant.mcq_positive is not None else (
+            MCQ_POSITIVE if r11 else 1.0)
         right = t.get("overallQuality") == "correct"
         for s in t.get("loSignals") or []:
             kind = s.get("signal")
@@ -639,8 +674,8 @@ def replay(
             base = WEIGHT.get(strength, 1.0) * s_factor
             target = sig_sg == scope.probed and s["loId"] == scope.target
             own = target and not follow_up and not incidental
-            if kind == "positive" and mcq:
-                base *= variant.mcq_positive
+            if kind == "positive" and pick:
+                base *= mcq_factor
             if forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
                 a, b = _shrink(a, b, forget)
             if kind == "positive":
@@ -664,16 +699,19 @@ def replay(
                 elif kind == "negative":
                     lo.n_follow_up_neg += 1
             direct = not follow_up and not incidental
-            if own and not own_counted:
-                lo.own_questions += 1  # once per question, should the grader name it twice
+            # Once per question, should the grader name the target twice:
+            # the first signal on it is the question's, as in the app.
+            first_own = own and not own_counted
+            if first_own:
+                lo.own_questions += 1
                 own_counted = True
-            if own and kind == "positive" and right:
+            if first_own and kind == "positive" and right:
                 lo.own_right += 1
                 if not mcq:
                     lo.own_right_open += 1
                 if (not mcq or variant.streak_counts_mcq) and DIFF_ORDER[diff] >= DIFF_ORDER[variant.streak_level]:
                     lo.own_streak += 1
-            elif own and kind != "neutral":
+            elif first_own and kind != "neutral":
                 lo.own_streak = 0
             if direct:
                 lo.n_direct += 1
@@ -692,7 +730,7 @@ def replay(
                         lo.positive_at_calibrated_at = now
                     if DIFF_ORDER[diff] > DIFF_ORDER[lo.ratchet]:
                         lo.ratchet = diff
-            if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
+            if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                 lo.first_mastered_at = now
         if apply_transfer_credits:
             # Transfer credit (#101, CONDUCTOR_POLICY §3.7). After the turn's
@@ -713,7 +751,7 @@ def replay(
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1
-                if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
+                if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                     lo.first_mastered_at = now
     return st
 

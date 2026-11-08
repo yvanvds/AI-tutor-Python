@@ -100,6 +100,10 @@ Map<String, dynamic> _almostMastered(DateTime now) => {
   'lastPositiveAtCalibratedAt': now.toIso8601String(),
   'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
+  // One right own question on record, no pick (#279): the grade is the
+  // second.
+  'ownQuestionsRight': 1,
+  'ownQuestionsRightNonMcq': 1,
 };
 
 http.Response _ok(String body) => http.Response(

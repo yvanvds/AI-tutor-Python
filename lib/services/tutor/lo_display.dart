@@ -9,10 +9,10 @@
 // question and answer, holds them for the session, and publishes them in
 // [subgoalLoDisplayProvider].
 
-import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
+import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,24 +33,45 @@ enum LoDisplayState {
 
 /// The segment an LO gets from its belief as it is now: [snap] is the
 /// decayed `(α, β)`, [calibration] the student's level, [ownQuestions] the
-/// doc's count of own questions (`LoBelief.ownQuestions`, #278).
+/// doc's count of own questions (`LoBelief.ownQuestions`, #278), and
+/// [ownQuestionsRight] and [ownQuestionsRightNonMcq] how many of them were
+/// right, and right without multiple choice (#279; `null` on a doc
+/// without the counts, read as 0).
 ///
 /// Full when the LO was ever mastered ([firstMasteredAt], the one-way
-/// reading the grade uses, #168), is mastered now (§4.1) or is stuck
-/// (§4.4); half when one right answer would master it; empty otherwise.
+/// reading the grade uses, #168), is mastered now (§4.1, the four
+/// conditions of `belief_math.isMastered`) or is stuck (§4.4); half when
+/// one right answer would master it; empty otherwise.
 LoDisplayState loDisplayStateOf({
   required BeliefSnapshot snap,
   required DateTime? lastPositiveAtCalibratedAt,
   required DateTime? firstMasteredAt,
   required QuestionDifficulty calibration,
   required int ownQuestions,
+  int? ownQuestionsRight,
+  int? ownQuestionsRightNonMcq,
 }) {
   if (firstMasteredAt != null) return LoDisplayState.full;
-  if (lastPositiveAtCalibratedAt != null && meetsMasteryMeanAndEvidence(snap)) {
+  // A doc without the counts is from before 1.1: over the bar it is a
+  // stamp an old build gave and did not write (`belief_math.everMastered`),
+  // which needs no condition 4.
+  final countsKept =
+      ownQuestionsRight != null || ownQuestionsRightNonMcq != null;
+  if (lastPositiveAtCalibratedAt != null &&
+      meetsMasteryMeanAndEvidence(snap) &&
+      (!countsKept ||
+          meetsOwnQuestionsCondition(
+            ownQuestionsRight: ownQuestionsRight,
+            ownQuestionsRightNonMcq: ownQuestionsRightNonMcq,
+          ))) {
     return LoDisplayState.full;
   }
   if (isStuck(snap, ownQuestions: ownQuestions)) return LoDisplayState.full;
-  if (oneRightAnswerMasters(snap: snap, calibration: calibration)) {
+  if (oneRightAnswerMasters(
+    snap: snap,
+    calibration: calibration,
+    ownQuestionsRight: ownQuestionsRight,
+  )) {
     return LoDisplayState.half;
   }
   return LoDisplayState.empty;
@@ -59,8 +80,14 @@ LoDisplayState loDisplayStateOf({
 /// Whether one right answer would master an LO at [snap]: a
 /// `(positive, strong)` at [calibration], with the home factor (× 1.0),
 /// applied to [snap] as every answer is — forgetting, then the cap (§3.4,
-/// #278) — meets conditions 1 and 2 of §4.1. Condition 3 that answer meets
-/// itself: it is a positive at calibration.
+/// #278) — meets conditions 1 and 2 of §4.1
+/// (`belief_math.oneRightAnswerMeetsMeanAndEvidence`). Condition 3 that
+/// answer meets itself: it is a positive at calibration. Condition 4 (#279)
+/// too, when the LO already has one right own question
+/// ([ownQuestionsRight]; `null` reads 0) and the answer is no multiple
+/// choice — the type the conductor then asks (§2.2,
+/// `belief_math.needsNonMcqQuestion`). Without a right own question one
+/// answer cannot master an LO, whatever its belief.
 ///
 /// From the prior that is never true — one strong positive at hard leaves
 /// μ at 0.79 and the evidence at 4.8, under 5.75 (#276). After one right
@@ -71,20 +98,16 @@ LoDisplayState loDisplayStateOf({
 bool oneRightAnswerMasters({
   required BeliefSnapshot snap,
   required QuestionDifficulty calibration,
+  int? ownQuestionsRight,
 }) {
-  final deltas = signalDeltas(
-    kind: LoSignalKind.positive,
-    strength: LoSignalStrength.strong,
-    difficulty: calibration,
-    provenance: EvidenceProvenance.home,
+  if ((ownQuestionsRight ?? 0) + 1 <
+      PolicyConstants.masteryRightOwnQuestionsMin) {
+    return false;
+  }
+  return oneRightAnswerMeetsMeanAndEvidence(
+    snap: snap,
+    calibration: calibration,
   );
-  final next = applyEvidence(
-    alpha: snap.alpha,
-    beta: snap.beta,
-    alphaDelta: deltas.alphaDelta,
-    betaDelta: deltas.betaDelta,
-  );
-  return meetsMasteryMeanAndEvidence(next);
 }
 
 /// The segment to show, given what it showed so far this session ([held],

@@ -90,6 +90,8 @@ Map<String, dynamic> printAdvancedPast(DateTime at) => {
 /// last asked directly at [probedAt], last written at [updatedAt]. Close
 /// enough that one right answer takes it over: since #278 the answer
 /// forgets first, and from μ 0.77 it would leave the LO at 0.80 exactly.
+/// One right own question on record, no pick (#279): the check question's
+/// right answer is the second, which the stamp wants.
 Map<String, dynamic> nearBelief({
   required DateTime probedAt,
   required DateTime updatedAt,
@@ -105,6 +107,8 @@ Map<String, dynamic> nearBelief({
   'lastQuestionType': 'completeCodeQuestion',
   'recentNegativesAtCalibrated': 0,
   'lastProbedAt': probedAt.toIso8601String(),
+  'ownQuestionsRight': 1,
+  'ownQuestionsRightNonMcq': 1,
 };
 
 /// The seeded account with a full calibration window at medium: [correct]

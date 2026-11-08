@@ -1308,7 +1308,8 @@ void main() {
     });
 
     test('a side signal on another LO of the subgoal moves no ratchet, so two '
-        'of them do not stamp it; its own question then does', () async {
+        'of them do not stamp it; since #279 its first own question does '
+        'not either, the second does', () async {
       final s = await setup();
       await rightInLesson(s.c, lo1, ['lo1', 'lo2']);
       await rightInLesson(s.c, lo1, ['lo1', 'lo2']);
@@ -1330,10 +1331,22 @@ void main() {
       // lo1, the question's target, is stamped.
       expect(belief(s.f, 'lo1').firstMasteredAt, isNotNull);
 
+      // The side weight carries it over the bar on one own question: the
+      // 31 stamps of #279 that fell so. Condition 4 wants two.
       await rightInLesson(s.c, lo2, ['lo2']);
       final asked = belief(s.f, 'lo2');
-      expect(asked.firstMasteredAt, isNotNull);
+      expect(
+        meetsMasteryMeanAndEvidence(BeliefSnapshot(asked.alpha, asked.beta)),
+        isTrue,
+      );
+      expect(asked.lastPositiveAtCalibratedAt, isNotNull);
       expect(asked.highestPositiveDifficulty, QuestionDifficulty.hard);
+      expect(asked.ownQuestionsRight, 1);
+      expect(asked.firstMasteredAt, isNull);
+
+      await rightInLesson(s.c, lo2, ['lo2']);
+      expect(belief(s.f, 'lo2').ownQuestionsRight, 2);
+      expect(belief(s.f, 'lo2').firstMasteredAt, isNotNull);
     });
   });
 
@@ -2235,6 +2248,591 @@ void main() {
     );
   });
 
+  group('#279 a pick weighs half; the stamp wants two right own questions, '
+      'one of them no pick', () {
+    const recallLo = LearningObjective(
+      id: 'lo-r',
+      statement: 'r',
+      kind: LoKind.recall,
+    );
+    const predictLo = LearningObjective(
+      id: 'lo-p',
+      statement: 'p',
+      kind: LoKind.predict,
+    );
+    const applyLo = LearningObjective(
+      id: 'lo-a',
+      statement: 'a',
+      kind: LoKind.apply,
+    );
+    const oldLo = LearningObjective(
+      id: 'lo-old',
+      statement: 'old',
+      kind: LoKind.recall,
+    );
+    final earlier = Goal(
+      id: 's0',
+      title: 's0',
+      parentId: 'r',
+      order: 0,
+      objectives: const [oldLo],
+    );
+    final subgoal = Goal(
+      id: 's',
+      title: 's',
+      parentId: 'r',
+      order: 1,
+      objectives: const [recallLo, predictLo, applyLo],
+    );
+    final next = Goal(
+      id: 's2',
+      title: 's2',
+      parentId: 'r',
+      order: 2,
+      objectives: const [
+        LearningObjective(id: 'lo-n', statement: 'n', kind: LoKind.apply),
+      ],
+    );
+    final now = DateTime.now().toUtc();
+    final hourAgo = now.subtract(const Duration(hours: 1));
+    DateTime daysAgo(int d) => now.subtract(Duration(days: d));
+
+    /// A full calibration window, every answer right at [at]: the recent
+    /// work a near goal's recheck wants (§2.6).
+    List<CalibrationAnswer> goodWindow(QuestionDifficulty at) => [
+      for (var i = 0; i < PolicyConstants.calibrationWindow; i++)
+        CalibrationAnswer(
+          quality: AnswerQuality.correct,
+          difficulty: at,
+          at: daysAgo(1),
+        ),
+    ];
+
+    /// The student on [subgoal], "s0" left behind ten days ago. [recent]
+    /// is the calibration window, empty by default, so the answers of a
+    /// test do not promote the student.
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LoBelief> beliefs, {
+      QuestionDifficulty calibration = QuestionDifficulty.medium,
+      List<CalibrationAnswer> recent = const [],
+    }) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      f.roots.add(root);
+      f.children[root.id] = [earlier, subgoal, next];
+      f.progressById['s0'] = Progress(
+        goalID: 's0',
+        progress: 0.0,
+        advancedAt: daysAgo(10),
+      );
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = StudentCalibration(
+        difficulty: calibration,
+        recentAnswers: recent,
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(f.selection.activeChildGoal?.id, 's');
+      return (c: c, f: f);
+    }
+
+    /// A doc written [at] (an hour ago by default), right at calibration
+    /// unless [atCalibration] is false. [right] and [nonMcq]: its right
+    /// own questions, and those no pick; missing by default, a doc from
+    /// before 1.1.
+    LoBelief seeded(
+      String loId,
+      double alpha,
+      double beta, {
+      String subgoalId = 's',
+      bool atCalibration = true,
+      DateTime? firstMasteredAt,
+      int? right,
+      int? nonMcq,
+      DateTime? at,
+      DateTime? probedAt,
+    }) {
+      final written = at ?? hourAgo;
+      return LoBelief(
+        subgoalId: subgoalId,
+        loId: loId,
+        alpha: alpha,
+        beta: beta,
+        lastUpdatedAt: written,
+        lastQuestionType: 'mcQuestion',
+        lastPositiveAtCalibratedAt: atCalibration ? written : null,
+        highestPositiveDifficulty: atCalibration
+            ? QuestionDifficulty.medium
+            : null,
+        firstMasteredAt: firstMasteredAt,
+        lastProbedAt: probedAt ?? written,
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
+      );
+    }
+
+    /// Mastered and stamped: the selection passes it by.
+    LoBelief done(String loId) =>
+        seeded(loId, 9, 1, firstMasteredAt: hourAgo, right: 2, nonMcq: 2);
+
+    /// Every LO of the subgoal but [loId] done, and [b] for [loId].
+    List<LoBelief> onlyOpen(LoBelief b) => [
+      b,
+      for (final id in ['lo-r', 'lo-p', 'lo-a'])
+        if (id != b.loId) done(id),
+    ];
+
+    GradedSignal on(
+      String loId,
+      LoSignalKind kind, {
+      String subgoalId = 's',
+      LoSignalStrength strength = LoSignalStrength.strong,
+    }) => GradedSignal(
+      subgoalId: subgoalId,
+      loId: loId,
+      kind: kind,
+      strength: strength,
+    );
+
+    QuestionPlan planOn(
+      LearningObjective lo, {
+      ChatRequestType type = ChatRequestType.completeCodeQuestion,
+      QuestionDifficulty difficulty = QuestionDifficulty.medium,
+    }) => QuestionPlan(
+      type: type,
+      difficulty: difficulty,
+      targetLOs: [lo],
+      reason: const TurnSelectionReason(
+        candidateLOs: [],
+        chosenReason: 'test',
+        notchDropFired: false,
+      ),
+    );
+
+    Future<TurnOutcome> answer(
+      Conductor c,
+      QuestionPlan plan,
+      AnswerQuality quality,
+      List<GradedSignal> signals, {
+      bool isFollowUp = false,
+      EvidenceProvenance provenance = EvidenceProvenance.home,
+    }) {
+      c.notePlannedQuestion(plan);
+      return c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: quality,
+          signals: signals,
+          isFollowUp: isFollowUp,
+          chainDepth: isFollowUp ? 1 : 0,
+          provenance: provenance,
+        ),
+      );
+    }
+
+    LoBelief stored(_Fakes f, String loId, {String subgoalId = 's'}) =>
+        f.beliefs[f._key(subgoalId, loId)]!;
+
+    test('a right pick weighs half, on the target and from the side; a wrong '
+        'pick, and a follow-up on a pick, weigh as before', () async {
+      final s = await setup([]);
+      const pick = ChatRequestType.mcQuestion;
+      final outcome = await answer(
+        s.c,
+        planOn(recallLo, type: pick),
+        AnswerQuality.correct,
+        [on('lo-r', LoSignalKind.positive), on('lo-a', LoSignalKind.positive)],
+      );
+      // strong 2.0 × medium 1.0 × a pick's 0.5.
+      expect(stored(s.f, 'lo-r').alpha, closeTo(2.0, 1e-9));
+      expect(stored(s.f, 'lo-a').alpha, closeTo(2.0, 1e-9));
+      expect(
+        outcome.appliedSignals.map((a) => a.alphaDelta),
+        everyElement(closeTo(1.0, 1e-9)),
+      );
+
+      await answer(s.c, planOn(predictLo, type: pick), AnswerQuality.wrong, [
+        on('lo-p', LoSignalKind.negative),
+      ]);
+      expect(stored(s.f, 'lo-p').beta, closeTo(3.0, 1e-9));
+
+      // A follow-up on the pick is free text: weak, as medium (§6.2).
+      await answer(s.c, planOn(recallLo, type: pick), AnswerQuality.correct, [
+        on('lo-r', LoSignalKind.positive),
+      ], isFollowUp: true);
+      expect(stored(s.f, 'lo-r').alpha, closeTo(1 + 1.0 * 0.7 + 0.5, 1e-3));
+    });
+
+    test('the counts: a right own question counts, a pick not as no pick; a '
+        'partial with a positive, a wrong answer, a side signal and a '
+        'follow-up count for neither', () async {
+      final s = await setup([]);
+      await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
+        on('lo-a', LoSignalKind.positive),
+        on('lo-r', LoSignalKind.positive),
+      ]);
+      expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+      expect(stored(s.f, 'lo-a').ownQuestionsRightNonMcq, 1);
+      // The side signal wrote a doc: it counts from 0.
+      expect(stored(s.f, 'lo-r').ownQuestionsRight, 0);
+      expect(stored(s.f, 'lo-r').ownQuestionsRightNonMcq, 0);
+
+      await answer(s.c, planOn(applyLo), AnswerQuality.partial, [
+        on('lo-a', LoSignalKind.positive, strength: LoSignalStrength.moderate),
+      ]);
+      await answer(s.c, planOn(applyLo), AnswerQuality.wrong, [
+        on('lo-a', LoSignalKind.negative),
+      ]);
+      await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
+        on('lo-a', LoSignalKind.positive),
+      ], isFollowUp: true);
+      expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+      expect(stored(s.f, 'lo-a').ownQuestions, 3);
+
+      await answer(
+        s.c,
+        planOn(recallLo, type: ChatRequestType.mcQuestion),
+        AnswerQuality.correct,
+        [on('lo-r', LoSignalKind.positive)],
+      );
+      expect(stored(s.f, 'lo-r').ownQuestionsRight, 1);
+      expect(stored(s.f, 'lo-r').ownQuestionsRightNonMcq, 0);
+
+      // The grader names the target twice, against the contract (§3.5):
+      // one question, one right one.
+      await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
+        on('lo-a', LoSignalKind.positive),
+        on('lo-a', LoSignalKind.positive, strength: LoSignalStrength.weak),
+      ]);
+      expect(stored(s.f, 'lo-a').ownQuestionsRight, 2);
+      expect(stored(s.f, 'lo-a').ownQuestionsRightNonMcq, 2);
+    });
+
+    test(
+      'no stamp on picks alone: three right picks on hard in the lesson '
+      'take a recall LO over the bar without it; it stays in the selection, '
+      'asked as a socratic question, and that right answer stamps it',
+      () async {
+        final s = await setup([
+          done('lo-p'),
+          done('lo-a'),
+        ], calibration: QuestionDifficulty.hard);
+        final pick = planOn(
+          recallLo,
+          type: ChatRequestType.mcQuestion,
+          difficulty: QuestionDifficulty.hard,
+        );
+        late TurnOutcome outcome;
+        for (var i = 0; i < 3; i++) {
+          outcome = await answer(s.c, pick, AnswerQuality.correct, [
+            on('lo-r', LoSignalKind.positive),
+          ], provenance: EvidenceProvenance.supervised);
+        }
+        // 1.75 a pick (2.0 × 1.4 × 0.5 × 1.25), forgetting before each:
+        // (4.83, 1), μ 0.83 on evidence 5.83 — over the bar.
+        final picked = stored(s.f, 'lo-r');
+        final snap = BeliefSnapshot(picked.alpha, picked.beta);
+        expect(meetsMasteryMeanAndEvidence(snap), isTrue);
+        expect(picked.lastPositiveAtCalibratedAt, isNotNull);
+        expect(picked.ownQuestionsRight, 3);
+        expect(picked.ownQuestionsRightNonMcq, 0);
+        expect(picked.firstMasteredAt, isNull);
+        expect(
+          outcome.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+          isFalse,
+        );
+        expect(outcome.subgoalAdvanced, isFalse);
+
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.targetLOs.single.id, 'lo-r');
+        expect(plan.type, ChatRequestType.socraticQuestion);
+        final last = await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-r', LoSignalKind.positive),
+        ], provenance: EvidenceProvenance.supervised);
+        expect(stored(s.f, 'lo-r').firstMasteredAt, isNotNull);
+        expect(stored(s.f, 'lo-r').ownQuestionsRightNonMcq, 1);
+        expect(last.subgoalAdvanced, isTrue);
+      },
+    );
+
+    test('the type: no pick once a right own question is on record without '
+        'its non-pick — socratic for recall, explainCode for predict; before '
+        'the first right own question a pick is still the way in', () async {
+      Future<QuestionPlan> planFor(
+        LoBelief b, {
+        QuestionDifficulty calibration = QuestionDifficulty.medium,
+      }) async {
+        final s = await setup(onlyOpen(b), calibration: calibration);
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.isOffSubgoal, isFalse);
+        expect(plan.targetLOs.single.id, b.loId);
+        return plan;
+      }
+
+      // (2, 1): one right pick at medium.
+      expect(
+        (await planFor(seeded('lo-r', 2, 1, right: 1, nonMcq: 0))).type,
+        ChatRequestType.socraticQuestion,
+      );
+      expect(
+        (await planFor(seeded('lo-p', 2, 1, right: 1, nonMcq: 0))).type,
+        ChatRequestType.explainCodeQuestion,
+      );
+      // Still at any level.
+      expect(
+        (await planFor(
+          seeded('lo-r', 2, 1, right: 1, nonMcq: 0),
+          calibration: QuestionDifficulty.hard,
+        )).type,
+        ChatRequestType.socraticQuestion,
+      );
+      // Nothing right yet, μ 0.25: the gentlest, a pick.
+      expect(
+        (await planFor(
+          seeded('lo-r', 1, 3, atCalibration: false, right: 0, nonMcq: 0),
+        )).type,
+        ChatRequestType.mcQuestion,
+      );
+      // A doc from before 1.1 reads 0: a pick.
+      expect(
+        (await planFor(seeded('lo-r', 2, 1))).type,
+        ChatRequestType.mcQuestion,
+      );
+    });
+
+    test('the type: picks cannot get there on medium — a run of right picks '
+        'at home stops at evidence 5.33 — so no pick there, even with the '
+        'open question on record; on hard a pick, unless the next right '
+        'answer decides', () async {
+      Future<QuestionPlan> planFor(
+        LoBelief b, {
+        QuestionDifficulty calibration = QuestionDifficulty.medium,
+      }) async {
+        final s = await setup(onlyOpen(b), calibration: calibration);
+        final plan = _expectQuestion(await s.c.planNext());
+        expect(plan.targetLOs.single.id, b.loId);
+        return plan;
+      }
+
+      expect(
+        (await planFor(seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1))).type,
+        ChatRequestType.socraticQuestion,
+      );
+      // Hard, far from the bar: picks can get there, the rotation's pick.
+      expect(
+        (await planFor(
+          seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1),
+          calibration: QuestionDifficulty.hard,
+        )).type,
+        ChatRequestType.mcQuestion,
+      );
+      // Hard, one right answer from the bar — (3.6, 1): a socratic answer
+      // takes it to (5.62, 1), a pick to (4.22, 1), evidence 5.22 — and
+      // the bar shows that segment half, so the answer must count.
+      final s = await setup(
+        onlyOpen(seeded('lo-r', 3.6, 1, right: 2, nonMcq: 1)),
+        calibration: QuestionDifficulty.hard,
+      );
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.type, ChatRequestType.socraticQuestion);
+      expect(
+        {for (final e in s.f.loDisplay!.los) e.loId: e.state}['lo-r'],
+        LoDisplayState.half,
+      );
+    });
+
+    test('a top-up of a mastered subgoal keeps every type', () async {
+      final s = await setup([
+        seeded('lo-r', 7, 1, firstMasteredAt: hourAgo, right: 3, nonMcq: 0),
+        done('lo-p'),
+        done('lo-a'),
+      ]);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.reason.chosenReason, 'all mastered: lowest mean');
+      expect(plan.targetLOs.single.id, 'lo-r');
+      expect(plan.type, ChatRequestType.mcQuestion);
+    });
+
+    test('#278 with #279: a weak side positive drops a just-stamped LO under '
+        'the bar; it is asked again — no pick on medium, where picks cannot '
+        'get back — and one right answer takes it over; the stamp never '
+        'moved', () async {
+      final stamp = hourAgo;
+      final s = await setup([
+        // (5.38, 1): stamped at its third right answer on medium (#278).
+        seeded('lo-r', 5.38, 1, firstMasteredAt: stamp, right: 3, nonMcq: 1),
+        done('lo-p'),
+        done('lo-a'),
+      ]);
+      // A question on lo-a (a top-up) with a weak positive on lo-r from the
+      // side: forgotten to (4.07, 1), + 0.5 — evidence 5.57, under 5.75.
+      final side = await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
+        on('lo-a', LoSignalKind.positive),
+        on('lo-r', LoSignalKind.positive, strength: LoSignalStrength.weak),
+      ]);
+      final dipped = stored(s.f, 'lo-r');
+      expect(dipped.alpha + dipped.beta, lessThan(5.75));
+      expect(
+        side.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+        isFalse,
+      );
+      expect(dipped.firstMasteredAt, stamp);
+
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.targetLOs.single.id, 'lo-r');
+      expect(plan.type, ChatRequestType.socraticQuestion);
+      final back = await answer(s.c, plan, AnswerQuality.correct, [
+        on('lo-r', LoSignalKind.positive),
+      ]);
+      expect(
+        back.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+        isTrue,
+      );
+      expect(stored(s.f, 'lo-r').firstMasteredAt, stamp);
+    });
+
+    test('a stamp from before 1.1 stays, mastered on conditions 1–3, and '
+        'keeps its counts missing — #275 tells it from a thin one by that; a '
+        'doc without a stamp starts counting from 0', () async {
+      final stamp = daysAgo(20);
+      final s = await setup([
+        seeded('lo-a', 9, 1, firstMasteredAt: stamp),
+        seeded('lo-r', 2, 1),
+        // Over the bar without a stamp or counts: a stamp an old build gave
+        // and did not write (everMastered).
+        seeded('lo-p', 9, 1, at: daysAgo(3)),
+      ]);
+      // lo-a is not asked: mastered without counts.
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.targetLOs.single.id, 'lo-r');
+
+      final outcome = await answer(
+        s.c,
+        planOn(applyLo),
+        AnswerQuality.correct,
+        [
+          on('lo-a', LoSignalKind.positive),
+          on('lo-p', LoSignalKind.positive, strength: LoSignalStrength.weak),
+        ],
+      );
+      // The old build's stamp is written, dated to its last write, and the
+      // counts stay missing on it too.
+      final p = stored(s.f, 'lo-p');
+      expect(p.firstMasteredAt, daysAgo(3));
+      expect(p.hasRightCounts, isFalse);
+      final a = stored(s.f, 'lo-a');
+      expect(a.ownQuestions, 1);
+      expect(a.ownQuestionsRight, isNull);
+      expect(a.ownQuestionsRightNonMcq, isNull);
+      expect(a.toMap(uid: 'u').containsKey('ownQuestionsRight'), isFalse);
+      expect(a.firstMasteredAt, stamp);
+      expect(
+        outcome.loStatusAfter.firstWhere((l) => l.loId == 'lo-a').mastered,
+        isTrue,
+      );
+
+      await answer(
+        s.c,
+        planOn(recallLo, type: ChatRequestType.socraticQuestion),
+        AnswerQuality.correct,
+        [on('lo-r', LoSignalKind.positive)],
+      );
+      expect(stored(s.f, 'lo-r').ownQuestionsRight, 1);
+      expect(stored(s.f, 'lo-r').ownQuestionsRightNonMcq, 1);
+    });
+
+    test('the recheck: an LO of an earlier subgoal over the bar on one right '
+        'pick is unconfirmed, asked as a socratic question, and that right '
+        'answer stamps it; a stamp from before 1.1 is not due', () async {
+      final s = await setup([
+        seeded(
+          'lo-old',
+          6,
+          1,
+          subgoalId: 's0',
+          right: 1,
+          nonMcq: 0,
+          at: daysAgo(2),
+          probedAt: daysAgo(10),
+        ),
+      ]);
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.recheck?.rule, RecheckRule.unconfirmed);
+      expect(plan.targetLOs.single.id, 'lo-old');
+      expect(plan.type, ChatRequestType.socraticQuestion);
+      await answer(s.c, plan, AnswerQuality.correct, [
+        on('lo-old', LoSignalKind.positive, subgoalId: 's0'),
+      ]);
+      final after = stored(s.f, 'lo-old', subgoalId: 's0');
+      expect(after.ownQuestionsRight, 2);
+      expect(after.ownQuestionsRightNonMcq, 1);
+      expect(after.firstMasteredAt, after.lastUpdatedAt);
+
+      final old = await setup([
+        seeded(
+          'lo-old',
+          6,
+          1,
+          subgoalId: 's0',
+          firstMasteredAt: daysAgo(30),
+          at: daysAgo(2),
+          probedAt: daysAgo(10),
+        ),
+      ]);
+      expect((await old.c.planNext()).isRecheck, isFalse);
+    });
+
+    test('#278 with #279: a near goal at μ 0.76 whose right own question was '
+        'a pick takes two right rechecks, a week apart, no pick either '
+        'time', () async {
+      final s = await setup([
+        seeded(
+          'lo-old',
+          7.7,
+          2.3,
+          subgoalId: 's0',
+          atCalibration: false,
+          right: 1,
+          nonMcq: 0,
+          at: daysAgo(10),
+        ),
+      ], recent: goodWindow(QuestionDifficulty.medium));
+      final first = _expectQuestion(await s.c.planNext());
+      expect(first.recheck?.rule, RecheckRule.nearGoal);
+      expect(first.type, ChatRequestType.socraticQuestion);
+      await answer(s.c, first, AnswerQuality.correct, [
+        on('lo-old', LoSignalKind.positive, subgoalId: 's0'),
+      ]);
+      // Forgetting first (#278): from 0.76 one right answer reaches 0.799.
+      final once = stored(s.f, 'lo-old', subgoalId: 's0');
+      expect(once.alpha / (once.alpha + once.beta), lessThan(0.8));
+      expect(once.ownQuestionsRight, 2);
+      expect(once.ownQuestionsRightNonMcq, 1);
+      expect(once.firstMasteredAt, isNull);
+
+      // A week later: a near goal again, and still no pick — on medium a
+      // run of picks would never get it over the bar.
+      s.f.beliefs[s.f._key('s0', 'lo-old')] = once.copyWith(
+        lastProbedAt: daysAgo(8),
+      );
+      await s.c.setTarget();
+      final second = _expectQuestion(await s.c.planNext());
+      expect(second.recheck?.rule, RecheckRule.nearGoal);
+      expect(second.type, ChatRequestType.socraticQuestion);
+      await answer(s.c, second, AnswerQuality.correct, [
+        on('lo-old', LoSignalKind.positive, subgoalId: 's0'),
+      ]);
+      final twice = stored(s.f, 'lo-old', subgoalId: 's0');
+      expect(twice.firstMasteredAt, twice.lastUpdatedAt);
+    });
+  });
+
   // ---- §8.2 signalEvents ---------------------------------------------------
   group('§8.2 signalEvents emission', () {
     test('stuck-LO advance emits stuckLoAdvance + advances subgoal', () async {
@@ -2683,12 +3281,15 @@ void main() {
       );
 
       final b = f.beliefs.values.single;
-      // strong 2.0 x hard 1.4 on a positive.
-      expect(b.alpha, closeTo(1 + 2.8, 1e-9));
+      // strong 2.0 x hard 1.4 on a positive, x 0.5 for a pick (#279).
+      expect(b.alpha, closeTo(1 + 1.4, 1e-9));
       expect(b.beta, closeTo(1.0, 1e-9));
       expect(b.lastPositiveAtCalibratedAt, isNotNull);
       expect(b.highestPositiveDifficulty, QuestionDifficulty.hard);
       expect(b.lastQuestionType, 'mcQuestion');
+      // A right own question, and no non-pick (#279).
+      expect(b.ownQuestionsRight, 1);
+      expect(b.ownQuestionsRightNonMcq, 0);
       expect(f.calibration.recentAnswers, hasLength(1));
       expect(
         f.calibration.recentAnswers.single.difficulty,
@@ -2698,8 +3299,10 @@ void main() {
 
       c.notePlannedQuestion(plan);
       await c.integrateAnswer(plan: plan, answer: byKey(correct: false));
-      // moderate 1.0 x hard 0.6 on a negative.
+      // moderate 1.0 x hard 0.6 on a negative: a wrong pick weighs as any
+      // wrong answer.
       expect(f.beliefs.values.single.beta, closeTo(1 + 0.6, 1e-9));
+      expect(f.beliefs.values.single.ownQuestionsRight, 1);
     });
 
     test('is not a grading call: it stays out of the degraded-mode window, '
@@ -4589,7 +5192,9 @@ void main() {
     /// A belief just under the bar — stored (7.7, 2.3), μ 0.77; ten days of
     /// decay read it as ~0.76 — last asked directly [probedAt] (ten days
     /// ago by default) and never demonstrated. [withClock] false is a doc
-    /// from before `lastProbedAt` existed.
+    /// from before `lastProbedAt` existed. [right] and [nonMcq]: its right
+    /// own questions, and those no multiple choice (#279); missing by
+    /// default, a doc from before 1.1.
     LoBelief near(
       String loId, {
       String subgoalId = 's0',
@@ -4601,6 +5206,8 @@ void main() {
       String? lastQuestionType = 'completeCodeQuestion',
       DateTime? firstMasteredAt,
       DateTime? lastPositiveAtCalibratedAt,
+      int? right,
+      int? nonMcq,
     }) {
       final probed = probedAt ?? tenDaysAgo;
       return LoBelief(
@@ -4616,6 +5223,8 @@ void main() {
             : QuestionDifficulty.medium,
         firstMasteredAt: firstMasteredAt,
         lastProbedAt: withClock ? probed : null,
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
       );
     }
 
@@ -4928,11 +5537,15 @@ void main() {
 
     test('a right answer is a direct probe of the old LO: decayed and '
         'forgotten α plus the full weight, both ratchets, the probe clock — '
-        'and the stamp, now that the three conditions hold', () async {
+        'and the stamp, now that the four conditions hold', () async {
       // μ 0.79 after ten days of decay. From the fixture's 0.76 one right
       // answer reaches 0.799 since #278: forgetting shrinks the old
-      // evidence first, so a low near goal takes two.
-      final s = await setup([near('lo-print', alpha: 8.2, beta: 2.1)]);
+      // evidence first, so a low near goal takes two. One right own
+      // question that was no pick is on record (#279): this one is the
+      // second.
+      final s = await setup([
+        near('lo-print', alpha: 8.2, beta: 2.1, right: 1, nonMcq: 1),
+      ]);
       final windowBefore = s.f.calibration.recentAnswers;
       final plan = await s.c.planNext();
       expect(plan.isRecheck, isTrue);
@@ -4958,6 +5571,8 @@ void main() {
       expect(after.highestPositiveDifficulty, QuestionDifficulty.medium);
       expect(after.lastProbedAt, after.lastUpdatedAt);
       expect(after.lastQuestionType, plan.type.name);
+      expect(after.ownQuestionsRight, 2);
+      expect(after.ownQuestionsRightNonMcq, 2);
       // The student earned the stamp the grade reads (PUNTENFORMULE §2.2).
       expect(after.firstMasteredAt, after.lastUpdatedAt);
       expect(outcome.appliedSignals.single.subgoalId, 's0');
@@ -5075,6 +5690,8 @@ void main() {
         QuestionDifficulty? highestPositiveDifficulty,
         DateTime? firstMasteredAt,
         double beta = 1.4,
+        int? right,
+        int? nonMcq,
       }) => LoBelief(
         subgoalId: 's0',
         loId: loId,
@@ -5086,6 +5703,8 @@ void main() {
         highestPositiveDifficulty: highestPositiveDifficulty,
         firstMasteredAt: firstMasteredAt,
         lastProbedAt: asked ? (probedAt ?? tenDaysAgo) : null,
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
       );
 
       const strongSidePositive = GradedSignal(
@@ -5267,8 +5886,10 @@ void main() {
         'a right answer confirms it: the positive at calibration, the '
         'level asked, the stamp and the probe clock; never asked again',
         () async {
+          // One right own question on record that was no pick (#279):
+          // this answer is the second.
           final s = await setup([
-            high('lo-print'),
+            high('lo-print', right: 1, nonMcq: 1),
           ], calibration: QuestionDifficulty.hard);
           final windowBefore = s.f.calibration.recentAnswers;
           final plan = await s.c.planNext();
@@ -5377,6 +5998,9 @@ void main() {
           beta: 1,
           lastUpdatedAt: now,
           lastPositiveAtCalibratedAt: now,
+          // One right own question on record, no pick (#279).
+          ownQuestionsRight: 1,
+          ownQuestionsRightNonMcq: 1,
         );
         f.calibration = const StudentCalibration(
           difficulty: QuestionDifficulty.medium,
@@ -5714,6 +6338,8 @@ void main() {
       bool atCalibration = true,
       DateTime? firstMasteredAt,
       int ownQuestions = 0,
+      int? right,
+      int? nonMcq,
     }) {
       final written = DateTime.now().toUtc().subtract(const Duration(hours: 1));
       f.beliefs[f._key('s1', loId)] = LoBelief(
@@ -5725,6 +6351,8 @@ void main() {
         lastPositiveAtCalibratedAt: atCalibration ? written : null,
         firstMasteredAt: firstMasteredAt,
         ownQuestions: ownQuestions,
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
       );
     }
 
@@ -5769,6 +6397,8 @@ void main() {
         firstMasteredAt: b.firstMasteredAt,
         calibration: f.calibration.difficulty,
         ownQuestions: b.ownQuestions,
+        ownQuestionsRight: b.ownQuestionsRight,
+        ownQuestionsRightNonMcq: b.ownQuestionsRightNonMcq,
       );
     }
 
@@ -5855,9 +6485,10 @@ void main() {
     test('a not-right answer that leaves the LO one answer away keeps it '
         'half; a follow-up on it that is not right empties it', () async {
       final f = onHard();
-      // lo-a one right answer away (6.5 ≥ 4 × 1.5); lo-b mastered, so the
-      // question is on lo-a.
-      seed(f, 'lo-a', 3.7, 1.5);
+      // lo-a one right answer away (6.5 ≥ 4 × 1.5), with one right own
+      // question on record (#279); lo-b mastered, so the question is on
+      // lo-a.
+      seed(f, 'lo-a', 3.7, 1.5, right: 1, nonMcq: 1);
       seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -5889,10 +6520,11 @@ void main() {
     test('a segment mastered in the session is full and stays full after a '
         'negative on it from the side', () async {
       final f = onHard();
-      // lo-a one right answer away; lo-b higher (μ 0.82, clear of the bar
-      // at 0.8) but never right at the student's level, so unmastered and
-      // the question goes to lo-a.
-      seed(f, 'lo-a', 3.8, 1);
+      // lo-a one right answer away, its first right own question on record
+      // (#279); lo-b higher (μ 0.82, clear of the bar at 0.8) but never
+      // right at the student's level, so unmastered and the question goes
+      // to lo-a.
+      seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
       seed(f, 'lo-b', 4.5, 1, atCalibration: false);
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -5981,7 +6613,7 @@ void main() {
       "after an advance the bar is the next subgoal's, read afresh",
       () async {
         final f = onHard();
-        seed(f, 'lo-a', 3.8, 1);
+        seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
         seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
         final c = Conductor(deps: _buildDeps(f));
         await c.setTarget();

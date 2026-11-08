@@ -50,7 +50,7 @@ class MasteryStamps {
 
   /// The LOs among [beliefs] whose doc carries `firstMasteredAt`. A doc
   /// without it is not demonstrated, also when its belief would meet the
-  /// three conditions today: the grade applies no such fallback either.
+  /// conditions today: the grade applies no such fallback either.
   MasteryStamps.fromBeliefs(Iterable<LoBelief> beliefs)
     : _stamped = {
         for (final b in beliefs)

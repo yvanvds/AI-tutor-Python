@@ -338,4 +338,57 @@ void main() {
       expect(b.copyWith(ownQuestions: 4).ownQuestions, 4);
     });
   });
+
+  group('LoBelief.ownQuestionsRight and ownQuestionsRightNonMcq (#279)', () {
+    LoBelief belief({int? right, int? nonMcq}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 5,
+      beta: 1,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      ownQuestions: 3,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+
+    test('are written and read back, 0 as 0', () {
+      final map = belief(right: 2, nonMcq: 0).toMap(uid: 'u');
+      expect(map['ownQuestionsRight'], 2);
+      expect(map['ownQuestionsRightNonMcq'], 0);
+      final back = LoBelief.fromCosmos(map);
+      expect(back.ownQuestionsRight, 2);
+      expect(back.ownQuestionsRightNonMcq, 0);
+      expect(back.hasRightCounts, isTrue);
+    });
+
+    test('missing stays missing — not 0 — in the model and on disk: #275 '
+        'tells a stamp from before 1.1 from a thin one by it', () {
+      final old = LoBelief.fromCosmos(_doc());
+      expect(old.ownQuestionsRight, isNull);
+      expect(old.ownQuestionsRightNonMcq, isNull);
+      expect(old.hasRightCounts, isFalse);
+      final map = old.toMap(uid: 'u');
+      expect(map.containsKey('ownQuestionsRight'), isFalse);
+      expect(map.containsKey('ownQuestionsRightNonMcq'), isFalse);
+      // A malformed value is a missing one.
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestionsRight': 'two'})
+            .ownQuestionsRight,
+        isNull,
+      );
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestionsRightNonMcq': 1.0})
+            .ownQuestionsRightNonMcq,
+        1,
+      );
+    });
+
+    test('copyWith keeps them unless given', () {
+      final b = belief(right: 2, nonMcq: 1);
+      expect(b.copyWith(alpha: 3).ownQuestionsRight, 2);
+      expect(b.copyWith(alpha: 3).ownQuestionsRightNonMcq, 1);
+      expect(b.copyWith(ownQuestionsRight: 3).ownQuestionsRight, 3);
+      expect(belief().copyWith(alpha: 3).hasRightCounts, isFalse);
+    });
+  });
 }

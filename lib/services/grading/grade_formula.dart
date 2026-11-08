@@ -35,8 +35,8 @@ class GradingConstants {
 
 /// What the formula reads per LO on the report moment (§2.2): **mastered**
 /// is the one-way `firstMasteredAt` stamp (#168, v1.0.12) — has this LO
-/// *ever* met the three conditions of §1.5 — plus the three-level
-/// difficulty ratchet of §2.5.
+/// *ever* met the conditions of §1.5 (four since v1.1) — plus the
+/// three-level difficulty ratchet of §2.5.
 ///
 /// The live belief is not consulted for mastery. It is designed to move:
 /// that is its job for the tutor (question choice, stuck detection, the

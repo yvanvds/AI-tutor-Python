@@ -27,18 +27,25 @@ BeliefSnapshot _afterRight(BeliefSnapshot snap, QuestionDifficulty level) {
   );
 }
 
+/// The segment of [snap]. [right] and [nonMcq]: the doc's right own
+/// questions, and those of them no multiple choice (#279) — by default
+/// one, the answer that set [atCalibration].
 LoDisplayState _state(
   BeliefSnapshot snap, {
   QuestionDifficulty calibration = QuestionDifficulty.hard,
   bool atCalibration = true,
   DateTime? firstMasteredAt,
   int ownQuestions = 0,
+  int? right = 1,
+  int? nonMcq = 1,
 }) => loDisplayStateOf(
   snap: snap,
   lastPositiveAtCalibratedAt: atCalibration ? DateTime.utc(2026, 10, 1) : null,
   firstMasteredAt: firstMasteredAt,
   calibration: calibration,
   ownQuestions: ownQuestions,
+  ownQuestionsRight: right,
+  ownQuestionsRightNonMcq: nonMcq,
 );
 
 void main() {
@@ -50,6 +57,7 @@ void main() {
         oneRightAnswerMasters(
           snap: _prior,
           calibration: QuestionDifficulty.hard,
+          ownQuestionsRight: 0,
         ),
         isFalse,
       );
@@ -70,7 +78,7 @@ void main() {
       // (3, 1); a second right answer takes it to (4.4, 1), evidence 5.4.
       expect(_state(once, calibration: medium), LoDisplayState.empty);
       expect(
-        _state(_afterRight(once, medium), calibration: medium),
+        _state(_afterRight(once, medium), calibration: medium, right: 2),
         LoDisplayState.half,
       );
 
@@ -81,9 +89,12 @@ void main() {
       for (var i = 0; i < 6; i++) {
         snap = _afterRight(snap, easy);
       }
-      expect(_state(snap, calibration: easy), LoDisplayState.empty);
       expect(
-        _state(_afterRight(snap, easy), calibration: easy),
+        _state(snap, calibration: easy, right: 6, nonMcq: 6),
+        LoDisplayState.empty,
+      );
+      expect(
+        _state(_afterRight(snap, easy), calibration: easy, right: 7, nonMcq: 7),
         LoDisplayState.half,
       );
     });
@@ -105,7 +116,7 @@ void main() {
       const snap = BeliefSnapshot(5, 1);
       expect(meetsMasteryMeanAndEvidence(snap), isTrue);
       expect(_state(snap, atCalibration: false), LoDisplayState.half);
-      expect(_state(snap), LoDisplayState.full);
+      expect(_state(snap, right: 2), LoDisplayState.full);
     });
 
     test('mastered is full', () {
@@ -113,7 +124,52 @@ void main() {
         _afterRight(_prior, QuestionDifficulty.hard),
         QuestionDifficulty.hard,
       );
-      expect(_state(twice), LoDisplayState.full);
+      expect(_state(twice, right: 2, nonMcq: 2), LoDisplayState.full);
+    });
+
+    test('#279: over the bar on one right own question, or on picks alone, '
+        'is half — the next right answer is the stamp, if it is no pick — '
+        'and full once two are right, one of them no pick', () {
+      const snap = BeliefSnapshot(5, 1);
+      expect(_state(snap, right: 1, nonMcq: 1), LoDisplayState.half);
+      expect(_state(snap, right: 1, nonMcq: 0), LoDisplayState.half);
+      expect(_state(snap, right: 3, nonMcq: 0), LoDisplayState.half);
+      expect(_state(snap, right: 2, nonMcq: 1), LoDisplayState.full);
+    });
+
+    test('#279: without a right own question one answer cannot master it, '
+        'however high side signals took the belief; a doc without the '
+        'counts reads 0', () {
+      const snap = BeliefSnapshot(5, 1);
+      expect(
+        _state(snap, atCalibration: false, right: 0, nonMcq: 0),
+        LoDisplayState.empty,
+      );
+      expect(
+        _state(snap, atCalibration: false, right: null, nonMcq: null),
+        LoDisplayState.empty,
+      );
+      expect(
+        oneRightAnswerMasters(
+          snap: snap,
+          calibration: QuestionDifficulty.hard,
+          ownQuestionsRight: null,
+        ),
+        isFalse,
+      );
+      // A doc without the counts over the bar, right at calibration: a stamp
+      // an old build gave and did not write — full, as before 1.1.
+      expect(_state(snap, right: null, nonMcq: null), LoDisplayState.full);
+      // A stamp that is there stays full, counts or not.
+      expect(
+        _state(
+          snap,
+          right: null,
+          nonMcq: null,
+          firstMasteredAt: DateTime.utc(2026, 9, 1),
+        ),
+        LoDisplayState.full,
+      );
     });
 
     test('stuck is full: six own questions and μ under 0.6 (#278)', () {

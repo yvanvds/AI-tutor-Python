@@ -143,6 +143,10 @@ Map<String, dynamic> varBelief(DateTime at) => {
   'lastPositiveAtCalibratedAt': at.toIso8601String(),
   'highestPositiveDifficulty': 'medium',
   'recentNegativesAtCalibrated': 0,
+  // One right own question on record, no pick (#279): the grade is the
+  // second.
+  'ownQuestionsRight': 1,
+  'ownQuestionsRightNonMcq': 1,
 };
 
 /// A turn in "Comparisons" whose strong positive on the asked `lo-cmp` was

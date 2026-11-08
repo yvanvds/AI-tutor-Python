@@ -48,7 +48,7 @@ class LoBelief {
   /// existing belief docs without it are fine.
   final int recentNegativesAtCalibrated;
 
-  /// When this LO first met all three mastery conditions (CONDUCTOR_POLICY
+  /// When this LO first met all the mastery conditions (CONDUCTOR_POLICY
   /// §4.1) — a one-way stamp, `null` until then, never cleared by decay or
   /// later negatives. It is the gate for transfer credit (#101, §3.7): only
   /// an LO once mastered by direct probing can be refreshed sideways. And
@@ -100,6 +100,27 @@ class LoBelief {
   /// `LoState.own_questions`, #281).
   final int ownQuestions;
 
+  /// How many own questions ([ownQuestions]) this LO got right (#279): the
+  /// answer was `correct` and the signal on the LO positive — a `partial`
+  /// with a positive is not right. Mastery condition 4 (CONDUCTOR_POLICY
+  /// §4.1) wants `PolicyConstants.masteryRightOwnQuestionsMin` of them, and
+  /// [ownQuestionsRightNonMcq] says how many were no multiple choice.
+  ///
+  /// `null` when the doc does not have the count — a doc from before
+  /// formula 1.1 — and that is kept apart from 0 (#275): the rules read a
+  /// missing count as 0, but a stamp on a doc without the counts is not a
+  /// thin one, it came before they were kept. So the conductor starts the
+  /// counts on a doc without a stamp, and leaves them missing on a doc that
+  /// has one, until the release fills them from `turn_history`
+  /// (`tooling/evaluation`, `LoState.own_right`, #281). The two are written
+  /// together, or not at all.
+  final int? ownQuestionsRight;
+
+  /// Of [ownQuestionsRight], how many were no multiple choice (#279): a
+  /// question of another type than `mcQuestion`. `null` exactly when
+  /// [ownQuestionsRight] is (`LoState.own_right_open` in the tooling).
+  final int? ownQuestionsRightNonMcq;
+
   const LoBelief({
     required this.subgoalId,
     required this.loId,
@@ -114,7 +135,14 @@ class LoBelief {
     this.regressedAt,
     this.lastProbedAt,
     this.ownQuestions = 0,
+    this.ownQuestionsRight,
+    this.ownQuestionsRightNonMcq,
   });
+
+  /// Whether the doc keeps the counts of #279 ([ownQuestionsRight],
+  /// [ownQuestionsRightNonMcq]) — false on a doc from before formula 1.1.
+  bool get hasRightCounts =>
+      ownQuestionsRight != null || ownQuestionsRightNonMcq != null;
 
   /// When a direct probe last landed, as far as this doc can tell:
   /// [lastProbedAt]; on a doc from before #187 that was ever the target of
@@ -139,6 +167,8 @@ class LoBelief {
     bool clearRegressedAt = false,
     DateTime? lastProbedAt,
     int? ownQuestions,
+    int? ownQuestionsRight,
+    int? ownQuestionsRightNonMcq,
   }) {
     return LoBelief(
       subgoalId: subgoalId,
@@ -157,6 +187,9 @@ class LoBelief {
       regressedAt: clearRegressedAt ? null : (regressedAt ?? this.regressedAt),
       lastProbedAt: lastProbedAt ?? this.lastProbedAt,
       ownQuestions: ownQuestions ?? this.ownQuestions,
+      ownQuestionsRight: ownQuestionsRight ?? this.ownQuestionsRight,
+      ownQuestionsRightNonMcq:
+          ownQuestionsRightNonMcq ?? this.ownQuestionsRightNonMcq,
     );
   }
 
@@ -190,6 +223,9 @@ class LoBelief {
     if (lastProbedAt != null)
       'lastProbedAt': lastProbedAt!.toUtc().toIso8601String(),
     'ownQuestions': ownQuestions,
+    if (ownQuestionsRight != null) 'ownQuestionsRight': ownQuestionsRight,
+    if (ownQuestionsRightNonMcq != null)
+      'ownQuestionsRightNonMcq': ownQuestionsRightNonMcq,
   };
 
   factory LoBelief.fromCosmos(Map<String, dynamic> doc) {
@@ -229,6 +265,15 @@ class LoBelief {
       ownQuestions: switch (doc['ownQuestions']) {
         final num n => n.toInt(),
         _ => 0,
+      },
+      // Missing stays missing (#279, #275): not the same as 0.
+      ownQuestionsRight: switch (doc['ownQuestionsRight']) {
+        final num n => n.toInt(),
+        _ => null,
+      },
+      ownQuestionsRightNonMcq: switch (doc['ownQuestionsRightNonMcq']) {
+        final num n => n.toInt(),
+        _ => null,
       },
     );
   }

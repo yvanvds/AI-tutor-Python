@@ -1276,8 +1276,9 @@ class Rules11Test(unittest.TestCase):
         turns = self.series("FFJFJJFJJJ")
         old_turns = self.series("FFJFJJFJJJ", self.OLD)
         now = rules.replay(turns, GOALS)[self.KEY]
+        chosen = rules.Variant(forget=0.7, min_own_right=2, min_open_right=1, mcq_positive=0.5)
         for lo in (
-            rules.replay(old_turns, GOALS, variant=rules.Variant(forget=0.7))[self.KEY],
+            rules.replay(old_turns, GOALS, variant=chosen)[self.KEY],
             rules.replay(old_turns, GOALS, variant=rules.Variant(as_11=True))[self.KEY],
         ):
             self.assertAlmostEqual(lo.alpha, now.alpha)
@@ -1308,6 +1309,93 @@ class Rules11Test(unittest.TestCase):
         st = rules.replay([self.answer(0), neutral, follow_up, twice, side], GOALS)
         self.assertEqual(st[self.KEY].own_questions, 3)
         self.assertEqual(st[("sg-b", "predict_b2")].own_questions, 1)
+
+
+class Rules279Test(unittest.TestCase):
+    """#279, formula 1.1 from the same build as #278: a positive of a
+    multiple-choice question weighs ×0.5 — from the key or the grader, on
+    the target and from the side, not on a follow-up on one — and the stamp
+    wants two own questions right, one of them no multiple choice. Same rule
+    set (`1.1-eval8`), same switch (`rules_11`)."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.13.0+30"}
+    OLD = {"clientVersion": "2.12.0+29"}
+
+    def answer(self, minute: int, quality: str = "correct", build: dict | None = None,
+               questionType: str = "completeCodeQuestion", **extra) -> dict:
+        signal = "positive" if quality == "correct" else "negative"
+        t = _turn(f"2026-11-16T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType=questionType, overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", "strong", signal)],
+                  **(self.NEW if build is None else build))
+        t.update(extra)
+        return t
+
+    def pick(self, minute: int, build: dict | None = None, **extra) -> dict:
+        return self.answer(minute, build=build, questionType="mcQuestion", **extra)
+
+    def lo(self, turns: list[dict], key=None, **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[key or self.KEY]
+
+    def test_the_constants(self):
+        self.assertEqual(rules.MCQ_POSITIVE, 0.5)
+        self.assertEqual((rules.STAMP_OWN_RIGHT_MIN, rules.STAMP_OWN_RIGHT_NON_MCQ_MIN), (2, 1))
+        self.assertEqual(rules.RULES_VERSION, "1.1-eval8")
+
+    def test_a_pick_of_1_1_weighs_half_on_the_target_and_from_the_side(self):
+        side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
+        st = rules.replay([self.pick(0, loSignals=side)], GOALS)
+        self.assertAlmostEqual(st[self.KEY].alpha, 1 + 2.0 * 0.5)
+        self.assertAlmostEqual(st[("sg-b", "predict_b2")].alpha, 1 + 2.0 * 0.5)
+        # An older build weighed it in full.
+        self.assertAlmostEqual(self.lo([self.pick(0, self.OLD)]).alpha, 1 + 2.0)
+        # A wrong pick weighs as any wrong answer.
+        wrong = self.answer(0, "wrong", questionType="mcQuestion")
+        self.assertAlmostEqual(self.lo([wrong]).beta, 1 + 2.0)
+
+    def test_a_follow_up_on_a_pick_is_free_text_and_weighs_as_any_follow_up(self):
+        lo = self.lo([self.pick(0), self.pick(1, isFollowUp=True, chainDepth=1)])
+        self.assertAlmostEqual(lo.alpha, 1 + 1.0 * 0.7 + 0.5, places=3)  # and a minute of decay
+
+    def test_no_stamp_on_picks_alone_the_right_open_question_stamps(self):
+        # On hard in the lesson a pick weighs 1.75: three take the LO over
+        # the bar, (4.83, 1) — no stamp under 1.1, a stamp before.
+        hard = {"difficulty": "hard", "calibrationBefore": "hard", "provenance": "supervised"}
+        picks = [self.pick(m, **hard) for m in range(3)]
+        lo = self.lo(picks)
+        self.assertTrue(lo.mastered_at())
+        self.assertEqual((lo.own_right, lo.own_right_open), (3, 0))
+        self.assertIsNone(lo.first_mastered_at)
+        old = self.lo([self.pick(m, self.OLD, **hard) for m in range(3)])
+        self.assertIsNotNone(old.first_mastered_at)
+        stamped = self.lo(picks + [self.answer(3, questionType="socraticQuestion", **hard)])
+        self.assertEqual(stamped.first_mastered_at, rules.parse_at("2026-11-16T09:03:00Z"))
+
+    def test_one_own_question_after_side_weight_is_not_enough(self):
+        side = _turn("2026-11-16T09:00:00Z", "sg-b", "predict_b2", uid="u-x",
+                     questionType="completeCodeQuestion", difficulty="hard", calibrationBefore="hard",
+                     provenance="supervised", loSignals=[_sig("sg-b", "predict_b2"), _sig("sg-b", "predict_b1")],
+                     **self.NEW)
+        hard = {"difficulty": "hard", "calibrationBefore": "hard", "provenance": "supervised"}
+        once = self.lo([side, self.answer(1, **hard)])
+        self.assertTrue(once.mastered_at())
+        self.assertEqual(once.own_right, 1)
+        self.assertIsNone(once.first_mastered_at)
+        twice = self.lo([side, self.answer(1, **hard), self.answer(2, **hard)])
+        self.assertEqual(twice.first_mastered_at, rules.parse_at("2026-11-16T09:02:00Z"))
+
+    def test_right_counts_once_per_question_and_not_on_a_partial(self):
+        twice = self.answer(0, loSignals=[_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b1", "weak")])
+        partial = self.answer(1, overallQuality="partial")  # a positive signal, not right
+        lo = self.lo([twice, partial, self.pick(2)])
+        self.assertEqual((lo.own_questions, lo.own_right, lo.own_right_open), (3, 2, 1))
+
+    def test_as_11_replays_an_older_build_with_it(self):
+        hard = {"difficulty": "hard", "calibrationBefore": "hard", "provenance": "supervised"}
+        old = [self.pick(m, self.OLD, **hard) for m in range(3)]
+        self.assertIsNone(self.lo(old, as_11=True).first_mastered_at)
+        self.assertAlmostEqual(self.lo(old[:1], as_11=True).alpha, 1 + 1.75)
 
 
 class NotchDropReplayTest(unittest.TestCase):

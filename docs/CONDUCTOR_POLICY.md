@@ -59,6 +59,9 @@ the gentlest type in the kind's set. The cold-start defaults:
 | `predict` | `mcQuestion` |
 | `reason` | `explainCode` |
 
+A pick stays the way in for `recall` and `predict`: the #279 rule of
+2.2 asks another type only after the LO's first right own answer.
+
 The full mapping of *acceptable* (not just default) types per LO kind
 is deferred to section 2.2. It depends on tightening the question-type
 prompt definitions; without that, the mapping isn't trustworthy. The
@@ -390,7 +393,10 @@ low-weight, much-weaker LO. Authoring experience may push us to a
 stronger weighting later (e.g. `weight × (1 − mean)` as the sort key);
 not now.
 
-**Mastered LOs are skipped during practice.** They re-enter the
+**Mastered LOs are skipped during practice.** Mastered is the four
+conditions of 4.1, so since #279 an LO over the bar on fewer than two
+right own questions, or on picks alone, is no mastered LO: it stays a
+candidate until the questions it lacks are answered. They re-enter the
 candidate pool only via decay (section 1.2), a new answer that takes
 them under the bar, or the top-up of a mastered subgoal (section 1.3).
 No within-session refresh of mastered LOs — that
@@ -458,12 +464,44 @@ question-type instruction prompts.
 
 ```
 1. Take the acceptable types for the target LO's kind.
+   (#279) Without mcQuestion when a right pick can no longer bring an
+   unmastered LO to its stamp, and the kind has another type (below).
 2. Exclude the type used in the immediately previous question on this LO,
    if other types remain.
 3. If LO belief is weak (mean < 0.5), pick the gentlest remaining type
    (gentleness order from section 1.1).
 4. Otherwise pick the type least-recently-used for this LO.
 ```
+
+**No pick when a pick can no longer get the LO there (#279).** A right
+multiple-choice answer weighs half (3.1), and the stamp wants a right own
+question that was no pick (condition 4 of 4.1). Without this rule a
+`recall` or `predict` LO, asked as multiple choice whenever the rotation
+lands on its first type, would never be stamped. So for an LO that is not
+mastered now (4.1) the conductor drops `mcQuestion` — `recall` gets
+`socraticQuestion`, `predict` `explainCode` or `socraticQuestion` — once
+the LO has its first right own answer (`ownQuestionsRight`; before it, a
+pick is the gentle way in, as it was), when
+
+1. **the right non-pick is missing**: no stamp, and none of the right own
+   questions was no multiple choice — condition 4 can only be met by
+   another type. The teacher's rule: "ontbreekt alleen de open vraag nog";
+2. **picks cannot get there**: at the student's calibration a run of right
+   picks never reaches conditions 1 and 2. With forgetting (3.4) a steady
+   pick at home holds the evidence under `2 + w / (1 − λ)`: 4 on easy,
+   5.33 on medium, under 5.75; only on hard (6.67) do picks alone get over
+   the bar. On easy and medium an LO stamped once that dipped under the
+   bar — a weak positive from the side can do that to a just-stamped
+   `(5.38, 1)` — would otherwise be asked picks that never take it back;
+3. **the next right answer decides**: one right answer of another type
+   would master the LO and a right pick would not. The bar shows that
+   segment half (4.5); the answer must count.
+
+An LO without a doc, or with no right own question yet, keeps every type;
+so does a mastered LO in the top-up of a mastered subgoal (1.3), with no
+stamp at stake. The rule is `belief_math.needsNonMcqQuestion`. The same
+filter applies to the recheck (2.6), and not to the warm-up review (1.5),
+whose LO has its stamp.
 
 The `mean < 0.5` threshold is the prior midpoint: the student has
 shown net-negative evidence on this LO. That's the right moment to be
@@ -810,7 +848,9 @@ bands do not overlap:
 - **Near goal (#187).** Not demonstrated (`everMastered` false, 3.7);
   decayed mean in [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to
   0.80, close enough that one or two good answers at the calibrated level
-  can earn the stamp; no *direct* probe for `recheckAfter` (7 days); and
+  can earn the stamp (with forgetting, 3.4, from 0.76 one right answer
+  reaches 0.799, so a low near goal takes two, a week apart; and the
+  stamp wants its two right own questions, 4.1); no *direct* probe for `recheckAfter` (7 days); and
   the student's recent work at their level is good: the calibration
   window (section 5, ten answers) is full and its level-weighted share of correct
   answers (`StudentCalibration.levelWeightedAccuracy`: a correct answer
@@ -825,7 +865,11 @@ bands do not overlap:
   calibration (`lastPositiveAtCalibratedAt` unset, condition 3 open), or
   no recorded level (`highestPositiveDifficulty` unset under a set
   calibrated-positive flag: an old client's doc, #165, where the grade
-  can only guess the level). And no direct probe for `recheckAfter`, the
+  can only guess the level), or — without a stamp — fewer than two right
+  own questions behind it, one of them no pick (condition 4 of 4.1, #279:
+  a belief a side signal lifted over the bar on one own question). A
+  stamp that is there stays: a stamp from before 1.1 on few own questions
+  is #275's to bring back. And no direct probe for `recheckAfter`, the
   near goal's clock — or never one: an LO never asked directly is due at
   once. There is no recent-work gate: the belief already says the student
   has it; the question lets them show it. A right answer at the
@@ -857,13 +901,15 @@ probe, then the highest decayed mean — the one closest to the stamp.
 
 **The question and its answer: like a warm-up.** The gentlest acceptable
 type for the LO's kind at the student's calibrated difficulty, never
-notch-dropped (condition 3 of 4.1 wants a positive at calibration). From
+notch-dropped (condition 3 of 4.1 wants a positive at calibration) — and
+no pick when a pick can no longer bring the LO to its stamp (2.2, #279):
+a recheck is that LO's way to the stamp. From
 here on a recheck is handled exactly like a warm-up review (1.5) — the
 plan carries the other subgoal (`QuestionPlan.offSubgoal`) and every
 consumer reads that: prompted and graded in that subgoal's context; the
 target signal is a direct probe of that LO, decayed then updated with the
 full weight, both ratchets, the counter, `lastQuestionType`, the probe
-clock and — when the answer completes the three conditions of 4.1 — the
+clock and — when the answer completes the four conditions of 4.1 — the
 one-way stamp; no calibration window entry (5), no follow-up (6.3), no
 cache write or advancement for either subgoal; a transfer nomination on
 the target itself is dropped (3.7); other signals are incidental under
@@ -1004,7 +1050,8 @@ doc, and so is the graded answer — which can hide the question (above).
 **A multiple-choice pick is graded from the key.** Right or wrong is known.
 The target LO's signal is fixed — the key: `positive`/`strong`; any other
 option: `negative`/`moderate` — and integrated exactly like a grader's
-signal on a direct probe: the plan's difficulty multiplier (3.2) and the
+signal on a direct probe, a pick's included: a right pick weighs ×0.5
+(3.1, #279), and counts as a right own question that was a pick (4.1): the plan's difficulty multiplier (3.2) and the
 provenance, both ratchets and the stamp (4.3), the notch-drop counter
 (2.3 — a moderate negative is no strike), `lastQuestionType`, the probe
 clock, the calibration window (5), the cache and advancement (4.5); for a
@@ -1086,13 +1133,26 @@ The base weight per `(signal, strength)`:
 | `neutral` | (no weight) | (no weight) | (no weight) |
 
 **Symmetric in positive/negative.** Asymmetry here would distort
-calibration. The "wrong is more diagnostic than right" intuition is
-real but belongs in the LLM contract — the grader emits `moderate` or
-`weak` (not `strong`) on questions where lucky-guess corrects are
-plausible (e.g. binary MCQ). The conductor's *base* weights stay
-symmetric; the one asymmetry the conductor does apply is by difficulty
-(3.2, #169), and that is about the level of the question relative to
-the student, not about one sign being more trustworthy than the other.
+calibration. The conductor's *base* weights stay symmetric; the
+asymmetries it applies are by difficulty (3.2, #169), about the level
+of the question relative to the student, and by question type, below.
+
+**A right pick weighs half (#279, formula 1.1).** A positive signal of a
+multiple-choice question is multiplied by
+`PolicyConstants.multipleChoicePositiveFactor`, 0.5 — a `strong` pick
+weighs as a `moderate` answer — whether the bank's key graded it (2.7,
+always `strong`) or the grader, and for every positive of that turn, a
+side signal on another LO (2.4) included. A negative weighs as before. A
+follow-up on a multiple-choice question (6.2) is free text and weighs as
+any follow-up; a transfer credit (3.7) is no signal of the turn. The
+"right is less diagnostic on a guessable format" correction was meant to
+live in the LLM contract, the grader emitting `moderate` or `weak` there.
+It did not: of the right own answers since 2026-10-05, 437 of 440 on a
+grader's multiple choice were `strong`, and all 120 from the key — a
+clicked option weighed as much as a program the student wrote. The
+factor lives in the conductor now (`signalDeltas(multipleChoice:)`), not
+in the grader's instructions, and the turn record carries what a replay
+needs to apply it (`questionType`, `isFollowUp`).
 
 **`neutral` carries no weight, but it is written.** A neutral signal
 means "the answer touched the LO but gave no clear evidence." Adding
@@ -1366,8 +1426,10 @@ State after the first five questions:
 | `write_if_else` | 1 | 1 | 0.50 | 2 |
 
 `predict_branch` formally meets mastery (mean ≥ 0.8, evidence ≥ 5.75):
-three strong positives at medium — `(3, 1)`, `(4.4, 1)`, `(5.38, 1)`;
-after two the evidence was 5.4. `write_if_only` had a strong positive,
+three strong positives at medium on its own `explainCode` questions —
+`(3, 1)`, `(4.4, 1)`, `(5.38, 1)`; after two the evidence was 5.4. As
+picks they would have weighed half (3.1, #279) and left it at
+`(3.38, 1)`, and with no right non-pick it would not be mastered (4.1). `write_if_only` had a strong positive,
 `(3, 1)`, then a moderate negative: forgotten to `(2.4, 1)`, `β += 1.0`.
 
 **Q6: target `write_if_else`** (lowest mean unmastered), type
@@ -1456,12 +1518,15 @@ A nominated LO earns credit only when **all** of these hold:
 4. **The LO was ever mastered by direct probing.** An LO that was never
    directly probed — or probed but never mastered — cannot be brought
    to mastery sideways. Tracked by the one-way `firstMasteredAt` stamp on
-   `lo_beliefs` (part 2), set the first time all three mastery
+   `lo_beliefs` (part 2), set the first time all four mastery
    conditions (4.1) hold after a write. Docs written before the stamp
    existed read as "mastered as of the last direct write" when their
    stored `(α, β)` meet conditions 1–2 and the calibrated-positive
-   ratchet is set; the stamp is then written on the next update, dated
-   to that write. Nothing is backfilled.
+   ratchet is set — and, on a doc that keeps the right own questions
+   (#279), condition 4 too: such a doc was written by 1.1, which stamps
+   in the write itself; one without the counts is from before 1.1 and is
+   read by the rules of its day. The stamp is then written on the next
+   update, dated to that write. Nothing is backfilled.
 
 **Refresh-and-raise, small weight.** The credit is an ordinary
 `(positive, weak)` signal treated as `medium` — the same footing as a
@@ -1516,9 +1581,10 @@ took a cross-subgoal incidental signal, or a review flag, this turn
   the belief shape we just defined). Section 4.
 - **The student's calibration update** (when does `easy/medium/hard`
   itself change). Section 5.
-- **Per-question-type weight modulation** (e.g. `mcQuestion`
-  guess-rate adjustment). Handled in the LLM contract, not the
-  conductor — the LLM emits weaker strength on guessable formats.
+- **Per-question-type weight modulation beyond multiple choice.** A
+  right pick weighs half since #279 (3.1); the other types weigh alike.
+  Until #279 the guess correction was left to the LLM contract, and the
+  grader did not apply it.
 
 ---
 
@@ -1529,7 +1595,7 @@ mastered? What if a student is genuinely stuck on one LO?
 
 ### 4.1 Per-LO mastery
 
-An LO is mastered when **all three** conditions hold:
+An LO is mastered when **all four** conditions hold:
 
 1. **Belief mean ≥ 0.8.** The conductor is confident the student has
    it.
@@ -1549,14 +1615,45 @@ An LO is mastered when **all three** conditions hold:
 3. **At least one positive signal contributing to current belief was
    at the student's calibration *at the time of the answer*, or
    higher.** This is the E.1 fix (see 4.3).
+4. **At least two own questions answered right, one of them no
+   multiple choice (#279, formula 1.1).** An *own question* is a direct
+   question with the LO as its target (4.4); *right* is a `correct`
+   answer with a positive signal on the LO — a `partial` with a positive
+   is not right — counted once per question. A side signal (2.4), a
+   follow-up (6.2) and a transfer credit (3.7) move `(α, β)` but count
+   for neither. The conductor keeps both counts on the belief doc
+   (`ownQuestionsRight`, `ownQuestionsRightNonMcq`, part 2;
+   `masteryRightOwnQuestionsMin` 2, `masteryRightNonMcqQuestionsMin` 1).
 
-All three are tunable constants (see the front-matter note on
+All four are tunable constants (see the front-matter note on
 constants).
+
+**Why condition 4.** Of the 201 stamps since 21 October, 71 fell after a
+single own question — 31 on that question, carried by side weight; 40 on
+a later side signal or a transfer credit — and 83 rested, as own
+questions, on multiple choice alone, 34 of them on one. The teacher
+(2026-11-08): two multiple-choice questions are no achieved goal. It
+absorbs the rest of #257: since #276 a side signal moves no ratchet, and
+now it cannot carry the count either, so it can no longer give the
+stamp. With the half-weight pick (3.1) and forgetting (3.4), the replay
+put the cost at +17% oefeningen against #276 if every extra question is
+answered right, nearer +23% at the 73% right of open questions in the
+data. An LO that lacks its right own questions simply stays in the
+selection (2.1), and the type rule of 2.2 asks the non-pick it needs.
+
+**A missing count reads 0; a stamp that is there stays.** A doc from
+before 1.1 has no counts: without a stamp, its LO earns its two right own
+questions anew, unless the release fills them from `turn_history`
+(#281). With a stamp, the LO met condition 4 when it was stamped, or was
+stamped before it existed: it is mastered again on conditions 1–3 after
+a dip (`belief_math.isMastered`), as before 1.1. Such a doc keeps its
+counts missing — a count started at the release would read the old
+stamp as a thin one (#275) — until the release fills them.
 
 **Mastery is checked on every belief update.** No latching. If decay
 or new negative evidence drops the belief below conditions 1 or 2,
 the LO is unmastered again. (Condition 3 is satisfied by a timestamp
-field; once set, it doesn't reset.)
+field; once set, it doesn't reset. Condition 4's counts only grow.)
 
 ### 4.2 Subgoal-level aggregation
 
@@ -1639,7 +1736,8 @@ back as if it had been measured, and the next positive records the level
 actually asked; nothing is backfilled.
 
 **Mastery stamp (#101).** A third field, `firstMasteredAt`, records
-when the LO first met all three conditions after a belief write. One-way:
+when the LO first met all the conditions after a belief write — four
+since #279. One-way:
 decay and later negatives unmaster the LO (4.1, no latching) but never
 clear the stamp, which answers a different question — "was this ever
 mastered by direct probing?" — the gate for transfer credit (3.7) and,
@@ -1782,10 +1880,14 @@ optional LO gets none), each in one of three states:
   strong)` signal at the student's calibration, with the home factor
   (×1.0), applied to the current decayed `(α, β)` as every answer is —
   forgetting, then the cap (3.4) — meets conditions 1 and 2 of 4.1;
-  condition 3 that answer meets itself. Since #278 on medium at home
-  that is after the second right answer, not the first;
-- **full**: mastered now, mastered once (`firstMasteredAt`, the
-  one-way reading the grade uses), or stuck (4.4). Stuck looks full to
+  condition 3 that answer meets itself, and condition 4 (#279) when the
+  LO already has a right own question and the answer is no pick — the
+  type 2.2 then asks. Without a right own question one answer cannot
+  master an LO, whatever its belief. Since #278 on medium at home that
+  is after the second right answer, not the first;
+- **full**: mastered now (the four conditions of 4.1), mastered once
+  (`firstMasteredAt`, the one-way reading the grade uses), or stuck
+  (4.4). Stuck looks full to
   the student, as the advance it allows looks normal (4.4,
   "student-side invisibility").
 
@@ -1843,7 +1945,8 @@ question: **stuck** (6 ≥ 6, mean 0.31 < 0.6).
 **Q13: target `write_if_else`.** Answer correct, strong-positive at
 medium: forgotten to `(3.38, 1)`, `α += 2.0` → `(5.38, 1)`, mean 0.84,
 evidence 6.38. Condition 1 ✓, condition 2 ✓, condition 3 ✓ (positive at
-calibrated medium → `lastPositiveAtCalibratedAt` set). **Mastered.**
+calibrated medium → `lastPositiveAtCalibratedAt` set), condition 4 ✓
+(Q6, Q11 and Q13 right, code questions). **Mastered.**
 
 Subgoal mastery check:
 - `predict_branch`: mastered ✓

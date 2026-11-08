@@ -9,6 +9,7 @@ import 'dart:math' as math;
 
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 
 class BeliefSnapshot {
@@ -69,11 +70,18 @@ double baseWeight(LoSignalStrength s) {
 /// (CONDUCTOR_POLICY §3.2, PUNTENFORMULE §2.7): symmetric in positive and
 /// negative, unlike the difficulty multiplier, so it changes how *hard* a
 /// piece of evidence is, not which way it points.
+///
+/// [multipleChoice] is a signal of a multiple-choice question (#279, not a
+/// follow-up on one): a positive weighs
+/// `PolicyConstants.multipleChoicePositiveFactor` — a right pick is half
+/// the evidence a right answer the student wrote is — and a negative as
+/// any other.
 ({double alphaDelta, double betaDelta}) signalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,
   required QuestionDifficulty difficulty,
   EvidenceProvenance provenance = EvidenceProvenance.home,
+  bool multipleChoice = false,
 }) {
   if (kind == LoSignalKind.neutral) {
     return (alphaDelta: 0.0, betaDelta: 0.0);
@@ -81,9 +89,13 @@ double baseWeight(LoSignalStrength s) {
   final difficultyFactor = kind == LoSignalKind.positive
       ? PolicyConstants.positiveDifficultyMultiplier(difficulty)
       : PolicyConstants.negativeDifficultyMultiplier(difficulty);
+  final pickFactor = multipleChoice && kind == LoSignalKind.positive
+      ? PolicyConstants.multipleChoicePositiveFactor
+      : 1.0;
   final weighted =
       baseWeight(strength) *
       difficultyFactor *
+      pickFactor *
       PolicyConstants.provenanceMultiplier(provenance);
   if (kind == LoSignalKind.positive) {
     return (alphaDelta: weighted, betaDelta: 0.0);
@@ -122,18 +134,23 @@ double baseWeight(LoSignalStrength s) {
 /// conductor turns it into a review flag instead ([nextRegressedAt]) and
 /// does not call this for it. Nor for a cross-subgoal *neutral* (#204):
 /// that one is only logged — no doc, no clock.
+///
+/// A positive from a multiple-choice question weighs half here too
+/// ([multipleChoice], #279): the factor is the turn's, not the target's.
 ({double alphaDelta, double betaDelta}) crossSubgoalSignalDeltas({
   required LoSignalKind kind,
   required LoSignalStrength strength,
   EvidenceProvenance provenance = EvidenceProvenance.home,
+  bool multipleChoice = false,
 }) => signalDeltas(
   kind: kind,
   strength: strength,
   difficulty: QuestionDifficulty.medium,
   provenance: provenance,
+  multipleChoice: multipleChoice,
 );
 
-/// Whether an LO has ever met all three mastery conditions — the gate for
+/// Whether an LO has ever met all the mastery conditions — the gate for
 /// transfer credit (CONDUCTOR_POLICY §3.7): an LO never mastered by direct
 /// probing cannot be brought to mastery sideways.
 ///
@@ -146,17 +163,44 @@ double baseWeight(LoSignalStrength s) {
 /// The evidence bar is today's (`masteryEvidenceMin`, #276), not the 4 an
 /// old build wrote under: the conductor applies this reading to every doc
 /// without a stamp, so the old bar would stamp a new doc between 4 and
-/// 5.75.
+/// 5.75. Condition 4 (#279) is today's for the same reason on a doc that
+/// keeps the right own questions: formula 1.1 wrote it, and a doc that
+/// met conditions 1–3 without them has no stamp and must not get one at
+/// its next write. A doc without the counts is from before 1.1, and this
+/// reading recognises a stamp the rules of its day gave and an old build
+/// did not write — a stamp that is there stays (#168), so condition 4 is
+/// not asked of it.
 bool everMastered({
   required DateTime? firstMasteredAt,
   required double alpha,
   required double beta,
   required DateTime? lastPositiveAtCalibratedAt,
+  required int? ownQuestionsRight,
+  required int? ownQuestionsRightNonMcq,
 }) {
   if (firstMasteredAt != null) return true;
-  return lastPositiveAtCalibratedAt != null &&
-      meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta));
+  if (lastPositiveAtCalibratedAt == null ||
+      !meetsMasteryMeanAndEvidence(BeliefSnapshot(alpha, beta))) {
+    return false;
+  }
+  final countsKept =
+      ownQuestionsRight != null || ownQuestionsRightNonMcq != null;
+  return !countsKept ||
+      meetsOwnQuestionsCondition(
+        ownQuestionsRight: ownQuestionsRight,
+        ownQuestionsRightNonMcq: ownQuestionsRightNonMcq,
+      );
 }
+
+/// [everMastered] of a stored doc.
+bool everMasteredBelief(LoBelief b) => everMastered(
+  firstMasteredAt: b.firstMasteredAt,
+  alpha: b.alpha,
+  beta: b.beta,
+  lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
+  ownQuestionsRight: b.ownQuestionsRight,
+  ownQuestionsRightNonMcq: b.ownQuestionsRightNonMcq,
+);
 
 /// The warm-up review flag after a graded turn touched an LO outside the
 /// active subgoal (#112, #167; CONDUCTOR_POLICY §1.5, §2.4): the value of
@@ -269,12 +313,150 @@ QuestionDifficulty? ratchetHighestPositiveDifficulty({
 }
 
 /// Per-LO mastery condition 1 (mean) and 2 (evidence). Condition 3
-/// (`lastPositiveAtCalibratedAt` non-null) is checked separately by the
-/// conductor since it's stored alongside the belief, not derivable from
-/// `(α, β)` alone.
+/// (`lastPositiveAtCalibratedAt` non-null) and condition 4 (the right own
+/// questions, [meetsOwnQuestionsCondition]) are stored alongside the
+/// belief, not derivable from `(α, β)` alone; [isMastered] reads all four.
 bool meetsMasteryMeanAndEvidence(BeliefSnapshot snap) {
   return snap.mean >= PolicyConstants.masteryMeanThreshold &&
       snap.evidence >= PolicyConstants.masteryEvidenceMin;
+}
+
+/// Per-LO mastery condition 4 (#279, formula 1.1, CONDUCTOR_POLICY §4.1):
+/// at least `masteryRightOwnQuestionsMin` own questions answered right
+/// ([ownQuestionsRight], `LoBelief.ownQuestionsRight`), of which at least
+/// `masteryRightNonMcqQuestionsMin` no multiple choice
+/// ([ownQuestionsRightNonMcq]). A side signal, a follow-up and a transfer
+/// credit move `(α, β)` but count for neither. A count the doc does not
+/// have reads 0 — the teacher's choice: a doc from before 1.1 earns them
+/// anew, unless the release fills them from `turn_history` (#281).
+bool meetsOwnQuestionsCondition({
+  required int? ownQuestionsRight,
+  required int? ownQuestionsRightNonMcq,
+}) {
+  return (ownQuestionsRight ?? 0) >=
+          PolicyConstants.masteryRightOwnQuestionsMin &&
+      (ownQuestionsRightNonMcq ?? 0) >=
+          PolicyConstants.masteryRightNonMcqQuestionsMin;
+}
+
+/// Whether an LO is mastered now (CONDUCTOR_POLICY §4.1): [snap] is its
+/// decayed belief, [belief] its doc (`null`: never written, not mastered).
+///
+/// Conditions 1 and 2 on [snap], condition 3 (a positive at calibration),
+/// and condition 4 ([meetsOwnQuestionsCondition]) — unless the LO has its
+/// stamp ([everMastered]: `firstMasteredAt`, or the reading of an old doc
+/// without it): a stamp that is there stays (#168), and the LO it marks
+/// met condition 4 when it was set, or was set before condition 4 existed
+/// (#279). Such an LO is mastered again on conditions 1–3 after a dip, as
+/// it was before 1.1; a stamp from before 1.1 on few own questions is
+/// #275's to bring back, not the live reading's.
+///
+/// What every live reading of mastery uses: the selection (§2.1), the
+/// subgoal's advance and its cached share (§4.2, §4.5), the cascade skip,
+/// the bar's full segment (§4.5).
+bool isMastered(BeliefSnapshot snap, LoBelief? belief) {
+  if (belief == null) return false;
+  if (belief.lastPositiveAtCalibratedAt == null) return false;
+  if (!meetsMasteryMeanAndEvidence(snap)) return false;
+  return everMasteredBelief(belief) ||
+      meetsOwnQuestionsCondition(
+        ownQuestionsRight: belief.ownQuestionsRight,
+        ownQuestionsRightNonMcq: belief.ownQuestionsRightNonMcq,
+      );
+}
+
+/// Whether one right answer at [calibration] would meet conditions 1 and 2
+/// of §4.1 on [snap]: a `(positive, strong)` with the home factor (× 1.0)
+/// — the lower bound — applied as every answer is, forgetting and then the
+/// cap (§3.4, #278). [multipleChoice]: the answer is a pick (#279), half
+/// the weight. Condition 3 that answer meets itself; condition 4 is the
+/// caller's.
+bool oneRightAnswerMeetsMeanAndEvidence({
+  required BeliefSnapshot snap,
+  required QuestionDifficulty calibration,
+  bool multipleChoice = false,
+}) {
+  final deltas = signalDeltas(
+    kind: LoSignalKind.positive,
+    strength: LoSignalStrength.strong,
+    difficulty: calibration,
+    provenance: EvidenceProvenance.home,
+    multipleChoice: multipleChoice,
+  );
+  final next = applyEvidence(
+    alpha: snap.alpha,
+    beta: snap.beta,
+    alphaDelta: deltas.alphaDelta,
+    betaDelta: deltas.betaDelta,
+  );
+  return meetsMasteryMeanAndEvidence(next);
+}
+
+/// Whether right picks alone — strong multiple-choice answers at
+/// [difficulty] at home, one after another — can ever bring an LO to
+/// conditions 1 and 2 of §4.1 (#279). With forgetting (§3.4) a run of them
+/// holds `α` under `1 + w / (1 − λ)` for the pick's weight `w`: at easy 3,
+/// at medium 4.33 (evidence 5.33, under 5.75), at hard 5.67. Only on hard
+/// do picks get there.
+bool picksAloneCanMaster(QuestionDifficulty difficulty) {
+  final w = signalDeltas(
+    kind: LoSignalKind.positive,
+    strength: LoSignalStrength.strong,
+    difficulty: difficulty,
+    multipleChoice: true,
+  ).alphaDelta;
+  const prior = PolicyConstants.prior;
+  return meetsMasteryMeanAndEvidence(
+    BeliefSnapshot(prior + w / (1 - PolicyConstants.forgetFactor), prior),
+  );
+}
+
+/// The type rule of #279 (CONDUCTOR_POLICY §2.2): whether the next
+/// question on an LO that is not mastered now should be no multiple
+/// choice, because a right pick can no longer bring it to its stamp.
+/// [snap] is its decayed belief, [belief] its doc, [calibration] the level
+/// the stamp is earned at.
+///
+/// Before the LO's first right own answer a pick is the gentle way in, as
+/// it was: no rule. After it, no pick when
+///
+///   1. **the right non-pick is missing** — no stamp, and no right own
+///      question that was no multiple choice: condition 4 can only be met
+///      by another type. The teacher's rule ("ontbreekt alleen de open
+///      vraag nog").
+///   2. **picks cannot get there** — at [calibration] a run of right picks
+///      never reaches conditions 1 and 2 ([picksAloneCanMaster]): on easy
+///      and medium an LO asked only as multiple choice would never be
+///      mastered, at home.
+///   3. **the next right answer decides** — one right answer of another
+///      type would master it, a right pick would not: the bar shows that
+///      segment half (§4.5), and the answer should count.
+///
+/// An LO without a doc gets no rule, and one whose kind has no other type
+/// is the caller's.
+bool needsNonMcqQuestion({
+  required BeliefSnapshot snap,
+  required LoBelief? belief,
+  required QuestionDifficulty calibration,
+}) {
+  if (belief == null) return false;
+  final stamped = belief.firstMasteredAt != null;
+  if (!stamped && (belief.ownQuestionsRight ?? 0) == 0) return false;
+  if (!stamped &&
+      (belief.ownQuestionsRightNonMcq ?? 0) <
+          PolicyConstants.masteryRightNonMcqQuestionsMin) {
+    return true;
+  }
+  if (!picksAloneCanMaster(calibration)) return true;
+  return oneRightAnswerMeetsMeanAndEvidence(
+        snap: snap,
+        calibration: calibration,
+      ) &&
+      !oneRightAnswerMeetsMeanAndEvidence(
+        snap: snap,
+        calibration: calibration,
+        multipleChoice: true,
+      );
 }
 
 /// Stuck rule (CONDUCTOR_POLICY 4.4, #278). Computed live, never stored.

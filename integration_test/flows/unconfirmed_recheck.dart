@@ -93,6 +93,9 @@ Map<String, dynamic> printAdvancedPast(DateTime at) => {
 /// last asked directly at [probedAt], last written (from the side) at
 /// [updatedAt]. Unconfirmed unless [confirmedAt] is given: then it carries
 /// a positive at calibration, its level and the stamp from that moment.
+/// One right own question on record, no pick, asked a notch lower — no
+/// positive at calibration (#279): the check question's right answer is
+/// the second, which the stamp wants.
 Map<String, dynamic> highBelief({
   required DateTime probedAt,
   required DateTime updatedAt,
@@ -109,6 +112,8 @@ Map<String, dynamic> highBelief({
   'lastQuestionType': 'completeCodeQuestion',
   'recentNegativesAtCalibrated': 0,
   'lastProbedAt': probedAt.toIso8601String(),
+  'ownQuestionsRight': 1,
+  'ownQuestionsRightNonMcq': 1,
   if (confirmedAt != null) ...{
     'lastPositiveAtCalibratedAt': confirmedAt.toIso8601String(),
     'highestPositiveDifficulty': 'medium',

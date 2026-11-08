@@ -234,9 +234,9 @@ StudentLOBelief {
                                         // set, and writes nothing back.
   recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
   firstMasteredAt: string?              // ISO 8601, set the first time all
-                                        // three mastery conditions held
-                                        // after a write (conductor policy
-                                        // 4.3, #101). One-way: decay and
+                                        // mastery conditions held (four
+                                        // since #279) after a write
+                                        // (conductor policy 4.3, #101). One-way: decay and
                                         // later negatives never clear it.
                                         // Gate for transfer credit (3.7).
                                         // Missing on older docs: read as
@@ -273,6 +273,23 @@ StudentLOBelief {
                                         // it (conductor policy 4.4).
                                         // Missing on older docs: read as
                                         // 0.
+  ownQuestionsRight: number?            // #279: own questions answered
+                                        // right (`correct`, positive on
+                                        // the LO), once per question.
+                                        // Mastery condition 4 wants 2
+                                        // (conductor policy 4.1).
+  ownQuestionsRightNonMcq: number?      // #279: of those, the ones that
+                                        // were no multiple choice; the
+                                        // condition wants 1. Both missing
+                                        // on docs from before 1.1, and
+                                        // kept apart from 0: the rules
+                                        // read missing as 0, but a stamp
+                                        // on a doc without them is no
+                                        // thin one (#275). The conductor
+                                        // starts them on a doc without a
+                                        // stamp, and leaves them missing
+                                        // on one with a stamp until the
+                                        // release fills them (#281).
 }
 ```
 
@@ -498,7 +515,11 @@ release pressed again for reports nobody touched rewrites nothing.
 - **Mastery requires both** mean above threshold and minimum evidence.
   A third condition — at least one positive signal at calibrated
   difficulty (tracked by `lastPositiveAtCalibratedAt`) — is added
-  by conductor policy section 4.3 to fix the easy-grinding problem.
+  by conductor policy section 4.3 to fix the easy-grinding problem. A
+  fourth since #279: two own questions answered right, one of them no
+  multiple choice (`ownQuestionsRight`, `ownQuestionsRightNonMcq`;
+  conductor policy 4.1), so side signals and picks alone give no stamp.
+  A right pick also weighs half (conductor policy 3.1).
 - **Forgetting per answer** (#278): before every update that carries
   weight the evidence above the prior shrinks by λ = 0.7. The evidence
   cap (20) stays as a backstop (conductor policy 3.4).

@@ -54,6 +54,7 @@ import 'flows/lesson_language.dart' as lesson_language;
 import 'flows/lesson_translation.dart' as lesson_translation;
 import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/mcq_option_tiles.dart' as mcq_option_tiles;
+import 'flows/multiple_choice_stamp.dart' as multiple_choice_stamp;
 import 'flows/my_reports_tab.dart' as my_reports_tab;
 import 'flows/near_goal_recheck.dart' as near_goal_recheck;
 import 'flows/next_root_signal.dart' as next_root_signal;
@@ -145,6 +146,7 @@ void main() {
   question_id.main();
   mcq_answer_key.main();
   mcq_option_tiles.main();
+  multiple_choice_stamp.main();
   quiz_ligatures.main();
   quiz_verdict_colors.main();
   playground_during_mcq.main();

@@ -138,6 +138,32 @@ herspeling rekent het niet. Ze telt wel de eigen vragen per leerdoel
 vervolgvraag, één per vraag, welke kant het antwoord ook uitging.
 `replay-beliefs` schrijft die telling nog niet, en herspeelt de oefeningen van vóór 1.1 nog zonder vergeten (#281).
 
+Dezelfde build brengt **#279**, in dezelfde regelversie:
+
+- **Een juiste meerkeuzevraag weegt ×0,5** (`rules.MCQ_POSITIVE`): elk
+  positief signaal van een beurt met `questionType` `mcQuestion`, of de
+  sleutel van de vragenbank het gaf of de grader, op het doel-LO en van
+  opzij. Een negatief signaal weegt zoals voorheen, en een vervolgvraag op
+  een meerkeuzevraag ook: dat antwoord is vrije tekst. Transfer-krediet is
+  geen signaal van de beurt en verandert niet.
+- **Een vierde voorwaarde voor de stempel**: minstens 2 eigen vragen juist
+  (`rules.STAMP_OWN_RIGHT_MIN`), waarvan minstens 1 geen meerkeuzevraag
+  (`rules.STAMP_OWN_RIGHT_NON_MCQ_MIN`). *Juist* is `correct` met een
+  positief signaal op het leerdoel, één per vraag; een signaal van opzij
+  telt niet mee. Een stempel die er al is, blijft staan.
+
+De herspeling telt de juiste eigen vragen over het hele logboek, elke build
+(`LoState.own_right`, `LoState.own_right_open`), zoals de app ze bewaart
+(`ownQuestionsRight`, `ownQuestionsRightNonMcq` op `lo_beliefs`). De app
+begint haar telling bij de release: een document zonder de tellingen leest
+ze als 0, en een document met een stempel maar zonder tellingen houdt ze
+weg, zodat #275 een stempel van vóór 1.1 niet voor een dunne aanziet. Tot
+`replay-beliefs` ze aanvult (#281), kan `validate` op een oefening van 1.1
+een stempel vroeger herspelen dan de app hem zette: de herspeling kent de
+juiste eigen vragen van vóór de release, de app niet. Met de rest van 1.1
+is het de variant `min_own_right=2, min_open_right=1, mcq_positive=0.5` van
+de herspeling (#248).
+
 ## Regelversie `1.0.23-eval7`
 
 PUNTENFORMULE v1.0.23, herspeeld uit `turn_history`. `eval7`
@@ -524,8 +550,9 @@ document staan en noemt de uitvoer het: draai het dan opnieuw. Daarna
 `rules.replay(..., variant=rules.Variant(...))` herspeelt dezelfde
 antwoorden met een kandidaat-regel voor formule 1.1 (#249). Een variant is
 geen regelversie. `Variant()` is de regel van nu, per oefening die van de
-build die ze schreef. De gekozen kandidaat, `forget=0.7`, is sinds `eval8`
-die regel voor de oefeningen van een build met 1.1 (#278, hierboven).
+build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
+`min_own_right=2, min_open_right=1, mcq_positive=0.5` (#279), zijn sinds
+`eval8` die regel voor de oefeningen van een build met 1.1 (hierboven).
 
 - `as_276`: elke beurt met de stempel van #276, welke build ze ook schreef;
   wat de kandidaat met deze antwoorden gedaan zou hebben, niet wat de app
@@ -540,7 +567,9 @@ die regel voor de oefeningen van een build met 1.1 (#278, hierboven).
   vanaf `streak_level`, meerkeuzevragen niet (tenzij `streak_counts_mcq`).
 - `min_own_right`, `min_open_right` en `mcq_positive` (#279): geen stempel
   vóór zoveel juiste eigen vragen, waarvan zoveel geen meerkeuzevraag, en
-  het gewicht van een positief signaal op een meerkeuzevraag.
+  het gewicht van een positief signaal op een meerkeuzevraag (niet op een
+  vervolgvraag erop). Gezet gelden ze voor elke beurt; zonder vraagt een
+  beurt van 1.1 er 2 en 1, en weegt ze ×0,5.
 
 Een *eigen vraag* is een rechtstreekse vraag met het leerdoel als doel,
 geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal.

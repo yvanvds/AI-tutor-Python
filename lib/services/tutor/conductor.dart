@@ -629,13 +629,13 @@ class Conductor {
         now: now,
       );
       snapshots[lo.id] = snap;
-      if (meetsMasteryMeanAndEvidence(snap) &&
-          b.lastPositiveAtCalibratedAt != null) {
+      if (isMastered(snap, b)) {
         masteredLoIds.add(lo.id);
       }
     }
 
-    // Unmastered = mean < threshold OR evidence < min OR cond3 not yet set.
+    // Unmastered = one of the four conditions of §4.1 not met (#279: the
+    // fourth, the right own questions, only without a stamp).
     final unmastered = objectives
         .where((lo) => !masteredLoIds.contains(lo.id))
         .toList(growable: false);
@@ -696,7 +696,15 @@ class Conductor {
       chosenReason = 'all mastered: lowest mean';
     }
 
-    final type = _pickType(target, snapshots[target.id]!);
+    final type = _pickType(
+      target,
+      snapshots[target.id]!,
+      // #279: an unmastered target gets no multiple choice when a right
+      // pick can no longer bring it to its stamp; a top-up of a mastered
+      // subgoal (§1.3) has no stamp at stake.
+      belief: unmastered.isNotEmpty ? byId[target.id] : null,
+      calibration: calibration,
+    );
     final notchDropRules = await _shouldDropNotch(
       lo: target,
       subgoalId: subgoal.id,
@@ -783,13 +791,7 @@ class Conductor {
         final stale =
             now.difference(b.lastUpdatedAt) >= PolicyConstants.warmUpStaleAfter;
         if (!regressed && !stale) continue;
-        final mastered = everMastered(
-          firstMasteredAt: b.firstMasteredAt,
-          alpha: b.alpha,
-          beta: b.beta,
-          lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
-        );
-        if (!mastered) continue;
+        if (!everMasteredBelief(b)) continue;
         final snap = applyDecay(
           alpha: b.alpha,
           beta: b.beta,
@@ -870,7 +872,7 @@ class Conductor {
   /// condition 3 stays open. The slot is that LO's way back: one
   /// direct question at the student's calibrated level, graded like any
   /// probe of that LO (§3, ratchets and stamp included), so a right
-  /// answer can complete the three conditions of §4.1 that the grade
+  /// answer can complete the four conditions of §4.1 that the grade
   /// reads.
   ///
   /// Candidates are the LOs of the active root's subgoals *before* the
@@ -965,9 +967,18 @@ class Conductor {
       'candidates': candidates.length,
     });
 
+    final calibration = _deps.getCalibration().difficulty;
     return QuestionPlan(
-      type: _gentlestTypeFor(pick.lo),
-      difficulty: _deps.getCalibration().difficulty,
+      // #279: the recheck is that LO's way to its stamp, so a pick that
+      // can no longer bring it there is not asked. An LO mastered now —
+      // an unconfirmed one whose level only is missing — has none at stake.
+      type: _gentlestTypeFor(
+        pick.lo,
+        belief: isMastered(pick.snap, pick.belief) ? null : pick.belief,
+        snap: pick.snap,
+        calibration: calibration,
+      ),
+      difficulty: calibration,
       targetLOs: [pick.lo],
       recheck: Recheck(subgoal: pick.subgoal, rule: pick.rule),
       reason: TurnSelectionReason(
@@ -1013,12 +1024,7 @@ class Conductor {
     // the evaluation tooling's "fossil" (tooling/evaluation/diagnostics.py),
     // which the teacher otherwise has to settle by hand at report time.
     final probedAt = belief.lastDirectProbeAt;
-    final demonstrated = everMastered(
-      firstMasteredAt: belief.firstMasteredAt,
-      alpha: belief.alpha,
-      beta: belief.beta,
-      lastPositiveAtCalibratedAt: belief.lastPositiveAtCalibratedAt,
-    );
+    final demonstrated = everMasteredBelief(belief);
     if (!demonstrated &&
         probedAt != null &&
         now.difference(probedAt) >= PolicyConstants.recheckAfter &&
@@ -1039,9 +1045,18 @@ class Conductor {
     // belief already says the student has it, the question lets them show
     // it. The same clock as a near goal, so a wrong answer that leaves the
     // belief high waits a week too; an LO never asked directly is due now.
+    // #279: condition 4 open is the same case — a belief lifted over the
+    // bar with fewer than two right own questions behind it, one of them
+    // no multiple choice, and no stamp. A stamp that is there stays: a
+    // stamp from before 1.1 on few own questions is #275's.
     final unconfirmed =
         belief.lastPositiveAtCalibratedAt == null ||
-        belief.highestPositiveDifficulty == null;
+        belief.highestPositiveDifficulty == null ||
+        (belief.firstMasteredAt == null &&
+            !meetsOwnQuestionsCondition(
+              ownQuestionsRight: belief.ownQuestionsRight,
+              ownQuestionsRightNonMcq: belief.ownQuestionsRightNonMcq,
+            ));
     if (unconfirmed &&
         meetsMasteryMeanAndEvidence(snap) &&
         (probedAt == null ||
@@ -1054,11 +1069,56 @@ class Conductor {
   /// The gentlest acceptable type for [lo]'s kind — the §1.1 cold-start
   /// default. Also the type of the one-question probes on another subgoal
   /// (§1.5 warm-up, §2.6 recheck), which have no per-LO rotation to follow.
-  static ChatRequestType _gentlestTypeFor(LearningObjective lo) {
-    final acceptable =
-        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+  /// [belief], [snap] and [calibration] as for [_acceptableFor]: without a
+  /// pick when one can no longer bring the LO to its stamp (#279) — then
+  /// `socraticQuestion` for `recall`, `explainCode` for `predict`.
+  static ChatRequestType _gentlestTypeFor(
+    LearningObjective lo, {
+    LoBelief? belief,
+    BeliefSnapshot? snap,
+    QuestionDifficulty? calibration,
+  }) {
+    final acceptable = _acceptableFor(
+      lo,
+      belief: belief,
+      snap: snap,
+      calibration: calibration,
+    );
     final def = _coldStartDefault[lo.kind] ?? acceptable.first;
     return acceptable.contains(def) ? def : acceptable.first;
+  }
+
+  /// The acceptable types for [lo]'s kind (§2.2), without `mcQuestion` when
+  /// a right pick can no longer bring the LO to its stamp
+  /// (`belief_math.needsNonMcqQuestion`, #279) and the kind has another
+  /// type. [belief] is the doc of an LO that is not mastered now — `null`
+  /// for a mastered one, or one without a doc, which keeps every type; its
+  /// decayed [snap] and the student's [calibration] go with it.
+  static List<ChatRequestType> _acceptableFor(
+    LearningObjective lo, {
+    LoBelief? belief,
+    BeliefSnapshot? snap,
+    QuestionDifficulty? calibration,
+  }) {
+    final acceptable =
+        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+    if (belief == null || snap == null || calibration == null) {
+      return acceptable;
+    }
+    if (!acceptable.contains(ChatRequestType.mcQuestion) ||
+        acceptable.length == 1) {
+      return acceptable;
+    }
+    if (!needsNonMcqQuestion(
+      snap: snap,
+      belief: belief,
+      calibration: calibration,
+    )) {
+      return acceptable;
+    }
+    return acceptable
+        .where((t) => t != ChatRequestType.mcQuestion)
+        .toList(growable: false);
   }
 
   /// Acceptable types per LO `kind` (CONDUCTOR_POLICY §2.2).
@@ -1099,16 +1159,33 @@ class Conductor {
     ChatRequestType.socraticQuestion,
   ];
 
-  ChatRequestType _pickType(LearningObjective lo, BeliefSnapshot snap) {
-    final acceptable =
-        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+  /// The type of the next question on [lo] (§2.2). [belief] is its doc
+  /// when it is not mastered now (`null` otherwise), for the rule of #279
+  /// ([_acceptableFor]); [calibration] the student's level.
+  ChatRequestType _pickType(
+    LearningObjective lo,
+    BeliefSnapshot snap, {
+    LoBelief? belief,
+    required QuestionDifficulty calibration,
+  }) {
+    final acceptable = _acceptableFor(
+      lo,
+      belief: belief,
+      snap: snap,
+      calibration: calibration,
+    );
     final priorOnly =
         snap.alpha == PolicyConstants.prior &&
         snap.beta == PolicyConstants.prior;
     if (priorOnly) {
       // Cold-start default per kind. Falls back to the first acceptable if
       // the default is somehow not in the acceptable set.
-      return _gentlestTypeFor(lo);
+      return _gentlestTypeFor(
+        lo,
+        belief: belief,
+        snap: snap,
+        calibration: calibration,
+      );
     }
     final candidates = acceptable
         .where((t) => t.name != _lastQuestionTypeForLo(lo.id))
@@ -1388,6 +1465,11 @@ class Conductor {
     }
     // The root's subgoals, read on the first cross-subgoal signal only.
     List<Goal>? siblings;
+    // #279: a positive of a multiple-choice question weighs half, from the
+    // key or the grader, on the target and from the side. A follow-up on
+    // one is free text (§6.2), weighed as any follow-up.
+    final multipleChoice =
+        plan.type == ChatRequestType.mcQuestion && !answer.isFollowUp;
     // One own question per question (#278), should the grader name the
     // target twice against the contract (§3.5).
     var ownQuestionCounted = false;
@@ -1450,14 +1532,7 @@ class Conductor {
         final flaggedAt = nextRegressedAt(
           current: existing?.regressedAt,
           directProbe: false,
-          everMastered:
-              existing != null &&
-              everMastered(
-                firstMasteredAt: existing.firstMasteredAt,
-                alpha: existing.alpha,
-                beta: existing.beta,
-                lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-              ),
+          everMastered: existing != null && everMasteredBelief(existing),
           negative: true,
           now: DateTime.now().toUtc(),
         );
@@ -1524,12 +1599,14 @@ class Conductor {
               kind: sig.kind,
               strength: effectiveStrength,
               provenance: answer.provenance,
+              multipleChoice: multipleChoice,
             )
           : signalDeltas(
               kind: sig.kind,
               strength: effectiveStrength,
               difficulty: effectiveDifficulty,
               provenance: answer.provenance,
+              multipleChoice: multipleChoice,
             );
       final next = applyEvidence(
         alpha: alpha,
@@ -1558,6 +1635,30 @@ class Conductor {
       final movesRatchets = isCalibratedProbeOfThisLo && isTarget;
       final countsAsOwnQuestion = movesRatchets && !ownQuestionCounted;
       if (countsAsOwnQuestion) ownQuestionCounted = true;
+      // #279, condition 4 of §4.1: the own question answered right — a
+      // `correct` answer with a positive on its target; a `partial` with a
+      // positive is not right — and whether it was no multiple choice.
+      final ownRight =
+          countsAsOwnQuestion &&
+          hasPositive &&
+          answer.overallQuality == AnswerQuality.correct;
+      // A doc with a stamp but without the counts (from before 1.1) keeps
+      // them missing — a written stamp, or one an old build gave and did
+      // not write (`everMastered`): a count started now would read that
+      // stamp as a thin one (#275). The release fills them from
+      // `turn_history` (#281). Any other doc counts, from 0 when it had
+      // none.
+      final keepCountsMissing =
+          existing != null &&
+          !existing.hasRightCounts &&
+          everMasteredBelief(existing);
+      final nextOwnRight = keepCountsMissing
+          ? null
+          : (existing?.ownQuestionsRight ?? 0) + (ownRight ? 1 : 0);
+      final nextOwnRightNonMcq = keepCountsMissing
+          ? null
+          : (existing?.ownQuestionsRightNonMcq ?? 0) +
+                (ownRight && plan.type != ChatRequestType.mcQuestion ? 1 : 0);
       final newPositiveAtCalibrated =
           (movesRatchets && hasPositive && atOrAbove) ? now : null;
       // #103 three-level ratchet: absolute, not calibration-relative — the
@@ -1591,21 +1692,20 @@ class Conductor {
       // #101 one-way mastery stamp. A doc from before the field existed
       // that reads as "mastered at its last write" keeps that verdict
       // durably (dated to that write) even if this turn leaves it below
-      // mastery; otherwise the stamp is set the first time all three
+      // mastery; otherwise the stamp is set the first time all four
       // conditions hold after this write.
       var nextFirstMasteredAt = existing?.firstMasteredAt;
       if (nextFirstMasteredAt == null) {
-        final legacyMastered =
-            existing != null &&
-            everMastered(
-              firstMasteredAt: null,
-              alpha: existing.alpha,
-              beta: existing.beta,
-              lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-            );
+        final legacyMastered = existing != null && everMasteredBelief(existing);
+        // #279: all four conditions, the right own questions after this
+        // write included.
         final masteredAfter =
             meetsMasteryMeanAndEvidence(next) &&
-            nextPositiveAtCalibrated != null;
+            nextPositiveAtCalibrated != null &&
+            meetsOwnQuestionsCondition(
+              ownQuestionsRight: nextOwnRight,
+              ownQuestionsRightNonMcq: nextOwnRightNonMcq,
+            );
         if (legacyMastered) {
           nextFirstMasteredAt = existing.lastUpdatedAt;
         } else if (masteredAfter) {
@@ -1648,6 +1748,8 @@ class Conductor {
             : existing?.lastDirectProbeAt,
         ownQuestions:
             (existing?.ownQuestions ?? 0) + (countsAsOwnQuestion ? 1 : 0),
+        ownQuestionsRight: nextOwnRight,
+        ownQuestionsRightNonMcq: nextOwnRightNonMcq,
       );
       await _deps.upsertLoBelief(updated);
       // The evidence this signal added, not the change in `(α, β)`: since
@@ -1703,21 +1805,19 @@ class Conductor {
               lastUpdatedAt: b.lastUpdatedAt,
               now: DateTime.now().toUtc(),
             );
-      final isMastered =
-          meetsMasteryMeanAndEvidence(snap) &&
-          (b?.lastPositiveAtCalibratedAt != null);
+      final mastered = isMastered(snap, b);
       final stuck = isStuck(snap, ownQuestions: b?.ownQuestions ?? 0);
       loStatus.add(
         TurnLoStatus(
           loId: lo.id,
           mean: snap.mean,
           evidence: snap.evidence,
-          mastered: isMastered,
+          mastered: mastered,
           stuck: stuck,
         ),
       );
       if (!lo.optional) {
-        masteredCount.add(isMastered);
+        masteredCount.add(mastered);
         stuckCount.add(stuck);
       }
     }
@@ -1997,14 +2097,7 @@ class Conductor {
         subgoalId: ref.subgoalId,
         loId: ref.loId,
       );
-      final eligible =
-          existing != null &&
-          everMastered(
-            firstMasteredAt: existing.firstMasteredAt,
-            alpha: existing.alpha,
-            beta: existing.beta,
-            lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-          );
+      final eligible = existing != null && everMasteredBelief(existing);
       if (!eligible) {
         _deps.recordDebugEvent('conductor.transfer_dropped', {
           'subgoalId': ref.subgoalId,
@@ -2185,8 +2278,7 @@ class Conductor {
           lastUpdatedAt: b.lastUpdatedAt,
           now: DateTime.now().toUtc(),
         );
-        if (!(meetsMasteryMeanAndEvidence(snap) &&
-            b.lastPositiveAtCalibratedAt != null)) {
+        if (!isMastered(snap, b)) {
           allDone = false;
           break;
         }
@@ -2331,6 +2423,8 @@ class Conductor {
           firstMasteredAt: b?.firstMasteredAt,
           calibration: calibration,
           ownQuestions: b?.ownQuestions ?? 0,
+          ownQuestionsRight: b?.ownQuestionsRight,
+          ownQuestionsRightNonMcq: b?.ownQuestionsRightNonMcq,
         ),
         askedAndNotRight: askedAndNotRight.contains(lo.id),
       );

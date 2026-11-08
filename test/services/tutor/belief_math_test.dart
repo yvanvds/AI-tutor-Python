@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,19 +81,58 @@ void main() {
           alpha: 1,
           beta: 1,
           lastPositiveAtCalibratedAt: null,
+          ownQuestionsRight: null,
+          ownQuestionsRightNonMcq: null,
         ),
         isTrue,
       );
     });
 
     test('without the stamp: mastered as of the last write counts', () {
-      // (5, 1): mean 0.83, evidence 6, ratchet set → was mastered.
+      // (5, 1): mean 0.83, evidence 6, ratchet set, two right own
+      // questions, one no multiple choice → was mastered.
       expect(
         everMastered(
           firstMasteredAt: null,
           alpha: 5,
           beta: 1,
           lastPositiveAtCalibratedAt: ratchet,
+          ownQuestionsRight: 2,
+          ownQuestionsRightNonMcq: 1,
+        ),
+        isTrue,
+      );
+    });
+
+    test('without the stamp: condition 4 is today\'s too on a doc that '
+        'keeps the counts (#279) — over the bar on fewer right own '
+        'questions, or on picks alone, is not mastered', () {
+      for (final (right, nonMcq) in [(1, 1), (3, 0), (0, 0)]) {
+        expect(
+          everMastered(
+            firstMasteredAt: null,
+            alpha: 5,
+            beta: 1,
+            lastPositiveAtCalibratedAt: ratchet,
+            ownQuestionsRight: right,
+            ownQuestionsRightNonMcq: nonMcq,
+          ),
+          isFalse,
+          reason: '$right right, $nonMcq no multiple choice',
+        );
+      }
+    });
+
+    test('without the stamp and without the counts: a doc from before 1.1 '
+        'is read by the rules of its day, a stamp they gave stays', () {
+      expect(
+        everMastered(
+          firstMasteredAt: null,
+          alpha: 5,
+          beta: 1,
+          lastPositiveAtCalibratedAt: ratchet,
+          ownQuestionsRight: null,
+          ownQuestionsRightNonMcq: null,
         ),
         isTrue,
       );
@@ -106,6 +146,8 @@ void main() {
           alpha: 3,
           beta: 1,
           lastPositiveAtCalibratedAt: ratchet,
+          ownQuestionsRight: 2,
+          ownQuestionsRightNonMcq: 1,
         ),
         isFalse,
       );
@@ -116,6 +158,8 @@ void main() {
           alpha: 2.5,
           beta: 0.5,
           lastPositiveAtCalibratedAt: ratchet,
+          ownQuestionsRight: 2,
+          ownQuestionsRightNonMcq: 1,
         ),
         isFalse,
       );
@@ -128,6 +172,8 @@ void main() {
           alpha: 9,
           beta: 1,
           lastPositiveAtCalibratedAt: null,
+          ownQuestionsRight: 2,
+          ownQuestionsRightNonMcq: 1,
         ),
         isFalse,
       );
@@ -691,6 +737,225 @@ void main() {
         'not stuck, however often it was asked', () {
       // (12, 6) was stuck by the saturated branch (α + β ≥ 18, μ < 0.75).
       expect(isStuck(const BeliefSnapshot(12, 6), ownQuestions: 20), isFalse);
+    });
+  });
+
+  group('#279 a pick weighs half; condition 4; the type rule', () {
+    const medium = QuestionDifficulty.medium;
+    const hard = QuestionDifficulty.hard;
+    const easy = QuestionDifficulty.easy;
+    final at = DateTime.utc(2026, 11, 1);
+
+    LoBelief doc({
+      bool atCalibration = true,
+      DateTime? firstMasteredAt,
+      int? right,
+      int? nonMcq,
+    }) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 5,
+      beta: 1,
+      lastUpdatedAt: at,
+      lastPositiveAtCalibratedAt: atCalibration ? at : null,
+      firstMasteredAt: firstMasteredAt,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+
+    test('a positive of a pick weighs half — on the target and from the '
+        'side; a negative and a neutral as before', () {
+      expect(PolicyConstants.multipleChoicePositiveFactor, 0.5);
+      for (final level in QuestionDifficulty.values) {
+        final full = signalDeltas(
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.strong,
+          difficulty: level,
+          provenance: EvidenceProvenance.supervised,
+        );
+        final pick = signalDeltas(
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.strong,
+          difficulty: level,
+          provenance: EvidenceProvenance.supervised,
+          multipleChoice: true,
+        );
+        expect(pick.alphaDelta, closeTo(full.alphaDelta * 0.5, 1e-12));
+        // A strong pick weighs as a moderate answer.
+        expect(
+          pick.alphaDelta,
+          closeTo(
+            signalDeltas(
+              kind: LoSignalKind.positive,
+              strength: LoSignalStrength.moderate,
+              difficulty: level,
+              provenance: EvidenceProvenance.supervised,
+            ).alphaDelta,
+            1e-12,
+          ),
+        );
+        final wrong = signalDeltas(
+          kind: LoSignalKind.negative,
+          strength: LoSignalStrength.moderate,
+          difficulty: level,
+          multipleChoice: true,
+        );
+        expect(
+          wrong.betaDelta,
+          PolicyConstants.negativeDifficultyMultiplier(level),
+        );
+      }
+      expect(
+        crossSubgoalSignalDeltas(
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.strong,
+          multipleChoice: true,
+        ).alphaDelta,
+        closeTo(1.0, 1e-12),
+      );
+      final neutral = signalDeltas(
+        kind: LoSignalKind.neutral,
+        strength: LoSignalStrength.strong,
+        difficulty: medium,
+        multipleChoice: true,
+      );
+      expect((neutral.alphaDelta, neutral.betaDelta), (0.0, 0.0));
+    });
+
+    test('condition 4: two right own questions, one of them no pick; a '
+        'missing count reads 0', () {
+      bool meets(int? right, int? nonMcq) => meetsOwnQuestionsCondition(
+        ownQuestionsRight: right,
+        ownQuestionsRightNonMcq: nonMcq,
+      );
+      expect(meets(2, 1), isTrue);
+      expect(meets(5, 3), isTrue);
+      expect(meets(1, 1), isFalse);
+      expect(meets(4, 0), isFalse);
+      expect(meets(null, null), isFalse);
+    });
+
+    test('mastered now: the four conditions, the fourth only without a '
+        'stamp — a stamp that is there stays', () {
+      const over = BeliefSnapshot(5, 1);
+      const under = BeliefSnapshot(4, 1.2);
+      expect(isMastered(over, doc(right: 2, nonMcq: 1)), isTrue);
+      expect(isMastered(over, doc(right: 3, nonMcq: 0)), isFalse);
+      expect(isMastered(over, doc(right: 1, nonMcq: 1)), isFalse);
+      expect(isMastered(under, doc(right: 2, nonMcq: 1)), isFalse);
+      expect(
+        isMastered(over, doc(atCalibration: false, right: 2, nonMcq: 1)),
+        isFalse,
+      );
+      expect(isMastered(over, null), isFalse);
+      // Stamped, with or without counts: conditions 1–3 decide.
+      expect(isMastered(over, doc(firstMasteredAt: at)), isTrue);
+      expect(isMastered(over, doc(firstMasteredAt: at, right: 0)), isTrue);
+      expect(isMastered(under, doc(firstMasteredAt: at)), isFalse);
+      // An old doc without counts that met 1–3 at its last write: the
+      // reading of everMastered, a stamp an old build did not write.
+      expect(isMastered(over, doc()), isTrue);
+      // A 1.1 doc keeps counts: the fourth condition holds it.
+      expect(isMastered(over, doc(right: 0, nonMcq: 0)), isFalse);
+    });
+
+    test('picks alone: with forgetting a run of right picks at home stops '
+        'at evidence 4 on easy and 5.33 on medium — under 5.75 — and only '
+        'on hard gets over the bar', () {
+      expect(picksAloneCanMaster(easy), isFalse);
+      expect(picksAloneCanMaster(medium), isFalse);
+      expect(picksAloneCanMaster(hard), isTrue);
+      var snap = const BeliefSnapshot(1, 1);
+      for (var i = 0; i < 60; i++) {
+        final d = signalDeltas(
+          kind: LoSignalKind.positive,
+          strength: LoSignalStrength.strong,
+          difficulty: medium,
+          multipleChoice: true,
+        );
+        snap = applyEvidence(
+          alpha: snap.alpha,
+          beta: snap.beta,
+          alphaDelta: d.alphaDelta,
+          betaDelta: d.betaDelta,
+        );
+      }
+      expect(snap.evidence, closeTo(2 + 1.0 / 0.3, 1e-6));
+      expect(meetsMasteryMeanAndEvidence(snap), isFalse);
+    });
+
+    test('one right answer, a pick or not', () {
+      // (3.5, 1) on hard: another type takes it to (5.55, 1), a pick to
+      // (4.15, 1), evidence 5.15.
+      const snap = BeliefSnapshot(3.5, 1);
+      expect(
+        oneRightAnswerMeetsMeanAndEvidence(snap: snap, calibration: hard),
+        isTrue,
+      );
+      expect(
+        oneRightAnswerMeetsMeanAndEvidence(
+          snap: snap,
+          calibration: hard,
+          multipleChoice: true,
+        ),
+        isFalse,
+      );
+    });
+
+    group('the type rule', () {
+      bool needs(
+        LoBelief? b, {
+        BeliefSnapshot snap = const BeliefSnapshot(2, 1.5),
+        QuestionDifficulty calibration = medium,
+      }) =>
+          needsNonMcqQuestion(snap: snap, belief: b, calibration: calibration);
+
+      test('before the first right own question a pick is the way in', () {
+        expect(needs(null), isFalse);
+        expect(needs(doc(right: 0, nonMcq: 0)), isFalse);
+        expect(needs(doc()), isFalse); // a doc from before 1.1
+        expect(needs(doc(right: 0, nonMcq: 0), calibration: easy), isFalse);
+      });
+
+      test('1. the right non-pick is missing: at any level', () {
+        for (final level in QuestionDifficulty.values) {
+          expect(needs(doc(right: 1, nonMcq: 0), calibration: level), isTrue);
+          expect(needs(doc(right: 4, nonMcq: 0), calibration: level), isTrue);
+        }
+      });
+
+      test('2. picks cannot get there: on easy and medium, also for a '
+          'stamped LO that dipped under the bar', () {
+        expect(needs(doc(right: 2, nonMcq: 1)), isTrue);
+        expect(needs(doc(right: 2, nonMcq: 1), calibration: easy), isTrue);
+        expect(needs(doc(firstMasteredAt: at)), isTrue);
+        // On hard, far from the bar, a pick still helps.
+        expect(needs(doc(right: 2, nonMcq: 1), calibration: hard), isFalse);
+        expect(needs(doc(firstMasteredAt: at), calibration: hard), isFalse);
+      });
+
+      test('3. on hard, the next right answer decides: no pick when only '
+          'another type would master it', () {
+        const deciding = BeliefSnapshot(3.5, 1);
+        expect(
+          needs(doc(right: 2, nonMcq: 1), snap: deciding, calibration: hard),
+          isTrue,
+        );
+        // Where a pick would master it too, a pick is fine.
+        const close = BeliefSnapshot(4.6, 1);
+        expect(
+          oneRightAnswerMeetsMeanAndEvidence(
+            snap: close,
+            calibration: hard,
+            multipleChoice: true,
+          ),
+          isTrue,
+        );
+        expect(
+          needs(doc(right: 2, nonMcq: 1), snap: close, calibration: hard),
+          isFalse,
+        );
+      });
     });
   });
 }

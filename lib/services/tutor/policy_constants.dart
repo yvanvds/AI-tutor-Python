@@ -116,6 +116,26 @@ class PolicyConstants {
     }
   }
 
+  /// Factor on a *positive* signal of a multiple-choice question (#279,
+  /// formula 1.1, CONDUCTOR_POLICY §3.1): a right pick weighs half — a
+  /// `strong` one as a `moderate` — whether the bank's answer key graded it
+  /// (§2.7, always `strong`) or the grader, and for every positive of that
+  /// turn, a side signal (§2.4) included. A negative weighs as it did.
+  ///
+  /// The guess correction was the grader's job (§3.1), and it did not do
+  /// it: of the right own answers since 2026-10-05, 437 of 440 on a
+  /// grader's multiple choice were `strong`, as were all 120 from the key —
+  /// a clicked option weighed as much as a program the student wrote. Not a
+  /// follow-up on one: its answer is free text, weighed as any follow-up
+  /// (§6.2). Not a transfer credit (§3.7), which is no signal of the turn.
+  ///
+  /// With forgetting ([forgetFactor]) a steady run of right picks at home
+  /// holds the evidence under `2 + w / (1 − λ)`: 4 on easy, 5.33 on medium,
+  /// under [masteryEvidenceMin] — only on hard, 6.67, can picks alone reach
+  /// the bar. The conductor asks something else when a pick can no longer
+  /// bring the LO to its stamp (§2.2, `belief_math.needsNonMcqQuestion`).
+  static const double multipleChoicePositiveFactor = 0.5;
+
   /// Weight applied to follow-up answer signals. Per CONDUCTOR_POLICY §6.2,
   /// follow-up signals are capped at `weak` and treated as `medium`
   /// difficulty for the multiplier step. (Follow-up chaining is out of scope
@@ -146,6 +166,30 @@ class PolicyConstants {
   /// medium at home (evidence 5.4 after two, 6.38 after three) and still
   /// two on hard or in the lesson time. The bar itself did not move.
   static const double masteryEvidenceMin = 5.75;
+
+  /// Per-LO mastery, condition 4 (#279, formula 1.1, CONDUCTOR_POLICY
+  /// §4.1): at least this many own questions on the LO answered right
+  /// (`LoBelief.ownQuestionsRight`) — a direct question with the LO as its
+  /// target, not a follow-up, whose answer was `correct` with a positive
+  /// signal on the LO; a `partial` with a positive is not right — and at
+  /// least [masteryRightNonMcqQuestionsMin] of them no multiple choice.
+  ///
+  /// A side signal (§2.4) still moves `(α, β)` but counts for neither, so
+  /// it can no longer give the stamp: of the 201 stamps since 21 October,
+  /// 71 fell after a single own question — 31 on that
+  /// question, carried by side weight, 40 on a later side signal or
+  /// transfer credit — and 83 rested on multiple choice alone. The teacher
+  /// (2026-11-08): two multiple-choice questions are no achieved goal.
+  ///
+  /// A stamp that is there stays (one-way, #168): an LO with
+  /// `firstMasteredAt` met this condition, or came before it, and counts as
+  /// mastered again on conditions 1–3 alone after a dip
+  /// (`belief_math.isMastered`).
+  static const int masteryRightOwnQuestionsMin = 2;
+
+  /// Of [masteryRightOwnQuestionsMin], how many must be no multiple choice
+  /// (`LoBelief.ownQuestionsRightNonMcq`, #279).
+  static const int masteryRightNonMcqQuestionsMin = 1;
 
   /// Stuck rule (§4.4, #278): at least this many own questions on the LO
   /// (`LoBelief.ownQuestions`: a direct question with the LO as its target,

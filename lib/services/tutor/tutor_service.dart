@@ -470,10 +470,7 @@ class TutorService extends Notifier<TutorState> {
         lastUpdatedAt: b.lastUpdatedAt,
         now: now,
       );
-      if (meetsMasteryMeanAndEvidence(snap) &&
-          b.lastPositiveAtCalibratedAt != null) {
-        mastered += 1;
-      }
+      if (isMastered(snap, b)) mastered += 1;
     }
     final cached = mastered / nonOptional.length;
     // No `advancedAt` (#161): a subgoal that just grew an LO is open again,

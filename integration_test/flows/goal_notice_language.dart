@@ -196,6 +196,10 @@ void main() {
             'lastPositiveAtCalibratedAt': now.toIso8601String(),
             'highestPositiveDifficulty': 'medium',
             'recentNegativesAtCalibrated': 0,
+            // One right own question on record, no pick (#279): the grade
+            // below is the second.
+            'ownQuestionsRight': 1,
+            'ownQuestionsRightNonMcq': 1,
           },
         ],
         'translations': [
