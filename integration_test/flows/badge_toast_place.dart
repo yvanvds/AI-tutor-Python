@@ -53,9 +53,11 @@ import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/session/widgets/objective_banner.dart';
 import 'package:ai_tutor_python/features/session/widgets/output_panel.dart';
 import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
+import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -213,6 +215,23 @@ void _overTheChat(WidgetTester tester, String where) {
     'the restart button': find.byTooltip('Restart session'),
   }, where);
 }
+
+/// Pumps until the chat panel has slid all the way open, to its full width
+/// for the window: only then is the exercise next to it laid out where it
+/// stays. The slide takes 380 ms, and a scripted exercise can be in the
+/// editor before it ends — "Send to tutor" read mid-slide is further right
+/// than where it comes to rest, up to past its own right edge and into the
+/// chat (CI on #287: the first click still found the button, the second, on
+/// the same spot, did not).
+///
+/// Measured against the window, not the session as last laid out: right
+/// after a resize the old layout still matches itself.
+Future<void> _untilChatOpen(WidgetTester tester) => pumpUntil(tester, () {
+  final session = _window(tester).width - sidebarWidth;
+  bool near(double a, double b) => (a - b).abs() < 0.01;
+  return near(tester.getSize(find.byType(SessionView)).width, session) &&
+      near(tester.getSize(_panel()).width, chatPanelFullWidth(session));
+}, reason: 'the chat never slid all the way open');
 
 /// Closes every notice up, as a student would.
 Future<void> _closeAll(WidgetTester tester) async {
@@ -444,6 +463,8 @@ void main() {
     expect(_toast(), findsNothing);
     expect(tester.getSize(_panel()).width, lessThan(kBadgeToastWidth));
 
+    // Where "Send to tutor" comes to rest, once the chat has slid open.
+    await _untilChatOpen(tester);
     final sendAt = tester.getCenter(_send());
     await click(sendAt);
     await waitForTurns(1);
@@ -479,7 +500,9 @@ void main() {
     await waitForExercise(_second);
     await waitForIdle();
     expect(_toast(), findsOneWidget);
-    // Back on the spot of "Send to tutor", still under the notice's time.
+    // Back on the spot of "Send to tutor", still under the notice's time —
+    // and "Send to tutor" is still there.
+    expect(tester.getCenter(_send()), sendAt, reason: 'the button moved');
     await click(sendAt);
     expect(_toast(), findsOneWidget, reason: 'the notice went first');
     await waitForTurns(2);
@@ -487,12 +510,8 @@ void main() {
     // 2. 1280 px: over the chat at its full width, under the header.
     await mouse.moveTo(tester.getCenter(_toast()));
     _resize(tester, kRunnerWindowSize.width);
-    await pumpUntil(
-      tester,
-      () => tester.getSize(_panel()).width > kBadgeToastWidth,
-      reason: 'the chat never widened with the window',
-    );
-    await tester.pump(const Duration(milliseconds: 500));
+    await _untilChatOpen(tester);
+    expect(tester.getSize(_panel()).width, greaterThan(kBadgeToastWidth));
     expect(_toast(), findsOneWidget);
     _overTheChat(tester, '1280 px');
     expect(tester.getSize(_toast()).width, kBadgeToastWidth);
@@ -560,7 +579,7 @@ void main() {
     await pumpUntilFound(tester, find.byType(PracticeView));
     await pumpUntilFound(tester, _inToast(find.text('Helping hand')));
     await waitForExercise(_third);
-    await tester.pump(const Duration(milliseconds: 500));
+    await _untilChatOpen(tester);
     _overTheChat(tester, 'back in Practice, 700 px');
     await _closeAll(tester);
     expect(harness.llm!.remaining, 0);
