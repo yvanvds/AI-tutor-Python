@@ -4,145 +4,143 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI Tutor — Python (Installer)</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet" />
-  <meta name="color-scheme" content="dark" />
-  <style>
-    :root{
-      --primary:#f1b3e6; --on-primary:#4c1f48; --primary-container:#663560; --on-primary-container:#ffd7f5;
-      --secondary:#dabfd2; --on-secondary:#3d2b3a; --secondary-container:#554151; --on-secondary-container:#f7daee;
-      --tertiary:#f5b8a7; --on-tertiary:#4c261a; --tertiary-container:#663c2f; --on-tertiary-container:#ffdbd1;
-      --error:#ffb4ab; --on-error:#690005;
-      --surface:#171216; --on-surface:#ecdfe5; --on-surface-variant:#d1c2cb; --outline:#9a8d95; --outline-variant:#4e444b;
-      --surface-bright:#3e373c; --surface-container:#241e22; --surface-container-high:#2f282d; --inverse-primary:#804d79;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      font-family:"Exo 2",system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji";
-      background:
-        radial-gradient(1200px 800px at 10% -10%, rgba(128,77,121,.25), transparent 60%),
-        radial-gradient(1200px 800px at 110% 10%, rgba(102,53,96,.25), transparent 60%),
-        var(--surface);
-      color:var(--on-surface); line-height:1.5;
-    }
-    .wrap{max-width:1100px;margin:0 auto;padding:24px}
-    header{
-      display:flex;align-items:center;gap:12px;padding:8px 0 18px;
-      border-bottom:1px solid var(--outline-variant);
-    }
-    .logo{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--tertiary));
-      box-shadow:0 0 0 2px rgba(241,179,230,.15),0 6px 20px rgba(0,0,0,.35)}
-    .title{font-weight:700;letter-spacing:.2px;font-size:1.1rem}
+  <meta name="description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#211D18" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F6F1E7" media="(prefers-color-scheme: light)" />
 
-    h1{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.4rem);margin:0 0 12px;font-weight:700}
-    .accent-underline{height:4px;width:160px;border-radius:999px;
-      background:linear-gradient(90deg,var(--primary),var(--tertiary));margin:12px 0 20px;
-      box-shadow:0 2px 20px rgba(241,179,230,.25)}
-    .card{
-      background:linear-gradient(180deg,var(--surface-container),var(--surface-container-high));
-      border:1px solid var(--outline-variant);border-radius:20px;padding:20px;
-      box-shadow:0 10px 40px rgba(0,0,0,.35); margin-top:24px;
-    }
-    .tagline{color:var(--on-surface-variant);margin:0 0 16px}
-    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
-    .btn{
-      appearance:none;border:0;padding:14px 18px;border-radius:14px;font-weight:700;text-decoration:none;cursor:pointer;
-      display:inline-flex;align-items:center;gap:10px;transition:transform .04s ease,box-shadow .2s ease,background .2s ease;
-      box-shadow:0 6px 18px rgba(0,0,0,.35), 0 0 0 1px var(--outline-variant) inset; will-change:transform;
-    }
-    .btn:active{transform:translateY(1px) scale(.995)}
-    .btn-primary{color:var(--on-primary);background:linear-gradient(180deg,var(--primary),var(--primary-container))}
-    .btn-primary:hover{box-shadow:0 10px 28px rgba(241,179,230,.35),0 0 0 1px var(--primary) inset}
-    .btn-secondary{color:var(--on-secondary-container);background:linear-gradient(180deg,var(--secondary-container),#3a3338)}
-    .note{margin-top:12px;font-size:.95rem;color:var(--on-surface-variant)}
-    .screenshot{
-      margin-top:20px;border-radius:16px;overflow:hidden;border:1px solid var(--outline-variant);
-      background:var(--surface-bright);box-shadow:0 10px 40px rgba(0,0,0,.4)
-    }
-    .screenshot img{display:block;width:100%;height:auto}
-    .info-grid{display:grid;gap:16px;grid-template-columns:repeat(3,1fr);margin:22px 0 8px}
-    @media (max-width: 900px){.info-grid{grid-template-columns:1fr}}
-    .info{
-      border-left:3px solid var(--outline-variant);padding:12px 14px;
-      background:linear-gradient(180deg,rgba(85,65,81,.25),rgba(62,55,60,.15));border-radius:10px
-    }
-    .info h3{margin:0 0 6px;font-size:1rem}
-    .info p{margin:0;color:var(--on-surface-variant)}
-    footer{margin-top:28px;padding:18px 0 8px;border-top:1px solid var(--outline-variant);font-size:.92rem;color:var(--on-surface-variant)}
-    .icon{width:1.2em;height:1.2em;display:inline-block}
-    .icon-download{
-      background:conic-gradient(from 180deg at 50% 55%, var(--on-primary) 0 25%, transparent 0 100%);
-      border:2px solid var(--on-primary);border-top:transparent;border-radius:3px;width:1.1em;height:1.1em;transform:translateY(1px)
-    }
-  </style>
+  <!-- Sharing (Smartschool, Teams, …) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="AI Tutor — Python" />
+  <meta property="og:title" content="AI Tutor — Python" />
+  <meta property="og:description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <meta property="og:url" content="https://yvanvds.github.io/AI-tutor-Python/" />
+  <meta property="og:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/practice.png" />
+  <meta property="og:image:width" content="2160" />
+  <meta property="og:image:height" content="1350" />
+  <meta property="og:image:alt" content="The AI Tutor app: a Python exercise in the editor, with the tutor chat beside it." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AI Tutor — Python" />
+  <meta name="twitter:description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/practice.png" />
+  <meta name="twitter:image:alt" content="The AI Tutor app: a Python exercise in the editor, with the tutor chat beside it." />
+
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+  <link rel="stylesheet" href="assets/site.css" />
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="logo" aria-hidden="true"></div>
-      <div class="title">AI Tutor — Python</div>
-    </header>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- FULL-WIDTH TOP PANEL -->
-    <section class="card" id="top">
-      <h1>Install the AI Tutor for Python</h1>
-      <div class="accent-underline" aria-hidden="true"></div>
-      <p class="tagline">
-        A classroom-focused app that helps students practice Python with guided exercises,
-        instant feedback, and teacher-controlled progress tracking.
-      </p>
-      <div class="actions">
-        <a class="btn btn-primary" href="https://github.com/yvanvds/AI-tutor-Python/releases/latest/download/python_teacher_install.exe" download>
-          <span class="icon icon-download" aria-hidden="true"></span>
-          Download installer (Windows)
-        </a>
-        <a class="btn btn-secondary" href="#notes">Read installation notes</a>
-      </div>
-      <p class="note">
-        The download is a single <code>.exe</code> and should start immediately. If your browser blocks it,
-        choose “Keep” or “Keep anyway”.
-      </p>
-    </section>
+  <header class="site-header">
+    <div class="wrap site-header-inner">
+      <a class="brand" href="./">
+        <img class="brand-logo" src="assets/logo.svg" width="32" height="32" alt="" />
+        <span class="brand-name">AI Tutor — Python</span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="#top">Download</a></li>
+          <li><a href="#notes">Installation notes</a></li>
+          <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
 
-    <!-- SCREENSHOT BELOW TOP PANEL -->
-    <aside class="screenshot" aria-label="App screenshot">
-      <img src="./screenshot.png" alt="AI Tutor — Python app screenshot" />
-    </aside>
-
-    <!-- THREE TEXT BLOCKS AFTER SCREENSHOT -->
-    <section class="info-grid" id="notes" aria-label="Installation notes and information">
-      <div class="info">
-        <h3>Who can use it?</h3>
-        <p>
-          Students can install the app freely. <strong>Sign-in will only work after your teacher enables your account</strong>
-          (they toggle access for your API key in the teacher dashboard). You don’t need prior permission to install—just
-          know that the app becomes usable once your teacher has switched you on.
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <span class="pill pill-accent">Windows</span>
+        <h1 class="hero-title">Install the AI Tutor for Python</h1>
+        <p class="hero-lead">
+          A classroom-focused app that helps students practice Python with guided exercises,
+          instant feedback, and teacher-controlled progress tracking.
         </p>
-      </div>
-
-      <div class="info">
-        <h3>Windows SmartScreen</h3>
-        <p>
-          Because this is a new, unsigned app, Windows may show a warning that the publisher is unknown.
-          If you trust this source, click <em>More info</em> → <em>Run anyway</em> to continue.
-        </p>
-      </div>
-
-      <div class="info">
-        <h3>What it does</h3>
-        <p>
-          Generates tailored Python exercises, checks code, and provides hints—aligned with your class goals and
-          controlled by the teacher’s settings.
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/yvanvds/AI-tutor-Python/releases/latest/download/python_teacher_install.exe" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            Download installer (Windows)
+          </a>
+          <a class="btn btn-secondary" href="#notes">Read installation notes</a>
+        </div>
+        <p class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
+          <span>
+            The download is a single <code>.exe</code> and should start immediately. If your browser blocks it,
+            choose “Keep” or “Keep anyway”.
+          </span>
         </p>
       </div>
     </section>
 
-    <footer>
-      © <span id="year"></span> AI Tutor — Python • Theme colors match the classroom app.
-    </footer>
-  </div>
+    <section class="section" aria-label="App screenshot">
+      <div class="wrap">
+        <figure class="screenshot">
+          <div class="screenshot-bar" aria-hidden="true">
+            <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+            <span class="screenshot-controls"><i></i><i></i><i></i></span>
+          </div>
+          <img src="screenshot.png" width="1910" height="1027" alt="AI Tutor — Python app screenshot" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="notes" aria-labelledby="notes-heading">
+      <div class="wrap">
+        <h2 class="section-heading" id="notes-heading">Installation notes</h2>
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3" /><path d="M3 21v-1a5 5 0 0 1 10 0v1" /><circle cx="17" cy="9" r="2.5" /><path d="M14.5 21v-.5a3.5 3.5 0 0 1 7 0v.5" /></svg>
+            </div>
+            <h3 class="card-title">Who can use it?</h3>
+            <p>
+              Students can install the app freely. <strong>Sign-in will only work after your teacher enables your account</strong>
+              (they toggle access for your API key in the teacher dashboard). You don’t need prior permission to install—just
+              know that the app becomes usable once your teacher has switched you on.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z" /><path d="M12 8v4.5M12 15.5v.01" /></svg>
+            </div>
+            <h3 class="card-title">Windows SmartScreen</h3>
+            <p>
+              Because this is a new, unsigned app, Windows may show a warning that the publisher is unknown.
+              If you trust this source, click <em>More info</em> → <em>Run anyway</em> to continue.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7zM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z" /></svg>
+            </div>
+            <h3 class="card-title">What it does</h3>
+            <p>
+              Generates tailored Python exercises, checks code, and provides hints—aligned with your class goals and
+              controlled by the teacher’s settings.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© <span id="year">2026</span> AI Tutor — Python • Theme colors match the classroom app.</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Source on GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
 
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 </body>

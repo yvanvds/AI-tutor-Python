@@ -1,33 +1,72 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Page Not Found</title>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- GitHub Pages serves this page for a missing path at any depth
+       (/AI-tutor-Python/en/missing/…), so every link resolves from the site root. -->
+  <base href="/AI-tutor-Python/" />
+  <title>Page not found — AI Tutor — Python</title>
+  <meta name="robots" content="noindex" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#211D18" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F6F1E7" media="(prefers-color-scheme: light)" />
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px 16px; border-radius: 3px; }
-      #message h3 { color: #888; font-weight: normal; font-size: 16px; margin: 16px 0 12px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>404</h2>
-      <h1>Page Not Found</h1>
-      <p>The specified file was not found on this website. Please check the URL for mistakes and try again.</p>
-      <h3>Why am I seeing this?</h3>
-      <p>This site is published to GitHub Pages from the <code>public/</code> directory of the <a href="https://github.com/yvanvds/AI-tutor-Python">AI-tutor-Python</a> repository. To modify this page, edit <code>public/404.html</code> there.</p>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap site-header-inner">
+      <a class="brand" href="./">
+        <img class="brand-logo" src="assets/logo.svg" width="32" height="32" alt="" />
+        <span class="brand-name">AI Tutor — Python</span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="./#top">Download</a></li>
+          <li><a href="./#notes">Installation notes</a></li>
+          <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
+        </ul>
+      </nav>
     </div>
-  </body>
+  </header>
+
+  <main class="hero not-found">
+    <div class="wrap">
+      <span class="pill">404</span>
+      <h1 class="hero-title">Page not found</h1>
+      <p class="hero-lead">This page doesn’t exist (anymore). Check the address, or go back to the start page.</p>
+      <p class="hero-lead" lang="nl">Deze pagina bestaat niet (meer). Kijk het adres na, of ga terug naar de startpagina.</p>
+
+      <div class="code code-wrap">
+        <div class="code-bar">python</div>
+        <pre><code><span class="op">&gt;&gt;&gt;</span> <span class="fn">open</span><span class="op">(</span><span class="str">"this-page"</span><span class="op">)</span>
+<span class="err">FileNotFoundError: [Errno 2] No such file or directory: 'this-page'</span></code></pre>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="./">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+          Back to the start page
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>AI Tutor — Python</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Source on GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
 </html>

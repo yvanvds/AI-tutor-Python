@@ -1,0 +1,715 @@
+/* =============================================================================
+   AI Tutor — Python · website stylesheet (#289)
+
+   The app's "study lamp" design on the web. Tokens come from
+   lib/theme/tokens.dart (AppPalette.dark / .light, AppSpacing, AppRadius) and
+   the type scale from lib/theme/app_theme.dart. Dark is the default, like the
+   app; light follows prefers-color-scheme. Every colour goes through a
+   variable below — never write a hex value further down this file.
+
+   Fonts are loaded per page (Google Fonts <link>, Inter Tight 400–800 +
+   JetBrains Mono 400/500). Pages link this file with a relative path
+   (assets/site.css, ../assets/site.css from /en/); 404.html uses
+   <base href="/AI-tutor-Python/"> because GitHub Pages serves it at any depth.
+
+   Building blocks (plain class names, no JavaScript needed):
+
+   .wrap                 centred column, max 1100px, 16px side gutter on phones
+   .skip-link            "skip to content" link, visible on keyboard focus
+   .site-header          top bar with the 2px leaf→sand rim of the app
+     .site-header-inner    flex row: .brand left, .site-nav right (wraps)
+     .brand                logo + name, links home; .brand-logo, .brand-name
+     .site-nav             nav links; a[aria-current="page"] = active
+   .hero                 page intro with a faint lamp glow
+     .hero-title           h1; .hero-lead = intro paragraph
+   .pill                 small uppercase label (the app's "HUIDIG DOEL" pill)
+                         tones: .pill-accent .pill-success .pill-info
+   .actions              row of buttons (stacks full-width on phones)
+   .btn                  button/link; .btn-primary (leaf), .btn-secondary
+                         (raised ink), .btn-ghost; an <svg> inside is an icon
+   .section              vertical rhythm between page parts
+     .section-label        small uppercase eyebrow above a heading
+     .section-heading      h2; .section-lead = paragraph under it
+   .card-grid            responsive grid of .card (1 → 2 → 3 columns)
+   .card                 feature card: .card-icon (tones .card-icon-info,
+                         .card-icon-success), .card-title (h3), <p>
+   .screenshot           window-like frame around an <img>:
+     .screenshot-bar       title bar: .screenshot-title (+ img.screenshot-logo)
+                           and .screenshot-controls (three <i>: – □ ×)
+     .screenshot-caption   optional <figcaption>
+   .code                 code block in the editor's colours:
+     .code-bar             optional header (file name)
+     <pre><code>           tokens: .kw .str .num .com .fn .op .err
+     .code-numbered        line numbers; wrap each line in <span class="line">
+     .code-wrap            wrap long lines instead of scrolling (output)
+   .notice               callout box (default info blue);
+                         tones .notice-accent .notice-success .notice-danger;
+                         .notice-title = bold first line
+   .site-footer          bottom bar; .footer-links
+   Helpers: .muted .faint .mono .visually-hidden, inline <code>, <kbd>
+   ========================================================================== */
+
+/* --- Tokens ---------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  /* AppPalette.dark — the shipping "study lamp" palette */
+  --ink-0: #211D18; /* canvas, code editor */
+  --ink-1: #28241E; /* cards, header bars */
+  --ink-2: #332E26; /* raised: buttons, hover */
+  --ink-3: #3F3A31; /* border, divider strong */
+  --ink-4: #534D42; /* most contrasting divider */
+  --paper: #F6F1E7; /* inverse of the canvas */
+  --fg: #EEE9DF; /* primary text */
+  --fg-mute: #B1AB9F; /* secondary text */
+  --fg-faint: #7D786D; /* captions */
+  --accent: #7DC89F; /* leaf — the active thing */
+  --accent-2: #DCCF9A; /* sand — done / correct */
+  --accent-3: #7AB9D4; /* blue — info / hint */
+  --danger: #D97565; /* errors */
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  /* Roles built from the palette (the app's ColorScheme mapping) */
+  --bg: var(--ink-0);
+  --surface: var(--ink-1);
+  --raised: var(--ink-2);
+  --border: var(--ink-2);
+  --border-strong: var(--ink-3);
+  --on-accent: var(--ink-0);
+  --rim: linear-gradient(90deg, var(--accent), var(--accent-2));
+
+  /* AppSpacing (4-pt scale) */
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-sm: 10px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-lg-plus: 18px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+  /* site-only steps for page sections */
+  --space-section: 56px;
+  --space-section-lg: 88px;
+
+  /* AppRadius */
+  --radius-pill: 999px;
+  --radius-input-small: 8px;
+  --radius-input-large: 10px;
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-modal: 16px;
+
+  /* Type */
+  --font-text: "Inter Tight", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* Motion (AppDurations.hover, AppCurves.layout) */
+  --dur-hover: 120ms;
+  --ease-layout: cubic-bezier(.2, .8, .2, 1);
+
+  --page-max: 1100px;
+  --gutter: 16px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    /* AppPalette.light — daylight variant (#32) */
+    --ink-0: #F6F1E7;
+    --ink-1: #FFFCF5;
+    --ink-2: #EBE4D5;
+    --ink-3: #D9D0BD;
+    --ink-4: #C0B5A0;
+    --paper: #211D18;
+    --fg: #241F19;
+    --fg-mute: #5B5449;
+    --fg-faint: #817A6C;
+    --accent: #2C7A55;
+    --accent-2: #8A6A18;
+    --accent-3: #1B6484;
+    --danger: #B03A28;
+    --syntax-kw: #8E2478;
+    --syntax-str: #1B6E45;
+    --syntax-num: #8A5300;
+    --syntax-com: #7A7263;
+    --syntax-fn: #1A5686;
+
+    --border: var(--ink-3);
+    --border-strong: var(--ink-4);
+  }
+}
+
+@media (min-width: 720px) {
+  :root { --gutter: 28px; }
+}
+
+/* --- Base ------------------------------------------------------------------ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-text);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: break-word;
+}
+
+img, svg { max-width: 100%; }
+img { height: auto; }
+
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 700; }
+p { margin: 0; }
+p + p { margin-top: var(--space-m); }
+
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+
+strong { font-weight: 600; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  color: var(--fg);
+}
+
+code, kbd, pre { font-family: var(--font-code); }
+
+/* JetBrains Mono fuses == != >= into glyphs Python does not have (#83). */
+code, kbd, pre, .mono {
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0;
+}
+
+/* Inline code in running text */
+:not(pre) > code {
+  font-size: 0.875em;
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--fg);
+}
+
+kbd {
+  display: inline-block;
+  padding: 0 6px;
+  font-size: 0.75em;
+  line-height: 1.6;
+  color: var(--fg-mute);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.muted { color: var(--fg-mute); }
+.faint { color: var(--fg-faint); }
+.mono { font-family: var(--font-code); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-lg);
+  top: -100px;
+  z-index: 10;
+  padding: var(--space-s) var(--space-md);
+  border-radius: var(--radius-input-large);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus { top: var(--space-m); }
+
+/* --- Header ---------------------------------------------------------------- */
+
+.site-header {
+  position: relative;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The app's ambient progress rim, at the very top edge. */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--rim);
+}
+
+.site-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s) var(--space-lg);
+  min-height: 64px;
+  padding-block: var(--space-m);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+.brand:hover { color: var(--fg); }
+.brand-logo { width: 32px; height: 32px; flex: none; display: block; }
+.brand-name { white-space: nowrap; }
+
+.site-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input-large);
+  color: var(--fg-mute);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
+}
+.site-nav a:hover { background: var(--raised); color: var(--fg); }
+.site-nav a[aria-current="page"] { background: var(--raised); color: var(--fg); }
+
+/* On a phone the nav takes its own row under the brand. */
+@media (max-width: 599px) {
+  .site-nav { flex-basis: 100%; margin-inline: calc(-1 * var(--space-sm)); }
+}
+
+/* --- Hero ------------------------------------------------------------------ */
+
+.hero {
+  position: relative;
+  padding-block: var(--space-section) var(--space-xxxl);
+  /* a faint lamp glow from above */
+  background: radial-gradient(900px 420px at 18% -160px,
+      color-mix(in oklab, var(--accent-2) 9%, transparent), transparent 70%);
+}
+
+.hero .pill { margin-bottom: var(--space-lg); }
+
+.hero-title {
+  max-width: 22ch;
+  font-size: clamp(2rem, 1.4rem + 2.6vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.hero-lead {
+  max-width: 42rem;
+  margin-top: var(--space-lg);
+  font-size: 1.125rem;
+  line-height: 1.55;
+  color: var(--fg-mute);
+}
+
+.hero-lead + .hero-lead { margin-top: var(--space-s); }
+
+.hero .actions { margin-top: var(--space-xxl); }
+.hero .notice { margin-top: var(--space-xl); max-width: 42rem; }
+
+/* --- Pill ------------------------------------------------------------------ */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  color: var(--fg-mute);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pill-accent, .pill-success, .pill-info {
+  --tone: var(--accent);
+  color: var(--tone);
+  background: color-mix(in oklab, var(--tone) 14%, transparent);
+  border-color: color-mix(in oklab, var(--tone) 30%, transparent);
+}
+.pill-success { --tone: var(--accent-2); }
+.pill-info { --tone: var(--accent-3); }
+
+/* --- Buttons --------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s);
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-lg-plus);
+  border: 1px solid transparent;
+  border-radius: var(--radius-input-large);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--dur-hover) ease, border-color var(--dur-hover) ease,
+    color var(--dur-hover) ease;
+}
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover {
+  color: var(--on-accent);
+  background: color-mix(in oklab, var(--accent) 86%, var(--fg));
+}
+
+.btn-secondary {
+  background: var(--raised);
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover { color: var(--fg); background: var(--ink-3); }
+
+.btn-ghost { background: transparent; color: var(--fg-mute); }
+.btn-ghost:hover { color: var(--fg); background: var(--raised); }
+
+@media (max-width: 479px) {
+  .actions { flex-direction: column; align-items: stretch; }
+}
+
+/* --- Sections -------------------------------------------------------------- */
+
+.section { padding-block: var(--space-xxxl) var(--space-section); }
+.section + .section { padding-top: 0; }
+
+.section-label {
+  display: block;
+  margin-bottom: var(--space-s);
+  color: var(--fg-faint);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-heading {
+  font-size: clamp(1.375rem, 1.15rem + 1vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.section-lead {
+  max-width: 42rem;
+  margin-top: var(--space-s);
+  color: var(--fg-mute);
+}
+
+.section-heading + .card-grid,
+.section-lead + .card-grid,
+.section-heading + .screenshot,
+.section-lead + .screenshot,
+.section-heading + .code,
+.section-lead + .code { margin-top: var(--space-xl); }
+
+/* --- Feature cards --------------------------------------------------------- */
+
+.card-grid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.card {
+  min-width: 0;
+  padding: var(--space-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card-large);
+}
+
+.card-icon {
+  --tone: var(--accent);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: var(--space-md);
+  border-radius: var(--radius-input-large);
+  color: var(--tone);
+  background: color-mix(in oklab, var(--tone) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tone) 30%, transparent);
+}
+.card-icon svg { width: 20px; height: 20px; }
+.card-icon-info { --tone: var(--accent-3); }
+.card-icon-success { --tone: var(--accent-2); }
+
+.card-title {
+  margin-bottom: var(--space-s);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.card p { color: var(--fg-mute); }
+.card p strong { color: var(--fg); }
+
+/* --- Screenshot frame ------------------------------------------------------ */
+
+.screenshot {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ink-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card-large);
+}
+
+.screenshot-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-m);
+  height: 36px;
+  padding-inline: var(--space-m);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.screenshot-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-mute);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.screenshot-logo { width: 16px; height: 16px; flex: none; }
+
+/* Window buttons, drawn: minimise, maximise, close. */
+.screenshot-controls { display: inline-flex; gap: var(--space-lg-plus); flex: none; }
+.screenshot-controls i { position: relative; display: block; width: 10px; height: 10px; }
+.screenshot-controls i:nth-child(1)::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: var(--fg-faint);
+}
+.screenshot-controls i:nth-child(2)::before {
+  content: ""; position: absolute; inset: 0;
+  border: 1px solid var(--fg-faint); border-radius: 2px;
+}
+.screenshot-controls i:nth-child(3)::before,
+.screenshot-controls i:nth-child(3)::after {
+  content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 1px;
+  background: var(--fg-faint);
+  transform: rotate(45deg);
+}
+.screenshot-controls i:nth-child(3)::after { transform: rotate(-45deg); }
+
+.screenshot > img,
+.screenshot > picture img { display: block; width: 100%; height: auto; }
+
+.screenshot-caption {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  color: var(--fg-faint);
+  font-size: 0.8125rem;
+}
+
+/* --- Code block ------------------------------------------------------------ */
+
+.code {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ink-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+}
+
+.code-bar {
+  padding: var(--space-s) var(--space-md);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--fg-mute);
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+}
+
+.code pre {
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  overflow-x: auto;
+  color: var(--fg);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  tab-size: 4;
+}
+.code pre code { font-size: inherit; }
+
+.code .kw { color: var(--syntax-kw); }
+.code .str { color: var(--syntax-str); }
+.code .num { color: var(--syntax-num); }
+.code .com { color: var(--syntax-com); font-style: italic; }
+.code .fn { color: var(--syntax-fn); }
+.code .op { color: var(--fg-mute); }
+.code .err { color: var(--danger); }
+
+.code-numbered pre { counter-reset: line; }
+.code-numbered .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2ch;
+  margin-right: var(--space-md);
+  text-align: right;
+  color: var(--fg-faint);
+  user-select: none;
+}
+
+.code-wrap pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* --- Notice / callout ------------------------------------------------------ */
+
+.notice {
+  --tone: var(--accent-3);
+  display: flex;
+  gap: var(--space-m);
+  align-items: flex-start;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in oklab, var(--tone) 32%, transparent);
+  background: color-mix(in oklab, var(--tone) 10%, var(--surface));
+  color: var(--fg);
+  font-size: 0.9375rem;
+}
+.notice > svg { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--tone); }
+.notice-title { display: block; color: var(--tone); font-weight: 600; }
+.notice-accent { --tone: var(--accent); }
+.notice-success { --tone: var(--accent-2); }
+.notice-danger { --tone: var(--danger); }
+
+/* --- Footer ---------------------------------------------------------------- */
+
+.site-footer {
+  padding-block: var(--space-xxl);
+  border-top: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-size: 0.875rem;
+}
+
+.site-footer .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-m) var(--space-xl);
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-links a { color: var(--fg-mute); text-decoration: none; }
+.footer-links a:hover { color: var(--fg); text-decoration: underline; }
+
+/* --- 404 ------------------------------------------------------------------- */
+
+.hero.not-found { padding-bottom: var(--space-section-lg); }
+.not-found .code { max-width: 42rem; margin-top: var(--space-xxl); }
+
+/* --- Older browsers without color-mix() ----------------------------------- */
+
+@supports not (color: color-mix(in oklab, red 10%, blue)) {
+  .pill-accent, .pill-success, .pill-info, .card-icon {
+    background: var(--raised);
+    border-color: var(--border-strong);
+  }
+  .notice { background: var(--surface); border-color: var(--border-strong); }
+  .btn-primary:hover { background: var(--accent); }
+  ::selection { background: var(--ink-3); }
+}
+
+/* --- Motion ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
