@@ -402,6 +402,28 @@ the unit tests in the `SonarQube` job, the flows in a separate `integration`
 job that builds the desktop runner and launches the real app on a Windows
 runner.
 
+### Website screenshots
+
+The screenshots on the website (`public/screenshots/`) are made from the
+running app, through the same harness, with an invented demo class — no real
+names and nothing from Cosmos
+([integration_test/screenshots/demo_seed.dart](integration_test/screenshots/demo_seed.dart)):
+
+```powershell
+# Every screen, dark, in Dutch and in English, plus Practice in light:
+# public/screenshots/nl/*.png and public/screenshots/en/*.png
+flutter test integration_test/screenshots/site_screenshots.dart -d windows
+
+# One screen (or `--name "\(en"` for one language)
+flutter test integration_test/screenshots/site_screenshots.dart -d windows --name practice
+```
+
+Run it when a screen the site shows has changed visibly, not on every release:
+the images are committed, and every refresh lands in the git history. It is
+not part of the integration suite, and CI never runs it. Like the flows, it
+builds and launches the Windows app, so close a running copy of the app
+first.
+
 ## Project structure
 
 For a deeper architectural tour — services, data model, how the tutor decides what to ask next — read [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). It is the source of truth for the codebase shape and stays current as the code evolves.
