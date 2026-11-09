@@ -45,8 +45,7 @@
       </a>
       <nav class="site-nav" aria-label="Main">
         <ul>
-          <li><a href="#top">Download</a></li>
-          <li><a href="#notes">Installation notes</a></li>
+          <li><a href="#download">Download</a></li>
           <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
         </ul>
       </nav>
@@ -63,19 +62,13 @@
           instant feedback, and teacher-controlled progress tracking.
         </p>
         <div class="actions">
-          <a class="btn btn-primary" href="https://github.com/yvanvds/AI-tutor-Python/releases/latest/download/python_teacher_install.exe" download>
+          <!-- To the download section, not to the .exe: who can use the app is
+               said there, before its download button (#291). -->
+          <a class="btn btn-primary" href="#download">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
-            Download installer (Windows)
+            Download for Windows
           </a>
-          <a class="btn btn-secondary" href="#notes">Read installation notes</a>
         </div>
-        <p class="notice">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
-          <span>
-            The download is a single <code>.exe</code> and should start immediately. If your browser blocks it,
-            choose “Keep” or “Keep anyway”.
-          </span>
-        </p>
       </div>
     </section>
 
@@ -91,42 +84,128 @@
       </div>
     </section>
 
-    <section class="section" id="notes" aria-labelledby="notes-heading">
+    <!-- Download (#291): who can use the app, the installer with the facts of
+         the latest release, the install steps, what you need, updates and how
+         to report a problem. One self-contained section, already in Dutch: #292
+         rewrites the rest of this page in Dutch, #294 adds the English copy. -->
+    <section class="section" id="download" lang="nl" aria-labelledby="download-heading">
       <div class="wrap">
-        <h2 class="section-heading" id="notes-heading">Installation notes</h2>
+        <span class="section-label">Downloaden</span>
+        <h2 class="section-heading" id="download-heading">De app installeren</h2>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
+          <p>
+            <strong class="notice-title">Voorlopig alleen voor SMA Arcadia</strong>
+            De app werkt nu alleen voor leerlingen van SMA Arcadia. Je meldt je aan met je schoolaccount.
+            Een versie zonder schoolaccount is in voorbereiding
+            (<a href="https://github.com/yvanvds/AI-tutor-Python/issues/261">#261 op GitHub</a>).
+          </p>
+        </div>
+
+        <div class="download-panel">
+          <div class="actions">
+            <a class="btn btn-primary" href="https://github.com/yvanvds/AI-tutor-Python/releases/latest/download/python_teacher_install.exe" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+              Download voor Windows
+            </a>
+          </div>
+          <div class="download-release">
+            <!-- static.yml fills in the latest release when it publishes the site
+                 (tooling/site/fill_release.py): the two release markers and the
+                 fallback between them make way for the template below them.
+                 Without that step (a local preview, or a failed lookup) the
+                 fallback stays and the template is inert. -->
+            <!-- release:start -->
+            <p class="muted">Versie, datum, grootte en SHA-256: zie <a href="https://github.com/yvanvds/AI-tutor-Python/releases">alle releases op GitHub</a>.</p>
+            <!-- release:end -->
+            <template data-release-template lang="nl">
+              <dl class="release-facts">
+                <div><dt>Versie</dt><dd>{{version}}</dd></div>
+                <div><dt>Uitgebracht op</dt><dd><time datetime="{{date_iso}}">{{date}}</time></dd></div>
+                <div><dt>Grootte</dt><dd>{{size}}</dd></div>
+                <div class="release-facts-wide"><dt>SHA-256</dt><dd><code>{{sha256}}</code></dd></div>
+              </dl>
+              <p class="release-note">
+                Wil je nagaan of het bestand heel binnenkwam? In PowerShell toont
+                <code>Get-FileHash python_teacher_install.exe</code> dezelfde SHA-256, in hoofdletters.
+              </p>
+              <p class="release-note"><a href="https://github.com/yvanvds/AI-tutor-Python/releases">Alle releases op GitHub</a></p>
+            </template>
+          </div>
+        </div>
+
+        <h3 class="section-subheading">Installeren, stap voor stap</h3>
+        <ol class="steps">
+          <li>
+            <strong class="steps-title">Download de installer</strong>
+            <p>Klik op <strong>Download voor Windows</strong>. Vraagt je browser of je het bestand wil houden? Kies dan <strong>Behouden</strong>.</p>
+          </li>
+          <li>
+            <strong class="steps-title">Start de installer</strong>
+            <p>
+              Open <code>python_teacher_install.exe</code> uit je map Downloads.
+              Toont Windows een blauw venster van SmartScreen? Klik op <strong>Meer info</strong> en dan op <strong>Toch uitvoeren</strong>.
+              Windows waarschuwt omdat de app nieuw is en geen digitale handtekening heeft.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Installeer voor jou alleen</strong>
+            <p>
+              De installer is in het Engels. Kies <strong>Install for me only</strong> en klik op <strong>Next</strong> tot je <strong>Install</strong> ziet.
+              Je hebt geen adminrechten nodig: de app wordt alleen voor jou geïnstalleerd.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Start de app</strong>
+            <p>
+              Laat <strong>Launch Python Teacher</strong> aangevinkt en klik op <strong>Finish</strong>. De app start meteen.
+              Later vind je ze in het startmenu als <strong>Python Teacher</strong>.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Meld je aan</strong>
+            <p>Klik op <strong>Aanmelden met schoolaccount</strong> en meld je aan met je Microsoft-account van school.</p>
+            <p>
+              Vraagt de app daarna om een API-sleutel? Dan moet je leerkracht je account nog aanzetten.
+              Je hebt zelf geen sleutel nodig. Zeg het je leerkracht en laat de app open: zodra je account aanstaat, ga je vanzelf verder.
+            </p>
+          </li>
+        </ol>
+
         <div class="card-grid">
           <article class="card">
-            <div class="card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3" /><path d="M3 21v-1a5 5 0 0 1 10 0v1" /><circle cx="17" cy="9" r="2.5" /><path d="M14.5 21v-.5a3.5 3.5 0 0 1 7 0v.5" /></svg>
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
             </div>
-            <h3 class="card-title">Who can use it?</h3>
-            <p>
-              Students can install the app freely. <strong>Sign-in will only work after your teacher enables your account</strong>
-              (they toggle access for your API key in the teacher dashboard). You don’t need prior permission to install—just
-              know that the app becomes usable once your teacher has switched you on.
-            </p>
+            <h3 class="card-title">Wat je nodig hebt</h3>
+            <p>Windows 10 of 11, 64-bit. En internet: de tutor en je voortgang staan online.</p>
+            <p>Python hoef je niet te installeren. Het zit in de app, met turtle, matplotlib, numpy en pandas.</p>
           </article>
 
           <article class="card">
-            <div class="card-icon card-icon-info" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z" /><path d="M12 8v4.5M12 15.5v.01" /></svg>
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10A8 8 0 0 0 5 7M4.5 3.5V7.5H8.5" /><path d="M4.5 14A8 8 0 0 0 19 17M19.5 20.5v-4h-4" /></svg>
             </div>
-            <h3 class="card-title">Windows SmartScreen</h3>
+            <h3 class="card-title">Updates</h3>
             <p>
-              Because this is a new, unsigned app, Windows may show a warning that the publisher is unknown.
-              If you trust this source, click <em>More info</em> → <em>Run anyway</em> to continue.
+              De app werkt zichzelf bij. Is er een nieuwe versie, dan zie je bovenaan in de app een balk.
+              Klik op <strong>Bijwerken</strong>: de app sluit even en komt terug in de nieuwe versie.
+              Je hoeft niet terug naar deze site.
             </p>
+            <p>Zelf kijken? Ga naar <strong>Opties → Over</strong> en klik op <strong>Controleren op updates</strong>.</p>
           </article>
 
           <article class="card">
             <div class="card-icon card-icon-success" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7zM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5V6a3 3 0 0 1 6 0v1.5" /><rect x="7" y="7.5" width="10" height="12" rx="5" /><path d="M12 11v8.5M3.5 13H7M17 13h3.5M4.5 8.5 7 10M19.5 8.5 17 10M4.5 18.5 7 17M19.5 18.5 17 17" /></svg>
             </div>
-            <h3 class="card-title">What it does</h3>
+            <h3 class="card-title">Een probleem melden</h3>
             <p>
-              Generates tailored Python exercises, checks code, and provides hints—aligned with your class goals and
-              controlled by the teacher’s settings.
+              Ga naar <strong>Opties → Bugmeldingen</strong>, klik op <strong>Bug melden…</strong> en schrijf wat er misging.
+              Klik op <strong>Als bestand bewaren</strong> en stuur dat bestand naar je leerkracht.
             </p>
+            <p>Heb je een GitHub-account? Klik dan eerst op <strong>GitHub verbinden</strong>. Daarna zet <strong>Op GitHub plaatsen</strong> je melding meteen op GitHub.</p>
           </article>
         </div>
       </div>

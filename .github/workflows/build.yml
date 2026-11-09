@@ -3,6 +3,11 @@ on:
   push:
     branches:
       - main
+    # A push that only changes the website (#288) cannot change this build's
+    # outcome; skip the ~10 min run. A push that also touches anything else
+    # still builds, and pull requests always build.
+    paths-ignore:
+      - 'public/**'
   pull_request:
     types: [opened, synchronize, reopened]
 
