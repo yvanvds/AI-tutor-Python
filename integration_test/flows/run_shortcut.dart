@@ -93,7 +93,9 @@ void main() {
     await tester.tap(find.text('Stop'));
     await pumpUntilFound(tester, find.text('Run'));
 
-    // Ctrl+Enter in the composer sends the message, and runs no code.
+    // Ctrl+Enter in the composer sends the message, and runs no code. The
+    // harness blocks the LLM, so the tutor's answer fails (it logs the
+    // failure and shows a notice in the chat); only the send is under test.
     await tester.tap(_composerField());
     await tester.pump();
     await tester.enterText(_composerField(), 'mag ik een tip?');
