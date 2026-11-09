@@ -22,7 +22,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 
 class ChatWidget extends ConsumerStatefulWidget {
-  const ChatWidget({super.key});
+  const ChatWidget({super.key, this.overMessages});
+
+  /// Laid over the messages, under the header: what the page puts up over
+  /// the chat — the session, its badge notice (#283). Positioned in a
+  /// [Stack] the size of the message list.
+  final Widget? overMessages;
 
   @override
   ConsumerState<ChatWidget> createState() => _ChatWidgetState();
@@ -46,7 +51,14 @@ class _ChatWidgetState extends ConsumerState<ChatWidget> {
     return Column(
       children: [
         const ChatHeader(),
-        Expanded(child: _ChatBody()),
+        Expanded(
+          child: widget.overMessages == null
+              ? _ChatBody()
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [_ChatBody(), widget.overMessages!],
+                ),
+        ),
       ],
     );
   }
