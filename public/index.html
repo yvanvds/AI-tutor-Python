@@ -1,29 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Tutor — Python (Installer)</title>
-  <meta name="description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <title>AI Tutor — Python</title>
+  <meta name="description" content="Een Python-tutor die met je meeleest, vragen stelt op jouw niveau en je verder helpt zonder het antwoord voor te zeggen. Met uitleg, oefeningen, een Leerpad, XP, badges en je rapporten in één app." />
   <meta name="color-scheme" content="dark light" />
   <meta name="theme-color" content="#211D18" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#F6F1E7" media="(prefers-color-scheme: light)" />
 
   <!-- Sharing (Smartschool, Teams, …) -->
   <meta property="og:type" content="website" />
+  <meta property="og:locale" content="nl_BE" />
   <meta property="og:site_name" content="AI Tutor — Python" />
   <meta property="og:title" content="AI Tutor — Python" />
-  <meta property="og:description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <meta property="og:description" content="Een Python-tutor die met je meeleest, vragen stelt op jouw niveau en je verder helpt zonder het antwoord voor te zeggen." />
   <meta property="og:url" content="https://yvanvds.github.io/AI-tutor-Python/" />
   <meta property="og:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/practice.png" />
   <meta property="og:image:width" content="2160" />
   <meta property="og:image:height" content="1350" />
-  <meta property="og:image:alt" content="The AI Tutor app: a Python exercise in the editor, with the tutor chat beside it." />
+  <meta property="og:image:alt" content="De app tijdens het oefenen: een Python-programma in de editor, met de tutor in de chat ernaast." />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="AI Tutor — Python" />
-  <meta name="twitter:description" content="A classroom-focused app that helps students practice Python with guided exercises, instant feedback, and teacher-controlled progress tracking." />
+  <meta name="twitter:description" content="Een Python-tutor die met je meeleest, vragen stelt op jouw niveau en je verder helpt zonder het antwoord voor te zeggen." />
   <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/practice.png" />
-  <meta name="twitter:image:alt" content="The AI Tutor app: a Python exercise in the editor, with the tutor chat beside it." />
+  <meta name="twitter:image:alt" content="De app tijdens het oefenen: een Python-programma in de editor, met de tutor in de chat ernaast." />
 
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
@@ -35,53 +36,681 @@
   <link rel="stylesheet" href="assets/site.css" />
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">Naar de inhoud</a>
 
   <header class="site-header">
     <div class="wrap site-header-inner">
-      <a class="brand" href="./">
+      <a class="brand" href="./" aria-current="page">
         <img class="brand-logo" src="assets/logo.svg" width="32" height="32" alt="" />
         <span class="brand-name">AI Tutor — Python</span>
       </a>
-      <nav class="site-nav" aria-label="Main">
+      <nav class="site-nav" aria-label="Hoofdmenu">
         <ul>
           <li><a href="#download">Download</a></li>
-          <li><a href="leerkrachten.html" lang="nl">Voor leerkrachten</a></li>
+          <li><a href="leerkrachten.html">Voor leerkrachten</a></li>
           <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
+  <!-- The start page (#292): what the app does for a student, in the app's
+       own words (lib/l10n/app_nl.arb). Every claim was checked against the
+       code and the issues it names on 2026-11-09. Screenshots: the demo class
+       of #290, invented names only. There is no screenshot of Mijn rapporten
+       yet: the screenshot run (integration_test/screenshots) has none (#298). -->
   <main id="main">
     <section class="hero" id="top">
       <div class="wrap">
-        <span class="pill pill-accent">Windows</span>
-        <h1 class="hero-title">Install the AI Tutor for Python</h1>
+        <span class="pill pill-accent">Voor leerlingen</span>
+        <h1 class="hero-title">Leer Python met je eigen tutor</h1>
         <p class="hero-lead">
-          A classroom-focused app that helps students practice Python with guided exercises,
-          instant feedback, and teacher-controlled progress tracking.
+          De AI Tutor is een Python-tutor die met je meeleest, vragen stelt op jouw niveau
+          en je verder helpt zonder het antwoord voor te zeggen.
         </p>
         <div class="actions">
           <!-- To the download section, not to the .exe: who can use the app is
                said there, before its download button (#291). -->
           <a class="btn btn-primary" href="#download">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
-            Download for Windows
+            Download voor Windows
           </a>
+          <a class="btn btn-secondary" href="#zo-werk-je">Zo werkt het</a>
         </div>
-      </div>
-    </section>
 
-    <section class="section" aria-label="App screenshot">
-      <div class="wrap">
+        <!-- The big picture follows the visitor's theme: practice-light.png
+             in light mode, practice.png otherwise (#290). Not lazy: it is
+             the first thing on the page. -->
         <figure class="screenshot">
           <div class="screenshot-bar" aria-hidden="true">
             <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
             <span class="screenshot-controls"><i></i><i></i><i></i></span>
           </div>
-          <img src="screenshot.png" width="1910" height="1027" alt="AI Tutor — Python app screenshot" />
+          <picture>
+            <source srcset="screenshots/nl/practice-light.png" media="(prefers-color-scheme: light)" width="2160" height="1350" />
+            <img src="screenshots/nl/practice.png" width="2160" height="1350" fetchpriority="high"
+              alt="De app tijdens het oefenen. Links een Python-programma over korting in de editor, met de uitvoer eronder. Rechts de chat: de leerling vroeg een hint, en de tutor wijst op de laatste regel zonder de oplossing te geven. Bovenaan de knoppen Uitleg, Oefenen en Playground, het niveau van de oefening en het level." />
+          </picture>
+          <figcaption class="screenshot-caption">Oefenen: je code links, de tutor rechts. Rechtsboven zie je het niveau van de oefening en je level.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <!-- 1. Zo werk je: the three modes of the session (session_mode_*) and
+         the quiz that takes over the editor (QuizView, session_quiz_pill).
+         Uitleg: #115/#272 paging, #132 page questions. Oefenen: #256 chip,
+         #273 no solution (openCodeExerciseDirective). Playground: #19, #31;
+         the chat is hidden there. -->
+    <section class="section" id="zo-werk-je" aria-labelledby="zo-werk-je-heading">
+      <div class="wrap">
+        <span class="section-label">In de app</span>
+        <h2 class="section-heading" id="zo-werk-je-heading">Zo werk je</h2>
+        <p class="section-lead">
+          Bovenaan kies je tussen <strong>Uitleg</strong>, <strong>Oefenen</strong> en <strong>Playground</strong>.
+          Bij Uitleg en Oefenen zit de tutor ernaast, in de chat.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+            </div>
+            <h3 class="card-title">Uitleg</h3>
+            <p>
+              Je leest de les van het subdoel waaraan je werkt.
+              De codevoorbeelden voer je zelf uit met <strong>Uitvoeren</strong>.
+            </p>
+            <p>
+              Snap je iets niet? Stel je vraag in de chat. De tutor weet welke les je leest.
+            </p>
+            <p>
+              Met <strong>Vorige</strong> blader je terug naar lessen die je al las, ook van vorige doelen.
+              Klaar met lezen? <strong>Probeer het zelf</strong> brengt je naar Oefenen.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" /></svg>
+            </div>
+            <h3 class="card-title">Oefenen</h3>
+            <p>
+              De tutor geeft je oefeningen: code schrijven, code aanvullen, uitleggen wat code doet,
+              voorspellen wat ze toont, of een open vraag.
+              Je test je code met <strong>Run</strong> en stuurt ze naar de tutor. Hij zegt wat al goed is en wat nog niet.
+            </p>
+            <p>
+              Zit je vast? Klik op het lampje of typ <kbd>?</kbd> voor een hint.
+              De tutor helpt je op weg, maar geeft de oplossing niet weg, ook niet als je erom vraagt.
+            </p>
+            <p>
+              Rechtsboven zie je hoe moeilijk de oefening is: makkelijk, gemiddeld of moeilijk.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="7" rx="1.5" /><rect x="13" y="4" width="8" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="7" rx="1.5" /><rect x="13" y="13" width="8" height="7" rx="1.5" /></svg>
+            </div>
+            <h3 class="card-title">Quizvragen</h3>
+            <p>
+              Tussendoor krijg je een <strong>quizvraag</strong>: een meerkeuzevraag die even de plaats van de editor inneemt.
+              Je klikt op een antwoord en leest meteen of het juist is, en waarom.
+            </p>
+            <p>
+              Twijfel je? Vraag het in de chat. De tutor legt de vraag uit, maar verklapt het antwoord niet.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3M12 15h5" /></svg>
+            </div>
+            <h3 class="card-title">Playground</h3>
+            <p>
+              Vrij coderen, zonder doel en zonder tutor: alleen jij en Python.
+            </p>
+            <p>
+              Bewaar je code met <strong>Opslaan</strong> en open ze later opnieuw met <strong>Openen</strong>.
+              Je bestanden staan bij je account, dus je vindt ze ook terug op een andere computer.
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot screenshot-wide">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/explain.png" width="2160" height="1350" loading="lazy"
+              alt="De Uitleg: een les over if en else met een codevoorbeeld, zijn uitvoer en de knop Uitvoeren. Rechts vraagt de leerling in de chat waarom de laatste regel altijd loopt, en de tutor legt het uit. Onderaan de knoppen Vorige en Probeer het zelf." />
+            <figcaption class="screenshot-caption">Uitleg: de les van je subdoel, met voorbeelden die je zelf uitvoert en een vraag in de chat.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/quiz.png" width="2160" height="1350" loading="lazy"
+              alt="Een quizvraag: ‘Wat toont dit programma?’, met een kort programma met if en else en vier antwoorden, A tot D. De chat staat ernaast." />
+            <figcaption class="screenshot-caption">Een quizvraag neemt even de plaats van de editor in.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/playground.png" width="2160" height="1350" loading="lazy"
+              alt="De Playground: een programma dat vijf keer met een dobbelsteen gooit, met de uitvoer eronder, en het venster Opgeslagen code openen met vijf bewaarde bestanden." />
+            <figcaption class="screenshot-caption">Playground: vrij coderen en je eigen bestanden bewaren.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. De tutor past zich aan, without formulas: CONDUCTOR_POLICY §2.1
+         (weakest LO next), §5 (one level, start on medium), §4.1 (at least
+         two right answers, not only multiple choice), §4.4 (stuck: move on),
+         §1.5 and §2.6 (#102, #187, #275: warm-up and recheck). The details
+         are on the teachers page (#293). -->
+    <section class="section" id="aanpassen" aria-labelledby="aanpassen-heading">
+      <div class="wrap">
+        <span class="section-label">Op jouw niveau</span>
+        <h2 class="section-heading" id="aanpassen-heading">De tutor past zich aan jou aan</h2>
+        <p class="section-lead">
+          Niet iedereen krijgt dezelfde vragen. Wat je krijgt, hangt af van wat je al kan.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r=".8" /></svg>
+            </div>
+            <h3 class="card-title">De app weet wat je al kan</h3>
+            <p>
+              Elk subdoel heeft een paar leerdoelen: kleine dingen die je moet kunnen,
+              zoals voorspellen welke tak van een if-else loopt.
+              Na elke oefening schat de app opnieuw in hoe goed je elk leerdoel kan.
+            </p>
+            <p>
+              Je volgende oefening gaat meestal over het leerdoel dat het minst lukt.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-4M12 19V10M19 19V5" /></svg>
+            </div>
+            <h3 class="card-title">Makkelijker of moeilijker</h3>
+            <p>
+              Je oefent op een van drie niveaus: makkelijk, gemiddeld of moeilijk. Iedereen begint op gemiddeld.
+            </p>
+            <p>
+              Gaat het een tijd goed, dan worden je vragen moeilijker.
+              Loopt het een tijd minder, dan worden ze makkelijker.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></svg>
+            </div>
+            <h3 class="card-title">Pas af als je het echt kan</h3>
+            <p>
+              Een subdoel is af als je al zijn leerdoelen aantoonde. Optionele leerdoelen hoeven niet.
+              Eén juist antwoord is niet genoeg: je hebt er minstens twee nodig,
+              en minstens één daarvan is geen quizvraag.
+            </p>
+            <p>
+              Lukt een leerdoel echt niet, dan gaat de tutor na een tijd toch verder. Het komt later terug.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10A8 8 0 0 0 5 7M4.5 3.5V7.5H8.5" /><path d="M4.5 14A8 8 0 0 0 19 17M19.5 20.5v-4h-4" /></svg>
+            </div>
+            <h3 class="card-title">Oude leerstof komt terug</h3>
+            <p>
+              Wat je al kon, komt later nog eens terug.
+              Soms begint een sessie met een <strong>opfrisvraag</strong> over iets van een vorig subdoel.
+            </p>
+            <p>
+              Een leerdoel dat nog niet helemaal lukte, krijg je later opnieuw, als controlevraag.
+            </p>
+          </article>
+        </div>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+          <p>
+            <strong class="notice-title">Hoe beslist de tutor dat?</strong>
+            Dat lees je in detail op de <a href="leerkrachten.html#beslissen">pagina voor leerkrachten</a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Je vooruitgang: Leerpad (#230 bar per LO, #243 "x van y
+         aangetoond", #280 Afmaken/Herhalen), XP and levels (#217:
+         kXpPerOefening 20, kXpPerSubgoal 100, kXpPerLevel 500), Prijzenkast
+         and Klaspodium (#220, #221), Mijn rapporten (#151). -->
+    <section class="section" id="vooruitgang" aria-labelledby="vooruitgang-heading">
+      <div class="wrap">
+        <span class="section-label">Je vooruitgang</span>
+        <h2 class="section-heading" id="vooruitgang-heading">Je ziet hoe ver je staat</h2>
+        <p class="section-lead">
+          De app toont wat je al kan en wat nog niet. Zo weet je waaraan je nog kan werken.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 5.5-5.5 4 4L21 7" /><path d="M15 7h6v6" /></svg>
+            </div>
+            <h3 class="card-title">Leerpad</h3>
+            <p>
+              Al je doelen op een rij. Bij elk subdoel zie je hoeveel leerdoelen je al aantoonde,
+              bijvoorbeeld <em>2 van 3 aangetoond</em>. Klap het open en je ziet welke nog openstaan.
+            </p>
+            <p>
+              Met <strong>Afmaken</strong> werk je een vorig subdoel af dat nog niet helemaal lukte.
+              Met <strong>Herhalen</strong> oefen je er een opnieuw.
+              <strong>Verder</strong> brengt je terug naar je huidige doel.
+            </p>
+            <p>
+              Tijdens het oefenen toont de balk onder <strong>Huidig doel</strong> één stuk per leerdoel.
+              Een half stuk betekent: nog één juist antwoord.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 14.6 9l6 .7-4.4 4.1 1.2 5.9L12 16.8l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z" /></svg>
+            </div>
+            <h3 class="card-title">XP en levels</h3>
+            <p>
+              Elke oefening levert 20 XP op, ook als je antwoord fout was.
+              Wat je aantoont, levert extra XP op: 100 per subdoel.
+            </p>
+            <p>
+              Per 500 XP ga je een level hoger. Je level staat rechtsboven in de app.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4" /></svg>
+            </div>
+            <h3 class="card-title">Prijzenkast</h3>
+            <p>
+              Badges voor wat je doet: voor inzet, voor juiste antwoorden na elkaar, voor code die je zelf schreef.
+              Sommige zijn geheim. Andere krijg je van je leerkracht, voor wat de app niet ziet.
+            </p>
+            <p>
+              Rond je een subdoel af als een van de eerste drie van je klas?
+              Dan krijg je goud, zilver of brons op het <strong>Klaspodium</strong>. Alleen jij ziet je medailles.
+            </p>
+            <p>
+              Badges leveren geen XP op en tellen niet mee voor je punten.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5" /><path d="m10 14.5 2 2 4-4" /></svg>
+            </div>
+            <h3 class="card-title">Mijn rapporten</h3>
+            <p>
+              Op een rapportmoment geeft je leerkracht je rapport vrij.
+              Onder <strong>Mijn rapporten</strong> lees je je punt en waarom je het kreeg.
+            </p>
+            <p>
+              Wil je het narekenen? Onder je rapport staat hoe je punt berekend is,
+              en de regels staan onder <strong>Puntenformule</strong>.
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/learning-path.png" width="2160" height="1350" loading="lazy"
+              alt="Het Leerpad. Het eerste doel is voltooid, en elk van zijn subdoelen heeft de knop Herhalen. Bij het tweede doel staat een subdoel open met zijn drie leerdoelen: één aangetoond, twee nog niet. Onderaan de knop Verder." />
+            <figcaption class="screenshot-caption">Leerpad: per subdoel wat je al aantoonde.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/level-up.png" width="2160" height="1350" loading="lazy"
+              alt="Een felicitatie midden op het scherm: plus 100 XP, Level 7, je hebt Beslissingen met if en else onder de knie. Met de knop Verder leren." />
+            <figcaption class="screenshot-caption">Een nieuw level.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/trophy-case.png" width="2160" height="1350" loading="lazy"
+              alt="De Prijzenkast met badges in trappen, zoals Inzet, Op dreef, Schrijver en Allrounder. Elke badge toont wat telt en hoe ver je staat tot de volgende trap." />
+            <figcaption class="screenshot-caption">Prijzenkast: badges in trappen.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/trophy-case-podium.png" width="2160" height="1350" loading="lazy"
+              alt="Verder in de Prijzenkast: een Kenner-badge per doel, het Klaspodium met goud voor Variabelen en brons voor Vergelijkingen, en de badges die je van je leerkracht krijgt." />
+            <figcaption class="screenshot-caption">Het Klaspodium en de badges van je leerkracht.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Wat leer je? The goals that are live, with their subgoals. -->
+    <section class="section" id="wat-leer-je" aria-labelledby="wat-leer-je-heading">
+      <div class="wrap">
+        <span class="section-label">De cursus</span>
+        <h2 class="section-heading" id="wat-leer-je-heading">Wat leer je?</h2>
+        <p class="section-lead">
+          De cursus bestaat uit doelen, en elk doel uit subdoelen. Je werkt ze in deze volgorde af.
+          Klik op een doel om zijn subdoelen te zien.
+        </p>
+
+        <!-- Written by tooling/site/curriculum.py from the goal files, for the
+             goals that are live. Do not edit between the markers: run the
+             script (ROADMAP.md, "Van doelbestand tot live"). -->
+        <!-- curriculum:start -->
+        <ol class="curriculum">
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">1</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Eenvoudige Python-scripts schrijven en begrijpen</span>
+                  <span class="curriculum-count">5 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Uitvoer met print</dt>
+                    <dd>Je kan met print() strings en getallen op het scherm tonen en herkent het verschil tussen wat in de broncode staat en wat als uitvoer verschijnt.</dd>
+                  </div>
+                  <div>
+                    <dt>Variabelen</dt>
+                    <dd>Je kan een waarde toekennen aan een variabele met =, een geldige naam kiezen, de variabele gebruiken in expressies en print, en haar waarde herwijzen.</dd>
+                  </div>
+                  <div>
+                    <dt>Rekenen met getallen</dt>
+                    <dd>Je kan rekenkundige expressies schrijven en evalueren met de standaardoperatoren (+, -, *, /, //, %, **), de volgorde van bewerkingen toepassen, en het verschil herkennen tussen int en float.</dd>
+                  </div>
+                  <div>
+                    <dt>Invoer met input</dt>
+                    <dd>Je kan met input() een waarde van de gebruiker opvragen met een duidelijke prompt, het resultaat opslaan in een variabele, en de invoer omzetten naar int of float wanneer rekenwerk nodig is.</dd>
+                  </div>
+                  <div>
+                    <dt>Een klein script samenstellen</dt>
+                    <dd>Je kan de eerder behandelde bouwstenen — input, variabelen, rekenen, print — combineren tot een klein, werkend Python-script dat een probleem in natuurlijke taal oplost, en kan zo'n script lezen, traceren en debuggen.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">2</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Beslissingen programmeren met condities</span>
+                  <span class="curriculum-count">4 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan vergelijkingen schrijven die True of False opleveren, beslissingen programmeren met if, elif en else, voorwaarden combineren met and, or en not, en met de turtle-module tekeningen maken waarin condities bepalen wat er getekend wordt.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Vergelijkingen en booleans</dt>
+                    <dd>Je kan vergelijkingsoperatoren (==, !=, &lt;, &gt;, &lt;=, &gt;=) gebruiken om expressies te schrijven die True of False opleveren, dat resultaat opslaan in een variabele, en voorspellen wat een vergelijking oplevert.</dd>
+                  </div>
+                  <div>
+                    <dt>Beslissingen met if en else</dt>
+                    <dd>Je kan een if-statement schrijven dat code uitvoert als een voorwaarde waar is, een else-tak toevoegen om tussen twee blokken te kiezen, en voorspellen welke tak uitgevoerd wordt.</dd>
+                  </div>
+                  <div>
+                    <dt>Meer keuzes met elif, and, or en not</dt>
+                    <dd>Je kan meerdere gevallen onderscheiden met een if/elif/else-keten en voorwaarden combineren met and, or en not.</dd>
+                  </div>
+                  <div>
+                    <dt>Tekenen met turtle</dt>
+                    <dd>Je kan met de turtle-module een tekening programmeren: een turtle aanmaken, hem bewegen en draaien, de pen en kleur instellen, en condities gebruiken om te bepalen wat er getekend wordt.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">3</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Herhalingen programmeren met lussen</span>
+                  <span class="curriculum-count">4 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan herhalingen implementeren met for en while, programma's systematisch testen en debuggen met verschillende testgevallen, en complexere probleemstellingen vertalen naar werkende Python-code, ook met turtle-tekeningen.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Herhalen met for en range</dt>
+                    <dd>Je kan een for-lus met range schrijven om een bewerking een vast aantal keer te herhalen, de uitvoer van zo'n lus voorspellen, een resultaat opbouwen in een variabele, en met turtle regelmatige figuren tekenen.</dd>
+                  </div>
+                  <div>
+                    <dt>Herhalen met while</dt>
+                    <dd>Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is, voorspellen wanneer zo'n lus stopt, oneindige lussen herkennen, en een lus gebruiken om invoer te valideren.</dd>
+                  </div>
+                  <div>
+                    <dt>Testen en debuggen</dt>
+                    <dd>Je kan een programma systematisch testen door verschillende testgevallen uit te proberen, zinvolle testgevallen kiezen inclusief randgevallen, foutmeldingen interpreteren, en fouten opsporen en verbeteren.</dd>
+                  </div>
+                  <div>
+                    <dt>Van probleem naar programma</dt>
+                    <dd>Je kan een complexere probleemstelling opdelen in stappen en vertalen naar een werkend Python-programma dat condities, lussen en eventueel turtle combineert, en logische fouten daarin opsporen en verbeteren.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">4</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Lijsten en tuples</span>
+                  <span class="curriculum-count">6 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen via hun index of met slicing, lijsten en strings doorlopen met lussen, zelf klassieke lijstalgoritmes schrijven, het verschil tussen veranderbare lijsten en onveranderbare tuples benutten, en met geneste lussen werken op paren en rasters.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Lijsten, strings en indexen</dt>
+                    <dd>Je kan een lijst aanmaken, elementen opvragen en aanpassen via hun index (ook negatief), een deel eruit halen met slicing, en een string op dezelfde manier indexeren als een reeks tekens.</dd>
+                  </div>
+                  <div>
+                    <dt>Lijsten aanpassen met methodes</dt>
+                    <dd>Je kan een lijst laten groeien en krimpen met append, insert, remove en pop, met in controleren of een waarde erin zit, en sum, min, max en sort gebruiken.</dd>
+                  </div>
+                  <div>
+                    <dt>Lijsten en strings doorlopen</dt>
+                    <dd>Je kan met een for-lus elk element van een lijst of string verwerken, kiezen tussen een lus over de elementen en een lus over de indexen, een nieuwe lijst opbouwen door te filteren of om te zetten, en met turtle tekenen op basis van een lijst.</dd>
+                  </div>
+                  <div>
+                    <dt>Klassieke lijstpatronen</dt>
+                    <dd>Je kan zelf veelgebruikte algoritmes over een lijst schrijven: het grootste of kleinste element zoeken zonder max() of min(), tellen wat aan een voorwaarde voldoet, zoeken of en waar een waarde voorkomt, en twee elementen van plaats wisselen.</dd>
+                  </div>
+                  <div>
+                    <dt>Tuples en onveranderbaarheid</dt>
+                    <dd>Je kan tuples aanmaken, indexeren en uitpakken (ook om te wisselen of om een lijst van paren te doorlopen), uitleggen waarom tuples en strings niet aan te passen zijn, en voorspellen wat er gebeurt als twee namen naar dezelfde lijst verwijzen.</dd>
+                  </div>
+                  <div>
+                    <dt>Geneste lussen en lijsten van lijsten</dt>
+                    <dd>Je kan een lus in een lus schrijven om paren uit een lijst te overlopen, voorspellen hoe vaak de binnenste lus loopt, en een raster als lijst van lijsten doorlopen en aanpassen met rooster[r][k].</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">5</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Functies</span>
+                  <span class="curriculum-count">6 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegevens doorgeven via parameters, een resultaat teruggeven met return, voorspellen welke variabelen binnen en buiten een functie bestaan, formules uit wiskunde, fysica en economie vertalen naar functies en er waardetabellen mee maken, en een groter probleem opsplitsen in functies die elkaar aanroepen.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Een functie schrijven en aanroepen</dt>
+                    <dd>Je kan met def een functie schrijven die een waarde binnenkrijgt via een parameter en een resultaat teruggeeft met return, ze aanroepen, en het resultaat opslaan, afdrukken of verder gebruiken in een expressie.</dd>
+                  </div>
+                  <div>
+                    <dt>Parameters en argumenten</dt>
+                    <dd>Je kan een functie meerdere parameters geven, ze aanroepen met de juiste argumenten in de juiste volgorde, voorspellen welke waarde elke parameter krijgt, en een berekening die je meermaals nodig hebt veralgemenen tot een functie.</dd>
+                  </div>
+                  <div>
+                    <dt>Return onder de loep</dt>
+                    <dd>Je kan voorspellen wat er misloopt als een functie afdrukt in plaats van teruggeeft en dat herstellen, voorspellen dat een functie stopt bij de eerste return, functies schrijven die True of False teruggeven, en herkennen wanneer een functie iets doet, zoals tekenen, in plaats van iets te berekenen.</dd>
+                  </div>
+                  <div>
+                    <dt>Lokale variabelen</dt>
+                    <dd>Je kan voorspellen welke variabelen binnen en buiten een functie bestaan, wat er met een variabele van buitenaf gebeurt als de functie een variabele met dezelfde naam een waarde geeft, en uitleggen waarom een functie haar gegevens best via parameters krijgt en via return teruggeeft.</dd>
+                  </div>
+                  <div>
+                    <dt>Wiskundige functies en waardetabellen</dt>
+                    <dd>Je kan een voorschrift uit de wiskunde, fysica of economie vertalen naar een Python-functie, de math-module gebruiken, met een lus een waardetabel maken, en uit die functiewaarden iets afleiden over de functie, zoals waar ze het kleinst is of van teken wisselt.</dd>
+                  </div>
+                  <div>
+                    <dt>Een probleem opsplitsen in functies</dt>
+                    <dd>Je kan een groter probleem opsplitsen in functies die elk één taak hebben, functies schrijven die andere functies aanroepen of met lijsten werken, en een functie testen met goed gekozen aanroepen.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">6</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Toeval en simulatie</span>
+                  <span class="curriculum-count">5 subdoelen</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>Je kan met de random-module toeval in een programma brengen en daarmee experimenten naspelen: toevallige waarden maken, een kans schatten door een experiment vaak te herhalen, een oppervlakte schatten met toevallige punten, een toevalswandeling programmeren, en een beschreven situatie vertalen naar een simulatie die je controleert met een geval waarvan je het antwoord kent.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Toevalsgetallen maken</dt>
+                    <dd>Je kan met de random-module toevallige waarden maken: een geheel getal tussen twee grenzen, een kommagetal tussen 0 en 1 of een willekeurig element uit een lijst, een gebeurtenis met een gegeven kans laten gebeuren, en voorspellen welke uitvoer van zo'n script mogelijk is.</dd>
+                  </div>
+                  <div>
+                    <dt>Een kans schatten door te herhalen</dt>
+                    <dd>Je kan een toevalsexperiment vele keren herhalen, tellen hoe vaak een gebeurtenis voorkomt en zo haar kans schatten, bijhouden hoe vaak elke uitkomst valt, en uitleggen waarom meer herhalingen een betrouwbaardere schatting geven.</dd>
+                  </div>
+                  <div>
+                    <dt>Een oppervlakte schatten met toevallige punten</dt>
+                    <dd>Je kan toevallige punten binnen een rechthoek maken, nagaan of een punt binnen een figuur ligt, en uit het aandeel treffers de oppervlakte van die figuur schatten, zoals een cirkel of het gebied onder een grafiek.</dd>
+                  </div>
+                  <div>
+                    <dt>Toevalswandelingen</dt>
+                    <dd>Je kan een toevalswandeling programmeren waarbij een positie bij elke stap toevallig verandert, de afgelegde weg in een lijst bewaren, een wandeling laten stoppen bij een grens, en uitleggen wat vele herhaalde wandelingen tonen dat één wandeling niet toont.</dd>
+                  </div>
+                  <div>
+                    <dt>Van situatie naar simulatie</dt>
+                    <dd>Je kan een beschreven situatie met toeval vertalen naar een simulatie: bepalen wat één experiment is, dat experiment als functie schrijven, het vaak herhalen om een kans of een gemiddelde te schatten, en de simulatie controleren met een geval waarvan je het antwoord kent.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+        </ol>
+        <!-- curriculum:end -->
+      </div>
+    </section>
+
+    <!-- 5. Alles zit erin: #5 (Python and its packages), #23/#117/#206
+         (two languages: app, lessons, tutor), #32 (theme, default follows
+         Windows), the in-app update (#291). -->
+    <section class="section" id="alles-erin" aria-labelledby="alles-erin-heading">
+      <div class="wrap">
+        <span class="section-label">De app</span>
+        <h2 class="section-heading" id="alles-erin-heading">Alles zit erin</h2>
+        <p class="section-lead">
+          Je installeert één app, en je kan beginnen.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5z" /><path d="M3 8v8l9 5 9-5V8M12 13v8" /></svg>
+            </div>
+            <h3 class="card-title">Python zit erin</h3>
+            <p>
+              Python hoef je niet te installeren, ook turtle, matplotlib, numpy en pandas niet.
+              Ze zitten in de app. Je code draait op je eigen laptop.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z" /></svg>
+            </div>
+            <h3 class="card-title">Nederlands of Engels</h3>
+            <p>
+              De app, de lessen en wat de tutor schrijft, zijn er in het Nederlands en in het Engels.
+              Je kiest je taal in <strong>Opties → Taal</strong>.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></svg>
+            </div>
+            <h3 class="card-title">Donker of licht</h3>
+            <p>
+              De app volgt het thema van Windows.
+              In <strong>Opties → Weergave</strong> kies je zelf <strong>Licht</strong> of <strong>Donker</strong>.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            </div>
+            <h3 class="card-title">Werkt zichzelf bij</h3>
+            <p>
+              Is er een nieuwe versie, dan zie je een balk bovenaan de app.
+              Klik op <strong>Bijwerken</strong> en je werkt verder in de nieuwe versie.
+            </p>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -215,9 +844,10 @@
 
   <footer class="site-footer">
     <div class="wrap">
-      <p>© <span id="year">2026</span> AI Tutor — Python • Theme colors match the classroom app.</p>
+      <p>© <span id="year">2026</span> AI Tutor — Python</p>
       <ul class="footer-links">
-        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Source on GitHub</a></li>
+        <li><a href="leerkrachten.html">Voor leerkrachten</a></li>
+        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Broncode op GitHub</a></li>
       </ul>
     </div>
   </footer>

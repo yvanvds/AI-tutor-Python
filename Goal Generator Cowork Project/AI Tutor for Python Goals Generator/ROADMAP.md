@@ -225,6 +225,13 @@ Wel gezien, naast doel 1 tot 4 (daarin ook `+=` en `-=`, sinds de les over
 4. Live zetten: `python tooling/curriculum/push_goal.py plan NN-<doel-id>`,
    dan `push`. Het script maakt alleen aan en overschrijft niets.
 5. De Engelse teksten: `python tooling/translations/translations.py push`.
+6. De site bijwerken: zet `NN-<doel-id>` in `LIVE_GOALS` van
+   `tooling/site/curriculum.py`, kijk met
+   `python tooling/site/curriculum.py --check-live` of de lijst klopt met
+   wat live staat (alleen lezen), en schrijf de lijst "Wat leer je?" op de
+   startpagina met `python tooling/site/curriculum.py` (en met `--lang en`
+   zodra de Engelse site er is, #294). Commit en push: dat raakt alleen
+   `public/` en `tooling/`, dus rechtstreeks op main.
 
 Een doel dat al live staat wijzig je via de import in de app. De id's van
 subdoelen en LO's dragen de voortgang van de leerlingen.

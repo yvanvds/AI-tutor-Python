@@ -22,6 +22,8 @@
      .site-nav             nav links; a[aria-current="page"] = active
    .hero                 page intro with a faint lamp glow
      .hero-title           h1; .hero-lead = intro paragraph
+                           a .screenshot after the .actions = the big
+                           picture of the start page (#292)
    .page-toc             "on this page": a <nav> with a <ul> of jump links,
                          drawn as chips that wrap (#293)
    .pill                 small uppercase label (the app's "HUIDIG DOEL" pill)
@@ -36,7 +38,9 @@
                          .card-grid-2 stops at two columns (four cards)
    .card                 feature card: .card-icon (tones .card-icon-info,
                          .card-icon-success), .card-title (h3), <p>, <ul>
-   .screenshot           window-like frame around an <img>:
+   .screenshot           window-like frame around an <img>, or around a
+                         <picture> whose <source media="(prefers-color-
+                         scheme: light)"> swaps in the light screenshot:
      .screenshot-bar       title bar: .screenshot-title (+ img.screenshot-logo)
                            and .screenshot-controls (three <i>: – □ ×)
      .screenshot-caption   optional <figcaption>
@@ -59,6 +63,12 @@
                          (tooling/site/fill_release.py) — dl.release-facts
                          (.release-facts-wide = a row of its own) and
                          .release-note
+   .curriculum           "Wat leer je?" (#292), written by
+                         tooling/site/curriculum.py: <ol> > <li> >
+                         <details class="curriculum-goal"> with a <summary>
+                         (.curriculum-number, .curriculum-heading >
+                         .curriculum-title + .curriculum-count) and a
+                         .curriculum-body (<p>, dl.curriculum-subgoals)
    .site-footer          bottom bar; .footer-links
    Helpers: .muted .faint .mono .visually-hidden, inline <code>, <kbd>
    ========================================================================== */
@@ -382,6 +392,7 @@ kbd {
 
 .hero .actions { margin-top: var(--space-xxl); }
 .hero .notice { margin-top: var(--space-xl); max-width: 42rem; }
+.hero .screenshot { margin-top: var(--space-xxxl); }
 
 /* --- On this page (#293) --------------------------------------------------- */
 
@@ -643,6 +654,7 @@ kbd {
 }
 .screenshot-controls i:nth-child(3)::after { transform: rotate(-45deg); }
 
+.screenshot > picture { display: block; }
 .screenshot > img,
 .screenshot > picture img { display: block; width: 100%; height: auto; }
 
@@ -840,6 +852,102 @@ kbd {
 .release-note + .release-note { margin-top: var(--space-xs); }
 .release-note code { overflow-wrap: anywhere; }
 
+/* --- Curriculum (#292) ----------------------------------------------------- */
+
+.section-lead + .curriculum { margin-top: var(--space-xl); }
+
+.curriculum {
+  display: grid;
+  gap: var(--space-m);
+  max-width: 52rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.curriculum-goal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card-large);
+}
+.curriculum-goal[open] { border-color: var(--border-strong); }
+
+.curriculum-goal > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card-large);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color var(--dur-hover) ease;
+}
+.curriculum-goal > summary::-webkit-details-marker { display: none; }
+.curriculum-goal > summary:hover { background: var(--raised); }
+
+/* A chevron that points down when closed and up when open. */
+.curriculum-goal > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-xxs);
+  border-right: 2px solid var(--fg-faint);
+  border-bottom: 2px solid var(--fg-faint);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--dur-hover) ease;
+}
+.curriculum-goal[open] > summary::after { transform: translateY(2px) rotate(225deg); }
+
+/* The goal's number in the leaf-tinted circle of .steps. */
+.curriculum-number {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.curriculum-heading {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-m);
+  min-width: 0;
+}
+.curriculum-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
+.curriculum-count { color: var(--fg-faint); font-size: 0.875rem; }
+.curriculum .pill { margin-left: var(--space-xs); vertical-align: 1px; }
+
+/* The body lines up with the title, past the number. */
+.curriculum-body {
+  padding: var(--space-xxs) var(--space-lg) var(--space-lg)
+    calc(var(--space-lg) + 32px + var(--space-md));
+}
+.curriculum-body > p { color: var(--fg-mute); }
+
+@media (max-width: 479px) {
+  .curriculum-body { padding-left: var(--space-lg); }
+}
+
+.curriculum-subgoals {
+  display: grid;
+  gap: var(--space-md);
+  margin: var(--space-lg) 0 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+.curriculum-subgoals dt { font-weight: 600; }
+.curriculum-subgoals dd { margin: 2px 0 0; color: var(--fg-mute); }
+
 /* --- Footer ---------------------------------------------------------------- */
 
 .site-footer {
@@ -876,7 +984,8 @@ kbd {
 /* --- Older browsers without color-mix() ----------------------------------- */
 
 @supports not (color: color-mix(in oklab, red 10%, blue)) {
-  .pill-accent, .pill-success, .pill-info, .card-icon, .steps > li::before {
+  .pill-accent, .pill-success, .pill-info, .card-icon, .steps > li::before,
+  .curriculum-number {
     background: var(--raised);
     border-color: var(--border-strong);
   }
