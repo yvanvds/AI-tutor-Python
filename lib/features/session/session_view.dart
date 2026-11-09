@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/badges/badge_toast_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -136,7 +137,9 @@ class _ChatPanel extends StatelessWidget {
         color: AppColors.ink1,
         border: Border(left: BorderSide(color: AppColors.ink2, width: 1)),
       ),
-      child: const ChatWidget(),
+      // The badge notice lies over the messages, not over the exercise
+      // next to them (#283).
+      child: const ChatWidget(overMessages: BadgeToastOverChat()),
     );
   }
 }

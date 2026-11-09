@@ -18,6 +18,7 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/badge_toast_place.dart' as badge_toast_place;
 import 'flows/badges.dart' as badges;
 import 'flows/bug_report_file.dart' as bug_report_file;
 import 'flows/bug_report_oauth.dart' as bug_report_oauth;
@@ -173,6 +174,7 @@ void main() {
   level_up_gate.main();
   oefening_xp.main();
   badges.main();
+  badge_toast_place.main();
   class_podium.main();
   teacher_badges.main();
   bug_report_oauth.main();

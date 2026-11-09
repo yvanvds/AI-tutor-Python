@@ -222,24 +222,11 @@ void main() {
     reason: 'the exercise never reached the editor:\n$code',
   );
 
-  /// The notice of a badge the first answer earned lies over the run
-  /// controls in a 700 px window (#283): a student closes it before handing
-  /// the next answer in.
-  Future<void> closeBadgeToasts(WidgetTester tester) async {
-    final toast = find.byKey(const ValueKey('badge-toast'));
-    while (toast.evaluate().isNotEmpty) {
-      await tester.tap(
-        find.descendant(of: toast, matching: find.byTooltip('Close')),
-      );
-      await tester.pump(const Duration(milliseconds: 400));
-    }
-  }
-
-  /// Hands the code in with "Send to tutor".
-  Future<void> send(WidgetTester tester) async {
-    await closeBadgeToasts(tester);
-    await tester.tap(find.byTooltip('Send to tutor'));
-  }
+  /// Hands the code in with "Send to tutor" — also while the notice of a
+  /// badge the first answer earned is up: it lies over the chat, not over
+  /// the row above the editor (#283).
+  Future<void> send(WidgetTester tester) =>
+      tester.tap(find.byTooltip('Send to tutor'));
 
   Future<void> openLearningPath(WidgetTester tester) async {
     await tester.tap(find.byTooltip('Learning path'));
