@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voor leerkrachten — AI Tutor — Python</title>
+  <meta name="description" content="Wat de AI-tutor voor Python een leerkracht biedt: de cursus in eigen hand, de klas volgen, hoe de tutor beslist, evalueren, en wat er met de gegevens van leerlingen gebeurt." />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#211D18" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F6F1E7" media="(prefers-color-scheme: light)" />
+
+  <!-- Sharing (Smartschool, Teams, …) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="nl_BE" />
+  <meta property="og:site_name" content="AI Tutor — Python" />
+  <meta property="og:title" content="Voor leerkrachten — AI Tutor — Python" />
+  <meta property="og:description" content="Wat de AI-tutor voor Python een leerkracht biedt: de cursus in eigen hand, de klas volgen, hoe de tutor beslist, evalueren, en wat er met de gegevens van leerlingen gebeurt." />
+  <meta property="og:url" content="https://yvanvds.github.io/AI-tutor-Python/leerkrachten.html" />
+  <meta property="og:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/lesson-content.png" />
+  <meta property="og:image:width" content="2160" />
+  <meta property="og:image:height" content="1350" />
+  <meta property="og:image:alt" content="De pagina Lesinhoud van de app: de HTML van een les naast de les zoals de leerling ze ziet." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Voor leerkrachten — AI Tutor — Python" />
+  <meta name="twitter:description" content="Wat de AI-tutor voor Python een leerkracht biedt: de cursus in eigen hand, de klas volgen, hoe de tutor beslist, evalueren, en wat er met de gegevens van leerlingen gebeurt." />
+  <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/lesson-content.png" />
+  <meta name="twitter:image:alt" content="De pagina Lesinhoud van de app: de HTML van een les naast de les zoals de leerling ze ziet." />
+
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Naar de inhoud</a>
+
+  <header class="site-header">
+    <div class="wrap site-header-inner">
+      <a class="brand" href="./">
+        <img class="brand-logo" src="assets/logo.svg" width="32" height="32" alt="" />
+        <span class="brand-name">AI Tutor — Python</span>
+      </a>
+      <nav class="site-nav" aria-label="Hoofdmenu">
+        <ul>
+          <li><a href="./#download">Download</a></li>
+          <li><a href="leerkrachten.html" aria-current="page">Voor leerkrachten</a></li>
+          <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- A page for teachers (#293): what the app offers them, how the tutor
+       decides, what it keeps and whether they can use it today. Every claim
+       was checked against the code and docs/ of the day; the labels in bold
+       are the app's own (lib/l10n/app_nl.arb). Screenshots: the demo class
+       of #290, invented names only. -->
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <span class="pill pill-accent">Voor leerkrachten</span>
+        <h1 class="hero-title">Wat de app voor jou als leerkracht doet</h1>
+        <p class="hero-lead">
+          De tutor oefent Python met elke leerling apart. Jij bepaalt wat er geleerd wordt,
+          volgt de klas tijdens de les en krijgt een onderbouwd puntvoorstel voor het rapport.
+        </p>
+        <p class="hero-lead">
+          Op deze pagina lees je wat de app kan, hoe de tutor beslist wat hij vraagt,
+          wat de app bewaart en of je ze vandaag in je eigen school kunt gebruiken.
+        </p>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
+          <p>
+            <strong class="notice-title">Vandaag alleen voor SMA Arcadia</strong>
+            De app werkt nu alleen met de schoolaccounts van SMA Arcadia.
+            Wat je nodig hebt om ze in je eigen school te gebruiken, lees je onder
+            <a href="#eigen-school">In je eigen school</a>.
+          </p>
+        </div>
+
+        <nav class="page-toc" aria-label="Op deze pagina">
+          <ul>
+            <li><a href="#cursus">De cursus</a></li>
+            <li><a href="#klas">De klas volgen</a></li>
+            <li><a href="#beslissen">Hoe de tutor beslist</a></li>
+            <li><a href="#evalueren">Evalueren</a></li>
+            <li><a href="#gegevens">Gegevens</a></li>
+            <li><a href="#eigen-school">In je eigen school</a></li>
+          </ul>
+        </nav>
+      </div>
+    </section>
+
+    <!-- 1. De cursus in eigen hand: Doelen, Lesinhoud, Instructies, Vragen. -->
+    <section class="section" id="cursus" aria-labelledby="cursus-heading">
+      <div class="wrap">
+        <span class="section-label">De cursus</span>
+        <h2 class="section-heading" id="cursus-heading">De cursus in eigen hand</h2>
+        <p class="section-lead">
+          Wat de tutor vraagt en uitlegt, komt uit wat jij in de app schrijft. Code heb je daar niet voor nodig.
+          Je vindt het in de zijbalk, onder <strong>Docent</strong>.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5" /></svg>
+            </div>
+            <h3 class="card-title">Doelen</h3>
+            <p>
+              Hoofddoelen en subdoelen in een boom, in de volgorde waarin de leerlingen ze doorlopen.
+              Elk subdoel heeft leerdoelen: kleine dingen die een leerling moet kunnen, zoals voorspellen wat een if/else toont.
+            </p>
+            <p>
+              Bij een subdoel schrijf je <strong>lestips</strong> voor de tutor en koppel je de les.
+              Titel en beschrijving schrijf je in het Nederlands; een Engelse vertaling kan erbij.
+              De leerdoelen staan in het doelenbestand dat je exporteert en importeert.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+            </div>
+            <h3 class="card-title">Lesinhoud</h3>
+            <p>
+              Per subdoel een les die de leerling leest, met voorbeelden die hij meteen kan uitvoeren.
+              Je uploadt de les als HTML en ziet ernaast hoe de leerling ze ziet.
+              Een vraag over de les stelt de leerling aan de tutor, in de chat ernaast.
+            </p>
+            <p>
+              Elke les heeft een Nederlandse bron, en kan een Engelse vertaling krijgen.
+              Pas je de Nederlandse les aan, dan zegt de app dat de vertaling verouderd is.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+            </div>
+            <h3 class="card-title">Instructies</h3>
+            <p>
+              Hier schrijf je wat de tutor doet en hoe hij schrijft: hoe hij een vraag stelt, een antwoord beoordeelt,
+              een hint geeft of een statusrapport schrijft. Het zijn gewone teksten, met plaatshouders als
+              <code>{subgoal}</code> en <code>{teachingTips}</code> die de app invult.
+            </p>
+            <p>
+              Een paar regels liggen vast in de app: in welke taal de tutor antwoordt,
+              en dat hij de oplossing niet verklapt als een leerling tijdens een oefening iets vraagt.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4V14M12 17v.01" /></svg>
+            </div>
+            <h3 class="card-title">Vragen</h3>
+            <p>
+              Een nieuwe vraag van de tutor komt in de vragenbank zodra de eerste leerling ze juist beantwoordt.
+              Daarna kan de tutor ze opnieuw stellen, zonder te wachten. Open vragen worden niet bewaard.
+            </p>
+            <p>
+              Krijgt een vraag op tien antwoorden of meer minder dan de helft juist, dan verbergt de app ze vanzelf.
+              Wat fout of onduidelijk is, verberg of verwijder je zelf. Een leerling kan je de ID tonen die boven elke oefening staat, zoals <code>#3fa91c</code>.
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot screenshot-wide">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/lesson-content.png" width="2160" height="1350" loading="lazy"
+              alt="De pagina Lesinhoud: links de subdoelen per hoofddoel, in het midden de HTML van de les ‘Beslissingen met if en else’, rechts dezelfde les zoals de leerling ze ziet, met een voorbeeld en de knop Uitvoeren." />
+            <figcaption class="screenshot-caption">Lesinhoud: de HTML van een les, en ernaast de les zoals de leerling ze ziet.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/goals.png" width="2160" height="1350" loading="lazy"
+              alt="De pagina Doelen: links de hoofddoelen, in het midden de subdoelen van Condities, rechts het subdoel ‘Beslissingen met if en else’ met titel, lestips en de gekoppelde lesinhoud." />
+            <figcaption class="screenshot-caption">Doelen: hoofddoelen en subdoelen, met lestips en een les per subdoel.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/questions.png" width="2160" height="1350" loading="lazy"
+              alt="De pagina Vragen: de bewaarde vragen van een subdoel, elk met de soort vraag, het niveau, hoe vaak ze gesteld is en welk deel juist was, en de knoppen Verberg en Verwijder." />
+            <figcaption class="screenshot-caption">Vragen: de vragenbank, met per vraag hoe vaak ze juist beantwoord werd.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. De klas volgen: Studenten, Klassen, meldingen, verbruik, badges. -->
+    <section class="section" id="klas" aria-labelledby="klas-heading">
+      <div class="wrap">
+        <span class="section-label">In de klas</span>
+        <h2 class="section-heading" id="klas-heading">De klas volgen</h2>
+        <p class="section-lead">
+          Je ziet de voortgang van elke leerling, en tijdens de les meldt de app wie vastloopt.
+        </p>
+
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14c2.1.8 3.5 3 3.5 6" /></svg>
+            </div>
+            <h3 class="card-title">Studenten</h3>
+            <p>
+              Al je leerlingen in een lijst, met hun klas, hun huidige doel en hun voortgang.
+              Klik op een leerling voor het detail: de voortgang per doel en subdoel, een grafiek van de voortgang in de tijd,
+              en de <strong>statusrapporten</strong> die de tutor schrijft na elk afgerond subdoel.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+            </div>
+            <h3 class="card-title">Klassen</h3>
+            <p>
+              Elke klas met haar leerlingen en haar lessen per week: dag, begin en einde.
+              De klas van een leerling kies je bij <strong>Studenten</strong>.
+              Uit de lesuren weet de app welke oefeningen in de les vallen.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20.5a2 2 0 0 0 4 0" /></svg>
+            </div>
+            <h3 class="card-title">Meldingen</h3>
+            <p>
+              Werkt een leerling minstens 25 minuten aan een subdoel, en is de helft of meer van zijn laatste antwoorden niet juist?
+              Dan staat bij hem op de pagina <strong>Studenten</strong> een melding: <strong>Loopt vast</strong>. Zo zie je het nog in de les.
+            </p>
+            <p>
+              Antwoordt een leerling op een leerdoel thuis vooral juist en in de les daarna vooral fout,
+              dan meldt de app: <strong>De les spreekt het thuiswerk tegen</strong>.
+              Meldingen veranderen niets aan het punt, en de leerling ziet ze niet.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M6 20v-6M11 20V8M16 20v-9" /></svg>
+            </div>
+            <h3 class="card-title">Verbruik</h3>
+            <p>
+              Bovenaan <strong>Studenten</strong> staat het tokengebruik per klas:
+              wat de tutor de laatste 30 dagen bij het AI-model verbruikte voor de oefeningen van die klas.
+              Welk model de tutor van de hele school gebruikt, kies je in <strong>Opties</strong>.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5" /><path d="M8.6 13.4 7 21l5-2.8 5 2.8-1.6-7.6" /></svg>
+            </div>
+            <h3 class="card-title">Badges</h3>
+            <p>
+              Leerlingen verdienen badges in hun <strong>Prijzenkast</strong>: voor inzet, voor juiste antwoorden,
+              en een klaspodium voor de eerste drie van de klas die een onderwerp afronden. Badges tellen niet mee voor het punt.
+            </p>
+            <p>
+              Drie badges geef je zelf, voor wat de app niet ziet, met <strong>Badge toekennen</strong> in het detail van een leerling:
+              <strong>Foutenjager</strong>, <strong>Helpende hand</strong> en <strong>Goede vraag!</strong>
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/students.png" width="2160" height="1350" loading="lazy"
+              alt="De pagina Studenten met een verzonnen demoklas: per leerling het e-mailadres, de naam, de klas, het huidige doel, de voortgang en de status, met bovenaan het tokengebruik per klas." />
+            <figcaption class="screenshot-caption">Studenten: de klas in één lijst. Klas en namen zijn verzonnen.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="screenshots/nl/student-detail.png" width="2160" height="1350" loading="lazy"
+              alt="Het detail van een leerling: de voortgang per subdoel, de statusrapporten en een grafiek van de voortgang in de tijd, met bovenaan de knop Badge toekennen." />
+            <figcaption class="screenshot-caption">Het detail van een leerling, met de voortgang in de tijd.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Hoe de tutor beslist — today's rules (formula 1.1), no formulas:
+         STUDENT_MODEL.md, CONDUCTOR_POLICY.md §2–4, PUNTENFORMULE.md §1. -->
+    <section class="section" id="beslissen" aria-labelledby="beslissen-heading">
+      <div class="wrap">
+        <span class="section-label">Achter de schermen</span>
+        <h2 class="section-heading" id="beslissen-heading">Hoe de tutor beslist</h2>
+        <p class="section-lead">
+          De app beslist wat er gevraagd wordt. Het taalmodel schrijft de vraag en beoordeelt het antwoord.
+          Zo werkt dat, in gewone taal.
+        </p>
+
+        <ol class="steps">
+          <li>
+            <strong class="steps-title">Per leerdoel een inschatting</strong>
+            <p>
+              Voor elk leerdoel houdt de app bij hoe zeker ze is dat de leerling het kan, en op hoeveel antwoorden dat steunt.
+              Na elke oefening wordt die inschatting bijgesteld.
+            </p>
+            <p>
+              Een juist antwoord op een moeilijke vraag weegt meer dan een op een makkelijke.
+              Een fout op een makkelijke vraag weegt meer dan een fout op een moeilijke.
+              Een juist gekozen optie bij een meerkeuzevraag weegt maar half.
+            </p>
+            <p>
+              Recente antwoorden tellen het zwaarst: wie eerst vijf keer fout antwoordt en dan vier keer juist, kan het nu.
+              Wat maanden niet aan bod kwam, zakt langzaam terug.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">De volgende vraag</strong>
+            <p>
+              Van de leerdoelen van het subdoel die nog niet aangetoond zijn, kiest de tutor dat met de laagste inschatting,
+              maar niet twee keer na elkaar hetzelfde.
+              De soort vraag past bij het leerdoel: wie code moet leren schrijven, krijgt code om te schrijven of aan te vullen, geen meerkeuzevraag.
+              Loopt het moeizaam, dan kiest de tutor de zachtste soort vraag. Soms komt de vraag uit de vragenbank.
+            </p>
+            <p>
+              Elke leerling heeft één niveau: makkelijk, gemiddeld of moeilijk. Iedereen start op gemiddeld.
+              Na een reeks goede antwoorden gaat het een trap omhoog, na een reeks mindere een trap omlaag. Omlaag gaat sneller dan omhoog.
+              Het niveau blijft staan bij het volgende subdoel.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Wanneer een leerdoel aangetoond is</strong>
+            <p>
+              De inschatting moet hoog genoeg zijn en op genoeg antwoorden steunen. Daarbovenop zijn nodig:
+              minstens twee helemaal juiste antwoorden op vragen over dat leerdoel zelf, waarvan minstens één geen meerkeuzevraag,
+              en minstens één goed antwoord op het niveau van de leerling of hoger.
+              Twee keer de juiste optie aanklikken is dus niet genoeg.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Wanneer een subdoel af is</strong>
+            <p>
+              Een subdoel is af als al zijn leerdoelen aangetoond zijn. Optionele leerdoelen tellen daar niet voor mee.
+            </p>
+            <p>
+              Lukt een leerdoel na zes vragen nog altijd niet, dan gaat de tutor toch verder.
+              De leerling merkt daar niets van, maar jij krijgt een melding.
+              Dat leerdoel komt later terug als controlevraag, eerst een trap makkelijker.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Oude leerstof komt terug</strong>
+            <p>
+              Een aangetoond leerdoel van een eerder subdoel dat lang niet meer aan bod kwam, krijgt aan het begin van een sessie een opfrisvraag.
+              Een leerdoel dat nog niet aangetoond was, komt terug als controlevraag.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">In de les telt zwaarder</strong>
+            <p>
+              Een antwoord tijdens de les weegt een kwart zwaarder dan thuis.
+              Tijdens de les betekent: in de lesuren van de klas bij <strong>Klassen</strong>, van 10 minuten voor tot 10 minuten na de les.
+            </p>
+            <p>
+              Er is geen knop: het tijdstip beslist, niet de plek. Voor een klas zonder lesuren telt alles als thuis.
+            </p>
+          </li>
+        </ol>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+          <p>
+            <strong class="notice-title">Meer weten?</strong>
+            De regels staan volledig, met alle getallen, in drie documenten op GitHub:
+            <a href="https://github.com/yvanvds/AI-tutor-Python/blob/main/docs/STUDENT_MODEL.md" hreflang="en">wat de app per leerling bijhoudt</a> (Engels),
+            <a href="https://github.com/yvanvds/AI-tutor-Python/blob/main/docs/CONDUCTOR_POLICY.md" hreflang="en">hoe de tutor beslist</a> (Engels)
+            en <a href="https://github.com/yvanvds/AI-tutor-Python/blob/main/docs/PUNTENFORMULE.md">de puntenformule</a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Evalueren: Mijlpalen, Puntenformule, Rapporten (#99, #129, #148–#151). -->
+    <section class="section" id="evalueren" aria-labelledby="evalueren-heading">
+      <div class="wrap">
+        <span class="section-label">Evalueren</span>
+        <h2 class="section-heading" id="evalueren-heading">Van oefeningen naar een rapportpunt</h2>
+        <p class="section-lead">
+          Uit wat de leerlingen aantoonden, berekent de app een puntvoorstel op 100.
+          Jij legt vooraf vast wat telt, en jij tekent af. De AI kiest nooit het punt.
+        </p>
+
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M7 20V4l10 3.5L7 11" /></svg>
+            </div>
+            <h3 class="card-title">Mijlpalen</h3>
+            <p>
+              Per rapportmoment een mijlpaal: de subdoelen die tegen dan gekend horen te zijn, de periode en het verwachte niveau.
+              Per leerdoel duid je aan of een nét geslaagde leerling het beheerst. Dat is de <strong>kern</strong>; de rest is <strong>uitbreiding</strong>.
+            </p>
+            <p>
+              De hele kern op het verwachte niveau geeft 50 op 100. Daarboven tellen de uitbreiding en wat op moeilijk aangetoond werd.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5H7l5 7-5 7h10" /></svg>
+            </div>
+            <h3 class="card-title">Puntenformule</h3>
+            <p>
+              De formule is openbaar: twee leerlingen met dezelfde gegevens krijgen hetzelfde voorstel.
+              Een aangetoond leerdoel blijft meetellen, ook als de inschatting later zakt. Verder werken kan het punt dus niet verlagen.
+            </p>
+            <p>
+              Je leerlingen lezen dezelfde uitleg in de app, onder <strong>Puntenformule</strong>.
+              Een deel van de getallen erin is nog voorlopig: ze worden bijgesteld na een vergelijking met punten die de leerkracht op de gewone manier gaf.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5" /><path d="m10 14.5 2 2 4-4" /></svg>
+            </div>
+            <h3 class="card-title">Rapporten</h3>
+            <p>
+              Kies een mijlpaal en een klas, en klik op <strong>Genereer rapporten</strong>.
+              De app berekent voor elke leerling het voorstel en laat de AI er een verantwoording bij schrijven, uit de statusrapporten en de voortgang.
+            </p>
+            <p>
+              Jij leest na, herschrijft waar nodig, past het punt aan met een reden en tekent af.
+              Met <strong>Vrijgeven</strong> gaan alle afgetekende rapporten van de mijlpaal tegelijk naar de leerlingen.
+              Zij lezen hun punt en de uitleg onder <strong>Mijn rapporten</strong>.
+            </p>
+          </article>
+        </div>
+
+        <figure class="screenshot">
+          <div class="screenshot-bar" aria-hidden="true">
+            <span class="screenshot-title"><img class="screenshot-logo" src="assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+            <span class="screenshot-controls"><i></i><i></i><i></i></span>
+          </div>
+          <img src="screenshots/nl/reports.png" width="2160" height="1350" loading="lazy"
+            alt="De pagina Rapporten met een verzonnen demoklas: links de leerlingen met hun voorstel en hoe ver hun rapport is, rechts het voorstel van één leerling met de cijfers erachter, de verantwoording en de knop Aftekenen." />
+          <figcaption class="screenshot-caption">Rapporten: het voorstel, de verantwoording en jouw punt voor het rapport.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 5. Gegevens. What goes to OpenAI, checked in the code:
+         - the tutor (OpenaiConnector via TutorService): the instructions
+           (InstructionGenerator: the teacher's docs with goal and subgoal
+           titles, teaching tips and LO statements), the request
+           (QuestionFormatter: the student's answer, code, question, the
+           lesson text for a page question, recent questions) and the history
+           of the exercise or, for a status report, the conversation. No
+           name, e-mail or class;
+         - the grade justification (buildJustificationPrompt, called from
+           ReportBatch): the first name, or the e-mail when there is none. -->
+    <section class="section" id="gegevens" aria-labelledby="gegevens-heading">
+      <div class="wrap">
+        <span class="section-label">Gegevens</span>
+        <h2 class="section-heading" id="gegevens-heading">Wat de app bewaart, en wat naar OpenAI gaat</h2>
+        <p class="section-lead">
+          Wat de app over je leerlingen bijhoudt, waar dat staat, hoe lang het blijft, en wat het taalmodel te zien krijgt.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="10" r="3" /><path d="M6.5 18.5c1.2-2 3.2-3 5.5-3s4.3 1 5.5 3" /></svg>
+            </div>
+            <h3 class="card-title">Aanmelden</h3>
+            <p>
+              Leerlingen en leerkrachten melden zich aan met hun Microsoft-schoolaccount (Microsoft Entra).
+              Daaruit krijgt de app de naam en het e-mailadres.
+              Wie in Entra de rol van leerkracht heeft, ziet in de app ook het deel <strong>Docent</strong>.
+            </p>
+            <p>
+              Code die een leerling uitvoert, draait op zijn eigen laptop: Python zit in de app.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.5" /><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" /></svg>
+            </div>
+            <h3 class="card-title">Wat de app bewaart</h3>
+            <p>Alles staat in één database in Azure Cosmos DB, in de cloud van Microsoft. Per leerling:</p>
+            <ul>
+              <li>naam, e-mailadres, klas, niveau en badges;</li>
+              <li>per leerdoel de inschatting, en per subdoel de voortgang en hoe die veranderde;</li>
+              <li>per oefening een kort verslag: welke leerdoelen, juist of fout, het niveau, het tijdstip, in de les of thuis;</li>
+              <li>apart daarvan de vraag, het antwoord en de feedback van elke oefening;</li>
+              <li>de statusrapporten, de puntvoorstellen en de vrijgegeven rapporten;</li>
+              <li>de code die de leerling in de Playground bewaart.</li>
+            </ul>
+            <p>Daarnaast staan er de doelen, de lessen, de instructies en de vragenbank.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            </div>
+            <h3 class="card-title">Hoe lang</h3>
+            <p>
+              De vraag, het antwoord en de feedback van een oefening blijven tot het einde van het schooljaar (standaard 1 juli).
+              Dan verwijdert de database ze vanzelf. Ze zijn er om na te gaan waar een leerling vastliep; in de app zelf open je ze nog niet.
+              De leerling leest in <strong>Opties</strong> dat ze bewaard worden.
+            </p>
+            <p>
+              De rest blijft staan: er is geen automatische opruiming.
+              Een leerling kan zijn voortgang zelf wissen in <strong>Opties</strong>, helemaal of voor één doel.
+              Dan verdwijnen ook zijn inschattingen, het verslag per oefening en zijn vragen en antwoorden.
+              De vragenbank blijft over de schooljaren heen.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 3 10.5l7 3 3 7.5z" /><path d="m10 13.5 4.5-4.5" /></svg>
+            </div>
+            <h3 class="card-title">Wat naar OpenAI gaat</h3>
+            <p>
+              Een taalmodel van OpenAI schrijft de vragen, beoordeelt de antwoorden en geeft feedback.
+              Daarvoor krijgt het:
+            </p>
+            <ul>
+              <li>je instructies, met wat de plaatshouders erin zetten: de titel van het doel en het subdoel, de leerdoelen en je lestips;</li>
+              <li>het gesprek van de oefening: de vraag, het antwoord of de code van de leerling, en wat de tutor al zei;</li>
+              <li>de vragen die de leerling net kreeg, zodat de tutor ze niet herhaalt;</li>
+              <li>bij een vraag over de les: de tekst van die les;</li>
+              <li>voor een statusrapport: het gesprek van de leerling met de tutor.</li>
+            </ul>
+            <p>
+              De naam, het e-mailadres en de klas van de leerling gaan niet mee.
+              Wat een leerling zelf typt, gaat wel mee zoals het er staat.
+            </p>
+            <p>
+              Eén uitzondering: voor de verantwoording bij een puntvoorstel krijgt het model de voornaam van de leerling
+              (of het e-mailadres als er geen voornaam is), samen met de cijfers van het voorstel en de statusrapporten van de periode.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. In je eigen school: today Arcadia only; README; #261; an issue. -->
+    <section class="section" id="eigen-school" aria-labelledby="eigen-school-heading">
+      <div class="wrap">
+        <span class="section-label">In je eigen school</span>
+        <h2 class="section-heading" id="eigen-school-heading">Kun je de app vandaag gebruiken?</h2>
+        <p class="section-lead">
+          Nog niet zomaar. De app die je op deze site downloadt, werkt alleen met de schoolaccounts van SMA Arcadia.
+          Met een account van een andere school kom je niet voorbij het aanmelden.
+        </p>
+
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5 5L4 17v3h3l5.5-5.5a4 4 0 0 0 5-5L15 12l-3-3z" /></svg>
+            </div>
+            <h3 class="card-title">Zelf bouwen</h3>
+            <p>
+              Wil je de app nu al in je school? Dan bouw je een eigen versie, met de Microsoft-accounts van je school, een eigen database en een eigen OpenAI-account.
+              Code schrijven hoeft niet, maar je werkt wel in de Azure-portal en in PowerShell.
+            </p>
+            <p><a href="https://github.com/yvanvds/AI-tutor-Python#readme" hreflang="en">De README op GitHub</a> beschrijft het stap voor stap, in het Engels.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
+            </div>
+            <h3 class="card-title">Zonder schoolaccount</h3>
+            <p>
+              Een versie die je zonder schoolaccount gebruikt, is in voorbereiding.
+              Je volgt ze in <a href="https://github.com/yvanvds/AI-tutor-Python/issues/261">#261 op GitHub</a>.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z" /><path d="M9 10h6" /></svg>
+            </div>
+            <h3 class="card-title">Een vraag?</h3>
+            <p>
+              Heb je een vraag of een idee? <a href="https://github.com/yvanvds/AI-tutor-Python/issues">Open een issue op GitHub</a>.
+              Daar zie je ook waar nu aan gewerkt wordt.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© <span id="year">2026</span> AI Tutor — Python</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Broncode op GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

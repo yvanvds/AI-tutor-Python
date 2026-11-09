@@ -22,6 +22,8 @@
      .site-nav             nav links; a[aria-current="page"] = active
    .hero                 page intro with a faint lamp glow
      .hero-title           h1; .hero-lead = intro paragraph
+   .page-toc             "on this page": a <nav> with a <ul> of jump links,
+                         drawn as chips that wrap (#293)
    .pill                 small uppercase label (the app's "HUIDIG DOEL" pill)
                          tones: .pill-accent .pill-success .pill-info
    .actions              row of buttons (stacks full-width on phones)
@@ -30,13 +32,16 @@
    .section              vertical rhythm between page parts
      .section-label        small uppercase eyebrow above a heading
      .section-heading      h2; .section-lead = paragraph under it
-   .card-grid            responsive grid of .card (1 → 2 → 3 columns)
+   .card-grid            responsive grid of .card (1 → 2 → 3 columns);
+                         .card-grid-2 stops at two columns (four cards)
    .card                 feature card: .card-icon (tones .card-icon-info,
-                         .card-icon-success), .card-title (h3), <p>
+                         .card-icon-success), .card-title (h3), <p>, <ul>
    .screenshot           window-like frame around an <img>:
      .screenshot-bar       title bar: .screenshot-title (+ img.screenshot-logo)
                            and .screenshot-controls (three <i>: – □ ×)
      .screenshot-caption   optional <figcaption>
+   .screenshot-grid      .screenshot frames side by side (1 → 2 columns);
+                         .screenshot-wide = a frame across the whole row
    .code                 code block in the editor's colours:
      .code-bar             optional header (file name)
      <pre><code>           tokens: .kw .str .num .com .fn .op .err
@@ -378,6 +383,35 @@ kbd {
 .hero .actions { margin-top: var(--space-xxl); }
 .hero .notice { margin-top: var(--space-xl); max-width: 42rem; }
 
+/* --- On this page (#293) --------------------------------------------------- */
+
+.page-toc { margin-top: var(--space-xl); }
+
+.page-toc ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page-toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--fg-mute);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
+}
+.page-toc a:hover { background: var(--raised); color: var(--fg); }
+
 /* --- Pill ------------------------------------------------------------------ */
 
 .pill {
@@ -488,7 +522,17 @@ kbd {
 .section-heading + .screenshot,
 .section-lead + .screenshot,
 .section-heading + .code,
-.section-lead + .code { margin-top: var(--space-xl); }
+.section-lead + .code,
+.section-heading + .steps,
+.section-lead + .steps,
+.section-heading + .screenshot-grid,
+.section-lead + .screenshot-grid { margin-top: var(--space-xl); }
+
+/* Parts that follow each other inside one section. */
+.card-grid + .screenshot,
+.card-grid + .screenshot-grid,
+.card-grid + .notice { margin-top: var(--space-xl); }
+.steps + .notice { margin-top: var(--space-xxl); max-width: 42rem; }
 
 /* --- Feature cards --------------------------------------------------------- */
 
@@ -531,6 +575,18 @@ kbd {
 
 .card p { color: var(--fg-mute); }
 .card p strong { color: var(--fg); }
+
+/* Four cards read better as two rows of two than as three and one. */
+.card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+
+.card ul {
+  margin: var(--space-s) 0 0;
+  padding-left: 1.25em;
+  color: var(--fg-mute);
+}
+.card li + li { margin-top: var(--space-xxs); }
+.card li strong { color: var(--fg); }
+.card ul + p { margin-top: var(--space-m); }
 
 /* --- Screenshot frame ------------------------------------------------------ */
 
@@ -597,6 +653,14 @@ kbd {
   color: var(--fg-faint);
   font-size: 0.8125rem;
 }
+
+/* Two frames side by side from about 860px; one column below (#293). */
+.screenshot-grid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+.screenshot-grid > .screenshot-wide { grid-column: 1 / -1; }
 
 /* --- Code block ------------------------------------------------------------ */
 
