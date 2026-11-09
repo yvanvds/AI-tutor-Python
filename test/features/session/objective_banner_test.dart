@@ -3,6 +3,10 @@
 // translation, and in Dutch, without a notice, when it has none. In Dutch
 // nothing is fetched from `translations`, and a translation that arrives on
 // a later poll takes the Dutch text's place.
+//
+// Issue #280 — on a subgoal the student picked back up from the Leerpad,
+// the pill says "Your choice" / "Zelf gekozen" over that subgoal, not
+// "Current goal": the goal in progress is the one "Verder" returns to.
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/session/widgets/objective_banner.dart';
@@ -42,6 +46,18 @@ class _PresetSelection extends GoalSelectionNotifier {
       GoalSelectionState(selectedRoot: _root, selectedChild: _printen);
 }
 
+/// "Lussen" is the goal in progress; the student picked "Printen" back up.
+class _PickedUpSelection extends GoalSelectionNotifier {
+  @override
+  GoalSelectionState build() => GoalSelectionState(
+    selectedRoot: _root,
+    selectedChild: Goal(id: 's2', title: 'Lussen', parentId: 'r1', order: 2),
+    preferredRoot: _root,
+    preferredChild: _printen,
+    selfChosen: true,
+  );
+}
+
 /// The real service, recording every language it was asked to fetch.
 class _RecordingTranslations extends TranslationService {
   _RecordingTranslations(InMemoryCosmos store)
@@ -65,13 +81,17 @@ void main() {
     service = _RecordingTranslations(store);
   });
 
-  Future<void> mount(WidgetTester tester, Locale locale) async {
+  Future<void> mount(
+    WidgetTester tester,
+    Locale locale, {
+    GoalSelectionNotifier Function() selection = _PresetSelection.new,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           appLocaleProvider.overrideWithValue(locale),
           translationServiceProvider.overrideWithValue(service),
-          goalSelectionProvider.overrideWith(_PresetSelection.new),
+          goalSelectionProvider.overrideWith(selection),
           ambientProgressProvider.overrideWithValue(0.4),
         ],
         child: localizedTestApp(
@@ -126,5 +146,19 @@ void main() {
     expect(find.text('Tekst op het scherm zetten.'), findsOneWidget);
     expect(find.text('Printing'), findsNothing);
     expect(service.fetched, isEmpty);
+  });
+
+  testWidgets('a subgoal picked back up (#280): "Your choice" over that '
+      'subgoal, in English and in Dutch', (tester) async {
+    await mount(tester, const Locale('en'), selection: _PickedUpSelection.new);
+    expect(find.text('YOUR CHOICE'), findsOneWidget);
+    expect(find.text('CURRENT GOAL'), findsNothing);
+    expect(find.text('Printing'), findsOneWidget);
+    expect(find.text('Lussen'), findsNothing);
+
+    await mount(tester, const Locale('nl'), selection: _PickedUpSelection.new);
+    expect(find.text('ZELF GEKOZEN'), findsOneWidget);
+    expect(find.text('HUIDIG DOEL'), findsNothing);
+    expect(find.text('Printen'), findsOneWidget);
   });
 }

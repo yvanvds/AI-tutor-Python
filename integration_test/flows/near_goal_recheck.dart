@@ -9,7 +9,7 @@
 // practice only probes the active subgoal, the warm-up review only once-
 // mastered LOs after 30 days — and decay pulls a belief toward the prior,
 // never over the bar. Now the conductor's recheck slot (CONDUCTOR_POLICY
-// §2.6) asks it: here `lo-print` sits at μ 0.77, last asked twelve days
+// §2.6) asks it: here `lo-print` sits at μ 0.79, last asked twelve days
 // ago (a signal from the side two days ago moved the belief, not the
 // probe clock), and the student's last ten answers were right. The first
 // exercise of the session is a check question on "Print", announced in
@@ -86,8 +86,12 @@ Map<String, dynamic> printAdvancedPast(DateTime at) => {
   'advancedAt': at.toIso8601String(),
 };
 
-/// `lo-print` just under the bar — (7.7, 2.3), μ 0.77, never demonstrated —
-/// last asked directly at [probedAt], last written at [updatedAt].
+/// `lo-print` just under the bar — (7.9, 2.1), μ 0.79, never demonstrated —
+/// last asked directly at [probedAt], last written at [updatedAt]. Close
+/// enough that one right answer takes it over: since #278 the answer
+/// forgets first, and from μ 0.77 it would leave the LO at 0.80 exactly.
+/// One right own question on record, no pick (#279): the check question's
+/// right answer is the second, which the stamp wants.
 Map<String, dynamic> nearBelief({
   required DateTime probedAt,
   required DateTime updatedAt,
@@ -97,12 +101,14 @@ Map<String, dynamic> nearBelief({
   'uid': kStudentUid,
   'subgoalId': 's1',
   'loId': 'lo-print',
-  'alpha': 7.7,
-  'beta': 2.3,
+  'alpha': 7.9,
+  'beta': 2.1,
   'lastUpdatedAt': updatedAt.toIso8601String(),
   'lastQuestionType': 'completeCodeQuestion',
   'recentNegativesAtCalibrated': 0,
   'lastProbedAt': probedAt.toIso8601String(),
+  'ownQuestionsRight': 1,
+  'ownQuestionsRightNonMcq': 1,
 };
 
 /// The seeded account with a full calibration window at medium: [correct]
@@ -224,8 +230,9 @@ void main() {
     expect(applied.single['subgoalId'], 's1');
     expect(applied.single['alphaDelta'], closeTo(2.0, 1e-9));
 
-    // A direct probe of the old LO: decayed α plus the full weight — over
-    // the bar now, with the calibrated positive — so the stamp is set.
+    // A direct probe of the old LO: decayed, forgotten (#278), plus the
+    // full weight — over the bar now, with the calibrated positive — so the
+    // stamp is set.
     final print = storedPrint(harness);
     final writtenAt = DateTime.parse(print['lastUpdatedAt'] as String);
     expect(
@@ -233,13 +240,14 @@ void main() {
       lessThan(const Duration(minutes: 1)),
     );
     final decayed = applyDecay(
-      alpha: 7.7,
-      beta: 2.3,
+      alpha: 7.9,
+      beta: 2.1,
       lastUpdatedAt: twoDaysAgo,
       now: writtenAt,
     );
-    expect(print['alpha'], closeTo(decayed.alpha + 2.0, 1e-9));
-    expect(print['beta'], closeTo(decayed.beta, 1e-9));
+    final kept = forgetBeforeEvidence(decayed);
+    expect(print['alpha'], closeTo(kept.alpha + 2.0, 1e-9));
+    expect(print['beta'], closeTo(kept.beta, 1e-9));
     final mean =
         (print['alpha'] as num) /
         ((print['alpha'] as num) + (print['beta'] as num));

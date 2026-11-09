@@ -2,8 +2,9 @@
 // earlier LOs it correctly uses. The student mastered "Print" three weeks
 // ago and is now on "Variables"; the grader nominates `lo-print` in
 // `transferLOs`, and the app lands a small positive on the old belief doc —
-// its decayed α plus the weak weight, its decay clock reset — and names the
-// credit on the `turn_history` doc. A never-mastered LO gets nothing.
+// its decayed α, forgotten by λ like every write (#278), plus the weak
+// weight, its decay clock reset — and names the credit on the
+// `turn_history` doc. A never-mastered LO gets nothing.
 //
 // Real app, real navigation, real practice view and editor, real
 // TutorService → grader payload → conductor → belief math → Cosmos
@@ -140,8 +141,8 @@ void main() {
   );
 
   testWidgets('a correct answer on a later subgoal refreshes the mastered '
-      'LO it used: decayed α plus the weak weight, clock reset, credit '
-      'on the turn record', (tester) async {
+      'LO it used: decayed and forgotten α plus the weak weight, clock '
+      'reset, credit on the turn record', (tester) async {
     final harness = AppHarness(
       llm: ScriptedLlm(script()),
       extraDocs: {
@@ -176,7 +177,9 @@ void main() {
       DateTime.now().toUtc().difference(writtenAt),
       lessThan(const Duration(minutes: 1)),
     );
-    // Three weeks of decay on (5, 1), then the credit.
+    // Three weeks of decay on (5, 1), forgetting (#278), then the credit.
+    // On this much evidence the weak credit lowers μ a little: what it
+    // refreshes is the clock.
     final decayed = applyDecay(
       alpha: 5,
       beta: 1,
@@ -184,11 +187,12 @@ void main() {
       now: writtenAt,
     );
     expect(decayed.alpha, lessThan(5));
+    final kept = forgetBeforeEvidence(decayed);
     expect(
       print['alpha'],
-      closeTo(decayed.alpha + PolicyConstants.weightWeak, 1e-9),
+      closeTo(kept.alpha + PolicyConstants.weightWeak, 1e-9),
     );
-    expect(print['beta'], closeTo(decayed.beta, 1e-9));
+    expect(print['beta'], closeTo(kept.beta, 1e-9));
     // Nothing else on the old doc moved.
     expect(print['highestPositiveDifficulty'], 'medium');
     expect(print['lastPositiveAtCalibratedAt'], weeksAgo.toIso8601String());
@@ -219,7 +223,9 @@ void main() {
 
     expect(turn(harness)['transferCredits'], hasLength(1));
     final print = storedPrint(harness);
-    expect(print['alpha'], greaterThan(4.0));
+    // Decayed, forgotten (#278), plus the weak credit: written, not left.
+    expect(print['alpha'], greaterThan(3.5));
+    expect(print['lastUpdatedAt'], isNot(weeksAgo.toIso8601String()));
     expect(print['firstMasteredAt'], weeksAgo.toIso8601String());
 
     await harness.dispose(tester);

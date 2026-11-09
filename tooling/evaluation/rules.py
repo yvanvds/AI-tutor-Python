@@ -20,8 +20,44 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.0.23-eval7` = PUNTENFORMULE v1.0.23, replayed from the turn
-log. `eval7` (#276) follows the app's stamp from the build that fixed it
+Rule set `1.1-eval8` = PUNTENFORMULE v1.1, replayed from the turn log.
+`eval8` (#278) follows the app's forgetting per answer from the build that
+brought it (`RULES_11_FROM`, by the turn's `clientVersion`, `rules_11`):
+before evidence lands on an LO, what it holds above the prior shrinks by
+λ = 0.7 (`FORGET`), on every signal that carries weight — the question's,
+a follow-up, a side signal, a transfer credit. The cap of 20 stays as a
+backstop. It is `Variant(forget=0.7)` of #248, promoted; a turn from an
+earlier build replays as that build wrote it, and every stamp from before
+stays where the app put it (#168). The stuck rule moved to own questions
+(≥ 6 and μ < 0.6, CONDUCTOR_POLICY §4.4); stuck moves neither M nor P, so
+the replay only counts them (`LoState.own_questions`).
+
+The same build brings #279, in the same rule set: a positive signal of a
+multiple-choice question weighs ×0.5 (`MCQ_POSITIVE`), from the bank's key
+or the grader, on the target and from the side — not on a follow-up on
+one, which is free text — and the stamp wants a fourth condition: at
+least two own questions answered right (`STAMP_OWN_RIGHT_MIN`), one of
+them no multiple choice (`STAMP_OWN_RIGHT_NON_MCQ_MIN`). The replay counts
+them over the whole log, every build (`LoState.own_right`,
+`LoState.own_right_open`), as the app keeps them (`ownQuestionsRight`,
+`ownQuestionsRightNonMcq` on `lo_beliefs`); the app starts its count at
+the release, so `validate` agrees on a doc the release filled (#281). It
+is `Variant(min_own_right=2, min_open_right=1, mcq_positive=0.5)` of #248.
+
+#275, in the same build and rule set, changes which questions the app asks,
+not what an answer does to a belief: stuck LOs, open core LOs (of earlier
+roots too) and thin stamps from before 1.1 come back as rechecks, a stuck
+one a notch lower first (`difficulty` on the record says so), and every
+replayed turn already says what was asked. So the replay needs no rule of
+its own for it. It reads why a recheck came (`recheckRule` on the turn,
+`DirectAnswer.recheck_rule`), and it offers the two judgements the app
+makes on a doc: `is_stuck` (at least `STUCK_OWN_QUESTIONS_MIN` own
+questions and μ under `STUCK_MEAN`) and `is_thin_stamp` (a stamp on fewer
+than `STAMP_OWN_RIGHT_MIN` right own questions). On the replay the counts
+are always known; in the app a doc from before 1.1 keeps them missing, and
+so is no thin stamp, until the release fills them (#281).
+
+`eval7` (#276) follows the app's stamp from the build that fixed it
 (`STAMP_RULES_276_FROM`, by the turn's `clientVersion`): mastery needs
 evidence ≥ 5.75 instead of 4 (two right answers, not one — in the lesson
 time one strong positive at hard reached 5.5 and a stamp), and a signal on
@@ -105,10 +141,29 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.0.23-eval7"
+RULES_VERSION = "1.1-eval8"
 
 PRIOR = 1.0
+# A backstop since #278: forgetting keeps the evidence under 14.
 EVIDENCE_CAP = 20.0
+# `PolicyConstants.forgetFactor` (λ, #278): the evidence above the prior
+# shrinks by this before every write that carries weight. From the build
+# that brought it (`rules_11`); the teacher chose 0.7 on the replay of #248.
+FORGET = 0.7
+RULES_11_FROM = (2, 13, 0)
+# #279, from the same build: a right pick weighs half
+# (`PolicyConstants.multipleChoicePositiveFactor`), and the stamp wants two
+# own questions answered right, one of them no multiple choice
+# (`PolicyConstants.masteryRightOwnQuestionsMin`,
+# `masteryRightNonMcqQuestionsMin`).
+MCQ_POSITIVE = 0.5
+STAMP_OWN_RIGHT_MIN = 2
+STAMP_OWN_RIGHT_NON_MCQ_MIN = 1
+# The stuck rule since #278 (`PolicyConstants.stuckOwnQuestionsMin`,
+# `stuckMeanCeiling`): at least this many own questions and a decayed mean
+# under this. Since #275 a stuck LO comes back as a recheck.
+STUCK_OWN_QUESTIONS_MIN = 6
+STUCK_MEAN = 0.6
 DECAY_HALF_LIFE_DAYS = 60.0  # the conductor decays on every write; replay must too
 
 WEIGHT = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}
@@ -277,6 +332,15 @@ def stamp_rules_276(turn: dict) -> bool:
     return v is not None and v >= STAMP_RULES_276_FROM
 
 
+def rules_11(turn: dict) -> bool:
+    """Whether the build that wrote [turn] computes with formula 1.1:
+    forgetting per answer (`FORGET`, #278), a pick at half weight and the
+    stamp's fourth condition (#279), and the stamp of #276. Older builds,
+    and turns without `clientVersion`, only shrank at the cap."""
+    v = build_version(turn)
+    return v is not None and v >= RULES_11_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -302,6 +366,10 @@ class DirectAnswer(NamedTuple):
     # The question bank's answer key decided, not the grader (`gradedByKey`,
     # #186): a multiple-choice pick on a bank question, its target LO only.
     by_key: bool = False
+    # Why the recheck brought the LO back (`recheckRule`, #275): "open",
+    # "nearGoal", "unconfirmed", "stuck" or "thin"; "" for any other
+    # question, and for a recheck written before the field.
+    recheck_rule: str = ""
 
 
 @dataclass
@@ -339,10 +407,15 @@ class LoState:
     # already set, cleared by every write that is not incidental (§2.4),
     # follow-ups and neutrals included.
     regressed_at: dt.datetime | None = None
-    # The LO's own questions (target, no follow-up) answered right — a
-    # `correct` answer with a positive signal on it — for a `Variant` (#246,
-    # #279): all of them, those that were no multiple choice, and the run of
-    # the streak.
+    # The LO's own questions (#278): a direct question with the LO as its
+    # target, no follow-up, once per question whichever way it went — what
+    # the app counts as `ownQuestions` for the stuck rule.
+    own_questions: int = 0
+    # The LO's own questions answered right — a `correct` answer with a
+    # positive signal on it, once per question — all of them and those that
+    # were no multiple choice: the app's `ownQuestionsRight` and
+    # `ownQuestionsRightNonMcq`, the stamp's fourth condition since 1.1
+    # (#279). And the run of the streak, for a `Variant` (#246).
     own_right: int = 0
     own_right_open: int = 0
     own_streak: int = 0
@@ -400,8 +473,11 @@ def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
 @dataclass(frozen=True)
 class Variant:
     """A candidate rule for formula 1.1 (#249), replayed beside the current
-    one to compare them (#248). No rule set: `RULES_VERSION` stays until the
-    teacher picks one and the app takes it over. `Variant()` changes nothing.
+    one to compare them (#248). No rule set of its own: `Variant()` is the
+    rule set of now, each turn by the build that wrote it. The chosen ones,
+    `forget=0.7` (#278) and `min_own_right=2, min_open_right=1,
+    mcq_positive=0.5` (#279), are that rule set since `eval8`; `as_11`
+    replays every turn with them.
 
     An *own question* is a direct question with the LO as its target, no
     follow-up; it is *right* when the answer was `correct` and the signal on
@@ -411,9 +487,14 @@ class Variant:
     # it: what the candidate would have done on these answers, not what the
     # app did.
     as_276: bool = False
+    # Every turn replays with the rules of 1.1 (`rules_11`, the stamp of
+    # #276 with it), whatever build wrote it: what 1.1 would have made of
+    # the answers from before it.
+    as_11: bool = False
     # #278: before evidence lands on an LO, what it holds above the prior
     # shrinks by this factor (λ). The cap stays, as a backstop it hardly
-    # reaches. With `forget_own_only` only an own question shrinks.
+    # reaches. With `forget_own_only` only an own question shrinks. Set,
+    # it holds for every turn; unset, a turn of 1.1 forgets by `FORGET`.
     forget: float | None = None
     forget_own_only: bool = False
     # #246: this many own questions right in a row stamp the LO, whatever
@@ -424,11 +505,14 @@ class Variant:
     streak_level: str = "medium"
     streak_counts_mcq: bool = False
     # #279: no stamp before this many own questions right, and this many of
-    # them no multiple choice.
-    min_own_right: int = 0
-    min_open_right: int = 0
-    # #279: the weight of a positive signal on a multiple-choice turn.
-    mcq_positive: float = 1.0
+    # them no multiple choice. Set, it holds for every turn; unset, a turn
+    # of 1.1 asks `STAMP_OWN_RIGHT_MIN` and `STAMP_OWN_RIGHT_NON_MCQ_MIN`.
+    min_own_right: int | None = None
+    min_open_right: int | None = None
+    # #279: the weight of a positive signal on a multiple-choice turn, not
+    # a follow-up on one. Set, it holds for every turn; unset, a turn of
+    # 1.1 weighs `MCQ_POSITIVE`.
+    mcq_positive: float | None = None
 
 
 CURRENT = Variant()
@@ -438,8 +522,8 @@ def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
     return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
 
 
-def _stamps(lo: LoState, evidence_min: float, v: Variant) -> bool:
-    if lo.own_right < v.min_own_right or lo.own_right_open < v.min_open_right:
+def _stamps(lo: LoState, evidence_min: float, v: Variant, min_right: int, min_open: int) -> bool:
+    if lo.own_right < min_right or lo.own_right_open < min_open:
         return False
     if v.streak and lo.own_streak >= v.streak:
         return True
@@ -565,9 +649,20 @@ def replay(
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
         s_factor = SUPERVISED_WEIGHT_FACTOR if supervised(t) else 1.0
-        rules_276 = stamp_rules_276(t) or variant.as_276
+        r11 = rules_11(t) or variant.as_11
+        rules_276 = stamp_rules_276(t) or variant.as_276 or r11
         evidence_min = MASTERY_EVIDENCE if rules_276 else MASTERY_EVIDENCE_BEFORE_276
+        forget = variant.forget if variant.forget is not None else (FORGET if r11 else None)
+        min_right = variant.min_own_right if variant.min_own_right is not None else (
+            STAMP_OWN_RIGHT_MIN if r11 else 0)
+        min_open = variant.min_open_right if variant.min_open_right is not None else (
+            STAMP_OWN_RIGHT_NON_MCQ_MIN if r11 else 0)
+        own_counted = False
         mcq = t.get("questionType") == "mcQuestion"
+        # #279: a pick weighs half; a follow-up on one is free text (§6.2).
+        pick = mcq and not follow_up
+        mcq_factor = variant.mcq_positive if variant.mcq_positive is not None else (
+            MCQ_POSITIVE if r11 else 1.0)
         right = t.get("overallQuality") == "correct"
         for s in t.get("loSignals") or []:
             kind = s.get("signal")
@@ -601,10 +696,10 @@ def replay(
             base = WEIGHT.get(strength, 1.0) * s_factor
             target = sig_sg == scope.probed and s["loId"] == scope.target
             own = target and not follow_up and not incidental
-            if kind == "positive" and mcq:
-                base *= variant.mcq_positive
-            if variant.forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
-                a, b = _shrink(a, b, variant.forget)
+            if kind == "positive" and pick:
+                base *= mcq_factor
+            if forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
+                a, b = _shrink(a, b, forget)
             if kind == "positive":
                 a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
             elif kind == "negative":
@@ -626,13 +721,19 @@ def replay(
                 elif kind == "negative":
                     lo.n_follow_up_neg += 1
             direct = not follow_up and not incidental
-            if own and kind == "positive" and right:
+            # Once per question, should the grader name the target twice:
+            # the first signal on it is the question's, as in the app.
+            first_own = own and not own_counted
+            if first_own:
+                lo.own_questions += 1
+                own_counted = True
+            if first_own and kind == "positive" and right:
                 lo.own_right += 1
                 if not mcq:
                     lo.own_right_open += 1
                 if (not mcq or variant.streak_counts_mcq) and DIFF_ORDER[diff] >= DIFF_ORDER[variant.streak_level]:
                     lo.own_streak += 1
-            elif own and kind != "neutral":
+            elif first_own and kind != "neutral":
                 lo.own_streak = 0
             if direct:
                 lo.n_direct += 1
@@ -643,7 +744,8 @@ def replay(
                 elif target and t.get("isWarmUp"):
                     asked_as = "warmup"
                 by_key = target and t.get("gradedByKey") is True
-                lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key))
+                recheck_rule = (t.get("recheckRule") or "") if asked_as == "recheck" else ""
+                lo.direct_signals.append(DirectAnswer(now, kind, strength, diff, asked_as, by_key, recheck_rule))
                 # #276: since then only the question's target moves the
                 # ratchets; another LO of the active subgoal takes the weight.
                 if kind == "positive" and (target or not rules_276):
@@ -651,7 +753,7 @@ def replay(
                         lo.positive_at_calibrated_at = now
                     if DIFF_ORDER[diff] > DIFF_ORDER[lo.ratchet]:
                         lo.ratchet = diff
-            if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
+            if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                 lo.first_mastered_at = now
         if apply_transfer_credits:
             # Transfer credit (#101, CONDUCTOR_POLICY §3.7). After the turn's
@@ -667,14 +769,33 @@ def replay(
             for c in t.get("transferCredits") or []:
                 lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
-                if variant.forget is not None and not variant.forget_own_only:
-                    a, b = _shrink(a, b, variant.forget)
+                if forget is not None and not variant.forget_own_only:
+                    a, b = _shrink(a, b, forget)
                 lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
                 lo.last_at = now
                 lo.n_transfer += 1
-                if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant):
+                if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                     lo.first_mastered_at = now
     return st
+
+
+def is_stuck(lo: LoState, now: dt.datetime | None = None) -> bool:
+    """The app's stuck rule since #278 (`belief_math.isStuck`): at least
+    `STUCK_OWN_QUESTIONS_MIN` own questions and a mean under `STUCK_MEAN` —
+    decayed to [now] as the app reads it, or as stored without [now].
+    Since #275 such an LO comes back as a recheck, a notch lower first."""
+    a, b = (lo.alpha, lo.beta) if now is None else _decay(lo.alpha, lo.beta, lo.last_at, now)
+    return lo.own_questions >= STUCK_OWN_QUESTIONS_MIN and a / (a + b) < STUCK_MEAN
+
+
+def is_thin_stamp(lo: LoState) -> bool:
+    """A thin stamp (#275, `belief_math.isThinStamp`): a stamp on fewer than
+    `STAMP_OWN_RIGHT_MIN` right own questions, counted over the whole log.
+    Only a stamp from before 1.1 can be one; the app gives it one recheck a
+    week after its last direct probe, and the stamp stays. In the app a doc
+    without the counts is no thin stamp until the release fills them
+    (#281); on the replay the counts are always there."""
+    return lo.demonstrated and lo.own_right < STAMP_OWN_RIGHT_MIN
 
 
 @dataclass

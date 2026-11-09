@@ -2,8 +2,9 @@
 // older, once-mastered LO whose belief has gone stale. The student mastered
 // "Print" six weeks ago and is now on "Variables"; the first exercise of the
 // session is a warm-up on `lo-print`, announced in chat, and its grade lands
-// on the old belief doc like any direct probe — decayed α plus the full
-// weight, decay clock reset, ratchets moved — with the turn recorded against
+// on the old belief doc like any direct probe — decayed α, forgotten by λ
+// (#278), plus the full weight, decay clock reset, ratchets moved — with
+// the turn recorded against
 // the old subgoal. The next exercise is the ordinary first probe of
 // "Variables". A student whose old LO was written recently gets no warm-up
 // — unless a cross-subgoal negative flagged the LO for review (#112, #167):
@@ -196,8 +197,9 @@ void main() {
       now: writtenAt,
     );
     expect(decayed.alpha, lessThan(5));
-    expect(print['alpha'], closeTo(decayed.alpha + 2.0, 1e-9));
-    expect(print['beta'], closeTo(decayed.beta, 1e-9));
+    final kept = forgetBeforeEvidence(decayed);
+    expect(print['alpha'], closeTo(kept.alpha + 2.0, 1e-9));
+    expect(print['beta'], closeTo(kept.beta, 1e-9));
     expect(print['highestPositiveDifficulty'], 'medium');
     expect(
       DateTime.parse(print['lastPositiveAtCalibratedAt'] as String),
@@ -321,7 +323,10 @@ void main() {
       lastUpdatedAt: recently,
       now: writtenAt,
     );
-    expect(print['alpha'], closeTo(decayed.alpha + 2.0, 1e-9));
+    expect(
+      print['alpha'],
+      closeTo(forgetBeforeEvidence(decayed).alpha + 2.0, 1e-9),
+    );
     expect(harness.llm!.remaining, 0);
 
     await harness.dispose(tester);

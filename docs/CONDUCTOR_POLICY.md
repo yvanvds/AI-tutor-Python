@@ -59,6 +59,9 @@ the gentlest type in the kind's set. The cold-start defaults:
 | `predict` | `mcQuestion` |
 | `reason` | `explainCode` |
 
+A pick stays the way in for `recall` and `predict`: the #279 rule of
+2.2 asks another type only after the LO's first right own answer.
+
 The full mapping of *acceptable* (not just default) types per LO kind
 is deferred to section 2.2. It depends on tightening the question-type
 prompt definitions; without that, the mapping isn't trustworthy. The
@@ -162,23 +165,19 @@ confidence is shakiest rather than where the *student's* belief has
 slipped. The student-intent reading is the right one for the
 top-up use case.
 
-**Saturation case.** If every LO has `α + β` close to the cap (rule of
-thumb: `α + β < cap - 2` is "practiceable"; if no LO meets this, the
-subgoal is "saturated"), the conductor declines to ask a question and
-surfaces a "verder?" prompt. The student can override the suggestion;
-the prompt is a soft nudge, not a wall.
+**No saturation case since #278.** Until formula 1.1 a subgoal whose
+LOs all sat near the evidence cap (`α + β ≥ cap − 2`, "not
+practiceable") was "saturated": the conductor declined to ask and
+surfaced a "verder?" prompt, since at the cap one more answer hardly
+moved the mean. With forgetting per answer (3.4) every answer moves the
+mean, and an old doc at the cap shrinks below it at its next write, so
+a mastered subgoal the student opens again is topped up like any other.
+That replaced an earlier "auto-advance on a fully-mastered subgoal"
+rule, which ignored student intent (they tapped *this* subgoal).
 
-This replaces an earlier "auto-advance on a fully-mastered subgoal"
-rule. Auto-advance was wrong because it ignores student intent (they
-tapped *this* subgoal). The saturation prompt respects intent while
-being honest that the system has nothing further to learn from this
-LO right now.
-
-**Conductor-driven entry to a saturated subgoal doesn't happen by
+**Conductor-driven entry to a mastered subgoal doesn't happen by
 construction.** The conductor's "next subgoal" selection skips
-mastered subgoals. If a saturated subgoal is reached via conductor
-flow due to data inconsistency, advance defensively to the next
-unmastered subgoal.
+mastered subgoals.
 
 ### 1.4 The unified entry algorithm
 
@@ -198,11 +197,7 @@ entry(subgoal, student):
     if unmastered is non-empty:
         target_lo = first unmastered LO in curriculum order
     else:
-        practiceable = LOs with (α + β) < cap - 2
-        if practiceable is empty:
-            surface "verder?" prompt; do not generate a question
-            return
-        target_lo = mastered LO with lowest mean
+        target_lo = mastered LO with lowest mean       # no saturation since #278
     type = gentlest acceptable type for target_lo.kind
     difficulty = student.calibration.difficulty
     last_question_type = null   // session reset
@@ -260,7 +255,11 @@ graded and are out) whose belief doc:
      `lo_beliefs` (part 2) — an incidental cross-subgoal negative (2.4)
      suggested a gap in this once-mastered LO and no direct probe has
      happened since. The negative itself is not applied to the belief
-     (2.4); the flag is all it leaves behind.
+     (2.4); the flag is all it leaves behind;
+   - **missed last time (#275):** `returnWrongAt` set — the LO's last
+     warm-up review, in an earlier session, was not answered right, so it
+     comes back at the next session instead of after another 30 days
+     (2.6, "after the answer").
 
 There is no separate "not naturally recurring" test: any write bumps
 `lastUpdatedAt`, and a transfer credit (3.7) is a write, so an LO that
@@ -286,14 +285,19 @@ from the side does not answer the question the negative raised; the
 review does, and it is one short question. Orphaned belief docs (LO or
 subgoal deleted, 7.4) are skipped because they resolve to no live LO.
 
-Among candidates a **regressed LO wins over a stale one** — a suspected
-gap before suspected forgetting; among regressed LOs the oldest flag
-first — then the **most stale wins** (oldest `lastUpdatedAt`); ties go
-to the lowest decayed mean. Staleness order, not mean order, so the
-pool is rotated through predictably: once asked, an LO's clock resets,
-its flag clears, and it goes to the back of the queue. A *failed* review
-does not re-flag the LO (it was a direct probe), so a regressed LO comes
-back once it is stale again, not every session. The active subgoal's own
+Among candidates a **flagged LO wins over a stale one** — regressed, or
+missed last time: a suspected or shown gap before suspected forgetting;
+among flagged LOs the oldest flag first — then the **most stale wins**
+(oldest `lastUpdatedAt`); ties go to the lowest decayed mean. Staleness
+order, not mean order, so the pool is rotated through predictably: once
+asked, an LO's clock resets, its flag clears, and it goes to the back of
+the queue. A *failed* review does not re-flag the LO as regressed (it was
+a direct probe); until #275 a regressed LO then came back only once it
+was stale again. Since #275 a review that is not answered right (`wrong`
+or `partial`) sets `returnWrongAt`, and the LO comes back at the next
+session — the teacher's rule for every question that brought an LO back,
+"in plaats van na 7 of 30 dagen" (2.6). A right review clears it. The
+active subgoal's own
 LOs are never candidates — those are 1.2's business. An earlier LO that
 was *never* mastered is not review material either; the recheck slot
 (2.6) is its way back.
@@ -347,12 +351,79 @@ incidental under 2.4's rules (#108).
 **Audit.** The turn record (8.1) carries `isWarmUp: true`, names the old
 subgoal in `subgoalId` and the LO in `targetLOIds`; `selectionReason`
 lists the top candidates with their decayed stats under `chosenReason:
-"warm-up review: most stale mastered LO"` or `"warm-up review:
-regressed mastered LO"`, saying which rule picked it. The debug event
-`conductor.warm_up_planned` carries `regressed` and, when set, the
-flag's age.
+"warm-up review: most stale mastered LO"`, `"warm-up review:
+regressed mastered LO"` or (#275) `"warm-up review: again after an
+answer that was not right"`, saying which rule picked it. The debug event
+`conductor.warm_up_planned` carries `regressed`, `missed` and, when
+regressed, the flag's age.
 
-### 1.6 What this section deliberately does not address
+### 1.6 A subgoal the student picks back up (#280)
+
+The conductor brings LOs back by itself (1.5, 2.6), but the student can
+also do it: on the Leerpad, the tile of every subgoal they were moved past
+(`advancedAt`, under the root in progress or a finished one) carries a
+button — **"Afmaken"** while one of its non-optional LOs has no mastery
+stamp, **"Herhalen"** when all do. Decided by the teacher on 2026-11-08:
+it puts more of the responsibility with the student, and it lets a student
+who watches a milestone's deadline do something about an LO still open.
+It is not a rule of the formula (PUNTENFORMULE 1.1 is unchanged): a stamp
+earned this way counts like any other.
+
+**What changes.** The button makes the subgoal and its root the
+preference (`GoalSelectionNotifier.chooseSubgoal`,
+`GoalSelectionState.isSelfChosen`) and starts a session
+(`SessionStart.workOnGoal`). The selection keeps the goal in progress:
+`setTarget` walks nothing (it reads the goal in progress without the
+"new goal" pill when the app had none yet), and the chat says what the
+oefeningen are about now and how to go back (`selfChosenSubgoal`). The
+subgoal is the *active* one for everything else — the prompt (`{goal}`
+and `{subgoal}` in every section), the grading scope (its root's
+subgoals), the scope check and the signal reading of 2.4 — so the answer
+counts on its LOs as on any active subgoal's, also under a root that is
+not the one in progress. The banner says "Zelf gekozen" over it.
+
+**Which LO.** `Conductor._planSelfChosen`, instead of 2.1:
+
+- **Afmaken** first: the non-optional LOs without the stamp, open or
+  stuck.
+- **Herhalen** once each of them has it: the stamped LOs (an optional LO
+  without a stamp is no review).
+- In either group the weakest first (lowest decayed mean), on a tie the
+  one asked longest ago (`lastProbedAt`, never asked first), then
+  authoring order; the LO of the question before is skipped while the
+  group has another (2.1's recency guard). Type (2.2, with #279's rule
+  while the LO is not mastered now) and difficulty (2.3, notch drops
+  included) as for any probe.
+
+Nothing interrupts it: no warm-up review (1.5), no recheck (2.6), no
+chained return. The student chose what to practise; those wait until
+"Verder" starts a new session on the goal in progress, which opens both
+slots again.
+
+**What it does not do.**
+
+- **It reopens nothing.** A wrong answer leaves the stamp (it is one-way,
+  4.1). The subgoal never advances (4.5) — no splash, no status report,
+  no walk — and its cached `progress` is written only when it rises, with
+  its `advancedAt` kept (`_raiseSubgoalCache`): a new stamp shows, a dip
+  does not set the bar back, and the walk stays on the goal in progress.
+  An LO the teacher adds to it meanwhile does not reopen it either (7.4).
+- **It stays out of the calibration window** (5.3), like a warm-up or a
+  recheck: a strong student must not climb on old material, nor one
+  stuck on an LO sink, and find that in the goal in progress. It is an
+  oefening all the same (#217).
+- **It ends only when the student says so**: "Verder" on the card of the
+  goal in progress — which stays that card meanwhile — clears the
+  preference. A restart keeps it; an app start does not.
+
+**Audit.** The turn record (8.1) carries `selfChosen: true`, follow-ups
+on its questions included, so the evaluation can tell these oefeningen
+apart and the teacher can see who uses the button — also who escapes to
+old, easy material in the lesson. `chosenReason` is `"self-chosen: finish,
+weakest open LO"` or `"self-chosen: review, weakest LO"`; the debug event
+`conductor.self_chosen_planned`.
+
+### 1.7 What this section deliberately does not address
 
 - **Picking the next question after the first.** "Which LO next, given
   belief just updated?" is section 2.1. The entry algorithm above
@@ -398,33 +469,33 @@ low-weight, much-weaker LO. Authoring experience may push us to a
 stronger weighting later (e.g. `weight × (1 − mean)` as the sort key);
 not now.
 
-**Mastered LOs are skipped during practice.** They re-enter the
-candidate pool only via decay (section 1.2) or the saturation revisit
-case (section 1.3). No within-session refresh of mastered LOs — that
+**Mastered LOs are skipped during practice.** Mastered is the four
+conditions of 4.1, so since #279 an LO over the bar on fewer than two
+right own questions, or on picks alone, is no mastered LO: it stays a
+candidate until the questions it lacks are answered. They re-enter the
+candidate pool only via decay (section 1.2), a new answer that takes
+them under the bar, or the top-up of a mastered subgoal (section 1.3).
+No within-session refresh of mastered LOs — that
 conflicts with goal 3 ("don't poke at things they've shown they
 handle"). Cross-session decay handles forgetting; mastered LOs that
 later work keeps using are refreshed without being probed, by transfer
 credit (3.7); mastered LOs of *earlier* subgoals that nothing refreshes
 get one review question at the start of a session (1.5); LOs of earlier
-subgoals the student left *without* mastering get an occasional recheck
-question (2.6).
+subgoals the student left *without* mastering — since #275 of earlier
+root goals too, stuck ones included, and stamps from before 1.1 on one
+right own question — get an occasional recheck question (2.6).
 
-**Saturated LOs are filtered out of the unmastered pool.** An LO at
-`α + β ≥ cap − saturationSlack` is non-practiceable (section 3.4):
-the cap-then-shrink rule makes mean movement too slow for re-probing
-to flip mastery in any reasonable number of turns. The saturated-stuck
-rule (section 4.4) normally marks these LOs stuck so the subgoal can
-advance; the selection-side filter is the matching guarantee that
-during the same turn the conductor doesn't preferentially target a
-dead-zone LO over a practiceable one with similar mean.
-
-**Fallback: all unmastered LOs saturated.** Rare, but possible when
-every remaining LO sits in the purgatory zone (saturated, mean in
-`[stuckSaturatedMeanCeiling, masteryMeanThreshold)`). In that case
-the conductor picks the **highest** mean (closest to mastery) so the
-slow climb has the best chance of flipping one LO and unblocking the
-subgoal. `chosenReason` is logged as `all unmastered saturated:
-highest-mean fallback` for debug visibility.
+**Every unmastered LO is a candidate (#278).** Until formula 1.1 an LO
+at `α + β ≥ cap − 2` was filtered out as "not practiceable": at the cap
+one answer hardly moved the mean, and the saturated branch of the stuck
+rule (4.4) was to mark it stuck. When every unmastered LO was saturated
+but not stuck, the conductor fell back to the *highest* mean. In the
+class data of the first three milestones that purgatory held 47 of the
+73 core LOs without a stamp at μ 0.70–0.80: not stuck, not demonstrated, hardly ever
+asked again, and the teacher counted them by hand. Since forgetting per
+answer (3.4) the mean moves on every answer and the evidence stays far
+under the cap, so the filter, the fallback and the saturated branch are
+gone; an old doc at the cap shrinks below it at its next write.
 
 **Convergence with curriculum order.** Early in a subgoal, "first
 unmastered in order" (section 1) and "lowest mean unmastered" pick
@@ -470,12 +541,44 @@ question-type instruction prompts.
 
 ```
 1. Take the acceptable types for the target LO's kind.
+   (#279) Without mcQuestion when a right pick can no longer bring an
+   unmastered LO to its stamp, and the kind has another type (below).
 2. Exclude the type used in the immediately previous question on this LO,
    if other types remain.
 3. If LO belief is weak (mean < 0.5), pick the gentlest remaining type
    (gentleness order from section 1.1).
 4. Otherwise pick the type least-recently-used for this LO.
 ```
+
+**No pick when a pick can no longer get the LO there (#279).** A right
+multiple-choice answer weighs half (3.1), and the stamp wants a right own
+question that was no pick (condition 4 of 4.1). Without this rule a
+`recall` or `predict` LO, asked as multiple choice whenever the rotation
+lands on its first type, would never be stamped. So for an LO that is not
+mastered now (4.1) the conductor drops `mcQuestion` — `recall` gets
+`socraticQuestion`, `predict` `explainCode` or `socraticQuestion` — once
+the LO has its first right own answer (`ownQuestionsRight`; before it, a
+pick is the gentle way in, as it was), when
+
+1. **the right non-pick is missing**: no stamp, and none of the right own
+   questions was no multiple choice — condition 4 can only be met by
+   another type. The teacher's rule: "ontbreekt alleen de open vraag nog";
+2. **picks cannot get there**: at the student's calibration a run of right
+   picks never reaches conditions 1 and 2. With forgetting (3.4) a steady
+   pick at home holds the evidence under `2 + w / (1 − λ)`: 4 on easy,
+   5.33 on medium, under 5.75; only on hard (6.67) do picks alone get over
+   the bar. On easy and medium an LO stamped once that dipped under the
+   bar — a weak positive from the side can do that to a just-stamped
+   `(5.38, 1)` — would otherwise be asked picks that never take it back;
+3. **the next right answer decides**: one right answer of another type
+   would master the LO and a right pick would not. The bar shows that
+   segment half (4.5); the answer must count.
+
+An LO without a doc, or with no right own question yet, keeps every type;
+so does a mastered LO in the top-up of a mastered subgoal (1.3), with no
+stamp at stake. The rule is `belief_math.needsNonMcqQuestion`. The same
+filter applies to the recheck (2.6), and not to the warm-up review (1.5),
+whose LO has its stamp.
 
 The `mean < 0.5` threshold is the prior midpoint: the student has
 shown net-negative evidence on this LO. That's the right moment to be
@@ -612,6 +715,16 @@ Why four (the teacher's choice, 2026-10-04): for a student who gets the
 LO right half the time, four in a row without a correct one happens by
 chance about once in sixteen runs; with follow-ups, four attempts are
 often only two questions — the student in #227 had nine in 22 minutes.
+
+**A stuck LO's return (#275).** The recheck slot (2.6) brings a stuck LO
+(4.4) back one notch below the calibration first — at easy it stays easy
+— and asks the questions after it in the same session at the
+calibration. The lower question works as the two rules above do: weighed
+at the level asked, out of the calibration window (every recheck is),
+no `lastPositiveAtCalibratedAt`, `highestPositiveDifficulty` at the level
+asked; the record says `notchDropFired: true` and `notchDropRules:
+[stuckReturn]`. The two rules above do not apply to a recheck: they read
+this session's attempts and the strike counter on the active subgoal.
 
 **No upward override.** If belief on a target LO is high but not yet
 mastered (e.g. mean 0.78, just below threshold), the policy does *not*
@@ -780,7 +893,7 @@ is tracked, how recency-of-types-on-this-LO is stored). Those are
 storage concerns: the per-LO recent activity in the student model
 (part 2 §3) carries the data we need.
 
-### 2.6 The recheck slot (#187, #188)
+### 2.6 The recheck slot (#187, #188, #275)
 
 2.1 only ever probes the active subgoal, and the warm-up review (1.5)
 only LOs that were once mastered. An LO the student left behind *without*
@@ -799,6 +912,21 @@ ratchet, so condition 3 of 4.1 stayed open with nothing left to close
 it. The recheck slot is that LO's way back: now and then, one direct
 question on it in the middle of practice.
 
+**What comes back since formula 1.1 (#275, with #247).** Until 1.1 the
+slot reached only the earlier subgoals of the active root goal, and under
+the bar only at μ 0.70–0.80. A stuck LO (4.4), at μ < 0.6, never came
+back; once the student moved on to the next root goal, nothing of the
+old one did; and a stamp from before 1.1 that fell on one right own
+question was never looked at again. In the week of 13–21 October 35 LOs
+of 22 finished subgoals stood on stuck, and on 23 September 70 core LOs
+of the first milestone had no stamp. The teacher decided (2026-11-08):
+stuck is "not now", not "never"; the open core LOs of a milestone come
+back, of earlier root goals too, the milestone still open first; a thin
+stamp from before 1.1 gets one check after a week and keeps its stamp.
+The brake stays as it was. The student can also take a subgoal up again
+themselves in the Leerpad (#280), so the app need not bring everything
+back.
+
 **The slot.** `planNext` checks it after the warm-up (1.5) and before
 2.1's selection, when it is *open*: at session entry, and again once
 `recheckSpacing` (5) ordinary questions have been fired since the last
@@ -809,45 +937,98 @@ per question. Planning stays repeatable: a found recheck changes nothing
 until the host fires it (`notePlannedQuestion`), like the warm-up's
 session-start plan-and-discard. The spacing spreads a backlog through the
 practice instead of stacking it; each candidate's own clock (below)
-keeps the same LO from coming back every few questions.
+keeps the same LO from coming back every few questions. The question
+after a right answer (below) is the one exception: it is not held by the
+spacing.
 
-**Candidates.** The LOs of the active root's subgoals *before* the active
-one — the grading scope, where a later subgoal would be a forward
-reference — with a belief doc that one of the slot's rules finds due.
-Each rule is one branch of `Conductor._recheckRuleFor` plus one
-`RecheckRule` value; the rules are the only part that differs per case,
-everything else about the question is shared. Two rules, whose mean
-bands do not overlap:
+**Candidates.** The LOs before the active subgoal in curriculum order:
+the earlier subgoals of the active root and, since #275, every subgoal of
+an earlier root goal (the roots in curriculum order, as the next-subgoal
+walk reads them). A later subgoal would be a forward reference. An LO
+needs a belief doc: one that was never asked or touched never came, so
+nothing brings it back. Each rule is one branch of
+`Conductor._recheckRuleFor` plus one `RecheckRule` value; the rules are
+the only part that differs per case, everything else about the question
+is shared. An LO gets the first rule that fits, in this order:
 
-- **Near goal (#187).** Not demonstrated (`everMastered` false, 3.7);
-  decayed mean in [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to
-  0.80, close enough that one or two good answers at the calibrated level
-  can earn the stamp; no *direct* probe for `recheckAfter` (7 days); and
-  the student's recent work at their level is good: the calibration
-  window (section 5, ten answers) is full and its level-weighted share of correct
-  answers (`StudentCalibration.levelWeightedAccuracy`: a correct answer
-  weighs the positive difficulty factor, anything else the negative one,
-  as μ does since #169) is at least `recheckRecentAccuracy` (0.75). A
-  student who is struggling now is not sent back to old material. This is
-  the evaluation tooling's "fossil" (`tooling/evaluation/diagnostics.py`),
-  which the teacher otherwise has to settle by hand at report time.
+- **Open core LO (#275).** A core LO of a milestone
+  (`Milestone.coreLoKeys`, PUNTENFORMULE §2.1: the Angoff set K) without
+  a stamp (`everMastered` false, 3.7), under the bar (conditions 1 and 2
+  of 4.1 not both met) and not stuck (4.4), at any mean: the near goal's
+  window falls away for it, since with forgetting per answer (3.4, #278)
+  its mean moves again — from (3, 3), μ 0.5, four right answers in a
+  row at medium take it over the bar. No direct probe for `recheckAfter` (7 days), or never one
+  (a doc that only side signals wrote); and good recent work (the brake,
+  below).
+- **Near goal (#187).** Not demonstrated; decayed mean in
+  [`recheckMeanFloor`, `masteryMeanThreshold`) — 0.70 to 0.80, close
+  enough that one or two good answers at the calibrated level can earn
+  the stamp (with forgetting, 3.4, from 0.76 one right answer reaches
+  0.799, so a low near goal takes two; and the stamp wants its two right
+  own questions, 4.1); no *direct* probe for `recheckAfter`; and the
+  student's recent work at their level is good: the calibration window
+  (section 5, ten answers) is full and its level-weighted share of
+  correct answers (`StudentCalibration.levelWeightedAccuracy`: a correct
+  answer weighs the positive difficulty factor, anything else the
+  negative one, as μ does since #169) is at least `recheckRecentAccuracy`
+  (0.75). A student who is struggling now is not sent back to old
+  material. This is the evaluation tooling's "fossil"
+  (`tooling/evaluation/diagnostics.py`), which the teacher otherwise has
+  to settle by hand at report time. Since #275 it covers what the open
+  rule does not: an LO no milestone counts as core — an extension LO, or
+  one of a subgoal no milestone has yet.
 - **Unconfirmed (#188).** The belief says "known" — decayed mean and
   evidence meet the bar (`meetsMasteryMeanAndEvidence`, conditions 1 and
   2 of 4.1) — but no direct right answer backs it: no positive at
   calibration (`lastPositiveAtCalibratedAt` unset, condition 3 open), or
   no recorded level (`highestPositiveDifficulty` unset under a set
   calibrated-positive flag: an old client's doc, #165, where the grade
-  can only guess the level). And no direct probe for `recheckAfter`, the
-  near goal's clock — or never one: an LO never asked directly is due at
-  once. There is no recent-work gate: the belief already says the student
-  has it; the question lets them show it. A right answer at the
-  calibrated level sets the positive, the ratchet at the level asked
-  (#164: the model records what was asked, never a guess) and — with 1
-  and 2 already met — the stamp. A wrong one debits the belief like any
-  probe; if it is still over the bar, the LO waits a week like any
-  rechecked LO, and a belief that drops under it follows the near-goal
-  rule from there. Near goals go first: they are few, gated and dated,
-  while old docs can form a backlog that must not hold them up.
+  can only guess the level), or — without a stamp — fewer than two right
+  own questions behind it, one of them no pick (condition 4 of 4.1, #279:
+  a belief a side signal lifted over the bar on one own question). And no
+  direct probe for `recheckAfter` — or never one: an LO never asked
+  directly is due at once. There is no recent-work gate: the belief
+  already says the student has it; the question lets them show it. A
+  right answer at the calibrated level sets the positive, the ratchet at
+  the level asked (#164: the model records what was asked, never a
+  guess) and — with 1, 2 and 4 met — the stamp. A wrong one debits the
+  belief like any probe; the LO comes back at the next session (below),
+  and a belief that dropped under the bar follows the open or near-goal
+  rule from there.
+- **Stuck (#275).** Stuck (4.4: at least `stuckOwnQuestionsMin` (6) own
+  questions and μ under `stuckMeanCeiling` (0.6)) and no stamp. No direct
+  probe for `recheckAfter`, and good recent work. Its first question
+  comes a notch below the calibration (below).
+- **Thin stamp (#275).** A stamp on fewer than two right own questions
+  (`belief_math.isThinStamp`, by the counts of #279) — only a stamp from
+  before 1.1 can be one, since 1.1 stamps on two. A doc without the counts
+  is no thin stamp: its stamp came before they were kept, and the
+  conductor leaves them missing (4.1) until the release fills them from
+  `turn_history` (#281), so the old stamps do not all come back at once.
+  One check question a week after its last direct probe (or at once,
+  never asked directly), with good recent work; `thinCheckedAt` on the
+  doc then says it had it. The stamp stays whatever the answer
+  (PUNTENFORMULE §5).
+
+**Order.** Among candidates:
+
+1. **A milestone whose deadline has not passed first (#275)**: an LO of a
+   subgoal of a milestone whose `dueAt` is still ahead — its report day
+   counts, as the students work up to it that day. There a stamp still
+   counts for the report; a stamp after the release counts for the
+   learning, not for that report (PUNTENFORMULE §5). The rest after.
+2. **Missed in an earlier session (#275)**: an LO whose last return was
+   not answered right (below) — so it does come back in the next session.
+3. Rule priority, in the order above.
+4. The oldest direct probe — never asked directly first.
+5. The highest decayed mean — the one closest to the stamp.
+
+**The brake (#187; kept by #275).** At most one warm-up review at the
+start of a session (1.5), and one recheck per `recheckSpacing` ordinary
+oefeningen; the open, near-goal, stuck and thin rules only when the
+student's recent work is good (`recheckRecentAccuracy`). The dose per
+lesson hour was the one open question; the teacher kept the brake of
+now.
 
 The clock is the **last direct probe**, `lastProbedAt` on the belief doc
 (part 2): set on every write that may move the ratchets — the target of a
@@ -861,37 +1042,86 @@ before the field existed reads `lastUpdatedAt` instead when the LO was
 ever the target of a question (`lastQuestionType` set) — never earlier
 than the real last probe, so an old doc is at worst due late, never
 early — and a non-probe write on such a doc stores that reading, so its
-own clock bump does not pass for a probe. An LO never asked directly has
-no clock: it is not a near goal, and an unconfirmed one is due at once.
-
-Among candidates: rule priority (enum order), then the oldest direct
-probe, then the highest decayed mean — the one closest to the stamp.
+own clock bump does not pass for a probe. The release can fill the field
+from `turn_history` (`replay-beliefs`, #275). An LO never asked directly
+has no clock: it is no near goal, and an unconfirmed or open one is due
+at once. After a return that was not answered right, the next session
+takes the place of the week (below).
 
 **The question and its answer: like a warm-up.** The gentlest acceptable
 type for the LO's kind at the student's calibrated difficulty, never
-notch-dropped (condition 3 of 4.1 wants a positive at calibration). From
+notch-dropped (condition 3 of 4.1 wants a positive at calibration) — and
+no pick when a pick can no longer bring the LO to its stamp (2.2, #279):
+a recheck is that LO's way to the stamp. **A stuck LO** (#275) is the
+exception: its first question comes one notch below the calibration, at
+easy it stays easy. That question works as a notch drop (2.3): out of the
+calibration window like every recheck, and asked under the calibration it
+sets no `lastPositiveAtCalibratedAt` — the questions after it are at the
+calibration, where condition 3 is earned. The record says
+`notchDropRules: [stuckReturn]` (8.1). From
 here on a recheck is handled exactly like a warm-up review (1.5) — the
 plan carries the other subgoal (`QuestionPlan.offSubgoal`) and every
 consumer reads that: prompted and graded in that subgoal's context; the
 target signal is a direct probe of that LO, decayed then updated with the
 full weight, both ratchets, the counter, `lastQuestionType`, the probe
-clock and — when the answer completes the three conditions of 4.1 — the
+clock and — when the answer completes the four conditions of 4.1 — the
 one-way stamp; no calibration window entry (5), no follow-up (6.3), no
 cache write or advancement for either subgoal; a transfer nomination on
 the target itself is dropped (3.7); other signals are incidental under
-2.4. Right, wrong or neutral (3.1), the probe clock restarts, so the LO waits another
-`recheckAfter` before it can come back. The chat announces it
-(`recheck` notice, naming the old subgoal). Like a warm-up, the question
-comes from the question bank whenever one fits (2.7).
+2.4. Right, wrong or neutral (3.1), the probe clock restarts. The chat
+announces it (`recheck` notice, naming the old subgoal). Like a warm-up,
+the question comes from the question bank whenever one fits (2.7).
+
+**An earlier root goal (#275).** The grader gets the active root as its
+scope (LLM_CONTRACT part 3). A question about another root's LO takes its
+context along, as an extension of `offSubgoal`, not a new mechanism: the
+plan names that root (`Recheck.root`, `QuestionPlan.offRoot`), `{goal}` in
+the prompt is that root and `{subgoal}` its subgoal, and that one subgoal
+joins the scope (`goal_scope_los` and the scope check), so the signal on
+the asked LO is no `targetSignalLost` (8.2) and lands as a direct probe —
+as for an earlier subgoal. Any other signal on that root is dropped as
+`outsideActiveRoot`, as before, and so is a transfer nomination on it:
+transfer credit (3.7) stays within the active root.
+
+**After the answer (#275).**
+
+- **Right** (`correct`), on an LO whose stamp is still to earn (every
+  rule but the thin stamp) and that is not mastered after it: the next
+  question is on that LO again, in the same session, not held by the
+  spacing — at the calibration, never notch-dropped, of another type than
+  the one before when the kind has one, announced as such
+  (`recheckAgain` notice: "Nog een controlevraag over …: de vorige was
+  juist."). So the two right own questions the stamp wants (4.1, #279)
+  can fall in one session; without it a run of returns would take weeks.
+  The run goes on while the answers are right and the LO is not mastered;
+  once it ends, the spacing counts from its last question.
+- **Not right** (`wrong` or `partial`): no question after it, and the LO
+  comes back at the *next* session instead of after `recheckAfter` (or
+  `warmUpStaleAfter` for a warm-up review, 1.5): the answer sets
+  `returnWrongAt` on its doc, which makes it due at a later session
+  whatever its clock, and first in the order above (under the open
+  milestone). In this session it does not come back. The LO's next own
+  question that is not such a miss clears it — a right return, or any
+  question on its own subgoal.
+- **A thin stamp's check**: one question. The stamp stays whatever the
+  answer; `thinCheckedAt` marks it as checked, nothing follows, and
+  `returnWrongAt` is not set.
 
 **Audit.** The turn record (8.1) carries `isRecheck: true`, names the old
-subgoal in `subgoalId`, the LO in `targetLOIds` and the subgoal the
-student was practising in `activeSubgoalId`; `selectionReason` lists the
-top candidates with the rule's `chosenReason`: `"recheck: near goal not
-asked for a week"` or `"recheck: high belief not confirmed by a direct
-right answer"`. The debug event `conductor.recheck_planned` carries the
-rule, the mean, the days since the last direct probe and the recent
-accuracy.
+subgoal in `subgoalId`, the LO in `targetLOIds`, the subgoal the student
+was practising in `activeSubgoalId`, and why the LO came back in
+`recheckRule` (#275: `open`, `nearGoal`, `unconfirmed`, `stuck` or
+`thin`), so the evaluation can tell them apart; `selectionReason` lists
+the top candidates with the rule's `chosenReason`: `"recheck: open core
+LO not asked for a week"`, `"recheck: near goal not asked for a week"`,
+`"recheck: high belief not confirmed by a direct right answer"`,
+`"recheck: stuck LO, a notch lower first"`, `"recheck: thin stamp from
+before formula 1.1"`, and for the question after a right answer
+`"recheck: again after a right answer"` (with the rule that brought the
+LO back). The debug event `conductor.recheck_planned` carries the rule,
+the mean, the days since the last direct probe, the recent accuracy, the
+root of an earlier root's LO, whether its milestone is open and whether
+it was missed — and `chained` for the question after a right answer.
 
 **Adding a rule.** A new case adds its `RecheckRule` value and its
 branch in `_recheckRuleFor`, its `chosenReason`, and its tests; the slot,
@@ -1016,7 +1246,8 @@ doc, and so is the graded answer — which can hide the question (above).
 **A multiple-choice pick is graded from the key.** Right or wrong is known.
 The target LO's signal is fixed — the key: `positive`/`strong`; any other
 option: `negative`/`moderate` — and integrated exactly like a grader's
-signal on a direct probe: the plan's difficulty multiplier (3.2) and the
+signal on a direct probe, a pick's included: a right pick weighs ×0.5
+(3.1, #279), and counts as a right own question that was a pick (4.1): the plan's difficulty multiplier (3.2) and the
 provenance, both ratchets and the stamp (4.3), the notch-drop counter
 (2.3 — a moderate negative is no strike), `lastQuestionType`, the probe
 clock, the calibration window (5), the cache and advancement (4.5); for a
@@ -1098,13 +1329,26 @@ The base weight per `(signal, strength)`:
 | `neutral` | (no weight) | (no weight) | (no weight) |
 
 **Symmetric in positive/negative.** Asymmetry here would distort
-calibration. The "wrong is more diagnostic than right" intuition is
-real but belongs in the LLM contract — the grader emits `moderate` or
-`weak` (not `strong`) on questions where lucky-guess corrects are
-plausible (e.g. binary MCQ). The conductor's *base* weights stay
-symmetric; the one asymmetry the conductor does apply is by difficulty
-(3.2, #169), and that is about the level of the question relative to
-the student, not about one sign being more trustworthy than the other.
+calibration. The conductor's *base* weights stay symmetric; the
+asymmetries it applies are by difficulty (3.2, #169), about the level
+of the question relative to the student, and by question type, below.
+
+**A right pick weighs half (#279, formula 1.1).** A positive signal of a
+multiple-choice question is multiplied by
+`PolicyConstants.multipleChoicePositiveFactor`, 0.5 — a `strong` pick
+weighs as a `moderate` answer — whether the bank's key graded it (2.7,
+always `strong`) or the grader, and for every positive of that turn, a
+side signal on another LO (2.4) included. A negative weighs as before. A
+follow-up on a multiple-choice question (6.2) is free text and weighs as
+any follow-up; a transfer credit (3.7) is no signal of the turn. The
+"right is less diagnostic on a guessable format" correction was meant to
+live in the LLM contract, the grader emitting `moderate` or `weak` there.
+It did not: of the right own answers since 2026-10-05, 437 of 440 on a
+grader's multiple choice were `strong`, and all 120 from the key — a
+clicked option weighed as much as a program the student wrote. The
+factor lives in the conductor now (`signalDeltas(multipleChoice:)`), not
+in the grader's instructions, and the turn record carries what a replay
+needs to apply it (`questionType`, `isFollowUp`).
 
 **`neutral` carries no weight, but it is written.** A neutral signal
 means "the answer touched the LO but gave no clear evidence." Adding
@@ -1256,15 +1500,18 @@ the next read doesn't double-decay. `lastUpdatedAt` is bumped to
 
 No background job. Decay is part of the read path.
 
-### 3.4 Evidence cap
+### 3.4 Forgetting per answer and the evidence cap
 
-**`α + β ≤ 20`.** When new evidence would push past the cap, shrink
-existing evidence-above-prior proportionally to make room, then add
-new evidence at full weight.
+**Forgetting, λ = 0.7 (#278, formula 1.1).** Before new evidence
+lands, what the LO holds above the prior shrinks by a fixed factor,
+then the evidence is added:
 
 ```
 applyEvidence(α, β, w_α, w_β):
-    if α + β + w_α + w_β > CAP:
+    if w_α + w_β == 0: return (α, β)        // a neutral forgets nothing
+    α = 1 + (α - 1) × λ                     // forget
+    β = 1 + (β - 1) × λ
+    if α + β + w_α + w_β > CAP:             // the cap, a backstop
         excess_capacity = CAP - 2 - w_α - w_β   // 2 = prior contribution
         existing_excess = α + β - 2
         scale = excess_capacity / existing_excess
@@ -1273,22 +1520,72 @@ applyEvidence(α, β, w_α, w_β):
     return (α + w_α, β + w_β)
 ```
 
-Result: `α + β = CAP` after the update, mean approximately preserved
-through the shrink, new evidence direction faithfully applied.
+On every write that carries weight: the question's own signal, a
+follow-up (6.2), a side signal (2.4), a transfer credit (3.7).
+Symmetric in right and wrong, so the first answers weigh less the more
+answers follow — the teacher's wish: "de eerste antwoorden hebben nog
+niet zoveel impact, zowel de goede als de foute". The mean was in
+effect the average of every answer, which assumes the student was
+equally good all along; a student who learns is not. Five wrong and
+then four right is "has it now", not "can do it 45% of the time".
+Decay in time (3.3) stays as it was; forgetting is per answer, decay
+per day.
 
-**Property: at cap, new evidence still moves belief.** A capped
-`(18, 2)` (mean 0.9) receiving strong-negative `(0, 2)`:
+Strong answers on medium at home, μ after the series:
 
-1. Shrink existing-above-prior by `(20 - 2 - 2) / (20 - 2) = 16/18`:
-   `(α=1 + 17×8̄/9, β=1 + 1×8̄/9) ≈ (16.1, 1.89)`.
-2. Add new: `(16.1, 3.89)`. Mean 0.81. Evidence 20.
+| series | cap of 20 (until #278) | λ = 0.7 |
+| --- | --- | --- |
+| right, right, right (new LO) | 0.88, mastered at the 2nd | 0.84, mastered at the 3rd |
+| W W R W R R W R R R | 0.59 (stuck at the 9th, #245) | 0.75 |
+| 6 wrong, then 4 right | 0.42 | 0.72 |
+| 12 wrong, then 4 right | 0.39 | 0.70 |
+| 20 × alternating | 0.48 | 0.43 |
+| 10 right, then 1 wrong | 0.85 | 0.65 |
 
-One strong-negative drops mean from 0.9 to 0.81 — still mastered, but
-close. Two would demote. Right responsiveness.
+- **A new LO needs three right answers at home on medium, not two**
+  (4.1): the evidence grows slower, so 5.75 falls at the third. On
+  hard, and in the lesson time, two still do it.
+- **After many wrong answers the road to the stamp is bounded**,
+  however long the history.
+- **Alternating right and wrong stays around 0.45**: no stamp from
+  volume alone.
+- **μ moves more.** The stamp stays (one-way, 4.3), but the conductor
+  asks the LO again when it falls under the bar.
 
-**Cap value of 20** is the sweet spot found by sanity check. Smaller
-(10) makes belief jumpy; larger (50) makes it rigid and hard to
-recover from after decay or isolated bad answers.
+**The evidence stays bounded**: a steady weight `w` converges to
+`α + β = 2 + w / (1 − λ)`, at most 13.7 for the heaviest answer
+(strong, hard, in the lesson time: 3.5). Two consequences. A weight
+under `(5.75 − 2) × (1 − λ)` = 1.125 cannot carry an LO to the
+evidence bar of mastery (4.1) on its own: a weak signal, a moderate one
+on medium at home, a transfer credit (0.5). And a small positive on an
+LO with much more evidence lowers the mean: the old answers fade faster
+than the new one adds — a transfer credit on a `(7, 1)` LO leaves it at
+`(5.7, 1)`.
+
+λ = 0.7 is the teacher's choice on the replay of #248 (2026-11-08): it
+found 55 of the 68 LOs he had counted by hand in three evaluation
+rounds (λ = 0.8: 51), left the proposals he had accepted alone (+0.4)
+and cost no extra oefeningen against #276. Forgetting only on the LO's
+own questions found fewer (50 of 68) and stamped more often on side
+signals, which then keep adding up undiminished. Considered and not
+chosen: a run-in, where the first ~5 answers count partly and then
+everything in full — after thirty oefeningen old evidence weighs as
+much as new again.
+
+**The cap, `α + β ≤ 20`, stays as a backstop.** When new evidence would
+push past it, existing evidence-above-prior shrinks proportionally to
+make room. With forgetting a doc under the cap never reaches it again:
+after the shrink the most it holds is `2 + 18 × 0.7` = 14.6, plus at
+most 3.5. An old doc at the cap shrinks below it at its next write: a
+capped `(18, 2)` (μ 0.9) receiving a strong negative becomes
+`(12.9, 1.7) + (0, 2)` = `(12.9, 3.7)`, μ 0.78, where the cap alone made
+it `(16.1, 3.89)`, μ 0.81.
+
+Until #278 the cap was the only shrink. At the cap the mean hardly
+moved: in the class data of the first three milestones 47 of the 73
+core LOs without a stamp at μ 0.70–0.80 sat at `α + β ≥ 18`, out of
+reach (2.1, 4.4), and from μ 0.60 a strong right answer at a time took
+8 answers to the stamp, a moderate one 15.
 
 ### 3.5 Edge cases in the update step
 
@@ -1312,51 +1609,64 @@ recover from after decay or isolated bad answers.
 
 ### 3.6 Worked example
 
-Sanity check, medium student, "use if/else" subgoal, three LOs.
+Sanity check, medium student at home, "use if/else" subgoal, three
+LOs. Every write that carries weight forgets first (3.4, λ = 0.7); decay
+between the questions is left out.
 
-State after first 4 questions:
+State after the first five questions:
 
 | LO | α | β | mean | evidence |
 | --- | --- | --- | --- | --- |
-| `predict_branch` | 5 | 1 | 0.83 | 6 |
-| `write_if_only` | 3 | 2 | 0.60 | 5 |
+| `predict_branch` | 5.38 | 1 | 0.84 | 6.38 |
+| `write_if_only` | 2.4 | 2 | 0.55 | 4.4 |
 | `write_if_else` | 1 | 1 | 0.50 | 2 |
 
 `predict_branch` formally meets mastery (mean ≥ 0.8, evidence ≥ 5.75):
-two strong positives at medium.
+three strong positives at medium on its own `explainCode` questions —
+`(3, 1)`, `(4.4, 1)`, `(5.38, 1)`; after two the evidence was 5.4. As
+picks they would have weighed half (3.1, #279) and left it at
+`(3.38, 1)`, and with no right non-pick it would not be mastered (4.1). `write_if_only` had a strong positive,
+`(3, 1)`, then a moderate negative: forgotten to `(2.4, 1)`, `β += 1.0`.
 
-**Q5: target `write_if_else`** (lowest mean unmastered), type
+**Q6: target `write_if_else`** (lowest mean unmastered), type
 `completeCode`, difficulty medium.
 
 Answer correct. LLM emits strong-positive on `write_if_else`,
-weak-positive on `predict_branch` (incidental).
+moderate-positive on `predict_branch` (incidental).
 
-- `write_if_else`: `α += 2.0 × 1.0 = 2.0` → `(3, 1)`, mean 0.75.
-- `predict_branch`: `α += 0.5 × 1.0 = 0.5` → `(5.5, 1)`, mean 0.85.
+- `write_if_else`: nothing to forget at the prior; `α += 2.0 × 1.0 =
+  2.0` → `(3, 1)`, mean 0.75.
+- `predict_branch`: forgotten to `(4.07, 1)`, `α += 1.0 × 1.0` →
+  `(5.07, 1)`, mean 0.84, evidence 6.07. A weak positive here (0.5)
+  would have left evidence 5.57, under the bar again (3.4).
 
-**Q6: target `write_if_only`** (now lowest at 0.60), type `writeCode`
+**Q7: target `write_if_only`** (now lowest at 0.55), type `writeCode`
 (least-recently-used), difficulty medium.
 
 Answer wrong. Strong-negative.
 
-- `write_if_only`: `β += 2.0 × 1.0 = 2.0` → `(3, 4)`, mean 0.43.
+- `write_if_only`: forgotten to `(1.98, 1.7)`, `β += 2.0 × 1.0` →
+  `(1.98, 3.7)`, mean 0.35.
 
-**Q7: target `write_if_else`** (`write_if_only` excluded by recency
-guard; `write_if_else` is unmastered).
+**Q8: target `write_if_else`** (`write_if_only` excluded by recency
+guard; `write_if_else` is unmastered). Partly right; the grader's signal
+is neutral, so nothing is added and nothing forgotten (3.1).
 
-**Q8: target `write_if_only` again.** Wrong again. Strong-negative.
+**Q9: target `write_if_only` again.** Wrong again. Strong-negative.
 
-- `write_if_only`: `β += 2.0` → `(3, 6)`, mean 0.33.
+- `write_if_only`: forgotten to `(1.69, 2.89)`, `β += 2.0` →
+  `(1.69, 4.89)`, mean 0.26.
 
 Now two negatives at calibrated medium on this LO.
 
-**Q9: target `write_if_only`** (recency guard relaxed; still lowest).
+**Q10: target `write_if_only`** (recency guard relaxed; still lowest).
 Notch-drop fires per section 2.3 → difficulty `easy`. Type rotates to
 `completeCode`.
 
-Answer correct. Strong-positive at easy: `α += 2.0 × 0.6 = 1.2`.
+Answer correct. Strong-positive at easy: forgotten to `(1.48, 3.72)`,
+`α += 2.0 × 0.6 = 1.2`.
 
-- `write_if_only`: `(4.2, 6)`, mean 0.41.
+- `write_if_only`: `(2.68, 3.72)`, mean 0.42.
 
 Override releases (positive received). Next probe of `write_if_only`
 goes back to medium.
@@ -1398,18 +1708,24 @@ A nominated LO earns credit only when **all** of these hold:
 2. **The turn is a primary probe, not a follow-up (6.2), and not a
    fallback turn (7.2).** Dialogue is not a solution, and a response
    whose primary signals failed validation is not trusted for extras.
-3. **The LO is outside the active subgoal.** LOs inside it already get
-   ordinary incidental signals at full weight (2.4); a nomination there
-   is dropped.
+3. **The LO is outside the active subgoal, and inside the active
+   root.** LOs inside the subgoal already get ordinary incidental
+   signals at full weight (2.4); a nomination there is dropped. So is one
+   on another root's LO (#275): a recheck of an earlier root (2.6) puts
+   that one subgoal in the grader's scope for its asked LO, not for a
+   credit.
 4. **The LO was ever mastered by direct probing.** An LO that was never
    directly probed — or probed but never mastered — cannot be brought
    to mastery sideways. Tracked by the one-way `firstMasteredAt` stamp on
-   `lo_beliefs` (part 2), set the first time all three mastery
+   `lo_beliefs` (part 2), set the first time all four mastery
    conditions (4.1) hold after a write. Docs written before the stamp
    existed read as "mastered as of the last direct write" when their
    stored `(α, β)` meet conditions 1–2 and the calibrated-positive
-   ratchet is set; the stamp is then written on the next update, dated
-   to that write. Nothing is backfilled.
+   ratchet is set — and, on a doc that keeps the right own questions
+   (#279), condition 4 too: such a doc was written by 1.1, which stamps
+   in the write itself; one without the counts is from before 1.1 and is
+   read by the rules of its day. The stamp is then written on the next
+   update, dated to that write. Nothing is backfilled.
 
 **Refresh-and-raise, small weight.** The credit is an ordinary
 `(positive, weak)` signal treated as `medium` — the same footing as a
@@ -1433,7 +1749,16 @@ it. Credits do not enter the calibration window (section 5).
 **Audit.** Every credit applied is listed on the turn record as
 `transferCredits: [{subgoalId, loId, alphaDelta}]` (8.1), next to the
 target's own `appliedSignals`; declined nominations are logged in the
-debug recorder with the reason.
+debug recorder with the reason. `alphaDelta` is the credit itself since
+#278; before, it was the change in α after the cap.
+
+**Forgetting (3.4, #278).** A credit forgets first, like every write
+that carries weight. Its weight (0.5 × s) is under what keeps an LO at
+the evidence bar, so on an LO with much evidence it lowers the mean — a
+`(7, 1)` LO becomes `(5.7, 1)` — and many credits in a row would settle
+at `(2.67, 1)` at home, μ 0.73. What the credit refreshes is the clock:
+`lastUpdatedAt`, which keeps a recurring LO out of the warm-up review.
+The stamp the grade reads stays (4.3).
 
 **Complement: warm-up review (1.5, #102).** LOs that naturally recur in
 later work are refreshed here for free; LOs that nothing later builds on
@@ -1455,9 +1780,10 @@ took a cross-subgoal incidental signal, or a review flag, this turn
   the belief shape we just defined). Section 4.
 - **The student's calibration update** (when does `easy/medium/hard`
   itself change). Section 5.
-- **Per-question-type weight modulation** (e.g. `mcQuestion`
-  guess-rate adjustment). Handled in the LLM contract, not the
-  conductor — the LLM emits weaker strength on guessable formats.
+- **Per-question-type weight modulation beyond multiple choice.** A
+  right pick weighs half since #279 (3.1); the other types weigh alike.
+  Until #279 the guess correction was left to the LLM contract, and the
+  grader did not apply it.
 
 ---
 
@@ -1468,7 +1794,7 @@ mastered? What if a student is genuinely stuck on one LO?
 
 ### 4.1 Per-LO mastery
 
-An LO is mastered when **all three** conditions hold:
+An LO is mastered when **all four** conditions hold:
 
 1. **Belief mean ≥ 0.8.** The conductor is confident the student has
    it.
@@ -1481,18 +1807,52 @@ An LO is mastered when **all three** conditions hold:
    ×1.25 (3.2) one strong right answer on hard there was mastery on its
    own — μ 0.82, evidence 5.5 — where at home it leaves μ at 0.79 (4.5).
    57% of the stamps after 5 October fell on the first signal, against
-   13% before.
+   13% before. Since forgetting per answer (3.4, #278) the first answer
+   shrinks before the second lands, so on medium at home a new LO takes
+   three strong right answers (evidence 5.4 after two, 6.38 after three);
+   on hard, or in the lesson time, two still do it. The bar did not move.
 3. **At least one positive signal contributing to current belief was
    at the student's calibration *at the time of the answer*, or
    higher.** This is the E.1 fix (see 4.3).
+4. **At least two own questions answered right, one of them no
+   multiple choice (#279, formula 1.1).** An *own question* is a direct
+   question with the LO as its target (4.4); *right* is a `correct`
+   answer with a positive signal on the LO — a `partial` with a positive
+   is not right — counted once per question. A side signal (2.4), a
+   follow-up (6.2) and a transfer credit (3.7) move `(α, β)` but count
+   for neither. The conductor keeps both counts on the belief doc
+   (`ownQuestionsRight`, `ownQuestionsRightNonMcq`, part 2;
+   `masteryRightOwnQuestionsMin` 2, `masteryRightNonMcqQuestionsMin` 1).
 
-All three are tunable constants (see the front-matter note on
+All four are tunable constants (see the front-matter note on
 constants).
+
+**Why condition 4.** Of the 201 stamps since 21 October, 71 fell after a
+single own question — 31 on that question, carried by side weight; 40 on
+a later side signal or a transfer credit — and 83 rested, as own
+questions, on multiple choice alone, 34 of them on one. The teacher
+(2026-11-08): two multiple-choice questions are no achieved goal. It
+absorbs the rest of #257: since #276 a side signal moves no ratchet, and
+now it cannot carry the count either, so it can no longer give the
+stamp. With the half-weight pick (3.1) and forgetting (3.4), the replay
+put the cost at +17% oefeningen against #276 if every extra question is
+answered right, nearer +23% at the 73% right of open questions in the
+data. An LO that lacks its right own questions simply stays in the
+selection (2.1), and the type rule of 2.2 asks the non-pick it needs.
+
+**A missing count reads 0; a stamp that is there stays.** A doc from
+before 1.1 has no counts: without a stamp, its LO earns its two right own
+questions anew, unless the release fills them from `turn_history`
+(#281). With a stamp, the LO met condition 4 when it was stamped, or was
+stamped before it existed: it is mastered again on conditions 1–3 after
+a dip (`belief_math.isMastered`), as before 1.1. Such a doc keeps its
+counts missing — a count started at the release would read the old
+stamp as a thin one (#275) — until the release fills them.
 
 **Mastery is checked on every belief update.** No latching. If decay
 or new negative evidence drops the belief below conditions 1 or 2,
 the LO is unmastered again. (Condition 3 is satisfied by a timestamp
-field; once set, it doesn't reset.)
+field; once set, it doesn't reset. Condition 4's counts only grow.)
 
 ### 4.2 Subgoal-level aggregation
 
@@ -1575,7 +1935,8 @@ back as if it had been measured, and the next positive records the level
 actually asked; nothing is backfilled.
 
 **Mastery stamp (#101).** A third field, `firstMasteredAt`, records
-when the LO first met all three conditions after a belief write. One-way:
+when the LO first met all the conditions after a belief write — four
+since #279. One-way:
 decay and later negatives unmaster the LO (4.1, no latching) but never
 clear the stamp, which answers a different question — "was this ever
 mastered by direct probing?" — the gate for transfer credit (3.7) and,
@@ -1595,47 +1956,55 @@ students who get genuinely stuck on specific things, damaging
 motivation and burning the calibration system. Pure "advance after
 N attempts" treats unmastered as mastered, which it isn't.
 
-**Compound rule (classic):** an LO is *stuck* when `α + β ≥ 10` AND
-mean < 0.6. A subgoal advances when all non-optional LOs are either
-**mastered or stuck**.
+**Compound rule, in own questions (#278):** an LO is *stuck* when it
+got **at least 6 own questions** AND its mean is < 0.6. A subgoal
+advances when all non-optional LOs are either **mastered or stuck**.
+
+An *own question* is a direct question with the LO as its target: an
+ordinary question on the active subgoal, or a warm-up review (1.5) or
+recheck (2.6) of it. Not a follow-up (6.2), and not a signal on the LO
+from a question about another one (2.4). One per question, whichever
+way the answer went, a neutral included; a question whose signal on its
+LO was lost (#225, 8.2) never reaches the doc and is not counted. The
+conductor keeps the count on the belief doc (`ownQuestions`,
+`stuckOwnQuestionsMin`); a doc from before formula 1.1 has none and
+reads 0, so its LO is stuck only after six new own questions.
 
 Numbers:
 
-- `α + β ≥ 10` is the "tried enough" threshold — meaningful effort. It
-  was 8 until #276: 8 × 1.25, because a wrong answer in the lesson time
-  weighs ×1.25 too (3.2, #219). At 8 four strong wrong answers on hard in
-  the lesson made an LO stuck, the very answer at which the attempts rule
-  (2.3, #227) would have asked it a notch lower; with a follow-up or a
-  side signal, three did. At 10 the student gets the lower notch first.
+- **6 own questions** is the "tried enough" threshold, the teacher's
+  choice (2026-11-08): the attempts rule (2.3, #227) asks a notch lower
+  after four attempts without a right answer, and six leaves two
+  questions at that level.
 - mean < 0.6 is "still not getting it." Above 0.6 is on the upswing —
-  keep probing.
+  keep probing. The mean reads the level (3.2): at hard 0.6 is about 39%
+  raw, at easy about 78%.
 
-**Second branch (saturated):** an LO is also stuck when
-`α + β ≥ cap − saturationSlack` AND mean < `stuckSaturatedMeanCeiling`
-(0.75). This handles the case where an early strong-negative pushed
-the LO's β up, evidence saturated at the cap before subsequent
-correct answers could pull mean back above the mastery threshold, and
-the cap-then-shrink rule in §3.4 now makes mean movement so slow that
-further probing wastes turns. Without this branch a non-practiceable
-LO with mean between the classic-stuck ceiling (0.6) and the
-saturated-stuck ceiling (0.75) sits in purgatory — not mastered, not
-stuck, blocks subgoal advance indefinitely.
-
-Numbers for the saturated branch:
-
-- `α + β ≥ cap − saturationSlack` = `α + β ≥ 18` with current
-  constants. Matches the `isPracticeable` boundary in §3.4 so the
-  selection-side filter (§2.1) and the stuck-side rule agree.
-- mean < 0.75 leaves a one-strong-positive buffer to mastery
-  (`masteryMeanThreshold` = 0.8). LOs within that buffer are not
-  written off as stuck, even though the selection filter still skips
-  them; the highest-mean fallback in §2.1 keeps probing them.
+**Why in questions.** Until #278 the rule was `α + β ≥ 10` (8 until
+#276) AND mean < 0.6, with a second, saturated branch: `α + β ≥ 18`
+AND mean < 0.75, for an LO stuck at the cap where the cap-then-shrink
+rule made the mean too slow to move. With forgetting per answer (3.4)
+the evidence stays bounded, so `α + β` no longer says how often the
+student tried, and nothing saturates. The evidence rule also wrote
+students off while they were getting it (#245): on the series wrong,
+wrong, right, wrong, right, right, wrong, right, right, right the old
+rule made the LO stuck at the ninth answer, μ 0.55 on evidence 20, and
+around 40% of the stuck-advances in the class came after at least two
+right answers in a row. With forgetting μ ends that series at 0.75.
 
 **Stuck is computed live, not stored.** Every mastery check evaluates
-each LO as `mastered | stuck | neither`. No flag, no persistence.
-Decay naturally rescues an LO from stuck status because evidence
-shrinks toward the prior — on a future revisit, a previously-stuck
-LO can be probed afresh.
+each LO as `mastered | stuck | neither` from the decayed mean and the
+stored count. No flag. The count only grows, so an LO leaves stuck
+when its mean climbs back to 0.6 — with forgetting a few right answers
+do that — and decay alone, which pulls the mean toward 0.5, does not.
+
+**Stuck is "not now", not "never" (#275).** Once its subgoal advanced, a
+stuck LO comes back as a recheck (2.6): a week after its last direct
+probe, when the student's recent work is good, a notch lower first (2.3);
+a right answer brings the next question on it in the same session, at the
+calibration, a wrong one brings it back at the next session. Until #275
+nothing brought it back: a stuck LO stood under the near goal's window
+for good.
 
 **Student-side invisibility.** The advance feels normal to the
 student. No "you didn't really master this but we're moving on"
@@ -1716,11 +2085,16 @@ optional LO gets none), each in one of three states:
 - **empty**;
 - **half**: one right answer would master the LO. A `(positive,
   strong)` signal at the student's calibration, with the home factor
-  (×1.0), applied to the current decayed `(α, β)` with the cap (3.4),
-  meets conditions 1 and 2 of 4.1; condition 3 that answer meets
-  itself;
-- **full**: mastered now, mastered once (`firstMasteredAt`, the
-  one-way reading the grade uses), or stuck (4.4). Stuck looks full to
+  (×1.0), applied to the current decayed `(α, β)` as every answer is —
+  forgetting, then the cap (3.4) — meets conditions 1 and 2 of 4.1;
+  condition 3 that answer meets itself, and condition 4 (#279) when the
+  LO already has a right own question and the answer is no pick — the
+  type 2.2 then asks. Without a right own question one answer cannot
+  master an LO, whatever its belief. Since #278 on medium at home that
+  is after the second right answer, not the first;
+- **full**: mastered now (the four conditions of 4.1), mastered once
+  (`firstMasteredAt`, the one-way reading the grade uses), or stuck
+  (4.4). Stuck looks full to
   the student, as the advance it allows looks normal (4.4,
   "student-side invisibility").
 
@@ -1754,24 +2128,32 @@ the plain bar of the cached share.
 
 ### 4.6 Worked example
 
-Continuing from 3.6, end of Q9:
+Continuing from 3.6, end of Q10:
 
-| LO | α | β | mean | evidence | mastered? | stuck? |
-| --- | --- | --- | --- | --- | --- | --- |
-| `predict_branch` | 5.5 | 1 | 0.85 | 6.5 | yes | no |
-| `write_if_only` | 4.2 | 6 | 0.41 | 10.2 | no | **yes** |
-| `write_if_else` | 3 | 1 | 0.75 | 4 | no | no |
+| LO | α | β | mean | evidence | own questions | mastered? | stuck? |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `predict_branch` | 5.07 | 1 | 0.84 | 6.07 | 3 | yes | no |
+| `write_if_only` | 2.68 | 3.72 | 0.42 | 6.4 | 5 | no | no |
+| `write_if_else` | 3 | 1 | 0.75 | 4 | 2 | no | no |
 
-`write_if_only` is stuck (`α + β = 10.2 ≥ 10`, mean 0.41 < 0.6).
+`write_if_only` is not stuck yet: mean 0.42 < 0.6, but five own
+questions (Q4, Q5, Q7, Q9, Q10), one short of six (4.4).
 
-**Q10: target `write_if_else`** (lowest-mean unmastered). Type
-rotates. Difficulty `medium` (calibrated).
+**Q11: target `write_if_else`** (`write_if_only` excluded by the
+recency guard). Type rotates. Difficulty `medium` (calibrated). Answer
+correct, strong-positive: forgotten to `(2.4, 1)`, `α += 2.0` →
+`(4.4, 1)`, mean 0.81 but evidence 5.4 — not yet (4.1).
 
-Answer correct. Strong-positive at medium: `α += 2.0 × 1.0 = 2.0`.
+**Q12: target `write_if_only`** (lowest mean; back at medium, the
+override released). Answer wrong, strong-negative: forgotten to
+`(2.18, 2.9)`, `β += 2.0` → `(2.18, 4.9)`, mean 0.31. Its sixth own
+question: **stuck** (6 ≥ 6, mean 0.31 < 0.6).
 
-`write_if_else`: `(5, 1)`, mean 0.83, evidence 6. Condition 1 ✓,
-condition 2 ✓, condition 3 ✓ (positive at calibrated medium →
-`lastPositiveAtCalibratedAt` now set). **Mastered.**
+**Q13: target `write_if_else`.** Answer correct, strong-positive at
+medium: forgotten to `(3.38, 1)`, `α += 2.0` → `(5.38, 1)`, mean 0.84,
+evidence 6.38. Condition 1 ✓, condition 2 ✓, condition 3 ✓ (positive at
+calibrated medium → `lastPositiveAtCalibratedAt` set), condition 4 ✓
+(Q6, Q11 and Q13 right, code questions). **Mastered.**
 
 Subgoal mastery check:
 - `predict_branch`: mastered ✓
@@ -1782,10 +2164,10 @@ All non-optional LOs are mastered or stuck → **subgoal mastered.**
 Advancement triggers.
 
 Student advances to "use elif and combine conditions logically."
-`write_if_only`'s `(4.2, 6)` belief persists in the student model;
-on manual revisit, decay will have softened it and re-probing
-becomes meaningful. Teacher dashboard flags `write_if_only` as a
-stuck LO at advancement (section 8).
+`write_if_only`'s `(2.18, 4.9)` belief and its six own questions
+persist in the student model; on manual revisit its mean can move with
+every answer (3.4). Teacher dashboard flags `write_if_only` as a stuck
+LO at advancement (section 8).
 
 ### 4.7 What this section deliberately does not address
 
@@ -1930,7 +2312,9 @@ from another subgoal, so a wrong answer says "forgotten", not "too hard",
 and a right one must not buy a promotion on the current topic. Neither
 the answer nor its question type is appended. For a recheck there is a
 second reason: the window is its own gate (`levelWeightedAccuracy`), and
-must not be fed by the questions it lets through.
+must not be fed by the questions it lets through. Nor do the answers on
+a subgoal the student picked back up (1.6, #280): the level holds across
+all goals, and old material must not move it.
 
 ### 5.4 Edge cases
 
@@ -2284,13 +2668,18 @@ previously-mastered subgoal can flip back to "in progress." This is
 correct behavior; the teacher decided this LO matters. Student
 returning to leerpad sees the chip slip from done back to
 in-progress. The section 1 entry algorithm picks up the new LO via
-"first unmastered in curriculum order" on next entry.
+"first unmastered in curriculum order" on next entry. Not for a subgoal
+the student picked back up (1.6, #280): practising it does not reopen
+it, so it keeps its finished mark like any finished subgoal the student
+is not on; the new LO is in its order (open, so first) from the next
+question.
 
 **Subgoal deleted.** If the conductor's current subgoal is deleted,
 surface a message ("Je vorige onderwerp is verwijderd door je
 leerkracht. Ga verder met het volgende.") and advance to the next
 unmastered subgoal in curriculum order. Logged for teacher
-dashboard.
+dashboard. A subgoal the student picked back up (1.6) that is deleted
+ends the choice: back to the goal in progress, as "Verder" would.
 
 **Flag toggles** (e.g. `allowChains`, `optional`): read fresh on
 each evaluation. No retroactive effect on chains already in
@@ -2428,22 +2817,28 @@ TurnRecord {
   chainDepth: int                  // 0, 1, or 2
   isWarmUp: bool                   // section 1.5, #102; omitted when false
   isRecheck: bool                  // section 2.6, #187; omitted when false
+  recheckRule: string              // 2.6, #275: why the recheck brought the LO back —
+                                   // open | nearGoal | unconfirmed | stuck | thin; omitted
+                                   // on other turns and older rechecks
+  selfChosen: bool                 // 1.6, #280: on a subgoal the student picked back up
+                                   // in the Leerpad (the active subgoal then, and
+                                   // `subgoalId`); omitted when false
 
   // Why these were picked (section 2 decisions)
   selectionReason: {
     candidateLOs: [{loId, mean, evidence}]   // top 3
     chosenReason: string                     // "lowest mean", "recency relaxed", "stuck-fallback", "warm-up review: …", "recheck: …"
     notchDropFired: bool
-    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; omitted when none fired
+    notchDropRules: string[]                 // 2.3, #227: strongNegatives | attemptsWithoutCorrect; #275: stuckReturn (2.6); omitted when none fired
   }
 
   // What happened
   overallQuality: string            // wrong | partial | correct
   loSignals: [{subgoalId, loId, signal, strength}]
   hadFallback: bool                 // grader response was unparseable
-  appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals)
+  appliedSignals: [{subgoalId, loId, alphaDelta, betaDelta}]   // post-modulation; subgoalId since #108 (2.4 cross-subgoal signals); since #278 the evidence added, not the change in (α, β), which forgetting (3.4) folds in
   provenance: string                // home | supervised (3.2, #100); absent on older docs = home
-  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none
+  transferCredits: [{subgoalId, loId, alphaDelta}]  // 3.7, #101; omitted when none; alphaDelta the credit since #278
   reviewFlags: [{subgoalId, loId}]  // 2.4, #167: earlier LOs an incidental negative flagged for review instead of debiting; omitted when none
 
   // Calibration impact
@@ -2578,6 +2973,8 @@ TurnContent {
     selectedRootId, selectedChildId,
     preferredRootId, preferredChildId,
     sessionStart: startup | continueLearningPath | workOnGoal | restart
+                                          // workOnGoal: a subgoal picked
+                                          //   back up in the Leerpad (1.6)
   }
   hintCount: int              // hints since the question (or the last
                               //   graded answer) went up
@@ -2699,9 +3096,11 @@ an LO finished at home).
 ordinary question, a follow-up, a warm-up review or a recheck — not
 incidental signals on other LOs and not transfer credits. Each counts
 by the sign of its belief delta (`alphaDelta − betaDelta`); the size
-is left out, because at the evidence cap (3.4) a delta is mostly the
-shrink toward the prior, and the supervised factor would make class
-answers look heavier. A turn is supervised when it was recorded so or
+is left out, because the supervised factor would make class answers
+look heavier, and on a turn from before #278 a delta at the evidence
+cap (3.4) was mostly the shrink toward the prior. Since #278 the delta
+is the evidence the signal added, without the forgetting, so its sign
+is the signal's. A turn is supervised when it was recorded so or
 falls in a lesson of the student's class (#219) — the turns graded
 before the timetable was the source are all `home` on the record, and
 the grade proposal's tally reads them the same way.

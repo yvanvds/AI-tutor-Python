@@ -10,7 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// when there is no active goal (e.g. before the conductor has selected one).
 /// The goal's title and description are in the app language when there is
 /// a translation, else in Dutch (#210). Under them, for a subgoal, its bar:
-/// a segment per LO ([SubgoalProgressBar], #230).
+/// a segment per LO ([SubgoalProgressBar], #230). On a subgoal the student
+/// picked back up from the Leerpad, the pill says "Zelf gekozen" (#280):
+/// the goal in progress is still the one "Verder" returns to.
 class ObjectiveBanner extends ConsumerWidget {
   const ObjectiveBanner({super.key});
 
@@ -49,7 +51,11 @@ class ObjectiveBanner extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
-                  AppLocalizations.of(context).session_objectiveBanner_pill
+                  (selection.isSelfChosen
+                          ? AppLocalizations.of(context)
+                                .session_objectiveBanner_pillSelfChosen
+                          : AppLocalizations.of(context)
+                                .session_objectiveBanner_pill)
                       .toUpperCase(),
                   style: TextStyle(
                     color: AppColors.accent,

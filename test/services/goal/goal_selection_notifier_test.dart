@@ -166,4 +166,57 @@ void main() {
       expect(state().selectedChild?.id, 'c1');
     });
   });
+
+  group('chooseSubgoal — a subgoal picked back up in the Leerpad (#280)', () {
+    test("prefers the subgoal and its root, as the student's own choice; "
+        'the selection — the goal in progress — stays', () {
+      notifier().setSelectedRoot(_g('now'));
+      notifier().setSelectedChild(_g('now-sub'));
+      expect(state().isSelfChosen, isFalse);
+
+      notifier().chooseSubgoal(root: _g('old'), child: _g('old-sub'));
+
+      expect(state().isSelfChosen, isTrue);
+      expect(state().activeRootGoal?.id, 'old');
+      expect(state().activeChildGoal?.id, 'old-sub');
+      expect(state().selectedRoot?.id, 'now');
+      expect(state().selectedChild?.id, 'now-sub');
+    });
+
+    test('"Verder" — a root preferred without a child — ends it', () {
+      notifier().chooseSubgoal(root: _g('old'), child: _g('old-sub'));
+      notifier().setPreferredRoot(_g('now'));
+      // The root alone leaves the choice: the child goes with it.
+      expect(state().isSelfChosen, isTrue);
+      notifier().setPreferredChild(null);
+      expect(state().isSelfChosen, isFalse);
+      expect(state().activeRootGoal?.id, 'now');
+    });
+
+    test("a preferred child set otherwise is no choice of the student's, "
+        'and clearing the preferences ends one', () {
+      notifier().chooseSubgoal(root: _g('old'), child: _g('old-sub'));
+      notifier().setPreferredChild(_g('other'));
+      expect(state().isSelfChosen, isFalse);
+
+      notifier().chooseSubgoal(root: _g('old'), child: _g('old-sub'));
+      final cleared = state().copyWith(
+        clearPreferredRoot: true,
+        clearPreferredChild: true,
+      );
+      expect(cleared.isSelfChosen, isFalse);
+      // And it does not come back with the next child.
+      expect(
+        cleared.copyWith(preferredChild: _g('next')).isSelfChosen,
+        isFalse,
+      );
+    });
+
+    test('other updates keep it', () {
+      notifier().chooseSubgoal(root: _g('old'), child: _g('old-sub'));
+      notifier().setSelectedRoot(_g('r2'));
+      notifier().setCachedRoots([_g('r1')]);
+      expect(state().isSelfChosen, isTrue);
+    });
+  });
 }

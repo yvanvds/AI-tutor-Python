@@ -13,8 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// The non-optional LOs come first, as many as the tile counts; an
 /// optional one follows, marked as such. There is no advice per LO and no
-/// way to retry one from here: the app picks the exercises, and how an
-/// open LO can still be shown is decided separately (#249).
+/// way to retry one from here: the app picks the exercises. The tile's own
+/// button picks the whole subgoal back up, its open LOs first (#280).
 ///
 /// [stamps] is `null` while they load or when they could not be read: the
 /// sentences then show without a status.

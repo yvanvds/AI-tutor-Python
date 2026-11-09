@@ -66,17 +66,38 @@ An LO is considered mastered when both:
 Exact values are policy and live in part 4. The minimum-evidence floor
 is what prevents a single correct answer from declaring mastery — since
 #276 even a hard one in the lesson time, which the supervised weight
-(×1.25, #219) had made enough on its own.
+(×1.25, #219) had made enough on its own. With forgetting per answer
+(below, #278) a new LO on medium at home takes three right answers.
 
-#### Evidence cap
+#### Evidence cap, and forgetting per answer
 
-Without a cap, drilling a single LO to e.g. `(α=50, β=2)` makes the
-belief unresponsive — a wrong answer barely moves the mean. Cap
-`α + β` (likely around 20). When new evidence arrives at the cap,
-shrink existing counts proportionally toward the prior before applying
-the update.
+Without a bound, drilling a single LO to e.g. `(α=50, β=2)` makes the
+belief unresponsive — a wrong answer barely moves the mean. Until
+formula 1.1 the bound was a cap on `α + β` (20): when new evidence
+arrived at the cap, existing counts shrank proportionally toward the
+prior before the update. That kept the mass bounded but not the mean
+responsive: the mean was in effect the average of every answer, and at
+the cap one more answer hardly moved it. In the class data most near
+goals of the first three milestones sat there, out of reach (#278).
 
-Exact cap value is policy (part 4); the model commits to *having* a cap.
+Since #278 the evidence above the prior shrinks by a fixed factor λ
+(0.7) before *every* update that carries weight, right and wrong alike,
+then the new evidence is added:
+
+```
+α ← 1 + (α − 1) · λ
+β ← 1 + (β − 1) · λ
+(α, β) += new evidence
+```
+
+The first answers weigh less the more answers follow, so the mean reads
+what the student can do *now*: five wrong and then four right is "has it
+now", not 45%. The mass stays bounded by itself, at `2 + w / (1 − λ)`
+for a steady weight `w` (under 14). The cap stays as a backstop that is
+hardly reached; decay over time (below) is unchanged.
+
+Exact values are policy (part 4, conductor policy 3.4); the model
+commits to a bounded, responsive belief.
 
 #### Decay over time
 
@@ -213,9 +234,9 @@ StudentLOBelief {
                                         // set, and writes nothing back.
   recentNegativesAtCalibrated: number   // conductor policy 2.3 counter
   firstMasteredAt: string?              // ISO 8601, set the first time all
-                                        // three mastery conditions held
-                                        // after a write (conductor policy
-                                        // 4.3, #101). One-way: decay and
+                                        // mastery conditions held (four
+                                        // since #279) after a write
+                                        // (conductor policy 4.3, #101). One-way: decay and
                                         // later negatives never clear it.
                                         // Gate for transfer credit (3.7).
                                         // Missing on older docs: read as
@@ -245,6 +266,41 @@ StudentLOBelief {
                                         // docs: lastUpdatedAt stands in if
                                         // the LO was ever a question's
                                         // target (lastQuestionType set).
+  ownQuestions: number                  // #278: direct questions with
+                                        // this LO as target (not follow-
+                                        // ups, not side signals), one per
+                                        // question. The stuck rule reads
+                                        // it (conductor policy 4.4).
+                                        // Missing on older docs: read as
+                                        // 0.
+  ownQuestionsRight: number?            // #279: own questions answered
+                                        // right (`correct`, positive on
+                                        // the LO), once per question.
+                                        // Mastery condition 4 wants 2
+                                        // (conductor policy 4.1).
+  ownQuestionsRightNonMcq: number?      // #279: of those, the ones that
+                                        // were no multiple choice; the
+                                        // condition wants 1. Both missing
+                                        // on docs from before 1.1, and
+                                        // kept apart from 0: the rules
+                                        // read missing as 0, but a stamp
+                                        // on a doc without them is no
+                                        // thin one (#275). The conductor
+                                        // starts them on a doc without a
+                                        // stamp, and leaves them missing
+                                        // on one with a stamp until the
+                                        // release fills them (#281).
+  returnWrongAt: string?                // ISO 8601, #275: a warm-up
+                                        // review or a recheck that brought
+                                        // the LO back was not answered
+                                        // right; due again at the next
+                                        // session whatever its clock.
+                                        // Cleared by its next own
+                                        // question that is no such miss.
+  thinCheckedAt: string?                // ISO 8601, #275: a thin stamp
+                                        // from before 1.1 got its one
+                                        // check question; not checked as
+                                        // thin again. The stamp stays.
 }
 ```
 
@@ -470,8 +526,17 @@ release pressed again for reports nobody touched rewrites nothing.
 - **Mastery requires both** mean above threshold and minimum evidence.
   A third condition — at least one positive signal at calibrated
   difficulty (tracked by `lastPositiveAtCalibratedAt`) — is added
-  by conductor policy section 4.3 to fix the easy-grinding problem.
-- **Evidence cap exists.** Exact value: 20 (conductor policy 3.4).
+  by conductor policy section 4.3 to fix the easy-grinding problem. A
+  fourth since #279: two own questions answered right, one of them no
+  multiple choice (`ownQuestionsRight`, `ownQuestionsRightNonMcq`;
+  conductor policy 4.1), so side signals and picks alone give no stamp.
+  A right pick also weighs half (conductor policy 3.1).
+- **Forgetting per answer** (#278): before every update that carries
+  weight the evidence above the prior shrinks by λ = 0.7. The evidence
+  cap (20) stays as a backstop (conductor policy 3.4).
+- **Stuck counts own questions** (#278): at least six direct questions
+  with the LO as target (`ownQuestions` on the belief doc) and mean
+  under 0.6 (conductor policy 4.4).
 - **Decay applies from v1**, lazily on read, gentle (months not weeks),
   preserving the prior. Half-life: 60 days (conductor policy 3.3).
 - **Difficulty is per-student, one value**, sticks across subgoals.
@@ -551,7 +616,19 @@ release pressed again for reports nobody touched rewrites nothing.
   late), and an indirect write on such a doc stores that reading instead
   of letting its own clock bump pass for a probe. A replay from
   `turn_history` can backfill it exactly (the last direct signal per
-  LO, a neutral one included: conductor policy 3.1, #202).
+  LO, a neutral one included: conductor policy 3.1, #202); since #275
+  `replay-beliefs` does, on docs without the field.
+- **`returnWrongAt` and `thinCheckedAt` are what a return leaves
+  behind** (#275, conductor policy 1.5, 2.6). A warm-up review or a
+  recheck that brought an LO back and was not answered right sets
+  `returnWrongAt`: the LO is due at the next session instead of after 7
+  or 30 days, and the slot does not ask it again in the same session.
+  The LO's next own question that is not such a miss clears it; a
+  follow-up, a side signal and a transfer credit leave it alone. A thin
+  stamp's one check sets `thinCheckedAt` instead, whatever the answer,
+  and leaves `returnWrongAt` alone: the stamp stays. Both missing on
+  older docs: nothing is due early, and a thin stamp has not been
+  checked.
 
 ## What this model deliberately does not do
 

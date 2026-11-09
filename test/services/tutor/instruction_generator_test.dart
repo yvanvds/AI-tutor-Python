@@ -115,6 +115,62 @@ void main() {
     expect(out, isNot(contains('Loops')));
   });
 
+  group('a subgoal the student picked back up (#280)', () {
+    final earlier = Goal(id: 'root-0', title: 'Basics', order: -1);
+    final picked = Goal(
+      id: 'sub-0',
+      title: 'Print',
+      parentId: 'root-0',
+      order: 0,
+      teachingTips: const ['Tip P'],
+    );
+    final sections = [
+      makeInstruction('alwaysInclude', {
+        'main': 'always: {goal} / {subgoal} / {teachingTips}',
+      }),
+      makeInstruction('completeCodeQuestion', {
+        'main': 'type: {goal} / {subgoal} / {teachingTips}',
+      }),
+    ];
+    Future<String> generate(GoalSelectionState selection) =>
+        InstructionGenerator().generateInstructions(
+          ChatRequestType.completeCodeQuestion,
+          goalSelection: selection,
+          cachedInstructions: sections,
+          fetchInstructions: () async => const [],
+          fetchRootGoals: () async => const [],
+          languageCode: 'nl',
+        );
+
+    test('both sections describe it and its root, not the goal in '
+        'progress', () async {
+      final out = await generate(
+        GoalSelectionState(
+          selectedRoot: root(),
+          selectedChild: subgoal(),
+          preferredRoot: earlier,
+          preferredChild: picked,
+          selfChosen: true,
+        ),
+      );
+      expect(out, contains('always: Basics / Print / Tip P'));
+      expect(out, contains('type: Basics / Print / Tip P'));
+      expect(out, isNot(contains('Loops')));
+      expect(out, isNot(contains('Iteration')));
+    });
+
+    test('also for a student with no goal left in progress', () async {
+      final out = await generate(
+        GoalSelectionState(
+          preferredRoot: earlier,
+          preferredChild: picked,
+          selfChosen: true,
+        ),
+      );
+      expect(out, contains('always: Basics / Print / Tip P'));
+    });
+  });
+
   group('content question (#132)', () {
     Future<String> generate(
       List<Instruction> docs, {

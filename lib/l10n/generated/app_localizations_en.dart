@@ -1311,6 +1311,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_objectiveBanner_pill => 'Current goal';
 
   @override
+  String get session_objectiveBanner_pillSelfChosen => 'Your choice';
+
+  @override
   String session_objectiveBanner_segments(int mastered, int almost, int todo) {
     String _temp0 = intl.Intl.pluralLogic(
       mastered,
@@ -2423,6 +2426,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leerpad_card_button_continue => 'Continue';
 
   @override
+  String get leerpad_child_button_finish => 'Finish';
+
+  @override
+  String get leerpad_child_button_review => 'Review';
+
+  @override
+  String get leerpad_child_button_practise => 'Practise';
+
+  @override
+  String get leerpad_child_button_tooltip =>
+      'Exercises on this subgoal. Continue takes you back to your current goal.';
+
+  @override
+  String get leerpad_child_practising => 'practising now';
+
+  @override
   String leerpad_child_demonstrated(int demonstrated, int total) {
     return '$demonstrated of $total demonstrated';
   }
@@ -2691,10 +2710,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
   @override
-  String get chat_notice_subgoalSaturated =>
-      'You already have a good grip on this subgoal. Ready to move on?';
-
-  @override
   String get chat_notice_noGoalsLeft =>
       'There are no goals left to work on. Congratulations!';
 
@@ -2722,6 +2737,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String chat_notice_recheck(String title) {
     return 'In between: one check question on $title, so you can show you\'ve got it now.';
+  }
+
+  @override
+  String chat_notice_recheckAgain(String title) {
+    return 'One more check question on $title: you got the last one right.';
+  }
+
+  @override
+  String chat_notice_selfChosenSubgoal(String title) {
+    return 'You picked $title: the exercises are on it now. Done? Continue in the learning path takes you back to your current goal.';
   }
 
   @override

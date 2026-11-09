@@ -146,7 +146,9 @@ Inputs:
 
 Note: `goalScopeLOs` does not include LOs from earlier root goals.
 Forgetting from earlier roots is handled by belief decay (part 2), not
-by per-question signals. Keeps prompt token cost bounded.
+by per-question signals. Keeps prompt token cost bounded. The one
+exception is a recheck of an earlier root's LO (below): that one subgoal
+joins the list.
 
 **Warm-up review questions (conductor policy 1.5, #102).** Once per
 session the conductor may ask one review question on an LO of an
@@ -156,7 +158,19 @@ subgoal, not the one the student is working on, and `targetLOs` name its
 LO with its `subgoalId`. Nothing else in the contract changes: the
 grader emits the same shape, `goalScopeLOs` is the same root-wide list,
 and the scope check (below) accepts the signal because the older subgoal
-is in scope.
+is in scope. A recheck (conductor policy 2.6, #187) works the same way.
+
+**A recheck of an earlier root goal (conductor policy 2.6, #275).** Since
+formula 1.1 a recheck can ask about an LO of an *earlier root goal*: an
+open core LO, a stuck LO or a thin stamp. The question takes that context
+along, as an extension of the older-subgoal case above, not a new
+mechanism: `goal` names that earlier root, `subgoal` and `teachingTips`
+its subgoal, `targetLOs` the LO with its `subgoalId`, and that one
+subgoal's LOs are added to `goalScopeLOs` — not the rest of the earlier
+root. The scope check accepts the signal on the asked LO, which counts as
+a direct question, as for an earlier subgoal. A signal on any other LO
+of that root still falls outside the active root and is dropped
+(`outsideActiveRoot`), and a transfer nomination there earns nothing.
 
 ### The answer key (#197)
 
@@ -581,7 +595,8 @@ model:
    live LO in the current goal's scope. Unresolved signals are
    dropped; the drop is logged.
 3. **Scope check.** `subgoalId` must be the current subgoal or an
-   earlier subgoal *within the current root goal*. Forward-references
+   earlier subgoal *within the current root goal* — or the subgoal of a
+   recheck of an earlier root, for the asked LO (#275). Forward-references
    (next subgoal, future goal) are dropped and logged. A signal on the
    question's own target LO, filed under the target's subgoal, can
    only fail this check when the scope itself is wrong — the conductor

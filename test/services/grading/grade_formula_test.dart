@@ -162,8 +162,9 @@ void main() {
       }
       // v1.0.17 (#187) and v1.0.18 (#188) changed when evidence is asked
       // for, v1.0.19 (#219) where the supervised weight comes from, v1.0.23
-      // (#276) when an LO counts as mastered — not the formula.
-      expect(GradingConstants.formulaVersion, '1.0.23');
+      // (#276) when an LO counts as mastered, v1.1 (#278) how an answer
+      // lands on the belief — not the formula.
+      expect(GradingConstants.formulaVersion, '1.1');
     });
     test('the proposal is a whole point on 100', () {
       expect(roundedProposal(72.1), 72);

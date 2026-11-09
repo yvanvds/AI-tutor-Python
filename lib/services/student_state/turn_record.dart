@@ -51,6 +51,12 @@ class TurnLoSignal {
 /// §2.4) lands on that subgoal's doc, not the active one's, and the audit
 /// trail has to say which. Docs written before the field existed have no
 /// `subgoalId` on their entries; nothing reads them back.
+///
+/// [alphaDelta] and [betaDelta] are the evidence the signal added — weight
+/// × difficulty × provenance — since formula 1.1 (#278). Before, they were
+/// the change in `(α, β)`, which at the cap included its shrink; since every
+/// write forgets first, that change no longer says which way the signal
+/// went.
 class TurnAppliedSignal {
   final String subgoalId;
   final String loId;
@@ -109,7 +115,8 @@ class TurnReviewFlag {
 /// One transfer credit applied this turn (#101, CONDUCTOR_POLICY §3.7): a
 /// previously mastered LO in *another* subgoal that the working solution
 /// correctly used. Carries the subgoal because, unlike `appliedSignals`,
-/// the LO is not one of the active subgoal's.
+/// the LO is not one of the active subgoal's. [alphaDelta] is the credit
+/// (since #278; before, the change in α after the cap).
 class TurnTransferCredit {
   final String subgoalId;
   final String loId;
@@ -297,6 +304,11 @@ enum NotchDropRule {
   /// this session — the question or a follow-up on it — without a single
   /// `correct`.
   attemptsWithoutCorrect,
+
+  /// #275: a stuck LO (§4.4) that a recheck brings back (§2.6) comes back
+  /// one notch below the calibration first; the questions after it in the
+  /// same session are at calibration.
+  stuckReturn,
 }
 
 class TurnSelectionReason {
@@ -348,6 +360,22 @@ class PersistedTurnRecord {
   /// §2.6): like a warm-up, `subgoalId` and `targetLOIds` name an earlier
   /// subgoal and its LO. Omitted from the doc when false.
   final bool isRecheck;
+
+  /// Why a recheck brought its LO back (#275): the name of the conductor's
+  /// `RecheckRule` — `open` (a core LO without a stamp), `nearGoal`,
+  /// `unconfirmed`, `stuck` or `thin` (a thin stamp from before formula
+  /// 1.1) — so the evaluation can tell them apart. `null`, and omitted, on
+  /// every other turn and on rechecks written before the field.
+  final String? recheckRule;
+
+  /// True when the student picked the turn's subgoal back up from the
+  /// Leerpad (#280, CONDUCTOR_POLICY §1.6), to finish or to review it,
+  /// follow-ups on its questions included: `subgoalId` is that subgoal,
+  /// read by the conductor as the active one, and the answer stayed out of
+  /// the calibration window. The evaluation can tell these oefeningen
+  /// apart, and the teacher can see who uses the button. Omitted when
+  /// false.
+  final bool selfChosen;
 
   /// The subgoal the student was practising when the turn was about
   /// another one (a warm-up or a recheck); `null` — and omitted — on every
@@ -472,6 +500,8 @@ class PersistedTurnRecord {
     this.reviewFlags = const [],
     this.isWarmUp = false,
     this.isRecheck = false,
+    this.recheckRule,
+    this.selfChosen = false,
     this.activeSubgoalId,
     this.clientVersion,
     this.usage,
@@ -498,6 +528,8 @@ class PersistedTurnRecord {
     'chainDepth': chainDepth,
     if (isWarmUp) 'isWarmUp': true,
     if (isRecheck) 'isRecheck': true,
+    if (recheckRule != null) 'recheckRule': recheckRule,
+    if (selfChosen) 'selfChosen': true,
     if (activeSubgoalId != null) 'activeSubgoalId': activeSubgoalId,
     if (selectionReason != null) 'selectionReason': selectionReason!.toJson(),
     'overallQuality': overallQuality.name,
@@ -592,6 +624,8 @@ class PersistedTurnRecord {
       chainDepth: (doc['chainDepth'] as num?)?.toInt() ?? 0,
       isWarmUp: (doc['isWarmUp'] as bool?) ?? false,
       isRecheck: (doc['isRecheck'] as bool?) ?? false,
+      recheckRule: doc['recheckRule'] as String?,
+      selfChosen: doc['selfChosen'] == true,
       activeSubgoalId: doc['activeSubgoalId'] as String?,
       selectionReason: null, // not consumed by dashboard reads; keep tiny
       overallQuality: parseQuality(doc['overallQuality']),

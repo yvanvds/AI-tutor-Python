@@ -343,8 +343,9 @@ void main() {
     expect(review.containsKey('reviewFlags'), isFalse);
 
     // The review is the measurement that counts: a direct probe of
-    // `lo-print` at full weight on the decayed (5, 1), clock reset, flag
-    // cleared. The LO is back on the ordinary staleness clock.
+    // `lo-print` at full weight on the decayed (5, 1), forgotten by λ first
+    // (#278), clock reset, flag cleared. The LO is back on the ordinary
+    // staleness clock.
     final reviewed = storedPrint(next)!;
     expect(reviewed.containsKey('regressedAt'), isFalse);
     final writtenAt = DateTime.parse(reviewed['lastUpdatedAt'] as String);
@@ -362,11 +363,14 @@ void main() {
     expect(onPrint['loId'], 'lo-print');
     expect(onPrint['subgoalId'], 's1');
     // A strong positive at the plan's difficulty: never less than the base
-    // weight, and exactly what the doc gained.
+    // weight, and exactly the evidence the doc gained after forgetting.
     expect(onPrint['alphaDelta'], greaterThanOrEqualTo(2.0));
     expect(
       reviewed['alpha'],
-      closeTo(decayed.alpha + (onPrint['alphaDelta'] as num), 1e-9),
+      closeTo(
+        forgetBeforeEvidence(decayed).alpha + (onPrint['alphaDelta'] as num),
+        1e-9,
+      ),
     );
     expect(next.llm!.remaining, 0);
 

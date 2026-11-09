@@ -763,6 +763,10 @@
   "@session_objectiveBanner_pill": {
     "description": "Banner header pill at the top of practice view — displayed uppercase"
   },
+  "session_objectiveBanner_pillSelfChosen": "Your choice",
+  "@session_objectiveBanner_pillSelfChosen": {
+    "description": "Banner header pill when the student picked the subgoal back up from the learning path (#280) — displayed uppercase"
+  },
   "session_objectiveBanner_segments": "{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do",
   "@session_objectiveBanner_segments": {
     "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.",
@@ -1402,6 +1406,26 @@
   "leerpad_header_subtitle_default": "Python — beginner's journey",
   "leerpad_card_completed": "completed",
   "leerpad_card_button_continue": "Continue",
+  "leerpad_child_button_finish": "Finish",
+  "@leerpad_child_button_finish": {
+    "description": "Button on a subgoal tile in the learning path (#280): pick the subgoal back up to demonstrate the learning objectives still open"
+  },
+  "leerpad_child_button_review": "Review",
+  "@leerpad_child_button_review": {
+    "description": "Button on a subgoal tile in the learning path (#280): pick a subgoal whose learning objectives are all demonstrated back up to review it"
+  },
+  "leerpad_child_button_practise": "Practise",
+  "@leerpad_child_button_practise": {
+    "description": "Button on a subgoal tile in the learning path (#280) while it is not known yet how many of its learning objectives are demonstrated"
+  },
+  "leerpad_child_button_tooltip": "Exercises on this subgoal. Continue takes you back to your current goal.",
+  "@leerpad_child_button_tooltip": {
+    "description": "Tooltip of the Finish / Review button on a subgoal tile (#280)"
+  },
+  "leerpad_child_practising": "practising now",
+  "@leerpad_child_practising": {
+    "description": "On the tile of the subgoal the student picked back up, while the exercises are on it (#280)"
+  },
   "leerpad_child_demonstrated": "{demonstrated} of {total} demonstrated",
   "@leerpad_child_demonstrated": {
     "description": "Under a subgoal tile on the learning path (#243): how many of the subgoal's non-optional learning objectives the student has demonstrated (the mastery stamp the grade reads), out of how many.",
@@ -1540,7 +1564,6 @@
   "chat_notice_exerciseWithoutBlank": "That exercise had nothing left to fill in. Fetching a new one.",
   "chat_notice_optionsLookAlike": "Two answers in that question looked the same. Fetching a new one.",
   "chat_notice_subgoalDeletedRedirect": "Your previous topic was removed by your teacher. Continuing with the next one.",
-  "chat_notice_subgoalSaturated": "You already have a good grip on this subgoal. Ready to move on?",
   "chat_notice_noGoalsLeft": "There are no goals left to work on. Congratulations!",
   "chat_notice_emptyObjectives": "This subgoal isn't quite finished yet — ask your teacher to complete it, or pick another subgoal.",
   "chat_notice_preparingExercise": "Preparing your next exercise...",
@@ -1555,6 +1578,14 @@
   },
   "chat_notice_recheck": "In between: one check question on {title}, so you can show you've got it now.",
   "@chat_notice_recheck": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "chat_notice_recheckAgain": "One more check question on {title}: you got the last one right.",
+  "@chat_notice_recheckAgain": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "chat_notice_selfChosenSubgoal": "You picked {title}: the exercises are on it now. Done? Continue in the learning path takes you back to your current goal.",
+  "@chat_notice_selfChosenSubgoal": {
     "placeholders": { "title": { "type": "String" } }
   },
   "chat_notice_difficultyChanged": "Difficulty adjusted: {from} -> {to}",

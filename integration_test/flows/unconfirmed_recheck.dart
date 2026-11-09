@@ -93,6 +93,10 @@ Map<String, dynamic> printAdvancedPast(DateTime at) => {
 /// last asked directly at [probedAt], last written (from the side) at
 /// [updatedAt]. Unconfirmed unless [confirmedAt] is given: then it carries
 /// a positive at calibration, its level and the stamp from that moment.
+/// One right own question on record, no pick, asked a notch lower — no
+/// positive at calibration (#279): the check question's right answer is
+/// the second, which the stamp wants. A confirmed one was stamped on two:
+/// a stamp on one is a thin stamp, which gets a check of its own (#275).
 Map<String, dynamic> highBelief({
   required DateTime probedAt,
   required DateTime updatedAt,
@@ -109,6 +113,8 @@ Map<String, dynamic> highBelief({
   'lastQuestionType': 'completeCodeQuestion',
   'recentNegativesAtCalibrated': 0,
   'lastProbedAt': probedAt.toIso8601String(),
+  'ownQuestionsRight': confirmedAt == null ? 1 : 2,
+  'ownQuestionsRightNonMcq': 1,
   if (confirmedAt != null) ...{
     'lastPositiveAtCalibratedAt': confirmedAt.toIso8601String(),
     'highestPositiveDifficulty': 'medium',
@@ -233,11 +239,11 @@ void main() {
       (turn['selectionReason'] as Map)['chosenReason'],
       allOf(contains('recheck'), contains('not confirmed')),
     );
-    // A direct probe of the old LO: decayed (α, β) plus the full weight of a
-    // strong positive at medium, through cap-then-add (the belief is at the
-    // cap) — the belief stays high, and now a right answer at the
-    // calibrated level backs it: the positive at calibration, the level
-    // asked, and the stamp the grade reads.
+    // A direct probe of the old LO: decayed (α, β), forgotten (#278) — which
+    // takes the old doc at the cap well under it — plus the full weight of a
+    // strong positive at medium. The belief stays high, and now a right
+    // answer at the calibrated level backs it: the positive at calibration,
+    // the level asked, and the stamp the grade reads.
     final print = storedPrint(harness);
     final writtenAt = DateTime.parse(print['lastUpdatedAt'] as String);
     expect(
@@ -258,12 +264,16 @@ void main() {
     );
     expect(print['alpha'], closeTo(expected.alpha, 1e-9));
     expect(print['beta'], closeTo(expected.beta, 1e-9));
+    expect(
+      expected.alpha + expected.beta,
+      lessThan(PolicyConstants.evidenceCap),
+    );
+    // The turn logs the evidence the answer added, not the change in α:
+    // forgetting took α down by more than the answer put back (#278).
     final applied = (turn['appliedSignals'] as List).cast<Map>();
     expect(applied.single['subgoalId'], 's1');
-    expect(
-      applied.single['alphaDelta'],
-      closeTo(expected.alpha - decayed.alpha, 1e-9),
-    );
+    expect(applied.single['alphaDelta'], closeTo(2.0, 1e-9));
+    expect(print['alpha'] as num, lessThan(decayed.alpha));
     final mean =
         (print['alpha'] as num) /
         ((print['alpha'] as num) + (print['beta'] as num));

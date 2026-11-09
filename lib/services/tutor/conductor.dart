@@ -19,6 +19,7 @@ import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+import 'package:ai_tutor_python/services/grading/milestone.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/student_state/student_calibration.dart';
@@ -38,12 +39,23 @@ class WarmUpReview {
 }
 
 /// Which rule of the recheck slot (CONDUCTOR_POLICY §2.6) picked the LO.
-/// Every rule names an LO of an earlier subgoal that the student has not
-/// demonstrated yet — or not at a level the doc recorded — and that
-/// ordinary practice will no longer ask about; they differ in why one
-/// direct question is worth asking now. The enum order is the priority
-/// order among due candidates.
+/// Every rule names an LO before the active subgoal — an earlier subgoal of
+/// the active root, or since #275 a subgoal of an earlier root — that
+/// ordinary practice will no longer ask about: one the student has not
+/// demonstrated yet, not at a level the doc recorded, or (#275) only on a
+/// thin stamp from before formula 1.1. They differ in why one direct
+/// question is worth asking now. The enum order is the order in which an
+/// LO's rule is found, and the priority among due candidates after the two
+/// keys before it: a milestone whose deadline has not passed first, then an
+/// LO missed in an earlier session (§2.6, #275).
 enum RecheckRule {
+  /// #275: a core LO of a milestone (`Milestone.coreLoKeys`) without a
+  /// stamp, under the bar and not stuck, at any mean — the near goal's
+  /// window falls away for it, since with forgetting per answer (#278) its
+  /// mean moves again. No direct probe for `recheckAfter` (or never one),
+  /// and good recent work, as for a near goal.
+  open,
+
   /// #187: just under the mastery bar (decayed μ in
   /// [`recheckMeanFloor`, `masteryMeanThreshold`)), no direct probe for
   /// `recheckAfter`, and the student's recent work at their level is good
@@ -61,6 +73,25 @@ enum RecheckRule {
   /// only come from asking. After [nearGoal]: the gated near goals are
   /// few, and a backlog of old docs must not hold them up.
   unconfirmed,
+
+  /// #275: stuck (§4.4: at least `stuckOwnQuestionsMin` own questions and
+  /// μ under `stuckMeanCeiling`), without a stamp — stuck is "not now", not
+  /// "never". No direct probe for `recheckAfter`, and good recent work. The
+  /// first question comes a notch below the calibration
+  /// ([NotchDropRule.stuckReturn]); the ones after it in the session at it.
+  stuck,
+
+  /// #275: a thin stamp (`belief_math.isThinStamp`): a stamp from before
+  /// formula 1.1 on fewer than two right own questions. One check question
+  /// a week after its last direct probe (`LoBelief.thinCheckedAt` then
+  /// says it had it), with good recent work; the stamp stays whatever the
+  /// answer.
+  thin;
+
+  /// Whether the LO's stamp is still to earn — every rule but [thin]. Such
+  /// a return goes on in the same session after a right answer, and comes
+  /// back at the next session after one that is not (#275).
+  bool get earnsStamp => this != thin;
 }
 
 /// A recheck question (CONDUCTOR_POLICY §2.6, #187, #188): a direct probe
@@ -72,7 +103,24 @@ enum RecheckRule {
 class Recheck {
   final Goal subgoal;
   final RecheckRule rule;
-  const Recheck({required this.subgoal, required this.rule});
+
+  /// The root goal [subgoal] belongs to when that is not the active root
+  /// (#275): the question is prompted under that goal, and the grader gets
+  /// [subgoal] in its scope. `null` for a subgoal of the active root.
+  final Goal? root;
+
+  /// The next question on the same LO in the same session, after a right
+  /// answer on the one before (#275): past the slot's spacing, at the
+  /// calibration, never notch-dropped. [rule] is the one that brought the
+  /// LO back.
+  final bool chained;
+
+  const Recheck({
+    required this.subgoal,
+    required this.rule,
+    this.root,
+    this.chained = false,
+  });
 }
 
 /// Selected target for the next question, computed by [Conductor.planNext].
@@ -84,7 +132,6 @@ class QuestionPlan {
   final List<LearningObjective> targetLOs;
   final TurnSelectionReason reason;
   final bool blockedEmptyObjectives;
-  final bool blockedSaturated;
 
   /// Set when [Conductor] is in degraded mode (CONDUCTOR_POLICY §7.3) and
   /// declines to plan anything. The conductor already surfaced its own
@@ -102,16 +149,24 @@ class QuestionPlan {
   /// for every other plan; never set together with [warmUp].
   final Recheck? recheck;
 
+  /// A question on a subgoal the student picked back up from the Leerpad
+  /// (#280, §1.6; `GoalSelectionState.isSelfChosen`): the active subgoal,
+  /// in its own order — the open LOs first, then the weakest. Its answer
+  /// stays out of the calibration window (§5), never advances or reopens
+  /// the subgoal, and the turn record says the student chose it. Never
+  /// set together with [warmUp] or [recheck].
+  final bool selfChosen;
+
   const QuestionPlan({
     required this.type,
     required this.difficulty,
     required this.targetLOs,
     required this.reason,
     this.blockedEmptyObjectives = false,
-    this.blockedSaturated = false,
     this.blockedDegraded = false,
     this.warmUp,
     this.recheck,
+    this.selfChosen = false,
   });
 
   bool get isWarmUp => warmUp != null;
@@ -124,6 +179,10 @@ class QuestionPlan {
   /// its target signal a direct probe of that LO, no follow-up, no
   /// calibration, no cache or advancement for either subgoal.
   Goal? get offSubgoal => warmUp?.subgoal ?? recheck?.subgoal;
+
+  /// The root of [offSubgoal] when that is not the active root: a recheck
+  /// of an earlier root (#275). `null` otherwise.
+  Goal? get offRoot => recheck?.root;
 
   bool get isOffSubgoal => offSubgoal != null;
 
@@ -165,20 +224,6 @@ class QuestionPlan {
         notchDropFired: false,
       ),
       blockedEmptyObjectives: true,
-    );
-  }
-
-  factory QuestionPlan.saturated() {
-    return const QuestionPlan(
-      type: ChatRequestType.noResult,
-      difficulty: QuestionDifficulty.medium,
-      targetLOs: [],
-      reason: TurnSelectionReason(
-        candidateLOs: [],
-        chosenReason: 'saturated',
-        notchDropFired: false,
-      ),
-      blockedSaturated: true,
     );
   }
 }
@@ -402,6 +447,7 @@ class ConductorDeps {
     required this.getAllLoBeliefs,
     required this.upsertLoBelief,
     required this.appendTurnHistory,
+    this.getMilestones = _noMilestones,
   });
 
   final GoalSelectionState Function() getGoalSelection;
@@ -466,6 +512,14 @@ class ConductorDeps {
   final Future<void> Function(LoBelief belief) upsertLoBelief;
 
   final Future<void> Function(PersistedTurnRecord record) appendTurnHistory;
+
+  /// The grading milestones (#99), for the recheck slot (§2.6, #275): an
+  /// open core LO (`Milestone.coreLoKeys`) is a candidate, and the LOs of a
+  /// milestone whose deadline has not passed go first. Read once per open
+  /// slot; a failed read reads none.
+  final Future<List<Milestone>> Function() getMilestones;
+
+  static Future<List<Milestone>> _noMilestones() async => const [];
 }
 
 class Conductor {
@@ -553,11 +607,43 @@ class Conductor {
   /// nothing due both set it back to 0.
   int _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
 
+  /// The recheck to ask next (#275, §2.6): set by a right answer on an LO a
+  /// recheck brought back for its stamp ([RecheckRule.earnsStamp]) that is
+  /// still not mastered; the next plan asks it again, in this session and
+  /// past the slot's spacing. Spent when a recheck is fired.
+  ({Recheck recheck, LearningObjective lo, ChatRequestType lastType})?
+  _returnChain;
+
+  /// `subgoalId/loId` of the LOs a warm-up review or a recheck brought back
+  /// in this session and the student did not answer right (#275). Such an
+  /// LO's doc says `returnWrongAt`, which makes it due at the *next*
+  /// session; this keeps it from coming back in this one.
+  final Set<String> _missedThisSession = {};
+
   /// Called on session entry / when the active subgoal changes externally.
   /// Picks the next subgoal if needed and resets per-subgoal state.
+  ///
+  /// A subgoal the student picked back up (#280, §1.6) is the active one
+  /// without a walk: the selection keeps the goal in progress, the one
+  /// "Verder" returns to — read now when the app had none yet, without the
+  /// "new goal" pill. The chat says what the oefeningen are about now, and
+  /// how to go back.
   Future<void> setTarget() async {
-    if (_deps.getGoalSelection().preferredChild == null) {
+    final selection = _deps.getGoalSelection();
+    if (selection.preferredChild == null) {
       await _setTargetGoal();
+    } else if (selection.isSelfChosen) {
+      if (selection.selectedChild == null) {
+        await _setTargetGoal(announce: false);
+      }
+      final chosen = selection.preferredChild!;
+      _deps.addSystemNotice(
+        ChatNotice(
+          ChatNoticeKind.selfChosenSubgoal,
+          args: [chosen.title],
+          goalId: chosen.id,
+        ),
+      );
     }
     final goal = _activeChildGoal;
     _lastTargetLoId = null;
@@ -574,6 +660,8 @@ class Conductor {
     _pendingCascadeHaltEvent = null;
     _warmUpSettled = false;
     _questionsSinceOffSubgoal = PolicyConstants.recheckSpacing;
+    _returnChain = null;
+    _missedThisSession.clear();
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
     // #230: the session's bar starts from the beliefs as they are.
     _loDisplay.clear();
@@ -600,6 +688,12 @@ class Conductor {
       return QuestionPlan.emptyObjectives();
     }
 
+    // #280 (§1.6): a subgoal the student picked back up has its own order,
+    // and nothing interrupts it — no warm-up review, no recheck, no chained
+    // return. They wait until the student is back on the goal in progress:
+    // "Verder" starts a new session, which opens both slots again.
+    if (selection.isSelfChosen) return _planSelfChosen(subgoal);
+
     // §1.5: the session opens with one review question on a stale,
     // once-mastered LO from an older subgoal, when there is one.
     if (!_warmUpSettled) {
@@ -609,6 +703,12 @@ class Conductor {
       // raised during practice is for the next session's review.
       _warmUpSettled = true;
     }
+
+    // #275: after a right answer on an LO a recheck brought back, the next
+    // question is on it again — in this session, past the slot's spacing —
+    // until it is mastered or an answer is not right.
+    final chained = await _planChainedRecheck();
+    if (chained != null) return chained;
 
     // §2.6 recheck slot (#187): every `recheckSpacing` questions, one
     // direct question on a not-yet-demonstrated LO of an earlier subgoal
@@ -645,13 +745,13 @@ class Conductor {
         now: now,
       );
       snapshots[lo.id] = snap;
-      if (meetsMasteryMeanAndEvidence(snap) &&
-          b.lastPositiveAtCalibratedAt != null) {
+      if (isMastered(snap, b)) {
         masteredLoIds.add(lo.id);
       }
     }
 
-    // Unmastered = mean < threshold OR evidence < min OR cond3 not yet set.
+    // Unmastered = one of the four conditions of §4.1 not met (#279: the
+    // fourth, the right own questions, only without a stamp).
     final unmastered = objectives
         .where((lo) => !masteredLoIds.contains(lo.id))
         .toList(growable: false);
@@ -665,76 +765,62 @@ class Conductor {
     String chosenReason;
 
     if (unmastered.isNotEmpty) {
-      // Prefer practiceable LOs: saturated ones can't move mean fast enough
-      // for re-probing to help, and the saturated-stuck rule (CONDUCTOR_POLICY
-      // §4.4) will normally have marked them stuck so the subgoal advances.
-      // Falling back to the full unmastered pool only matters for the
-      // purgatory case where every unmastered LO is saturated but sits in
-      // [stuckSaturatedMeanCeiling, masteryMeanThreshold).
-      final practiceable = unmastered
-          .where((lo) => isPracticeable(snapshots[lo.id]!))
+      // Lowest mean, weight as tiebreaker (CONDUCTOR_POLICY §2.1). Every
+      // unmastered LO is a candidate: since forgetting per answer (#278) an
+      // LO's mean moves on every answer, so there is no saturated LO left
+      // to filter out and no highest-mean fallback for one — an old doc at
+      // the cap shrinks to below it at its next write.
+      // Recency guard skips the previously-probed LO if alternatives exist.
+      var pool = unmastered
+          .where((lo) => lo.id != _lastTargetLoId)
           .toList(growable: false);
-      if (practiceable.isNotEmpty) {
-        // Among practiceable: pick lowest mean, weight as tiebreaker.
-        // Recency guard skips the previously-probed LO if alternatives exist.
-        var pool = practiceable
-            .where((lo) => lo.id != _lastTargetLoId)
-            .toList(growable: false);
-        if (pool.isEmpty) pool = practiceable;
-        pool = pool.toList()
-          ..sort((a, b) {
-            final ma = snapshots[a.id]!.mean;
-            final mb = snapshots[b.id]!.mean;
-            if (ma != mb) return ma.compareTo(mb);
-            // Higher weight wins on near-equal means.
-            return b.weight.compareTo(a.weight);
-          });
-        target = pool.first;
-        // Curriculum-order short-circuit during cold start: if every
-        // snapshot is the prior, "lowest mean" ties on every LO — pick the
-        // first in authoring order (CONDUCTOR_POLICY §1.1).
-        final allFresh = unmastered.every((lo) {
-          final snap = snapshots[lo.id]!;
-          return snap.alpha == PolicyConstants.prior &&
-              snap.beta == PolicyConstants.prior;
+      if (pool.isEmpty) pool = unmastered;
+      pool = pool.toList()
+        ..sort((a, b) {
+          final ma = snapshots[a.id]!.mean;
+          final mb = snapshots[b.id]!.mean;
+          if (ma != mb) return ma.compareTo(mb);
+          // Higher weight wins on near-equal means.
+          return b.weight.compareTo(a.weight);
         });
-        if (allFresh) {
-          target = unmastered.first;
-          chosenReason = 'cold start: first LO in order';
-        } else if (pool.length < practiceable.length) {
-          chosenReason = 'lowest mean (recency relaxed)';
-        } else {
-          chosenReason = 'lowest mean unmastered';
-        }
+      target = pool.first;
+      // Curriculum-order short-circuit during cold start: if every
+      // snapshot is the prior, "lowest mean" ties on every LO — pick the
+      // first in authoring order (CONDUCTOR_POLICY §1.1).
+      final allFresh = unmastered.every((lo) {
+        final snap = snapshots[lo.id]!;
+        return snap.alpha == PolicyConstants.prior &&
+            snap.beta == PolicyConstants.prior;
+      });
+      if (allFresh) {
+        target = unmastered.first;
+        chosenReason = 'cold start: first LO in order';
+      } else if (pool.length < unmastered.length) {
+        chosenReason = 'lowest mean (recency relaxed)';
       } else {
-        // Every unmastered LO is saturated but not stuck. Pick the one
-        // closest to mastery so the slow climb has the best chance to flip
-        // an LO and unblock subgoal advance.
-        final sorted = unmastered.toList()
-          ..sort(
-            (a, b) => snapshots[b.id]!.mean.compareTo(snapshots[a.id]!.mean),
-          );
-        target = sorted.first;
-        chosenReason = 'all unmastered saturated: highest-mean fallback';
+        chosenReason = 'lowest mean unmastered';
       }
     } else {
       // All mastered: top-up branch. Pick the mastered LO with the lowest
-      // mean among practiceable ones (CONDUCTOR_POLICY §1.3).
-      final practiceable = objectives
-          .where((lo) => isPracticeable(snapshots[lo.id]!))
-          .toList(growable: false);
-      if (practiceable.isEmpty) {
-        return QuestionPlan.saturated();
-      }
-      final sorted = practiceable.toList()
+      // mean (CONDUCTOR_POLICY §1.3). Every one of them can still move
+      // (#278), so there is no saturated subgoal to decline.
+      final sorted = objectives.toList()
         ..sort(
           (a, b) => snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean),
         );
       target = sorted.first;
-      chosenReason = 'all mastered: lowest-mean practiceable';
+      chosenReason = 'all mastered: lowest mean';
     }
 
-    final type = _pickType(target, snapshots[target.id]!);
+    final type = _pickType(
+      target,
+      snapshots[target.id]!,
+      // #279: an unmastered target gets no multiple choice when a right
+      // pick can no longer bring it to its stamp; a top-up of a mastered
+      // subgoal (§1.3) has no stamp at stake.
+      belief: unmastered.isNotEmpty ? byId[target.id] : null,
+      calibration: calibration,
+    );
     final notchDropRules = await _shouldDropNotch(
       lo: target,
       subgoalId: subgoal.id,
@@ -769,6 +855,124 @@ class Conductor {
     );
   }
 
+  /// The next question on a subgoal the student picked back up from the
+  /// Leerpad (#280, CONDUCTOR_POLICY §1.6), to finish it or to review it.
+  ///
+  /// Finish ("afmaken"): its non-optional LOs without the mastery stamp —
+  /// open or stuck — come first. Review ("herhalen"), once each of them
+  /// carries the stamp: the stamped LOs. In either group the weakest first
+  /// (the lowest decayed mean), on a tie the one asked longest ago
+  /// (`lastProbedAt`, never asked first), then authoring order; the LO of
+  /// the question before is skipped while the group has another. The type
+  /// as for any probe (§2.2), with #279's rule while the LO is not mastered
+  /// now, at the calibration and its notch drops (§2.3).
+  Future<QuestionPlan> _planSelfChosen(Goal subgoal) async {
+    final objectives = subgoal.objectives;
+    final beliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
+    final byId = {for (final b in beliefs) b.loId: b};
+    final now = DateTime.now().toUtc();
+    final calibration = _deps.getCalibration().difficulty;
+
+    // #230: the bar of the subgoal this question is about.
+    _publishLoDisplay(subgoal, byId, calibration: calibration);
+
+    final snapshots = <String, BeliefSnapshot>{
+      for (final lo in objectives)
+        lo.id: switch (byId[lo.id]) {
+          null => const BeliefSnapshot(
+            PolicyConstants.prior,
+            PolicyConstants.prior,
+          ),
+          final b => applyDecay(
+            alpha: b.alpha,
+            beta: b.beta,
+            lastUpdatedAt: b.lastUpdatedAt,
+            now: now,
+          ),
+        },
+    };
+    bool stamped(LearningObjective lo) => byId[lo.id]?.firstMasteredAt != null;
+
+    final open = objectives
+        .where((lo) => !lo.optional && !stamped(lo))
+        .toList(growable: false);
+    final finishing = open.isNotEmpty;
+    final reviewable = objectives.where(stamped).toList(growable: false);
+    // A subgoal of optional LOs only, none stamped, has neither: all of
+    // them then.
+    final group = finishing
+        ? open
+        : (reviewable.isNotEmpty ? reviewable : objectives);
+    final order = {
+      for (var i = 0; i < objectives.length; i++) objectives[i].id: i,
+    };
+    final sorted = group.toList()
+      ..sort((a, b) {
+        final byMean = snapshots[a.id]!.mean.compareTo(snapshots[b.id]!.mean);
+        if (byMean != 0) return byMean;
+        final pa = byId[a.id]?.lastDirectProbeAt;
+        final pb = byId[b.id]?.lastDirectProbeAt;
+        if (pa != pb) {
+          if (pa == null) return -1;
+          if (pb == null) return 1;
+          final byAge = pa.compareTo(pb);
+          if (byAge != 0) return byAge;
+        }
+        return order[a.id]!.compareTo(order[b.id]!);
+      });
+    final others = sorted.where((lo) => lo.id != _lastTargetLoId).toList();
+    final target = others.isEmpty ? sorted.first : others.first;
+
+    final snap = snapshots[target.id]!;
+    final belief = byId[target.id];
+    final type = _pickType(
+      target,
+      snap,
+      // #279: no pick when one can no longer bring the LO to its stamp —
+      // only while it is not mastered now.
+      belief: belief == null || isMastered(snap, belief) ? null : belief,
+      calibration: calibration,
+    );
+    final notchDropRules = await _shouldDropNotch(
+      lo: target,
+      subgoalId: subgoal.id,
+      calibration: calibration,
+    );
+    final notchDrop = notchDropRules.isNotEmpty;
+
+    _deps.recordDebugEvent('conductor.self_chosen_planned', {
+      'subgoalId': subgoal.id,
+      'loId': target.id,
+      'finishing': finishing,
+      'mean': snap.mean,
+      'candidates': group.length,
+    });
+
+    return QuestionPlan(
+      type: type,
+      difficulty: notchDrop ? _stepDown(calibration) : calibration,
+      targetLOs: [target],
+      selfChosen: true,
+      reason: TurnSelectionReason(
+        candidateLOs: sorted
+            .take(3)
+            .map(
+              (lo) => CandidateLoStat(
+                loId: lo.id,
+                mean: snapshots[lo.id]!.mean,
+                evidence: snapshots[lo.id]!.evidence,
+              ),
+            )
+            .toList(growable: false),
+        chosenReason: finishing
+            ? 'self-chosen: finish, weakest open LO'
+            : 'self-chosen: review, weakest LO',
+        notchDropFired: notchDrop,
+        notchDropRules: notchDropRules,
+      ),
+    );
+  }
+
   /// Warm-up review selection (CONDUCTOR_POLICY §1.5, #102, #112).
   ///
   /// Candidates are the LOs of the active root's *other* subgoals whose
@@ -784,6 +988,11 @@ class Conductor {
   ///
   /// Regressed candidates come first (oldest flag wins), then stale ones
   /// (most stale wins); ties go to the lowest decayed mean.
+  ///
+  /// #275: a warm-up that was not answered right brings its LO back at the
+  /// next session (`returnWrongAt`), instead of after another 30 days. Such
+  /// an LO is flagged like a regressed one, and ranks with them by the age
+  /// of its flag.
   ///
   /// The question is the gentlest acceptable type for the LO's kind, at the
   /// student's calibrated difficulty — a direct probe of that LO, so its
@@ -811,44 +1020,53 @@ class Conductor {
             LoBelief belief,
             double mean,
             bool regressed,
+            bool missed,
+            DateTime? flaggedAt,
           })
         >[];
     for (final sub in others) {
       for (final lo in sub.objectives) {
-        final b = byKey['${sub.id}/${lo.id}'];
+        final key = '${sub.id}/${lo.id}';
+        final b = byKey[key];
         if (b == null) continue;
         final regressed = b.regressedAt != null;
+        // #275: its last warm-up was not answered right, in an earlier
+        // session: it is back now.
+        final missed =
+            b.returnWrongAt != null && !_missedThisSession.contains(key);
         final stale =
             now.difference(b.lastUpdatedAt) >= PolicyConstants.warmUpStaleAfter;
-        if (!regressed && !stale) continue;
-        final mastered = everMastered(
-          firstMasteredAt: b.firstMasteredAt,
-          alpha: b.alpha,
-          beta: b.beta,
-          lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
-        );
-        if (!mastered) continue;
+        if (!regressed && !missed && !stale) continue;
+        if (!everMasteredBelief(b)) continue;
         final snap = applyDecay(
           alpha: b.alpha,
           beta: b.beta,
           lastUpdatedAt: b.lastUpdatedAt,
           now: now,
         );
+        final flags = [
+          if (regressed) b.regressedAt!,
+          if (missed) b.returnWrongAt!,
+        ]..sort();
         candidates.add((
           subgoal: sub,
           lo: lo,
           belief: b,
           mean: snap.mean,
           regressed: regressed,
+          missed: missed,
+          flaggedAt: flags.isEmpty ? null : flags.first,
         ));
       }
     }
     if (candidates.isEmpty) return null;
 
     candidates.sort((a, b) {
-      if (a.regressed != b.regressed) return a.regressed ? -1 : 1;
-      final byAge = a.regressed
-          ? a.belief.regressedAt!.compareTo(b.belief.regressedAt!)
+      final fa = a.flaggedAt;
+      final fb = b.flaggedAt;
+      if ((fa == null) != (fb == null)) return fa != null ? -1 : 1;
+      final byAge = fa != null
+          ? fa.compareTo(fb!)
           : a.belief.lastUpdatedAt.compareTo(b.belief.lastUpdatedAt);
       if (byAge != 0) return byAge;
       return a.mean.compareTo(b.mean);
@@ -864,6 +1082,7 @@ class Conductor {
       'regressed': pick.regressed,
       if (pick.regressed)
         'regressedDays': now.difference(pick.belief.regressedAt!).inDays,
+      'missed': pick.missed,
       'candidates': candidates.length,
     });
 
@@ -888,15 +1107,17 @@ class Conductor {
               ),
             )
             .toList(growable: false),
-        chosenReason: pick.regressed
+        chosenReason: pick.flaggedAt == null
+            ? 'warm-up review: most stale mastered LO'
+            : pick.flaggedAt == pick.belief.regressedAt
             ? 'warm-up review: regressed mastered LO'
-            : 'warm-up review: most stale mastered LO',
+            : 'warm-up review: again after an answer that was not right',
         notchDropFired: false,
       ),
     );
   }
 
-  /// The recheck slot (CONDUCTOR_POLICY §2.6, #187).
+  /// The recheck slot (CONDUCTOR_POLICY §2.6, #187, #275).
   ///
   /// Ordinary practice only asks about the active subgoal (§2.1), and the
   /// warm-up review (§1.5) only about LOs that were once mastered. An LO
@@ -906,52 +1127,75 @@ class Conductor {
   /// toward the prior, never up. Nor can a belief that later work lifted
   /// over the bar from the side (§2.4, #188): that moves no ratchet, so
   /// condition 3 stays open. The slot is that LO's way back: one
-  /// direct question at the student's calibrated level, graded like any
-  /// probe of that LO (§3, ratchets and stamp included), so a right
-  /// answer can complete the three conditions of §4.1 that the grade
-  /// reads.
+  /// direct question, graded like any probe of that LO (§3, ratchets and
+  /// stamp included), so a right answer can complete the four conditions
+  /// of §4.1 that the grade reads.
   ///
-  /// Candidates are the LOs of the active root's subgoals *before* the
-  /// active one — the grading scope, where a later subgoal would be a
-  /// forward reference — whose belief doc one of the [RecheckRule]s finds
-  /// due ([_recheckRuleFor], where each rule lives). Among candidates:
-  /// rule priority (enum order), then the oldest direct probe, then the
-  /// highest decayed mean — the one closest to the stamp. Answering resets
-  /// the LO's direct-probe clock (`LoBelief.lastProbedAt`), so a candidate
-  /// comes back no sooner than its rule allows, whichever way it went.
+  /// Candidates are the LOs before the active subgoal in curriculum order —
+  /// the active root's earlier subgoals and, since #275, every subgoal of
+  /// an earlier root — whose belief doc one of the [RecheckRule]s finds due
+  /// ([_recheckRuleFor], where each rule lives). A later subgoal would be a
+  /// forward reference. Among candidates (#275): an LO of a milestone whose
+  /// deadline has not passed first; then one a return in an earlier session
+  /// did not get right (`returnWrongAt`); then rule priority (enum order),
+  /// the oldest direct probe, and the highest decayed mean — the one
+  /// closest to the stamp. Answering resets the LO's direct-probe clock
+  /// (`LoBelief.lastProbedAt`), so a candidate comes back no sooner than its
+  /// rule allows.
   ///
   /// The question is the gentlest acceptable type for the LO's kind at the
-  /// calibrated difficulty, never notch-dropped: condition 3 of §4.1 wants
-  /// a positive at calibration.
+  /// calibrated difficulty — condition 3 of §4.1 wants a positive at
+  /// calibration — except for a stuck LO (#275), which comes back a notch
+  /// lower first ([NotchDropRule.stuckReturn]).
   Future<QuestionPlan?> _planRecheck({
     required GoalSelectionState selection,
     required Goal active,
   }) async {
     final root = selection.activeRootGoal;
     if (root == null) return null;
-    final earlier = (await _deps.getChildren(root.id))
-        .where((g) => g.id != active.id && g.order < active.order)
-        .toList();
+    final earlier = <({Goal subgoal, Goal? root})>[
+      for (final g in await _deps.getChildren(root.id))
+        if (g.id != active.id && g.order < active.order)
+          (subgoal: g, root: null),
+    ];
+    // #275: the open LOs of an earlier root come back too. Roots are in
+    // curriculum order, as the next-subgoal walk reads them.
+    final roots = await _deps.getRootGoals();
+    final rootIndex = roots.indexWhere((r) => r.id == root.id);
+    for (final r in roots.take(rootIndex < 0 ? 0 : rootIndex)) {
+      for (final g in await _deps.getChildren(r.id)) {
+        earlier.add((subgoal: g, root: r));
+      }
+    }
     if (earlier.isEmpty) return null;
 
     final recentAccuracy = _deps.getCalibration().levelWeightedAccuracy;
     final beliefs = await _deps.getAllLoBeliefs();
     final byKey = {for (final b in beliefs) '${b.subgoalId}/${b.loId}': b};
+    final milestones = await _readMilestones();
     final now = DateTime.now().toUtc();
 
     final candidates =
         <
           ({
             Goal subgoal,
+            Goal? root,
             LearningObjective lo,
             LoBelief belief,
             BeliefSnapshot snap,
             RecheckRule rule,
+            bool openMilestone,
+            bool missed,
           })
         >[];
-    for (final sub in earlier) {
-      for (final lo in sub.objectives) {
-        final b = byKey['${sub.id}/${lo.id}'];
+    for (final entry in earlier) {
+      final subgoal = entry.subgoal;
+      final openMilestone = milestones.any(
+        (m) => m.subgoalIds.contains(subgoal.id) && isMilestoneOpen(m, now),
+      );
+      for (final lo in subgoal.objectives) {
+        final key = '${subgoal.id}/${lo.id}';
+        final b = byKey[key];
         if (b == null) continue;
         final snap = applyDecay(
           alpha: b.alpha,
@@ -959,25 +1203,38 @@ class Conductor {
           lastUpdatedAt: b.lastUpdatedAt,
           now: now,
         );
+        // #275: a return in an earlier session was not answered right.
+        final missed =
+            b.returnWrongAt != null && !_missedThisSession.contains(key);
         final rule = _recheckRuleFor(
           belief: b,
           snap: snap,
           recentAccuracy: recentAccuracy,
+          core: milestones.any((m) => m.isCore(subgoal.id, lo.id)),
+          missedLastSession: missed,
           now: now,
         );
         if (rule == null) continue;
         candidates.add((
-          subgoal: sub,
+          subgoal: subgoal,
+          root: entry.root,
           lo: lo,
           belief: b,
           snap: snap,
           rule: rule,
+          openMilestone: openMilestone,
+          missed: missed,
         ));
       }
     }
     if (candidates.isEmpty) return null;
 
     candidates.sort((a, b) {
+      // #275: the milestone still open first, where a stamp still counts
+      // for the report (PUNTENFORMULE §5) — then the rest.
+      if (a.openMilestone != b.openMilestone) return a.openMilestone ? -1 : 1;
+      // #275: missed in an earlier session — back in this one.
+      if (a.missed != b.missed) return a.missed ? -1 : 1;
       if (a.rule != b.rule) return a.rule.index.compareTo(b.rule.index);
       final pa = a.belief.lastDirectProbeAt;
       final pb = b.belief.lastDirectProbeAt;
@@ -993,6 +1250,15 @@ class Conductor {
     final pick = candidates.first;
     final probedAt = pick.belief.lastDirectProbeAt;
 
+    final calibration = _deps.getCalibration().difficulty;
+    // #275: a stuck LO comes back a notch lower first — a notch drop
+    // (§2.3): out of the calibration window like every recheck, and no
+    // `lastPositiveAtCalibratedAt`. At easy it stays easy.
+    final difficulty = pick.rule == RecheckRule.stuck
+        ? _stepDown(calibration)
+        : calibration;
+    final notchDrop = difficulty != calibration;
+
     _deps.recordDebugEvent('conductor.recheck_planned', {
       'subgoalId': pick.subgoal.id,
       'loId': pick.lo.id,
@@ -1001,13 +1267,24 @@ class Conductor {
       if (probedAt != null) 'probeDays': now.difference(probedAt).inDays,
       'recentAccuracy': recentAccuracy,
       'candidates': candidates.length,
+      if (pick.root != null) 'rootId': pick.root!.id,
+      'openMilestone': pick.openMilestone,
+      'missed': pick.missed,
     });
 
     return QuestionPlan(
-      type: _gentlestTypeFor(pick.lo),
-      difficulty: _deps.getCalibration().difficulty,
+      // #279: the recheck is that LO's way to its stamp, so a pick that
+      // can no longer bring it there is not asked. An LO mastered now —
+      // an unconfirmed one whose level only is missing — has none at stake.
+      type: _gentlestTypeFor(
+        pick.lo,
+        belief: isMastered(pick.snap, pick.belief) ? null : pick.belief,
+        snap: pick.snap,
+        calibration: calibration,
+      ),
+      difficulty: difficulty,
       targetLOs: [pick.lo],
-      recheck: Recheck(subgoal: pick.subgoal, rule: pick.rule),
+      recheck: Recheck(subgoal: pick.subgoal, rule: pick.rule, root: pick.root),
       reason: TurnSelectionReason(
         candidateLOs: candidates
             .take(3)
@@ -1020,21 +1297,119 @@ class Conductor {
             )
             .toList(growable: false),
         chosenReason: _recheckReasons[pick.rule]!,
+        notchDropFired: notchDrop,
+        notchDropRules: notchDrop
+            ? const [NotchDropRule.stuckReturn]
+            : const [],
+      ),
+    );
+  }
+
+  /// The question after a right answer on an LO a recheck brought back
+  /// (#275, §2.6): the same LO again, in this session, past the slot's
+  /// spacing — so the two right own questions the stamp wants (#279) can
+  /// fall in one session. At the calibration, never notch-dropped (a stuck
+  /// LO's lower question was the first one), and another type than the one
+  /// before when the kind has one. `null` when there is no such question,
+  /// or the LO is mastered now.
+  Future<QuestionPlan?> _planChainedRecheck() async {
+    final chain = _returnChain;
+    if (chain == null) return null;
+    final sub = chain.recheck.subgoal;
+    final b = await _deps.getLoBelief(subgoalId: sub.id, loId: chain.lo.id);
+    final now = DateTime.now().toUtc();
+    final snap = b == null
+        ? null
+        : applyDecay(
+            alpha: b.alpha,
+            beta: b.beta,
+            lastUpdatedAt: b.lastUpdatedAt,
+            now: now,
+          );
+    if (b == null || snap == null || isMastered(snap, b)) {
+      _returnChain = null;
+      return null;
+    }
+    final calibration = _deps.getCalibration().difficulty;
+    final acceptable = _acceptableFor(
+      chain.lo,
+      belief: b,
+      snap: snap,
+      calibration: calibration,
+    );
+    final others = acceptable.where((t) => t != chain.lastType).toList();
+    final pool = others.isEmpty ? acceptable : others;
+    final def = _coldStartDefault[chain.lo.kind];
+    final type = def != null && pool.contains(def)
+        ? def
+        : _gentlenessOrder.firstWhere(pool.contains, orElse: () => pool.first);
+
+    _deps.recordDebugEvent('conductor.recheck_planned', {
+      'subgoalId': sub.id,
+      'loId': chain.lo.id,
+      'rule': chain.recheck.rule.name,
+      'mean': snap.mean,
+      'chained': true,
+      if (chain.recheck.root != null) 'rootId': chain.recheck.root!.id,
+    });
+
+    return QuestionPlan(
+      type: type,
+      difficulty: calibration,
+      targetLOs: [chain.lo],
+      recheck: Recheck(
+        subgoal: sub,
+        rule: chain.recheck.rule,
+        root: chain.recheck.root,
+        chained: true,
+      ),
+      reason: TurnSelectionReason(
+        candidateLOs: [
+          CandidateLoStat(
+            loId: chain.lo.id,
+            mean: snap.mean,
+            evidence: snap.evidence,
+          ),
+        ],
+        chosenReason: 'recheck: again after a right answer',
         notchDropFired: false,
       ),
     );
   }
 
+  /// The milestones, for the recheck slot (#275); none when they cannot be
+  /// read — the slot then works as before, without core LOs or order.
+  Future<List<Milestone>> _readMilestones() async {
+    try {
+      return await _deps.getMilestones();
+    } catch (e) {
+      _deps.recordDebugEvent('conductor.milestones_unread', {'error': '$e'});
+      return const [];
+    }
+  }
+
+  /// Whether [m]'s deadline has not passed at [now] (#275): its report day
+  /// (`dueAt`, local midnight at the start of the day) still counts, as the
+  /// students work up to it on that day.
+  static bool isMilestoneOpen(Milestone m, DateTime now) =>
+      now.isBefore(m.dueAt.add(const Duration(days: 1)));
+
   /// `selectionReason.chosenReason` per recheck rule (§8.1).
   static const Map<RecheckRule, String> _recheckReasons = {
+    RecheckRule.open: 'recheck: open core LO not asked for a week',
     RecheckRule.nearGoal: 'recheck: near goal not asked for a week',
     RecheckRule.unconfirmed:
         'recheck: high belief not confirmed by a direct right answer',
+    RecheckRule.stuck: 'recheck: stuck LO, a notch lower first',
+    RecheckRule.thin: 'recheck: thin stamp from before formula 1.1',
   };
 
   /// Which rule of the recheck slot finds [belief] due, if any (§2.6).
   /// [snap] is the decayed belief, [recentAccuracy] the student's
-  /// `levelWeightedAccuracy` (null while the window is not full).
+  /// `levelWeightedAccuracy` (null while the window is not full), [core]
+  /// whether a milestone counts the LO as core, [missedLastSession] whether
+  /// a return in an earlier session was not answered right
+  /// (`returnWrongAt`, #275).
   ///
   /// Each rule is one branch here plus one [RecheckRule] value, checked in
   /// enum order; everything else about the question — slot, spacing,
@@ -1044,27 +1419,51 @@ class Conductor {
     required LoBelief belief,
     required BeliefSnapshot snap,
     required double? recentAccuracy,
+    required bool core,
+    required bool missedLastSession,
     required DateTime now,
   }) {
-    // #187 near goal: not demonstrated, just under the bar, left alone for
-    // a week, while the student's current work at their level is good —
-    // the evaluation tooling's "fossil" (tooling/evaluation/diagnostics.py),
-    // which the teacher otherwise has to settle by hand at report time.
     final probedAt = belief.lastDirectProbeAt;
-    final demonstrated = everMastered(
-      firstMasteredAt: belief.firstMasteredAt,
-      alpha: belief.alpha,
-      beta: belief.beta,
-      lastPositiveAtCalibratedAt: belief.lastPositiveAtCalibratedAt,
-    );
-    if (!demonstrated &&
+    final weekPassed =
         probedAt != null &&
-        now.difference(probedAt) >= PolicyConstants.recheckAfter &&
-        snap.mean >= PolicyConstants.recheckMeanFloor &&
-        snap.mean < PolicyConstants.masteryMeanThreshold &&
+        now.difference(probedAt) >= PolicyConstants.recheckAfter;
+    // The clock of a return: a week without a direct probe — or, after a
+    // return that was not answered right, the next session instead (#275:
+    // "in plaats van na 7 of 30 dagen").
+    final due = weekPassed || missedLastSession;
+    // The brake (#187, kept by #275): the student's current work at their
+    // level is good.
+    final goodRecentWork =
         recentAccuracy != null &&
-        recentAccuracy >= PolicyConstants.recheckRecentAccuracy) {
-      return RecheckRule.nearGoal;
+        recentAccuracy >= PolicyConstants.recheckRecentAccuracy;
+    final demonstrated = everMasteredBelief(belief);
+    final overTheBar = meetsMasteryMeanAndEvidence(snap);
+    final stuck = isStuck(snap, ownQuestions: belief.ownQuestions);
+
+    if (!demonstrated) {
+      // #275 open: a core LO of a milestone, without a stamp, under the bar
+      // and not stuck, at any mean — with forgetting (#278) it moves again.
+      // Never asked directly (a doc from side signals): due at once.
+      if (core &&
+          !overTheBar &&
+          !stuck &&
+          (due || probedAt == null) &&
+          goodRecentWork) {
+        return RecheckRule.open;
+      }
+      // #187 near goal: just under the bar, left alone for a week, while the
+      // student's current work at their level is good — the evaluation
+      // tooling's "fossil" (tooling/evaluation/diagnostics.py), which the
+      // teacher otherwise has to settle by hand at report time. Since #275
+      // for an LO no milestone counts as core: an extension LO, or one of a
+      // subgoal no milestone has yet.
+      if (probedAt != null &&
+          due &&
+          snap.mean >= PolicyConstants.recheckMeanFloor &&
+          snap.mean < PolicyConstants.masteryMeanThreshold &&
+          goodRecentWork) {
+        return RecheckRule.nearGoal;
+      }
     }
 
     // #188 unconfirmed: the belief says "known" — conditions 1 and 2 of
@@ -1076,15 +1475,38 @@ class Conductor {
     // nothing else asks an earlier subgoal's LO. No recent-work gate: the
     // belief already says the student has it, the question lets them show
     // it. The same clock as a near goal, so a wrong answer that leaves the
-    // belief high waits a week too; an LO never asked directly is due now.
+    // belief high comes back at the next session (#275); an LO never asked
+    // directly is due now.
+    // #279: condition 4 open is the same case — a belief lifted over the
+    // bar with fewer than two right own questions behind it, one of them
+    // no multiple choice, and no stamp. A stamp that is there stays: a thin
+    // one from before 1.1 is the [RecheckRule.thin] check below.
     final unconfirmed =
         belief.lastPositiveAtCalibratedAt == null ||
-        belief.highestPositiveDifficulty == null;
-    if (unconfirmed &&
-        meetsMasteryMeanAndEvidence(snap) &&
-        (probedAt == null ||
-            now.difference(probedAt) >= PolicyConstants.recheckAfter)) {
+        belief.highestPositiveDifficulty == null ||
+        (belief.firstMasteredAt == null &&
+            !meetsOwnQuestionsCondition(
+              ownQuestionsRight: belief.ownQuestionsRight,
+              ownQuestionsRightNonMcq: belief.ownQuestionsRightNonMcq,
+            ));
+    if (unconfirmed && overTheBar && (probedAt == null || due)) {
       return RecheckRule.unconfirmed;
+    }
+
+    // #275 stuck: "nu niet", not "nooit". Without a stamp, a week after the
+    // last direct probe (or the next session after a miss), with good
+    // recent work; the question comes a notch lower.
+    if (!demonstrated && stuck && due && goodRecentWork) {
+      return RecheckRule.stuck;
+    }
+
+    // #275 thin: a stamp from before 1.1 on fewer than two right own
+    // questions gets one check a week after its last direct probe. Once.
+    if (isThinStamp(belief) &&
+        belief.thinCheckedAt == null &&
+        (probedAt == null || weekPassed) &&
+        goodRecentWork) {
+      return RecheckRule.thin;
     }
     return null;
   }
@@ -1092,11 +1514,56 @@ class Conductor {
   /// The gentlest acceptable type for [lo]'s kind — the §1.1 cold-start
   /// default. Also the type of the one-question probes on another subgoal
   /// (§1.5 warm-up, §2.6 recheck), which have no per-LO rotation to follow.
-  static ChatRequestType _gentlestTypeFor(LearningObjective lo) {
-    final acceptable =
-        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+  /// [belief], [snap] and [calibration] as for [_acceptableFor]: without a
+  /// pick when one can no longer bring the LO to its stamp (#279) — then
+  /// `socraticQuestion` for `recall`, `explainCode` for `predict`.
+  static ChatRequestType _gentlestTypeFor(
+    LearningObjective lo, {
+    LoBelief? belief,
+    BeliefSnapshot? snap,
+    QuestionDifficulty? calibration,
+  }) {
+    final acceptable = _acceptableFor(
+      lo,
+      belief: belief,
+      snap: snap,
+      calibration: calibration,
+    );
     final def = _coldStartDefault[lo.kind] ?? acceptable.first;
     return acceptable.contains(def) ? def : acceptable.first;
+  }
+
+  /// The acceptable types for [lo]'s kind (§2.2), without `mcQuestion` when
+  /// a right pick can no longer bring the LO to its stamp
+  /// (`belief_math.needsNonMcqQuestion`, #279) and the kind has another
+  /// type. [belief] is the doc of an LO that is not mastered now — `null`
+  /// for a mastered one, or one without a doc, which keeps every type; its
+  /// decayed [snap] and the student's [calibration] go with it.
+  static List<ChatRequestType> _acceptableFor(
+    LearningObjective lo, {
+    LoBelief? belief,
+    BeliefSnapshot? snap,
+    QuestionDifficulty? calibration,
+  }) {
+    final acceptable =
+        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+    if (belief == null || snap == null || calibration == null) {
+      return acceptable;
+    }
+    if (!acceptable.contains(ChatRequestType.mcQuestion) ||
+        acceptable.length == 1) {
+      return acceptable;
+    }
+    if (!needsNonMcqQuestion(
+      snap: snap,
+      belief: belief,
+      calibration: calibration,
+    )) {
+      return acceptable;
+    }
+    return acceptable
+        .where((t) => t != ChatRequestType.mcQuestion)
+        .toList(growable: false);
   }
 
   /// Acceptable types per LO `kind` (CONDUCTOR_POLICY §2.2).
@@ -1137,16 +1604,33 @@ class Conductor {
     ChatRequestType.socraticQuestion,
   ];
 
-  ChatRequestType _pickType(LearningObjective lo, BeliefSnapshot snap) {
-    final acceptable =
-        _acceptableTypes[lo.kind] ?? const [ChatRequestType.socraticQuestion];
+  /// The type of the next question on [lo] (§2.2). [belief] is its doc
+  /// when it is not mastered now (`null` otherwise), for the rule of #279
+  /// ([_acceptableFor]); [calibration] the student's level.
+  ChatRequestType _pickType(
+    LearningObjective lo,
+    BeliefSnapshot snap, {
+    LoBelief? belief,
+    required QuestionDifficulty calibration,
+  }) {
+    final acceptable = _acceptableFor(
+      lo,
+      belief: belief,
+      snap: snap,
+      calibration: calibration,
+    );
     final priorOnly =
         snap.alpha == PolicyConstants.prior &&
         snap.beta == PolicyConstants.prior;
     if (priorOnly) {
       // Cold-start default per kind. Falls back to the first acceptable if
       // the default is somehow not in the acceptable set.
-      return _gentlestTypeFor(lo);
+      return _gentlestTypeFor(
+        lo,
+        belief: belief,
+        snap: snap,
+        calibration: calibration,
+      );
     }
     final candidates = acceptable
         .where((t) => t.name != _lastQuestionTypeForLo(lo.id))
@@ -1231,6 +1715,9 @@ class Conductor {
       // warm-up also spends the session's one warm-up (§1.5).
       if (plan.isWarmUp) _warmUpSettled = true;
       _questionsSinceOffSubgoal = 0;
+      // A fired recheck spends the question that was to follow a right
+      // answer (#275); its own answer decides whether another follows.
+      if (plan.isRecheck) _returnChain = null;
       return;
     }
     _questionsSinceOffSubgoal += 1;
@@ -1426,6 +1913,22 @@ class Conductor {
     }
     // The root's subgoals, read on the first cross-subgoal signal only.
     List<Goal>? siblings;
+    // #279: a positive of a multiple-choice question weighs half, from the
+    // key or the grader, on the target and from the side. A follow-up on
+    // one is free text (§6.2), weighed as any follow-up.
+    final multipleChoice =
+        plan.type == ChatRequestType.mcQuestion && !answer.isFollowUp;
+    // One own question per question (#278), should the grader name the
+    // target twice against the contract (§3.5).
+    var ownQuestionCounted = false;
+    // The target's doc as this turn wrote it, for what a return does next
+    // (#275).
+    LoBelief? targetWritten;
+    // #275: a warm-up review or a recheck brought its LO back. Not the one
+    // check of a thin stamp, whose stamp stays whatever the answer.
+    final thinCheck = plan.recheck?.rule == RecheckRule.thin;
+    final returned = plan.isOffSubgoal && !answer.isFollowUp && !thinCheck;
+    final answeredRight = answer.overallQuality == AnswerQuality.correct;
     for (final sig in answer.signals) {
       final String signalSubgoalId;
       final LearningObjective? lo;
@@ -1485,14 +1988,7 @@ class Conductor {
         final flaggedAt = nextRegressedAt(
           current: existing?.regressedAt,
           directProbe: false,
-          everMastered:
-              existing != null &&
-              everMastered(
-                firstMasteredAt: existing.firstMasteredAt,
-                alpha: existing.alpha,
-                beta: existing.beta,
-                lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-              ),
+          everMastered: existing != null && everMasteredBelief(existing),
           negative: true,
           now: DateTime.now().toUtc(),
         );
@@ -1559,12 +2055,14 @@ class Conductor {
               kind: sig.kind,
               strength: effectiveStrength,
               provenance: answer.provenance,
+              multipleChoice: multipleChoice,
             )
           : signalDeltas(
               kind: sig.kind,
               strength: effectiveStrength,
               difficulty: effectiveDifficulty,
               provenance: answer.provenance,
+              multipleChoice: multipleChoice,
             );
       final next = applyEvidence(
         alpha: alpha,
@@ -1588,8 +2086,35 @@ class Conductor {
       // direct write — weight, strike counter and probe clock as above — but
       // the difficulty was chosen for the target, so it certifies nothing.
       // Without this, two side mentions in the lesson time stamped an LO
-      // nobody asked.
+      // nobody asked. That is the LO's *own question* (#278): the count the
+      // stuck rule reads (§4.4), once per question.
       final movesRatchets = isCalibratedProbeOfThisLo && isTarget;
+      final countsAsOwnQuestion = movesRatchets && !ownQuestionCounted;
+      if (countsAsOwnQuestion) ownQuestionCounted = true;
+      // #279, condition 4 of §4.1: the own question answered right — a
+      // `correct` answer with a positive on its target; a `partial` with a
+      // positive is not right — and whether it was no multiple choice.
+      final ownRight =
+          countsAsOwnQuestion &&
+          hasPositive &&
+          answer.overallQuality == AnswerQuality.correct;
+      // A doc with a stamp but without the counts (from before 1.1) keeps
+      // them missing — a written stamp, or one an old build gave and did
+      // not write (`everMastered`): a count started now would read that
+      // stamp as a thin one (#275). The release fills them from
+      // `turn_history` (#281). Any other doc counts, from 0 when it had
+      // none.
+      final keepCountsMissing =
+          existing != null &&
+          !existing.hasRightCounts &&
+          everMasteredBelief(existing);
+      final nextOwnRight = keepCountsMissing
+          ? null
+          : (existing?.ownQuestionsRight ?? 0) + (ownRight ? 1 : 0);
+      final nextOwnRightNonMcq = keepCountsMissing
+          ? null
+          : (existing?.ownQuestionsRightNonMcq ?? 0) +
+                (ownRight && plan.type != ChatRequestType.mcQuestion ? 1 : 0);
       final newPositiveAtCalibrated =
           (movesRatchets && hasPositive && atOrAbove) ? now : null;
       // #103 three-level ratchet: absolute, not calibration-relative — the
@@ -1623,27 +2148,37 @@ class Conductor {
       // #101 one-way mastery stamp. A doc from before the field existed
       // that reads as "mastered at its last write" keeps that verdict
       // durably (dated to that write) even if this turn leaves it below
-      // mastery; otherwise the stamp is set the first time all three
+      // mastery; otherwise the stamp is set the first time all four
       // conditions hold after this write.
       var nextFirstMasteredAt = existing?.firstMasteredAt;
       if (nextFirstMasteredAt == null) {
-        final legacyMastered =
-            existing != null &&
-            everMastered(
-              firstMasteredAt: null,
-              alpha: existing.alpha,
-              beta: existing.beta,
-              lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-            );
+        final legacyMastered = existing != null && everMasteredBelief(existing);
+        // #279: all four conditions, the right own questions after this
+        // write included.
         final masteredAfter =
             meetsMasteryMeanAndEvidence(next) &&
-            nextPositiveAtCalibrated != null;
+            nextPositiveAtCalibrated != null &&
+            meetsOwnQuestionsCondition(
+              ownQuestionsRight: nextOwnRight,
+              ownQuestionsRightNonMcq: nextOwnRightNonMcq,
+            );
         if (legacyMastered) {
           nextFirstMasteredAt = existing.lastUpdatedAt;
         } else if (masteredAfter) {
           nextFirstMasteredAt = now;
         }
       }
+
+      // #275: a return not answered right brings the LO back at the next
+      // session (`returnWrongAt`); any other own question on it — a right
+      // return, or a question on its own subgoal — settles that. The thin
+      // check leaves it, and marks the stamp as checked.
+      final nextReturnWrongAt = !countsAsOwnQuestion || thinCheck
+          ? existing?.returnWrongAt
+          : (returned && !answeredRight ? now : null);
+      final nextThinCheckedAt = countsAsOwnQuestion && thinCheck
+          ? now
+          : existing?.thinCheckedAt;
 
       // #112 warm-up review flag (§1.5). A direct probe of the LO — this
       // turn's target, in-subgoal incidentals, follow-ups — clears it; a
@@ -1678,14 +2213,25 @@ class Conductor {
         lastProbedAt: isCalibratedProbeOfThisLo
             ? now
             : existing?.lastDirectProbeAt,
+        ownQuestions:
+            (existing?.ownQuestions ?? 0) + (countsAsOwnQuestion ? 1 : 0),
+        ownQuestionsRight: nextOwnRight,
+        ownQuestionsRightNonMcq: nextOwnRightNonMcq,
+        returnWrongAt: nextReturnWrongAt,
+        thinCheckedAt: nextThinCheckedAt,
       );
       await _deps.upsertLoBelief(updated);
+      if (countsAsOwnQuestion) targetWritten = updated;
+      // The evidence this signal added, not the change in `(α, β)`: since
+      // #278 every write forgets first, so the change of a small positive
+      // on an LO with much evidence can be negative, and the direction the
+      // provenance-gap check reads (§8.2) would turn over.
       appliedSignals.add(
         TurnAppliedSignal(
           subgoalId: signalSubgoalId,
           loId: sig.loId,
-          alphaDelta: next.alpha - alpha,
-          betaDelta: next.beta - beta,
+          alphaDelta: deltas.alphaDelta,
+          betaDelta: deltas.betaDelta,
         ),
       );
       if (signalSubgoalId == subgoal.id) {
@@ -1698,10 +2244,35 @@ class Conductor {
       }
     }
 
+    // ---- What a return does next (#275, CONDUCTOR_POLICY §2.6) -----------
+    // Right, on an LO whose stamp is still to earn: the next question on it
+    // comes in this session. Not right: back at the next session — the doc
+    // says so (`returnWrongAt`), and this session leaves it alone.
+    if (plan.isOffSubgoal && !answer.isFollowUp && targetLo != null) {
+      if (!answeredRight) {
+        _missedThisSession.add('${offSubgoal!.id}/${targetLo.id}');
+      }
+      final recheck = plan.recheck;
+      final written = targetWritten;
+      _returnChain =
+          recheck != null &&
+              recheck.rule.earnsStamp &&
+              answeredRight &&
+              written != null &&
+              !isMastered(BeliefSnapshot(written.alpha, written.beta), written)
+          ? (recheck: recheck, lo: targetLo, lastType: plan.type)
+          : null;
+    }
+
     // ---- Transfer credit (#101, CONDUCTOR_POLICY §3.7) --------------------
     final transferCredits = await _applyTransferCredit(
       answer: answer,
       activeSubgoalId: subgoal.id,
+      // Within the active root (§3.7): a recheck of an earlier root (#275)
+      // puts that one subgoal in the grader's scope, not a credit there.
+      rootSubgoalIds: answer.transferLOs.isEmpty
+          ? const {}
+          : {for (final g in siblings ??= await _rootSubgoals(selection)) g.id},
       // The warm-up target and any LO that took a cross-subgoal signal
       // above — or was flagged for review by one — already have this
       // answer on record; a nomination on them would count it twice.
@@ -1712,7 +2283,8 @@ class Conductor {
     // A warm-up or recheck turn that touched no active-subgoal LO changes
     // nothing the active subgoal's cache, history or advancement should
     // react to (§1.5, §2.6): its status is still reported on the turn
-    // record, but not persisted.
+    // record, but not persisted. A subgoal the student picked back up
+    // (#280, §1.6) neither advances nor reopens: its cache only rises.
     final activeTouched = !plan.isOffSubgoal || touchedLoIds.isNotEmpty;
     final freshBeliefs = await _deps.getLoBeliefsForSubgoal(subgoal.id);
     final freshById = {for (final b in freshBeliefs) b.loId: b};
@@ -1729,21 +2301,19 @@ class Conductor {
               lastUpdatedAt: b.lastUpdatedAt,
               now: DateTime.now().toUtc(),
             );
-      final isMastered =
-          meetsMasteryMeanAndEvidence(snap) &&
-          (b?.lastPositiveAtCalibratedAt != null);
-      final stuck = isStuck(snap);
+      final mastered = isMastered(snap, b);
+      final stuck = isStuck(snap, ownQuestions: b?.ownQuestions ?? 0);
       loStatus.add(
         TurnLoStatus(
           loId: lo.id,
           mean: snap.mean,
           evidence: snap.evidence,
-          mastered: isMastered,
+          mastered: mastered,
           stuck: stuck,
         ),
       );
       if (!lo.optional) {
-        masteredCount.add(isMastered);
+        masteredCount.add(mastered);
         stuckCount.add(stuck);
       }
     }
@@ -1780,6 +2350,8 @@ class Conductor {
     bool advanced = false;
     if (!activeTouched) {
       // Nothing to persist or advance; fall through to the record.
+    } else if (plan.selfChosen) {
+      await _raiseSubgoalCache(subgoal, cached, quality: answer.overallQuality);
     } else if (subgoalMastered) {
       // §8.2 stuckLoAdvance: subgoal advanced with one or more stuck LOs.
       final stuckLoIds = <String>[];
@@ -1863,9 +2435,12 @@ class Conductor {
     // §1.5 / §2.6: neither do warm-up or recheck answers — a slip on older
     // material is forgetting, not miscalibration, and a question off the
     // active subgoal must not promote either. It would also feed the
-    // recheck gate its own answers (`levelWeightedAccuracy`).
+    // recheck gate its own answers (`levelWeightedAccuracy`). #280 (§1.6):
+    // nor an answer on a subgoal the student picked back up — a strong
+    // student must not climb on old material, nor one stuck on an LO sink,
+    // and find that in the goal in progress.
     final cal = _deps.getCalibration();
-    final updatedCal = answer.isFollowUp || plan.isOffSubgoal
+    final updatedCal = answer.isFollowUp || plan.isOffSubgoal || plan.selfChosen
         ? cal
         : _updateCalibration(
             current: cal,
@@ -1965,7 +2540,9 @@ class Conductor {
   ///   - never on follow-up grading (dialogue, not a solution) or a
   ///     fallback turn (the primary signals did not validate),
   ///   - never inside the active subgoal (those LOs get §2.4 incidental
-  ///     signals at full weight),
+  ///     signals at full weight), and never outside the active root
+  ///     ([rootSubgoalIds]): a recheck of an earlier root (#275) puts that
+  ///     subgoal in the grader's scope for its target only,
   ///   - only an LO with a belief doc that was ever mastered by direct
   ///     probing (`everMastered`) — an LO never probed cannot be brought
   ///     to mastery sideways.
@@ -1986,6 +2563,7 @@ class Conductor {
   Future<List<TurnTransferCredit>> _applyTransferCredit({
     required GradedAnswer answer,
     required String activeSubgoalId,
+    required Set<String> rootSubgoalIds,
     Map<String, String> excluded = const {},
   }) async {
     if (answer.transferLOs.isEmpty) return const [];
@@ -2010,6 +2588,14 @@ class Conductor {
         });
         continue;
       }
+      if (!rootSubgoalIds.contains(ref.subgoalId)) {
+        _deps.recordDebugEvent('conductor.transfer_dropped', {
+          'subgoalId': ref.subgoalId,
+          'loId': ref.loId,
+          'reason': 'outside the active root',
+        });
+        continue;
+      }
       final excludedReason = excluded['${ref.subgoalId}/${ref.loId}'];
       if (excludedReason != null) {
         _deps.recordDebugEvent('conductor.transfer_dropped', {
@@ -2023,14 +2609,7 @@ class Conductor {
         subgoalId: ref.subgoalId,
         loId: ref.loId,
       );
-      final eligible =
-          existing != null &&
-          everMastered(
-            firstMasteredAt: existing.firstMasteredAt,
-            alpha: existing.alpha,
-            beta: existing.beta,
-            lastPositiveAtCalibratedAt: existing.lastPositiveAtCalibratedAt,
-          );
+      final eligible = existing != null && everMasteredBelief(existing);
       if (!eligible) {
         _deps.recordDebugEvent('conductor.transfer_dropped', {
           'subgoalId': ref.subgoalId,
@@ -2079,11 +2658,13 @@ class Conductor {
           lastProbedAt: existing.lastDirectProbeAt,
         ),
       );
+      // The credit itself, as `appliedSignals` (#278): forgetting would
+      // make the change in α of a credit on a well-evidenced LO negative.
       credits.add(
         TurnTransferCredit(
           subgoalId: ref.subgoalId,
           loId: ref.loId,
-          alphaDelta: next.alpha - snap.alpha,
+          alphaDelta: deltas.alphaDelta,
         ),
       );
     }
@@ -2209,8 +2790,7 @@ class Conductor {
           lastUpdatedAt: b.lastUpdatedAt,
           now: DateTime.now().toUtc(),
         );
-        if (!(meetsMasteryMeanAndEvidence(snap) &&
-            b.lastPositiveAtCalibratedAt != null)) {
+        if (!isMastered(snap, b)) {
           allDone = false;
           break;
         }
@@ -2244,7 +2824,11 @@ class Conductor {
     }
   }
 
-  Future<bool> _setTargetGoal() async {
+  /// The next-subgoal walk: the first subgoal not advanced past, of the
+  /// first root not finished. [announce] off keeps the "new goal" pill out
+  /// of the chat — for the goal in progress read under a subgoal the
+  /// student picked back up (#280).
+  Future<bool> _setTargetGoal({bool announce = true}) async {
     _deps.setSelectedRoot(null);
     _deps.setSelectedChild(null);
 
@@ -2271,13 +2855,15 @@ class Conductor {
           _deps.setSelectedChild(targetChild);
           // The Dutch title plus the id: the chat pill names the subgoal in
           // the app language (#212).
-          _deps.addSystemNotice(
-            ChatNotice(
-              ChatNoticeKind.newGoalSelected,
-              args: [targetChild.title],
-              goalId: targetChild.id,
-            ),
-          );
+          if (announce) {
+            _deps.addSystemNotice(
+              ChatNotice(
+                ChatNoticeKind.newGoalSelected,
+                args: [targetChild.title],
+                goalId: targetChild.id,
+              ),
+            );
+          }
           return true;
         }
       }
@@ -2354,6 +2940,9 @@ class Conductor {
           lastPositiveAtCalibratedAt: b?.lastPositiveAtCalibratedAt,
           firstMasteredAt: b?.firstMasteredAt,
           calibration: calibration,
+          ownQuestions: b?.ownQuestions ?? 0,
+          ownQuestionsRight: b?.ownQuestionsRight,
+          ownQuestionsRightNonMcq: b?.ownQuestionsRightNonMcq,
         ),
         askedAndNotRight: askedAndNotRight.contains(lo.id),
       );
@@ -2401,6 +2990,26 @@ class Conductor {
       quality: quality,
       recordHistory: recordHistory,
     );
+  }
+
+  /// The cached fraction of a subgoal the student picked back up (#280,
+  /// §1.6), written only when it rises: a new stamp shows, a dip does not
+  /// set the bar back, and the doc keeps its `advancedAt` — the subgoal
+  /// stays finished and the walk stays on the goal in progress.
+  Future<void> _raiseSubgoalCache(
+    Goal subgoal,
+    double cached, {
+    AnswerQuality? quality,
+  }) async {
+    final existing = await _deps.getProgressByGoalId(subgoal.id);
+    if (existing != null && cached <= existing.progress) return;
+    await _persistCacheFor(
+      subgoal.id,
+      cached,
+      quality: quality,
+      advancedAt: existing?.advancedAt,
+    );
+    await _recomputeRoot();
   }
 
   Future<void> _recomputeRoot() async {

@@ -26,6 +26,7 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
+import 'package:ai_tutor_python/services/grading/milestone_service.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/progress/progress.dart';
 import 'package:ai_tutor_python/services/progress/progress_service.dart';
@@ -86,7 +87,9 @@ enum SessionStart {
   /// "Continue" on a goal in the learning path.
   continueLearningPath,
 
-  /// "Work on this" on a subgoal.
+  /// A subgoal picked back up from its tile in the learning path, to
+  /// finish or to review it (#280) — before May, "Work on this" on a
+  /// subgoal.
   workOnGoal,
 
   /// The restart button in the chat header.
@@ -204,6 +207,11 @@ class TutorService extends Notifier<TutorState> {
   /// How the session began (#228); see [startSession].
   SessionStart _sessionStart = SessionStart.startup;
   SessionStart? _pendingSessionStart;
+
+  /// The session start in progress, while one is (#284): from the moment
+  /// [initializeSession] hands over to the conductor until the session has
+  /// its subgoal and its first plan. [requestExercise] waits for it.
+  Future<void>? _sessionStarting;
 
   /// Per subgoal, the bank ids on this student's turn records — the
   /// questions they answered there — read once when the bank is first
@@ -443,6 +451,14 @@ class TutorService extends Notifier<TutorState> {
     _inFlightPlan = null;
     _setInFlightQuestion(null);
     _followUpInFlight = null;
+    // A subgoal the student picked back up (#280) that is gone: back to
+    // the goal in progress, as "Verder" would.
+    final selection = ref.read(goalSelectionProvider);
+    if (selection.isSelfChosen && selection.preferredChild?.id == deletedId) {
+      ref.read(goalSelectionProvider.notifier)
+        ..setPreferredRoot(null)
+        ..setPreferredChild(null);
+    }
     await _conductor.setTarget();
     await requestExercise();
   }
@@ -451,6 +467,10 @@ class TutorService extends Notifier<TutorState> {
     final selection = ref.read(goalSelectionProvider);
     final activeChild = selection.activeChildGoal;
     if (activeChild == null) return;
+    // A subgoal the student picked back up (#280) is not reopened by
+    // practising it: it keeps its finished mark, as every finished subgoal
+    // the student is not on does when an LO is added to it.
+    if (selection.isSelfChosen) return;
     final beliefs = await ref
         .read(loBeliefsServiceProvider)
         .getAllForSubgoal(activeChild.id);
@@ -470,10 +490,7 @@ class TutorService extends Notifier<TutorState> {
         lastUpdatedAt: b.lastUpdatedAt,
         now: now,
       );
-      if (meetsMasteryMeanAndEvidence(snap) &&
-          b.lastPositiveAtCalibratedAt != null) {
-        mastered += 1;
-      }
+      if (isMastered(snap, b)) mastered += 1;
     }
     final cached = mastered / nonOptional.length;
     // No `advancedAt` (#161): a subgoal that just grew an LO is open again,
@@ -556,6 +573,8 @@ class TutorService extends Notifier<TutorState> {
       upsertLoBelief: (b) => ref.read(loBeliefsServiceProvider).upsert(b),
       appendTurnHistory: (record) =>
           ref.read(turnHistoryServiceProvider).append(record),
+      // The recheck slot's core LOs and order (#275).
+      getMilestones: () => ref.read(milestoneServiceProvider).getAllOnce(),
     );
   }
 
@@ -596,6 +615,9 @@ class TutorService extends Notifier<TutorState> {
       );
     }
 
+    // An exercise asked for from here on waits for this start (#284).
+    final starting = Completer<void>();
+    _sessionStarting = starting.future;
     try {
       await _initializeSessionBody();
     } catch (e, stack) {
@@ -615,6 +637,10 @@ class TutorService extends Notifier<TutorState> {
           cause: describeFailure(e),
         ),
       );
+    } finally {
+      // A restart pressed meanwhile is a start of its own, still going.
+      if (identical(_sessionStarting, starting.future)) _sessionStarting = null;
+      starting.complete();
     }
   }
 
@@ -625,10 +651,6 @@ class TutorService extends Notifier<TutorState> {
     final plan = await _conductor.planNext();
     if (plan.blockedEmptyObjectives) {
       await _surfaceEmptyObjectivesBlock();
-      return;
-    }
-    if (plan.blockedSaturated) {
-      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
       return;
     }
     if (plan.blockedDegraded) {
@@ -688,9 +710,15 @@ class TutorService extends Notifier<TutorState> {
       final page = type == ChatRequestType.contentQuestion
           ? await _pageSubgoal(selection)
           : null;
+      final offPlan = plan ?? _inFlightPlan;
       final subgoalOverride = type == ChatRequestType.contentQuestion
           ? page?.subgoal
-          : (plan ?? _inFlightPlan)?.offSubgoal;
+          : offPlan?.offSubgoal;
+      // A recheck of an earlier root (#275) is prompted under that goal,
+      // as a page of an earlier goal is (#272).
+      final goalOverride = type == ChatRequestType.contentQuestion
+          ? page?.goal
+          : offPlan?.offRoot;
       final instructions = await _instructionGenerator.generateInstructions(
         type,
         goalSelection: selection,
@@ -702,9 +730,12 @@ class TutorService extends Notifier<TutorState> {
         // so switching language changes the very next question.
         languageCode: ref.read(appLocaleProvider).languageCode,
         targetLOs: plan?.targetLOs ?? const [],
-        goalScopeLOs: await _buildGoalScopeLOs(selection),
+        goalScopeLOs: await _buildGoalScopeLOs(
+          selection,
+          offSubgoal: offPlan?.offSubgoal,
+        ),
         subgoalOverride: subgoalOverride,
-        goalOverride: page?.goal,
+        goalOverride: goalOverride,
         // A question asked next to an open quiz, or while it waits behind
         // the theory, must not give its answer away (#271).
         quizOpen: ref.read(activeMcqProvider) != null,
@@ -849,15 +880,18 @@ class TutorService extends Notifier<TutorState> {
   }
 
   Future<List<({String subgoalId, LearningObjective lo})>> _buildGoalScopeLOs(
-    GoalSelectionState selection,
-  ) async {
+    GoalSelectionState selection, {
+    Goal? offSubgoal,
+  }) async {
     // Returns subgoalId × LearningObjective entries for every subgoal in
     // the active root, used by the grader's `goal_scope_los` payload (per
     // LLM_CONTRACT). Wrapped in a record list to keep the public surface
-    // import-free.
+    // import-free. [offSubgoal] is the subgoal of a warm-up review or a
+    // recheck; when it lies under another root (#275) it joins the scope,
+    // so the grader can file the signal on the asked LO.
     final root = selection.activeRootGoal;
     if (root == null) return const [];
-    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
+    final subs = await _scopeSubgoals(root, offSubgoal: offSubgoal);
     final out = <({String subgoalId, LearningObjective lo})>[];
     for (final sub in subs) {
       for (final o in sub.objectives) {
@@ -865,6 +899,18 @@ class TutorService extends Notifier<TutorState> {
       }
     }
     return out;
+  }
+
+  /// The grading scope's subgoals (LLM_CONTRACT part 3): the active
+  /// [root]'s, plus [offSubgoal] when a recheck asks about a subgoal of an
+  /// earlier root (#275) — that one subgoal, not its root: its other LOs
+  /// stay out of the conductor's reach (`outsideActiveRoot`).
+  Future<List<Goal>> _scopeSubgoals(Goal root, {Goal? offSubgoal}) async {
+    final subs = await ref.read(goalsServiceProvider).getChildrenOnce(root.id);
+    if (offSubgoal == null || subs.any((g) => g.id == offSubgoal.id)) {
+      return subs;
+    }
+    return [...subs, offSubgoal];
   }
 
   Future<_RequestInput?> _buildRequestInput({
@@ -1001,7 +1047,7 @@ class TutorService extends Notifier<TutorState> {
   Future<List<({String subgoalId, LearningObjective lo})>> _buildGradingScope(
     GoalSelectionState selection,
   ) async {
-    return _buildGoalScopeLOs(selection);
+    return _buildGoalScopeLOs(selection, offSubgoal: _inFlightPlan?.offSubgoal);
   }
 
   /// A question request goes out without history — it opens a new
@@ -1173,7 +1219,7 @@ class TutorService extends Notifier<TutorState> {
     final activeChild = selection.activeChildGoal;
     final scopeSubgoals = activeRoot == null
         ? const <Goal>[]
-        : await ref.read(goalsServiceProvider).getChildrenOnce(activeRoot.id);
+        : await _scopeSubgoals(activeRoot, offSubgoal: plan.offSubgoal);
 
     final priorFollowUp = _followUpInFlight;
     final isFollowUpGrading = priorFollowUp != null;
@@ -1287,6 +1333,10 @@ class TutorService extends Notifier<TutorState> {
       chainDepth: chainDepthOnAnswer,
       isWarmUp: plan.isWarmUp,
       isRecheck: plan.isRecheck,
+      // Why the recheck brought its LO back (#275).
+      recheckRule: plan.recheck?.rule.name,
+      // The student picked this subgoal back up (#280).
+      selfChosen: plan.selfChosen,
       // Which subgoal the student was on when the turn was about another
       // one: what a replay needs to read the signals as the conductor did.
       activeSubgoalId: plan.isOffSubgoal ? activeChild?.id : null,
@@ -1885,8 +1935,31 @@ class TutorService extends Notifier<TutorState> {
   /// Public entry (PracticeView mount, "Volgende" after an MCQ). The
   /// conductor's `planNext` reads beliefs from Cosmos; a failure there is
   /// reported in chat instead of escaping the widget callback (#7).
-  Future<void> requestExercise() =>
-      _guarded('requestExercise', _requestExerciseBody);
+  ///
+  /// Asked for while a session is starting, it waits for that start
+  /// (#284). "Verder" in the learning path, pressed in Practice, mounts a
+  /// practice view that asks one frame after the start began, and the
+  /// start's walk to the next subgoal empties the selection before it
+  /// reads the goals and the progress docs: on a slow Cosmos a plan made
+  /// in between found no subgoal, the chat said there were no goals left,
+  /// and nothing asked again. A start that failed has said so in the chat;
+  /// nothing is asked then.
+  Future<void> requestExercise() => _guarded('requestExercise', () async {
+    if (!await _sessionStarted()) return;
+    await _requestExerciseBody();
+  });
+
+  /// Waits until no session start is in progress — a restart pressed
+  /// during one is waited for too (#284). False when it waited and the
+  /// session did not start: the start failed, or the student signed out.
+  Future<bool> _sessionStarted() async {
+    if (_sessionStarting == null) return true;
+    _debug.recordEvent('tutor.request_exercise.awaits_session_start');
+    for (var s = _sessionStarting; s != null; s = _sessionStarting) {
+      await s;
+    }
+    return _initialized;
+  }
 
   Future<void> _requestExerciseBody() async {
     _debug.recordEvent('tutor.request_exercise.entered');
@@ -1905,10 +1978,6 @@ class TutorService extends Notifier<TutorState> {
 
     if (plan.blockedEmptyObjectives) {
       await _surfaceEmptyObjectivesBlock();
-      return;
-    }
-    if (plan.blockedSaturated) {
-      _chat.addSystemNotice(const ChatNotice(ChatNoticeKind.subgoalSaturated));
       return;
     }
     if (plan.blockedDegraded) {
@@ -1936,10 +2005,13 @@ class TutorService extends Notifier<TutorState> {
     final recheck = plan.recheck;
     if (recheck != null) {
       // So is a recheck (#187): one question on an older topic in the
-      // middle of practice needs a reason on screen.
+      // middle of practice needs a reason on screen — and the one after a
+      // right answer on it (#275), which says why it comes again.
       _chat.addSystemNotice(
         ChatNotice(
-          ChatNoticeKind.recheck,
+          recheck.chained
+              ? ChatNoticeKind.recheckAgain
+              : ChatNoticeKind.recheck,
           args: [recheck.subgoal.title],
           goalId: recheck.subgoal.id,
         ),

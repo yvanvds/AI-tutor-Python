@@ -302,4 +302,136 @@ void main() {
       expect(belief().lastDirectProbeAt, isNull);
     });
   });
+
+  group('LoBelief.ownQuestions (#278)', () {
+    LoBelief belief({int ownQuestions = 0}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 2.4,
+      beta: 5,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      ownQuestions: ownQuestions,
+    );
+
+    test('is written and read back', () {
+      final map = belief(ownQuestions: 6).toMap(uid: 'u');
+      expect(map['ownQuestions'], 6);
+      expect(LoBelief.fromCosmos(map).ownQuestions, 6);
+    });
+
+    test('a doc from before formula 1.1 reads 0, so its LO is stuck only '
+        'after six new own questions; a malformed value reads 0 too', () {
+      expect(LoBelief.fromCosmos(_doc()).ownQuestions, 0);
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestions': 'six'}).ownQuestions,
+        0,
+      );
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestions': 7.0}).ownQuestions,
+        7,
+      );
+    });
+
+    test('copyWith keeps it unless given one', () {
+      final b = belief(ownQuestions: 3);
+      expect(b.copyWith(alpha: 3).ownQuestions, 3);
+      expect(b.copyWith(ownQuestions: 4).ownQuestions, 4);
+    });
+  });
+
+  group('LoBelief.ownQuestionsRight and ownQuestionsRightNonMcq (#279)', () {
+    LoBelief belief({int? right, int? nonMcq}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 5,
+      beta: 1,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      ownQuestions: 3,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+
+    test('are written and read back, 0 as 0', () {
+      final map = belief(right: 2, nonMcq: 0).toMap(uid: 'u');
+      expect(map['ownQuestionsRight'], 2);
+      expect(map['ownQuestionsRightNonMcq'], 0);
+      final back = LoBelief.fromCosmos(map);
+      expect(back.ownQuestionsRight, 2);
+      expect(back.ownQuestionsRightNonMcq, 0);
+      expect(back.hasRightCounts, isTrue);
+    });
+
+    test('missing stays missing — not 0 — in the model and on disk: #275 '
+        'tells a stamp from before 1.1 from a thin one by it', () {
+      final old = LoBelief.fromCosmos(_doc());
+      expect(old.ownQuestionsRight, isNull);
+      expect(old.ownQuestionsRightNonMcq, isNull);
+      expect(old.hasRightCounts, isFalse);
+      final map = old.toMap(uid: 'u');
+      expect(map.containsKey('ownQuestionsRight'), isFalse);
+      expect(map.containsKey('ownQuestionsRightNonMcq'), isFalse);
+      // A malformed value is a missing one.
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestionsRight': 'two'})
+            .ownQuestionsRight,
+        isNull,
+      );
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'ownQuestionsRightNonMcq': 1.0})
+            .ownQuestionsRightNonMcq,
+        1,
+      );
+    });
+
+    test('copyWith keeps them unless given', () {
+      final b = belief(right: 2, nonMcq: 1);
+      expect(b.copyWith(alpha: 3).ownQuestionsRight, 2);
+      expect(b.copyWith(alpha: 3).ownQuestionsRightNonMcq, 1);
+      expect(b.copyWith(ownQuestionsRight: 3).ownQuestionsRight, 3);
+      expect(belief().copyWith(alpha: 3).hasRightCounts, isFalse);
+    });
+  });
+
+  group('LoBelief.returnWrongAt and thinCheckedAt (#275)', () {
+    LoBelief belief({DateTime? wrong, DateTime? checked}) => LoBelief(
+      subgoalId: 's',
+      loId: 'lo',
+      alpha: 3,
+      beta: 2,
+      lastUpdatedAt: DateTime.utc(2026, 11, 9),
+      returnWrongAt: wrong,
+      thinCheckedAt: checked,
+    );
+
+    test('are written and read back; missing on an older doc', () {
+      final at = DateTime.utc(2026, 11, 9, 10);
+      final map = belief(wrong: at, checked: at).toMap(uid: 'u');
+      expect(map['returnWrongAt'], '2026-11-09T10:00:00.000Z');
+      expect(map['thinCheckedAt'], '2026-11-09T10:00:00.000Z');
+      final back = LoBelief.fromCosmos(map);
+      expect(back.returnWrongAt, at);
+      expect(back.thinCheckedAt, at);
+
+      final old = LoBelief.fromCosmos(_doc());
+      expect(old.returnWrongAt, isNull);
+      expect(old.thinCheckedAt, isNull);
+      final oldMap = old.toMap(uid: 'u');
+      expect(oldMap.containsKey('returnWrongAt'), isFalse);
+      expect(oldMap.containsKey('thinCheckedAt'), isFalse);
+      expect(
+        LoBelief.fromCosmos({..._doc(), 'returnWrongAt': 12}).returnWrongAt,
+        isNull,
+      );
+    });
+
+    test('copyWith keeps them unless given; returnWrongAt clears only on '
+        'request', () {
+      final at = DateTime.utc(2026, 11, 9, 10);
+      final b = belief(wrong: at, checked: at);
+      expect(b.copyWith(alpha: 4).returnWrongAt, at);
+      expect(b.copyWith(alpha: 4).thinCheckedAt, at);
+      expect(b.copyWith(clearReturnWrongAt: true).returnWrongAt, isNull);
+      expect(b.copyWith(clearReturnWrongAt: true).thinCheckedAt, at);
+    });
+  });
 }

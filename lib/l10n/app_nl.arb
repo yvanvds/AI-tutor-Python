@@ -387,6 +387,7 @@
   "session_runControls_button_stop": "Stop",
 
   "session_objectiveBanner_pill": "Huidig doel",
+  "session_objectiveBanner_pillSelfChosen": "Zelf gekozen",
   "session_objectiveBanner_segments": "{mastered, plural, =1{1 onderdeel beheerst} other{{mastered} onderdelen beheerst}}, {almost} bijna, {todo} nog te doen",
 
   "chat_tutorName": "Tutor",
@@ -716,6 +717,11 @@
   "leerpad_header_subtitle_default": "Python — beginnersreis",
   "leerpad_card_completed": "voltooid",
   "leerpad_card_button_continue": "Verder",
+  "leerpad_child_button_finish": "Afmaken",
+  "leerpad_child_button_review": "Herhalen",
+  "leerpad_child_button_practise": "Oefenen",
+  "leerpad_child_button_tooltip": "Oefeningen over dit subdoel. Met Verder ga je terug naar je huidige doel.",
+  "leerpad_child_practising": "nu bezig",
   "leerpad_child_demonstrated": "{demonstrated} van {total} aangetoond",
   "leerpad_objective_demonstrated": "aangetoond",
   "leerpad_objective_notYetDemonstrated": "nog niet aangetoond",
@@ -796,7 +802,6 @@
   "chat_notice_exerciseWithoutBlank": "In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.",
   "chat_notice_optionsLookAlike": "Twee antwoorden in die vraag zagen er hetzelfde uit. Ik haal een nieuwe op.",
   "chat_notice_subgoalDeletedRedirect": "Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.",
-  "chat_notice_subgoalSaturated": "Je hebt dit subdoel al goed onder de knie. Klaar om verder te gaan?",
   "chat_notice_noGoalsLeft": "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
   "chat_notice_emptyObjectives": "Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om het af te ronden, of kies een ander subdoel.",
   "chat_notice_preparingExercise": "Je volgende oefening wordt voorbereid...",
@@ -804,6 +809,8 @@
   "chat_notice_newGoalSelected": "Nieuw doel geselecteerd: {title}",
   "chat_notice_warmUpReview": "Eerst even opwarmen: één opfrisvraag over {title}.",
   "chat_notice_recheck": "Tussendoor: één controlevraag over {title}, om te tonen dat je het nu kan.",
+  "chat_notice_recheckAgain": "Nog een controlevraag over {title}: de vorige was juist.",
+  "chat_notice_selfChosenSubgoal": "Je koos zelf {title}: de oefeningen gaan nu daarover. Klaar? Met Verder in het Leerpad ga je terug naar je huidige doel.",
   "chat_notice_difficultyChanged": "Moeilijkheid aangepast: {from} -> {to}",
   "chat_notice_submitViaEditor": "Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.",
 

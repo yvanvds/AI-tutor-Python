@@ -44,8 +44,6 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_optionsLookAlike;
       case ChatNoticeKind.subgoalDeletedRedirect:
         return chat_notice_subgoalDeletedRedirect;
-      case ChatNoticeKind.subgoalSaturated:
-        return chat_notice_subgoalSaturated;
       case ChatNoticeKind.noGoalsLeft:
         return chat_notice_noGoalsLeft;
       case ChatNoticeKind.emptyObjectives:
@@ -60,6 +58,10 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_warmUpReview(arg(0));
       case ChatNoticeKind.recheck:
         return chat_notice_recheck(arg(0));
+      case ChatNoticeKind.recheckAgain:
+        return chat_notice_recheckAgain(arg(0));
+      case ChatNoticeKind.selfChosenSubgoal:
+        return chat_notice_selfChosenSubgoal(arg(0));
       case ChatNoticeKind.difficultyChanged:
         return chat_notice_difficultyChanged(
           difficultyName(arg(0)),
