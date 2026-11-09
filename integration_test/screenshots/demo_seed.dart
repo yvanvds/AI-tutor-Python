@@ -32,6 +32,7 @@ import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/grading/grade_formula.dart';
 import 'package:ai_tutor_python/services/grading/grade_proposal.dart';
 import 'package:ai_tutor_python/services/grading/milestone.dart';
+import 'package:ai_tutor_python/services/grading/published_report.dart';
 import 'package:ai_tutor_python/services/playground/playground_files_service.dart';
 import 'package:ai_tutor_python/services/progress/progress_sample.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
@@ -1048,6 +1049,94 @@ GradeProposal _demoProposal(DemoLanguage lang, DateTime now) => GradeProposal(
   justificationAt: _day(now, 1).add(const Duration(hours: 20)).toUtc(),
 );
 
+// ---- The demo student's released report ----------------------------------
+
+/// The report the demo student reads under "My reports" (#298): an interim
+/// report from before [kDemoMilestoneId], released already.
+///
+/// Only the published copy, the way `PublishedReportService.publish` leaves
+/// it in `reports`: the student's page reads that and nothing else, and the
+/// copy carries its own title and date. Its milestone and grade proposal are
+/// left out on purpose — the teacher's Reports page opens on the earliest
+/// milestone, and the tutor's rechecks read the milestones' core LOs, so a
+/// second milestone would change other screenshots.
+const String kDemoReleasedReportId = 'demo-report-0';
+
+Map<String, dynamic> _releasedReport(DemoLanguage lang, DateTime now) {
+  // The core is the first LO of s1–s4, demonstrated at the expected level;
+  // of the extension (lo-calc, lo-int, lo-bool) predicting a comparison is
+  // not there yet; three of the six mastered at the hard level.
+  const k = 1.0, u = 2 / 3, d = 0.5;
+  final mastery = masteryFromFractions(k: k, u: u, d: d);
+  final publishedAt = _day(now, 16).add(const Duration(hours: 9)).toUtc();
+  return PublishedReport(
+    uid: demoStudent.oid,
+    milestoneId: kDemoReleasedReportId,
+    milestoneTitle: lang.pick(
+      'Tussentijds rapport — herfst',
+      'Interim report — autumn',
+    ),
+    dueAt: _day(now, 17).toUtc(),
+    grade: roundedProposal(proposalScore(mEnd: mastery)),
+    // The way the teacher writes report texts: two headings, addressed to
+    // the student, no app words, no names.
+    justification: lang.pick(
+      'Verantwoording van je score\n'
+          '\n'
+          'Je toonde alle vier de kerndoelen van dit rapport aan en twee van '
+          'de drie extra doelen, de helft daarvan met moeilijke oefeningen. '
+          'Print, variabelen en invoer had je in de eerste weken af. Bij '
+          'vergelijkingen ontbreekt nog één doel: je kan voorspellen of een '
+          'vergelijking True of False is.\n'
+          '\n'
+          'Feedback\n'
+          '\n'
+          'Je werkt regelmatig, in de les en thuis. Rekenen met variabelen '
+          'lukt je goed, ook in moeilijke oefeningen. Gaat er iets fout, dan '
+          'is het meestal bij invoer: je vergeet int() en ziet het pas aan '
+          'de uitvoer. Dat merk je wel telkens zelf op, en dat is sterk. In '
+          'de eerste weken werkte je met gewone oefeningen, intussen vooral '
+          'met moeilijke. Over het voorspellen van vergelijkingen kreeg je '
+          'nog weinig vragen. De app komt erop terug; schrijf dan eerst op '
+          'wat links en rechts van het teken staat. Je bent nu bezig met '
+          'vergelijkingen.',
+      'Why you got this score\n'
+          '\n'
+          'You showed all four core objectives of this report and two of the '
+          'three extra objectives, half of them with hard exercises. You '
+          'finished print, variables and input in the first weeks. In '
+          'comparisons one objective is still missing: you can predict '
+          'whether a comparison is True or False.\n'
+          '\n'
+          'Feedback\n'
+          '\n'
+          'You work steadily, in class and at home. Calculating with '
+          'variables goes well, also in hard exercises. When something goes '
+          'wrong, it is usually with input: you forget int() and only see it '
+          'in the output. You do spot it yourself every time, and that is a '
+          'strength. In the first weeks you worked with regular exercises, '
+          'by now mostly with hard ones. You got few questions so far on '
+          'predicting comparisons. The app will come back to it; then first '
+          'write down what is on each side of the sign. You are now working '
+          'on comparisons.',
+    ),
+    note: '',
+    computedAt: _day(now, 18).add(const Duration(hours: 20)).toUtc(),
+    publishedAt: publishedAt,
+    updatedAt: publishedAt,
+    formulaVersion: GradingConstants.formulaVersion,
+    mEnd: mastery,
+    k: k,
+    u: u,
+    d: d,
+    coreCounted: 4,
+    coreTotal: 4,
+    extensionMastered: 2,
+    extensionTotal: 3,
+    expectedDifficulty: QuestionDifficulty.medium,
+  ).toMap();
+}
+
 List<Map<String, dynamic>> _proposals(DemoLanguage lang, DateTime now) => [
   _demoProposal(lang, now).toMap(),
   for (final c in _classmates.where((c) => c.className == kDemoClass))
@@ -1379,6 +1468,7 @@ Map<String, List<Map<String, dynamic>>> demoDocs(
     'turn_history': [for (final r in history) r.toMap(uid: demoStudent.oid)],
     'milestones': [_milestone(lang, now)],
     'grade_proposals': _proposals(lang, now),
+    'reports': [_releasedReport(lang, now)],
     'questions': _bankQuestions(lang, now),
     'playground_files': _playgroundFiles(lang, now),
   };
