@@ -218,11 +218,35 @@ abstract class AppLocalizations {
   /// **'Options'**
   String get sidebar_section_options;
 
-  /// No description provided for @puntenformule_header_note.
+  /// Header line of the Grade formula tab over the short explanation for students (#301), docs/puntenformule-leerlingen.<nl|en>.md
   ///
   /// In en, this message translates to:
-  /// **'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.'**
+  /// **'How your grade comes about, in short. The full formula is at the bottom.'**
   String get puntenformule_header_note;
+
+  /// Header line of the Grade formula tab over the full specification, docs/PUNTENFORMULE.md, which exists in Dutch only (#301)
+  ///
+  /// In en, this message translates to:
+  /// **'The full grade formula, in Dutch: public and versioned. This is the version this build of the app ships with.'**
+  String get puntenformule_full_header_note;
+
+  /// No description provided for @puntenformule_showFull_lead.
+  ///
+  /// In en, this message translates to:
+  /// **'Want to check every rule, down to the decimal?'**
+  String get puntenformule_showFull_lead;
+
+  /// Button at the bottom of the Grade formula tab that switches from the short explanation to the full specification; the specification is Dutch only, so the English label says so (#301)
+  ///
+  /// In en, this message translates to:
+  /// **'Read the full formula (in Dutch)'**
+  String get puntenformule_showFull;
+
+  /// Button at the bottom of the Grade formula tab that switches from the full specification back to the short explanation (#301)
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the short explanation'**
+  String get puntenformule_showShort;
 
   /// No description provided for @puntenformule_loading.
   ///
@@ -856,7 +880,7 @@ abstract class AppLocalizations {
   /// No description provided for @myReports_breakdown_hint.
   ///
   /// In en, this message translates to:
-  /// **'Recompute it yourself with the grade formula (§2) — this grade used formula v{version}.'**
+  /// **'Recompute it yourself: the Grade formula tab shows how. This grade used formula v{version}.'**
   String myReports_breakdown_hint(String version);
 
   /// No description provided for @options_page_title.

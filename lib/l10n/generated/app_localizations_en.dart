@@ -71,7 +71,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get puntenformule_header_note =>
-      'How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.';
+      'How your grade comes about, in short. The full formula is at the bottom.';
+
+  @override
+  String get puntenformule_full_header_note =>
+      'The full grade formula, in Dutch: public and versioned. This is the version this build of the app ships with.';
+
+  @override
+  String get puntenformule_showFull_lead =>
+      'Want to check every rule, down to the decimal?';
+
+  @override
+  String get puntenformule_showFull => 'Read the full formula (in Dutch)';
+
+  @override
+  String get puntenformule_showShort => 'Back to the short explanation';
 
   @override
   String get puntenformule_loading => 'Loading the grade formula…';
@@ -471,7 +485,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String myReports_breakdown_hint(String version) {
-    return 'Recompute it yourself with the grade formula (§2) — this grade used formula v$version.';
+    return 'Recompute it yourself: the Grade formula tab shows how. This grade used formula v$version.';
   }
 
   @override

@@ -90,11 +90,14 @@ flutter:
     - assets/sounds/question.mp3
     - assets/sounds/chime.mp3
     - assets/lesson/lesson.css
-    # The grade formula students read inside the app (#129). The repository
-    # document is bundled as-is — declared here rather than copied under
-    # assets/ — so there is one file to edit and the build ships whatever
-    # version the tree carries.
+    # The grade formula inside the app (#129): the specification, and the
+    # short explanation for students in both app languages that the tab
+    # opens on (#301). The repository documents are bundled as-is — declared
+    # here rather than copied under assets/ — so there is one file to edit
+    # and the build ships whatever version the tree carries.
     - docs/PUNTENFORMULE.md
+    - docs/puntenformule-leerlingen.nl.md
+    - docs/puntenformule-leerlingen.en.md
 
 
   # An image asset can refer to one or more resolution-specific "variants", see
