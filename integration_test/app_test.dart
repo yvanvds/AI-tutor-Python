@@ -77,6 +77,7 @@ import 'flows/question_id.dart' as question_id;
 import 'flows/quiz_chat.dart' as quiz_chat;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
+import 'flows/restart_in_practice.dart' as restart_in_practice;
 import 'flows/session_narrow.dart' as session_narrow;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
@@ -169,6 +170,7 @@ void main() {
   leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();
   verder_slow_cosmos.main();
+  restart_in_practice.main();
   next_root_signal.main();
   turn_content.main();
   level_up_gate.main();

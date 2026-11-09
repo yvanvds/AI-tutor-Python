@@ -37,15 +37,30 @@ class _PracticeViewState extends ConsumerState<PracticeView> {
     ],
   );
 
+  /// The ask for an exercise this view made, while it is on its way.
+  Future<void>? _asking;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final tutor = ref.read(tutorServiceProvider.notifier);
-      if (!tutor.hasInFlightExercise()) {
-        tutor.requestExercise();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askForAnExercise());
+    // A session that starts while this view is on screen — the restart in
+    // the chat header — brings its first exercise, as coming on screen
+    // does (#286). The ask waits for the start (#284).
+    ref.listenManual<int>(sessionStartsProvider, (_, _) => _askForAnExercise());
+  }
+
+  /// Asks for an exercise unless one is in flight for the subgoal the
+  /// session is on, or this view's last ask is still on its way: a restart
+  /// pressed twice, or in the frame this view mounted, asks once.
+  void _askForAnExercise() {
+    if (!mounted || _asking != null) return;
+    final tutor = ref.read(tutorServiceProvider.notifier);
+    if (tutor.hasInFlightExercise()) return;
+    final ask = tutor.requestExercise();
+    _asking = ask;
+    ask.whenComplete(() {
+      if (identical(_asking, ask)) _asking = null;
     });
   }
 

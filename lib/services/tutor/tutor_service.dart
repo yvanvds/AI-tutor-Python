@@ -604,6 +604,11 @@ class TutorService extends Notifier<TutorState> {
     _setInFlightQuestion(null);
     _clearShownQuestion();
     _followUpInFlight = null;
+    // A quiz on screen goes with the exercise it was (#286): left up, the
+    // session's first exercise, a code one, came in behind it, and a pick
+    // on it was graded against that exercise's plan.
+    ref.read(activeMcqProvider.notifier).state = null;
+    _pendingExplainAfterMcqAdvance = false;
     _chat.clear();
 
     if (force) {
@@ -618,6 +623,11 @@ class TutorService extends Notifier<TutorState> {
     // An exercise asked for from here on waits for this start (#284).
     final starting = Completer<void>();
     _sessionStarting = starting.future;
+    // A practice view already on screen asks for the first exercise of
+    // this session now (#286), and its ask waits for the start: the
+    // restart in the chat header changes neither the section nor the mode,
+    // so no new practice view mounts to ask for it.
+    ref.read(sessionStartsProvider.notifier).state++;
     try {
       await _initializeSessionBody();
     } catch (e, stack) {
@@ -2485,6 +2495,14 @@ class TutorService extends Notifier<TutorState> {
 final tutorServiceProvider = NotifierProvider<TutorService, TutorState>(
   TutorService.new,
 );
+
+/// How many sessions have started (#286): one more each time
+/// [TutorService.initializeSession] begins one — the app coming up, the
+/// restart in the chat header, "Verder" and a subgoal picked back up in the
+/// learning path. A practice view on screen asks for the first exercise of
+/// the session then, as it does when it comes on screen; a practice view
+/// that mounts after it asks on mounting.
+final sessionStartsProvider = StateProvider<int>((_) => 0);
 
 /// The clock a graded turn is stamped with (#235): when its question went up
 /// (`askedAt`) and when its answer was graded — the record's `turnAt` and id,

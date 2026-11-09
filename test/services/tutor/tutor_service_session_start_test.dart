@@ -8,11 +8,18 @@
 // progress docs, so on a slow Cosmos a plan made in between found no
 // subgoal: the chat said there were no goals left, and nothing asked again.
 //
+// #286 — the restart in the chat header changes neither the section nor
+// the mode, so no new practice view mounts to ask for the first exercise
+// of the session. The start says it has begun (`sessionStartsProvider`),
+// and a practice view on screen asks then; that ask waits for the start
+// too. The quiz on screen goes with the start.
+//
 // The real `TutorService` over a scripted connector and a mocked
 // conductor whose `setTarget` — the walk — finishes only when the test says
 // so, and whose `planNext` finds nothing until then, as the conductor does
-// while the selection is empty. The end-to-end run is
-// `integration_test/flows/verder_slow_cosmos.dart`.
+// while the selection is empty. The end-to-end runs are
+// `integration_test/flows/verder_slow_cosmos.dart` and
+// `integration_test/flows/restart_in_practice.dart`.
 
 import 'dart:async';
 
@@ -31,6 +38,7 @@ import 'package:ai_tutor_python/services/instructions/instruction.dart';
 import 'package:ai_tutor_python/services/instructions/instructions_service.dart';
 import 'package:ai_tutor_python/services/sound/sound_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/conductor.dart';
 import 'package:ai_tutor_python/services/tutor/instruction_generator.dart';
 import 'package:ai_tutor_python/services/tutor/openai_connector.dart';
@@ -283,5 +291,46 @@ void main() {
 
     expect(connector.sends, 1);
     expect(walks, isEmpty);
+  });
+
+  test('a restart says it has begun, and an exercise asked for then waits '
+      'for its subgoal, and comes', () async {
+    connector.streams.add(_question('Wat zit er in naam?'));
+    // The practice view on screen, as it listens to the starts (#286).
+    final asks = <Future<void>>[];
+    pc.listen<int>(
+      sessionStartsProvider,
+      (_, _) => asks.add(tutor().requestExercise()),
+    );
+
+    final restart = tutor().initializeSession(force: true);
+    await settle();
+    expect(asks, hasLength(1), reason: 'the start did not say it had begun');
+    expect(connector.sends, 0, reason: 'the ask did not wait for the walk');
+
+    walked = true;
+    walks.single.complete();
+    await restart;
+    await asks.single;
+
+    expect(connector.sends, 1);
+    expect(chat.tutorMessageCount.value, 1);
+    expect(pills(), isNot(contains(ChatNoticeKind.noGoalsLeft)));
+  });
+
+  test('a start takes the quiz on screen down', () async {
+    pc.read(activeMcqProvider.notifier).state = const ActiveMcq(
+      prompt: 'Wat toont dit?',
+      code: 'print(2)',
+      options: ['2', '22'],
+    );
+
+    final restart = tutor().initializeSession(force: true);
+    expect(pc.read(activeMcqProvider), isNull);
+    walked = true;
+    walks.single.complete();
+    await restart;
+
+    expect(pc.read(activeMcqProvider), isNull);
   });
 }
