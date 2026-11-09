@@ -1,18 +1,31 @@
+import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// The code editor of Practice and Playground. Ctrl+Enter (Cmd+Enter on a
+/// Mac) runs the code, as the Run button above it does (#300). The
+/// package's own Enter binding matches a plain Enter only, so the two do not
+/// meet; the chat composer has its own focus and keeps Ctrl+Enter for send.
 class Editor extends ConsumerWidget {
   const Editor({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(modeProvider);
+    return CallbackShortcuts(
+      bindings: submitShortcutBindings(() => runEditorCode(ref, mode)),
+      child: _codeField(ref, mode),
+    );
+  }
+
+  Widget _codeField(WidgetRef ref, SessionMode mode) {
     return CodeTheme(
       data: CodeThemeData(styles: tutorCodeTheme),
       child: CodeField(

@@ -78,6 +78,7 @@ import 'flows/quiz_chat.dart' as quiz_chat;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
 import 'flows/restart_in_practice.dart' as restart_in_practice;
+import 'flows/run_shortcut.dart' as run_shortcut;
 import 'flows/session_narrow.dart' as session_narrow;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
 import 'flows/status_report_retry.dart' as status_report_retry;
@@ -159,6 +160,7 @@ void main() {
   quiz_chat.main();
   code_exercise_chat.main();
   turtle_run_notice.main();
+  run_shortcut.main();
   puntenformule_tab.main();
   options_panel.main();
   own_key.main();
