@@ -43,6 +43,7 @@ import 'package:ai_tutor_python/features/goals/child_row.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/goals/root_row.dart';
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
+import 'package:ai_tutor_python/features/my_reports/my_reports_page.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dart';
 import 'package:ai_tutor_python/features/questions/questions_page.dart';
@@ -582,6 +583,26 @@ void main() {
       );
       await pumpUntilFound(tester, find.byType(LevelUpOverlay));
       await _capture(tester, lang, 'level-up');
+      await harness.dispose(tester);
+    });
+
+    testWidgets('my-reports (${lang.code})', (tester) async {
+      final harness = await _boot(tester, lang);
+      await tester.tap(find.byTooltip(l.sidebar_section_myReports));
+      await pumpUntilFound(tester, find.byType(MyReportsPage));
+      final toggle = find.byKey(
+        const Key('my-reports-breakdown-toggle-$kDemoReleasedReportId'),
+      );
+      await pumpUntilFound(tester, toggle);
+      // The grade and the reasoning, and under them, opened, how the grade
+      // was computed: the numbers a student can check against the grade
+      // formula.
+      await tester.tap(toggle);
+      await pumpUntilFound(
+        tester,
+        find.byKey(const Key('my-reports-breakdown-$kDemoReleasedReportId')),
+      );
+      await _capture(tester, lang, 'my-reports');
       await harness.dispose(tester);
     });
 
