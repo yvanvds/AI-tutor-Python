@@ -37,7 +37,23 @@
   "sidebar_section_reports": "Reports",
   "sidebar_section_options": "Options",
 
-  "puntenformule_header_note": "How your report grade is computed. The document is public and versioned; this is the version this build of the app ships with.",
+  "puntenformule_header_note": "How your grade comes about, in short. The full formula is at the bottom.",
+  "@puntenformule_header_note": {
+    "description": "Header line of the Grade formula tab over the short explanation for students (#301), docs/puntenformule-leerlingen.<nl|en>.md"
+  },
+  "puntenformule_full_header_note": "The full grade formula, in Dutch: public and versioned. This is the version this build of the app ships with.",
+  "@puntenformule_full_header_note": {
+    "description": "Header line of the Grade formula tab over the full specification, docs/PUNTENFORMULE.md, which exists in Dutch only (#301)"
+  },
+  "puntenformule_showFull_lead": "Want to check every rule, down to the decimal?",
+  "puntenformule_showFull": "Read the full formula (in Dutch)",
+  "@puntenformule_showFull": {
+    "description": "Button at the bottom of the Grade formula tab that switches from the short explanation to the full specification; the specification is Dutch only, so the English label says so (#301)"
+  },
+  "puntenformule_showShort": "Back to the short explanation",
+  "@puntenformule_showShort": {
+    "description": "Button at the bottom of the Grade formula tab that switches from the full specification back to the short explanation (#301)"
+  },
   "puntenformule_loading": "Loading the grade formula…",
   "puntenformule_loadError": "The grade formula could not be loaded: {error}",
   "@puntenformule_loadError": {
@@ -257,7 +273,7 @@
   "@myReports_breakdown_expectedLevel": {
     "placeholders": { "level": { "type": "String" } }
   },
-  "myReports_breakdown_hint": "Recompute it yourself with the grade formula (§2) — this grade used formula v{version}.",
+  "myReports_breakdown_hint": "Recompute it yourself: the Grade formula tab shows how. This grade used formula v{version}.",
   "@myReports_breakdown_hint": {
     "placeholders": { "version": { "type": "String" } }
   },

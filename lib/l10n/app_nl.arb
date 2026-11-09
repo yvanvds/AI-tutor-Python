@@ -22,7 +22,11 @@
   "sidebar_section_milestones": "Mijlpalen",
   "sidebar_section_reports": "Rapporten",
 
-  "puntenformule_header_note": "Hoe je rapportcijfer tot stand komt. Het document is openbaar en geversioneerd; dit is de versie die deze build van de app meebrengt.",
+  "puntenformule_header_note": "Hoe je punt tot stand komt, kort uitgelegd. Onderaan vind je de volledige formule.",
+  "puntenformule_full_header_note": "De volledige puntenformule: openbaar en geversioneerd. Dit is de versie die deze build van de app meebrengt.",
+  "puntenformule_showFull_lead": "Wil je elke regel tot op de komma narekenen?",
+  "puntenformule_showFull": "Lees de volledige formule",
+  "puntenformule_showShort": "Terug naar de korte uitleg",
   "puntenformule_loading": "Puntenformule laden…",
   "puntenformule_loadError": "De puntenformule kon niet geladen worden: {error}",
 
@@ -132,7 +136,7 @@
   "myReports_breakdown_core": "Kern op het verwachte niveau: {counted} / {total}",
   "myReports_breakdown_extension": "Uitbreiding beheerst: {counted} / {total}",
   "myReports_breakdown_expectedLevel": "Verwacht niveau voor de kern: {level}",
-  "myReports_breakdown_hint": "Reken het zelf na met de Puntenformule (§2) — dit punt gebruikte formule v{version}.",
+  "myReports_breakdown_hint": "Reken het zelf na: het tabblad Puntenformule legt uit hoe. Dit punt gebruikte formule v{version}.",
 
   "sidebar_section_students":"Studenten",
   "sidebar_section_classes": "Klassen",

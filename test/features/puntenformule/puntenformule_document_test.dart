@@ -1,5 +1,7 @@
-// #129: `docs/PUNTENFORMULE.md` ships inside the app and is converted to
-// HTML at load time. This reads the document the way the app does — through
+// #129: `docs/PUNTENFORMULE.md`, the specification behind the grade, ships
+// inside the app (since #301 behind the short explanation for students, see
+// `puntenformule_student_text_test.dart`) and is converted to HTML at load
+// time. This reads the document the way the app does — through
 // the asset bundle, so a missing `pubspec.yaml` entry fails here and not on
 // a student's screen — and checks the conversion keeps every structure the
 // document relies on. The guard the issue asks for: a future edit that
@@ -21,7 +23,7 @@ void main() {
     html = puntenformuleToHtml(source);
   });
 
-  test('the bundled document is the students\' one, with its version line', () {
+  test('the bundled document is the specification, with its version line', () {
     expect(source, startsWith('# Puntenformule'));
     expect(html, contains('<h1'));
     expect(html, contains('<strong>Versie '));

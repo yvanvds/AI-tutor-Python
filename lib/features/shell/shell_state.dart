@@ -20,8 +20,9 @@ enum SessionMode { explain, practice, playground }
 /// `options` is the settings / maintenance panel pinned to the bottom of
 /// the sidebar (issue #25). `milestones` is the grading-milestone editor
 /// (#99): grade proposals are teacher-only, so it never shows to a student.
-/// `puntenformule` is the grade formula document itself, shipped with the
-/// app for every student to read (#129). `reports` is the class-wide report
+/// `puntenformule` is the grade formula, shipped with the app for every
+/// student to read (#129): a short explanation in the app's language, with
+/// the full specification one button away (#301). `reports` is the class-wide report
 /// run and review surface (#148) — grades, so teacher-only like
 /// `milestones`. `questions` is the question bank (#185): every question the
 /// tutor generated, for the teacher to review and hide the bad ones.

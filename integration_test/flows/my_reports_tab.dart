@@ -190,6 +190,16 @@ void main() {
     expect(find.text('Core at the expected level: 2 / 2'), findsOneWidget);
     expect(find.text('Extension mastered: 2 / 4'), findsOneWidget);
     expect(find.text('Expected level for the core: hard'), findsOneWidget);
+    // The hint sends a student to the tab whose short text explains k, u and
+    // d with a worked example (#301), not to a section of the specification.
+    expect(
+      find.text(
+        'Recompute it yourself: the Grade formula tab shows how. This grade '
+        'used formula v1.0.7.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('§'), findsNothing);
     // The two teacher-side numbers behind d are not in the published doc, so
     // the student page never claims them.
     expect(find.textContaining('Demonstrated at hard'), findsNothing);

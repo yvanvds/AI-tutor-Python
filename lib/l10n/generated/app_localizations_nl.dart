@@ -71,7 +71,21 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get puntenformule_header_note =>
-      'Hoe je rapportcijfer tot stand komt. Het document is openbaar en geversioneerd; dit is de versie die deze build van de app meebrengt.';
+      'Hoe je punt tot stand komt, kort uitgelegd. Onderaan vind je de volledige formule.';
+
+  @override
+  String get puntenformule_full_header_note =>
+      'De volledige puntenformule: openbaar en geversioneerd. Dit is de versie die deze build van de app meebrengt.';
+
+  @override
+  String get puntenformule_showFull_lead =>
+      'Wil je elke regel tot op de komma narekenen?';
+
+  @override
+  String get puntenformule_showFull => 'Lees de volledige formule';
+
+  @override
+  String get puntenformule_showShort => 'Terug naar de korte uitleg';
 
   @override
   String get puntenformule_loading => 'Puntenformule laden…';
@@ -472,7 +486,7 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String myReports_breakdown_hint(String version) {
-    return 'Reken het zelf na met de Puntenformule (§2) — dit punt gebruikte formule v$version.';
+    return 'Reken het zelf na: het tabblad Puntenformule legt uit hoe. Dit punt gebruikte formule v$version.';
   }
 
   @override
