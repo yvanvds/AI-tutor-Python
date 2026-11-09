@@ -208,6 +208,11 @@ class TutorService extends Notifier<TutorState> {
   SessionStart _sessionStart = SessionStart.startup;
   SessionStart? _pendingSessionStart;
 
+  /// The session start in progress, while one is (#284): from the moment
+  /// [initializeSession] hands over to the conductor until the session has
+  /// its subgoal and its first plan. [requestExercise] waits for it.
+  Future<void>? _sessionStarting;
+
   /// Per subgoal, the bank ids on this student's turn records — the
   /// questions they answered there — read once when the bank is first
   /// considered for that subgoal (#186).
@@ -610,6 +615,9 @@ class TutorService extends Notifier<TutorState> {
       );
     }
 
+    // An exercise asked for from here on waits for this start (#284).
+    final starting = Completer<void>();
+    _sessionStarting = starting.future;
     try {
       await _initializeSessionBody();
     } catch (e, stack) {
@@ -629,6 +637,10 @@ class TutorService extends Notifier<TutorState> {
           cause: describeFailure(e),
         ),
       );
+    } finally {
+      // A restart pressed meanwhile is a start of its own, still going.
+      if (identical(_sessionStarting, starting.future)) _sessionStarting = null;
+      starting.complete();
     }
   }
 
@@ -1923,8 +1935,31 @@ class TutorService extends Notifier<TutorState> {
   /// Public entry (PracticeView mount, "Volgende" after an MCQ). The
   /// conductor's `planNext` reads beliefs from Cosmos; a failure there is
   /// reported in chat instead of escaping the widget callback (#7).
-  Future<void> requestExercise() =>
-      _guarded('requestExercise', _requestExerciseBody);
+  ///
+  /// Asked for while a session is starting, it waits for that start
+  /// (#284). "Verder" in the learning path, pressed in Practice, mounts a
+  /// practice view that asks one frame after the start began, and the
+  /// start's walk to the next subgoal empties the selection before it
+  /// reads the goals and the progress docs: on a slow Cosmos a plan made
+  /// in between found no subgoal, the chat said there were no goals left,
+  /// and nothing asked again. A start that failed has said so in the chat;
+  /// nothing is asked then.
+  Future<void> requestExercise() => _guarded('requestExercise', () async {
+    if (!await _sessionStarted()) return;
+    await _requestExerciseBody();
+  });
+
+  /// Waits until no session start is in progress — a restart pressed
+  /// during one is waited for too (#284). False when it waited and the
+  /// session did not start: the start failed, or the student signed out.
+  Future<bool> _sessionStarted() async {
+    if (_sessionStarting == null) return true;
+    _debug.recordEvent('tutor.request_exercise.awaits_session_start');
+    for (var s = _sessionStarting; s != null; s = _sessionStarting) {
+      await s;
+    }
+    return _initialized;
+  }
 
   Future<void> _requestExerciseBody() async {
     _debug.recordEvent('tutor.request_exercise.entered');

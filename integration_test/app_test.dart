@@ -106,6 +106,7 @@ import 'flows/update_prompt.dart' as update_prompt;
 import 'flows/update_proxy.dart' as update_proxy;
 import 'flows/update_required.dart' as update_required;
 import 'flows/update_tls_fallback.dart' as update_tls_fallback;
+import 'flows/verder_slow_cosmos.dart' as verder_slow_cosmos;
 import 'flows/warm_up_review.dart' as warm_up_review;
 import 'flows/whats_new_overlay.dart' as whats_new_overlay;
 
@@ -166,6 +167,7 @@ void main() {
   leerpad_demonstrated.main();
   leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();
+  verder_slow_cosmos.main();
   next_root_signal.main();
   turn_content.main();
   level_up_gate.main();
