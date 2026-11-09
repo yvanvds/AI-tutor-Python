@@ -12,6 +12,7 @@
   <!-- Sharing (Smartschool, Teams, …) -->
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="nl_BE" />
+  <meta property="og:locale:alternate" content="en_GB" />
   <meta property="og:site_name" content="AI Tutor — Python" />
   <meta property="og:title" content="Voor leerkrachten — AI Tutor — Python" />
   <meta property="og:description" content="Wat de AI-tutor voor Python een leerkracht biedt: de cursus in eigen hand, de klas volgen, hoe de tutor beslist, evalueren, en wat er met de gegevens van leerlingen gebeurt." />
@@ -25,6 +26,11 @@
   <meta name="twitter:description" content="Wat de AI-tutor voor Python een leerkracht biedt: de cursus in eigen hand, de klas volgen, hoe de tutor beslist, evalueren, en wat er met de gegevens van leerlingen gebeurt." />
   <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/lesson-content.png" />
   <meta name="twitter:image:alt" content="De pagina Lesinhoud van de app: de HTML van een les naast de les zoals de leerling ze ziet." />
+
+  <!-- This page in both languages (#294); x-default is the Dutch page. -->
+  <link rel="alternate" hreflang="nl" href="https://yvanvds.github.io/AI-tutor-Python/leerkrachten.html" />
+  <link rel="alternate" hreflang="en" href="https://yvanvds.github.io/AI-tutor-Python/en/teachers.html" />
+  <link rel="alternate" hreflang="x-default" href="https://yvanvds.github.io/AI-tutor-Python/leerkrachten.html" />
 
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
@@ -51,6 +57,11 @@
           <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
         </ul>
       </nav>
+      <!-- The same page in the other language (#294); en/teachers.html links back. -->
+      <ul class="lang-switch" aria-label="Taal">
+        <li><a href="leerkrachten.html" hreflang="nl" lang="nl" aria-current="page">NL<span class="visually-hidden"> Nederlands</span></a></li>
+        <li><a href="en/teachers.html" hreflang="en" lang="en">EN<span class="visually-hidden"> English</span></a></li>
+      </ul>
     </div>
   </header>
 

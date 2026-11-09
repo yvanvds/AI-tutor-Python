@@ -17,9 +17,16 @@
    .wrap                 centred column, max 1100px, 16px side gutter on phones
    .skip-link            "skip to content" link, visible on keyboard focus
    .site-header          top bar with the 2px leaf→sand rim of the app
-     .site-header-inner    flex row: .brand left, .site-nav right (wraps)
+     .site-header-inner    flex row: .brand left, .site-nav and
+                           .lang-switch right; below 720px the nav takes a
+                           row of its own under the brand and the switch
      .brand                logo + name, links home; .brand-logo, .brand-name
      .site-nav             nav links; a[aria-current="page"] = active
+     .lang-switch          NL | EN (#294): a <ul> after the nav with a link
+                           to the same page in each language (lang,
+                           hreflang); the current one has
+                           aria-current="page". No redirect by browser
+                           language: the visitor picks.
    .hero                 page intro with a faint lamp glow
      .hero-title           h1; .hero-lead = intro paragraph
                            a .screenshot after the .actions = the big
@@ -311,13 +318,14 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-s) var(--space-lg);
   min-height: 64px;
   padding-block: var(--space-m);
 }
 
 .brand {
+  margin-right: auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
@@ -355,9 +363,49 @@ kbd {
 .site-nav a:hover { background: var(--raised); color: var(--fg); }
 .site-nav a[aria-current="page"] { background: var(--raised); color: var(--fg); }
 
-/* On a phone the nav takes its own row under the brand. */
-@media (max-width: 599px) {
-  .site-nav { flex-basis: 100%; margin-inline: calc(-1 * var(--space-sm)); }
+/* Language switch (#294): two small segments, the current language tinted
+   like .pill-accent. */
+.lang-switch {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input-large);
+  background: var(--surface);
+}
+
+.lang-switch a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 32px;
+  padding: var(--space-xxs) var(--space-s);
+  border-radius: var(--radius-input-small);
+  color: var(--fg-mute);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
+}
+.lang-switch a:hover { background: var(--raised); color: var(--fg); }
+.lang-switch a[aria-current="page"] {
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* Below 720px the nav takes its own row under the brand and the language
+   switch, which stay side by side on the first row. */
+@media (max-width: 719px) {
+  .site-nav {
+    order: 1;
+    flex-basis: 100%;
+    margin-inline: calc(-1 * var(--space-sm));
+  }
 }
 
 /* --- Hero ------------------------------------------------------------------ */
@@ -990,6 +1038,7 @@ kbd {
     border-color: var(--border-strong);
   }
   .notice { background: var(--surface); border-color: var(--border-strong); }
+  .lang-switch a[aria-current="page"] { background: var(--raised); }
   .btn-primary:hover { background: var(--accent); }
   ::selection { background: var(--ink-3); }
 }

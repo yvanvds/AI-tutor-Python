@@ -22,6 +22,9 @@ the date and number format, so the English copy under /en/ (#294) brings its
 own template and labels. An unknown {{placeholder}} is an error, so a typo
 never reaches the site as raw braces.
 
+Every *.html under --site with the markers is filled, at any depth: today
+index.html and en/index.html, so static.yml needs no list of pages.
+
 All or nothing: the release must have the installer and its SHA-256, and every
 page must fill, before any file is written. On any failure this exits 1 and
 leaves every page as it was; static.yml runs the step with

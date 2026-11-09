@@ -19,14 +19,18 @@ markers stay, so a second run with the same files changes nothing:
     <!-- curriculum:start -->
     <!-- curriculum:end -->
 
-`--lang en` is for the English copy under /en/ (#294). It takes the titles and
-descriptions from goals/en/goal-texts.json and refuses a goal whose English
-text is missing, or was translated from another Dutch text than the file's.
+By default it writes both start pages (#294): the Dutch list into
+public/index.html and the English one into public/en/index.html. The English
+titles and descriptions come from goals/en/goal-texts.json; a goal whose
+English text is missing, or was translated from another Dutch text than the
+file's, is an error. All or nothing: every page is filled in memory before
+any is written, so a missing translation leaves both pages as they were.
+`--lang nl` or `--lang en` writes only that page.
 
 Run from the repo root:
 
-    python tooling/site/curriculum.py                # nl -> public/index.html
-    python tooling/site/curriculum.py --lang en      # en -> public/en/index.html
+    python tooling/site/curriculum.py                # both pages
+    python tooling/site/curriculum.py --lang nl      # only public/index.html
     python tooling/site/curriculum.py --check-live   # LIVE_GOALS against Cosmos
 
 Standard library only; --check-live uses tooling/evaluation/cosmos.py and
@@ -231,14 +235,18 @@ def check_live(names: list[str], goals_dir: Path = GOALS, cosmos=None) -> list[s
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--lang", choices=sorted(PAGES), default="nl")
+    parser.add_argument("--lang", choices=sorted(PAGES),
+                        help="write only this language's page (default: both)")
     parser.add_argument("--page", type=Path,
-                        help="the page to write (default: public/index.html, public/en/index.html for en)")
+                        help="with --lang: the page to write instead of the default "
+                             "(public/index.html, public/en/index.html for en)")
     parser.add_argument("--goals", nargs="+", metavar="NN-<goal-id>",
                         help="the live goal files, instead of LIVE_GOALS")
     parser.add_argument("--check-live", action="store_true",
                         help="compare the live goals with Cosmos (read-only) and write nothing")
     args = parser.parse_args(argv)
+    if args.page and not args.lang:
+        parser.error("--page needs --lang")
     names = list(args.goals or LIVE_GOALS)
 
     try:
@@ -250,24 +258,28 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"live goals match: {', '.join(names)}")
             return 1 if problems else 0
 
-        page = args.page or PAGES[args.lang]
+        # Every page filled in memory first; nothing is written on an error.
         entries = load_goals(names)
-        lines = render(entries, texts_for(entries, args.lang), args.lang)
-        text = page.read_bytes().decode("utf-8")
-        filled = fill_page(text, lines, page.name)
+        pages = []
+        for lang in [args.lang] if args.lang else list(PAGES):
+            page = args.page or PAGES[lang]
+            lines = render(entries, texts_for(entries, lang), lang)
+            text = page.read_bytes().decode("utf-8")
+            pages.append((page, text, fill_page(text, lines, page.name)))
     except (CurriculumError, OSError, KeyError, ValueError) as e:
-        print(f"error: {e}", file=sys.stderr)
+        print(f"error: {e}. No page was written.", file=sys.stderr)
         return 1
 
-    where = page.resolve()
-    where = where.relative_to(ROOT) if where.is_relative_to(ROOT) else where
     goals = len(entries)
     subgoals = sum(len(e["subgoals"]) for e in entries)
-    if filled == text:
-        print(f"{where}: unchanged ({goals} goals, {subgoals} subgoals)")
-        return 0
-    page.write_bytes(filled.encode("utf-8"))
-    print(f"{where}: written ({goals} goals, {subgoals} subgoals)")
+    for page, text, filled in pages:
+        where = page.resolve()
+        where = where.relative_to(ROOT) if where.is_relative_to(ROOT) else where
+        if filled == text:
+            print(f"{where}: unchanged ({goals} goals, {subgoals} subgoals)")
+            continue
+        page.write_bytes(filled.encode("utf-8"))
+        print(f"{where}: written ({goals} goals, {subgoals} subgoals)")
     return 0
 
 

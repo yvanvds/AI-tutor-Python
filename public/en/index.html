@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Tutor — Python</title>
+  <meta name="description" content="A Python tutor that reads along with you, asks questions at your level and helps you along without giving away the answer. Explanations, exercises, a learning path, XP, badges and your reports, all in one app." />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#211D18" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F6F1E7" media="(prefers-color-scheme: light)" />
+
+  <!-- Sharing (Smartschool, Teams, …) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_GB" />
+  <meta property="og:locale:alternate" content="nl_BE" />
+  <meta property="og:site_name" content="AI Tutor — Python" />
+  <meta property="og:title" content="AI Tutor — Python" />
+  <meta property="og:description" content="A Python tutor that reads along with you, asks questions at your level and helps you along without giving away the answer." />
+  <meta property="og:url" content="https://yvanvds.github.io/AI-tutor-Python/en/" />
+  <meta property="og:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/en/practice.png" />
+  <meta property="og:image:width" content="2160" />
+  <meta property="og:image:height" content="1350" />
+  <meta property="og:image:alt" content="The app during practice: a Python program in the editor, with the tutor in the chat beside it." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AI Tutor — Python" />
+  <meta name="twitter:description" content="A Python tutor that reads along with you, asks questions at your level and helps you along without giving away the answer." />
+  <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/en/practice.png" />
+  <meta name="twitter:image:alt" content="The app during practice: a Python program in the editor, with the tutor in the chat beside it." />
+
+  <!-- This page in both languages (#294); x-default is the Dutch root. -->
+  <link rel="alternate" hreflang="nl" href="https://yvanvds.github.io/AI-tutor-Python/" />
+  <link rel="alternate" hreflang="en" href="https://yvanvds.github.io/AI-tutor-Python/en/" />
+  <link rel="alternate" hreflang="x-default" href="https://yvanvds.github.io/AI-tutor-Python/" />
+
+  <link rel="icon" href="../assets/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+  <link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap site-header-inner">
+      <a class="brand" href="./" aria-current="page">
+        <img class="brand-logo" src="../assets/logo.svg" width="32" height="32" alt="" />
+        <span class="brand-name">AI Tutor — Python</span>
+      </a>
+      <nav class="site-nav" aria-label="Main menu">
+        <ul>
+          <li><a href="#download">Download</a></li>
+          <li><a href="teachers.html">For teachers</a></li>
+          <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
+        </ul>
+      </nav>
+      <!-- The same page in the other language (#294); ../index.html links back. -->
+      <ul class="lang-switch" aria-label="Language">
+        <li><a href="../" hreflang="nl" lang="nl">NL<span class="visually-hidden"> Nederlands</span></a></li>
+        <li><a href="./" hreflang="en" lang="en" aria-current="page">EN<span class="visually-hidden"> English</span></a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- The English copy of the start page (#294): the same sections and
+       blocks as ../index.html (#292), translated from it; keep the two in
+       step. The labels in bold are the app's own (lib/l10n/app_en.arb).
+       Screenshots: the English set of the demo class of #290, invented names
+       only. -->
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <span class="pill pill-accent">For students</span>
+        <h1 class="hero-title">Learn Python with your own tutor</h1>
+        <p class="hero-lead">
+          The AI Tutor is a Python tutor that reads along with you, asks questions at your level
+          and helps you along without giving away the answer.
+        </p>
+        <div class="actions">
+          <!-- To the download section, not to the .exe: who can use the app is
+               said there, before its download button (#291). -->
+          <a class="btn btn-primary" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            Download for Windows
+          </a>
+          <a class="btn btn-secondary" href="#how-it-works">How it works</a>
+        </div>
+
+        <!-- The big picture follows the visitor's theme: practice-light.png
+             in light mode, practice.png otherwise (#290). Not lazy: it is
+             the first thing on the page. -->
+        <figure class="screenshot">
+          <div class="screenshot-bar" aria-hidden="true">
+            <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+            <span class="screenshot-controls"><i></i><i></i><i></i></span>
+          </div>
+          <picture>
+            <source srcset="../screenshots/en/practice-light.png" media="(prefers-color-scheme: light)" width="2160" height="1350" />
+            <img src="../screenshots/en/practice.png" width="2160" height="1350" fetchpriority="high"
+              alt="The app during practice. On the left, a Python program about a discount in the editor, with its output below. On the right, the chat: the student asked for a hint, and the tutor points to the last line without giving the solution. At the top, the Explain, Practice and Playground buttons, the difficulty of the exercise and the level." />
+          </picture>
+          <figcaption class="screenshot-caption">Practice: your code on the left, the tutor on the right. Top right you see the difficulty of the exercise and your level.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 1. How it works: the three modes of the session and the quiz that
+         takes over the editor (see ../index.html for the sources). -->
+    <section class="section" id="how-it-works" aria-labelledby="how-it-works-heading">
+      <div class="wrap">
+        <span class="section-label">In the app</span>
+        <h2 class="section-heading" id="how-it-works-heading">How it works</h2>
+        <p class="section-lead">
+          At the top you choose between <strong>Explain</strong>, <strong>Practice</strong> and <strong>Playground</strong>.
+          In Explain and Practice, the tutor is right beside you, in the chat.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+            </div>
+            <h3 class="card-title">Explain</h3>
+            <p>
+              You read the lesson of the subgoal you are working on.
+              You run the code examples yourself with <strong>Run</strong>.
+            </p>
+            <p>
+              Don't get something? Ask your question in the chat. The tutor knows which lesson you are reading.
+            </p>
+            <p>
+              With <strong>Previous</strong> you page back to lessons you have already read, from earlier goals too.
+              Done reading? <strong>Try it yourself</strong> takes you to Practice.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" /></svg>
+            </div>
+            <h3 class="card-title">Practice</h3>
+            <p>
+              The tutor gives you exercises: writing code, completing code, explaining what code does,
+              predicting what it prints, or an open question.
+              You test your code with <strong>Run</strong> and send it to the tutor, who tells you what is already right and what isn't yet.
+            </p>
+            <p>
+              Stuck? Click the light bulb or type <kbd>?</kbd> for a hint.
+              The tutor helps you on your way, but won't give away the solution, not even if you ask for it.
+            </p>
+            <p>
+              Top right you see how hard the exercise is: easy, medium or hard.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="7" rx="1.5" /><rect x="13" y="4" width="8" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="7" rx="1.5" /><rect x="13" y="13" width="8" height="7" rx="1.5" /></svg>
+            </div>
+            <h3 class="card-title">Quiz questions</h3>
+            <p>
+              Every now and then you get a <strong>quiz question</strong>: a multiple-choice question that takes the place of the editor for a moment.
+              You click an answer and see straight away whether it is right, and why.
+            </p>
+            <p>
+              Not sure? Ask in the chat. The tutor explains the question, but doesn't give away the answer.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3M12 15h5" /></svg>
+            </div>
+            <h3 class="card-title">Playground</h3>
+            <p>
+              Free coding, without a goal and without the tutor: just you and Python.
+            </p>
+            <p>
+              Keep your code with <strong>Save</strong> and open it again later with <strong>Open</strong>.
+              Your files are stored with your account, so you can find them on another computer too.
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot screenshot-wide">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/explain.png" width="2160" height="1350" loading="lazy"
+              alt="Explain: a lesson about if and else with a code example, its output and the Run button. On the right, the student asks in the chat why the last line always runs, and the tutor explains. At the bottom, the Previous and Try it yourself buttons." />
+            <figcaption class="screenshot-caption">Explain: the lesson of your subgoal, with examples you run yourself and a question in the chat.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/quiz.png" width="2160" height="1350" loading="lazy"
+              alt="A quiz question: ‘What does this program print?’, with a short program with if and else and four answers, A to D. The chat is beside it." />
+            <figcaption class="screenshot-caption">A quiz question takes the place of the editor for a moment.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/playground.png" width="2160" height="1350" loading="lazy"
+              alt="The Playground: a program that rolls a die five times, with the output below, and the Open saved code window with five saved files." />
+            <figcaption class="screenshot-caption">Playground: free coding, and keeping your own files.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. The tutor adapts to you, without formulas. The details are on
+         the teachers page (#293). -->
+    <section class="section" id="your-level" aria-labelledby="your-level-heading">
+      <div class="wrap">
+        <span class="section-label">At your level</span>
+        <h2 class="section-heading" id="your-level-heading">The tutor adapts to you</h2>
+        <p class="section-lead">
+          Not everyone gets the same questions. What you get depends on what you can already do.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r=".8" /></svg>
+            </div>
+            <h3 class="card-title">The app knows what you can already do</h3>
+            <p>
+              Every subgoal has a few learning objectives: small things you need to be able to do,
+              like predicting which branch of an if-else runs.
+              After every exercise, the app estimates again how well you can do each learning objective.
+            </p>
+            <p>
+              Your next exercise is usually about the learning objective you are weakest at.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-4M12 19V10M19 19V5" /></svg>
+            </div>
+            <h3 class="card-title">Easier or harder</h3>
+            <p>
+              You practise at one of three difficulty levels: easy, medium or hard. Everyone starts at medium.
+            </p>
+            <p>
+              If things go well for a while, your questions get harder.
+              If things go less well for a while, they get easier.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></svg>
+            </div>
+            <h3 class="card-title">Only done when you really know it</h3>
+            <p>
+              A subgoal is done when you have demonstrated all of its learning objectives. Optional learning objectives aren't required.
+              One right answer is not enough: you need at least two,
+              and at least one of them must not be a quiz question.
+            </p>
+            <p>
+              If a learning objective really doesn't work out, the tutor moves on after a while anyway. It comes back later.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10A8 8 0 0 0 5 7M4.5 3.5V7.5H8.5" /><path d="M4.5 14A8 8 0 0 0 19 17M19.5 20.5v-4h-4" /></svg>
+            </div>
+            <h3 class="card-title">Old material comes back</h3>
+            <p>
+              What you could already do comes back again later.
+              Sometimes a session starts with a <strong>warm-up question</strong> about something from an earlier subgoal.
+            </p>
+            <p>
+              A learning objective that didn't quite work out yet comes back later, as a check question.
+            </p>
+          </article>
+        </div>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13" /></svg>
+          <p>
+            <strong class="notice-title">How does the tutor decide that?</strong>
+            You can read it in detail on the <a href="teachers.html#decisions">page for teachers</a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Your progress: learning path, XP and levels, trophy case and class
+         podium, My reports. -->
+    <section class="section" id="progress" aria-labelledby="progress-heading">
+      <div class="wrap">
+        <span class="section-label">Your progress</span>
+        <h2 class="section-heading" id="progress-heading">You see how far you've come</h2>
+        <p class="section-lead">
+          The app shows what you can already do and what you can't do yet. That way you know what to work on next.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 5.5-5.5 4 4L21 7" /><path d="M15 7h6v6" /></svg>
+            </div>
+            <h3 class="card-title">Learning path</h3>
+            <p>
+              All your goals in a row. For every subgoal you see how many learning objectives you have already demonstrated,
+              for example <em>2 of 3 demonstrated</em>. Open it up and you see which ones are still to do.
+            </p>
+            <p>
+              With <strong>Finish</strong> you complete an earlier subgoal that didn't quite work out yet.
+              With <strong>Review</strong> you practise one again.
+              <strong>Continue</strong> takes you back to your current goal.
+            </p>
+            <p>
+              While you practise, the bar under <strong>Current goal</strong> shows one piece per learning objective.
+              A half piece means: one more right answer.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 14.6 9l6 .7-4.4 4.1 1.2 5.9L12 16.8l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z" /></svg>
+            </div>
+            <h3 class="card-title">XP and levels</h3>
+            <p>
+              Every exercise earns you 20 XP, even if your answer was wrong.
+              What you demonstrate earns extra XP: 100 per subgoal.
+            </p>
+            <p>
+              Every 500 XP takes you up a level. Your level is shown top right in the app.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4" /></svg>
+            </div>
+            <h3 class="card-title">Trophy case</h3>
+            <p>
+              Badges for what you do: for effort, for right answers in a row, for code you wrote yourself.
+              Some are secret. Others you get from your teacher, for things the app can't see.
+            </p>
+            <p>
+              Do you finish a subgoal as one of the first three in your class?
+              Then you get gold, silver or bronze on the <strong>Class podium</strong>. Only you see your medals.
+            </p>
+            <p>
+              Badges give no XP and don't count towards your grade.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5" /><path d="m10 14.5 2 2 4-4" /></svg>
+            </div>
+            <h3 class="card-title">My reports</h3>
+            <p>
+              At report time, your teacher releases your report.
+              Under <strong>My reports</strong> you read your grade and why you got it.
+            </p>
+            <p>
+              Want to check it? Below your report you see how your grade was calculated,
+              and the rules are under <strong>Grade formula</strong>.
+            </p>
+          </article>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/learning-path.png" width="2160" height="1350" loading="lazy"
+              alt="The learning path. The first goal is completed, and each of its subgoals has the Review button. In the second goal, one subgoal is open with its three learning objectives: one demonstrated, two not yet. At the bottom, the Continue button." />
+            <figcaption class="screenshot-caption">Learning path: for every subgoal, what you have already demonstrated.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/level-up.png" width="2160" height="1350" loading="lazy"
+              alt="A congratulation in the middle of the screen: plus 100 XP, Level 7, you've mastered Decisions with if and else. With the Keep learning button." />
+            <figcaption class="screenshot-caption">A new level.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/trophy-case.png" width="2160" height="1350" loading="lazy"
+              alt="The trophy case with badges in tiers, such as Effort, On a roll, Writer and All-rounder. Every badge shows what counts and how far you are from the next tier." />
+            <figcaption class="screenshot-caption">Trophy case: badges in tiers.</figcaption>
+          </figure>
+
+          <figure class="screenshot">
+            <div class="screenshot-bar" aria-hidden="true">
+              <span class="screenshot-title"><img class="screenshot-logo" src="../assets/logo.svg" width="16" height="16" alt="" />AI Tutor — Python</span>
+              <span class="screenshot-controls"><i></i><i></i><i></i></span>
+            </div>
+            <img src="../screenshots/en/trophy-case-podium.png" width="2160" height="1350" loading="lazy"
+              alt="Further down the trophy case: an Expert badge for every goal, the class podium with gold for Variables and bronze for Comparisons, and the badges you get from your teacher." />
+            <figcaption class="screenshot-caption">The class podium and the badges from your teacher.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. What will you learn? The goals that are live, with their subgoals. -->
+    <section class="section" id="what-you-learn" aria-labelledby="what-you-learn-heading">
+      <div class="wrap">
+        <span class="section-label">The course</span>
+        <h2 class="section-heading" id="what-you-learn-heading">What will you learn?</h2>
+        <p class="section-lead">
+          The course is made up of goals, and every goal of subgoals. You work through them in this order.
+          Click a goal to see its subgoals.
+        </p>
+
+        <!-- Written by tooling/site/curriculum.py from the goal files and
+             goals/en/goal-texts.json, for the goals that are live. Do not edit
+             between the markers: run the script, which writes this list and
+             the Dutch one in ../index.html (ROADMAP.md, "Van doelbestand tot
+             live"). -->
+        <!-- curriculum:start -->
+        <ol class="curriculum">
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">1</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Writing and understanding simple Python scripts</span>
+                  <span class="curriculum-count">5 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can write short Python scripts that output numbers and text, use variables to store values, do simple calculations with the standard operators, and process input from the user.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Output with print</dt>
+                    <dd>You can use print() to show strings and numbers on the screen, and you recognize the difference between what is in the source code and what appears as output.</dd>
+                  </div>
+                  <div>
+                    <dt>Variables</dt>
+                    <dd>You can assign a value to a variable with =, choose a valid name, use the variable in expressions and in print, and reassign its value.</dd>
+                  </div>
+                  <div>
+                    <dt>Calculating with numbers</dt>
+                    <dd>You can write and evaluate arithmetic expressions with the standard operators (+, -, *, /, //, %, **), apply the order of operations, and recognize the difference between int and float.</dd>
+                  </div>
+                  <div>
+                    <dt>Input with input</dt>
+                    <dd>You can use input() to ask the user for a value with a clear prompt, store the result in a variable, and convert the input to int or float when you need to calculate with it.</dd>
+                  </div>
+                  <div>
+                    <dt>Putting together a small script</dt>
+                    <dd>You can combine the building blocks covered so far — input, variables, calculations, print — into a small, working Python script that solves a problem described in plain language, and you can read, trace and debug such a script.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">2</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Programming decisions with conditions</span>
+                  <span class="curriculum-count">4 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can write comparisons that give True or False, program decisions with if, elif and else, combine conditions with and, or and not, and use the turtle module to make drawings in which conditions decide what gets drawn.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Comparisons and booleans</dt>
+                    <dd>You can use comparison operators (==, !=, &lt;, &gt;, &lt;=, &gt;=) to write expressions that give True or False, store that result in a variable, and predict what a comparison gives.</dd>
+                  </div>
+                  <div>
+                    <dt>Decisions with if and else</dt>
+                    <dd>You can write an if statement that runs code when a condition is true, add an else branch to choose between two blocks, and predict which branch runs.</dd>
+                  </div>
+                  <div>
+                    <dt>More choices with elif, and, or and not</dt>
+                    <dd>You can tell several cases apart with an if/elif/else chain and combine conditions with and, or and not.</dd>
+                  </div>
+                  <div>
+                    <dt>Drawing with turtle</dt>
+                    <dd>You can program a drawing with the turtle module: create a turtle, move and turn it, set the pen and the color, and use conditions to decide what gets drawn.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">3</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Programming repetition with loops</span>
+                  <span class="curriculum-count">4 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can implement repetition with for and while, test and debug programs systematically with different test cases, and translate more complex problems into working Python code, including turtle drawings.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Repeating with for and range</dt>
+                    <dd>You can write a for loop with range to repeat an operation a fixed number of times, predict the output of such a loop, build up a result in a variable, and draw regular shapes with turtle.</dd>
+                  </div>
+                  <div>
+                    <dt>Repeating with while</dt>
+                    <dd>You can write a while loop that repeats as long as a condition is true, predict when such a loop stops, recognize infinite loops, and use a loop to validate input.</dd>
+                  </div>
+                  <div>
+                    <dt>Testing and debugging</dt>
+                    <dd>You can test a program systematically by trying out different test cases, choose meaningful test cases including edge cases, interpret error messages, and find and fix errors.</dd>
+                  </div>
+                  <div>
+                    <dt>From problem to program</dt>
+                    <dd>You can break a more complex problem down into steps and translate it into a working Python program that combines conditions, loops and possibly turtle, and find and fix logic errors in it.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">4</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Lists and tuples</span>
+                  <span class="curriculum-count">6 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can store data in lists and tuples: get and change elements by their index or with slicing, loop over lists and strings, write classic list algorithms yourself, make use of the difference between mutable lists and immutable tuples, and work with nested loops on pairs and grids.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Lists, strings and indexes</dt>
+                    <dd>You can create a list, get and change elements by their index (including a negative one), take out a part with slicing, and index a string the same way, as a sequence of characters.</dd>
+                  </div>
+                  <div>
+                    <dt>Changing lists with methods</dt>
+                    <dd>You can make a list grow and shrink with append, insert, remove and pop, check with in whether a value is in it, and use sum, min, max and sort.</dd>
+                  </div>
+                  <div>
+                    <dt>Looping over lists and strings</dt>
+                    <dd>You can use a for loop to process every element of a list or string, choose between a loop over the elements and a loop over the indexes, build a new list by filtering or transforming, and draw with turtle based on a list.</dd>
+                  </div>
+                  <div>
+                    <dt>Classic list patterns</dt>
+                    <dd>You can write common algorithms over a list yourself: find the largest or smallest element without max() or min(), count what meets a condition, search whether and where a value occurs, and swap two elements.</dd>
+                  </div>
+                  <div>
+                    <dt>Tuples and immutability</dt>
+                    <dd>You can create, index and unpack tuples (also to swap values or to loop over a list of pairs), explain why tuples and strings can't be changed, and predict what happens when two names refer to the same list.</dd>
+                  </div>
+                  <div>
+                    <dt>Nested loops and lists of lists</dt>
+                    <dd>You can write a loop inside a loop to go through pairs from a list, predict how often the inner loop runs, and loop through and change a grid as a list of lists with grid[r][c].</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">5</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Functions</span>
+                  <span class="curriculum-count">6 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can write and call your own functions: give code a name with def, pass data in through parameters, give back a result with return, predict which variables exist inside and outside a function, translate formulas from math, physics and economics into functions and make tables of values with them, and split a bigger problem into functions that call each other.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Writing and calling a function</dt>
+                    <dd>You can use def to write a function that takes in a value through a parameter and gives back a result with return, call it, and store the result, print it or use it further in an expression.</dd>
+                  </div>
+                  <div>
+                    <dt>Parameters and arguments</dt>
+                    <dd>You can give a function several parameters, call it with the right arguments in the right order, predict which value each parameter gets, and generalize a calculation you need more than once into a function.</dd>
+                  </div>
+                  <div>
+                    <dt>A closer look at return</dt>
+                    <dd>You can predict what goes wrong when a function prints instead of giving back a value and fix that, predict that a function stops at the first return, write functions that give back True or False, and recognize when a function does something, such as drawing, instead of calculating something.</dd>
+                  </div>
+                  <div>
+                    <dt>Local variables</dt>
+                    <dd>You can predict which variables exist inside and outside a function, what happens to a variable from outside when the function assigns a value to a variable with the same name, and explain why a function should get its data through parameters and give it back through return.</dd>
+                  </div>
+                  <div>
+                    <dt>Mathematical functions and tables of values</dt>
+                    <dd>You can translate a rule from math, physics or economics into a Python function, use the math module, make a table of values with a loop, and work out something about the function from those values, such as where it is smallest or changes sign.</dd>
+                  </div>
+                  <div>
+                    <dt>Splitting a problem into functions</dt>
+                    <dd>You can split a bigger problem into functions that each have one task, write functions that call other functions or work with lists, and test a function with well-chosen calls.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+          <li>
+            <details class="curriculum-goal">
+              <summary>
+                <span class="curriculum-number">6</span>
+                <span class="curriculum-heading">
+                  <span class="curriculum-title">Randomness and simulation</span>
+                  <span class="curriculum-count">5 subgoals</span>
+                </span>
+              </summary>
+              <div class="curriculum-body">
+                <p>You can bring randomness into a program with the random module and use it to act out experiments: make random values, estimate a probability by repeating an experiment many times, estimate an area with random points, program a random walk, and translate a described situation into a simulation that you check with a case whose answer you know.</p>
+                <dl class="curriculum-subgoals">
+                  <div>
+                    <dt>Making random numbers</dt>
+                    <dd>You can make random values with the random module: a whole number between two limits, a decimal number between 0 and 1 or a random element from a list, make an event happen with a given probability, and predict which output of such a script is possible.</dd>
+                  </div>
+                  <div>
+                    <dt>Estimating a probability by repeating</dt>
+                    <dd>You can repeat a random experiment many times, count how often an event occurs and so estimate its probability, keep track of how often each outcome comes up, and explain why more repetitions give a more reliable estimate.</dd>
+                  </div>
+                  <div>
+                    <dt>Estimating an area with random points</dt>
+                    <dd>You can make random points inside a rectangle, check whether a point is inside a shape, and estimate the area of that shape from the share of hits, such as a circle or the area under a graph.</dd>
+                  </div>
+                  <div>
+                    <dt>Random walks</dt>
+                    <dd>You can program a random walk in which a position changes randomly at every step, keep the path in a list, make a walk stop at a limit, and explain what many repeated walks show that one walk does not.</dd>
+                  </div>
+                  <div>
+                    <dt>From situation to simulation</dt>
+                    <dd>You can translate a described situation with randomness into a simulation: decide what one experiment is, write that experiment as a function, repeat it many times to estimate a probability or an average, and check the simulation with a case whose answer you know.</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </li>
+        </ol>
+        <!-- curriculum:end -->
+      </div>
+    </section>
+
+    <!-- 5. Everything's included: Python and its packages, two languages,
+         the theme, the in-app update. -->
+    <section class="section" id="all-in" aria-labelledby="all-in-heading">
+      <div class="wrap">
+        <span class="section-label">The app</span>
+        <h2 class="section-heading" id="all-in-heading">Everything's included</h2>
+        <p class="section-lead">
+          You install one app, and you can get started.
+        </p>
+
+        <div class="card-grid card-grid-2">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5z" /><path d="M3 8v8l9 5 9-5V8M12 13v8" /></svg>
+            </div>
+            <h3 class="card-title">Python included</h3>
+            <p>
+              You don't need to install Python, nor turtle, matplotlib, numpy or pandas.
+              They are in the app. Your code runs on your own laptop.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z" /></svg>
+            </div>
+            <h3 class="card-title">Dutch or English</h3>
+            <p>
+              The app, the lessons and what the tutor writes are available in Dutch and in English.
+              You choose your language in <strong>Options → Language</strong>.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></svg>
+            </div>
+            <h3 class="card-title">Dark or light</h3>
+            <p>
+              The app follows the Windows theme.
+              In <strong>Options → Appearance</strong> you choose <strong>Light</strong> or <strong>Dark</strong> yourself.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            </div>
+            <h3 class="card-title">Updates itself</h3>
+            <p>
+              When there is a new version, you see a bar at the top of the app.
+              Click <strong>Update</strong> and you carry on in the new version.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download (#291): who can use the app, the installer with the facts of
+         the latest release, the install steps, what you need, updates and how
+         to report a problem. The English copy of the section in ../index.html,
+         with its own template (lang="en": English date and size), filled by
+         the same deploy step. -->
+    <section class="section" id="download" aria-labelledby="download-heading">
+      <div class="wrap">
+        <span class="section-label">Download</span>
+        <h2 class="section-heading" id="download-heading">Installing the app</h2>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
+          <p>
+            <strong class="notice-title">For now only for SMA Arcadia</strong>
+            The app currently only works for students of SMA Arcadia. You sign in with your school account.
+            A version without a school account is in preparation
+            (<a href="https://github.com/yvanvds/AI-tutor-Python/issues/261">#261 on GitHub</a>).
+          </p>
+        </div>
+
+        <div class="download-panel">
+          <div class="actions">
+            <a class="btn btn-primary" href="https://github.com/yvanvds/AI-tutor-Python/releases/latest/download/python_teacher_install.exe" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+              Download for Windows
+            </a>
+          </div>
+          <div class="download-release">
+            <!-- static.yml fills in the latest release when it publishes the site
+                 (tooling/site/fill_release.py, which fills every page under
+                 public/ that has these markers): the two release markers and
+                 the fallback between them make way for the template below
+                 them. Without that step (a local preview, or a failed lookup)
+                 the fallback stays and the template is inert. -->
+            <!-- release:start -->
+            <p class="muted">Version, date, size and SHA-256: see <a href="https://github.com/yvanvds/AI-tutor-Python/releases">all releases on GitHub</a>.</p>
+            <!-- release:end -->
+            <template data-release-template lang="en">
+              <dl class="release-facts">
+                <div><dt>Version</dt><dd>{{version}}</dd></div>
+                <div><dt>Released on</dt><dd><time datetime="{{date_iso}}">{{date}}</time></dd></div>
+                <div><dt>Size</dt><dd>{{size}}</dd></div>
+                <div class="release-facts-wide"><dt>SHA-256</dt><dd><code>{{sha256}}</code></dd></div>
+              </dl>
+              <p class="release-note">
+                Want to check that the file arrived intact? In PowerShell,
+                <code>Get-FileHash python_teacher_install.exe</code> shows the same SHA-256, in capitals.
+              </p>
+              <p class="release-note"><a href="https://github.com/yvanvds/AI-tutor-Python/releases">All releases on GitHub</a></p>
+            </template>
+          </div>
+        </div>
+
+        <h3 class="section-subheading">Installing, step by step</h3>
+        <ol class="steps">
+          <li>
+            <strong class="steps-title">Download the installer</strong>
+            <p>Click <strong>Download for Windows</strong>. Does your browser ask whether you want to keep the file? Then choose <strong>Keep</strong>.</p>
+          </li>
+          <li>
+            <strong class="steps-title">Start the installer</strong>
+            <p>
+              Open <code>python_teacher_install.exe</code> from your Downloads folder.
+              Does Windows show a blue SmartScreen window? Click <strong>More info</strong> and then <strong>Run anyway</strong>.
+              Windows warns you because the app is new and has no digital signature.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Install it just for you</strong>
+            <p>
+              Choose <strong>Install for me only</strong> and click <strong>Next</strong> until you see <strong>Install</strong>.
+              You don't need admin rights: the app is installed for you only.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Start the app</strong>
+            <p>
+              Leave <strong>Launch Python Teacher</strong> ticked and click <strong>Finish</strong>. The app starts right away.
+              Later you'll find it in the Start menu as <strong>Python Teacher</strong>.
+            </p>
+          </li>
+          <li>
+            <strong class="steps-title">Sign in</strong>
+            <p>Click <strong>Sign in with school account</strong> and sign in with your school Microsoft account.</p>
+            <p>
+              Does the app then ask for an API key? Then your teacher still has to switch your account on.
+              You don't need a key yourself. Tell your teacher and leave the app open: as soon as your account is on, you carry on by yourself.
+            </p>
+          </li>
+        </ol>
+
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon card-icon-info" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
+            </div>
+            <h3 class="card-title">What you need</h3>
+            <p>Windows 10 or 11, 64-bit. And internet: the tutor and your progress are online.</p>
+            <p>You don't need to install Python. It is in the app, with turtle, matplotlib, numpy and pandas.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10A8 8 0 0 0 5 7M4.5 3.5V7.5H8.5" /><path d="M4.5 14A8 8 0 0 0 19 17M19.5 20.5v-4h-4" /></svg>
+            </div>
+            <h3 class="card-title">Updates</h3>
+            <p>
+              The app updates itself. When there is a new version, you see a bar at the top of the app.
+              Click <strong>Update</strong>: the app closes for a moment and comes back in the new version.
+              You don't need to come back to this site.
+            </p>
+            <p>Want to check yourself? Go to <strong>Options → About</strong> and click <strong>Check for updates</strong>.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon card-icon-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5V6a3 3 0 0 1 6 0v1.5" /><rect x="7" y="7.5" width="10" height="12" rx="5" /><path d="M12 11v8.5M3.5 13H7M17 13h3.5M4.5 8.5 7 10M19.5 8.5 17 10M4.5 18.5 7 17M19.5 18.5 17 17" /></svg>
+            </div>
+            <h3 class="card-title">Reporting a problem</h3>
+            <p>
+              Go to <strong>Options → Bug reports</strong>, click <strong>Report a bug…</strong> and write what went wrong.
+              Click <strong>Save as file</strong> and send that file to your teacher.
+            </p>
+            <p>Have a GitHub account? Then click <strong>Connect GitHub</strong> first. After that, <strong>Post on GitHub</strong> puts your report straight on GitHub.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© <span id="year">2026</span> AI Tutor — Python</p>
+      <ul class="footer-links">
+        <li><a href="teachers.html">For teachers</a></li>
+        <li><a href="https://github.com/yvanvds/AI-tutor-Python">Source on GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

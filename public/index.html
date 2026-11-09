@@ -12,6 +12,7 @@
   <!-- Sharing (Smartschool, Teams, …) -->
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="nl_BE" />
+  <meta property="og:locale:alternate" content="en_GB" />
   <meta property="og:site_name" content="AI Tutor — Python" />
   <meta property="og:title" content="AI Tutor — Python" />
   <meta property="og:description" content="Een Python-tutor die met je meeleest, vragen stelt op jouw niveau en je verder helpt zonder het antwoord voor te zeggen." />
@@ -25,6 +26,11 @@
   <meta name="twitter:description" content="Een Python-tutor die met je meeleest, vragen stelt op jouw niveau en je verder helpt zonder het antwoord voor te zeggen." />
   <meta name="twitter:image" content="https://yvanvds.github.io/AI-tutor-Python/screenshots/nl/practice.png" />
   <meta name="twitter:image:alt" content="De app tijdens het oefenen: een Python-programma in de editor, met de tutor in de chat ernaast." />
+
+  <!-- This page in both languages (#294); x-default is the Dutch root. -->
+  <link rel="alternate" hreflang="nl" href="https://yvanvds.github.io/AI-tutor-Python/" />
+  <link rel="alternate" hreflang="en" href="https://yvanvds.github.io/AI-tutor-Python/en/" />
+  <link rel="alternate" hreflang="x-default" href="https://yvanvds.github.io/AI-tutor-Python/" />
 
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
@@ -51,6 +57,11 @@
           <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
         </ul>
       </nav>
+      <!-- The same page in the other language (#294); en/index.html links back. -->
+      <ul class="lang-switch" aria-label="Taal">
+        <li><a href="./" hreflang="nl" lang="nl" aria-current="page">NL<span class="visually-hidden"> Nederlands</span></a></li>
+        <li><a href="en/" hreflang="en" lang="en">EN<span class="visually-hidden"> English</span></a></li>
+      </ul>
     </div>
   </header>
 
@@ -431,7 +442,8 @@
 
         <!-- Written by tooling/site/curriculum.py from the goal files, for the
              goals that are live. Do not edit between the markers: run the
-             script (ROADMAP.md, "Van doelbestand tot live"). -->
+             script, which writes this list and the English one in
+             en/index.html (ROADMAP.md, "Van doelbestand tot live"). -->
         <!-- curriculum:start -->
         <ol class="curriculum">
           <li>
@@ -716,8 +728,9 @@
 
     <!-- Download (#291): who can use the app, the installer with the facts of
          the latest release, the install steps, what you need, updates and how
-         to report a problem. One self-contained section, already in Dutch: #292
-         rewrites the rest of this page in Dutch, #294 adds the English copy. -->
+         to report a problem. One self-contained section; en/index.html has
+         the English copy, with its own template (lang="en"), filled by the
+         same step (#294). -->
     <section class="section" id="download" lang="nl" aria-labelledby="download-heading">
       <div class="wrap">
         <span class="section-label">Downloaden</span>

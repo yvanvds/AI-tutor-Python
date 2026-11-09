@@ -35,6 +35,12 @@
           <li><a href="https://github.com/yvanvds/AI-tutor-Python">GitHub</a></li>
         </ul>
       </nav>
+      <!-- The two start pages (#294): this page has no counterpart, so
+           neither language is the current one. -->
+      <ul class="lang-switch" aria-label="Language / Taal">
+        <li><a href="./" hreflang="nl" lang="nl">NL<span class="visually-hidden"> Nederlands</span></a></li>
+        <li><a href="en/" hreflang="en" lang="en">EN<span class="visually-hidden"> English</span></a></li>
+      </ul>
     </div>
   </header>
 
@@ -51,10 +57,15 @@
 <span class="err">FileNotFoundError: [Errno 2] No such file or directory: 'this-page'</span></code></pre>
       </div>
 
+      <!-- Both start pages: English under en/, Dutch at the root (#294). -->
       <div class="actions">
-        <a class="btn btn-primary" href="./">
+        <a class="btn btn-primary" href="en/" hreflang="en">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
           Back to the start page
+        </a>
+        <a class="btn btn-secondary" href="./" hreflang="nl" lang="nl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+          Terug naar de startpagina
         </a>
       </div>
     </div>
