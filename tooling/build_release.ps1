@@ -231,7 +231,17 @@ if ($lastTag) {
 } else {
     $rangeArg = '-30'
 }
-$commits = (& git log $rangeArg --no-merges --pretty=format:'- %s')
+# Git writes UTF-8, but PowerShell decodes a native command's output with
+# [Console]::OutputEncoding - the OEM code page (850) on this machine - so a
+# subject with a non-ASCII character came out garbled: λ as "╬╗", — as "ÔÇö"
+# (#295). Read the log as UTF-8 and put the console back afterwards.
+$prevOutputEncoding = [Console]::OutputEncoding
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $commits = (& git log $rangeArg --no-merges --pretty=format:'- %s')
+} finally {
+    [Console]::OutputEncoding = $prevOutputEncoding
+}
 if (-not $commits) { $commits = "- $fullVersion" }
 
 $tag       = "v$fullVersion"
