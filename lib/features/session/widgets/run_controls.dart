@@ -8,6 +8,7 @@ import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/question_id_tag.dart';
+import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -94,6 +95,16 @@ class _QuestionId extends ConsumerWidget {
   }
 }
 
+/// Runs the code in the editor of [mode]: the Run button, and Ctrl+Enter in
+/// the editor (#300). Like the button, which is Stop during a run, it does
+/// nothing while a run is going.
+Future<void> runEditorCode(WidgetRef ref, SessionMode mode) async {
+  final output = ref.read(outputServiceProvider);
+  if (output.isRunning.value) return;
+  final code = ref.read(codeServiceProvider(mode)).getText();
+  await output.run(code);
+}
+
 class _RunButton extends StatelessWidget {
   const _RunButton({required this.ref, required this.mode});
   final WidgetRef ref;
@@ -104,10 +115,7 @@ class _RunButton extends StatelessWidget {
     return _PillButton(
       bg: AppColors.accent,
       fg: AppColors.ink0,
-      onTap: () async {
-        final code = ref.read(codeServiceProvider(mode)).getText();
-        await ref.read(outputServiceProvider).run(code);
-      },
+      onTap: () => runEditorCode(ref, mode),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -123,7 +131,8 @@ class _RunButton extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '⌘↵',
+            submitShortcutLabel(),
+            key: const Key('run-shortcut-hint'),
             style: AppMono.kbd(color: AppColors.ink0).copyWith(fontSize: 11),
           ),
         ],

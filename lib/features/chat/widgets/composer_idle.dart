@@ -7,12 +7,14 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Idle composer: multi-line TextField, accent send button when populated,
-/// `Cmd/Ctrl + Enter` to send, plain `Enter` inserts a newline. Sending a
+/// `Ctrl/Cmd + Enter` to send ([submitShortcutActivators]; the hint below
+/// the field names the key of the platform, #300), plain `Enter` inserts a
+/// newline. Sending a
 /// solo `?` is shorthand for "give me a hint". While a theory page is on
 /// screen the field's hint says a question is about that page (#132).
 class ComposerIdle extends ConsumerStatefulWidget {
@@ -77,10 +79,7 @@ class _ComposerIdleState extends ConsumerState<ComposerIdle> {
         : l.chat_composer_idle_hint;
     return ComposerChrome(
       child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.enter, control: true): _send,
-          const SingleActivator(LogicalKeyboardKey.enter, meta: true): _send,
-        },
+        bindings: submitShortcutBindings(_send),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -228,7 +227,7 @@ class _HintFooter extends StatelessWidget {
       children: [
         Row(
           children: [
-            _Kbd(text: '⌘↵'),
+            _Kbd(text: submitShortcutLabel()),
             const SizedBox(width: 4),
             Text(l.chat_composer_idle_kbd_send, style: _captionStyle),
             const SizedBox(width: AppSpacing.s),
