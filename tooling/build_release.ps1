@@ -21,6 +21,7 @@
 #   7. Compute SHA256, write public/python_teacher_install.exe.sha256
 #   8. Commit pubspec/version.dart + tag v<version> + push
 #   9. gh release create v<version> with the installer AND its .sha256 attached
+#  10. gh workflow run static.yml, so the website shows the new release (#291)
 #
 # The app reads the release straight from the GitHub Releases API (#50), so the
 # tag and the two assets are the whole contract - there is no version.json to
@@ -115,7 +116,7 @@ if (-not $SkipPublish) {
 
 # --- 1. Bump pubspec.yaml +build --------------------------------------------
 
-Write-Step 'Step 1/9: bump version in pubspec.yaml'
+Write-Step 'Step 1/10: bump version in pubspec.yaml'
 $yaml = Get-Content -LiteralPath $Pubspec -Raw
 if ($yaml -notmatch 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)') {
     throw "Could not find 'version: x.y.z+n' in pubspec.yaml"
@@ -133,7 +134,7 @@ Write-Ok "Version: $fullVersion"
 
 # --- 2. Regenerate lib/version.dart -----------------------------------------
 
-Write-Step 'Step 2/9: regenerate lib/version.dart'
+Write-Step 'Step 2/10: regenerate lib/version.dart'
 $versionDartContent = @"
 /// Generated. Do not edit.
 const String kAppVersion = '$fullVersion';
@@ -143,7 +144,7 @@ Write-Utf8NoBom -Path $VersionDart -Content $versionDartContent
 
 # --- 3. Python bundle --------------------------------------------------------
 
-Write-Step 'Step 3/9: Python bundle'
+Write-Step 'Step 3/10: Python bundle'
 $BundleScript = Join-Path $ScriptDir 'python\build_bundle.ps1'
 # Invoke in the current PowerShell session (works on both Windows PowerShell 5.1
 # and PowerShell 7). $ErrorActionPreference=Stop in the bundle script will
@@ -153,7 +154,7 @@ if ($LASTEXITCODE -gt 0) { throw "build_bundle.ps1 failed (exit $LASTEXITCODE)" 
 
 # --- 4. Flutter release build ------------------------------------------------
 
-Write-Step 'Step 4/9: flutter build windows --release'
+Write-Step 'Step 4/10: flutter build windows --release'
 Push-Location $RepoRoot
 try {
     & flutter build windows --release
@@ -164,7 +165,7 @@ try {
 
 # --- 5. Inno Setup -----------------------------------------------------------
 
-Write-Step 'Step 5/9: Inno Setup'
+Write-Step 'Step 5/10: Inno Setup'
 $iscc = Find-Iscc
 Write-Host "          ISCC: $iscc"
 
@@ -193,7 +194,7 @@ if (-not (Test-Path -LiteralPath $IsccOutput)) {
 
 # --- 6. Rename to canonical asset filename ----------------------------------
 
-Write-Step 'Step 6/9: rename installer to canonical asset filename'
+Write-Step 'Step 6/10: rename installer to canonical asset filename'
 if (Test-Path -LiteralPath $Installer) { Remove-Item -LiteralPath $Installer -Force }
 Move-Item -LiteralPath $IsccOutput -Destination $Installer -Force
 
@@ -205,7 +206,7 @@ if ($sizeMB -gt 300) {
 
 # --- 7. Write the checksum asset ---------------------------------------------
 
-Write-Step 'Step 7/9: compute SHA256 + write the .sha256 asset'
+Write-Step 'Step 7/10: compute SHA256 + write the .sha256 asset'
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Installer).Hash.ToLowerInvariant()
 # `sha256sum` shape, so it is usable by hand as well as by the app. BOM-less:
 # a leading U+FEFF ends up in front of the hash and turns every comparison
@@ -220,7 +221,7 @@ if ($SkipPublish) {
 
 # --- 8. Commit + tag + push --------------------------------------------------
 
-Write-Step 'Step 8/9: commit + tag + push'
+Write-Step 'Step 8/10: commit + tag + push'
 
 # Release notes from commits since the last v* tag (built BEFORE the release
 # commit so the notes describe what is being released, not the release commit
@@ -271,7 +272,7 @@ if ($LASTEXITCODE -ne 0) { throw 'git push (tag) failed.' }
 
 # --- 9. GitHub release -------------------------------------------------------
 
-Write-Step "Step 9/9: gh release create $tag"
+Write-Step "Step 9/10: gh release create $tag"
 # Both assets: the app finds the installer by name and reads its hash from the
 # .sha256 next to it. A release without the second one is not offerable (#50).
 & gh release create $tag $Installer $Checksum `
@@ -281,5 +282,22 @@ Write-Step "Step 9/9: gh release create $tag"
 if ($LASTEXITCODE -ne 0) { throw 'gh release create failed.' }
 
 Remove-Item -LiteralPath $notesFile.FullName -Force -ErrorAction SilentlyContinue
+
+# --- 10. Refresh the website -------------------------------------------------
+
+Write-Step 'Step 10/10: deploy the website with the new release'
+# The download section on the site shows the latest release's version, date,
+# size and SHA-256, which static.yml reads when it deploys (#291). The push in
+# step 8 already started a deploy, but before step 9 made the release, so that
+# one shows the previous version. A `release: published` trigger cannot do this
+# instead: the github-pages environment only lets `main` deploy, and a release
+# run is on the tag. So start a run on main now that the release exists.
+# Dispatch, never `gh run rerun`: rerunning the Pages workflow piles up
+# duplicate artifacts and the deploy fails. The release itself is done at this
+# point, so a failure here is a warning, not an error.
+& gh workflow run static.yml --repo $Repo --ref main
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Could not start the website deploy; the site shows the previous version until the next one. Start it with: gh workflow run static.yml --repo $Repo --ref main"
+}
 
 Write-Ok "Done. Release: https://github.com/$Repo/releases/tag/$tag"

@@ -6,7 +6,16 @@ on:
   push:
     branches: ["main"]
 
-  # Allows you to run this workflow manually from the Actions tab
+  # Allows you to run this workflow manually from the Actions tab.
+  #
+  # tooling/build_release.ps1 also dispatches it, as its last step, so the
+  # download section shows a new release right away (#291). The push of the
+  # release commit (step 8) deploys before `gh release create` (step 9), so
+  # that run still finds the previous release. A `release: published` trigger
+  # cannot take over: the github-pages environment only lets `main` deploy, and
+  # a release run is on the tag ref, so its deploy would be refused. Dispatch,
+  # never rerun: a rerun piles up duplicate `github-pages` artifacts and the
+  # deploy fails.
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -31,6 +40,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # Version, date, size and SHA-256 of the latest release next to the
+      # download button (#291), written into the published copy of the pages
+      # here, so the site needs no JavaScript and no browser ever calls the
+      # GitHub API (60 requests per hour per IP: one class would use it up).
+      # The script changes nothing unless it can fill every page; if it fails,
+      # the deploy still goes out and the pages keep their fallback text.
+      - name: Fill in the latest release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tooling/site/fill_release.py --site public
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
