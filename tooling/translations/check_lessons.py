@@ -16,6 +16,12 @@ For every lesson with a file in `lessons/<module>/<lang>/`:
    should close (a square) is checked to end where it started. A block whose
    output is random has a `seed` in [CASES]: the lesson shows, under "Een
    mogelijke uitvoer:" / "One possible output:", what that seed prints.
+   `matplotlib.pyplot` is a headless stub too: it records what a block draws
+   (lines, points, bars, histogram counts, texts) and whether `plt.show()`
+   was called, and [CASES] can state it under `plot`. A lesson that imports
+   `numpy` is only run where numpy is installed (the app's Python bundle:
+   `build/python_bundle/python/python.exe tooling/translations/check_lessons.py`);
+   elsewhere it is counted as skipped.
 3. **Inline claims** in [INLINE]: short inline snippets whose result the
    text states (`"5" == 5` gives `False`, `int("3.5")` fails, ...).
 
@@ -102,6 +108,34 @@ CASES: dict[str, dict[int, dict]] = {
         4: {"turtle": {"segments": 200}},
     },
     "situatie-simuleren": {1: {"seed": 1}, 3: {"seed": 5}},
+    # Goal 7: what each plotting block draws, on the pyplot stub.
+    "eerste-grafiek": {
+        0: {"plot": {"lines": 1, "points": [5]}},
+        1: {"plot": {"lines": 1, "x": [0, 1, 2, 3, 4]}},
+        2: {"error": "ValueError"},
+        3: {"plot": {"scatter": 1}},
+    },
+    "grafiek-afwerken": {
+        0: {"plot": {"lines": 1, "texts": ["title", "xlabel", "ylabel"]}},
+        1: {"plot": {"lines": 2, "legend": True, "texts": ["xlabel", "ylabel"]}},
+        2: {"plot": {"lines": 2, "legend": True}},
+        3: {"plot": {"lines": 1, "after_show": ["title"]}},
+    },
+    "functiegrafiek": {
+        1: {"plot": {"lines": 1, "points": [5], "texts": ["title", "xlabel", "ylabel"]}},
+        3: {"plot": {"lines": 1, "points": [201]}},
+        4: {"plot": {"lines": 2, "points": [51, 51], "legend": True, "texts": ["xlabel", "ylabel"]}},
+    },
+    "staafdiagram-histogram": {
+        0: {"plot": {"bars": 1, "texts": ["ylabel"]}},
+        1: {"plot": {"hist": 1, "counts": [2, 2, 3], "texts": ["xlabel", "ylabel"]}},
+        2: {"seed": 1, "plot": {"bars": 1, "texts": ["xlabel", "ylabel"]}},
+        3: {"seed": 1, "plot": {"hist": 1, "texts": ["xlabel", "ylabel"]}},
+    },
+    "rekenen-numpy": {
+        3: {"error": "TypeError"},
+        5: {"plot": {"lines": 1, "points": [200], "texts": ["xlabel", "ylabel"]}},
+    },
 }
 
 # Inline code whose result the prose states, run in the lesson's namespace
@@ -184,6 +218,23 @@ INLINE: dict[str, list[tuple[str, str, str]]] = {
     "toevalsgetallen": [("*", "6 in range(1, 6)", "False")],
     "oppervlakte-schatten": [("*", "round(0.9 ** 2 + 0.8 ** 2, 2)", "1.45"), ("*", "f(2)", "4")],
     "toevalswandeling": [("*", "abs(-8)", "8")],
+    "grafiek-afwerken": [
+        ("nl", "kosten[4] == opbrengst[4]", "True"),
+        ("en", "costs[4] == revenue[4]", "True"),
+    ],
+    "functiegrafiek": [
+        ("nl", "kosten(100) == opbrengst(100)", "True"),
+        ("en", "costs(100) == revenue(100)", "True"),
+    ],
+    "staafdiagram-histogram": [
+        ("nl", "len(tellingen[2:])", "11"),
+        ("en", "len(counts[2:])", "11"),
+    ],
+    "rekenen-numpy": [
+        ("nl", "lijst ** 2", "TypeError"),
+        ("en", "my_list ** 2", "TypeError"),
+        ("*", "def f(x):\n    return x ** 2 - 4 * x + 3\nlist(f(np.array([0, 1, 2])))", "[np.int64(3), np.int64(0), np.int64(-1)]"),
+    ],
 }
 
 
@@ -245,6 +296,128 @@ def _turtle_module(state: dict) -> types.ModuleType:
     m.Turtle = make
     m.done = lambda: state.__setitem__("done", True)
     return m
+
+
+# ---- matplotlib ----------------------------------------------------------------
+
+
+def _new_figure() -> dict:
+    return {"lines": [], "scatter": [], "bars": [], "hist": [], "texts": {}, "labels": [], "legend": False, "grid": False}
+
+
+def _pyplot_module(state: dict) -> types.ModuleType:
+    """Headless `matplotlib.pyplot`: the commands of goal 7, recorded per
+    figure. `show()` closes the figure, as the real window does when it is
+    closed, so a command after it lands in a figure that is never shown."""
+    m = types.ModuleType("matplotlib.pyplot")
+
+    def fig() -> dict:
+        return state.setdefault("figure", _new_figure())
+
+    def named(kw: dict, allowed: tuple) -> None:
+        for k in kw:
+            if k not in allowed:
+                raise TypeError(f"the lessons do not use the argument {k!r} here")
+        if "label" in kw:
+            fig()["labels"].append(kw["label"])
+
+    def plot(*args, **kw):
+        named(kw, ("label", "color"))
+        if len(args) == 1:
+            x, y = list(range(len(args[0]))), list(args[0])
+        elif len(args) == 2:
+            x, y = list(args[0]), list(args[1])
+        else:
+            raise TypeError("plot takes one list or an x and a y list in the lessons")
+        if len(x) != len(y):
+            raise ValueError(
+                f"x and y must have same first dimension, but have shapes ({len(x)},) and ({len(y)},)"
+            )
+        fig()["lines"].append({"x": x, "y": y, "color": kw.get("color")})
+
+    def scatter(x, y, **kw):
+        named(kw, ("label", "color"))
+        if len(x) != len(y):
+            raise ValueError("x and y must be the same size")
+        fig()["scatter"].append({"x": list(x), "y": list(y)})
+
+    def bar(x, height, **kw):
+        named(kw, ("label", "color"))
+        if len(x) != len(height):
+            raise ValueError("shape mismatch: objects cannot be broadcast to a single shape")
+        fig()["bars"].append({"x": list(x), "heights": list(height)})
+
+    def hist(values, bins=10, **kw):
+        named(kw, ("label", "color"))
+        values = list(values)
+        if isinstance(bins, int):
+            lo, hi = min(values), max(values)
+            edges = [lo + (hi - lo) * i / bins for i in range(bins + 1)]
+        else:
+            edges = list(bins)
+        counts = [0] * (len(edges) - 1)
+        for v in values:
+            for i in range(len(counts)):
+                last = i == len(counts) - 1
+                if edges[i] <= v < edges[i + 1] or (last and v == edges[-1]):
+                    counts[i] += 1
+                    break
+        fig()["hist"].append({"edges": edges, "counts": counts})
+
+    def text(kind):
+        def set_text(value):
+            fig()["texts"][kind] = value
+
+        return set_text
+
+    def show():
+        state.setdefault("shown", []).append(state.pop("figure", _new_figure()))
+
+    m.plot, m.scatter, m.bar, m.hist, m.show = plot, scatter, bar, hist, show
+    m.title, m.xlabel, m.ylabel = text("title"), text("xlabel"), text("ylabel")
+    m.legend = lambda: fig().__setitem__("legend", True)
+    m.grid = lambda: fig().__setitem__("grid", True)
+    return m
+
+
+def _check_plot(where: str, want: dict, state: dict) -> list[str]:
+    """Compares the first figure a block showed with what [CASES] states."""
+    shown = state.get("shown", [])
+    if not shown:
+        return [f"{where}: a plotting script without plt.show()"]
+    f = shown[0]
+    out = []
+    for key in ("lines", "scatter", "bars", "hist"):
+        if len(f[key]) != want.get(key, 0):
+            out.append(f"{where}: draws {len(f[key])} {key}, expected {want.get(key, 0)}")
+    if "points" in want and [len(line["x"]) for line in f["lines"]] != want["points"]:
+        out.append(f"{where}: lines of {[len(line['x']) for line in f['lines']]} points, expected {want['points']}")
+    if "x" in want and (not f["lines"] or f["lines"][0]["x"] != want["x"]):
+        out.append(f"{where}: the first line has x {f['lines'][0]['x'] if f['lines'] else None}, expected {want['x']}")
+    if "counts" in want and (not f["hist"] or f["hist"][0]["counts"] != want["counts"]):
+        out.append(f"{where}: histogram counts {f['hist'][0]['counts'] if f['hist'] else None}, expected {want['counts']}")
+    if f["legend"] != want.get("legend", False):
+        out.append(f"{where}: legend {f['legend']}, expected {want.get('legend', False)}")
+    if f["legend"] and len(f["labels"]) != len(f["lines"]) + len(f["scatter"]):
+        out.append(f"{where}: a legend, but not every line has a label")
+    if sorted(f["texts"]) != sorted(want.get("texts", [])):
+        out.append(f"{where}: sets {sorted(f['texts'])}, expected {sorted(want.get('texts', []))}")
+    late = sorted(state.get("figure", {}).get("texts", {}))
+    if late != sorted(want.get("after_show", [])):
+        out.append(f"{where}: after plt.show() it sets {late}, expected {sorted(want.get('after_show', []))}")
+    return out
+
+
+def needs_numpy(body: str) -> bool:
+    return "import numpy" in body
+
+
+def has_numpy() -> bool:
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 # ---- running -----------------------------------------------------------------
@@ -324,6 +497,10 @@ def check_lesson(lid: str, body: str, lang: str, verbose: bool = False) -> tuple
     ns: dict = {"__name__": "__lesson__"}
     state: dict = {}
     sys.modules["turtle"] = _turtle_module(state)
+    pyplot = _pyplot_module(state)
+    package = types.ModuleType("matplotlib")
+    package.pyplot = pyplot
+    sys.modules["matplotlib"], sys.modules["matplotlib.pyplot"] = package, pyplot
     blocks = split_blocks(body)
     cases = CASES.get(lid, {})
     for i, b in enumerate(blocks):
@@ -369,6 +546,10 @@ def check_lesson(lid: str, body: str, lang: str, verbose: bool = False) -> tuple
                 failures.append(f"{where}: colors {[s['color'] for s in segs]}, expected {t['colors']}")
             if "lengths" in t and [s["length"] for s in segs] != t["lengths"]:
                 failures.append(f"{where}: lengths {[s['length'] for s in segs]}, expected {t['lengths']}")
+        if "plot" in case:
+            failures.extend(_check_plot(where, case["plot"], state))
+        elif "plt." in code and not err:
+            failures.append(f"{where}: a plotting block without a `plot` entry in CASES")
         if "variant" in case:
             old, new = case["variant"]
             if old not in code:
@@ -386,7 +567,8 @@ def check_lesson(lid: str, body: str, lang: str, verbose: bool = False) -> tuple
         got = _eval_inline(code, dict(ns))
         if got != want:
             failures.append(f"{lang}/{lid} inline {code!r}: gives {got}, the text says {want}")
-    sys.modules.pop("turtle", None)
+    for name in ("turtle", "matplotlib", "matplotlib.pyplot"):
+        sys.modules.pop(name, None)
     return len(blocks), failures
 
 
@@ -405,6 +587,7 @@ def main(argv: list[str] | None = None) -> int:
     failures: list[str] = []
     runs = {"nl": 0, args.lang: 0}
     inline = {"nl": 0, args.lang: 0}
+    skipped: list[str] = []
     for lid in sorted(set(nl) | set(tr)):
         if lid not in tr:
             failures.append(f"{lid}: no {args.lang} file")
@@ -418,6 +601,9 @@ def main(argv: list[str] | None = None) -> int:
             a, b = tags(nl[lid]["body"]), tags(tr[lid]["body"])
             at = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
             failures.append(f"{lid}: HTML structure differs at tag {at}: nl {a[at:at+3]} vs {args.lang} {b[at:at+3]}")
+        if needs_numpy(nl[lid]["body"]) and not has_numpy():
+            skipped.append(lid)
+            continue
         for lang, body in (("nl", nl[lid]["body"]), (args.lang, tr[lid]["body"])):
             n, f = check_lesson(lid, body, lang, args.verbose)
             runs[lang] += n
@@ -428,6 +614,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{runs[args.lang]} {args.lang} + {runs['nl']} nl; inline claims: "
         f"{inline[args.lang]} {args.lang} + {inline['nl']} nl"
     )
+    for lid in skipped:
+        print(f"SKIPPED {lid}: its code needs numpy, which this Python does not have (structure was checked)")
     for f in failures:
         print("FAIL", f)
     print("all pass" if not failures else f"{len(failures)} failures")

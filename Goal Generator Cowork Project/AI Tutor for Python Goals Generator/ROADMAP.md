@@ -22,7 +22,7 @@ Drie keuzes lopen door alle doelen:
   Leerlingen schatten een kans, een nulpunt of een oppervlakte met een lus
   en leggen die naast de formule.
 - **Eerst zelf bouwen, dan de bibliotheek.** Een gemiddelde, een trendlijn
-  of de trapeziumregel schrijven ze eerst zelf. Numpy is daarom uitgesteld.
+  of de trapeziumregel schrijven ze eerst zelf. Numpy komt daarom pas aan het einde van doel 7, na de eigen lus.
 - **Elke context in twee smaken.** De teachingTips laten de AI afwisselen
   tussen economie en wetenschappen, zodat beide klassen zich herkennen.
 
@@ -32,7 +32,7 @@ Drie keuzes lopen door alle doelen:
 |---|---|---|
 | 5 | Functies (`functies`) | live sinds 5 oktober 2026 |
 | 6 | Toeval en simulatie (`toeval-simulatie`) | live sinds 5 oktober 2026 |
-| 7 | Grafieken maken | idee |
+| 7 | Grafieken maken (`grafieken`) | doelbestand en lessen geschreven, nog niet live |
 | 8 | Vergelijkingen oplossen door te zoeken | idee |
 | 9 | De wereld in tijdstappen | idee |
 | 10 | Dictionaries en gestructureerde data | idee |
@@ -71,7 +71,7 @@ dat de volgende doelen zichtbaar maakt.
   dobbelstenen, de eindposities van toevalswandelingen); de waardetabellen
   uit doel 5.
 - **Uit de oude cursus:** module 3, "Functies verkennen en visualiseren",
-  maar zonder numpy.
+  maar eerst met een eigen lus; numpy (`linspace`, rekenen op een hele array) is het laatste subdoel.
 - **Let op:** de beoordelaar ziet de grafiek niet. De LO's gaan over code
   schrijven en voorspellen wat er getekend wordt.
 
@@ -197,16 +197,28 @@ oefening te combineren. Zonder die afspraak stapelde de AI alle valkuilen
 van een subdoel in één vraag, ook op easy. Zie LO_AUTHORING_RUBRIC.md
 (checklist punt 16).
 
-### Nog niet gezien na doel 6
+### Nog niet gezien na doel 7
 
 f-strings, `break`, `range` met een stap, stringmethodes,
 `try`/`except`, `global`, recursie, `lambda`, list comprehensions,
-dictionaries, sets, een functie als argument, numpy en matplotlib.
+dictionaries, sets, een functie als argument, pandas.
 
 Wel gezien, naast doel 1 tot 4 (daarin ook `+=` en `-=`, sinds de les over
 `for` in doel 3): `def` en `return`, standaardwaarden,
 `import math` (`math.sqrt`, `math.pi`, `math.sin`, `math.cos`), `round`,
 `abs`, en uit `random` alleen `randint`, `random`, `choice` en `uniform`.
+Uit doel 7: benoemde argumenten bij een aanroep (`label=`, `color=`,
+`bins=`); uit matplotlib alleen `plt.plot`, `plt.scatter`, `plt.bar`,
+`plt.hist`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend`,
+`plt.grid` en `plt.show`; uit numpy alleen `np.linspace`, `np.array`,
+rekenen op een hele array, `np.sin`, `np.cos`, `np.sqrt` en `np.pi`.
+
+De lessen van doel 7 tonen geen afbeelding (de lesweergave kent geen
+beelden): ze beschrijven in woorden wat het venster toont. De
+vertaalcontrole draait hun code op een nagebootste `matplotlib.pyplot` die
+bijhoudt wat er getekend wordt; de les over numpy wordt alleen uitgevoerd
+met de Python-bundel van de app
+(`build/python_bundle/python/python.exe tooling/translations/check_lessons.py`).
 
 ### Woordgebruik
 

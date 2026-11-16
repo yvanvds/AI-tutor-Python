@@ -94,3 +94,18 @@ Je kan met de random-module toeval in een programma brengen en daarmee experimen
   - LOs: `predict_reachable_positions`, `write_random_walk`, `write_walk_history`, `write_walk_until_boundary`, `reason_position_vs_distance`, `write_turtle_random_walk`
 - **Van situatie naar simulatie** (`situatie-simuleren`)
   - LOs: `decompose_simulation`, `write_experiment_function`, `predict_experiment_for_given_draws`, `write_repeat_until_event`, `write_average_of_experiment`, `choose_sanity_check`
+
+### 7. Grafieken maken (`grafieken`)
+
+Je kan met matplotlib gegevens en functies zichtbaar maken: een lijngrafiek of puntenwolk tekenen uit twee lijsten, een grafiek leesbaar maken met titel, aslabels en legende, de grafiek van een functie opbouwen uit een zelfgemaakte waardetabel, de uitkomsten van een telling of simulatie tonen in een staafdiagram of histogram, en met numpy in één keer rekenen op een hele reeks waarden.
+
+- **Een eerste grafiek** (`eerste-grafiek`)
+  - LOs: `write_line_plot`, `predict_plotted_points`, `predict_length_mismatch`, `predict_plot_single_list`, `write_scatter_plot`, `reason_line_vs_points`
+- **Een grafiek leesbaar maken** (`grafiek-afwerken`)
+  - LOs: `write_title_and_axis_labels`, `write_multiple_lines_legend`, `predict_figure_contents`, `predict_commands_after_show`, `write_color_and_grid`, `reason_what_reader_needs`
+- **De grafiek van een functie** (`functiegrafiek`)
+  - LOs: `write_xy_lists_from_function`, `write_function_plot`, `predict_number_of_points`, `reason_more_points_smoother`, `write_x_values_function`, `write_compare_functions`
+- **Staafdiagram en histogram** (`staafdiagram-histogram`)
+  - LOs: `write_bar_chart`, `write_histogram`, `predict_histogram_bars`, `reason_bar_vs_histogram`, `write_plot_simulation`
+- **Sneller met numpy** (`rekenen-numpy`)
+  - LOs: `write_linspace`, `predict_linspace_values`, `write_array_formula`, `predict_list_vs_array`, `write_numpy_math`, `write_function_plot_numpy`

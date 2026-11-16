@@ -1278,6 +1278,233 @@
           "en": "You can check a simulation with a case whose answer you know, such as a probability of 0 or 1 or a fair coin."
         }
       ]
+    },
+    {
+      "id": "grafieken",
+      "parentId": null,
+      "nl": {
+        "title": "Grafieken maken",
+        "description": "Je kan met matplotlib gegevens en functies zichtbaar maken: een lijngrafiek of puntenwolk tekenen uit twee lijsten, een grafiek leesbaar maken met titel, aslabels en legende, de grafiek van een functie opbouwen uit een zelfgemaakte waardetabel, de uitkomsten van een telling of simulatie tonen in een staafdiagram of histogram, en met numpy in één keer rekenen op een hele reeks waarden."
+      },
+      "en": {
+        "title": "Making graphs",
+        "description": "You can make data and functions visible with matplotlib: draw a line graph or a scatter plot from two lists, make a graph readable with a title, axis labels and a legend, build the graph of a function from a table of values you made yourself, show the outcomes of a count or simulation in a bar chart or histogram, and use numpy to calculate on a whole series of values at once."
+      }
+    },
+    {
+      "id": "eerste-grafiek",
+      "parentId": "grafieken",
+      "nl": {
+        "title": "Een eerste grafiek",
+        "description": "Je kan matplotlib importeren, uit een lijst x-waarden en een lijst y-waarden een lijngrafiek of een puntenwolk tekenen, voorspellen welke punten getekend worden, en kiezen tussen een lijn en losse punten."
+      },
+      "en": {
+        "title": "A first graph",
+        "description": "You can import matplotlib, draw a line graph or a scatter plot from a list of x values and a list of y values, predict which points are drawn, and choose between a line and separate points."
+      },
+      "objectives": [
+        {
+          "id": "write_line_plot",
+          "nl": "Je kan een script schrijven dat uit een lijst x-waarden en een lijst y-waarden een lijngrafiek tekent en toont.",
+          "en": "You can write a script that draws and shows a line graph from a list of x values and a list of y values."
+        },
+        {
+          "id": "predict_plotted_points",
+          "nl": "Je kan voorspellen door welke punten de lijn van plt.plot(x, y) gaat en welke lijst op welke as komt.",
+          "en": "You can predict through which points the line of plt.plot(x, y) goes and which list ends up on which axis."
+        },
+        {
+          "id": "predict_length_mismatch",
+          "nl": "Je kan herkennen dat plt.plot een ValueError geeft als de lijst met x-waarden en de lijst met y-waarden niet even lang zijn.",
+          "en": "You can recognize that plt.plot gives a ValueError when the list of x values and the list of y values are not equally long."
+        },
+        {
+          "id": "predict_plot_single_list",
+          "nl": "Je kan voorspellen welke x-waarden plt.plot gebruikt als je maar één lijst meegeeft.",
+          "en": "You can predict which x values plt.plot uses when you pass only one list."
+        },
+        {
+          "id": "write_scatter_plot",
+          "nl": "Je kan met plt.scatter losse punten tekenen in plaats van een lijn.",
+          "en": "You can draw separate points instead of a line with plt.scatter."
+        },
+        {
+          "id": "reason_line_vs_points",
+          "nl": "Je kan uitleggen wanneer je gegevens beter als lijn tekent en wanneer als losse punten.",
+          "en": "You can explain when data is better drawn as a line and when as separate points."
+        }
+      ]
+    },
+    {
+      "id": "grafiek-afwerken",
+      "parentId": "grafieken",
+      "nl": {
+        "title": "Een grafiek leesbaar maken",
+        "description": "Je kan een grafiek een titel en aslabels met eenheden geven, meerdere lijnen in één figuur tekenen met een legende, kleur en raster instellen, en voorspellen wat een script wel en niet in de figuur zet."
+      },
+      "en": {
+        "title": "Making a graph readable",
+        "description": "You can give a graph a title and axis labels with units, draw several lines in one figure with a legend, set color and grid, and predict what a script does and does not put in the figure."
+      },
+      "objectives": [
+        {
+          "id": "write_title_and_axis_labels",
+          "nl": "Je kan een grafiek een titel en aslabels met eenheden geven met plt.title, plt.xlabel en plt.ylabel.",
+          "en": "You can give a graph a title and axis labels with units using plt.title, plt.xlabel and plt.ylabel."
+        },
+        {
+          "id": "write_multiple_lines_legend",
+          "nl": "Je kan meerdere lijnen in één figuur tekenen en ze met label= en plt.legend() een legende geven.",
+          "en": "You can draw several lines in one figure and give them a legend with label= and plt.legend()."
+        },
+        {
+          "id": "predict_figure_contents",
+          "nl": "Je kan van een script voorspellen hoeveel lijnen de figuur toont en welke tekst waar terechtkomt.",
+          "en": "You can predict from a script how many lines the figure shows and which text ends up where."
+        },
+        {
+          "id": "predict_commands_after_show",
+          "nl": "Je kan voorspellen dat opdrachten die na plt.show() staan niet meer in de getoonde figuur komen.",
+          "en": "You can predict that commands placed after plt.show() no longer end up in the figure that is shown."
+        },
+        {
+          "id": "write_color_and_grid",
+          "nl": "Je kan een lijn een kleur geven met color= en een raster toevoegen met plt.grid().",
+          "en": "You can give a line a color with color= and add a grid with plt.grid()."
+        },
+        {
+          "id": "reason_what_reader_needs",
+          "nl": "Je kan voor een beschreven grafiek aangeven welke titel, aslabels, eenheden en legende een lezer nodig heeft om hem te begrijpen.",
+          "en": "You can indicate for a described graph which title, axis labels, units and legend a reader needs to understand it."
+        }
+      ]
+    },
+    {
+      "id": "functiegrafiek",
+      "parentId": "grafieken",
+      "nl": {
+        "title": "De grafiek van een functie",
+        "description": "Je kan de grafiek van een functie tekenen door met een lus een lijst x-waarden en een lijst functiewaarden op te bouwen, voorspellen hoeveel punten er getekend worden, uitleggen waarom meer punten een vloeiendere kromme geven, en twee functies in één figuur vergelijken."
+      },
+      "en": {
+        "title": "The graph of a function",
+        "description": "You can draw the graph of a function by building a list of x values and a list of function values with a loop, predict how many points are drawn, explain why more points give a smoother curve, and compare two functions in one figure."
+      },
+      "objectives": [
+        {
+          "id": "write_xy_lists_from_function",
+          "nl": "Je kan met een lus een lijst x-waarden en een lijst bijbehorende functiewaarden opbouwen.",
+          "en": "You can build a list of x values and a list of matching function values with a loop."
+        },
+        {
+          "id": "write_function_plot",
+          "nl": "Je kan de grafiek van een gegeven functie over een gegeven interval tekenen, met titel en aslabels.",
+          "en": "You can draw the graph of a given function over a given interval, with a title and axis labels."
+        },
+        {
+          "id": "predict_number_of_points",
+          "nl": "Je kan voorspellen hoeveel punten een lus voor een functiegrafiek oplevert en wat de eerste en de laatste x-waarde zijn.",
+          "en": "You can predict how many points a loop for a function graph produces and what the first and the last x value are."
+        },
+        {
+          "id": "reason_more_points_smoother",
+          "nl": "Je kan uitleggen waarom een functiegrafiek met weinig punten hoekig is en met veel punten vloeiend lijkt.",
+          "en": "You can explain why a function graph with few points is angular and with many points looks smooth."
+        },
+        {
+          "id": "write_x_values_function",
+          "nl": "Je kan een functie schrijven die voor een begin, een einde en een aantal punten de lijst met gelijk verdeelde x-waarden teruggeeft.",
+          "en": "You can write a function that gives back the list of evenly spaced x values for a start, an end and a number of points."
+        },
+        {
+          "id": "write_compare_functions",
+          "nl": "Je kan twee functies in één figuur tekenen om ze te vergelijken, zoals kosten en opbrengst.",
+          "en": "You can draw two functions in one figure to compare them, such as costs and revenue."
+        }
+      ]
+    },
+    {
+      "id": "staafdiagram-histogram",
+      "parentId": "grafieken",
+      "nl": {
+        "title": "Staafdiagram en histogram",
+        "description": "Je kan aantallen per categorie of per uitkomst tonen in een staafdiagram, de verdeling van een lijst waarden tonen in een histogram, voorspellen hoe hoog de staven worden, en de uitkomsten van een simulatie verzamelen en zichtbaar maken."
+      },
+      "en": {
+        "title": "Bar chart and histogram",
+        "description": "You can show counts per category or per outcome in a bar chart, show how a list of values is spread in a histogram, predict how high the bars become, and collect the outcomes of a simulation and make them visible."
+      },
+      "objectives": [
+        {
+          "id": "write_bar_chart",
+          "nl": "Je kan met plt.bar een staafdiagram tekenen van aantallen per categorie of per uitkomst.",
+          "en": "You can draw a bar chart of counts per category or per outcome with plt.bar."
+        },
+        {
+          "id": "write_histogram",
+          "nl": "Je kan met plt.hist een histogram tekenen van een lijst waarden en het aantal klassen of de klassegrenzen kiezen met bins=.",
+          "en": "You can draw a histogram of a list of values with plt.hist and choose the number of classes or the class limits with bins=."
+        },
+        {
+          "id": "predict_histogram_bars",
+          "nl": "Je kan voor een korte lijst waarden en gegeven klassegrenzen voorspellen hoe hoog elke staaf van het histogram wordt.",
+          "en": "You can predict how high each bar of the histogram becomes for a short list of values and given class limits."
+        },
+        {
+          "id": "reason_bar_vs_histogram",
+          "nl": "Je kan uitleggen wanneer je een staafdiagram gebruikt en wanneer een histogram.",
+          "en": "You can explain when you use a bar chart and when a histogram."
+        },
+        {
+          "id": "write_plot_simulation",
+          "nl": "Je kan de uitkomsten van een herhaald experiment in een lijst verzamelen en ze tonen in een passende grafiek.",
+          "en": "You can collect the outcomes of a repeated experiment in a list and show them in a fitting graph."
+        }
+      ]
+    },
+    {
+      "id": "rekenen-numpy",
+      "parentId": "grafieken",
+      "nl": {
+        "title": "Sneller met numpy",
+        "description": "Je kan met np.linspace een reeks gelijk verdeelde x-waarden maken, met een formule in één keer rekenen op een hele array in plaats van met een lus, np.sin, np.cos en np.sqrt gebruiken, voorspellen waar een array zich anders gedraagt dan een lijst, en zo de grafiek van een functie in enkele regels tekenen."
+      },
+      "en": {
+        "title": "Faster with numpy",
+        "description": "You can make a series of evenly spaced x values with np.linspace, calculate on a whole array at once with a formula instead of a loop, use np.sin, np.cos and np.sqrt, predict where an array behaves differently from a list, and so draw the graph of a function in a few lines."
+      },
+      "objectives": [
+        {
+          "id": "write_linspace",
+          "nl": "Je kan met np.linspace een array maken van een gegeven aantal gelijk verdeelde waarden tussen een begin en een einde.",
+          "en": "You can make an array of a given number of evenly spaced values between a start and an end with np.linspace."
+        },
+        {
+          "id": "predict_linspace_values",
+          "nl": "Je kan voorspellen welke waarden np.linspace(start, einde, aantal) oplevert, inclusief het begin, het einde en de stap ertussen.",
+          "en": "You can predict which values np.linspace(start, end, count) produces, including the start, the end and the step between them."
+        },
+        {
+          "id": "write_array_formula",
+          "nl": "Je kan met één formule de functiewaarden voor een hele array x-waarden berekenen, zonder lus.",
+          "en": "You can calculate the function values for a whole array of x values with one formula, without a loop."
+        },
+        {
+          "id": "predict_list_vs_array",
+          "nl": "Je kan voorspellen wat bewerkingen zoals * 2 en + opleveren bij een array en hoe dat verschilt van een lijst.",
+          "en": "You can predict what operations such as * 2 and + produce for an array and how that differs from a list."
+        },
+        {
+          "id": "write_numpy_math",
+          "nl": "Je kan np.sin, np.cos of np.sqrt gebruiken om een wiskundige functie op elke waarde van een array toe te passen.",
+          "en": "You can use np.sin, np.cos or np.sqrt to apply a mathematical function to every value of an array."
+        },
+        {
+          "id": "write_function_plot_numpy",
+          "nl": "Je kan de grafiek van een functie tekenen met np.linspace en een formule op de hele array.",
+          "en": "You can draw the graph of a function with np.linspace and a formula on the whole array."
+        }
+      ]
     }
   ]
 }

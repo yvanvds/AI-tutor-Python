@@ -199,6 +199,30 @@ Pythons eigen namen (`t.pencolor`). De leerling wordt aangesproken met
 | trekken zonder terugleggen | draw without putting back |
 | "Een mogelijke uitvoer:" boven de uitvoer van een script met toeval | "One possible output:" |
 
+## Grafieken en numpy
+
+| Nederlands | Engels |
+|---|---|
+| grafiek | graph |
+| lijngrafiek | line graph |
+| puntenwolk, losse punten | scatter plot, separate points |
+| figuur (het venster van matplotlib) | figure |
+| as, horizontale / verticale as | axis, horizontal / vertical axis |
+| aslabel | axis label |
+| titel, legende, raster | title, legend, grid |
+| grootheid, eenheid | quantity, unit |
+| benoemd argument | named argument |
+| hoekig / vloeiend | angular / smooth |
+| lijnstuk, recht stuk | segment, straight piece |
+| snijden (van twee grafieken) | cross |
+| vaste kosten, opbrengst, winst, verlies | fixed costs, revenue, profit, loss |
+| staafdiagram, staaf | bar chart, bar |
+| histogram, klasse, klassegrens | histogram, class, class limit |
+| verdeling, verdeeld | spread |
+| array | array |
+| gelijk verdeelde waarden | evenly spaced values |
+| element per element | element by element |
+
 ## Namen in de code
 
 Nederlandse variabelenamen, strings en commentaar in de voorbeelden zijn mee
@@ -241,6 +265,12 @@ Dries) blijven.
 | `positie`, `weg` | `position`, `path` | `speel_tot_einde(geld, doel)` | `play_until_end(money, goal)` |
 | `gemiddelde_afstand` | `average_distance` | `heeft_dubbele(groep)` | `has_duplicate(group)` |
 | `dag`, `dagen` (verjaardagen) | `day`, `days` | `worpen_tot_zes` | `rolls_until_six` |
+| `uren`, `temperatuur` | `hours`, `temperature` | `dagen`, `neerslag` | `days`, `rainfall` |
+| `lengte`, `gewicht` (leerlingen) | `height`, `weight` | `jaren`, `saldo` | `years`, `balance` |
+| `maanden`, `verkoop` | `months`, `sales` | `kosten`, `opbrengst` | `costs`, `revenue` |
+| `x_waarden(start, einde, aantal)` | `x_values(start, end, count)` | `waarden` | `values` |
+| `aantallen`, `k`, `o`, `a` | `quantities`, `c`, `r`, `q` | `eindposities` | `end_positions` |
+| `sommen` | `totals` | `reeks` (een array naast `lijst`) | `arr` (naast `my_list`) |
 | `kaart`, `stapel` | `card`, `deck` | `"regen"`, `"droog"` | `"rain"`, `"dry"` |
 
 Zo wordt `rooster[r][k]` in de Engelse les en doeltekst `grid[r][c]`.

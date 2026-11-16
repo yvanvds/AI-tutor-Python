@@ -1,0 +1,326 @@
+{
+  "goal": {
+    "id": "grafieken",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Grafieken maken",
+    "description": "Je kan met matplotlib gegevens en functies zichtbaar maken: een lijngrafiek of puntenwolk tekenen uit twee lijsten, een grafiek leesbaar maken met titel, aslabels en legende, de grafiek van een functie opbouwen uit een zelfgemaakte waardetabel, de uitkomsten van een telling of simulatie tonen in een staafdiagram of histogram, en met numpy in één keer rekenen op een hele reeks waarden.",
+    "order": 7000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "eerste-grafiek",
+      "type": "goal",
+      "parentId": "grafieken",
+      "title": "Een eerste grafiek",
+      "description": "Je kan matplotlib importeren, uit een lijst x-waarden en een lijst y-waarden een lijngrafiek of een puntenwolk tekenen, voorspellen welke punten getekend worden, en kiezen tussen een lijn en losse punten.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Every script has the same skeleton: `import matplotlib.pyplot as plt` at the top, one or more drawing commands, and `plt.show()` as the last line — like `turtle.done()`, without it no window appears. `as plt` only gives the module a shorter name.",
+        "For `predict_plotted_points`: The first list holds the x values, the second the y values, and they are paired by position: probe which points `plt.plot([1, 2, 3], [5, 0, 4])` connects, and that swapping the two lists mirrors the graph.",
+        "For `predict_length_mismatch`: Lean on two lists of different length raising a ValueError ('x and y must have same first dimension') — typically a table loop where one `append` was forgotten or one list was built with a different `range`.",
+        "For `predict_plot_single_list`: With one list, `plt.plot(waarden)` uses the indexes 0, 1, 2, ... as x: probe the x value of the last point (the length minus 1).",
+        "For `reason_line_vs_points`: A line suggests that the values in between exist (a temperature over a day, a balance over the years); separate points fit loose measurements or pairs without an order (height against weight of students). `plt.plot` connects the points in list order, so unsorted x values give a scribble.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask through which points the line goes, how many points or lines are drawn, which list ends up on which axis, or what a described graph needs in code. Give every list of data literally in the question, with at most about 8 values, and vary the contexts between science (measurements, temperatures, distances) and economics (prices, revenue, savings).",
+        "Python: goals 1 to 6. From matplotlib use only `plt.plot(x, y)`, `plt.plot(y)`, `plt.scatter(x, y)` and `plt.show()` in this subgoal — titles, labels, legends, colours and several lines come in the next subgoal. No numpy (`linspace`, `arange`, arrays), no pandas, no `plt.subplots`, `fig`, `ax` or `savefig`, no format strings like `'ro-'`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_line_plot",
+          "statement": "Je kan een script schrijven dat uit een lijst x-waarden en een lijst y-waarden een lijngrafiek tekent en toont.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_plotted_points",
+          "statement": "Je kan voorspellen door welke punten de lijn van plt.plot(x, y) gaat en welke lijst op welke as komt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_length_mismatch",
+          "statement": "Je kan herkennen dat plt.plot een ValueError geeft als de lijst met x-waarden en de lijst met y-waarden niet even lang zijn.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_plot_single_list",
+          "statement": "Je kan voorspellen welke x-waarden plt.plot gebruikt als je maar één lijst meegeeft.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_scatter_plot",
+          "statement": "Je kan met plt.scatter losse punten tekenen in plaats van een lijn.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_line_vs_points",
+          "statement": "Je kan uitleggen wanneer je gegevens beter als lijn tekent en wanneer als losse punten.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "grafiek-afwerken",
+      "type": "goal",
+      "parentId": "grafieken",
+      "title": "Een grafiek leesbaar maken",
+      "description": "Je kan een grafiek een titel en aslabels met eenheden geven, meerdere lijnen in één figuur tekenen met een legende, kleur en raster instellen, en voorspellen wat een script wel en niet in de figuur zet.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Introduce the named argument here: `label=\"kosten\"` and `color=\"red\"` are arguments passed by name instead of by position, after the positional ones. It is the calling side of the default values from the functions goal; do not let students define functions with keyword-only tricks.",
+        "For `write_multiple_lines_legend`: Each `plt.plot` call adds one line to the same figure; a line gets its legend text through `label=...` and the legend only appears after `plt.legend()`. Probe the forgotten `plt.legend()` and the legend call without any labels.",
+        "For `predict_commands_after_show`: `plt.show()` shows the figure as it is at that moment and waits until the window is closed; a `plt.title` or `plt.plot` placed after it never appears in that figure.",
+        "For `predict_figure_contents`: Give a short script and ask how many lines the figure has, which text is on which axis, or which line gets which legend text — one of these per question.",
+        "For `reason_what_reader_needs`: Describe a bare graph (two lines, numbers on the axes, nothing else) with its context and ask what a reader cannot know; the answer is about quantities and units on the axes and which line is which, not about decoration.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many lines are drawn, which text appears where, or what a described graph needs in code. Give every list of data literally in the question, with at most about 8 values, and vary the contexts between science (two measurement series, temperatures in two cities) and economics (costs against revenue, two savings plans).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter` and `plt.show`. New in this subgoal: `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=` (colour names in English: \"red\", \"blue\", \"green\", \"orange\", \"black\"). No numpy, no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `xlim`/`ylim`, `linestyle`, `marker` or format strings like `'ro-'`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_title_and_axis_labels",
+          "statement": "Je kan een grafiek een titel en aslabels met eenheden geven met plt.title, plt.xlabel en plt.ylabel.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_multiple_lines_legend",
+          "statement": "Je kan meerdere lijnen in één figuur tekenen en ze met label= en plt.legend() een legende geven.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_figure_contents",
+          "statement": "Je kan van een script voorspellen hoeveel lijnen de figuur toont en welke tekst waar terechtkomt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_commands_after_show",
+          "statement": "Je kan voorspellen dat opdrachten die na plt.show() staan niet meer in de getoonde figuur komen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_color_and_grid",
+          "statement": "Je kan een lijn een kleur geven met color= en een raster toevoegen met plt.grid().",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": true
+        },
+        {
+          "id": "reason_what_reader_needs",
+          "statement": "Je kan voor een beschreven grafiek aangeven welke titel, aslabels, eenheden en legende een lezer nodig heeft om hem te begrijpen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "functiegrafiek",
+      "type": "goal",
+      "parentId": "grafieken",
+      "title": "De grafiek van een functie",
+      "description": "Je kan de grafiek van een functie tekenen door met een lus een lijst x-waarden en een lijst functiewaarden op te bouwen, voorspellen hoeveel punten er getekend worden, uitleggen waarom meer punten een vloeiendere kromme geven, en twee functies in één figuur vergelijken.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "The graph of a function is the value table from the functions goal, drawn: one loop appends x to one list and `f(x)` to another, then `plt.plot(xs, ys)`. Compute x from the loop index (`x = start + i * stap`), as in the value tables — `range` with a step or with floats has not been introduced.",
+        "For `predict_number_of_points`: Probe the number of points and the last x value: `range(11)` with step 0.5 from 0 gives 11 points and ends at 5.0 — one point more than there are steps.",
+        "For `reason_more_points_smoother`: matplotlib only knows the points it gets and draws straight segments between them: a parabola through 5 points has visible corners, through 200 points it looks curved. The curve is never really curved, and a peak or zero between two points is skipped — the same idea as the step size in the value tables.",
+        "For `write_x_values_function`: The helper `x_waarden(start, einde, aantal)` returns `aantal` evenly spaced values including both ends, so the step is `(einde - start) / (aantal - 1)`; probe the division by `aantal` instead of `aantal - 1`.",
+        "For `write_compare_functions`: Use pairs where the crossing means something: costs and revenue (break-even), two phone plans, two cars that start at different speeds, simple against compound interest. The student draws both and names where to look; reading the exact crossing off the picture is not asked.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many points are drawn, between which x values the graph runs, or what a described graph needs in code. State every formula in the question itself — the student translates it, they do not have to know it — and alternate between mathematics (a quadratic, a sine with `math.sin`), physics (distance or height against time) and economics (cost, revenue, growth of a capital).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=`. No numpy (`linspace`, `arange`, arrays — the student builds the lists with a loop), no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `xlim`/`ylim` or format strings. A function is not passed as an argument: the loop calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, `lambda`, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_xy_lists_from_function",
+          "statement": "Je kan met een lus een lijst x-waarden en een lijst bijbehorende functiewaarden opbouwen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_function_plot",
+          "statement": "Je kan de grafiek van een gegeven functie over een gegeven interval tekenen, met titel en aslabels.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_number_of_points",
+          "statement": "Je kan voorspellen hoeveel punten een lus voor een functiegrafiek oplevert en wat de eerste en de laatste x-waarde zijn.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_more_points_smoother",
+          "statement": "Je kan uitleggen waarom een functiegrafiek met weinig punten hoekig is en met veel punten vloeiend lijkt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_x_values_function",
+          "statement": "Je kan een functie schrijven die voor een begin, een einde en een aantal punten de lijst met gelijk verdeelde x-waarden teruggeeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_compare_functions",
+          "statement": "Je kan twee functies in één figuur tekenen om ze te vergelijken, zoals kosten en opbrengst.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "staafdiagram-histogram",
+      "type": "goal",
+      "parentId": "grafieken",
+      "title": "Staafdiagram en histogram",
+      "description": "Je kan aantallen per categorie of per uitkomst tonen in een staafdiagram, de verdeling van een lijst waarden tonen in een histogram, voorspellen hoe hoog de staven worden, en de uitkomsten van een simulatie verzamelen en zichtbaar maken.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "For `write_bar_chart`: `plt.bar(namen, aantallen)` takes one list for the positions or names and one for the heights, of equal length. With the list of counters from the simulation goal, draw only the used positions: build the outcomes with a loop (`uitkomsten.append(som)`) next to the matching counts, or slice the counters (`tellingen[2:]`).",
+        "For `predict_histogram_bars`: Give a short list (at most 10 values) and the class limits as a list, `bins=[0, 10, 20, 30]`, and ask how high each bar is. Keep every value strictly between two limits, never on one.",
+        "For `reason_bar_vs_histogram`: A bar chart shows numbers that are already counted or measured per category (sales per month, how often each die value fell); a histogram gets the raw values and does the counting into classes itself (200 heights, 1000 end positions). Probe handing a list of counters to `plt.hist`, which then counts the counters.",
+        "For `write_plot_simulation`: Reuse the simulations of the previous goal with their rules stated in the question: the end positions of many random walks or the number of throws until a six in a histogram, how often each sum of two dice fell in a bar chart, the path of one walk as a line with `plt.plot(weg)`. The experiment stays a function that returns a value; the main script repeats it, collects the results in a list and draws.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many bars are drawn, how high a given bar is, or what a described graph needs in code. For data that comes from `random`, never ask for exact heights: ask which bars can exist or which is expected to be the highest, with the rule of the experiment stated in the question. Alternate contexts between science (measurements, simulations) and economics (sales per month, incomes, prices).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=`. New in this subgoal: `plt.bar(x, heights)` and `plt.hist(values, bins=...)` with `bins` a number of classes or a list of limits. No numpy, no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `density=`, `plt.pie` or `plt.barh`. Counting uses a loop and a list of counters — no dictionaries, `count()` or `Counter`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_bar_chart",
+          "statement": "Je kan met plt.bar een staafdiagram tekenen van aantallen per categorie of per uitkomst.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_histogram",
+          "statement": "Je kan met plt.hist een histogram tekenen van een lijst waarden en het aantal klassen of de klassegrenzen kiezen met bins=.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_histogram_bars",
+          "statement": "Je kan voor een korte lijst waarden en gegeven klassegrenzen voorspellen hoe hoog elke staaf van het histogram wordt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_bar_vs_histogram",
+          "statement": "Je kan uitleggen wanneer je een staafdiagram gebruikt en wanneer een histogram.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_plot_simulation",
+          "statement": "Je kan de uitkomsten van een herhaald experiment in een lijst verzamelen en ze tonen in een passende grafiek.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "rekenen-numpy",
+      "type": "goal",
+      "parentId": "grafieken",
+      "title": "Sneller met numpy",
+      "description": "Je kan met np.linspace een reeks gelijk verdeelde x-waarden maken, met een formule in één keer rekenen op een hele array in plaats van met een lus, np.sin, np.cos en np.sqrt gebruiken, voorspellen waar een array zich anders gedraagt dan een lijst, en zo de grafiek van een functie in enkele regels tekenen.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Present numpy as the short way to do what the student already built by hand: `np.linspace(start, einde, aantal)` is their own `x_waarden` function, and `y = x ** 2 - 4 * x + 3` on an array is their loop over the x values, done element by element. In feedback, tie an array formula back to the loop it replaces.",
+        "For `predict_linspace_values`: The third argument is the number of points, not the step, and both ends are included: `np.linspace(0, 5, 11)` gives 11 values with step 0.5, `np.linspace(0, 2, 5)` gives 0, 0.5, 1, 1.5 and 2. Probe the confusion with `range(0, 5)`, which excludes the end.",
+        "For `predict_list_vs_array`: A list and an array look alike when printed but calculate differently: `[1, 2, 3] * 2` repeats the list while the array gives 2, 4, 6; `+` glues two lists together but adds two arrays element by element; `lijst ** 2` is a TypeError. Use one of these per question.",
+        "For `write_numpy_math`: `math.sin(x)` on an array raises a TypeError ('only length-1 arrays can be converted to Python scalars'); the numpy versions `np.sin`, `np.cos` and `np.sqrt` work on every element. Angles stay in radians, with `np.pi`.",
+        "For `write_array_formula`: A function from the functions goal that only calculates (`def f(x): return x ** 2 - 4 * x + 3`) works unchanged when it is called with an array. Do not use functions with an `if` on x here: a condition on a whole array raises a ValueError, and that is out of scope.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many points are drawn, which values an array holds, or what a described graph needs in code. State every formula in the question itself and alternate between mathematics (a quadratic, a sine), physics (a damped oscillation, distance against time, Celsius to Fahrenheit for a list of measurements) and economics (cost and revenue, growth of a capital).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.bar`, `plt.hist`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=`, `color=` and `bins=`. New in this subgoal, after `import numpy as np`: `np.linspace`, `np.array(lijst)` to turn a list into an array, calculating with a whole array (`+`, `-`, `*`, `/`, `**` with a number or with an array of the same length), `np.sin`, `np.cos`, `np.sqrt`, `np.pi`, plus `len()` and indexing as with a list. No `np.arange`, `np.zeros`, `np.random`, `np.sum`/`np.mean`, boolean masks, two-dimensional arrays, `np.vectorize` or pandas; no `plt.subplots`, `fig`, `ax` or `savefig`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, `lambda`, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "allowChains": false,
+      "objectives": [
+        {
+          "id": "write_linspace",
+          "statement": "Je kan met np.linspace een array maken van een gegeven aantal gelijk verdeelde waarden tussen een begin en een einde.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_linspace_values",
+          "statement": "Je kan voorspellen welke waarden np.linspace(start, einde, aantal) oplevert, inclusief het begin, het einde en de stap ertussen.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_array_formula",
+          "statement": "Je kan met één formule de functiewaarden voor een hele array x-waarden berekenen, zonder lus.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_list_vs_array",
+          "statement": "Je kan voorspellen wat bewerkingen zoals * 2 en + opleveren bij een array en hoe dat verschilt van een lijst.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_numpy_math",
+          "statement": "Je kan np.sin, np.cos of np.sqrt gebruiken om een wiskundige functie op elke waarde van een array toe te passen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_function_plot_numpy",
+          "statement": "Je kan de grafiek van een functie tekenen met np.linspace en een formule op de hele array.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}
