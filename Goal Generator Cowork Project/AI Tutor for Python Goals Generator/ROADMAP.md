@@ -32,7 +32,7 @@ Drie keuzes lopen door alle doelen:
 |---|---|---|
 | 5 | Functies (`functies`) | live sinds 5 oktober 2026 |
 | 6 | Toeval en simulatie (`toeval-simulatie`) | live sinds 5 oktober 2026 |
-| 7 | Grafieken maken (`grafieken`) | doelbestand en lessen geschreven, nog niet live |
+| 7 | Grafieken maken (`grafieken`) | live sinds 16 november 2026 |
 | 8 | Vergelijkingen oplossen door te zoeken | idee |
 | 9 | De wereld in tijdstappen | idee |
 | 10 | Dictionaries en gestructureerde data | idee |
