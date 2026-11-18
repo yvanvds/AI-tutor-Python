@@ -1058,5 +1058,7 @@
   "awardBadge_cancel": "Annuleren",
   "awardBadge_confirm": "Toekennen",
   "awardBadge_done": "{badge} toegekend ({count}×).",
-  "awardBadge_failed": "De badge kon niet toegekend worden. Probeer het opnieuw."
+  "awardBadge_failed": "De badge kon niet toegekend worden. Probeer het opnieuw.",
+  "standalone_placeholder_title": "Zonder school",
+  "standalone_placeholder_body": "De versie zonder school komt later."
 }

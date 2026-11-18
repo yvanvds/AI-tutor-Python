@@ -3686,4 +3686,11 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get awardBadge_failed =>
       'De badge kon niet toegekend worden. Probeer het opnieuw.';
+
+  @override
+  String get standalone_placeholder_title => 'Zonder school';
+
+  @override
+  String get standalone_placeholder_body =>
+      'De versie zonder school komt later.';
 }

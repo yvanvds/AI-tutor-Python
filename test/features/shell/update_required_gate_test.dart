@@ -10,6 +10,7 @@
 // getting the shell, and a minimum lowered again letting it back in — is
 // driven through the real app in integration_test/flows/update_required.dart.
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/main.dart';
@@ -21,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/test_app_mode.dart';
 
 const _uid = 'u1';
 
@@ -69,6 +71,7 @@ void main() {
 
   Widget app() => ProviderScope(
     overrides: [
+      appModeProvider.overrideWithValue(kTestSchoolMode),
       authServiceProvider.overrideWith(_SignedInAuth.new),
       systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
       appVersionProvider.overrideWithValue('2.5.0+22'),

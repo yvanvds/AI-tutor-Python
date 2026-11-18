@@ -1970,5 +1970,7 @@
   "@awardBadge_done": {
     "placeholders": { "badge": { "type": "String" }, "count": { "type": "int" } }
   },
-  "awardBadge_failed": "The badge could not be awarded. Try again."
+  "awardBadge_failed": "The badge could not be awarded. Try again.",
+  "standalone_placeholder_title": "Without a school",
+  "standalone_placeholder_body": "The version without a school comes later."
 }

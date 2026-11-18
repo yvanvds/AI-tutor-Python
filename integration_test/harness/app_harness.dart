@@ -36,6 +36,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/core/update_proxy.dart';
@@ -69,6 +70,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../test/helpers/fake_lesson_code_runner.dart';
 import '../../test/helpers/in_memory_cosmos.dart';
+import '../../test/helpers/test_app_mode.dart';
 import 'fake_github_server.dart';
 import 'fake_release_server.dart';
 import 'scripted_llm.dart';
@@ -181,6 +183,7 @@ class _FixedPathArchiveIo implements ProgressArchiveIo {
 class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
+    this.appMode,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -213,6 +216,11 @@ class AppHarness {
        lessonRunner = FakeLessonCodeRunner(results: lessonResults);
 
   final AccountIdentity identity;
+
+  /// The mode the app runs in (#262). `null` (the default) is a test school,
+  /// never the build's own: CI's dummy `.env` makes the build stand-alone.
+  /// The stand-alone flow passes `const StandaloneMode()`.
+  final AppMode? appMode;
 
   /// Where the shell looks for a published release on launch — GitHub's
   /// `/releases/latest` in production (#50). `null` (the default) switches
@@ -451,6 +459,9 @@ class AppHarness {
     final openaiClient = this.openaiClient;
     _container = ProviderContainer(
       overrides: [
+        // School mode unless the flow is about stand-alone (#262): never the
+        // build's own, which is stand-alone on CI's dummy `.env`.
+        appModeProvider.overrideWithValue(appMode ?? kTestSchoolMode),
         authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
         // Never the build's real key (#126): the school-key account's calls
         // are asserted against this string, and a developer's own key must

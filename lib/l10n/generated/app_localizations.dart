@@ -6036,6 +6036,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The badge could not be awarded. Try again.'**
   String get awardBadge_failed;
+
+  /// No description provided for @standalone_placeholder_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Without a school'**
+  String get standalone_placeholder_title;
+
+  /// No description provided for @standalone_placeholder_body.
+  ///
+  /// In en, this message translates to:
+  /// **'The version without a school comes later.'**
+  String get standalone_placeholder_body;
 }
 
 class _AppLocalizationsDelegate

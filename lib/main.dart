@@ -1,7 +1,9 @@
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
+import 'package:ai_tutor_python/features/standalone/standalone_placeholder_page.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -36,9 +38,12 @@ Future<void> main() async {
   };
 
   // Use an explicit container so we can call tryAcquireTokenSilent before
-  // the first frame, then hand it off to UncontrolledProviderScope.
+  // the first frame, then hand it off to UncontrolledProviderScope. Without
+  // a school (#262) there is nothing to sign in to.
   final container = ProviderContainer();
-  await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
+  if (container.read(appModeProvider) is SchoolMode) {
+    await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
+  }
 
   runApp(
     UncontrolledProviderScope(container: container, child: const GoalsApp()),
@@ -50,8 +55,13 @@ class GoalsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final identity = ref.watch(authServiceProvider);
-    final currentAccount = ref.watch(accountServiceProvider);
+    // School or stand-alone (#262). Stand-alone has no sign-in and no school
+    // database, so none of the school's providers is even watched.
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
+    final identity = standalone ? null : ref.watch(authServiceProvider);
+    final currentAccount = standalone
+        ? null
+        : ref.watch(accountServiceProvider);
     // Whether this build may run at all (#165), asked only once someone is
     // signed in so the sign-in page reads nothing: `AsyncLoading` until the
     // config has answered, then the requirement or `null`.
@@ -79,6 +89,7 @@ class GoalsApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(
         builder: (context) {
+          if (standalone) return const StandalonePlaceholderPage();
           if (identity == null) return const SignInPage();
 
           // Account doc still loading on first sign-in, or the config not yet

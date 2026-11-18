@@ -3658,4 +3658,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get awardBadge_failed => 'The badge could not be awarded. Try again.';
+
+  @override
+  String get standalone_placeholder_title => 'Without a school';
+
+  @override
+  String get standalone_placeholder_body =>
+      'The version without a school comes later.';
 }

@@ -5,21 +5,21 @@
 // in this app fit a small surface area — read / query / upsert / delete plus
 // transactional batch — so a hand-rolled client is the safest long-term bet.
 //
-// Auth is pluggable via [CosmosAuth]. Step 1 (this scaffolding) defaults to a
-// [MasterKeyAuth] reading the obfuscated key from [AzureConfig]. When MSAL
-// lands in Step 3, swap in an [AadTokenAuth] without touching call sites.
+// Auth is pluggable via [CosmosAuth]. [CosmosClient.instance] uses a
+// [MasterKeyAuth] on the school configuration of the app mode (#262). The
+// user's own sign-in ([AadTokenAuth], #306) swaps in without touching call
+// sites.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ai_tutor_python/services/config/azure_config.dart';
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 const String _apiVersion = '2018-12-31';
-const String _databaseId = 'python-tutor';
 const Duration _requestTimeout = Duration(seconds: 15);
 const int _maxThrottleRetries = 3;
 const Duration _maxThrottleBackoff = Duration(seconds: 5);
@@ -165,12 +165,13 @@ class AadTokenAuth implements CosmosAuth {
   }
 }
 
-/// Lazy singleton. First access pulls config out of `AzureConfig`; tests or
-/// the Step 3 auth swap can pre-seed via [overrideInstance].
+/// Lazy singleton. First access builds it from the school configuration of
+/// the app mode (#262); tests pre-seed it via [overrideInstance].
 class CosmosClient {
   CosmosClient._({
     required this._endpoint,
     required this._auth,
+    this._databaseId = kDefaultSchoolDatabaseName,
     http.Client? httpClient,
     this._transientRetryBaseDelay = _kTransientRetryBaseDelay,
   }) : _http = httpClient ?? http.Client();
@@ -192,10 +193,24 @@ class CosmosClient {
 
   static CosmosClient? _instance;
 
-  static CosmosClient get instance {
-    return _instance ??= CosmosClient._(
-      endpoint: Uri.parse(AzureConfig.cosmosEndpoint),
-      auth: MasterKeyAuth(AzureConfig.cosmosKey),
+  static CosmosClient get instance =>
+      _instance ??= CosmosClient.forMode(AppMode.fromBuild);
+
+  /// The client for [mode]'s school database. Stand-alone mode has none: it
+  /// keeps its data on the pc (#263), so reaching for Cosmos there is a bug.
+  /// [databaseKey] is the build's key unless a test passes its own.
+  static CosmosClient forMode(
+    AppMode mode, {
+    String Function() databaseKey = buildSchoolDatabaseKey,
+  }) {
+    final school = mode.school;
+    if (school == null) {
+      throw StateError('Stand-alone mode has no school database.');
+    }
+    return CosmosClient._(
+      endpoint: school.databaseEndpoint,
+      databaseId: school.databaseName,
+      auth: MasterKeyAuth(databaseKey()),
     );
   }
 
@@ -203,6 +218,7 @@ class CosmosClient {
 
   final Uri _endpoint;
   final CosmosAuth _auth;
+  final String _databaseId;
   final http.Client _http;
   final Duration _transientRetryBaseDelay;
 
