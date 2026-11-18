@@ -182,7 +182,7 @@ ENTRA_REDIRECT_URI=http://localhost
 A few things to know:
 
 - The file is **gitignored** — it will not get committed. Do not paste it into a chat or screenshot.
-- `OPEN_AI_API_KEY` and `COSMOS_KEY` are obfuscated into the compiled binary at build time via the `envied` package. They are *not* shipped in plaintext, but they *are* shipped — anyone determined enough can extract them from the binary. Treat the build as roughly as secret as the keys themselves.
+- The values are read at build time by the `envied` package. Keep the file private: it holds your own keys.
 - `ENTRA_REDIRECT_URI` must be exactly `http://localhost` to match step 2.4.
 - There is a seventh, **optional** line — `GITHUB_OAUTH_CLIENT_ID` — for in-app bug reports. Leave it out and everything else works; the Options panel simply says it cannot sign in to GitHub. [Step 8](#step-8-optional--in-app-bug-reports-github-oauth-app) sets it up.
 
