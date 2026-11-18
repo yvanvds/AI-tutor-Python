@@ -199,7 +199,12 @@ void main() {
         reason: 'the moment it was asked, not the moment it was answered',
       );
       expect(doc['optionFeedback'], [
-        {'option': '2', 'text': 'Juist: 1 + 1 is 2.', 'quality': 'correct'},
+        {
+          'option': '2',
+          'text': 'Juist: 1 + 1 is 2.',
+          'quality': 'correct',
+          'version': BankOptionFeedback.wrongPickVersion,
+        },
       ]);
       expect(doc.containsKey('hiddenBy'), isFalse);
       expect(doc.containsKey('reviewedAt'), isFalse);
@@ -339,8 +344,63 @@ void main() {
           'option': '11',
           'text': 'Nee: 1 + 1 is een som, geen tekst.',
           'quality': 'wrong',
+          'version': BankOptionFeedback.wrongPickVersion,
         },
-        {'option': '2', 'text': 'Juist.', 'quality': 'correct'},
+        {
+          'option': '2',
+          'text': 'Juist.',
+          'quality': 'correct',
+          'version': BankOptionFeedback.wrongPickVersion,
+        },
+      ]);
+    });
+
+    test('a text for a wrong pick stored before #305 is replaced, once, by '
+        'the next grading of that option; a text for the right option '
+        'stays', () async {
+      final q = _mcq();
+      seed(q);
+      store.docs[q.id]!['optionFeedback'] = [
+        {'option': '11', 'text': 'Oud duwtje.', 'quality': 'wrong'},
+        {'option': '2', 'text': 'Oud juist.', 'quality': 'correct'},
+      ];
+
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: false,
+        pickedOption: '11',
+        feedback: 'Nee: dat is tekst. Juist is 2, want 1 + 1 is een som.',
+        quality: AnswerQuality.wrong,
+      );
+      // The right option's old text is kept even when picked again.
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: true,
+        pickedOption: '2',
+        feedback: 'Nieuw juist.',
+        quality: AnswerQuality.correct,
+      );
+      // And the renewed text is not replaced again.
+      await bank.recordAnswer(
+        questionId: q.id,
+        subgoalId: 's1',
+        correct: false,
+        pickedOption: '11',
+        feedback: 'Nog een andere tekst.',
+        quality: AnswerQuality.wrong,
+      );
+
+      final s = stored(q.id);
+      expect(s.optionFeedback.map((f) => f.toJson()), [
+        {'option': '2', 'text': 'Oud juist.', 'quality': 'correct'},
+        {
+          'option': '11',
+          'text': 'Nee: dat is tekst. Juist is 2, want 1 + 1 is een som.',
+          'quality': 'wrong',
+          'version': BankOptionFeedback.wrongPickVersion,
+        },
       ]);
     });
 

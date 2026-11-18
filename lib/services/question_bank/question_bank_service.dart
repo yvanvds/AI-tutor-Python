@@ -306,9 +306,14 @@ class QuestionBankService {
     if (question == null || !question.options.contains(pickedOption)) {
       return;
     }
-    if (question.feedbackFor(pickedOption) != null) return;
+    // A text already kept stays, unless it is a stale text for a wrong pick
+    // (#305): then the one this grading wrote replaces it.
+    final kept = question.feedbackFor(pickedOption);
+    if (kept != null && !kept.isStale) return;
     doc['optionFeedback'] = [
-      ...question.optionFeedback.map((f) => f.toJson()),
+      ...question.optionFeedback
+          .where((f) => f.option != pickedOption)
+          .map((f) => f.toJson()),
       BankOptionFeedback(
         option: pickedOption,
         text: text,

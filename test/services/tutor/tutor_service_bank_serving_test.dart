@@ -722,8 +722,79 @@ void main() {
         'option': _wrong,
         'text': _wrongText,
         'quality': 'partial',
+        'version': BankOptionFeedback.wrongPickVersion,
       });
       expect(q.graderDisagreesWithKey, isFalse);
+    });
+
+    // #305 — a text for a wrong pick written before the feedback said which
+    // option is right only gave a nudge: it is fetched again, once, and the
+    // new text replaces it. A text for the key's own option stays.
+    test('a stale text for a wrong pick is not shown: one grading call writes '
+        'it again, the bank keeps the new one, and the key\'s text stays '
+        '(#305)', () async {
+      const stale = BankOptionFeedback(
+        option: _wrong,
+        text: 'Oude duw, geen antwoord.',
+        quality: AnswerQuality.wrong,
+        version: 0,
+      );
+      final doc = _mcqDoc('q', feedback: const [stale, _feedbackOnKey]);
+      final bank = await boot(docs: [doc], minimum: 1, share: 1);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      connector.scripts.add(
+        _reply(
+          McqFeedback(
+            type: 'mcq_feedback',
+            quality: AnswerQuality.wrong,
+            prompt: _wrongText,
+          ),
+        ),
+      );
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      expect(
+        connector.sent,
+        hasLength(1),
+        reason: 'the stale text is not used',
+      );
+      expect(pc!.read(activeMcqProvider)!.feedback, _wrongText);
+      expect(graded.single.fromAnswerKey, isTrue);
+
+      final q = stored(idOf(doc));
+      expect(q.optionFeedback, hasLength(2));
+      final renewed = q.feedbackFor(_wrong)!;
+      expect(renewed.text, _wrongText);
+      expect(renewed.version, BankOptionFeedback.wrongPickVersion);
+      expect(renewed.isStale, isFalse);
+      expect(
+        q.feedbackFor(_key)!.text,
+        _rightText,
+        reason: 'the text for the key stays',
+      );
+    });
+
+    test('a stale text for the key\'s own option is still shown: a text for '
+        'a correct pick never goes stale (#305)', () async {
+      const old = BankOptionFeedback(
+        option: _key,
+        text: _rightText,
+        quality: AnswerQuality.correct,
+        version: 0,
+      );
+      final doc = _mcqDoc('q', feedback: const [old]);
+      final bank = await boot(docs: [doc], minimum: 1, share: 1);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      await tutor().submitMcqAnswer(_key);
+      await bank.idle;
+
+      expect(connector.sent, isEmpty);
+      expect(pc!.read(activeMcqProvider)!.feedback, _rightText);
     });
 
     test('when the grader contradicts the key, its grade stands as for a '
