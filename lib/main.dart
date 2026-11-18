@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
@@ -46,8 +47,14 @@ Future<void> main() async {
   if (mode is StandaloneMode) {
     // Stand-alone (#263): the data lives on the pc. Opened before the first
     // frame, so every `CosmosPaths` handle reads the local storage.
-    CosmosClient.overrideInstance(
-      CosmosClient.forMode(mode, localDataRoot: await standaloneDataDir(mode)),
+    final dataRoot = await standaloneDataDir(mode);
+    final client = CosmosClient.forMode(mode, localDataRoot: dataRoot);
+    CosmosClient.overrideInstance(client);
+    // The content shipped with the app (#266): goals, lessons, prompts,
+    // translations. The school mode reads its own database instead.
+    await installCurriculumBundleAtStart(
+      client: client,
+      localDataRoot: dataRoot,
     );
   }
   // School: the stored sign-in. Stand-alone: the local profile (#264), so a

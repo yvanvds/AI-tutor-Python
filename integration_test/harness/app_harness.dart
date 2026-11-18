@@ -38,6 +38,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
@@ -187,6 +188,7 @@ class AppHarness {
     this.identity = studentIdentity,
     this.appMode,
     this.localData,
+    this.curriculumBundle,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -231,6 +233,12 @@ class AppHarness {
   /// first frame as `main()` reads it — instead of a signed-in stand-in.
   /// [identity] and [extraDocs] do not apply; [cosmos] is not set.
   final Directory? localData;
+
+  /// The content bundle the stand-alone app loads at start (#266), as
+  /// `main()` loads the one in its assets. `null` (the default) is the app's
+  /// own assets, which hold no bundle until the first export. Only with
+  /// [localData].
+  final CurriculumBundleSource? curriculumBundle;
 
   /// Where the shell looks for a published release on launch — GitHub's
   /// `/releases/latest` in production (#50). `null` (the default) switches
@@ -456,7 +464,14 @@ class AppHarness {
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     final localData = this.localData;
     if (localData != null) {
-      CosmosClient.overrideInstance(LocalCosmosClient.open(localData));
+      final client = LocalCosmosClient.open(localData);
+      CosmosClient.overrideInstance(client);
+      // The shipped content, as in `main()`.
+      await installCurriculumBundleAtStart(
+        client: client,
+        localDataRoot: localData,
+        source: curriculumBundle,
+      );
     } else {
       cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
       for (final entry in extraDocs.entries) {

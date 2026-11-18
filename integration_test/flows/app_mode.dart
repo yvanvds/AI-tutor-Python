@@ -7,8 +7,10 @@
 // app's own local storage (`LocalCosmosClient`) over a temp folder, with the
 // real `AuthService`. A second start goes straight to the shell.
 //
-// Content (goals, lessons) is not bundled yet (#266), so the stand-alone app
-// is empty; this flow is about getting in, not about what is inside.
+// The content the app ships with (#266) is loaded at start. This build's
+// assets hold no bundle yet, so the first test meets an empty app; the
+// second loads the fixture bundle (test/fixtures/curriculum_bundle) and the
+// student finds its goals on the learning path.
 //
 // Every other flow runs in school mode (the harness default); this one boots
 // the real app in both.
@@ -21,8 +23,10 @@
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/features/auth/local_key_gate_screen.dart';
 import 'package:ai_tutor_python/features/auth/sign_in_page.dart';
+import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
 import 'package:flutter/material.dart';
@@ -93,6 +97,46 @@ void main() {
     expect(find.byType(LocalKeyGateScreen), findsNothing);
     expect(find.text('Hi Alex,'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('without a school, with the shipped content: after welcome and '
+      'key the student finds its goals', (tester) async {
+    final data = Directory.systemTemp.createTempSync('ai_tutor_standalone_');
+    addTearDown(() {
+      if (data.existsSync()) data.deleteSync(recursive: true);
+    });
+
+    final harness = AppHarness(
+      appMode: const StandaloneMode(),
+      localData: data,
+      curriculumBundle: DirectoryCurriculumBundleSource(
+        Directory('test/fixtures/curriculum_bundle'),
+      ),
+    );
+    await harness.boot(tester, waitForShell: false);
+
+    await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
+    await tester.enterText(
+      find.byKey(const ValueKey('standalone-welcome-first-name')),
+      'Alex',
+    );
+    await tester.tap(find.byKey(const ValueKey('standalone-welcome-start')));
+    await pumpUntilFound(tester, find.byType(LocalKeyGateScreen));
+    await tester.enterText(find.byType(TextFormField), 'sk-own-key');
+    await tester.tap(find.text('Save key'));
+    await pumpUntilFound(tester, find.byType(AppShell));
+
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    // The fixture's root goal and its subgoal (in English, its translation).
+    await pumpUntilFound(tester, find.textContaining('Variabelen'));
+    await pumpUntilFound(tester, find.textContaining('Assignment'));
+    expect(tester.takeException(), isNull);
+    // Loaded into the local storage, and remembered as loaded.
+    expect(Directory('${data.path}/goals').existsSync(), isTrue);
+    expect(curriculumVersionFile(data).existsSync(), isTrue);
 
     await harness.dispose(tester);
   });
