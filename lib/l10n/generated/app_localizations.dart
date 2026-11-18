@@ -955,6 +955,12 @@ abstract class AppLocalizations {
   /// **'School default ({model})'**
   String options_model_followGlobal(String model);
 
+  /// No description provided for @options_model_followDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default ({model})'**
+  String options_model_followDefault(String model);
+
   /// No description provided for @options_globalModel_title.
   ///
   /// In en, this message translates to:
@@ -1321,6 +1327,12 @@ abstract class AppLocalizations {
   /// **'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.'**
   String get options_bugReport_subtitle;
 
+  /// No description provided for @options_bugReport_subtitle_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.'**
+  String get options_bugReport_subtitle_standalone;
+
   /// No description provided for @options_bugReport_github_notConnected.
   ///
   /// In en, this message translates to:
@@ -1494,6 +1506,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Report saved as {path}. Send this file to your teacher.'**
   String options_bugReport_saved(String path);
+
+  /// No description provided for @options_bugReport_saved_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved as {path}.'**
+  String options_bugReport_saved_standalone(String path);
 
   /// No description provided for @options_bugReport_saveFailed.
   ///
@@ -2136,6 +2154,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The ID of this question. Your teacher can use it to find the question.'**
   String get session_questionId_tooltip;
+
+  /// No description provided for @session_questionId_tooltip_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'The ID of this question. Mention it when you report a mistake in the question.'**
+  String get session_questionId_tooltip_standalone;
 
   /// Hover text on the small copy button next to a question's short ID (#304)
   ///
@@ -4543,6 +4567,12 @@ abstract class AppLocalizations {
   /// **'Your previous topic was removed by your teacher. Continuing with the next one.'**
   String get chat_notice_subgoalDeletedRedirect;
 
+  /// No description provided for @chat_notice_subgoalDeletedRedirect_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'Your previous topic no longer exists. Continuing with the next one.'**
+  String get chat_notice_subgoalDeletedRedirect_standalone;
+
   /// No description provided for @chat_notice_noGoalsLeft.
   ///
   /// In en, this message translates to:
@@ -4554,6 +4584,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This subgoal isn\'t quite finished yet — ask your teacher to complete it, or pick another subgoal.'**
   String get chat_notice_emptyObjectives;
+
+  /// No description provided for @chat_notice_emptyObjectives_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'This subgoal isn\'t quite finished yet. Pick another subgoal.'**
+  String get chat_notice_emptyObjectives_standalone;
 
   /// No description provided for @chat_notice_preparingExercise.
   ///
@@ -5136,6 +5172,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Badges for what you\'ve done. They give no XP and don\'t count towards your grade.'**
   String get badges_page_subtitle;
+
+  /// No description provided for @badges_page_subtitle_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'Badges for what you\'ve done. They give no XP.'**
+  String get badges_page_subtitle_standalone;
 
   /// No description provided for @badges_page_count.
   ///

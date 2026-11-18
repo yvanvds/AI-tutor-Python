@@ -71,9 +71,14 @@ class Sidebar extends ConsumerWidget {
     final selected = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
     final standalone = ref.watch(appModeProvider) is StandaloneMode;
+    // Stand-alone (#267): nothing that needs a school — no grade formula, no
+    // reports, no teacher group (part of it returns with #268).
     final studentSections = _studentSections.where(
-      (s) => !profile.isTeacher || !s.isStudentOnly,
+      (s) =>
+          (!profile.isTeacher || !s.isStudentOnly) &&
+          (!standalone || !s.isSchoolOnly),
     );
+    final showTeacher = profile.isTeacher && !standalone;
     final teacherSections = _teacherSections.where(
       (s) => devTools || !s.isDeveloperOnly,
     );
@@ -119,7 +124,7 @@ class Sidebar extends ConsumerWidget {
                       onTap: () => ref.read(sectionProvider.notifier).state = s,
                     ),
                   ),
-                  if (profile.isTeacher) ...[
+                  if (showTeacher) ...[
                     const SizedBox(height: AppSpacing.s),
                     _SidebarHeader(
                       label: AppLocalizations.of(context).sidebar_teacherHeader,

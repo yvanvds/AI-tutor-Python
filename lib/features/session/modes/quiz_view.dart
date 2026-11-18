@@ -125,7 +125,7 @@ class _QuizHeader extends ConsumerWidget {
           QuestionIdTag(
             questionId,
             key: const Key('quiz-question-id'),
-            tooltip: AppLocalizations.of(context).session_questionId_tooltip,
+            tooltip: questionIdTooltip(context, ref),
           ),
         ],
       ],

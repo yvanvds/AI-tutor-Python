@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/chat/mcq_options_widget.dart';
 import 'package:ai_tutor_python/features/chat/widgets/chat_header.dart';
 import 'package:ai_tutor_python/features/chat/widgets/chat_system_pill.dart';
@@ -226,6 +227,11 @@ class _NoticePill extends ConsumerWidget {
                 .watch(localizedGoalByIdOf(goalId, title: notice.args.first))
                 .title,
           );
-    return ChatSystemPill(text: AppLocalizations.of(context).chatNotice(shown));
+    return ChatSystemPill(
+      text: AppLocalizations.of(context).chatNotice(
+        shown,
+        standalone: ref.watch(appModeProvider) is StandaloneMode,
+      ),
+    );
   }
 }

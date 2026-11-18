@@ -134,9 +134,12 @@ class OptionsPage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.lg),
               const _TransferCard(),
               // What happens to the content of the oefeningen (#228): one
-              // sentence, for everyone — a student has a right to know.
-              const SizedBox(height: AppSpacing.lg),
-              const _AnswersKeptCard(),
+              // sentence, for everyone — a student has a right to know. Not
+              // in the stand-alone mode, which keeps none of it (#267).
+              if (!standalone) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const _AnswersKeptCard(),
+              ],
               if (usesOwnKey) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _ApiKeyCard(),
@@ -696,6 +699,8 @@ class _ModelCardState extends ConsumerState<_ModelCard> {
         ? OpenaiConnector.defaultModel
         : global;
     final overriding = current != null || _editing;
+    // Stand-alone (#267): the default is the app's, not a school's.
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
 
     return _OptionsCard(
       title: l.options_model_title,
@@ -707,7 +712,9 @@ class _ModelCardState extends ConsumerState<_ModelCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _choiceRow(
-            label: l.options_model_followGlobal(fallback),
+            label: standalone
+                ? l.options_model_followDefault(fallback)
+                : l.options_model_followGlobal(fallback),
             selected: !overriding,
             onTap: _followGlobal,
           ),
@@ -1538,7 +1545,13 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
           );
           // Cancelled in the save dialog: the student knows.
           if (!mounted || path == null) return;
-          _snack(context, l.options_bugReport_saved(path));
+          // Stand-alone (#267): no teacher to send it to.
+          _snack(
+            context,
+            ref.read(appModeProvider) is StandaloneMode
+                ? l.options_bugReport_saved_standalone(path)
+                : l.options_bugReport_saved(path),
+          );
       }
     } catch (e) {
       if (!mounted) return;
@@ -1560,6 +1573,7 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
     final l = AppLocalizations.of(context);
     final token = ref.watch(githubTokenStorageProvider);
     final configured = ref.watch(gitHubDeviceFlowProvider).isConfigured;
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
 
     final Widget status;
     if (token != null) {
@@ -1587,7 +1601,9 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
 
     return _OptionsCard(
       title: l.options_bugReport_title,
-      subtitle: l.options_bugReport_subtitle,
+      subtitle: standalone
+          ? l.options_bugReport_subtitle_standalone
+          : l.options_bugReport_subtitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

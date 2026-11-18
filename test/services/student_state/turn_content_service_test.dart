@@ -9,16 +9,19 @@
 
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/keep_until.dart';
 import 'package:ai_tutor_python/services/student_state/turn_content.dart';
 import 'package:ai_tutor_python/services/student_state/turn_content_service.dart';
 import 'package:ai_tutor_python/services/student_state/turn_record.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/mocks.dart';
+import '../../helpers/test_app_mode.dart';
 import '../../helpers/unprovisioned_cosmos.dart';
 
 final DateTime _turnAt = DateTime.utc(2026, 10, 2, 9, 15);
@@ -353,6 +356,44 @@ void main() {
 
       await expectLater(s.deleteAllForCurrentUser(), completes);
       expect(missing.requests.length, greaterThan(afterWrite));
+    });
+  });
+
+  // #267: nobody reads `turn_content` in the stand-alone mode, so the app
+  // writes none there. School mode writes as it always has.
+  group('stand-alone', () {
+    test('a service that does not write leaves the container empty', () async {
+      final store = InMemoryCosmos();
+      final s = TurnContentService(
+        container: store.container,
+        getUid: () => 'u1',
+        writes: false,
+      );
+      await s.record(_content());
+      await s.record(_content(id: 't-2'));
+      await s.idle;
+      expect(store.docs, isEmpty);
+    });
+
+    test('the app\'s service writes in school mode, not in stand-alone', () {
+      ProviderContainer containerFor(AppMode mode) {
+        final pc = ProviderContainer(
+          overrides: [appModeProvider.overrideWithValue(mode)],
+        );
+        addTearDown(pc.dispose);
+        return pc;
+      }
+
+      expect(
+        containerFor(const StandaloneMode())
+            .read(turnContentServiceProvider)
+            .writes,
+        isFalse,
+      );
+      expect(
+        containerFor(kTestSchoolMode).read(turnContentServiceProvider).writes,
+        isTrue,
+      );
     });
   });
 }

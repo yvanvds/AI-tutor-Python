@@ -109,7 +109,7 @@ class _QuestionId extends ConsumerWidget {
       child: QuestionIdTag(
         id,
         key: const Key('exercise-question-id'),
-        tooltip: AppLocalizations.of(context).session_questionId_tooltip,
+        tooltip: questionIdTooltip(context, ref),
       ),
     );
   }

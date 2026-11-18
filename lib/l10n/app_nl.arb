@@ -157,6 +157,7 @@
   "options_model_title": "AI-model",
   "options_model_subtitle": "Welk OpenAI-model de tutor bevraagt. Geldt alleen voor dit toestel; een groter model is trager en duurder.",
   "options_model_followGlobal": "Standaard van de school ({model})",
+  "options_model_followDefault": "Standaard ({model})",
 
   "options_globalModel_title": "AI-model voor de hele school",
   "options_globalModel_subtitle": "Welk model de tutor van elke leerling bevraagt. Alleen voor leerkrachten. Een toestel dat hierboven zelf een model koos, behoudt dat; de rest volgt binnen enkele seconden.",
@@ -224,6 +225,7 @@
 
   "options_bugReport_title": "Bugmeldingen",
   "options_bugReport_subtitle": "Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.",
+  "options_bugReport_subtitle_standalone": "Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente oefening erbij.",
   "options_bugReport_github_notConnected": "Niet verbonden met GitHub.",
   "options_bugReport_github_connectedAs": "Verbonden met GitHub als {login}.",
   "options_bugReport_github_connect_button": "GitHub verbinden",
@@ -253,6 +255,7 @@
   "options_bugReport_posted": "Issue geplaatst: {url}",
   "options_bugReport_postFailed": "Plaatsen mislukt: {error}",
   "options_bugReport_saved": "Melding bewaard als {path}. Stuur dit bestand naar je leerkracht.",
+  "options_bugReport_saved_standalone": "Melding bewaard als {path}.",
   "options_bugReport_saveFailed": "Bewaren mislukt: {error}",
 
   "options_developer_title": "Ontwikkelaarstools",
@@ -371,6 +374,7 @@
 
   "session_quiz_pill": "Quizvraag",
   "session_questionId_tooltip": "De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.",
+  "session_questionId_tooltip_standalone": "De ID van deze vraag. Noem hem als je een fout in de vraag meldt.",
   "questionId_copy_tooltip": "Kopieer de ID",
   "questionId_copied_tooltip": "Gekopieerd",
   "session_quiz_next_button": "Volgende →",
@@ -808,8 +812,10 @@
   "chat_notice_exerciseWithoutBlank": "In die oefening viel niets meer in te vullen. Ik haal een nieuwe op.",
   "chat_notice_optionsLookAlike": "Twee antwoorden in die vraag zagen er hetzelfde uit. Ik haal een nieuwe op.",
   "chat_notice_subgoalDeletedRedirect": "Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.",
+  "chat_notice_subgoalDeletedRedirect_standalone": "Je vorige onderwerp bestaat niet meer. Je gaat verder met het volgende.",
   "chat_notice_noGoalsLeft": "Er zijn geen doelen meer om aan te werken. Gefeliciteerd!",
   "chat_notice_emptyObjectives": "Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om het af te ronden, of kies een ander subdoel.",
+  "chat_notice_emptyObjectives_standalone": "Dit subdoel is nog niet helemaal klaar. Kies een ander subdoel.",
   "chat_notice_preparingExercise": "Je volgende oefening wordt voorbereid...",
   "chat_notice_feedbackDegraded": "Er is iets mis met de feedback. Probeer het over een paar minuten opnieuw.",
   "chat_notice_newGoalSelected": "Nieuw doel geselecteerd: {title}",
@@ -909,6 +915,7 @@
   "sidebar_section_trophies": "Prijzenkast",
   "badges_page_title": "Prijzenkast",
   "badges_page_subtitle": "Badges voor wat je gedaan hebt. Ze leveren geen XP op en tellen niet mee voor je punten.",
+  "badges_page_subtitle_standalone": "Badges voor wat je gedaan hebt. Ze leveren geen XP op.",
   "badges_page_count": "{earned} van de {total} badges verdiend",
   "badges_page_loading": "Je badges worden geteld…",
   "badges_page_noProgress": "Je voortgang kon niet geladen worden. Je ziet de badges die je al hebt.",

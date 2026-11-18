@@ -530,6 +530,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String options_model_followDefault(String model) {
+    return 'Default ($model)';
+  }
+
+  @override
   String get options_globalModel_title => 'School-wide AI model';
 
   @override
@@ -757,6 +762,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
 
   @override
+  String get options_bugReport_subtitle_standalone =>
+      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.';
+
+  @override
   String get options_bugReport_github_notConnected =>
       'Not connected to GitHub.';
 
@@ -865,6 +874,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String options_bugReport_saved(String path) {
     return 'Report saved as $path. Send this file to your teacher.';
+  }
+
+  @override
+  String options_bugReport_saved_standalone(String path) {
+    return 'Report saved as $path.';
   }
 
   @override
@@ -1262,6 +1276,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get session_questionId_tooltip =>
       'The ID of this question. Your teacher can use it to find the question.';
+
+  @override
+  String get session_questionId_tooltip_standalone =>
+      'The ID of this question. Mention it when you report a mistake in the question.';
 
   @override
   String get questionId_copy_tooltip => 'Copy the ID';
@@ -2730,12 +2748,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
   @override
+  String get chat_notice_subgoalDeletedRedirect_standalone =>
+      'Your previous topic no longer exists. Continuing with the next one.';
+
+  @override
   String get chat_notice_noGoalsLeft =>
       'There are no goals left to work on. Congratulations!';
 
   @override
   String get chat_notice_emptyObjectives =>
       'This subgoal isn\'t quite finished yet — ask your teacher to complete it, or pick another subgoal.';
+
+  @override
+  String get chat_notice_emptyObjectives_standalone =>
+      'This subgoal isn\'t quite finished yet. Pick another subgoal.';
 
   @override
   String get chat_notice_preparingExercise => 'Preparing your next exercise...';
@@ -3116,6 +3142,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get badges_page_subtitle =>
       'Badges for what you\'ve done. They give no XP and don\'t count towards your grade.';
+
+  @override
+  String get badges_page_subtitle_standalone =>
+      'Badges for what you\'ve done. They give no XP.';
 
   @override
   String badges_page_count(int earned, int total) {

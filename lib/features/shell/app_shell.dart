@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/account/accounts_page.dart';
@@ -75,6 +76,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final profile = ref.watch(profileProvider);
     final section = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
 
     // If a teacher-only section is active but the user is not a teacher, a
     // student-only one while they are (#151: sign-out and back in as the
@@ -83,7 +85,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     // the state mutation for after this build to keep Riverpod happy.
     if ((section.isTeacherOnly && !profile.isTeacher) ||
         (section.isStudentOnly && profile.isTeacher) ||
-        (section.isDeveloperOnly && !devTools)) {
+        (section.isDeveloperOnly && !devTools) ||
+        // Stand-alone (#267): no section that needs a school.
+        (section.isSchoolOnly && standalone)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(sectionProvider.notifier).state = Section.session;
       });

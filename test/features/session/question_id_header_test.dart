@@ -9,6 +9,7 @@
 // (`shownQuestionIdProvider`) is seeded. The end-to-end run
 // (integration_test/flows/question_id.dart) drives the tutor that sets it.
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -28,6 +29,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:py_runner/py_runner.dart';
 
 import '../../helpers/localization.dart';
+import '../../helpers/test_app_mode.dart';
 
 class _FakeTutorService extends TutorService {
   @override
@@ -44,19 +46,20 @@ void main() {
 
   late ProviderContainer pc;
 
-  setUp(() {
-    pc = ProviderContainer(
-      overrides: [
-        tutorServiceProvider.overrideWith(() => _FakeTutorService()),
-        outputServiceProvider.overrideWithValue(
-          OutputService(
-            pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
-            localizations: testLocalizations(),
-          ),
+  ProviderContainer containerFor(AppMode mode) => ProviderContainer(
+    overrides: [
+      appModeProvider.overrideWithValue(mode),
+      tutorServiceProvider.overrideWith(() => _FakeTutorService()),
+      outputServiceProvider.overrideWithValue(
+        OutputService(
+          pyRunner: PyRunner(locator: const InstallerPyHostLocator()),
+          localizations: testLocalizations(),
         ),
-      ],
-    );
-  });
+      ),
+    ],
+  );
+
+  setUp(() => pc = containerFor(kTestSchoolMode));
 
   tearDown(() => pc.dispose());
 
@@ -139,6 +142,42 @@ void main() {
     await tester.pump(QuestionIdTag.copiedFor);
     expect(tester.takeException(), isNull);
   }
+
+  // #267: no teacher to look the question up in the stand-alone mode.
+  testWidgets('stand-alone: the ID is for a bug report, not for a teacher', (
+    tester,
+  ) async {
+    pc.dispose();
+    pc = containerFor(const StandaloneMode());
+    pc.read(activeMcqProvider.notifier).state = const ActiveMcq(
+      prompt: 'Wat drukt dit af?',
+      code: 'print(1 + 1)',
+      options: ['2', '11'],
+    );
+    pc.read(shownQuestionIdProvider.notifier).state = _id;
+    await mount(tester, const QuizView());
+
+    final tag = find.byKey(const Key('quiz-question-id'));
+    expect(
+      find.descendant(
+        of: tag,
+        matching: find.byTooltip(
+          'The ID of this question. Mention it when you report a mistake in '
+          'the question.',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: tag,
+        matching: find.byWidgetPredicate(
+          (w) => w is Tooltip && (w.message ?? '').contains('teacher'),
+        ),
+      ),
+      findsNothing,
+    );
+  });
 
   group('a quiz', () {
     setUp(() {

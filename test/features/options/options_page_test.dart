@@ -685,6 +685,63 @@ void main() {
     });
   });
 
+  // #267: no teacher and no school year in the stand-alone mode. The school
+  // keeps every text as it was.
+  group('school or stand-alone', () {
+    const bugReportSchool =
+        'Save a report as a text file to send to your teacher, or post it on '
+        'GitHub straight from the app — with the debug data of a recent tutor '
+        'turn attached.';
+    const bugReportStandalone =
+        'Save a report as a text file, or post it on GitHub straight from the '
+        'app — with the debug data of a recent exercise attached.';
+
+    Future<void> saveReport(WidgetTester tester) async {
+      await tester.tap(find.text('Report a bug…'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Title'),
+        'Nothing happens',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('school: answers kept for the teacher, the school default, '
+        'a report to send to the teacher', (tester) async {
+      await mount(tester, oauthClientId: '');
+
+      expect(find.byKey(const Key('options-answers-kept')), findsOneWidget);
+      expect(find.text('School default (gpt-4o)'), findsOneWidget);
+      expect(find.text(bugReportSchool), findsOneWidget);
+      await saveReport(tester);
+      expect(
+        find.textContaining('Send this file to your teacher.'),
+        findsOneWidget,
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('stand-alone: no word about a teacher or the school', (
+      tester,
+    ) async {
+      await mount(tester, oauthClientId: '', mode: const StandaloneMode());
+
+      expect(find.byKey(const Key('options-answers-kept')), findsNothing);
+      expect(find.text('Your answers'), findsNothing);
+      expect(find.text('Default (gpt-4o)'), findsOneWidget);
+      expect(find.textContaining('School default'), findsNothing);
+      expect(find.text(bugReportStandalone), findsOneWidget);
+      expect(find.text(bugReportSchool), findsNothing);
+      await saveReport(tester);
+      expect(find.textContaining('Report saved as'), findsOneWidget);
+      expect(find.textContaining('teacher'), findsNothing);
+
+      await unmount(tester);
+    });
+  });
+
   group('OpenAI key', () {
     testWidgets('card is shown for own-key accounts; remove clears the key', (
       tester,

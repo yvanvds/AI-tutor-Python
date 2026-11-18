@@ -532,6 +532,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String options_model_followDefault(String model) {
+    return 'Standaard ($model)';
+  }
+
+  @override
   String get options_globalModel_title => 'AI-model voor de hele school';
 
   @override
@@ -762,6 +767,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
 
   @override
+  String get options_bugReport_subtitle_standalone =>
+      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente oefening erbij.';
+
+  @override
   String get options_bugReport_github_notConnected =>
       'Niet verbonden met GitHub.';
 
@@ -871,6 +880,11 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String options_bugReport_saved(String path) {
     return 'Melding bewaard als $path. Stuur dit bestand naar je leerkracht.';
+  }
+
+  @override
+  String options_bugReport_saved_standalone(String path) {
+    return 'Melding bewaard als $path.';
   }
 
   @override
@@ -1272,6 +1286,10 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get session_questionId_tooltip =>
       'De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.';
+
+  @override
+  String get session_questionId_tooltip_standalone =>
+      'De ID van deze vraag. Noem hem als je een fout in de vraag meldt.';
 
   @override
   String get questionId_copy_tooltip => 'Kopieer de ID';
@@ -2759,12 +2777,20 @@ class AppLocalizationsNl extends AppLocalizations {
       'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
 
   @override
+  String get chat_notice_subgoalDeletedRedirect_standalone =>
+      'Je vorige onderwerp bestaat niet meer. Je gaat verder met het volgende.';
+
+  @override
   String get chat_notice_noGoalsLeft =>
       'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!';
 
   @override
   String get chat_notice_emptyObjectives =>
       'Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om het af te ronden, of kies een ander subdoel.';
+
+  @override
+  String get chat_notice_emptyObjectives_standalone =>
+      'Dit subdoel is nog niet helemaal klaar. Kies een ander subdoel.';
 
   @override
   String get chat_notice_preparingExercise =>
@@ -3146,6 +3172,10 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get badges_page_subtitle =>
       'Badges voor wat je gedaan hebt. Ze leveren geen XP op en tellen niet mee voor je punten.';
+
+  @override
+  String get badges_page_subtitle_standalone =>
+      'Badges voor wat je gedaan hebt. Ze leveren geen XP op.';
 
   @override
   String badges_page_count(int earned, int total) {

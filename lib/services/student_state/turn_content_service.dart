@@ -19,9 +19,13 @@
 // bank (`questions`): it is kept for next year, also the questions this
 // student was the first to get. Read by the teacher's tooling
 // (`evaluate.py trace`).
+//
+// The stand-alone mode writes none (#267): nobody else reads them there.
+// `turn_history` stays, the badges read it.
 
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
@@ -42,12 +46,16 @@ class TurnContentService {
     CosmosContainer? container,
     required this._getUid,
     DateTime Function()? now,
+    this.writes = true,
   }) : _containerOverride = container,
        _now = now ?? (() => DateTime.now().toUtc());
 
   final CosmosContainer? _containerOverride;
   final String? Function() _getUid;
   final DateTime Function() _now;
+
+  /// Whether [record] writes at all: not in the stand-alone mode (#267).
+  final bool writes;
 
   CosmosContainer get _container =>
       _containerOverride ?? CosmosPaths.turnContent();
@@ -60,8 +68,9 @@ class TurnContentService {
   /// Writes [content] for the signed-in student, kept until [keepUntil]
   /// (the school's day, `null` for 1 July) after its turn. Never throws;
   /// the returned future is for tests — the tutor does not wait for it.
-  Future<void> record(TurnContent content, {KeepUntil? keepUntil}) =>
-      _enqueue(() => _write(content, keepUntil));
+  Future<void> record(TurnContent content, {KeepUntil? keepUntil}) => writes
+      ? _enqueue(() => _write(content, keepUntil))
+      : Future<void>.value();
 
   /// Deletes every `turn_content` doc of the signed-in student (#232):
   /// "Reset all progress" takes the content of the oefeningen along with
@@ -165,5 +174,8 @@ class TurnContentService {
 }
 
 final turnContentServiceProvider = Provider<TurnContentService>(
-  (ref) => TurnContentService(getUid: () => ref.read(authServiceProvider)?.oid),
+  (ref) => TurnContentService(
+    getUid: () => ref.read(authServiceProvider)?.oid,
+    writes: ref.watch(appModeProvider) is! StandaloneMode,
+  ),
 );

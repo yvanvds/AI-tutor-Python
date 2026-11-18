@@ -212,6 +212,12 @@ class BadgeCatalog {
   /// the place.
   static const BadgeIcon podiumIcon = BadgeIcon('sport-medal');
 
+  /// Whether [badge] counts lesson hours (#219): Thuiswerker and Lesweken.
+  /// Without a class they can never be earned, so the stand-alone mode
+  /// leaves them out of the trophy case (#267).
+  static bool needsLessons(BadgeDefinition badge) =>
+      badge.id == 'homeWork' || badge.id == 'lessonWeeks';
+
   /// The badges in tiers, in the order the trophy case shows them.
   static const List<BadgeDefinition> tiered = [
     BadgeDefinition(

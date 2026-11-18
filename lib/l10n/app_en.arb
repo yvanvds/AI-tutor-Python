@@ -296,6 +296,8 @@
   "@options_model_followGlobal": {
     "placeholders": { "model": { "type": "String" } }
   },
+  "options_model_followDefault": "Default ({model})",
+  "@options_model_followDefault": { "placeholders": { "model": { "type": "String" } } },
 
   "options_globalModel_title": "School-wide AI model",
   "options_globalModel_subtitle": "Which model every student's tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.",
@@ -412,6 +414,7 @@
 
   "options_bugReport_title": "Bug reports",
   "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.",
+  "options_bugReport_subtitle_standalone": "Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.",
   "options_bugReport_github_notConnected": "Not connected to GitHub.",
   "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
   "@options_bugReport_github_connectedAs": {
@@ -468,6 +471,8 @@
   "@options_bugReport_saved": {
     "placeholders": { "path": { "type": "String" } }
   },
+  "options_bugReport_saved_standalone": "Report saved as {path}.",
+  "@options_bugReport_saved_standalone": { "placeholders": { "path": { "type": "String" } } },
   "options_bugReport_saveFailed": "Saving failed: {error}",
   "@options_bugReport_saveFailed": {
     "placeholders": { "error": { "type": "String" } }
@@ -745,6 +750,7 @@
   "@session_questionId_tooltip": {
     "description": "Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)"
   },
+  "session_questionId_tooltip_standalone": "The ID of this question. Mention it when you report a mistake in the question.",
   "questionId_copy_tooltip": "Copy the ID",
   "@questionId_copy_tooltip": {
     "description": "Hover text on the small copy button next to a question's short ID (#304)"
@@ -1588,8 +1594,10 @@
   "chat_notice_exerciseWithoutBlank": "That exercise had nothing left to fill in. Fetching a new one.",
   "chat_notice_optionsLookAlike": "Two answers in that question looked the same. Fetching a new one.",
   "chat_notice_subgoalDeletedRedirect": "Your previous topic was removed by your teacher. Continuing with the next one.",
+  "chat_notice_subgoalDeletedRedirect_standalone": "Your previous topic no longer exists. Continuing with the next one.",
   "chat_notice_noGoalsLeft": "There are no goals left to work on. Congratulations!",
   "chat_notice_emptyObjectives": "This subgoal isn't quite finished yet — ask your teacher to complete it, or pick another subgoal.",
+  "chat_notice_emptyObjectives_standalone": "This subgoal isn't quite finished yet. Pick another subgoal.",
   "chat_notice_preparingExercise": "Preparing your next exercise...",
   "chat_notice_feedbackDegraded": "Something is wrong with the feedback. Try again in a few minutes.",
   "chat_notice_newGoalSelected": "New goal selected: {title}",
@@ -1773,6 +1781,7 @@
   "sidebar_section_trophies": "Trophy case",
   "badges_page_title": "Trophy case",
   "badges_page_subtitle": "Badges for what you've done. They give no XP and don't count towards your grade.",
+  "badges_page_subtitle_standalone": "Badges for what you've done. They give no XP.",
   "badges_page_count": "{earned} of {total} badges earned",
   "@badges_page_count": {
     "placeholders": { "earned": { "type": "int" }, "total": { "type": "int" } }

@@ -1,11 +1,23 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// The hover text on the ID of the student's own question (#216): what the
+/// ID is for. In the stand-alone mode there is no teacher to look it up
+/// (#267), so it says to mention it in a bug report.
+String questionIdTooltip(BuildContext context, WidgetRef ref) {
+  final l = AppLocalizations.of(context);
+  return ref.watch(appModeProvider) is StandaloneMode
+      ? l.session_questionId_tooltip_standalone
+      : l.session_questionId_tooltip;
+}
 
 /// A question's short ID (#216), `#3fa91c`: small, muted, monospace, with a
 /// small button that copies it (#304). The same on the header of the
