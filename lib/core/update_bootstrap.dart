@@ -130,6 +130,18 @@ String windowsCurlPath() => p.join(
 /// password from the environment", which on an SSPI build is the current
 /// Windows session. Passed only beside a `--proxy` that names no login of
 /// its own.
+///
+/// What that answer can be depends on the `curl.exe` Windows ships (#309).
+/// Its build has no NTLM scheme of its own (`curl -V` lists `SPNEGO
+/// Kerberos`, no `NTLM`; `--proxy-ntlm` is refused), so Negotiate is the
+/// only one it answers. Up to curl 8.21 SSPI's Negotiate fell back to NTLM
+/// when Kerberos had no ticket; curl 8.22.0 (in Windows since November
+/// 2026) blocks that fallback ("spnego: block NTLM fallback in SPNEGO
+/// negotiation", curl commit a8881e5e), so only a Kerberos answer is left:
+/// a domain-joined PC behind a proxy with a Kerberos service name still
+/// gets through, a proxy that needs NTLM no longer does and fails with
+/// SSPI's `SEC_E_NO_CREDENTIALS`. No other switch of this build changes
+/// that.
 const List<String> kCurlProxyWindowsLogin = <String>[
   '--proxy-anyauth',
   '--proxy-user',
@@ -167,7 +179,8 @@ const List<String> kCurlProxyWindowsLogin = <String>[
 ///   URL carries a login of its own: a proxy that authenticates answers the
 ///   `CONNECT` with a 407, and this is curl's documented way of answering a
 ///   Negotiate / NTLM challenge through SSPI as the logged-in Windows user —
-///   the empty login is what tells it to. No credential is stored, passed
+///   the empty login is what tells it to (with Windows' curl 8.22+ by
+///   Kerberos only, see [kCurlProxyWindowsLogin]). No credential is stored, passed
 ///   or logged. A proxy that only offers Basic is not answered at all —
 ///   curl ignores Basic for an empty login, rightly — and the request fails
 ///   exactly as it failed before. With a login in the URL

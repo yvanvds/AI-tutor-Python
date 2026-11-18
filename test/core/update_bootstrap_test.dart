@@ -80,6 +80,26 @@ class _FakeCurl {
   }
 }
 
+/// The version `curl.exe` at [path] reports on the first line of
+/// `--version` ("curl 8.22.0 (Windows) …"), as its numeric parts.
+Future<List<int>> _curlVersion(String path) async {
+  final ProcessResult result = await Process.run(path, <String>['--version']);
+  final RegExpMatch? match = RegExp(r'^curl (\d+)\.(\d+)\.(\d+)')
+      .firstMatch(result.stdout.toString());
+  if (match == null) {
+    throw StateError('$path --version said "${result.stdout}"');
+  }
+  return <int>[for (int i = 1; i <= 3; i++) int.parse(match.group(i)!)];
+}
+
+/// Whether [version] is older than [than], part by part.
+bool _curlVersionBelow(List<int> version, List<int> than) {
+  for (int i = 0; i < than.length; i++) {
+    if (version[i] != than[i]) return version[i] < than[i];
+  }
+  return false;
+}
+
 void main() {
   test('the silent install arguments carry the relaunch switch', () {
     expect(
@@ -807,15 +827,26 @@ void main() {
     // filter does. The shipped fallback, built by the production provider
     // with a proxy that names no login, has to answer by itself —
     // `--proxy-anyauth --proxy-user :` makes SSPI answer as the logged-in
-    // Windows user — and the proof is the same as above: Schannel's refusal
-    // of the loopback certificate means the authenticated CONNECT was
-    // tunnelled to the routed server. Without those switches curl gives up
-    // on the 407 with exit 7 ("CONNECT tunnel failed, response 407") and
-    // never meets a certificate at all. What SSPI produces on a machine
-    // outside any domain is NTLM's first message for the local account —
-    // enough to see the challenge answered with the Windows session, which
-    // is all a test without a domain can see; the proxy accepts that first
-    // leg without verifying it.
+    // Windows user. Without those switches curl gives up on the 407 with
+    // exit 7 ("CONNECT tunnel failed, response 407") and never asks SSPI at
+    // all; with them it always does. What SSPI can then produce depends on
+    // the binary Windows ships, not on this machine's sign-in (#309):
+    //
+    // - Up to curl 8.21, a machine outside any domain gets NTLM's first
+    //   message for the local account, wrapped in Negotiate. The proxy
+    //   accepts that first leg without verifying it, tunnels, and Schannel's
+    //   refusal of the loopback certificate (exit 60) proves the
+    //   authenticated CONNECT reached the routed server.
+    // - From curl 8.22.0 (in Windows since November 2026) Negotiate no
+    //   longer falls back to NTLM, and this build has no NTLM of its own, so
+    //   only Kerberos is left — and no machine has a Kerberos ticket for a
+    //   proxy at a loopback address, domain-joined or not. SSPI then fails
+    //   before anything is sent (`InitializeSecurityContext failed`), which
+    //   is still the proof the challenge was put to SSPI rather than ignored.
+    //
+    // The branch is picked by `curl.exe --version`, so each binary is held to
+    // what it does; a real Kerberos exchange needs a domain and stays out of
+    // reach of a unit test.
     test(
       'the shipped fallback answers the machine proxy\'s login challenge',
       () async {
@@ -847,6 +878,10 @@ void main() {
         );
         addTearDown(container.dispose);
         final NativeGet native = container.read(nativeGetProvider)!;
+        final bool ntlmBlocked = !_curlVersionBelow(
+          await _curlVersion(windowsCurlPath()),
+          const <int>[8, 22, 0],
+        );
 
         await expectLater(
           native(
@@ -858,20 +893,33 @@ void main() {
               (e) => e.message,
               'message',
               allOf(
-                contains('exited with 60'),
+                ntlmBlocked
+                    ? allOf(
+                        contains('exited with 7'),
+                        contains('InitializeSecurityContext failed'),
+                      )
+                    : contains('exited with 60'),
                 isNot(contains('407')),
                 isNot(contains('timed out')),
               ),
             ),
           ),
         );
-        // Challenged once, answered once — both CONNECTs for the same target
-        // — and answered with an SSPI token, not with any stored login.
-        expect(proxy.challenges, 1);
-        expect(proxy.logins, hasLength(1));
-        expect(proxy.logins.single, startsWith('Negotiate '));
-        expect(proxy.connects, <String>[hole.authority, hole.authority]);
+        expect(proxy.connects, everyElement(hole.authority));
         expect(hole.connections, 0, reason: 'curl dialled the hole directly');
+        if (ntlmBlocked) {
+          // Challenged, and nothing sent back: SSPI had no Kerberos ticket to
+          // give and is no longer allowed to give NTLM instead.
+          expect(proxy.challenges, greaterThanOrEqualTo(1));
+          expect(proxy.logins, isEmpty);
+        } else {
+          // Challenged once, answered once — both CONNECTs for the same
+          // target — and answered with an SSPI token, not any stored login.
+          expect(proxy.challenges, 1);
+          expect(proxy.logins, hasLength(1));
+          expect(proxy.logins.single, startsWith('Negotiate '));
+          expect(proxy.connects, hasLength(2));
+        }
       },
       skip: Platform.isWindows && File(windowsCurlPath()).existsSync()
           ? false
