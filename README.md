@@ -9,10 +9,12 @@ A Windows desktop application that acts as a personal AI tutor for Python studen
 - a teacher side where you author the *goals* (a tree of learning objectives) and the *instructions* (the prompts that shape the tutor's behaviour) without touching any code,
 - per-student progress tracking, status reports, and history charts.
 
-The tutor follows a teacher-defined goal tree, picks the type of exercise (multiple choice, explain-this-code, complete-the-code, write-code, Socratic question, …), and only marks a sub-goal as mastered once the student answers correctly across several different question types. UI is in Dutch.
+The tutor follows a teacher-defined goal tree, picks the type of exercise (multiple choice, explain-this-code, complete-the-code, write-code, Socratic question, …), and only marks a sub-goal as mastered once the student answers correctly across several different question types. The app is in Dutch and English: the interface, the lessons and what the tutor writes.
 
 
 ---
+
+> **For now the app only works for students of SMA Arcadia.** They sign in with their Arcadia Microsoft account, and the teacher switches the account on. A version you can use outside the school is being worked on: follow [#261](https://github.com/yvanvds/AI-tutor-Python/issues/261).
 
 ## ⚠️ This build cannot be used as-is
 
@@ -229,15 +231,11 @@ The installer ends up in `dist/<version>/python_teacher_install.exe`. That is th
 When you start the app for the first time:
 
 1. Sign in with your own (Teacher-role) Microsoft account. The app creates an `accounts/{your-uid}` document automatically.
-2. Because you have the `Teacher` role, you will see extra navigation items: **Goals**, **Instructions**, **Accounts**.
-3. Go to **Instructions** and create the prompt documents. Each document's **id** must match a request type the tutor uses. The minimum set to get a working tutor:
-   - `alwaysInclude` — global instructions injected on every call (tone, language, etc.).
-   - `socraticQuestion`, `multipleChoiceQuestion`, `explainCode`, `completeCode`, `writeCodeQuestion`, `guidingQuestion` — one per exercise type.
-   - `submitCode`, `submitMcqAnswer`, `submitExplain`, `submitSocratic`, `submitGuiding` — feedback prompts.
-   - `statusSummary` — periodic per-subgoal report.
+2. Because you have the `Teacher` role, you will see the teacher pages in the sidebar: **Goals**, **Lesson content**, **Questions**, **Instructions**, **Students**, …
+3. **Instructions.** The prompts that shape the tutor are in [instructions-export.md](instructions-export.md). Go to **Instructions** and use **Import from Markdown** to load it. Each document's id is the name of a request type in `ChatRequestType` ([lib/core/chat_request_type.dart](lib/core/chat_request_type.dart)), plus `alwaysInclude`, which goes along with every call; the file is the full list. It can lag behind what runs live, so if you have access to a working deployment, export a fresh copy there first (**Export all to Markdown**).
 
-   You can use `{goal}`, `{subgoal}`, `{suggestions}`, and `{known concepts}` as placeholders in any section. They get filled in at runtime from the active goal.
-4. Go to **Goals** and build your goal tree. Roots are top-level themes ("Variables", "Loops", …); children are concrete subgoals. The tutor walks the tree in order.
+   Placeholders filled in at runtime: `{goal}`, `{subgoal}`, `{teachingTips}`, `{targetLOs}` and `{goalScopeLOs}`. The old name `{suggestions}` still works as `{teachingTips}`; `{known concepts}` is replaced by nothing.
+4. **Goals and lessons.** You do not build the goal tree by hand. The goal files and their lessons are in `Goal Generator Cowork Project/AI Tutor for Python Goals Generator/` (`goals/` and `lessons/`). [tooling/curriculum/push_goal.py](tooling/curriculum/push_goal.py) writes a goal and its Dutch lessons to the database (`plan` first for a dry run, then `push`), and [tooling/translations/translations.py](tooling/translations/translations.py) `push` writes the English texts. Both need Python 3 and read the Cosmos values from your `.env`.
 5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
 
 Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
