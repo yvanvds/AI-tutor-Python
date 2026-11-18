@@ -61,6 +61,7 @@ LIVE_GOALS = (
     "05-functies",
     "06-toeval-simulatie",
     "07-grafieken",
+    "08-vergelijkingen-oplossen",
 )
 
 PAGES = {
