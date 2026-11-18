@@ -1,0 +1,333 @@
+{
+  "goal": {
+    "id": "vergelijkingen-oplossen",
+    "type": "goal",
+    "moduleId": "python-basics",
+    "title": "Vergelijkingen oplossen door te zoeken",
+    "description": "Je kan een vergelijking waarvoor geen formule bestaat numeriek oplossen: kommagetallen vergelijken met een tolerantie, een nulpunt insluiten en vinden met bisectie, een functie doorgeven als argument zodat één oplosfunctie voor elke vergelijking werkt, een schatting stap voor stap verbeteren met de methodes van Heron en Newton, de stappen van zo'n zoektocht zichtbaar maken met matplotlib, en een probleem uit de wetenschappen of de economie vertalen naar het zoeken van een nulpunt.",
+    "order": 8000,
+    "optional": false,
+    "parentId": null
+  },
+  "subgoals": [
+    {
+      "id": "benaderen",
+      "type": "goal",
+      "parentId": "vergelijkingen-oplossen",
+      "title": "Benaderen in plaats van uitrekenen",
+      "description": "Je kan voorspellen waar rekenen met kommagetallen kleine afwijkingen geeft, twee kommagetallen vergelijken met een tolerantie in plaats van met ==, een vergelijking herschrijven tot het zoeken van een nulpunt van een functie, op een grafiek zien waar dat nulpunt ongeveer ligt, en nagaan of een waarde een goede benadering van een oplossing is.",
+      "order": 1000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "For `predict_float_equality`: Lean on `0.1 + 0.2 == 0.3` being False and `0.1 + 0.2` printing 0.30000000000000004; contrast with `0.5 + 0.25 == 0.75`, which is True because halves and quarters are exact in binary. Do not go into bits or IEEE 754: 'the computer stores most decimal fractions slightly rounded' is the level.",
+        "For `write_close_enough`: The test is `abs(a - b) < tolerantie`, with the tolerance as a small number such as 0.001 or 0.000001; probe the forgotten `abs`, which makes every `a` smaller than `b` count as equal.",
+        "For `write_equation_as_function`: Every equation becomes 'find where a function is zero' by moving everything to one side: x³ = x + 1 becomes f(x) = x³ - x - 1. Use equations that the student cannot solve with a formula from class, and also 'where are two functions equal' (cost = revenue).",
+        "For `predict_good_approximation`: Give a candidate x and the value of f(x), or let the student compute it for an easy x, and ask whether it is a solution within a given tolerance; the check is `abs(f(x)) < tolerantie`, not `f(x) == 0`.",
+        "For `write_plot_to_locate_zero`: Draw the function over an interval with `plt.plot` and add `plt.grid()`: the zero is where the line crosses the horizontal axis, and the grid shows between which two round values that happens. The picture gives a rough place, not the answer — that is what the search methods are for.",
+        "For `reason_approximation_suffices`: A measured or modelled quantity is itself only known to a few digits, so an answer with a known, small error is as useful as an exact one — and for most equations no exact formula exists.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Alternate between mathematics (a cubic, an equation with a sine), science (the time at which a cooling or falling model reaches a value) and economics (break-even with a non-linear cost, an interest rate that gives a wanted final capital).",
+        "Python: goals 1 to 7. New in this subgoal: nothing in the language — only the habit of comparing floats with a tolerance. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. A function is not passed as an argument yet (that comes in the subgoal 'Een functie als argument'): the code calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_float_equality",
+          "statement": "Je kan voorspellen dat een vergelijking met == tussen kommagetallen onverwacht False kan geven, zoals bij 0.1 + 0.2 == 0.3.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_close_enough",
+          "statement": "Je kan nagaan of twee kommagetallen dicht genoeg bij elkaar liggen met abs(a - b) < tolerantie.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_equation_as_function",
+          "statement": "Je kan een vergelijking herschrijven tot f(x) = 0 en die f schrijven als Python-functie.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_good_approximation",
+          "statement": "Je kan voor een gegeven x voorspellen of abs(f(x)) < tolerantie waar is, en dus of x als oplossing aanvaard wordt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_plot_to_locate_zero",
+          "statement": "Je kan de grafiek van een functie met een raster tekenen om te zien tussen welke waarden een nulpunt ligt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_approximation_suffices",
+          "statement": "Je kan uitleggen waarom een benadering met een gekende, kleine fout in de praktijk volstaat als oplossing van een vergelijking.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "bisectie",
+      "type": "goal",
+      "parentId": "vergelijkingen-oplossen",
+      "title": "Bisectie: het interval halveren",
+      "description": "Je kan een nulpunt insluiten tussen twee waarden waar de functie een verschillend teken heeft, het interval halveren en de juiste helft kiezen, dat herhalen tot het interval kleiner is dan een tolerantie, voorspellen hoeveel stappen daarvoor nodig zijn, en de opeenvolgende stappen zichtbaar maken op de grafiek van de functie.",
+      "order": 2000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Frame bisection as the guessing game 'hoger, lager' or 'warm, koud': the zero is trapped between a and b, every step looks at the middle and keeps the half that still traps it. It continues the sign change in a value table from the functions goal.",
+        "For `predict_bisection_step`: Give f, a and b with easy numbers and ask for the new interval after one step (at most two steps): compute the midpoint, the sign of f there, and which end moves. Use the test `f(a) * f(m) < 0` — then the zero is in the left half and `b = m`, otherwise `a = m`.",
+        "For `write_bisection_loop`: The loop is `while b - a > tolerantie:` with the midpoint computed inside; the answer is the midpoint of the last interval. Probe the midpoint computed once before the loop, and both ends being moved in the same step.",
+        "For `predict_number_of_steps`: Every step halves the width: from width 1, after 3 steps 0.125, after 10 steps about 0.001. Ask for the width after n steps or how many steps bring a width of 8 below 1 — small numbers, counted by halving, without logarithms.",
+        "For `reason_sign_change_required`: Without a sign change between a and b the method has nothing to hold on to: there may be no zero, or two (f(x) = x² - 1 on [-2, 2]). With a sign change and a graph without jumps there is at least one zero in between, and bisection finds one of them.",
+        "For `write_plot_bisection_steps`: The search function appends every midpoint to a list and returns that list; the main script draws the graph of f and puts the midpoints on the horizontal axis with `plt.scatter(middens, hoogtes)`, where `hoogtes` is a list of zeros of the same length built with a loop. The points crowd together around the zero: that is the halving made visible.",
+        "A step counter next to the loop (`stappen += 1`) may be used to report how many steps a method needed.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Alternate between mathematics (x³ - x - 1 = 0, cos(x) = x), science and economics, always with the interval given or with a sign change the student can check by filling in two values.",
+        "Python: goals 1 to 7. New in this subgoal: nothing in the language — a `while` with a tolerance. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. A function is not passed as an argument yet (that comes in the subgoal 'Een functie als argument'): the code calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_sign_change_test",
+          "statement": "Je kan een voorwaarde schrijven die nagaat of een functie tussen a en b van teken wisselt, zoals f(a) * f(b) < 0.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_bisection_step",
+          "statement": "Je kan voor een gegeven functie en interval voorspellen welk interval overblijft na één bisectiestap.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_bisection_loop",
+          "statement": "Je kan een lus schrijven die het interval blijft halveren tot het smaller is dan een tolerantie en het midden als oplossing geeft.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_number_of_steps",
+          "statement": "Je kan voorspellen hoe breed het interval is na een aantal bisectiestappen en hoeveel stappen nodig zijn voor een gegeven breedte.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_plot_bisection_steps",
+          "statement": "Je kan de opeenvolgende middens van een bisectie in een lijst bewaren en ze tonen op de grafiek van de functie.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_sign_change_required",
+          "statement": "Je kan uitleggen waarom bisectie een tekenwissel tussen a en b nodig heeft en wat er zonder kan mislopen.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "functie-als-argument",
+      "type": "goal",
+      "parentId": "vergelijkingen-oplossen",
+      "title": "Een functie als argument",
+      "description": "Je kan een functie doorgeven als argument aan een andere functie, zodat één bisectie-functie elke vergelijking oplost, het verschil voorspellen tussen een functie doorgeven en haar aanroepen, en zo'n algemene functie gebruiken voor een concreet probleem.",
+      "order": 3000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Present it as the next step of 'what varies becomes a parameter' from the functions goal: in the bisection loop the only thing that changes from problem to problem is the function, so the function becomes a parameter: `def bisectie(f, a, b, tolerantie):`.",
+        "For `predict_function_vs_call`: `bisectie(kosten, 0, 10, 0.001)` hands over the function itself; `bisectie(kosten(0), 0, 10, 0.001)` first calls it and hands over a number, and inside `f(m)` then raises 'TypeError: 'int' object is not callable' (or 'float'). Probe exactly this difference: the name without parentheses is the function, with parentheses it is its result.",
+        "For `write_function_parameter`: Start with small helpers before bisection: `waardetabel(f, start, stap, aantal)` that returns the list of function values, or `is_tekenwissel(f, a, b)`. Inside the function the parameter is called like any function, `f(x)`, whatever the passed function is named outside.",
+        "For `write_use_general_solver`: The student gets a working `bisectie(f, a, b, tolerantie)` and writes only the function for the problem and the call; the function to pass takes exactly one parameter, so fixed values (a price, a capital) are written inside it or are variables of the main script.",
+        "For `reason_one_solver_many_problems`: One tested solver replaces a copy of the loop per equation: a bug is fixed once, and a new equation costs one small function.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Use the general solver on contexts from science (when does a cooling cup reach 40 degrees, at which angle does a throw reach a given distance) and economics (the price at which profit is zero, the interest rate at which a savings plan reaches a target).",
+        "Python: goals 1 to 7. New in this subgoal: a function passed as an argument and called through its parameter name. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "write_function_parameter",
+          "statement": "Je kan een functie schrijven die een andere functie als parameter krijgt en ze binnenin aanroept.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "predict_function_vs_call",
+          "statement": "Je kan voorspellen wat er misloopt als je bij een aanroep f(x) doorgeeft waar de functie f zelf verwacht wordt.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_general_bisection",
+          "statement": "Je kan bisectie schrijven als functie met de parameters f, a, b en tolerantie, die voor elke functie werkt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_use_general_solver",
+          "statement": "Je kan een gegeven oplosfunctie gebruiken voor een concreet probleem door de juiste functie te schrijven en door te geven.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_one_solver_many_problems",
+          "statement": "Je kan uitleggen wat het voordeel is van één algemene oplosfunctie tegenover een aparte lus per vergelijking.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "stap-voor-stap-verbeteren",
+      "type": "goal",
+      "parentId": "vergelijkingen-oplossen",
+      "title": "Een schatting stap voor stap verbeteren",
+      "description": "Je kan een oplossing zoeken door een schatting herhaaldelijk te verbeteren: een vierkantswortel benaderen met de methode van Heron, de helling van een functie numeriek benaderen, een Newton-stap uitvoeren, stoppen wanneer twee opeenvolgende schattingen dicht genoeg bij elkaar liggen, en uitleggen wanneer zo'n methode sneller is dan bisectie en wanneer ze faalt.",
+      "order": 4000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "For `predict_heron_step`: Heron for the square root of a: the new estimate is the average of x and a / x, `x = (x + a / x) / 2`. Trace one or two steps with easy numbers (a = 16 from x = 2 gives 5, then 4.1); if x is too small, a / x is too large, and the average lies in between.",
+        "For `write_improve_until_stable`: The loop keeps the previous estimate and stops when two successive estimates are close: `while abs(nieuw - oud) > tolerantie:`. Probe a loop that compares x with itself (and stops at once) and a start value that makes the first test false.",
+        "For `write_numeric_slope`: The slope of f at x is approximated with a small step h: `(f(x + h) - f(x)) / h`, for example h = 0.0001. Give this formula in the question; the student does not need derivative rules, though they may recognise the difference quotient from maths class.",
+        "For `write_newton_step`: One Newton step follows the tangent line down to the x-axis: `x = x - f(x) / helling(f, x)`. Give the formula; ask for one step as code, or for the whole loop with the stop rule of the Heron loop.",
+        "For `reason_newton_can_fail`: Newton needs a slope that is not zero and a start that is close enough: where the graph is flat the division explodes or the next estimate lands far away, and the method can jump to another zero. Bisection cannot fail once it has a sign change.",
+        "The successive estimates of a method can be collected in a list and drawn against the step number with `plt.plot(schattingen)`: a Newton or Heron line is flat after a few steps, a bisection line is still creeping closer. Show one method per question unless the target is `reason_bisection_vs_newton`.",
+        "For `reason_bisection_vs_newton`: Bisection gains a fixed factor 2 per step and is safe; Newton and Heron roughly double the number of correct digits per step but can fail. Let the student compare step counts they are given, not compute them.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Use square roots and cube roots, x³ - x - 1 = 0, and one context per question from science or economics.",
+        "Python: goals 1 to 7. A function passed as an argument is available (`helling(f, x)`, `newton(f, start, tolerantie)`). The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "predict_heron_step",
+          "statement": "Je kan voorspellen welke schatting één stap van de methode van Heron oplevert voor een gegeven getal en startwaarde.",
+          "kind": "predict",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_improve_until_stable",
+          "statement": "Je kan een lus schrijven die een schatting blijft verbeteren tot twee opeenvolgende schattingen minder dan een tolerantie verschillen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_numeric_slope",
+          "statement": "Je kan de helling van een functie in een punt numeriek benaderen met (f(x + h) - f(x)) / h.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_newton_step",
+          "statement": "Je kan een Newton-stap schrijven die een schatting verbetert met x - f(x) / helling.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_newton_can_fail",
+          "statement": "Je kan uitleggen in welke situaties de methode van Newton faalt, zoals bij een helling van nul of een slechte startwaarde.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_bisection_vs_newton",
+          "statement": "Je kan uitleggen wanneer je bisectie verkiest en wanneer de methode van Newton.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "id": "probleem-als-nulpunt",
+      "type": "goal",
+      "parentId": "vergelijkingen-oplossen",
+      "title": "Van probleem naar nulpunt",
+      "description": "Je kan een probleem uit de wetenschappen of de economie vertalen naar een vergelijking f(x) = 0, met een waardetabel of een grafiek een interval met een tekenwissel vinden, de vergelijking oplossen met een zoekmethode, en de oplossing controleren door ze in te vullen en op de grafiek te tonen.",
+      "order": 5000,
+      "optional": false,
+      "contentId": null,
+      "teachingTips": [
+        "Elicit the plan before code, as in the earlier capstone subgoals: what is the unknown, which function is zero at the answer, between which two values does the answer certainly lie, and how is the answer checked.",
+        "For `write_find_interval`: Reuse the sign-change search in a value table from the functions goal: step through x values and return the first pair of neighbours where f changes sign; that pair is the start interval for bisection. A graph with `plt.plot` and `plt.grid()` may be used to look for it, but the grader cannot see it.",
+        "For `write_solve_problem`: Good problems have no formula from class: the yearly interest rate at which monthly deposits reach a target, the interest rate at which the payments of a project are worth exactly its cost (interne opbrengstvoet, with the formula given), the time at which a cooling model reaches a temperature, the launch angle for a given distance, the quantity at which a curved cost equals revenue.",
+        "For `choose_solution_check`: The check is to fill the found value into the original problem, not into the solver: compute the final capital at the found interest rate and compare it with the target within a tolerance; also judge whether the size and the sign make sense (an interest rate of 340 percent, a negative time).",
+        "For `write_plot_solution`: Draw the function of the problem with labelled axes and mark the found solution with `plt.scatter([oplossing], [0])`: a point that does not sit where the line crosses the axis shows at once that something is wrong.",
+        "For `reason_which_zero_is_found`: A function can have several zeros, and the start interval or start value decides which one a method returns; the problem decides which one is meaningful (the positive time, the price inside the market).",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Give the model of the situation as a formula or as a function that is already written.",
+        "Python: goals 1 to 7. A function passed as an argument is available; `bisectie(f, a, b, tolerantie)` may be given as ready-made code or asked for. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "allowChains": true,
+      "objectives": [
+        {
+          "id": "decompose_equation_problem",
+          "statement": "Je kan voor een beschreven probleem aangeven wat de onbekende is, welke functie nul moet worden en tussen welke waarden je zoekt.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_find_interval",
+          "statement": "Je kan met een lus over x-waarden een interval zoeken waarin een functie van teken wisselt.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_solve_problem",
+          "statement": "Je kan een probleem oplossen door de bijbehorende functie te schrijven en een zoekmethode erop toe te passen.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "write_plot_solution",
+          "statement": "Je kan de grafiek van de functie van een probleem tekenen met de gevonden oplossing erop gemarkeerd.",
+          "kind": "apply",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "choose_solution_check",
+          "statement": "Je kan een gevonden oplossing controleren door ze in het oorspronkelijke probleem in te vullen en te beoordelen of ze zinvol is.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        },
+        {
+          "id": "reason_which_zero_is_found",
+          "statement": "Je kan uitleggen waarom het startinterval of de startwaarde bepaalt welk nulpunt je vindt als een functie er meerdere heeft.",
+          "kind": "reason",
+          "weight": 1.0,
+          "optional": false
+        }
+      ]
+    }
+  ]
+}

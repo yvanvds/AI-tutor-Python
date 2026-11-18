@@ -33,7 +33,7 @@ Drie keuzes lopen door alle doelen:
 | 5 | Functies (`functies`) | live sinds 5 oktober 2026 |
 | 6 | Toeval en simulatie (`toeval-simulatie`) | live sinds 5 oktober 2026 |
 | 7 | Grafieken maken (`grafieken`) | live sinds 16 november 2026 |
-| 8 | Vergelijkingen oplossen door te zoeken | idee |
+| 8 | Vergelijkingen oplossen door te zoeken (`vergelijkingen-oplossen`) | doelbestand en lessen geschreven, nog niet live |
 | 9 | De wereld in tijdstappen | idee |
 | 10 | Dictionaries en gestructureerde data | idee |
 | 11 | Echte data onderzoeken | idee |
@@ -88,6 +88,12 @@ stopcriterium met een tolerantie, en waarom `0.1 + 0.2 != 0.3`.
   stap van bisectie.
 - **Nieuw in Python:** een functie doorgeven als argument, zodat
   `bisectie(f, a, b)` voor elke functie werkt.
+- **Met matplotlib:** de grafiek toont waar het nulpunt ongeveer ligt, de
+  middens van de bisectie komen als punten op de grafiek, en de gevonden
+  oplossing wordt erop gemarkeerd. De zoekmethodes zelf blijven lussen op
+  gewone getallen, zonder numpy of scipy.
+- **Met figuren in de les:** een bisectiestap, het halverende interval, een
+  Newton-stap en de afkoelende koffie. Zie "Figuren in de lessen".
 - **Uit de oude cursus:** module 3, "Bisectie en Newton-Raphson".
 
 ### 9. De wereld in tijdstappen
@@ -197,11 +203,11 @@ oefening te combineren. Zonder die afspraak stapelde de AI alle valkuilen
 van een subdoel in één vraag, ook op easy. Zie LO_AUTHORING_RUBRIC.md
 (checklist punt 16).
 
-### Nog niet gezien na doel 7
+### Nog niet gezien na doel 8
 
 f-strings, `break`, `range` met een stap, stringmethodes,
 `try`/`except`, `global`, recursie, `lambda`, list comprehensions,
-dictionaries, sets, een functie als argument, pandas.
+dictionaries, sets, pandas, scipy.
 
 Wel gezien, naast doel 1 tot 4 (daarin ook `+=` en `-=`, sinds de les over
 `for` in doel 3): `def` en `return`, standaardwaarden,
@@ -213,12 +219,41 @@ Uit doel 7: benoemde argumenten bij een aanroep (`label=`, `color=`,
 `plt.grid` en `plt.show`; uit numpy alleen `np.linspace`, `np.array`,
 rekenen op een hele array, `np.sin`, `np.cos`, `np.sqrt` en `np.pi`.
 
-De lessen van doel 7 tonen geen afbeelding (de lesweergave kent geen
-beelden): ze beschrijven in woorden wat het venster toont. De
+Uit doel 8: een functie als argument (`bisectie(f, a, b, tolerantie)`),
+vergelijken met een tolerantie (`abs(a - b) < tolerantie`), en een functie
+die twee waarden teruggeeft en in het hoofdscript uitgepakt wordt.
+
+De lessen van doel 7 tonen geen afbeelding: ze beschrijven in woorden wat
+het venster toont. Sinds doel 8 kan een les wel figuren bevatten. De
 vertaalcontrole draait hun code op een nagebootste `matplotlib.pyplot` die
 bijhoudt wat er getekend wordt; de les over numpy wordt alleen uitgevoerd
 met de Python-bundel van de app
 (`build/python_bundle/python/python.exe tooling/translations/check_lessons.py`).
+
+### Figuren in de lessen
+
+Een les kan geen afbeeldingsbestand tonen (er is geen opslag voor), maar de
+lesweergave toont de HTML zoals ze is. Een tekening kan dus deel zijn van
+de lestekst zelf: een `<svg>`-element zonder script en zonder
+`style`-attribuut, gekleurd met de variabelen van de les-stylesheet, zodat
+ze meeschaalt en de kleuren van de app volgt.
+
+- De figuren komen uit `tooling/curriculum/figures.py`: één functie per
+  figuur, met de taal als argument omdat de labels tekst zijn.
+  `python tooling/curriculum/figures.py preview` schrijft een pagina met
+  alle figuren in beide talen.
+- De Nederlandse en de Engelse figuur hebben dezelfde elementen in dezelfde
+  volgorde; alleen de tekst verschilt. De beschrijving staat in een
+  `<title>` in de figuur, niet in een attribuut, zodat de vertaalcontrole
+  dezelfde structuur ziet.
+- Een figuur toont één idee en krijgt uitleg in de alinea ervoor of erna.
+  Ze vervangt geen uitvoer van code: wat een script tekent, beschrijft de
+  les nog altijd in woorden.
+- Wanneer een leerling een vraag stelt over de les, krijgt de AI de les als
+  platte tekst: de beschrijving en de labels van een figuur gaan mee, de
+  tekening niet.
+- Nog niet nagekeken in de app zelf (alleen in een browser met dezelfde
+  stylesheet). De lessen van doel 7 hebben nog geen figuren.
 
 ### Woordgebruik
 

@@ -223,6 +223,31 @@ Pythons eigen namen (`t.pencolor`). De leerling wordt aangesproken met
 | gelijk verdeelde waarden | evenly spaced values |
 | element per element | element by element |
 
+## Vergelijkingen oplossen
+
+| Nederlands | Engels |
+|---|---|
+| vergelijking (x³ = x + 1) | equation |
+| oplossing, oplossen | solution, solve |
+| benadering, benaderen | approximation, approximate |
+| tolerantie | tolerance |
+| afwijking | deviation |
+| nulpunt | zero |
+| insluiten (een nulpunt) | trap |
+| bisectie, halveren | bisection, halve |
+| midden (van een interval) | midpoint |
+| grens (van een interval) | limit |
+| breedte (van een interval) | width |
+| schatting, verbeteren | estimate, improve |
+| opeenvolgende schattingen | successive estimates |
+| startwaarde, startinterval | start value, start interval |
+| stopvoorwaarde | stop condition |
+| helling, raaklijn | slope, tangent line |
+| oplosfunctie | solver function |
+| onbekende | unknown |
+| invullen (een waarde in het model) | fill in |
+| vierkantswortel, wortel | square root |
+
 ## Namen in de code
 
 Nederlandse variabelenamen, strings en commentaar in de voorbeelden zijn mee
@@ -271,6 +296,12 @@ Dries) blijven.
 | `x_waarden(start, einde, aantal)` | `x_values(start, end, count)` | `waarden` | `values` |
 | `aantallen`, `k`, `o`, `a` | `quantities`, `c`, `r`, `q` | `eindposities` | `end_positions` |
 | `sommen` | `totals` | `reeks` (een array naast `lijst`) | `arr` (naast `my_list`) |
+| `bijna_gelijk(a, b, tolerantie)` | `almost_equal(a, b, tolerance)` | `bisectie(f, a, b, tolerantie)` | `bisection(f, a, b, tolerance)` |
+| `bisectie_middens`, `middens`, `hoogtes` | `bisection_midpoints`, `midpoints`, `heights` | `waardetabel(f, start, stap, aantal)` | `value_table(f, start, step, count)` |
+| `derdemacht` | `cube` | `winst(aantal)` | `profit(quantity)` |
+| `wortel(a, tolerantie)`, `oud`, `nieuw` | `square_root(a, tolerance)`, `old`, `new` | `helling(f, x)` | `slope(f, x)` |
+| `oplossing`, `stappen` | `solution`, `steps` | `temperatuur(t)` | `temperature(t)` |
+| `zoek_interval`, `links`, `rechts` | `find_interval`, `left`, `right` | `tijden`, `waarden` | `times`, `values` |
 | `kaart`, `stapel` | `card`, `deck` | `"regen"`, `"droog"` | `"rain"`, `"dry"` |
 
 Zo wordt `rooster[r][k]` in de Engelse les en doeltekst `grid[r][c]`.

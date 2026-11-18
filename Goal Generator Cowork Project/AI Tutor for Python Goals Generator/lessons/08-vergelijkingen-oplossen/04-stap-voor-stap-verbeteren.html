@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Een schatting stap voor stap verbeteren</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+<p>Bisectie sluit een nulpunt in. Er is een tweede manier van zoeken: begin met een schatting en verbeter ze, telkens opnieuw, tot ze niet meer verandert.</p>
+
+<h2>De wortel volgens Heron</h2>
+
+<pre><code>x = 2
+x = (x + 16 / x) / 2
+print(x)
+x = (x + 16 / x) / 2
+print(x)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>5.0
+4.1</code></pre>
+
+<p>Je zoekt de wortel van 16 en gokt 2. Is de schatting te klein, dan is 16 gedeeld door de schatting te groot: 16 / 2 = 8. De echte wortel ligt daartussen, dus neem je het gemiddelde van de twee: 5. Daarna hetzelfde met 5: het gemiddelde van 5 en 3.2 is 4.1. Elke stap ligt dichter bij 4.</p>
+
+<h2>Verbeteren tot het stabiel is</h2>
+
+<pre><code>def wortel(a, tolerantie):
+    oud = a
+    nieuw = (oud + a / oud) / 2
+    while abs(nieuw - oud) &gt; tolerantie:
+        oud = nieuw
+        nieuw = (oud + a / oud) / 2
+    return nieuw
+
+print(wortel(2, 0.000001))</code></pre>
+<p>Uitvoer:</p>
+<pre><code>1.414213562373095</code></pre>
+
+<p>Hier is geen interval dat smaller wordt. Je stopt wanneer twee opeenvolgende schattingen minder dan de tolerantie verschillen. Daarom houdt de lus twee variabelen bij: de vorige schatting en de nieuwe. Vergelijk je een schatting met zichzelf, dan stopt de lus meteen.</p>
+
+<h2>De helling van een functie</h2>
+
+<pre><code>def helling(f, x):
+    h = 0.0001
+    return (f(x + h) - f(x)) / h
+
+def f(x):
+    return x ** 3 - x - 1
+
+print(round(helling(f, 2), 2))</code></pre>
+<p>Uitvoer:</p>
+<pre><code>11.0</code></pre>
+
+<p>De helling in een punt benader je door een heel klein stapje h opzij te zetten en te kijken hoeveel de functie stijgt: het verschil in functiewaarde gedeeld door h. Je hebt er geen afleidingsregels voor nodig, alleen de functie zelf.</p>
+
+<h2>Een Newton-stap</h2>
+
+<svg viewBox="0 0 640 300" width="100%" role="img">
+<title>Een Newton-stap: de raaklijn in de schatting snijdt de as in de volgende schatting</title>
+<line x1="46" y1="218.4" x2="622" y2="218.4" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<line x1="46" y1="16" x2="46" y2="266" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<polyline points="46.0,246.3 50.8,245.9 55.6,245.4 60.4,245.0 65.2,244.5 70.0,244.1 74.8,243.6 79.6,243.0 84.4,242.5 89.2,242.0 94.0,241.4 98.8,240.8 103.6,240.2 108.4,239.5 113.2,238.9 118.0,238.2 122.8,237.5 127.6,236.8 132.4,236.1 137.2,235.3 142.0,234.5 146.8,233.7 151.6,232.9 156.4,232.0 161.2,231.2 166.0,230.3 170.8,229.4 175.6,228.4 180.4,227.4 185.2,226.5 190.0,225.4 194.8,224.4 199.6,223.4 204.4,222.3 209.2,221.2 214.0,220.0 218.8,218.9 223.6,217.7 228.4,216.5 233.2,215.2 238.0,214.0 242.8,212.7 247.6,211.3 252.4,210.0 257.2,208.6 262.0,207.2 266.8,205.8 271.6,204.3 276.4,202.9 281.2,201.3 286.0,199.8 290.8,198.2 295.6,196.6 300.4,195.0 305.2,193.3 310.0,191.7 314.8,189.9 319.6,188.2 324.4,186.4 329.2,184.6 334.0,182.8 338.8,180.9 343.6,179.0 348.4,177.1 353.2,175.1 358.0,173.1 362.8,171.1 367.6,169.0 372.4,166.9 377.2,164.8 382.0,162.6 386.8,160.4 391.6,158.2 396.4,155.9 401.2,153.6 406.0,151.3 410.8,148.9 415.6,146.5 420.4,144.1 425.2,141.6 430.0,139.1 434.8,136.6 439.6,134.0 444.4,131.4 449.2,128.7 454.0,126.1 458.8,123.3 463.6,120.6 468.4,117.8 473.2,114.9 478.0,112.1 482.8,109.2 487.6,106.2 492.4,103.2 497.2,100.2 502.0,97.1 506.8,94.0 511.6,90.9 516.4,87.7 521.2,84.5 526.0,81.2 530.8,77.9 535.6,74.6 540.4,71.2 545.2,67.8 550.0,64.3 554.8,60.8 559.6,57.3 564.4,53.7 569.2,50.0 574.0,46.4 578.8,42.7 583.6,38.9 588.4,35.1 593.2,31.2 598.0,27.4 602.8,23.4 607.6,19.5" fill="none" stroke="var(--syntax-fn)" stroke-width="2.5"/>
+<line x1="262.2" y1="249.8" x2="601.4" y2="33.9" stroke="var(--syntax-num)" stroke-width="2"/>
+<line x1="498.6" y1="218.4" x2="498.6" y2="99.3" stroke="var(--fg-faint)" stroke-width="1" stroke-dasharray="5 4"/>
+<circle cx="498.6" cy="99.3" r="5" fill="var(--fg)"/>
+<circle cx="498.6" cy="218.4" r="4" fill="var(--fg)"/>
+<circle cx="311.6" cy="218.4" r="6" fill="var(--syntax-num)"/>
+<circle cx="220.7" cy="218.4" r="5" fill="var(--accent)"/>
+<text x="498.6" y="240.4" text-anchor="middle" fill="var(--fg)" font-family="var(--font-mono)" font-size="13">schatting: x = 2</text>
+<text x="297.6" y="184.4" text-anchor="end" fill="var(--syntax-num)" font-family="var(--font-mono)" font-size="13">volgende schatting: x = 1.545</text>
+<text x="220.7" y="240.4" text-anchor="middle" fill="var(--accent)" font-family="var(--font-sans)" font-size="13">nulpunt</text>
+<text x="535.9" y="65.9" text-anchor="end" fill="var(--syntax-num)" font-family="var(--font-sans)" font-size="13">raaklijn</text>
+</svg>
+
+<pre><code>x = 2
+x = x - f(x) / helling(f, x)
+print(round(x, 3))</code></pre>
+<p>Uitvoer:</p>
+<pre><code>1.545</code></pre>
+
+<p>Newton volgt de raaklijn. In de schatting x = 2 is de functiewaarde 5 en de helling 11. Wie langs die rechte naar beneden loopt, komt 5 / 11 verder naar links op de as uit. Dat punt is de volgende schatting: <code>x - f(x) / helling</code>.</p>
+
+<pre><code>def newton(f, start, tolerantie):
+    oud = start
+    nieuw = oud - f(oud) / helling(f, oud)
+    stappen = 1
+    while abs(nieuw - oud) &gt; tolerantie:
+        oud = nieuw
+        nieuw = oud - f(oud) / helling(f, oud)
+        stappen += 1
+    return nieuw, stappen
+
+oplossing, stappen = newton(f, 2, 0.000001)
+print(round(oplossing, 4), stappen)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>1.3247 6</code></pre>
+
+<p>De lus is die van Heron, met een andere regel om te verbeteren. Ze telt ook haar stappen en geeft die samen met de oplossing terug.</p>
+
+<h2>Snel, maar niet zonder risico</h2>
+
+<p>Bisectie heeft van 1 tot 2 twintig stappen nodig om tot op een miljoenste te komen: elke stap wint een factor 2. Newton en Heron verdubbelen ruwweg het aantal juiste cijfers per stap en zijn er na een handvol stappen.</p>
+
+<div class="callout warn"><p>Newton kan mislukken. Waar de grafiek vlak loopt, is de helling bijna nul: de deling geeft dan een reusachtige sprong en de volgende schatting belandt ver weg, soms bij een ander nulpunt. Bisectie kan dat niet overkomen zodra ze een tekenwissel heeft.</p></div>
+
+<p>Kies bisectie als je zekerheid wil en een tekenwissel kent. Kies Newton als je een goede startwaarde hebt en snelheid telt.</p>
+
+<p>Een schatting, een regel om ze te verbeteren en een stopvoorwaarde: meer heeft een zoekmethode niet nodig.</p>
+</body>
+</html>

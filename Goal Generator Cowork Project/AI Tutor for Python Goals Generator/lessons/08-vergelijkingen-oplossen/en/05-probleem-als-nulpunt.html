@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>From problem to zero</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+<p>A cup of coffee at 90 degrees stands in a room at 20 degrees. Every minute a tenth of the temperature difference with the room disappears. After how many minutes is the coffee 40 degrees? For such a question you don't need a formula, only a plan.</p>
+
+<h2>First a plan</h2>
+
+<table>
+<thead><tr><th>Question</th><th>For the coffee</th></tr></thead>
+<tbody>
+<tr><td>What is the unknown?</td><td>The time t, in minutes</td></tr>
+<tr><td>Which function has to become zero?</td><td>The temperature at time t, minus 40</td></tr>
+<tr><td>Between which values do you search?</td><td>Two moments between which that function changes sign</td></tr>
+<tr><td>How do you check the answer?</td><td>Fill the time you found into the model: does 40 come out?</td></tr>
+</tbody>
+</table>
+
+<h2>The model and the function</h2>
+
+<pre><code>def temperature(t):
+    return 20 + 70 * 0.9 ** t
+
+def f(t):
+    return temperature(t) - 40
+
+print(temperature(0))
+print(round(f(0), 1), round(f(30), 1))</code></pre>
+<p>Output:</p>
+<pre><code>90.0
+50.0 -17.0</code></pre>
+
+<p>The difference with the room starts at 70 degrees and is multiplied by 0.9 every minute. The function f is zero at the moment the temperature is 40: positive as long as the coffee is warmer, negative after that.</p>
+
+<h2>Finding a start interval</h2>
+
+<pre><code>def find_interval(f, start, step, count):
+    for i in range(count):
+        left = start + i * step
+        right = left + step
+        if f(left) * f(right) &lt; 0:
+            return left, right
+    return None
+
+print(find_interval(f, 0, 5, 10))</code></pre>
+<p>Output:</p>
+<pre><code>(10, 15)</code></pre>
+
+<p>This is the sign change in a table of values, now as a function: it steps through time in steps of 5 minutes and gives back the first two neighbors between which f changes sign. If it finds nothing, it gives back <code>None</code>.</p>
+
+<h2>Solving and checking</h2>
+
+<pre><code>def bisection(f, a, b, tolerance):
+    while b - a &gt; tolerance:
+        m = (a + b) / 2
+        if f(a) * f(m) &lt; 0:
+            b = m
+        else:
+            a = m
+    return (a + b) / 2
+
+left, right = find_interval(f, 0, 5, 10)
+t = bisection(f, left, right, 0.0001)
+print(round(t, 2))
+print(round(temperature(t), 2))</code></pre>
+<p>Output:</p>
+<pre><code>11.89
+40.0</code></pre>
+
+<p>After almost 12 minutes the coffee is 40 degrees. The check happens in the original problem, not in the solver: you fill the time you found into the model and see whether 40 comes out. Also ask yourself whether the answer can be right. A negative time or three days of waiting would reveal an error here.</p>
+
+<h2>The solution on the graph</h2>
+
+<pre><code>import matplotlib.pyplot as plt
+
+times = []
+values = []
+for i in range(61):
+    times.append(i * 0.5)
+    values.append(f(i * 0.5))
+plt.plot(times, values)
+plt.scatter([t], [0], color="red")
+plt.grid()
+plt.xlabel("time (minutes)")
+plt.ylabel("temperature minus 40 (degrees)")
+plt.show()</code></pre>
+
+<svg viewBox="0 0 640 300" width="100%" role="img">
+<title>The temperature falls and reaches 40 degrees after about 11.9 minutes</title>
+<line x1="46.0" y1="16" x2="46.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="46.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">0</text>
+<line x1="142.0" y1="16" x2="142.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="142.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">5</text>
+<line x1="238.0" y1="16" x2="238.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="238.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">10</text>
+<line x1="334.0" y1="16" x2="334.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="334.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">15</text>
+<line x1="430.0" y1="16" x2="430.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="430.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">20</text>
+<line x1="526.0" y1="16" x2="526.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="526.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">25</text>
+<line x1="622.0" y1="16" x2="622.0" y2="250" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="622.0" y="270" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">30</text>
+<line x1="46" y1="203.2" x2="622" y2="203.2" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="207.2" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">20</text>
+<line x1="46" y1="156.4" x2="622" y2="156.4" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="160.4" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">40</text>
+<line x1="46" y1="109.6" x2="622" y2="109.6" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="113.6" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">60</text>
+<line x1="46" y1="62.8" x2="622" y2="62.8" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="66.8" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">80</text>
+<line x1="46" y1="250.0" x2="622" y2="250.0" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<line x1="46" y1="16" x2="46" y2="250" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<polyline points="46.0,39.4 50.8,43.7 55.6,47.8 60.4,51.8 65.2,55.8 70.0,59.6 74.8,63.3 79.6,67.0 84.4,70.5 89.2,74.0 94.0,77.3 98.8,80.6 103.6,83.8 108.4,86.9 113.2,89.9 118.0,92.9 122.8,95.7 127.6,98.5 132.4,101.2 137.2,103.9 142.0,106.5 146.8,109.0 151.6,111.4 156.4,113.8 161.2,116.1 166.0,118.4 170.8,120.6 175.6,122.8 180.4,124.9 185.2,126.9 190.0,128.9 194.8,130.8 199.6,132.7 204.4,134.5 209.2,136.3 214.0,138.0 218.8,139.7 223.6,141.4 228.4,143.0 233.2,144.6 238.0,146.1 242.8,147.6 247.6,149.0 252.4,150.4 257.2,151.8 262.0,153.1 266.8,154.4 271.6,155.7 276.4,156.9 281.2,158.1 286.0,159.3 290.8,160.5 295.6,161.6 300.4,162.6 305.2,163.7 310.0,164.7 314.8,165.7 319.6,166.7 324.4,167.7 329.2,168.6 334.0,169.5 338.8,170.4 343.6,171.2 348.4,172.0 353.2,172.8 358.0,173.6 362.8,174.4 367.6,175.2 372.4,175.9 377.2,176.6 382.0,177.3 386.8,178.0 391.6,178.6 396.4,179.3 401.2,179.9 406.0,180.5 410.8,181.1 415.6,181.6 420.4,182.2 425.2,182.8 430.0,183.3 434.8,183.8 439.6,184.3 444.4,184.8 449.2,185.3 454.0,185.7 458.8,186.2 463.6,186.6 468.4,187.1 473.2,187.5 478.0,187.9 482.8,188.3 487.6,188.7 492.4,189.1 497.2,189.4 502.0,189.8 506.8,190.1 511.6,190.5 516.4,190.8 521.2,191.1 526.0,191.4 530.8,191.7 535.6,192.0 540.4,192.3 545.2,192.6 550.0,192.9 554.8,193.2 559.6,193.4 564.4,193.7 569.2,193.9 574.0,194.2 578.8,194.4 583.6,194.6 588.4,194.9 593.2,195.1 598.0,195.3 602.8,195.5 607.6,195.7 612.4,195.9 617.2,196.1 622.0,196.3" fill="none" stroke="var(--syntax-fn)" stroke-width="2.5"/>
+<line x1="46.0" y1="156.4" x2="622.0" y2="156.4" stroke="var(--syntax-num)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<line x1="274.3" y1="250.0" x2="274.3" y2="156.4" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<circle cx="274.3" cy="156.4" r="6" fill="var(--accent)"/>
+<text x="612.4" y="148.4" text-anchor="end" fill="var(--syntax-num)" font-family="var(--font-sans)" font-size="13">40 degrees</text>
+<text x="284.3" y="146.4" text-anchor="start" fill="var(--accent)" font-family="var(--font-mono)" font-size="13">t = 11.89</text>
+<text x="94.0" y="44.1" text-anchor="start" fill="var(--syntax-fn)" font-family="var(--font-sans)" font-size="13">temperature</text>
+<text x="334.0" y="294.0" text-anchor="middle" fill="var(--fg-mute)" font-family="var(--font-sans)" font-size="13">time (minutes)</text>
+</svg>
+
+<p>The red point is on the axis, at the time you found. If it lies exactly where the line crosses the axis, the solution is right; a point next to it shows at once that something is wrong. The figure above shows the same moment on the temperature itself: the curve reaches the line of 40 degrees at t = 11.89.</p>
+
+<h2>Which zero do you find?</h2>
+
+<pre><code>def p(x):
+    return x ** 2 - 4 * x + 3
+
+print(round(bisection(p, 0.5, 2, 0.0001), 2))
+print(round(bisection(p, 2, 4.5, 0.0001), 2))</code></pre>
+<p>Output:</p>
+<pre><code>1.0
+3.0</code></pre>
+
+<div class="callout tip"><p>A function can have several zeros. The start interval or the start value decides which one you find, and the problem decides which one you need: the positive time, the price that fits the market.</p></div>
+
+<p>An unknown, a function that has to become zero, an interval and a check: that is how you solve equations for which no formula exists.</p>
+</body>
+</html>

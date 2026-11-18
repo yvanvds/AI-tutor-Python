@@ -136,6 +136,11 @@ CASES: dict[str, dict[int, dict]] = {
         3: {"error": "TypeError"},
         5: {"plot": {"lines": 1, "points": [200], "texts": ["xlabel", "ylabel"]}},
     },
+    # Goal 8: the graphs that go with the search methods.
+    "benaderen": {3: {"plot": {"lines": 1, "texts": ["xlabel", "ylabel"]}}},
+    "bisectie": {3: {"plot": {"lines": 1, "scatter": 1}}},
+    "functie-als-argument": {1: {"error": "TypeError"}},
+    "probleem-als-nulpunt": {3: {"plot": {"lines": 1, "scatter": 1, "texts": ["xlabel", "ylabel"]}}},
 }
 
 # Inline code whose result the prose states, run in the lesson's namespace
@@ -235,6 +240,9 @@ INLINE: dict[str, list[tuple[str, str, str]]] = {
         ("en", "my_list ** 2", "TypeError"),
         ("*", "def f(x):\n    return x ** 2 - 4 * x + 3\nlist(f(np.array([0, 1, 2])))", "[np.int64(3), np.int64(0), np.int64(-1)]"),
     ],
+    "bisectie": [("*", "f(1.5) > 0", "True"), ("*", "round(1 / 2 ** 10, 4)", "0.001"), ("*", "(-2) ** 2 - 1 > 0 and 2 ** 2 - 1 > 0", "True")],
+    "functie-als-argument": [("nl", "kwadraat(2)", "4"), ("en", "square(2)", "4")],
+    "stap-voor-stap-verbeteren": [("*", "round(2 - 5 / 11, 3)", "1.545"), ("*", "1 / 2 ** 20 < 0.000001 < 1 / 2 ** 19", "True")],
 }
 
 

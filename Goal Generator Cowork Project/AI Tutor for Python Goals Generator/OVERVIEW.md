@@ -109,3 +109,18 @@ Je kan met matplotlib gegevens en functies zichtbaar maken: een lijngrafiek of p
   - LOs: `write_bar_chart`, `write_histogram`, `predict_histogram_bars`, `reason_bar_vs_histogram`, `write_plot_simulation`
 - **Sneller met numpy** (`rekenen-numpy`)
   - LOs: `write_linspace`, `predict_linspace_values`, `write_array_formula`, `predict_list_vs_array`, `write_numpy_math`, `write_function_plot_numpy`
+
+### 8. Vergelijkingen oplossen door te zoeken (`vergelijkingen-oplossen`)
+
+Je kan een vergelijking waarvoor geen formule bestaat numeriek oplossen: kommagetallen vergelijken met een tolerantie, een nulpunt insluiten en vinden met bisectie, een functie doorgeven als argument zodat één oplosfunctie voor elke vergelijking werkt, een schatting stap voor stap verbeteren met de methodes van Heron en Newton, de stappen van zo'n zoektocht zichtbaar maken met matplotlib, en een probleem uit de wetenschappen of de economie vertalen naar het zoeken van een nulpunt.
+
+- **Benaderen in plaats van uitrekenen** (`benaderen`)
+  - LOs: `predict_float_equality`, `write_close_enough`, `write_equation_as_function`, `predict_good_approximation`, `write_plot_to_locate_zero`, `reason_approximation_suffices`
+- **Bisectie: het interval halveren** (`bisectie`)
+  - LOs: `write_sign_change_test`, `predict_bisection_step`, `write_bisection_loop`, `predict_number_of_steps`, `write_plot_bisection_steps`, `reason_sign_change_required`
+- **Een functie als argument** (`functie-als-argument`)
+  - LOs: `write_function_parameter`, `predict_function_vs_call`, `write_general_bisection`, `write_use_general_solver`, `reason_one_solver_many_problems`
+- **Een schatting stap voor stap verbeteren** (`stap-voor-stap-verbeteren`)
+  - LOs: `predict_heron_step`, `write_improve_until_stable`, `write_numeric_slope`, `write_newton_step`, `reason_newton_can_fail`, `reason_bisection_vs_newton`
+- **Van probleem naar nulpunt** (`probleem-als-nulpunt`)
+  - LOs: `decompose_equation_problem`, `write_find_interval`, `write_solve_problem`, `write_plot_solution`, `choose_solution_check`, `reason_which_zero_is_found`

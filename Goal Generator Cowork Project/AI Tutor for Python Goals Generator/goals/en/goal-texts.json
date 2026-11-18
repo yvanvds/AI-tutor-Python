@@ -1505,6 +1505,233 @@
           "en": "You can draw the graph of a function with np.linspace and a formula on the whole array."
         }
       ]
+    },
+    {
+      "id": "vergelijkingen-oplossen",
+      "parentId": null,
+      "nl": {
+        "title": "Vergelijkingen oplossen door te zoeken",
+        "description": "Je kan een vergelijking waarvoor geen formule bestaat numeriek oplossen: kommagetallen vergelijken met een tolerantie, een nulpunt insluiten en vinden met bisectie, een functie doorgeven als argument zodat één oplosfunctie voor elke vergelijking werkt, een schatting stap voor stap verbeteren met de methodes van Heron en Newton, de stappen van zo'n zoektocht zichtbaar maken met matplotlib, en een probleem uit de wetenschappen of de economie vertalen naar het zoeken van een nulpunt."
+      },
+      "en": {
+        "title": "Solving equations by searching",
+        "description": "You can solve an equation for which no formula exists numerically: compare decimal numbers with a tolerance, trap and find a zero with bisection, pass a function as an argument so that one solver function works for every equation, improve an estimate step by step with the methods of Heron and Newton, make the steps of such a search visible with matplotlib, and translate a problem from science or economics into the search for a zero."
+      }
+    },
+    {
+      "id": "benaderen",
+      "parentId": "vergelijkingen-oplossen",
+      "nl": {
+        "title": "Benaderen in plaats van uitrekenen",
+        "description": "Je kan voorspellen waar rekenen met kommagetallen kleine afwijkingen geeft, twee kommagetallen vergelijken met een tolerantie in plaats van met ==, een vergelijking herschrijven tot het zoeken van een nulpunt van een functie, op een grafiek zien waar dat nulpunt ongeveer ligt, en nagaan of een waarde een goede benadering van een oplossing is."
+      },
+      "en": {
+        "title": "Approximating instead of calculating",
+        "description": "You can predict where calculating with decimal numbers gives small deviations, compare two decimal numbers with a tolerance instead of with ==, rewrite an equation as the search for a zero of a function, see on a graph roughly where that zero is, and check whether a value is a good approximation of a solution."
+      },
+      "objectives": [
+        {
+          "id": "predict_float_equality",
+          "nl": "Je kan voorspellen dat een vergelijking met == tussen kommagetallen onverwacht False kan geven, zoals bij 0.1 + 0.2 == 0.3.",
+          "en": "You can predict that a comparison with == between decimal numbers can unexpectedly give False, as with 0.1 + 0.2 == 0.3."
+        },
+        {
+          "id": "write_close_enough",
+          "nl": "Je kan nagaan of twee kommagetallen dicht genoeg bij elkaar liggen met abs(a - b) < tolerantie.",
+          "en": "You can check whether two decimal numbers are close enough together with abs(a - b) < tolerance."
+        },
+        {
+          "id": "write_equation_as_function",
+          "nl": "Je kan een vergelijking herschrijven tot f(x) = 0 en die f schrijven als Python-functie.",
+          "en": "You can rewrite an equation as f(x) = 0 and write that f as a Python function."
+        },
+        {
+          "id": "predict_good_approximation",
+          "nl": "Je kan voor een gegeven x voorspellen of abs(f(x)) < tolerantie waar is, en dus of x als oplossing aanvaard wordt.",
+          "en": "You can predict for a given x whether abs(f(x)) < tolerance is true, and so whether x is accepted as a solution."
+        },
+        {
+          "id": "write_plot_to_locate_zero",
+          "nl": "Je kan de grafiek van een functie met een raster tekenen om te zien tussen welke waarden een nulpunt ligt.",
+          "en": "You can draw the graph of a function with a grid to see between which values a zero lies."
+        },
+        {
+          "id": "reason_approximation_suffices",
+          "nl": "Je kan uitleggen waarom een benadering met een gekende, kleine fout in de praktijk volstaat als oplossing van een vergelijking.",
+          "en": "You can explain why an approximation with a known, small error is enough in practice as the solution of an equation."
+        }
+      ]
+    },
+    {
+      "id": "bisectie",
+      "parentId": "vergelijkingen-oplossen",
+      "nl": {
+        "title": "Bisectie: het interval halveren",
+        "description": "Je kan een nulpunt insluiten tussen twee waarden waar de functie een verschillend teken heeft, het interval halveren en de juiste helft kiezen, dat herhalen tot het interval kleiner is dan een tolerantie, voorspellen hoeveel stappen daarvoor nodig zijn, en de opeenvolgende stappen zichtbaar maken op de grafiek van de functie."
+      },
+      "en": {
+        "title": "Bisection: halving the interval",
+        "description": "You can trap a zero between two values where the function has a different sign, halve the interval and choose the right half, repeat that until the interval is smaller than a tolerance, predict how many steps that takes, and make the successive steps visible on the graph of the function."
+      },
+      "objectives": [
+        {
+          "id": "write_sign_change_test",
+          "nl": "Je kan een voorwaarde schrijven die nagaat of een functie tussen a en b van teken wisselt, zoals f(a) * f(b) < 0.",
+          "en": "You can write a condition that checks whether a function changes sign between a and b, such as f(a) * f(b) < 0."
+        },
+        {
+          "id": "predict_bisection_step",
+          "nl": "Je kan voor een gegeven functie en interval voorspellen welk interval overblijft na één bisectiestap.",
+          "en": "You can predict for a given function and interval which interval is left after one bisection step."
+        },
+        {
+          "id": "write_bisection_loop",
+          "nl": "Je kan een lus schrijven die het interval blijft halveren tot het smaller is dan een tolerantie en het midden als oplossing geeft.",
+          "en": "You can write a loop that keeps halving the interval until it is narrower than a tolerance and gives the midpoint as the solution."
+        },
+        {
+          "id": "predict_number_of_steps",
+          "nl": "Je kan voorspellen hoe breed het interval is na een aantal bisectiestappen en hoeveel stappen nodig zijn voor een gegeven breedte.",
+          "en": "You can predict how wide the interval is after a number of bisection steps and how many steps are needed for a given width."
+        },
+        {
+          "id": "write_plot_bisection_steps",
+          "nl": "Je kan de opeenvolgende middens van een bisectie in een lijst bewaren en ze tonen op de grafiek van de functie.",
+          "en": "You can store the successive midpoints of a bisection in a list and show them on the graph of the function."
+        },
+        {
+          "id": "reason_sign_change_required",
+          "nl": "Je kan uitleggen waarom bisectie een tekenwissel tussen a en b nodig heeft en wat er zonder kan mislopen.",
+          "en": "You can explain why bisection needs a sign change between a and b and what can go wrong without one."
+        }
+      ]
+    },
+    {
+      "id": "functie-als-argument",
+      "parentId": "vergelijkingen-oplossen",
+      "nl": {
+        "title": "Een functie als argument",
+        "description": "Je kan een functie doorgeven als argument aan een andere functie, zodat één bisectie-functie elke vergelijking oplost, het verschil voorspellen tussen een functie doorgeven en haar aanroepen, en zo'n algemene functie gebruiken voor een concreet probleem."
+      },
+      "en": {
+        "title": "A function as an argument",
+        "description": "You can pass a function as an argument to another function, so that one bisection function solves every equation, predict the difference between passing a function and calling it, and use such a general function for a concrete problem."
+      },
+      "objectives": [
+        {
+          "id": "write_function_parameter",
+          "nl": "Je kan een functie schrijven die een andere functie als parameter krijgt en ze binnenin aanroept.",
+          "en": "You can write a function that gets another function as a parameter and calls it inside."
+        },
+        {
+          "id": "predict_function_vs_call",
+          "nl": "Je kan voorspellen wat er misloopt als je bij een aanroep f(x) doorgeeft waar de functie f zelf verwacht wordt.",
+          "en": "You can predict what goes wrong when you pass f(x) in a call where the function f itself is expected."
+        },
+        {
+          "id": "write_general_bisection",
+          "nl": "Je kan bisectie schrijven als functie met de parameters f, a, b en tolerantie, die voor elke functie werkt.",
+          "en": "You can write bisection as a function with the parameters f, a, b and tolerance, which works for every function."
+        },
+        {
+          "id": "write_use_general_solver",
+          "nl": "Je kan een gegeven oplosfunctie gebruiken voor een concreet probleem door de juiste functie te schrijven en door te geven.",
+          "en": "You can use a given solver function for a concrete problem by writing the right function and passing it."
+        },
+        {
+          "id": "reason_one_solver_many_problems",
+          "nl": "Je kan uitleggen wat het voordeel is van één algemene oplosfunctie tegenover een aparte lus per vergelijking.",
+          "en": "You can explain the advantage of one general solver function over a separate loop per equation."
+        }
+      ]
+    },
+    {
+      "id": "stap-voor-stap-verbeteren",
+      "parentId": "vergelijkingen-oplossen",
+      "nl": {
+        "title": "Een schatting stap voor stap verbeteren",
+        "description": "Je kan een oplossing zoeken door een schatting herhaaldelijk te verbeteren: een vierkantswortel benaderen met de methode van Heron, de helling van een functie numeriek benaderen, een Newton-stap uitvoeren, stoppen wanneer twee opeenvolgende schattingen dicht genoeg bij elkaar liggen, en uitleggen wanneer zo'n methode sneller is dan bisectie en wanneer ze faalt."
+      },
+      "en": {
+        "title": "Improving an estimate step by step",
+        "description": "You can search for a solution by improving an estimate repeatedly: approximate a square root with Heron's method, approximate the slope of a function numerically, carry out a Newton step, stop when two successive estimates are close enough together, and explain when such a method is faster than bisection and when it fails."
+      },
+      "objectives": [
+        {
+          "id": "predict_heron_step",
+          "nl": "Je kan voorspellen welke schatting één stap van de methode van Heron oplevert voor een gegeven getal en startwaarde.",
+          "en": "You can predict which estimate one step of Heron's method produces for a given number and start value."
+        },
+        {
+          "id": "write_improve_until_stable",
+          "nl": "Je kan een lus schrijven die een schatting blijft verbeteren tot twee opeenvolgende schattingen minder dan een tolerantie verschillen.",
+          "en": "You can write a loop that keeps improving an estimate until two successive estimates differ by less than a tolerance."
+        },
+        {
+          "id": "write_numeric_slope",
+          "nl": "Je kan de helling van een functie in een punt numeriek benaderen met (f(x + h) - f(x)) / h.",
+          "en": "You can approximate the slope of a function at a point numerically with (f(x + h) - f(x)) / h."
+        },
+        {
+          "id": "write_newton_step",
+          "nl": "Je kan een Newton-stap schrijven die een schatting verbetert met x - f(x) / helling.",
+          "en": "You can write a Newton step that improves an estimate with x - f(x) / slope."
+        },
+        {
+          "id": "reason_newton_can_fail",
+          "nl": "Je kan uitleggen in welke situaties de methode van Newton faalt, zoals bij een helling van nul of een slechte startwaarde.",
+          "en": "You can explain in which situations Newton's method fails, such as a slope of zero or a bad start value."
+        },
+        {
+          "id": "reason_bisection_vs_newton",
+          "nl": "Je kan uitleggen wanneer je bisectie verkiest en wanneer de methode van Newton.",
+          "en": "You can explain when you prefer bisection and when Newton's method."
+        }
+      ]
+    },
+    {
+      "id": "probleem-als-nulpunt",
+      "parentId": "vergelijkingen-oplossen",
+      "nl": {
+        "title": "Van probleem naar nulpunt",
+        "description": "Je kan een probleem uit de wetenschappen of de economie vertalen naar een vergelijking f(x) = 0, met een waardetabel of een grafiek een interval met een tekenwissel vinden, de vergelijking oplossen met een zoekmethode, en de oplossing controleren door ze in te vullen en op de grafiek te tonen."
+      },
+      "en": {
+        "title": "From problem to zero",
+        "description": "You can translate a problem from science or economics into an equation f(x) = 0, find an interval with a sign change using a table of values or a graph, solve the equation with a search method, and check the solution by filling it in and showing it on the graph."
+      },
+      "objectives": [
+        {
+          "id": "decompose_equation_problem",
+          "nl": "Je kan voor een beschreven probleem aangeven wat de onbekende is, welke functie nul moet worden en tussen welke waarden je zoekt.",
+          "en": "You can indicate for a described problem what the unknown is, which function has to become zero and between which values you search."
+        },
+        {
+          "id": "write_find_interval",
+          "nl": "Je kan met een lus over x-waarden een interval zoeken waarin een functie van teken wisselt.",
+          "en": "You can search with a loop over x values for an interval in which a function changes sign."
+        },
+        {
+          "id": "write_solve_problem",
+          "nl": "Je kan een probleem oplossen door de bijbehorende functie te schrijven en een zoekmethode erop toe te passen.",
+          "en": "You can solve a problem by writing the matching function and applying a search method to it."
+        },
+        {
+          "id": "write_plot_solution",
+          "nl": "Je kan de grafiek van de functie van een probleem tekenen met de gevonden oplossing erop gemarkeerd.",
+          "en": "You can draw the graph of the function of a problem with the solution you found marked on it."
+        },
+        {
+          "id": "choose_solution_check",
+          "nl": "Je kan een gevonden oplossing controleren door ze in het oorspronkelijke probleem in te vullen en te beoordelen of ze zinvol is.",
+          "en": "You can check a solution you found by filling it into the original problem and judging whether it makes sense."
+        },
+        {
+          "id": "reason_which_zero_is_found",
+          "nl": "Je kan uitleggen waarom het startinterval of de startwaarde bepaalt welk nulpunt je vindt als een functie er meerdere heeft.",
+          "en": "You can explain why the start interval or the start value decides which zero you find when a function has several."
+        }
+      ]
     }
   ]
 }

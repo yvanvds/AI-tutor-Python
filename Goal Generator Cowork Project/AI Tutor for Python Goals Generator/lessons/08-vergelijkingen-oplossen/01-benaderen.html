@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Benaderen in plaats van uitrekenen</title>
+<style>
+/* Lesson HTML stylesheet — used inside the WebView host that renders
+ * authored Content body fragments. Hand-written from the design tokens in
+ * lib/theme/tokens.dart. Keep in sync manually.
+ */
+
+:root {
+  --ink-0: #211D18;
+  --ink-1: #28241E;
+  --ink-2: #332E26;
+  --ink-3: #3F3A31;
+  --ink-4: #534D42;
+
+  --fg: #EEE9DF;
+  --fg-mute: #B1AB9F;
+  --fg-faint: #7D786D;
+
+  --accent: #7DC89F;
+  --accent-2: #DCCF9A;
+  --accent-3: #7AB9D4;
+  --danger: #D97565;
+
+  --syntax-kw: #E0A4D3;
+  --syntax-str: #7AD2A4;
+  --syntax-num: #DABA6E;
+  --syntax-com: #877F71;
+  --syntax-fn: #7EB7DF;
+
+  --radius-card: 12px;
+  --radius-card-large: 14px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-s: 8px;
+  --space-m: 12px;
+  --space-md: 14px;
+  --space-lg: 16px;
+  --space-xl: 22px;
+  --space-xxl: 28px;
+  --space-xxxl: 36px;
+
+  --font-sans: "Inter Tight", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.lesson {
+  padding: var(--space-xxl) var(--space-xxxl);
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+body.lesson > *:first-child { margin-top: 0; }
+body.lesson > *:last-child { margin-bottom: 0; }
+
+/* Headings */
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; margin-top: 0; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4, h5, h6 { font-size: 15px; }
+
+/* Paragraphs and inline text */
+
+p {
+  margin: 0 0 var(--space-lg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-3);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(122, 185, 212, 0.4);
+}
+a:hover { border-bottom-color: var(--accent-3); }
+
+strong, b { font-weight: 700; color: var(--fg); }
+em, i { font-style: italic; }
+small { color: var(--fg-mute); font-size: 12px; }
+
+/* Inline code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(125, 200, 159, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code block */
+
+pre {
+  background: var(--ink-1);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--radius-card-large);
+  padding: var(--space-m) var(--space-lg);
+  margin: var(--space-lg) 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Live preview — author with <pre class="run"><code>…</code></pre>.
+ * The app appends a .run-output pane under the block and fills it with
+ * what the code printed. */
+
+pre.run {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.run-output {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-2);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card-large) var(--radius-card-large);
+  margin: 0 0 var(--space-lg);
+}
+
+.run-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.run-output-label {
+  color: var(--fg-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.run-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-m);
+  cursor: pointer;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+
+.run-output-body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: var(--space-s) var(--space-lg) var(--space-m);
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.run-output.running .run-output-body { color: var(--fg-faint); }
+.run-output.error .run-output-body { color: var(--danger); }
+
+/* Lists */
+
+ul, ol {
+  margin: 0 0 var(--space-lg);
+  padding-left: var(--space-xl);
+}
+li { margin-bottom: var(--space-xs); }
+li::marker { color: var(--fg-mute); }
+
+/* Blockquote (generic) */
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding: var(--space-m) var(--space-lg);
+  border-left: 3px solid var(--ink-3);
+  color: var(--fg-mute);
+  font-style: italic;
+}
+
+/* Callout — author with <div class="callout info|warn|tip"> */
+
+.callout {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+  padding: var(--space-m) var(--space-lg);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(122, 185, 212, 0.4);
+  background: rgba(122, 185, 212, 0.10);
+  color: var(--fg);
+  margin: var(--space-lg) 0;
+}
+
+.callout.warn,
+.callout.warning {
+  border-color: rgba(217, 117, 101, 0.4);
+  background: rgba(217, 117, 101, 0.10);
+}
+
+.callout.tip {
+  border-color: rgba(125, 200, 159, 0.4);
+  background: rgba(125, 200, 159, 0.10);
+}
+
+.callout::before {
+  content: "ⓘ";
+  color: var(--accent-3);
+  font-size: 16px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.callout.warn::before,
+.callout.warning::before {
+  content: "⚠";
+  color: var(--danger);
+}
+.callout.tip::before {
+  content: "✓";
+  color: var(--accent);
+}
+
+.callout > p:last-child { margin-bottom: 0; }
+
+/* Tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--ink-2);
+}
+th {
+  color: var(--fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Horizontal rule */
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--ink-2);
+  margin: var(--space-xl) 0;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+}
+
+/* Selection */
+
+::selection {
+  background: rgba(125, 200, 159, 0.35);
+  color: var(--fg);
+}
+
+/* Scrollbar (WebView2/Edge) */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 5px;
+  border: 2px solid var(--ink-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+</style>
+</head>
+<body class="lesson">
+<p>Voor x² = 9 heb je een formule, voor x³ = x + 1 niet. Toch heeft die vergelijking een oplossing, en een computer vindt ze door te zoeken. Zoeken levert geen exact antwoord op maar een benadering, en dat begint bij hoe een computer met kommagetallen rekent.</p>
+
+<h2>Kommagetallen zijn bijna juist</h2>
+
+<pre><code>print(0.1 + 0.2)
+print(0.1 + 0.2 == 0.3)
+print(0.5 + 0.25 == 0.75)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>0.30000000000000004
+False
+True</code></pre>
+
+<p>De computer bewaart de meeste kommagetallen een heel klein beetje afgerond. Voor 0.1 en 0.2 geeft dat een som die net naast 0.3 ligt. Halven en kwarten kan hij wel exact bewaren, daarom klopt de derde regel. Vergelijk kommagetallen dus niet met <code>==</code>.</p>
+
+<h2>Dicht genoeg is gelijk</h2>
+
+<pre><code>def bijna_gelijk(a, b, tolerantie):
+    return abs(a - b) &lt; tolerantie
+
+print(bijna_gelijk(0.1 + 0.2, 0.3, 0.000001))</code></pre>
+<p>Uitvoer:</p>
+<pre><code>True</code></pre>
+
+<p>Je vraagt of het verschil kleiner is dan een <em>tolerantie</em>: een klein getal dat zegt hoeveel afwijking je aanvaardt.</p>
+
+<div class="callout warn"><p>Vergeet <code>abs</code> niet. Zonder is <code>a - b</code> negatief zodra a kleiner is dan b, en dan is de voorwaarde altijd waar, hoe ver de twee getallen ook uit elkaar liggen.</p></div>
+
+<h2>Van vergelijking naar nulpunt</h2>
+
+<p>Breng alles naar één kant: x³ = x + 1 wordt x³ - x - 1 = 0. De oplossing van de vergelijking is dan het <em>nulpunt</em> van de functie f(x) = x³ - x - 1, de x waarvoor de functie nul wordt.</p>
+
+<pre><code>def f(x):
+    return x ** 3 - x - 1
+
+print(f(1))
+print(f(2))</code></pre>
+<p>Uitvoer:</p>
+<pre><code>-1
+5</code></pre>
+
+<p>Elke vergelijking kan je zo herschrijven. Ook "waar zijn kosten en opbrengst gelijk?" wordt "waar is opbrengst min kosten nul?".</p>
+
+<h2>Kijken waar het nulpunt ligt</h2>
+
+<pre><code>import matplotlib.pyplot as plt
+
+xs = []
+ys = []
+for i in range(101):
+    x = i * 0.02
+    xs.append(x)
+    ys.append(f(x))
+plt.plot(xs, ys)
+plt.grid()
+plt.xlabel("x")
+plt.ylabel("f(x)")
+plt.show()</code></pre>
+
+<svg viewBox="0 0 640 300" width="100%" role="img">
+<title>De grafiek van f snijdt de horizontale as tussen 1 en 2</title>
+<line x1="46.0" y1="16" x2="46.0" y2="266" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="46.0" y="286" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">0</text>
+<line x1="190.0" y1="16" x2="190.0" y2="266" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="190.0" y="286" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">0.5</text>
+<line x1="334.0" y1="16" x2="334.0" y2="266" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="334.0" y="286" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">1</text>
+<line x1="478.0" y1="16" x2="478.0" y2="266" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="478.0" y="286" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">1.5</text>
+<line x1="622.0" y1="16" x2="622.0" y2="266" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="622.0" y="286" text-anchor="middle" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">2</text>
+<line x1="46" y1="266.0" x2="622" y2="266.0" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="270.0" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">-2</text>
+<line x1="46" y1="194.6" x2="622" y2="194.6" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="198.6" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">0</text>
+<line x1="46" y1="123.1" x2="622" y2="123.1" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="127.1" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">2</text>
+<line x1="46" y1="51.7" x2="622" y2="51.7" stroke="var(--ink-4)" stroke-width="1"/>
+<text x="38" y="55.7" text-anchor="end" fill="var(--fg-faint)" font-family="var(--font-mono)" font-size="13">4</text>
+<line x1="46" y1="194.6" x2="622" y2="194.6" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<line x1="46" y1="16" x2="46" y2="266" stroke="var(--fg-mute)" stroke-width="1.5"/>
+<polyline points="46.0,230.3 50.8,230.9 55.6,231.5 60.4,232.1 65.2,232.7 70.0,233.2 74.8,233.8 79.6,234.4 84.4,235.0 89.2,235.5 94.0,236.1 98.8,236.6 103.6,237.1 108.4,237.7 113.2,238.2 118.0,238.7 122.8,239.1 127.6,239.6 132.4,240.0 137.2,240.5 142.0,240.9 146.8,241.3 151.6,241.6 156.4,242.0 161.2,242.3 166.0,242.6 170.8,242.9 175.6,243.1 180.4,243.3 185.2,243.5 190.0,243.7 194.8,243.8 199.6,243.9 204.4,244.0 209.2,244.0 214.0,244.0 218.8,244.0 223.6,243.9 228.4,243.8 233.2,243.7 238.0,243.5 242.8,243.3 247.6,243.0 252.4,242.7 257.2,242.4 262.0,242.0 266.8,241.6 271.6,241.1 276.4,240.6 281.2,240.0 286.0,239.4 290.8,238.7 295.6,238.0 300.4,237.2 305.2,236.4 310.0,235.5 314.8,234.6 319.6,233.6 324.4,232.5 329.2,231.4 334.0,230.3 338.8,229.1 343.6,227.8 348.4,226.4 353.2,225.0 358.0,223.6 362.8,222.0 367.6,220.4 372.4,218.8 377.2,217.0 382.0,215.2 386.8,213.4 391.6,211.4 396.4,209.4 401.2,207.3 406.0,205.2 410.8,202.9 415.6,200.6 420.4,198.2 425.2,195.8 430.0,193.2 434.8,190.6 439.6,187.9 444.4,185.1 449.2,182.3 454.0,179.3 458.8,176.3 463.6,173.2 468.4,170.0 473.2,166.7 478.0,163.3 482.8,159.9 487.6,156.3 492.4,152.6 497.2,148.9 502.0,145.1 506.8,141.1 511.6,137.1 516.4,133.0 521.2,128.8 526.0,124.5 530.8,120.1 535.6,115.5 540.4,110.9 545.2,106.2 550.0,101.4 554.8,96.5 559.6,91.4 564.4,86.3 569.2,81.0 574.0,75.7 578.8,70.2 583.6,64.7 588.4,59.0 593.2,53.2 598.0,47.3 602.8,41.2 607.6,35.1 612.4,28.9 617.2,22.5 622.0,16.0" fill="none" stroke="var(--syntax-fn)" stroke-width="2.5"/>
+<circle cx="427.5" cy="194.6" r="6" fill="var(--accent)"/>
+<text x="437.5" y="212.6" text-anchor="start" fill="var(--accent)" font-family="var(--font-sans)" font-size="14">nulpunt</text>
+<text x="74.8" y="44.6" text-anchor="start" fill="var(--syntax-fn)" font-family="var(--font-mono)" font-size="14">f(x) = x³ - x - 1</text>
+</svg>
+
+<p>Het nulpunt is de plaats waar de grafiek de horizontale as snijdt. Het raster toont dat dat tussen 1 en 1.5 gebeurt. De grafiek geeft de buurt, niet het antwoord: daarvoor dienen de zoekmethodes die volgen.</p>
+
+<h2>Is dit een oplossing?</h2>
+
+<pre><code>x = 1.3247
+print(round(f(x), 4))
+print(abs(f(x)) &lt; 0.001)</code></pre>
+<p>Uitvoer:</p>
+<pre><code>-0.0001
+True</code></pre>
+
+<p>Een benadering test je door ze in te vullen. De functiewaarde is niet precies nul, maar ligt er dichter bij dan de tolerantie: x = 1.3247 wordt aanvaard als oplossing. De test is <code>abs(f(x)) &lt; tolerantie</code>, nooit <code>f(x) == 0</code>.</p>
+
+<h2>Waarom een benadering volstaat</h2>
+
+<p>Een prijs ken je tot op de cent, een gemeten temperatuur tot op een tiende graad. Een antwoord dat tot op een miljoenste klopt, is dan even bruikbaar als een exact antwoord. Je kiest zelf hoe klein de fout mag zijn, en voor de meeste vergelijkingen bestaat er gewoon geen formule.</p>
+
+<p>Met een functie, een tolerantie en een grafiek ben je klaar om naar oplossingen te zoeken.</p>
+</body>
+</html>
