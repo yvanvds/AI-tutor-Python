@@ -1,5 +1,7 @@
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
@@ -41,8 +43,15 @@ Future<void> main() async {
   // the first frame, then hand it off to UncontrolledProviderScope. Without
   // a school (#262) there is nothing to sign in to.
   final container = ProviderContainer();
-  if (container.read(appModeProvider) is SchoolMode) {
+  final mode = container.read(appModeProvider);
+  if (mode is SchoolMode) {
     await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
+  } else {
+    // Stand-alone (#263): the data lives on the pc. Opened before the first
+    // frame, so every `CosmosPaths` handle reads the local storage.
+    CosmosClient.overrideInstance(
+      CosmosClient.forMode(mode, localDataRoot: await standaloneDataDir(mode)),
+    );
   }
 
   runApp(

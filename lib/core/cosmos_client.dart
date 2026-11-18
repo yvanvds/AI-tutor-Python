@@ -8,13 +8,15 @@
 // Auth is pluggable via [CosmosAuth]. [CosmosClient.instance] uses a
 // [MasterKeyAuth] on the school configuration of the app mode (#262). The
 // user's own sign-in ([AadTokenAuth], #306) swaps in without touching call
-// sites.
+// sites. In stand-alone mode the same interface sits on local files instead
+// (`LocalCosmosClient`, #263).
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
@@ -196,16 +198,30 @@ class CosmosClient {
   static CosmosClient get instance =>
       _instance ??= CosmosClient.forMode(AppMode.fromBuild);
 
-  /// The client for [mode]'s school database. Stand-alone mode has none: it
-  /// keeps its data on the pc (#263), so reaching for Cosmos there is a bug.
-  /// [databaseKey] is the build's key unless a test passes its own.
+  /// The client for [mode]'s data.
+  ///
+  /// School mode: the school's database. [databaseKey] is the build's key
+  /// unless a test passes its own.
+  ///
+  /// Stand-alone mode: the local storage under [localDataRoot] (#263), read
+  /// from disk here. Finding that folder is async, so `main` opens it
+  /// (`standaloneDataDir`) and installs the client with [overrideInstance]
+  /// before anything reads data; without a folder this throws, because
+  /// reaching for data before then is a bug.
   static CosmosClient forMode(
     AppMode mode, {
     String Function() databaseKey = buildSchoolDatabaseKey,
+    Directory? localDataRoot,
   }) {
     final school = mode.school;
     if (school == null) {
-      throw StateError('Stand-alone mode has no school database.');
+      if (localDataRoot == null) {
+        throw StateError(
+          'Stand-alone mode keeps its data on the pc: open the local '
+          'storage (standaloneDataDir) before reading data.',
+        );
+      }
+      return LocalCosmosClient.open(localDataRoot);
     }
     return CosmosClient._(
       endpoint: school.databaseEndpoint,

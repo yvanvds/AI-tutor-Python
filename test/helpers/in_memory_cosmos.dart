@@ -1,10 +1,9 @@
 // In-memory stand-in for `CosmosContainer` / `CosmosClient`, so real
 // services (GoalsService, ContentService, ModuleService, AccountService, ...)
-// can run unmodified against a map of docs. Interprets just enough of the
-// SQL the services emit: parentId filters, root filter, uid / goalId /
-// subgoalId filters, the signal-event and acknowledgement filters of
-// `turn_history`, ORDER BY title / order, and the `TOP 1 ... AS o`
-// next-order query.
+// can run unmodified against a map of docs. Queries run through
+// `CosmosQuery` (lib/core/cosmos_query.dart), the interpreter the
+// stand-alone storage uses too (#263): a query it does not understand is a
+// 400, not an empty or unfiltered result.
 //
 // Two ways to use it:
 //
@@ -30,6 +29,7 @@
 // another app's write between a read and the replace that follows it.
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/cosmos_query.dart';
 
 class InMemoryCosmos {
   InMemoryCosmos([Iterable<Map<String, dynamic>> seed = const []])
@@ -223,74 +223,9 @@ class InMemoryCosmos {
       rows = rows.where((d) => d[field] == partitionKey);
     }
 
-    // Point lookup across partitions (`TranslationService.moveContent`).
-    if (sql.contains('c.id = @id')) {
-      rows = rows.where((d) => d['id'] == params['@id']);
-    }
-
-    if (sql.contains('c.parentId = @parentId')) {
-      final pid = params['@parentId'];
-      rows = rows.where((d) => d['parentId'] == pid);
-    } else if (sql.contains('IS_NULL(c.parentId)')) {
-      rows = rows.where((d) => d['parentId'] == null);
-    }
-
-    // Per-user containers (progress, progress_history, lo_beliefs,
-    // turn_history) filter on uid and optionally on goal / subgoal.
-    if (sql.contains('c.uid = @uid')) {
-      rows = rows.where((d) => d['uid'] == params['@uid']);
-    }
-    if (sql.contains('c.goalId = @goalId')) {
-      rows = rows.where((d) => d['goalId'] == params['@goalId']);
-    }
-    if (sql.contains('c.subgoalId = @sid')) {
-      rows = rows.where((d) => d['subgoalId'] == params['@sid']);
-    }
-    // Cross-partition: one milestone, every student (#148).
-    if (sql.contains('c.milestoneId = @milestoneId')) {
-      rows = rows.where((d) => d['milestoneId'] == params['@milestoneId']);
-    }
-    // The teacher's signal events (CONDUCTOR_POLICY §8.2): records that
-    // carry events, and of those the ones not yet acknowledged — what the
-    // "needs attention" badge counts and the acknowledge action clears.
-    if (sql.contains('ARRAY_LENGTH(c.signalEvents) > 0')) {
-      rows = rows.where(
-        (d) =>
-            d['signalEvents'] is List && (d['signalEvents'] as List).isNotEmpty,
-      );
-    }
-    if (sql.contains(
-      '(NOT IS_DEFINED(c.acknowledgedAt) OR IS_NULL(c.acknowledgedAt))',
-    )) {
-      rows = rows.where((d) => d['acknowledgedAt'] == null);
-    }
-
-    var list = rows.toList();
-    if (sql.contains('ORDER BY c.title')) {
-      list.sort(
-        (a, b) => ((a['title'] as String?) ?? '').compareTo(
-          (b['title'] as String?) ?? '',
-        ),
-      );
-    } else if (sql.contains('ORDER BY c["order"] DESC')) {
-      list.sort(
-        (a, b) =>
-            ((b['order'] as int?) ?? 0).compareTo((a['order'] as int?) ?? 0),
-      );
-    } else if (sql.contains('ORDER BY c["order"]')) {
-      list.sort(
-        (a, b) =>
-            ((a['order'] as int?) ?? 0).compareTo((b['order'] as int?) ?? 0),
-      );
-    }
-
-    if (sql.contains('SELECT TOP 1 c["order"] AS o')) {
-      if (list.isEmpty) return const [];
-      return [
-        {'o': list.first['order']},
-      ];
-    }
-    return list;
+    // The same interpreter as the stand-alone storage (#263): a query it
+    // does not understand fails here too, instead of matching everything.
+    return CosmosQuery.run(sql, rows, params);
   }
 }
 

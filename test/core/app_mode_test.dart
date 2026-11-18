@@ -105,7 +105,8 @@ void main() {
   });
 
   group('the school database', () {
-    test('stand-alone mode has none', () {
+    test('stand-alone mode has none: without its local folder, no '
+        'client', () {
       expect(
         () => CosmosClient.forMode(const StandaloneMode()),
         throwsStateError,
