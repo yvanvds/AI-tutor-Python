@@ -209,6 +209,40 @@ void main() {
       expect(back.feedbackFor('Python'), isNull);
     });
 
+    test('an option text keeps the rule it was written under; one stored '
+        'before #305 has none, and only one for a pick that is not correct '
+        'is then stale', () {
+      final q = BankQuestion.tryFromCosmos({
+        ..._bank(_mcq())!.toMap(),
+        'optionFeedback': [
+          {'option': 'Error', 'text': 'Duwtje.', 'quality': 'wrong'},
+          {'option': 'Python', 'text': 'Bijna.', 'quality': 'partial'},
+          {'option': 'Hallo', 'text': 'Juist!', 'quality': 'correct'},
+          {'option': 'x', 'text': 'Geen oordeel.'},
+          {'option': 'y', 'text': 'Nieuw.', 'quality': 'wrong', 'version': 1},
+        ],
+      })!;
+      expect(q.feedbackFor('Error')!.version, 0);
+      expect(q.feedbackFor('Error')!.isStale, isTrue);
+      expect(q.feedbackFor('Python')!.isStale, isTrue);
+      expect(q.feedbackFor('Hallo')!.isStale, isFalse);
+      expect(q.feedbackFor('x')!.isStale, isTrue);
+      expect(q.feedbackFor('y')!.isStale, isFalse);
+      // The version is written back as it was read, and absent when 0.
+      expect(q.toMap()['optionFeedback'], [
+        {'option': 'Error', 'text': 'Duwtje.', 'quality': 'wrong'},
+        {'option': 'Python', 'text': 'Bijna.', 'quality': 'partial'},
+        {'option': 'Hallo', 'text': 'Juist!', 'quality': 'correct'},
+        {'option': 'x', 'text': 'Geen oordeel.'},
+        {'option': 'y', 'text': 'Nieuw.', 'quality': 'wrong', 'version': 1},
+      ]);
+      // A new text is written under the current rule.
+      expect(
+        const BankOptionFeedback(option: 'z', text: 't').version,
+        BankOptionFeedback.wrongPickVersion,
+      );
+    });
+
     test('a question hidden before #215 carries no hiddenBy: the teacher hid '
         'it', () {
       final q = BankQuestion.tryFromCosmos({

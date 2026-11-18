@@ -198,9 +198,18 @@ teacher-authored bodies and before the output-language directive:
   pick: `"keyDisputed": true` in META (#198, see "A disputed key" below),
   the other flag;
 - the key is not for the student: no mention of it, of `correct_option` or
-  of `keyDisputed` — not even that the key is wrong — and on a wrong pick
-  the right option is not given away (the teacher's "a nudge, not the full
-  solution" still holds).
+  of `keyDisputed` — not even that the key is wrong;
+- on a pick that is not right, the feedback says why it is not, then which
+  option is right and why, in a few sentences (#305, `wrongPickDirective`,
+  part of the directive and also without a key). The question is closed
+  once picked and never asked of that student again, so a nudge leads
+  nowhere. The right option is named by its content, never by its letter:
+  the options are shuffled per student, and a bank question's stored text
+  reaches the next student under other letters. "Right" is what the grader
+  finds right — with a wrong key, what is actually right, still without a
+  word about a key. A `followUp` does not ask for the answer the feedback
+  just gave. A right pick's feedback is unchanged, and so are code
+  exercises, hints and follow-ups on code: there a nudge still holds.
 
 The directive lives in code, like the envelope contract, not in the
 teacher-editable `mcqAnswer` doc: the question bank depends on it. It
@@ -360,9 +369,11 @@ directive, whenever a quiz is open, to the turns that are not graded —
 (`openQuizGuardedTypes`). It says the message is no answer and is not
 graded (one that reads like an answer is sent back to the quiz), that the
 model may clarify the question, its words, its code and the Python behind
-it, and that it never gives the answer away — which option is right or
-wrong, or the output or value asked for — not even after the pick beyond
-what the feedback said, and never mentions an answer key. A grading call
+it, and that before the pick it never gives the answer away — which option
+is right or wrong, or the output or value asked for — not even when asked
+outright. After the pick the feedback has already said which option is
+right (#305), so the chat may explain the right answer too, by content. It
+never mentions an answer key. A grading call
 never gets it. Like the answer-key directive it lives in code, so it holds
 whatever the teacher's `studentQuestion` doc says.
 

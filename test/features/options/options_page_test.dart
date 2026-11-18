@@ -25,6 +25,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
@@ -65,6 +66,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/test_app_mode.dart';
 
 const _uid = 'u1';
 
@@ -362,8 +364,10 @@ void main() {
     ReleaseNotesFetcher? notes,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
+    AppMode? mode,
   }) => ProviderScope(
     overrides: [
+      appModeProvider.overrideWithValue(mode ?? kTestSchoolMode),
       // The by-tag lookup behind "What's new" (#130): never the production
       // one, which would reach api.github.com from a test.
       releaseNotesFetcherProvider.overrideWithValue(
@@ -438,6 +442,7 @@ void main() {
     ReleaseNotesFetcher? notes,
     String globalModel = 'gpt-4o',
     String oauthClientId = 'Ov23liTESTCLIENTID',
+    AppMode? mode,
   }) async {
     // Tall viewport so every card is laid out without scrolling — including
     // the teacher's second model card (#118).
@@ -458,6 +463,7 @@ void main() {
         notes: notes,
         globalModel: globalModel,
         oauthClientId: oauthClientId,
+        mode: mode,
       ),
     );
     // Account poll + SharedPreferences hydration.
@@ -622,6 +628,58 @@ void main() {
       expect(turns.docs, isEmpty);
       // Calibration is untouched by a granular reset.
       expect(accounts[_uid]!['calibration']['difficulty'], 'hard');
+
+      await unmount(tester);
+    });
+  });
+
+  // #264: in stand-alone mode the name is the user's own. A school account
+  // has no such card: its name comes from the school.
+  group('your name', () {
+    testWidgets('a school account has no name card', (tester) async {
+      await mount(tester);
+
+      expect(find.text('Your name'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('stand-alone: a new name lands on the profile and the '
+        'account', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'standalone.local_profile_v1': jsonEncode({
+          'uid': _uid,
+          'firstName': 'Sam',
+          'lastName': 'Student',
+        }),
+      });
+      await mount(tester, mode: const StandaloneMode());
+
+      expect(find.text('Your name'), findsOneWidget);
+      expect(find.byTooltip('Sign out'), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('options-profile-first-name')),
+        '  Alex ',
+      );
+      await tester.enterText(
+        find.byKey(const Key('options-profile-last-name')),
+        '',
+      );
+      await tester.tap(find.byKey(const Key('options-profile-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Name saved.'), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      final stored =
+          jsonDecode(prefs.getString('standalone.local_profile_v1')!) as Map;
+      expect(stored, {'uid': _uid, 'firstName': 'Alex', 'lastName': ''});
+      final doc = accounts[_uid]!;
+      expect(doc['firstName'], 'Alex');
+      expect(doc['lastName'], '');
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(OptionsPage)),
+      );
+      expect(container.read(authServiceProvider)?.firstName, 'Alex');
 
       await unmount(tester);
     });

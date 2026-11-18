@@ -18,6 +18,7 @@
 
 import 'package:integration_test/integration_test.dart';
 
+import 'flows/app_mode.dart' as app_mode;
 import 'flows/badge_toast_place.dart' as badge_toast_place;
 import 'flows/badges.dart' as badges;
 import 'flows/bug_report_file.dart' as bug_report_file;
@@ -210,4 +211,5 @@ void main() {
   update_proxy.main();
   update_required.main();
   whats_new_overlay.main();
+  app_mode.main();
 }

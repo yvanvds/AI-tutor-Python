@@ -1264,6 +1264,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'The ID of this question. Your teacher can use it to find the question.';
 
   @override
+  String get questionId_copy_tooltip => 'Copy the ID';
+
+  @override
+  String get questionId_copied_tooltip => 'Copied';
+
+  @override
   String get session_quiz_next_button => 'Next →';
 
   @override
@@ -3652,4 +3658,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get awardBadge_failed => 'The badge could not be awarded. Try again.';
+
+  @override
+  String get standalone_welcome_title => 'Welcome';
+
+  @override
+  String get standalone_welcome_intro =>
+      'With this app you learn to program in Python. An AI tutor gives you exercises and helps you along.';
+
+  @override
+  String get standalone_welcome_firstName => 'First name';
+
+  @override
+  String get standalone_welcome_lastName => 'Last name (optional)';
+
+  @override
+  String get standalone_welcome_language => 'Language';
+
+  @override
+  String get standalone_welcome_start => 'Start';
+
+  @override
+  String get standalone_welcome_firstNameRequired => 'Enter your first name.';
+
+  @override
+  String standalone_welcome_failed(String error) {
+    return 'That did not work: $error';
+  }
+
+  @override
+  String get auth_localKey_standalone_explainer =>
+      'The tutor uses OpenAI\'s AI. For that you need your own key.\n\nMake one at platform.openai.com/api-keys and paste it below. You pay OpenAI for what you use.\n\nThe key stays on this pc only.';
+
+  @override
+  String get options_profile_title => 'Your name';
+
+  @override
+  String get options_profile_subtitle => 'How the app addresses you.';
+
+  @override
+  String get options_profile_save => 'Save';
+
+  @override
+  String get options_profile_saved => 'Name saved.';
 }

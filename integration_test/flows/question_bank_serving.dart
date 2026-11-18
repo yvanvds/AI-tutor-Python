@@ -400,7 +400,98 @@ void main() {
       reason: 'the fetched text was not kept',
     );
     expect(bank[other['id'] as String]!['optionFeedback'], [
-      {'option': _wrong, 'text': _fetchedText, 'quality': 'wrong'},
+      {
+        'option': _wrong,
+        'text': _fetchedText,
+        'quality': 'wrong',
+        'version': BankOptionFeedback.wrongPickVersion,
+      },
+    ]);
+
+    await harness.dispose(tester);
+  });
+
+  // #305 — a text for a wrong pick written before the feedback said which
+  // option is right only gave a nudge. The student never sees it: one
+  // grading call writes the new text, told to name the right option, and
+  // the bank keeps that one instead. The key's own text stays.
+  testWidgets('a stale text for a wrong pick is not shown: one grading call '
+      'writes the right answer in, and the bank replaces the old text '
+      '(#305)', (tester) async {
+    const staleText = 'Kijk nog eens naar de haakjes.';
+    const renewedText =
+        'Nee: de haakjes maken er geen tekst van. Juist is 2: 1 + 1 is een som.';
+    final llm = ScriptedLlm([
+      llmEnvelope(
+        text: renewedText,
+        meta: jsonEncode({
+          'type': 'mcq_feedback',
+          'overallQuality': 'wrong',
+          'loSignals': <Object>[],
+        }),
+      ),
+    ]);
+    final staleDoc = {
+      ...other,
+      'optionFeedback': [
+        {'option': _wrong, 'text': staleText, 'quality': 'wrong'},
+        {'option': _key, 'text': 'Juist!', 'quality': 'correct'},
+      ],
+    };
+    final harness = AppHarness(
+      llm: llm,
+      extraDocs: {
+        'goals': [_printSubgoal()],
+        'config': [_config(minimum: 1)],
+        'questions': [staleDoc],
+      },
+    );
+    await harness.boot(tester);
+    await waitForMix(tester, harness);
+
+    await practise(tester);
+    await pumpUntilFound(tester, find.byType(QuizView));
+    await pumpUntilFound(tester, find.text(_wrong));
+    await waitForIdle(tester, harness);
+    expect(llm.sends, 0);
+
+    await tester.tap(find.text(_wrong));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('Juist is 2', findRichText: true),
+    );
+    await waitForIdle(tester, harness);
+    await tester.pump(AppDurations.hover);
+
+    expect(llm.sends, 1, reason: 'the stale text costs one call');
+    expect(find.textContaining(staleText, findRichText: true), findsNothing);
+    expect(optionHue(tester, _wrong), AppColors.danger);
+    expect(llm.sentInstructions.single, contains('WRONG PICK — STRICT.'));
+    expect(
+      llm.sentInstructions.single,
+      contains('Then say which option is right and why'),
+    );
+
+    await pumpUntil(tester, () => turns(harness).length == 1);
+    expect(turns(harness).single['gradedByKey'], isTrue);
+
+    final bank = harness.cosmos['questions'];
+    final id = other['id'] as String;
+    await pumpUntil(
+      tester,
+      () => (bank[id]!['optionFeedback'] as List).any(
+        (f) => (f as Map)['text'] == renewedText,
+      ),
+      reason: 'the new text was not kept',
+    );
+    expect(bank[id]!['optionFeedback'], [
+      {'option': _key, 'text': 'Juist!', 'quality': 'correct'},
+      {
+        'option': _wrong,
+        'text': renewedText,
+        'quality': 'wrong',
+        'version': BankOptionFeedback.wrongPickVersion,
+      },
     ]);
 
     await harness.dispose(tester);

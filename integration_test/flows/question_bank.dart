@@ -247,7 +247,12 @@ void main() {
     expect(mcq['correctCount'], 1);
     expect(mcq['lastAskedAt'], mcq['createdAt'], reason: 'asked, then stored');
     expect(mcq['optionFeedback'], [
-      {'option': _right2, 'text': _feedback2, 'quality': 'correct'},
+      {
+        'option': _right2,
+        'text': _feedback2,
+        'quality': 'correct',
+        'version': BankOptionFeedback.wrongPickVersion,
+      },
     ]);
     expect(mcq.containsKey('reviewedAt'), isFalse);
 

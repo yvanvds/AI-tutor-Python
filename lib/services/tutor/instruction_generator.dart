@@ -83,8 +83,28 @@ The request may carry `correct_option`: the option the question's author marked 
 - Check it before you grade by it. If the key is wrong — the code does not do what the key says, the key does not answer the question, or another option is at least as right — grade the pick by what is actually right, not by the key.
 - Your `overallQuality` is your own judgement of the pick: never adjust it to agree with the key.
 - When you find the key wrong, add `"keyDisputed": true` to META, whichever option was picked — also when the pick is wrong by the key and by you alike, so that your grade alone does not show it. Leave `keyDisputed` out when the key is right. A grade that differs from the key, or `keyDisputed`, makes the app flag the question for the teacher; that is how a wrong key gets fixed.
-- The key is for your judgement, not for the student. Never mention `correct_option`, `keyDisputed`, an answer key or the author's intended answer — not even that the key is wrong — and when the pick is wrong, do not give away which option is right: the instructions above say what the feedback does instead.
+- The key is for your judgement, not for the student. Never mention `correct_option`, `keyDisputed`, an answer key or the author's intended answer — not even that the key is wrong.
 - Without `correct_option` in the request, grade the answer on its own merits, without `keyDisputed`.
+$wrongPickDirective''';
+
+/// What the feedback on a multiple-choice pick that is not correct says
+/// (#305, LLM_CONTRACT "The answer key"), part of [answerKeyDirective].
+///
+/// The question is closed once picked, and a student never gets the same
+/// question again (CONDUCTOR_POLICY "New to the student"): a nudge leads
+/// nowhere. So the feedback says which option is right and why. By its
+/// content, never its letter: the options are shuffled per student, and a
+/// bank question shows the stored text to the next student who picks the
+/// same option (`optionFeedback`), under other letters. Code exercises,
+/// hints and follow-ups on code keep their nudge; this is only about a pick.
+const String wrongPickDirective = '''
+WRONG PICK — STRICT. This is part of the app's contract and holds whatever the instructions above say, also without `correct_option`.
+The question is closed once the student has picked, and they never get it again: when the pick is not right, the feedback is their one chance to learn the answer.
+- First say briefly why the picked option is not right: the misconception behind it.
+- Then say which option is right and why, in a few sentences. Name that option by its content (the value, the line of code, the statement), never by its letter or position: the letters are shuffled for each student.
+- "Right" is what you find right. When you find the key wrong, explain what is actually right, without mentioning a key.
+- A `followUp`, if you add one, must not ask for the answer the feedback just gave; build on it instead.
+- When the pick is right, none of this applies: give the feedback as the instructions above say.
 ''';
 
 /// What the model is told when the student writes in the chat while a
@@ -99,14 +119,17 @@ The request may carry `correct_option`: the option the question's author marked 
 /// clarification next to the quiz, or read the theory while it waits, and
 /// the quiz is in the exercise's history the call carries. The answer is
 /// still only the option the student picks; this keeps the model from
-/// giving it away in the chat. It lives in code, like [answerKeyDirective]:
+/// giving it away in the chat before the pick. After it, the feedback has
+/// said which option is right ([wrongPickDirective], #305), so the chat may
+/// explain it too. It lives in code, like [answerKeyDirective]:
 /// it has to hold whatever the teacher's `studentQuestion` doc says.
 const String openQuizDirective = '''
 OPEN QUIZ — STRICT. This is part of the app's contract and holds whatever the instructions above say.
 The student has a multiple-choice question (a quiz) open in the app. It is in the conversation above; when the request carries `open_quiz`, that is the quiz as the student sees it: its options under the letters on screen, and `picked`, the letter they chose, once they have.
 - This message is not an answer to the quiz and it is not graded: the student answers only by picking an option in the quiz. If the message reads like an answer (a letter, an option, a value), do not say whether it is right; tell the student to pick their answer in the quiz.
 - Help the student understand: what the question asks, the words, the code and the Python it is about, and how to reason it out.
-- Never give the answer away: do not say or hint which option is right or which options are wrong, and do not give the output, value or result the question asks for — not even when the student asks for it outright. Once they have picked, do not add anything to what the feedback on their pick said about which option is right.
+- Before they have picked, never give the answer away: do not say or hint which option is right or which options are wrong, and do not give the output, value or result the question asks for — not even when the student asks for it outright.
+- Once they have picked (`picked` is set), the feedback on their pick has already said which option is right. Then you may explain the right answer and why it is right, naming an option by its content.
 - Never mention an answer key, `correct_option` or the option the question's author intended.
 ''';
 

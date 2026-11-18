@@ -2,6 +2,7 @@
 // sidebar that gathers everything that used to be spread over the settings
 // popup and the debug dialog:
 //
+//   - the user's name, in stand-alone mode only (#264)
 //   - language (moved from the sidebar settings popup)
 //   - appearance: light / dark / follow the system (#32)
 //   - the AI model, on own-key and developer builds (#32) and for teachers
@@ -22,6 +23,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
@@ -74,6 +76,7 @@ class OptionsPage extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final devTools = ref.watch(developerToolsProvider);
     final isTeacher = ref.watch(isTeacherProvider);
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
     final usesOwnKey = ref.watch(
       accountServiceProvider.select((a) => a != null && !a.mayUseGlobalKey),
     );
@@ -99,6 +102,12 @@ class OptionsPage extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: AppSpacing.xl),
+              // Stand-alone (#264): the name is the user's own, so they can
+              // change it here. A school account's name comes from Entra.
+              if (standalone) ...[
+                const _ProfileNameCard(),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               const _LanguageCard(),
               const SizedBox(height: AppSpacing.lg),
               const _ThemeCard(),
@@ -241,6 +250,108 @@ class _AnswersKeptCard extends StatelessWidget {
         l.options_answersKept_text,
         key: const Key('options-answers-kept'),
         style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Your name (stand-alone, #264)
+// ---------------------------------------------------------------------------
+
+/// The local profile's name: kept with the profile and on the account doc,
+/// so the greeting and everything else that reads the account follow.
+class _ProfileNameCard extends ConsumerStatefulWidget {
+  const _ProfileNameCard();
+
+  @override
+  ConsumerState<_ProfileNameCard> createState() => _ProfileNameCardState();
+}
+
+class _ProfileNameCardState extends ConsumerState<_ProfileNameCard> {
+  late final TextEditingController _first;
+  late final TextEditingController _last;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final identity = ref.read(authServiceProvider);
+    _first = TextEditingController(text: identity?.firstName ?? '');
+    _last = TextEditingController(text: identity?.lastName ?? '');
+  }
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _last.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l = AppLocalizations.of(context);
+    final first = _first.text.trim();
+    if (first.isEmpty) {
+      _snack(context, l.standalone_welcome_firstNameRequired);
+      return;
+    }
+    final auth = ref.read(authServiceProvider.notifier);
+    final profile = await auth.loadLocalProfile();
+    if (profile == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      final renamed = profile.withName(firstName: first, lastName: _last.text);
+      await ref
+          .read(accountServiceProvider.notifier)
+          .upsertAccount(
+            uid: renamed.uid,
+            firstName: renamed.firstName,
+            lastName: renamed.lastName,
+            email: '',
+          );
+      await auth.useLocalProfile(renamed);
+      if (mounted) _snack(context, l.options_profile_saved);
+    } catch (e) {
+      if (mounted) _snack(context, l.standalone_welcome_failed(e.toString()));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _OptionsCard(
+      title: l.options_profile_title,
+      subtitle: l.options_profile_subtitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            key: const Key('options-profile-first-name'),
+            controller: _first,
+            decoration: InputDecoration(
+              labelText: l.standalone_welcome_firstName,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            key: const Key('options-profile-last-name'),
+            controller: _last,
+            decoration: InputDecoration(
+              labelText: l.standalone_welcome_lastName,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              key: const Key('options-profile-save'),
+              onPressed: _saving ? null : _save,
+              child: Text(l.options_profile_save),
+            ),
+          ),
+        ],
       ),
     );
   }

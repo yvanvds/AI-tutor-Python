@@ -395,13 +395,56 @@ void main() {
         ChatRequestType.followUpAnswer,
         ChatRequestType.contentQuestion,
         ChatRequestType.status,
+        ChatRequestType.requestHint,
       ]) {
-        expect(
-          await generate(type),
-          isNot(contains('ANSWER KEY')),
-          reason: type.name,
-        );
+        final out = await generate(type);
+        expect(out, isNot(contains('ANSWER KEY')), reason: type.name);
+        expect(out, isNot(contains('WRONG PICK')), reason: type.name);
       }
+    });
+
+    // #305 — the question is closed once picked and never asked again, so
+    // a nudge leads nowhere: the feedback on a wrong pick says which option
+    // is right, by its content, and why.
+    test('the grader of a wrong pick says which option is right and why, by '
+        'content, never by letter (#305)', () async {
+      final out = await generate(ChatRequestType.mcqAnswer);
+      expect(out, contains(wrongPickDirective));
+      expect(answerKeyDirective, contains(wrongPickDirective));
+      expect(
+        out.indexOf('WRONG PICK — STRICT.'),
+        lessThan(out.indexOf('OUTPUT LANGUAGE')),
+      );
+      expect(wrongPickDirective, contains('also without `correct_option`'));
+      expect(
+        wrongPickDirective,
+        contains('First say briefly why the picked option is not right'),
+      );
+      expect(
+        wrongPickDirective,
+        contains('Then say which option is right and why'),
+      );
+      expect(wrongPickDirective, contains('never by its letter or position'));
+      expect(
+        wrongPickDirective,
+        contains(
+          'When you find the key wrong, explain what is actually right, '
+          'without mentioning a key',
+        ),
+      );
+      expect(
+        wrongPickDirective,
+        contains('must not ask for the answer the feedback just gave'),
+      );
+      expect(
+        wrongPickDirective,
+        contains('When the pick is right, none of this applies'),
+      );
+      // The old rule is gone: the directive no longer withholds the answer.
+      expect(
+        answerKeyDirective,
+        isNot(contains('do not give away which option is right')),
+      );
     });
   });
 
@@ -481,8 +524,9 @@ void main() {
       }
     });
 
-    test('a message is no answer and the answer is not given away, not even '
-        'after the pick; the key is never mentioned', () {
+    test('a message is no answer and the answer is not given away before the '
+        'pick; after it the right answer may be explained (#305); the key is '
+        'never mentioned', () {
       expect(openQuizDirective, contains('`open_quiz`'));
       expect(openQuizDirective, contains('`picked`'));
       expect(
@@ -497,7 +541,22 @@ void main() {
         openQuizDirective,
         contains('do not say or hint which option is right'),
       );
-      expect(openQuizDirective, contains('Once they have picked'));
+      expect(
+        openQuizDirective,
+        contains('Before they have picked, never give the answer away'),
+      );
+      expect(
+        openQuizDirective,
+        contains(
+          'Once they have picked (`picked` is set), the feedback on their '
+          'pick has already said which option is right. Then you may '
+          'explain the right answer and why it is right',
+        ),
+      );
+      expect(
+        openQuizDirective,
+        isNot(contains('do not add anything to what the feedback')),
+      );
       expect(
         openQuizDirective,
         contains('Never mention an answer key, `correct_option`'),

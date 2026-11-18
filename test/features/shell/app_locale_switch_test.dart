@@ -12,6 +12,7 @@
 // Not driven through the full app: boot requires an Entra sign-in and a live
 // Cosmos endpoint, and there is no integration_test harness in the repo (#28).
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
@@ -33,6 +34,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/test_app_mode.dart';
 
 const _uid = 'u1';
 
@@ -113,6 +115,7 @@ void main() {
   group('GoalsApp (main.dart)', () {
     Widget app(Locale system) => ProviderScope(
       overrides: [
+        appModeProvider.overrideWithValue(kTestSchoolMode),
         authServiceProvider.overrideWith(_SignedOutAuth.new),
         systemLocaleProvider.overrideWithValue(system),
       ],
@@ -155,6 +158,43 @@ void main() {
       expect(find.text('Sign in with school account'), findsOneWidget);
       await unmount(tester);
     });
+
+    // #262, #264: without a school there is nothing to sign in to.
+    // Stand-alone mode starts on its welcome screen, in the language of the
+    // system, and shares the language setting with school mode.
+    for (final (system, text) in [
+      (
+        const Locale('nl', 'BE'),
+        'Met deze app leer je programmeren in Python. Een AI-tutor geeft je '
+            'oefeningen en helpt je verder.',
+      ),
+      (
+        const Locale('en', 'US'),
+        'With this app you learn to program in Python. An AI tutor gives you '
+            'exercises and helps you along.',
+      ),
+    ]) {
+      testWidgets('stand-alone mode starts on its welcome screen ($system)', (
+        tester,
+      ) async {
+        await setViewport(tester, const Size(1200, 800));
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              appModeProvider.overrideWithValue(const StandaloneMode()),
+              systemLocaleProvider.overrideWithValue(system),
+            ],
+            child: const GoalsApp(),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text(text), findsOneWidget);
+        expect(find.text('Sign in with school account'), findsNothing);
+        expect(find.text('Aanmelden met schoolaccount'), findsNothing);
+        await unmount(tester);
+      });
+    }
   });
 
   group('shell chrome', () {
@@ -176,6 +216,7 @@ void main() {
 
     Widget shell(Locale system) => ProviderScope(
       overrides: [
+        appModeProvider.overrideWithValue(kTestSchoolMode),
         profileProvider.overrideWithValue(_teacher),
         developerToolsProvider.overrideWithValue(false),
         systemLocaleProvider.overrideWithValue(system),

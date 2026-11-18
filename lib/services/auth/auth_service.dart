@@ -10,8 +10,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/services/auth/local_profile.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
-import 'package:ai_tutor_python/services/config/azure_config.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,16 +59,47 @@ class AccountIdentity {
 
 class AuthService extends Notifier<AccountIdentity?> {
   static const String _scope = 'openid profile email offline_access';
-  static const String _prefsKey = 'azure_auth_tokens_v1';
+
+  /// Where the tokens are kept. Scoped per mode (#262); school mode keeps
+  /// the key it always had, so existing installs stay signed in.
+  static const String tokensPrefsKey = 'azure_auth_tokens_v1';
+  String get _prefsKey =>
+      ref.read(appModeProvider).scopedPrefsKey(tokensPrefsKey);
+
+  /// The school to sign in with. Stand-alone mode has none (#264 gives it a
+  /// local profile instead), so asking there is a bug.
+  SchoolConfig get _school {
+    final school = ref.read(appModeProvider).school;
+    if (school == null) {
+      throw StateError('Stand-alone mode has no school sign-in.');
+    }
+    return school;
+  }
+
   String get _authorizeUrl =>
-      'https://login.microsoftonline.com/${AzureConfig.tenantId}/oauth2/v2.0/authorize';
+      'https://login.microsoftonline.com/${_school.tenantId}/oauth2/v2.0/authorize';
   String get _tokenUrl =>
-      'https://login.microsoftonline.com/${AzureConfig.tenantId}/oauth2/v2.0/token';
+      'https://login.microsoftonline.com/${_school.tenantId}/oauth2/v2.0/token';
 
   @override
   AccountIdentity? build() => null;
 
+  /// The local profile's store; stand-alone mode only (#264).
+  LocalProfileStore get _localProfiles {
+    final mode = ref.read(appModeProvider);
+    if (mode is! StandaloneMode) {
+      throw StateError('School mode has no local profile.');
+    }
+    return LocalProfileStore(mode);
+  }
+
   Future<void> tryAcquireTokenSilent() async {
+    // Nothing to sign in to without a school: the local profile, if there is
+    // one, is who uses the app (#264).
+    if (ref.read(appModeProvider).school == null) {
+      state = (await _localProfiles.load())?.toIdentity();
+      return;
+    }
     final stored = await _readStored();
     if (stored?.refreshToken == null) {
       state = null;
@@ -92,7 +124,7 @@ class AuthService extends Notifier<AccountIdentity?> {
     try {
       final authUri = Uri.parse(_authorizeUrl).replace(
         queryParameters: {
-          'client_id': AzureConfig.clientId,
+          'client_id': _school.clientId,
           'response_type': 'code',
           'redirect_uri': boundRedirect,
           'response_mode': 'query',
@@ -124,7 +156,20 @@ class AuthService extends Notifier<AccountIdentity?> {
     }
   }
 
+  /// Stand-alone (#264): keeps [profile] as the one profile on this pc and
+  /// makes it the identity. Also how a name change lands.
+  Future<void> useLocalProfile(LocalProfile profile) async {
+    await _localProfiles.save(profile);
+    state = profile.toIdentity();
+  }
+
+  /// The stored local profile, or `null` (stand-alone only).
+  Future<LocalProfile?> loadLocalProfile() => _localProfiles.load();
+
   Future<void> signOut() async {
+    // Stand-alone has no sign-out (#264): dropping the profile would leave
+    // its local data without an owner.
+    if (ref.read(appModeProvider) is StandaloneMode) return;
     await _clearStored();
     state = null;
   }
@@ -240,7 +285,7 @@ class AuthService extends Notifier<AccountIdentity?> {
       Uri.parse(_tokenUrl),
       headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {
-        'client_id': AzureConfig.clientId,
+        'client_id': _school.clientId,
         'grant_type': 'authorization_code',
         'code': code,
         'redirect_uri': redirectUri,
@@ -256,7 +301,7 @@ class AuthService extends Notifier<AccountIdentity?> {
       Uri.parse(_tokenUrl),
       headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {
-        'client_id': AzureConfig.clientId,
+        'client_id': _school.clientId,
         'grant_type': 'refresh_token',
         'refresh_token': refreshToken,
         'scope': _scope,

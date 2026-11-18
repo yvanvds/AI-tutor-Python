@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Shown when user is logged in but does not have access to the global key
 /// AND has not yet provided a local key.
+///
+/// In stand-alone mode (#264) there is no school key at all: the text says
+/// where to make a key, that the user pays for it, and that it stays on this
+/// pc.
 class LocalKeyGateScreen extends ConsumerStatefulWidget {
   const LocalKeyGateScreen({super.key});
 
@@ -53,6 +58,7 @@ class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
     return Scaffold(
       appBar: AppBar(title: Text(l.auth_localKey_appBarTitle)),
       body: Center(
@@ -65,7 +71,9 @@ class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
               child: ListView(
                 children: [
                   Text(
-                    l.auth_localKey_explainer,
+                    standalone
+                        ? l.auth_localKey_standalone_explainer
+                        : l.auth_localKey_explainer,
                     style: const TextStyle(height: 1.4),
                   ),
                   const SizedBox(height: 24),

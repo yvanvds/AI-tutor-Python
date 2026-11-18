@@ -1257,9 +1257,16 @@ the same question gives the same evidence every time. The feedback text is
 the grader's text for that option, kept in the bank (`optionFeedback`) the
 first time a student picked it, shown in the colour it was written with.
 When the bank has no text for the pick — or one whose verdict does not
-match the key — one `mcqAnswer` grading call fetches it, on the exercise's
-own exchange; the verdict and the signal still come from the key, and the
-bank keeps the text for the next student ("the next time for free"). That
+match the key, or a stale one — one `mcqAnswer` grading call fetches it, on
+the exercise's own exchange; the verdict and the signal still come from the
+key, and the bank keeps the text for the next student ("the next time for
+free"). A text for a pick that is not right says which option is right and
+why (#305, LLM_CONTRACT "The answer key"), by content, not by letter, so it
+reads true under any shuffle. One written before that rule
+(`optionFeedback[].version` below `BankOptionFeedback.wrongPickVersion`)
+is stale: it is not shown, the call writes it again and the new text
+replaces it — once per question and wrong option. A text for the right
+option never goes stale. That
 call is told the key (`correct_option`, #197), as the grading call of a
 pick on a fresh question is: the grader takes it as the intended answer
 but judges the pick itself (LLM_CONTRACT "The answer key"), so a wrong key

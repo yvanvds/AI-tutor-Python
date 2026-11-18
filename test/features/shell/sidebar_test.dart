@@ -41,6 +41,7 @@
 // Not driven through the full app: boot requires an Entra sign-in and a live
 // Cosmos endpoint, and there is no integration_test harness in the repo (#28).
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/shell/sidebar.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
@@ -49,6 +50,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/localization.dart';
+import '../../helpers/test_app_mode.dart';
 
 const _teacher = Profile(
   name: 'Yvan',
@@ -71,27 +73,32 @@ const _student = Profile(
 );
 
 void main() {
-  Widget buildApp({required Profile profile, required bool devTools}) =>
-      ProviderScope(
-        overrides: [
-          profileProvider.overrideWithValue(profile),
-          developerToolsProvider.overrideWithValue(devTools),
-        ],
-        child: localizedTestApp(
-          const Scaffold(body: Row(children: [Sidebar()])),
-        ),
-      );
+  Widget buildApp({
+    required Profile profile,
+    required bool devTools,
+    AppMode? mode,
+  }) => ProviderScope(
+    overrides: [
+      appModeProvider.overrideWithValue(mode ?? kTestSchoolMode),
+      profileProvider.overrideWithValue(profile),
+      developerToolsProvider.overrideWithValue(devTools),
+    ],
+    child: localizedTestApp(const Scaffold(body: Row(children: [Sidebar()]))),
+  );
 
   Future<void> mount(
     WidgetTester tester, {
     required Profile profile,
     required bool devTools,
+    AppMode? mode,
     Size window = const Size(1400, 900),
   }) async {
     tester.view.physicalSize = window;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(buildApp(profile: profile, devTools: devTools));
+    await tester.pumpWidget(
+      buildApp(profile: profile, devTools: devTools, mode: mode),
+    );
     await tester.pump();
   }
 
@@ -176,6 +183,18 @@ void main() {
     expect(find.byTooltip('Sign out'), findsOneWidget);
     expect(find.byTooltip('Settings'), findsNothing);
     expect(find.byTooltip('Debug'), findsNothing);
+  });
+
+  testWidgets('stand-alone has no sign out (#264)', (tester) async {
+    await mount(
+      tester,
+      profile: _student,
+      devTools: false,
+      mode: const StandaloneMode(),
+    );
+
+    expect(find.byTooltip('Options'), findsOneWidget);
+    expect(find.byTooltip('Sign out'), findsNothing);
   });
 
   testWidgets('teacher also gets the Options entry', (tester) async {

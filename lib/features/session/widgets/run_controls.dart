@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/first_that_fits.dart';
 import 'package:ai_tutor_python/widgets/question_id_tag.dart';
 import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
@@ -33,19 +34,38 @@ class RunControls extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          ValueListenableBuilder<bool>(
-            valueListenable: output.isRunning,
-            builder: (context, running, _) => running
-                ? _StopButton(output: output)
-                : _RunButton(ref: ref, mode: mode),
+          // Run and Reset on the left, in what the right side leaves. When
+          // that is short — a narrow window with the chat open — Run drops
+          // its shortcut hint first (#304), which its tooltip keeps.
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: output.isRunning,
+                    builder: (context, running, _) => running
+                        ? _StopButton(output: output)
+                        : FirstThatFits(
+                            children: [
+                              _RunButton(ref: ref, mode: mode),
+                              _RunButton(
+                                ref: ref,
+                                mode: mode,
+                                showShortcut: false,
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s),
+                _GhostIconButton(
+                  tooltip: l.session_runControls_tooltip_resetOutput,
+                  icon: Icons.refresh_rounded,
+                  onTap: output.clear,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: AppSpacing.s),
-          _GhostIconButton(
-            tooltip: l.session_runControls_tooltip_resetOutput,
-            icon: Icons.refresh_rounded,
-            onTap: output.clear,
-          ),
-          const Spacer(),
           if (mode == SessionMode.practice) const _QuestionId(),
           _GhostIconButton(
             tooltip: l.session_runControls_tooltip_askHint,
@@ -106,13 +126,21 @@ Future<void> runEditorCode(WidgetRef ref, SessionMode mode) async {
 }
 
 class _RunButton extends StatelessWidget {
-  const _RunButton({required this.ref, required this.mode});
+  const _RunButton({
+    required this.ref,
+    required this.mode,
+    this.showShortcut = true,
+  });
   final WidgetRef ref;
   final SessionMode mode;
 
+  /// Whether the shortcut is spelled out on the button; without it, it is
+  /// in the tooltip.
+  final bool showShortcut;
+
   @override
   Widget build(BuildContext context) {
-    return _PillButton(
+    final button = _PillButton(
       bg: AppColors.accent,
       fg: AppColors.ink0,
       onTap: () => runEditorCode(ref, mode),
@@ -129,14 +157,22 @@ class _RunButton extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 6),
-          Text(
-            submitShortcutLabel(),
-            key: const Key('run-shortcut-hint'),
-            style: AppMono.kbd(color: AppColors.ink0).copyWith(fontSize: 11),
-          ),
+          if (showShortcut) ...[
+            const SizedBox(width: 6),
+            Text(
+              submitShortcutLabel(),
+              key: const Key('run-shortcut-hint'),
+              style: AppMono.kbd(color: AppColors.ink0).copyWith(fontSize: 11),
+            ),
+          ],
         ],
       ),
+    );
+    if (showShortcut) return button;
+    return Tooltip(
+      message: submitShortcutLabel(),
+      waitDuration: const Duration(milliseconds: 400),
+      child: button,
     );
   }
 }

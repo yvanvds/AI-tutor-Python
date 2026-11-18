@@ -378,7 +378,12 @@ void main() {
     expect(q.lastAskedAt, q.createdAt);
     expect(q.createdAt.isBefore(before), isFalse);
     expect(q.optionFeedback.map((f) => f.toJson()), [
-      {'option': '2', 'text': 'Juist: 1 + 1 is 2.', 'quality': 'correct'},
+      {
+        'option': '2',
+        'text': 'Juist: 1 + 1 is 2.',
+        'quality': 'correct',
+        'version': BankOptionFeedback.wrongPickVersion,
+      },
     ]);
 
     expect(history.records.single.questionId, q.id);

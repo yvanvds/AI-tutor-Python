@@ -459,7 +459,7 @@ Omit `followUp` entirely if no follow-up is warranted (this is the common case f
 
 Be concise; keep output < 600 tokens.
 If correct: confirm and state the key idea.
-If incorrect: identify the misconception; give a nudge, not the full solution.
+If incorrect: name the misconception, then say which option is right and why. Name that option by its content, never by its letter (the options are shuffled).
 Friendly, instructional tone. Stay within the current subgoal.
 
 #### loSignals — what to emit
@@ -477,7 +477,7 @@ Friendly, instructional tone. Stay within the current subgoal.
 
 #### followUp — when to emit
 
-Emit only when a single clarifying question would teach more than a fresh MCQ would. Most MCQ feedback turns omit it.
+Emit only when a single clarifying question would teach more than a fresh MCQ would. Most MCQ feedback turns omit it. After a wrong pick, never ask for the answer the feedback just gave; build on it.
 
 # mcQuestion
 

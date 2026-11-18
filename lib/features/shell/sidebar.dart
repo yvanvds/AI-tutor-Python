@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -69,6 +70,7 @@ class Sidebar extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final selected = ref.watch(sectionProvider);
     final devTools = ref.watch(developerToolsProvider);
+    final standalone = ref.watch(appModeProvider) is StandaloneMode;
     final studentSections = _studentSections.where(
       (s) => !profile.isTeacher || !s.isStudentOnly,
     );
@@ -146,11 +148,13 @@ class Sidebar extends ConsumerWidget {
             onTap: () =>
                 ref.read(sectionProvider.notifier).state = Section.options,
           ),
-          _SidebarIconButton(
-            tooltip: AppLocalizations.of(context).sidebar_signOut_tooltip,
-            icon: Icons.logout,
-            onTap: () => ref.read(authServiceProvider.notifier).signOut(),
-          ),
+          // Stand-alone has no sign-out (#264): one local profile per pc.
+          if (!standalone)
+            _SidebarIconButton(
+              tooltip: AppLocalizations.of(context).sidebar_signOut_tooltip,
+              icon: Icons.logout,
+              onTap: () => ref.read(authServiceProvider.notifier).signOut(),
+            ),
           const SizedBox(height: AppSpacing.m),
         ],
       ),

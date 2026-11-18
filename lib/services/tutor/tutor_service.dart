@@ -2344,7 +2344,8 @@ class TutorService extends Notifier<TutorState> {
   /// no call at all. The text shown is the one the grader wrote the first
   /// time a student picked that option, in the colour it gave it; it must
   /// have been written for the key's verdict — a text that congratulates on
-  /// a pick the key calls wrong is not shown next to a red verdict. Returns
+  /// a pick the key calls wrong is not shown next to a red verdict, and a
+  /// text for a wrong pick must not be stale (#305). Returns
   /// whether it graded; on `false` a grading call fetches the text, once,
   /// and the bank keeps it for the next student.
   Future<bool> _gradeBankMcqByKey() async {
@@ -2353,7 +2354,10 @@ class TutorService extends Notifier<TutorState> {
     final stored = pick.question.feedbackFor(pick.picked);
     final text = stored?.text.trim() ?? '';
     final shown = stored?.quality;
+    // A text for a wrong pick written before #305 gave only a nudge, not
+    // the right option: the grading call writes it again, once.
     if (text.isEmpty ||
+        stored!.isStale ||
         shown == null ||
         !_keyAgrees(shown, keyCorrect: pick.correct)) {
       return false;

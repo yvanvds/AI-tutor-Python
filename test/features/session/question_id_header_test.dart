@@ -2,7 +2,8 @@
 // teacher can look the question up on the Questions page: next to the pill
 // of a quiz, and on the strip above the editor of a code exercise. Small,
 // muted, monospace; only while there is a question with an ID, and not in
-// the playground, which is no exercise.
+// the playground, which is no exercise. Next to it a small button copies it
+// (#304).
 //
 // The real `QuizView` and `RunControls`; what the tutor sets
 // (`shownQuestionIdProvider`) is seeded. The end-to-end run
@@ -17,7 +18,10 @@ import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
+import 'package:ai_tutor_python/widgets/question_id_tag.dart';
+import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -85,14 +89,55 @@ void main() {
     expect(text.style!.fontFamily, AppMono.code().fontFamily);
     expect(text.style!.fontSize, lessThan(13));
     expect(
-      tester
-          .widget<Tooltip>(
-            find.descendant(of: tag, matching: find.byType(Tooltip)),
-          )
-          .message,
-      'The ID of this question. Your teacher can use it to find the '
-      'question.',
+      find.descendant(
+        of: tag,
+        matching: find.byTooltip(
+          'The ID of this question. Your teacher can use it to find the '
+          'question.',
+        ),
+      ),
+      findsOneWidget,
     );
+  }
+
+  /// The copy button of the tag [key] (#304): a click puts the ID on the
+  /// clipboard.
+  Future<void> expectCopies(WidgetTester tester, Key key) async {
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final button = find.descendant(
+      of: find.byKey(key),
+      matching: find.byKey(QuestionIdTag.copyKey),
+    );
+    expect(button, findsOneWidget);
+    expect(
+      tester.getRect(button).left,
+      greaterThanOrEqualTo(tester.getRect(find.text('#3fa91c')).right),
+    );
+
+    await tester.tap(button);
+    await tester.pump();
+    expect(copied, ['#3fa91c']);
+    expect(
+      find.descendant(of: button, matching: find.byIcon(Icons.check_rounded)),
+      findsOneWidget,
+    );
+    await tester.pump(QuestionIdTag.copiedFor);
+    expect(tester.takeException(), isNull);
   }
 
   group('a quiz', () {
@@ -115,6 +160,15 @@ void main() {
       expect((tag.dy - pill.dy).abs(), lessThan(4), reason: 'on its line');
     });
 
+    testWidgets('a click on the button next to the ID copies it', (
+      tester,
+    ) async {
+      pc.read(shownQuestionIdProvider.notifier).state = _id;
+      await mount(tester, const QuizView());
+
+      await expectCopies(tester, const Key('quiz-question-id'));
+    });
+
     testWidgets('shows none without an ID', (tester) async {
       await mount(tester, const QuizView());
 
@@ -132,6 +186,61 @@ void main() {
       await mount(tester, const RunControls());
 
       expectIdTag(tester, const Key('exercise-question-id'));
+    });
+
+    testWidgets('a click on the button next to the ID copies it', (
+      tester,
+    ) async {
+      pc.read(modeProvider.notifier).state = SessionMode.practice;
+      pc.read(shownQuestionIdProvider.notifier).state = _id;
+      await mount(tester, const RunControls());
+
+      await expectCopies(tester, const Key('exercise-question-id'));
+    });
+
+    testWidgets('in a narrow strip Run drops its shortcut hint, so the ID '
+        'and its copy button still fit; the hint is in the tooltip', (
+      tester,
+    ) async {
+      pc.read(modeProvider.notifier).state = SessionMode.practice;
+      pc.read(shownQuestionIdProvider.notifier).state = _id;
+      await mount(
+        tester,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 300, child: RunControls()),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('run-shortcut-hint')), findsNothing);
+      expect(find.text('Run'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text('Run'),
+          matching: find.byTooltip(submitShortcutLabel()),
+        ),
+        findsOneWidget,
+      );
+      final strip = tester.getRect(find.byType(RunControls));
+      final copy = find.descendant(
+        of: find.byKey(const Key('exercise-question-id')),
+        matching: find.byKey(QuestionIdTag.copyKey),
+      );
+      expect(copy, findsOneWidget);
+      expect(tester.getRect(copy).right, lessThanOrEqualTo(strip.right));
+      expect(
+        tester.getRect(find.text('Run')).right,
+        lessThanOrEqualTo(tester.getRect(find.byTooltip('Reset output')).left),
+      );
+    });
+
+    testWidgets('with room, Run spells out its shortcut', (tester) async {
+      pc.read(modeProvider.notifier).state = SessionMode.practice;
+      pc.read(shownQuestionIdProvider.notifier).state = _id;
+      await mount(tester, const RunControls());
+
+      expect(find.byKey(const Key('run-shortcut-hint')), findsOneWidget);
     });
 
     testWidgets('shows none without an ID, nor in the playground', (

@@ -24,7 +24,9 @@
 //     `answeredCount` (answers graded — a question can be left unanswered),
 //     `correctCount` (of those, graded correct), `lastAskedAt`;
 //   - `optionFeedback`: per multiple-choice option a student picked, the
-//     feedback text the grader gave and the verdict it came with;
+//     feedback text the grader gave, the verdict it came with and the rule
+//     it was written under (`version`, #305: a text for a wrong pick from
+//     before that rule is fetched again once);
 //   - `keyDisputedCount`, `keyDisputedAt`: how often the grader of a pick
 //     said the answer key itself is wrong, and the last time (#198);
 //   - `status` (`active` | `hidden`); for a hidden one `hiddenBy` (`teacher`
@@ -68,12 +70,23 @@ enum BankHiddenBy { teacher, auto }
 /// The grader's feedback on one multiple-choice option, kept the first time
 /// a student picks it (#185) so a later pick of the same option can be
 /// answered without a model call (#186).
+///
+/// A text for a pick that is not correct is kept only once it was written
+/// under the current rule for such feedback ([wrongPickVersion]): since
+/// #305 it says which option is right and why, where it used to give only
+/// a nudge. An older one is [isStale]: the next student who picks that
+/// option gets a grading call, and the bank keeps the new text instead.
 class BankOptionFeedback {
   const BankOptionFeedback({
     required this.option,
     required this.text,
     this.quality,
+    this.version = wrongPickVersion,
   });
+
+  /// The rule a text for a pick that is not correct must have been written
+  /// under to be shown again (#305). Raise it when that rule changes again.
+  static const int wrongPickVersion = 1;
 
   /// The option's text, as in `payload.options`.
   final String option;
@@ -86,10 +99,20 @@ class BankOptionFeedback {
   /// pick the key calls wrong must not be shown next to a red verdict.
   final AnswerQuality? quality;
 
+  /// The rule the text was written under; 0 on one stored before #305.
+  final int version;
+
+  /// A text for a pick that is not correct, written under an older rule
+  /// than [wrongPickVersion] (#305): fetched again, once, instead of shown.
+  /// A text for a correct pick never goes stale.
+  bool get isStale =>
+      quality != AnswerQuality.correct && version < wrongPickVersion;
+
   Map<String, dynamic> toJson() => {
     'option': option,
     'text': text,
     if (quality != null) 'quality': quality!.name,
+    if (version > 0) 'version': version,
   };
 
   static BankOptionFeedback? tryFromJson(Object? raw) {
@@ -103,6 +126,7 @@ class BankOptionFeedback {
       quality: AnswerQuality.values.firstWhereOrNull(
         (q) => q.name == raw['quality'],
       ),
+      version: raw['version'] is num ? (raw['version'] as num).toInt() : 0,
     );
   }
 }
