@@ -1971,6 +1971,22 @@
     "placeholders": { "badge": { "type": "String" }, "count": { "type": "int" } }
   },
   "awardBadge_failed": "The badge could not be awarded. Try again.",
-  "standalone_placeholder_title": "Without a school",
-  "standalone_placeholder_body": "The version without a school comes later."
+  "standalone_welcome_title": "Welcome",
+  "standalone_welcome_intro": "With this app you learn to program in Python. An AI tutor gives you exercises and helps you along.",
+  "standalone_welcome_firstName": "First name",
+  "standalone_welcome_lastName": "Last name (optional)",
+  "standalone_welcome_language": "Language",
+  "standalone_welcome_start": "Start",
+  "standalone_welcome_firstNameRequired": "Enter your first name.",
+  "standalone_welcome_failed": "That did not work: {error}",
+  "@standalone_welcome_failed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "auth_localKey_standalone_explainer": "The tutor uses OpenAI's AI. For that you need your own key.\n\nMake one at platform.openai.com/api-keys and paste it below. You pay OpenAI for what you use.\n\nThe key stays on this pc only.",
+  "options_profile_title": "Your name",
+  "options_profile_subtitle": "How the app addresses you.",
+  "options_profile_save": "Save",
+  "options_profile_saved": "Name saved."
 }

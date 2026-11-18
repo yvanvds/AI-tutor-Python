@@ -159,14 +159,22 @@ void main() {
       await unmount(tester);
     });
 
-    // #262: without a school there is nothing to sign in to. Stand-alone
-    // mode shows its placeholder, in the language of the system, and shares
-    // the language setting with school mode.
+    // #262, #264: without a school there is nothing to sign in to.
+    // Stand-alone mode starts on its welcome screen, in the language of the
+    // system, and shares the language setting with school mode.
     for (final (system, text) in [
-      (const Locale('nl', 'BE'), 'De versie zonder school komt later.'),
-      (const Locale('en', 'US'), 'The version without a school comes later.'),
+      (
+        const Locale('nl', 'BE'),
+        'Met deze app leer je programmeren in Python. Een AI-tutor geeft je '
+            'oefeningen en helpt je verder.',
+      ),
+      (
+        const Locale('en', 'US'),
+        'With this app you learn to program in Python. An AI tutor gives you '
+            'exercises and helps you along.',
+      ),
     ]) {
-      testWidgets('stand-alone mode starts on its placeholder ($system)', (
+      testWidgets('stand-alone mode starts on its welcome screen ($system)', (
         tester,
       ) async {
         await setViewport(tester, const Size(1200, 800));
@@ -208,6 +216,7 @@ void main() {
 
     Widget shell(Locale system) => ProviderScope(
       overrides: [
+        appModeProvider.overrideWithValue(kTestSchoolMode),
         profileProvider.overrideWithValue(_teacher),
         developerToolsProvider.overrideWithValue(false),
         systemLocaleProvider.overrideWithValue(system),

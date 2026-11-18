@@ -37,6 +37,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/cosmos_client.dart';
+import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/core/update_proxy.dart';
@@ -184,6 +186,7 @@ class AppHarness {
   AppHarness({
     this.identity = studentIdentity,
     this.appMode,
+    this.localData,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -221,6 +224,13 @@ class AppHarness {
   /// never the build's own: CI's dummy `.env` makes the build stand-alone.
   /// The stand-alone flow passes `const StandaloneMode()`.
   final AppMode? appMode;
+
+  /// Stand-alone as a user meets it (#264): the app's own local storage
+  /// (`LocalCosmosClient`) over this folder instead of the seeded in-memory
+  /// Cosmos, and the real `AuthService` — the local profile, read before the
+  /// first frame as `main()` reads it — instead of a signed-in stand-in.
+  /// [identity] and [extraDocs] do not apply; [cosmos] is not set.
+  final Directory? localData;
 
   /// Where the shell looks for a published release on launch — GitHub's
   /// `/releases/latest` in production (#50). `null` (the default) switches
@@ -444,14 +454,19 @@ class AppHarness {
     tester.view.physicalSize = windowSize * tester.view.devicePixelRatio;
     addTearDown(tester.view.resetPhysicalSize);
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
-    cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
-    for (final entry in extraDocs.entries) {
-      final store = cosmos[entry.key];
-      // `translations` is partitioned on a doc field (#206): a write names
-      // the partition, as the app's own writes do.
-      final field = store.partitionKeyField;
-      for (final doc in entry.value) {
-        store.upsert(doc, partitionKey: field == null ? null : doc[field]);
+    final localData = this.localData;
+    if (localData != null) {
+      CosmosClient.overrideInstance(LocalCosmosClient.open(localData));
+    } else {
+      cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
+      for (final entry in extraDocs.entries) {
+        final store = cosmos[entry.key];
+        // `translations` is partitioned on a doc field (#206): a write names
+        // the partition, as the app's own writes do.
+        final field = store.partitionKeyField;
+        for (final doc in entry.value) {
+          store.upsert(doc, partitionKey: field == null ? null : doc[field]);
+        }
       }
     }
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
@@ -462,7 +477,8 @@ class AppHarness {
         // School mode unless the flow is about stand-alone (#262): never the
         // build's own, which is stand-alone on CI's dummy `.env`.
         appModeProvider.overrideWithValue(appMode ?? kTestSchoolMode),
-        authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
+        if (localData == null)
+          authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
         // Never the build's real key (#126): the school-key account's calls
         // are asserted against this string, and a developer's own key must
         // not leak into a test.
@@ -551,6 +567,13 @@ class AppHarness {
     // with its own fake — so it reads the next flow's docs for the same
     // student, and announces and marks seen what that flow is waiting for.
     addTearDown(() => dispose(tester));
+
+    // The stored local profile, before the first frame, as in `main()`.
+    if (localData != null) {
+      await container
+          .read(authServiceProvider.notifier)
+          .tryAcquireTokenSilent();
+    }
 
     // Same root and scope as `main()`.
     await tester.pumpWidget(

@@ -1059,6 +1059,17 @@
   "awardBadge_confirm": "Toekennen",
   "awardBadge_done": "{badge} toegekend ({count}×).",
   "awardBadge_failed": "De badge kon niet toegekend worden. Probeer het opnieuw.",
-  "standalone_placeholder_title": "Zonder school",
-  "standalone_placeholder_body": "De versie zonder school komt later."
+  "standalone_welcome_title": "Welkom",
+  "standalone_welcome_intro": "Met deze app leer je programmeren in Python. Een AI-tutor geeft je oefeningen en helpt je verder.",
+  "standalone_welcome_firstName": "Voornaam",
+  "standalone_welcome_lastName": "Achternaam (mag leeg)",
+  "standalone_welcome_language": "Taal",
+  "standalone_welcome_start": "Beginnen",
+  "standalone_welcome_firstNameRequired": "Vul je voornaam in.",
+  "standalone_welcome_failed": "Dat lukte niet: {error}",
+  "auth_localKey_standalone_explainer": "De tutor gebruikt de AI van OpenAI. Daarvoor heb je een eigen sleutel nodig.\n\nMaak er een op platform.openai.com/api-keys en plak hem hieronder. Je betaalt het gebruik zelf aan OpenAI.\n\nDe sleutel blijft alleen op deze pc.",
+  "options_profile_title": "Je naam",
+  "options_profile_subtitle": "Zo spreekt de app je aan.",
+  "options_profile_save": "Opslaan",
+  "options_profile_saved": "Naam opgeslagen."
 }

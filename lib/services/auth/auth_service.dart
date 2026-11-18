@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/services/auth/local_profile.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -83,10 +84,20 @@ class AuthService extends Notifier<AccountIdentity?> {
   @override
   AccountIdentity? build() => null;
 
+  /// The local profile's store; stand-alone mode only (#264).
+  LocalProfileStore get _localProfiles {
+    final mode = ref.read(appModeProvider);
+    if (mode is! StandaloneMode) {
+      throw StateError('School mode has no local profile.');
+    }
+    return LocalProfileStore(mode);
+  }
+
   Future<void> tryAcquireTokenSilent() async {
-    // Nothing to sign in to without a school.
+    // Nothing to sign in to without a school: the local profile, if there is
+    // one, is who uses the app (#264).
     if (ref.read(appModeProvider).school == null) {
-      state = null;
+      state = (await _localProfiles.load())?.toIdentity();
       return;
     }
     final stored = await _readStored();
@@ -145,7 +156,20 @@ class AuthService extends Notifier<AccountIdentity?> {
     }
   }
 
+  /// Stand-alone (#264): keeps [profile] as the one profile on this pc and
+  /// makes it the identity. Also how a name change lands.
+  Future<void> useLocalProfile(LocalProfile profile) async {
+    await _localProfiles.save(profile);
+    state = profile.toIdentity();
+  }
+
+  /// The stored local profile, or `null` (stand-alone only).
+  Future<LocalProfile?> loadLocalProfile() => _localProfiles.load();
+
   Future<void> signOut() async {
+    // Stand-alone has no sign-out (#264): dropping the profile would leave
+    // its local data without an owner.
+    if (ref.read(appModeProvider) is StandaloneMode) return;
     await _clearStored();
     state = null;
   }

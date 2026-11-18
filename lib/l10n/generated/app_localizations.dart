@@ -6037,17 +6037,83 @@ abstract class AppLocalizations {
   /// **'The badge could not be awarded. Try again.'**
   String get awardBadge_failed;
 
-  /// No description provided for @standalone_placeholder_title.
+  /// No description provided for @standalone_welcome_title.
   ///
   /// In en, this message translates to:
-  /// **'Without a school'**
-  String get standalone_placeholder_title;
+  /// **'Welcome'**
+  String get standalone_welcome_title;
 
-  /// No description provided for @standalone_placeholder_body.
+  /// No description provided for @standalone_welcome_intro.
   ///
   /// In en, this message translates to:
-  /// **'The version without a school comes later.'**
-  String get standalone_placeholder_body;
+  /// **'With this app you learn to program in Python. An AI tutor gives you exercises and helps you along.'**
+  String get standalone_welcome_intro;
+
+  /// No description provided for @standalone_welcome_firstName.
+  ///
+  /// In en, this message translates to:
+  /// **'First name'**
+  String get standalone_welcome_firstName;
+
+  /// No description provided for @standalone_welcome_lastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name (optional)'**
+  String get standalone_welcome_lastName;
+
+  /// No description provided for @standalone_welcome_language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get standalone_welcome_language;
+
+  /// No description provided for @standalone_welcome_start.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get standalone_welcome_start;
+
+  /// No description provided for @standalone_welcome_firstNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your first name.'**
+  String get standalone_welcome_firstNameRequired;
+
+  /// No description provided for @standalone_welcome_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not work: {error}'**
+  String standalone_welcome_failed(String error);
+
+  /// No description provided for @auth_localKey_standalone_explainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The tutor uses OpenAI\'s AI. For that you need your own key.\n\nMake one at platform.openai.com/api-keys and paste it below. You pay OpenAI for what you use.\n\nThe key stays on this pc only.'**
+  String get auth_localKey_standalone_explainer;
+
+  /// No description provided for @options_profile_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get options_profile_title;
+
+  /// No description provided for @options_profile_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How the app addresses you.'**
+  String get options_profile_subtitle;
+
+  /// No description provided for @options_profile_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get options_profile_save;
+
+  /// No description provided for @options_profile_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Name saved.'**
+  String get options_profile_saved;
 }
 
 class _AppLocalizationsDelegate

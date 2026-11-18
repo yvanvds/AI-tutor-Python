@@ -5,7 +5,7 @@ import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
-import 'package:ai_tutor_python/features/standalone/standalone_placeholder_page.dart';
+import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
@@ -40,19 +40,19 @@ Future<void> main() async {
   };
 
   // Use an explicit container so we can call tryAcquireTokenSilent before
-  // the first frame, then hand it off to UncontrolledProviderScope. Without
-  // a school (#262) there is nothing to sign in to.
+  // the first frame, then hand it off to UncontrolledProviderScope.
   final container = ProviderContainer();
   final mode = container.read(appModeProvider);
-  if (mode is SchoolMode) {
-    await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
-  } else {
+  if (mode is StandaloneMode) {
     // Stand-alone (#263): the data lives on the pc. Opened before the first
     // frame, so every `CosmosPaths` handle reads the local storage.
     CosmosClient.overrideInstance(
       CosmosClient.forMode(mode, localDataRoot: await standaloneDataDir(mode)),
     );
   }
+  // School: the stored sign-in. Stand-alone: the local profile (#264), so a
+  // second start goes straight to the app.
+  await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
 
   runApp(
     UncontrolledProviderScope(container: container, child: const GoalsApp()),
@@ -64,13 +64,12 @@ class GoalsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // School or stand-alone (#262). Stand-alone has no sign-in and no school
-    // database, so none of the school's providers is even watched.
+    // School or stand-alone (#262). Stand-alone has no sign-in: the local
+    // profile (#264) is the identity, and its account lives in the local
+    // storage (#263).
     final standalone = ref.watch(appModeProvider) is StandaloneMode;
-    final identity = standalone ? null : ref.watch(authServiceProvider);
-    final currentAccount = standalone
-        ? null
-        : ref.watch(accountServiceProvider);
+    final identity = ref.watch(authServiceProvider);
+    final currentAccount = ref.watch(accountServiceProvider);
     // Whether this build may run at all (#165), asked only once someone is
     // signed in so the sign-in page reads nothing: `AsyncLoading` until the
     // config has answered, then the requirement or `null`.
@@ -98,8 +97,11 @@ class GoalsApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(
         builder: (context) {
-          if (standalone) return const StandalonePlaceholderPage();
-          if (identity == null) return const SignInPage();
+          if (identity == null) {
+            return standalone
+                ? const StandaloneWelcomePage()
+                : const SignInPage();
+          }
 
           // Account doc still loading on first sign-in, or the config not yet
           // asked which builds may run (#165) — show a spinner. The second

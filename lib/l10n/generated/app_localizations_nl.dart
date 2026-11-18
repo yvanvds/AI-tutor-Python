@@ -3688,9 +3688,45 @@ class AppLocalizationsNl extends AppLocalizations {
       'De badge kon niet toegekend worden. Probeer het opnieuw.';
 
   @override
-  String get standalone_placeholder_title => 'Zonder school';
+  String get standalone_welcome_title => 'Welkom';
 
   @override
-  String get standalone_placeholder_body =>
-      'De versie zonder school komt later.';
+  String get standalone_welcome_intro =>
+      'Met deze app leer je programmeren in Python. Een AI-tutor geeft je oefeningen en helpt je verder.';
+
+  @override
+  String get standalone_welcome_firstName => 'Voornaam';
+
+  @override
+  String get standalone_welcome_lastName => 'Achternaam (mag leeg)';
+
+  @override
+  String get standalone_welcome_language => 'Taal';
+
+  @override
+  String get standalone_welcome_start => 'Beginnen';
+
+  @override
+  String get standalone_welcome_firstNameRequired => 'Vul je voornaam in.';
+
+  @override
+  String standalone_welcome_failed(String error) {
+    return 'Dat lukte niet: $error';
+  }
+
+  @override
+  String get auth_localKey_standalone_explainer =>
+      'De tutor gebruikt de AI van OpenAI. Daarvoor heb je een eigen sleutel nodig.\n\nMaak er een op platform.openai.com/api-keys en plak hem hieronder. Je betaalt het gebruik zelf aan OpenAI.\n\nDe sleutel blijft alleen op deze pc.';
+
+  @override
+  String get options_profile_title => 'Je naam';
+
+  @override
+  String get options_profile_subtitle => 'Zo spreekt de app je aan.';
+
+  @override
+  String get options_profile_save => 'Opslaan';
+
+  @override
+  String get options_profile_saved => 'Naam opgeslagen.';
 }
