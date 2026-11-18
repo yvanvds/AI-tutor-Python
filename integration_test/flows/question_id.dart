@@ -14,6 +14,14 @@
 // selected in the tree and the card put on top, marked. An ID on two
 // subgoals finds both; one the bank does not have says why that usually is.
 //
+// Next to every ID a small button copies it (#304), `#` and all, and shows
+// for a moment that it did: in the quiz header, on the strip above the
+// editor and on the teacher's card. What is copied, pasted into "Find by
+// ID", finds the question. The header and the strip still fit with the chat
+// open in a 700 px window. The real clipboard, the real font, the real
+// window made narrow; there the Run button drops its shortcut hint to make
+// room.
+//
 // Real app, real navigation, real quiz, practice and Questions views, real
 // tutor → question bank service → in-memory Cosmos; only the model is
 // scripted.
@@ -30,7 +38,9 @@ import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/questions/questions_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
+import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
+import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
@@ -38,7 +48,9 @@ import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/complete_code.dart';
 import 'package:ai_tutor_python/services/tutor/responses/multiple_choice.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
+import 'package:ai_tutor_python/widgets/question_id_tag.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -157,6 +169,95 @@ void main() {
   List<Map<String, dynamic>> turns(AppHarness harness) =>
       harness.cosmos['turn_history'].docs.values.toList();
 
+  Finder copyOf(Finder tag) =>
+      find.descendant(of: tag, matching: find.byKey(QuestionIdTag.copyKey));
+
+  /// Clicks the copy button of [tag] (#304): returns what is on the real
+  /// clipboard, once the button shows its check; the button sits right of
+  /// the ID, on its line.
+  Future<String?> copy(WidgetTester tester, Finder tag) async {
+    final button = copyOf(tag);
+    expect(button, findsOneWidget);
+    final id = tester.getRect(
+      find.descendant(of: tag, matching: find.byType(Text)),
+    );
+    final at = tester.getRect(button);
+    expect(at.left, greaterThanOrEqualTo(id.right));
+    expect(at.left - id.right, lessThan(6));
+    expect((at.center.dy - id.center.dy).abs(), lessThan(3));
+    await Clipboard.setData(const ClipboardData(text: 'not the ID'));
+
+    await tester.tap(button);
+    await pumpUntilFound(
+      tester,
+      find.descendant(of: button, matching: find.byIcon(Icons.check_rounded)),
+    );
+    expect(
+      find.ancestor(of: button, matching: find.byTooltip('Copied')),
+      findsOneWidget,
+    );
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    // And back to the copy icon after a moment.
+    await pumpUntilFound(
+      tester,
+      find.descendant(of: button, matching: find.byIcon(Icons.copy_rounded)),
+    );
+    expect(
+      find.ancestor(of: button, matching: find.byTooltip('Copy the ID')),
+      findsOneWidget,
+    );
+    return data?.text;
+  }
+
+  /// The window made 700 px wide. Outside the theory view the chat stays
+  /// open: it takes half the session, and half is left for the exercise.
+  Future<void> narrowWithChat(WidgetTester tester) async {
+    tester.view.physicalSize =
+        Size(700, kRunnerWindowSize.height) * tester.view.devicePixelRatio;
+    await pumpUntil(
+      tester,
+      () =>
+          (tester.getSize(find.byKey(const Key('chat-panel'))).width -
+                  tester.getSize(find.byType(SessionView)).width / 2)
+              .abs() <
+          0.5,
+      reason: 'the chat never took half the session',
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+  }
+
+  Future<void> wideAgain(WidgetTester tester) async {
+    tester.view.physicalSize = kRunnerWindowSize * tester.view.devicePixelRatio;
+    await pumpUntil(
+      tester,
+      () =>
+          tester.getSize(find.byKey(const Key('chat-panel'))).width ==
+          chatPanelWidth,
+      reason: 'the chat never grew back',
+    );
+  }
+
+  /// Every word and icon of [of] whole inside [outer].
+  void partsInside(WidgetTester tester, Finder of, Rect outer, String where) {
+    final parts = find.descendant(
+      of: of,
+      matching: find.byWidgetPredicate((w) => w is Text || w is Icon),
+    );
+    expect(parts, findsWidgets, reason: where);
+    for (final part in parts.evaluate()) {
+      final box = part.renderObject! as RenderBox;
+      final r = box.localToGlobal(Offset.zero) & box.size;
+      expect(
+        r.left >= outer.left - 0.01 &&
+            r.top >= outer.top - 0.01 &&
+            r.right <= outer.right + 0.01 &&
+            r.bottom <= outer.bottom + 0.01,
+        isTrue,
+        reason: '$where: ${part.widget} at $r, outside $outer',
+      );
+    }
+  }
+
   testWidgets('a generated question shows its short ID in the header of the '
       'exercise from the start — before the bank has it — and the next '
       'exercise its own, on the strip above the editor; not in the chat', (
@@ -185,6 +286,8 @@ void main() {
     expect(tag.left, greaterThan(pill.right));
     expect((tag.center.dy - pill.center.dy).abs(), lessThan(4));
     expect(find.text(mcqId), findsOneWidget);
+    // Its button copies it as it is shown (#304).
+    expect(await copy(tester, quizId), mcqId);
 
     // Answered wrong, so never stored: the ID stays with the question on
     // screen, and it is the one its turn record names.
@@ -240,6 +343,46 @@ void main() {
       findsNothing,
     );
     expect(find.text(codeId), findsOneWidget);
+    expect(await copy(tester, exerciseId), codeId);
+
+    // In a 700 px window with the chat open the strip still holds it all:
+    // Run and Reset, the ID with its button, hint and send (#304).
+    await narrowWithChat(tester);
+    expect(tester.takeException(), isNull, reason: 'the strip at 700 px');
+    final exercise = tester.getRect(find.byType(PracticeView));
+    final controls = tester.getRect(find.byType(RunControls));
+    expect(controls.left, greaterThanOrEqualTo(exercise.left));
+    expect(controls.right, lessThanOrEqualTo(exercise.right + 0.01));
+    partsInside(tester, find.byType(RunControls), controls, 'strip, 700 px');
+    expect(idText(tester, exerciseId), codeId);
+    final strip =
+        [
+          find.text('Run'),
+          find.byTooltip('Reset output'),
+          exerciseId,
+          find.byTooltip('Ask for a hint'),
+          find.byTooltip('Send to tutor'),
+        ].map((f) {
+          final inStrip = find.descendant(
+            of: find.byType(RunControls),
+            matching: f,
+          );
+          expect(inStrip, findsOneWidget, reason: '$f');
+          return tester.getRect(inStrip);
+        }).toList();
+    for (var i = 1; i < strip.length; i++) {
+      expect(
+        strip[i].left,
+        greaterThanOrEqualTo(strip[i - 1].right - 0.01),
+        reason: 'part $i of the strip runs into the one before: $strip',
+      );
+    }
+    // Run made room by putting its shortcut hint in its tooltip.
+    expect(find.byKey(const Key('run-shortcut-hint')), findsNothing);
+    expect(await copy(tester, exerciseId), codeId);
+    await wideAgain(tester);
+    expect(find.byKey(const Key('run-shortcut-hint')), findsOneWidget);
+
     expect(llm.remaining, 0);
     expect(tester.takeException(), isNull);
 
@@ -301,6 +444,21 @@ void main() {
 
     expect(idText(tester, quizId), served.shortId);
     expect(served.shortId, _shortIdOf(_mcq));
+
+    // In a 700 px window with the chat open the header holds the pill, the
+    // ID and its button, which still copies (#304).
+    await narrowWithChat(tester);
+    expect(tester.takeException(), isNull, reason: 'the quiz at 700 px');
+    final quiz = tester.getRect(find.byType(QuizView));
+    final pill = tester.getRect(find.text('QUIZ QUESTION'));
+    final tag = tester.getRect(quizId);
+    expect(pill.left, greaterThanOrEqualTo(quiz.left));
+    expect(tag.left, greaterThan(pill.right));
+    expect(tag.right, lessThanOrEqualTo(quiz.right));
+    expect((tag.center.dy - pill.center.dy).abs(), lessThan(4));
+    partsInside(tester, quizId, quiz, 'quiz header, 700 px');
+    expect(await copy(tester, quizId), served.shortId);
+    await wideAgain(tester);
     expect(tester.takeException(), isNull);
 
     await harness.dispose(tester);
@@ -429,6 +587,18 @@ void main() {
     await pumpUntil(tester, () => selected('s1'));
     await pumpUntilFound(tester, found(wanted));
     await pumpUntilGone(tester, several);
+
+    // The button on the card copies the ID (#304); pasted into the field it
+    // finds the question again — on both subgoals, as the short ID does.
+    final pasted = await copy(
+      tester,
+      find.byKey(Key('questions-id-${wanted.id}')),
+    );
+    expect(pasted, wanted.shortId);
+    await lookUp(pasted!);
+    await pumpUntilFound(tester, several);
+    await pumpUntilFound(tester, found(wanted));
+    expect(selected('s1'), isTrue);
 
     // One the bank does not have: why that usually is.
     final miss = find.byKey(const Key('questions-lookup-miss'));

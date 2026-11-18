@@ -371,6 +371,8 @@
 
   "session_quiz_pill": "Quizvraag",
   "session_questionId_tooltip": "De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.",
+  "questionId_copy_tooltip": "Kopieer de ID",
+  "questionId_copied_tooltip": "Gekopieerd",
   "session_quiz_next_button": "Volgende →",
 
   "session_output_state_idle": "Geen output",

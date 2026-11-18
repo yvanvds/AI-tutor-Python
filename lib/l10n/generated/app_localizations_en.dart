@@ -1264,6 +1264,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'The ID of this question. Your teacher can use it to find the question.';
 
   @override
+  String get questionId_copy_tooltip => 'Copy the ID';
+
+  @override
+  String get questionId_copied_tooltip => 'Copied';
+
+  @override
   String get session_quiz_next_button => 'Next →';
 
   @override

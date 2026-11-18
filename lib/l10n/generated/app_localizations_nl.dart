@@ -1274,6 +1274,12 @@ class AppLocalizationsNl extends AppLocalizations {
       'De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.';
 
   @override
+  String get questionId_copy_tooltip => 'Kopieer de ID';
+
+  @override
+  String get questionId_copied_tooltip => 'Gekopieerd';
+
+  @override
   String get session_quiz_next_button => 'Volgende →';
 
   @override

@@ -2137,6 +2137,18 @@ abstract class AppLocalizations {
   /// **'The ID of this question. Your teacher can use it to find the question.'**
   String get session_questionId_tooltip;
 
+  /// Hover text on the small copy button next to a question's short ID (#304)
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the ID'**
+  String get questionId_copy_tooltip;
+
+  /// Hover text on the copy button next to a question's short ID, just after a click (#304)
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get questionId_copied_tooltip;
+
   /// No description provided for @session_quiz_next_button.
   ///
   /// In en, this message translates to:

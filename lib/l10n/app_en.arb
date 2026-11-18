@@ -745,6 +745,14 @@
   "@session_questionId_tooltip": {
     "description": "Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)"
   },
+  "questionId_copy_tooltip": "Copy the ID",
+  "@questionId_copy_tooltip": {
+    "description": "Hover text on the small copy button next to a question's short ID (#304)"
+  },
+  "questionId_copied_tooltip": "Copied",
+  "@questionId_copied_tooltip": {
+    "description": "Hover text on the copy button next to a question's short ID, just after a click (#304)"
+  },
   "session_quiz_next_button": "Next →",
 
   "session_output_state_idle": "No output",
