@@ -1,0 +1,44 @@
+{
+  "container": "goals",
+  "docs": [
+    {
+      "allowChains": true,
+      "contentId": "toekennen",
+      "description": "Een waarde aan een naam geven.",
+      "id": "toekennen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "lo_toekennen",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een waarde toekennen.",
+          "weight": 1.0
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "variabelen",
+      "teachingTips": [
+        "Begin met een getal."
+      ],
+      "title": "Toekennen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan waarden bewaren.",
+      "id": "variabelen",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 1000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Variabelen",
+      "type": "goal"
+    }
+  ],
+  "partitionKeyField": "type"
+}
