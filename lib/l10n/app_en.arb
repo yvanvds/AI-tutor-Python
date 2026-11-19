@@ -1997,5 +1997,52 @@
   "options_profile_title": "Your name",
   "options_profile_subtitle": "How the app addresses you.",
   "options_profile_save": "Save",
-  "options_profile_saved": "Name saved."
+  "options_profile_saved": "Name saved.",
+  "firstStart_title": "How do you want to use the app?",
+  "firstStart_intro": "Using the app at school? Then your teacher gives you a school file.",
+  "firstStart_school": "I have a file from my school",
+  "firstStart_schoolHint": "Then you sign in with your school account.",
+  "firstStart_without": "Continue without a school",
+  "firstStart_withoutHint": "You practise on your own, with your own OpenAI key. Everything stays on this pc.",
+  "schoolFile_error_unreadable": "The file could not be read. Nothing has changed.",
+  "schoolFile_error_notASchoolFile": "This is not a school file. Nothing has changed.",
+  "schoolFile_error_newerFormat": "This school file is for a newer version of the app. Update the app and try again. Nothing has changed.",
+  "schoolFile_error_invalidField": "This school file is incomplete or invalid ({field}). Ask your teacher for a new one. Nothing has changed.",
+  "@schoolFile_error_invalidField": {
+    "placeholders": {
+      "field": {"type": "String"}
+    }
+  },
+  "schoolFile_error_containsSecret": "This file contains a key or password ({field}). A school file must not. Nothing has changed.",
+  "@schoolFile_error_containsSecret": {
+    "placeholders": {
+      "field": {"type": "String"}
+    }
+  },
+  "schoolFile_restart_title": "Restart the app",
+  "schoolFile_restart_imported": "The school file of {school} is saved. Close the app and start it again to sign in.",
+  "@schoolFile_restart_imported": {
+    "placeholders": {
+      "school": {"type": "String"}
+    }
+  },
+  "schoolFile_restart_left": "You left the school. Close the app and start it again. Then you choose again: with a school file or without a school.",
+  "schoolFile_restart_ok": "OK",
+  "options_school_title": "School",
+  "options_school_current": "You work with {school}.",
+  "@options_school_current": {
+    "placeholders": {
+      "school": {"type": "String"}
+    }
+  },
+  "options_school_currentBuild": "You work with the school this installation came with.",
+  "options_school_importOther": "Import another school file",
+  "options_school_leave": "Leave the school",
+  "options_school_leave_title": "Leave the school?",
+  "options_school_leave_text": "Your data at the school stays with the school. To come back you need the school file.",
+  "options_school_leave_confirm": "Leave",
+  "options_school_leave_cancel": "Cancel",
+  "options_school_standalone": "At a school? Import your school's file. What you did here stays on this pc.",
+  "options_school_import": "Import school file",
+  "auth_localKey_schoolEscape": "At a school? Import your school's file."
 }

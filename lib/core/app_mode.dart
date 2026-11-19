@@ -7,11 +7,13 @@
 //     tenant and work in the school's database, as students always have;
 //   - none → [StandaloneMode]: no account, no server.
 //
-// Today the school configuration still comes from the build (`.env`, through
-// `AzureConfig`). A build whose `.env` carries no school data — empty values,
-// the all-zero GUID or a `dummy` placeholder, as CI generates — comes out in
-// stand-alone mode. Later the configuration comes from a school file (#307)
-// as the same [SchoolConfig] value, and leaves the build (#308).
+// The school configuration comes from a school file the user imported
+// (#307, lib/core/school_file.dart) or, until it leaves the build (#308),
+// from the build (`.env`, through `AzureConfig`). A build whose `.env`
+// carries no school data — empty values, the all-zero GUID or a `dummy`
+// placeholder, as CI generates — has none. Which one applies, and when the
+// app asks at first start, is decided in lib/core/app_start.dart; `main()`
+// then overrides [appModeProvider] with the result.
 //
 // `AzureConfig` is read here and nowhere else
 // (test/core/app_mode_single_reader_test.dart). The rest of the app asks
@@ -57,6 +59,24 @@ class SchoolConfig {
 
   /// Shown to the user where it helps; the build's own school has none.
   final String? schoolName;
+
+  /// The build's own school configuration, or `null` when the build has none.
+  static SchoolConfig? get fromBuild => fromBuildValues(
+    tenantId: AzureConfig.tenantId,
+    clientId: AzureConfig.clientId,
+    redirectUri: AzureConfig.redirectUri,
+    databaseEndpoint: AzureConfig.cosmosEndpoint,
+  );
+
+  /// This configuration with [name] as the school's name.
+  SchoolConfig named(String name) => SchoolConfig(
+    tenantId: tenantId,
+    clientId: clientId,
+    redirectUri: redirectUri,
+    databaseEndpoint: databaseEndpoint,
+    databaseName: databaseName,
+    schoolName: name,
+  );
 
   /// The build's school configuration, or `null` when the build's values are
   /// not a school's (see [isMissingValue]).
@@ -118,15 +138,11 @@ class SchoolConfig {
 sealed class AppMode {
   const AppMode();
 
-  /// The mode of this build, decided once.
-  static AppMode get fromBuild => _fromBuild ??= fromSchoolConfig(
-    SchoolConfig.fromBuildValues(
-      tenantId: AzureConfig.tenantId,
-      clientId: AzureConfig.clientId,
-      redirectUri: AzureConfig.redirectUri,
-      databaseEndpoint: AzureConfig.cosmosEndpoint,
-    ),
-  );
+  /// The mode of this build alone, decided once: what tests and the
+  /// default [appModeProvider] see. The app itself starts in the mode
+  /// `decideStartMode` (lib/core/app_start.dart) picks.
+  static AppMode get fromBuild =>
+      _fromBuild ??= fromSchoolConfig(SchoolConfig.fromBuild);
   static AppMode? _fromBuild;
 
   /// [SchoolMode] with a school configuration, [StandaloneMode] without.
@@ -201,5 +217,6 @@ final class StandaloneMode extends AppMode {
 /// replaces it with the user's own sign-in.
 String buildSchoolDatabaseKey() => AzureConfig.cosmosKey;
 
-/// The mode the app runs in. Tests override it; the app reads the build.
+/// The mode the app runs in. `main()` overrides it with the mode decided at
+/// start (#307); tests override it too. Unoverridden it reads the build.
 final appModeProvider = Provider<AppMode>((ref) => AppMode.fromBuild);

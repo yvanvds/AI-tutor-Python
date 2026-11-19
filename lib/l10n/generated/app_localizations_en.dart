@@ -3731,4 +3731,104 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_profile_saved => 'Name saved.';
+
+  @override
+  String get firstStart_title => 'How do you want to use the app?';
+
+  @override
+  String get firstStart_intro =>
+      'Using the app at school? Then your teacher gives you a school file.';
+
+  @override
+  String get firstStart_school => 'I have a file from my school';
+
+  @override
+  String get firstStart_schoolHint =>
+      'Then you sign in with your school account.';
+
+  @override
+  String get firstStart_without => 'Continue without a school';
+
+  @override
+  String get firstStart_withoutHint =>
+      'You practise on your own, with your own OpenAI key. Everything stays on this pc.';
+
+  @override
+  String get schoolFile_error_unreadable =>
+      'The file could not be read. Nothing has changed.';
+
+  @override
+  String get schoolFile_error_notASchoolFile =>
+      'This is not a school file. Nothing has changed.';
+
+  @override
+  String get schoolFile_error_newerFormat =>
+      'This school file is for a newer version of the app. Update the app and try again. Nothing has changed.';
+
+  @override
+  String schoolFile_error_invalidField(String field) {
+    return 'This school file is incomplete or invalid ($field). Ask your teacher for a new one. Nothing has changed.';
+  }
+
+  @override
+  String schoolFile_error_containsSecret(String field) {
+    return 'This file contains a key or password ($field). A school file must not. Nothing has changed.';
+  }
+
+  @override
+  String get schoolFile_restart_title => 'Restart the app';
+
+  @override
+  String schoolFile_restart_imported(String school) {
+    return 'The school file of $school is saved. Close the app and start it again to sign in.';
+  }
+
+  @override
+  String get schoolFile_restart_left =>
+      'You left the school. Close the app and start it again. Then you choose again: with a school file or without a school.';
+
+  @override
+  String get schoolFile_restart_ok => 'OK';
+
+  @override
+  String get options_school_title => 'School';
+
+  @override
+  String options_school_current(String school) {
+    return 'You work with $school.';
+  }
+
+  @override
+  String get options_school_currentBuild =>
+      'You work with the school this installation came with.';
+
+  @override
+  String get options_school_importOther => 'Import another school file';
+
+  @override
+  String get options_school_leave => 'Leave the school';
+
+  @override
+  String get options_school_leave_title => 'Leave the school?';
+
+  @override
+  String get options_school_leave_text =>
+      'Your data at the school stays with the school. To come back you need the school file.';
+
+  @override
+  String get options_school_leave_confirm => 'Leave';
+
+  @override
+  String get options_school_leave_cancel => 'Cancel';
+
+  @override
+  String get options_school_standalone =>
+      'At a school? Import your school\'s file. What you did here stays on this pc.';
+
+  @override
+  String get options_school_import => 'Import school file';
+
+  @override
+  String get auth_localKey_schoolEscape =>
+      'At a school? Import your school\'s file.';
 }

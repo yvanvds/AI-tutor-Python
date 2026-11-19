@@ -1,10 +1,13 @@
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/app_start.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
+import 'package:ai_tutor_python/features/school/first_start_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -18,6 +21,7 @@ import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'features/auth/sign_in_page.dart';
 import 'features/auth/local_key_gate_screen.dart';
@@ -40,10 +44,34 @@ Future<void> main() async {
     });
   };
 
-  // Use an explicit container so we can call tryAcquireTokenSilent before
-  // the first frame, then hand it off to UncontrolledProviderScope.
-  final container = ProviderContainer();
-  final mode = container.read(appModeProvider);
+  // Which mode to start in (#307): a stored school file, an earlier "without
+  // a school", or the build's own school — else the first-start choice asks.
+  final mode = decideStartMode(
+    stored: await SchoolFileStore.appData().read(),
+    build: SchoolConfig.fromBuild,
+    prefs: await SharedPreferences.getInstance(),
+  );
+  if (mode != null) {
+    final container = await bootApp(mode);
+    runApp(
+      UncontrolledProviderScope(container: container, child: const GoalsApp()),
+    );
+  } else {
+    runApp(
+      UncontrolledProviderScope(
+        container: ProviderContainer(),
+        child: const FirstStartApp(boot: bootApp),
+      ),
+    );
+  }
+}
+
+/// The app's container for [mode], ready for the first frame: the data
+/// behind `CosmosClient.instance`, and the stored sign-in or local profile.
+Future<ProviderContainer> bootApp(AppMode mode) async {
+  final container = ProviderContainer(
+    overrides: [appModeProvider.overrideWithValue(mode)],
+  );
   if (mode is StandaloneMode) {
     // Stand-alone (#263): the data lives on the pc. Opened before the first
     // frame, so every `CosmosPaths` handle reads the local storage.
@@ -56,14 +84,57 @@ Future<void> main() async {
       client: client,
       localDataRoot: dataRoot,
     );
+  } else {
+    // The school's database: the build's or the school file's (#307).
+    CosmosClient.overrideInstance(CosmosClient.forMode(mode));
   }
   // School: the stored sign-in. Stand-alone: the local profile (#264), so a
   // second start goes straight to the app.
   await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
+  return container;
+}
 
-  runApp(
-    UncontrolledProviderScope(container: container, child: const GoalsApp()),
-  );
+/// The first start without a decided mode (#307): the choice, then the app
+/// in the chosen mode, booted by [boot] as `main()` boots it.
+class FirstStartApp extends ConsumerStatefulWidget {
+  const FirstStartApp({super.key, required this.boot});
+
+  final Future<ProviderContainer> Function(AppMode mode) boot;
+
+  @override
+  ConsumerState<FirstStartApp> createState() => _FirstStartAppState();
+}
+
+class _FirstStartAppState extends ConsumerState<FirstStartApp> {
+  ProviderContainer? _app;
+
+  Future<void> _start(AppMode mode) async {
+    final app = await widget.boot(mode);
+    if (!mounted) {
+      app.dispose();
+      return;
+    }
+    setState(() => _app = app);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = _app;
+    if (app != null) {
+      return UncontrolledProviderScope(container: app, child: const GoalsApp());
+    }
+    final locale = ref.watch(appLocaleProvider);
+    final palette = ref.watch(appPaletteProvider);
+    AppColors.use(palette);
+    return MaterialApp(
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      theme: buildAppTheme(palette),
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: FirstStartPage(onChosen: _start),
+    );
+  }
 }
 
 class GoalsApp extends ConsumerWidget {

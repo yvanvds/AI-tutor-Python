@@ -3759,4 +3759,104 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_profile_saved => 'Naam opgeslagen.';
+
+  @override
+  String get firstStart_title => 'Hoe wil je de app gebruiken?';
+
+  @override
+  String get firstStart_intro =>
+      'Gebruik je de app op school? Dan geeft je leerkracht je een schoolbestand.';
+
+  @override
+  String get firstStart_school => 'Ik heb een bestand van mijn school';
+
+  @override
+  String get firstStart_schoolHint =>
+      'Daarna meld je je aan met je schoolaccount.';
+
+  @override
+  String get firstStart_without => 'Zonder school verder';
+
+  @override
+  String get firstStart_withoutHint =>
+      'Je oefent alleen, met je eigen OpenAI-sleutel. Alles blijft op deze pc.';
+
+  @override
+  String get schoolFile_error_unreadable =>
+      'Het bestand kon niet gelezen worden. Er is niets veranderd.';
+
+  @override
+  String get schoolFile_error_notASchoolFile =>
+      'Dit is geen schoolbestand. Er is niets veranderd.';
+
+  @override
+  String get schoolFile_error_newerFormat =>
+      'Dit schoolbestand is voor een nieuwere versie van de app. Werk de app bij en probeer opnieuw. Er is niets veranderd.';
+
+  @override
+  String schoolFile_error_invalidField(String field) {
+    return 'Dit schoolbestand is onvolledig of ongeldig ($field). Vraag je leerkracht om een nieuw. Er is niets veranderd.';
+  }
+
+  @override
+  String schoolFile_error_containsSecret(String field) {
+    return 'Dit bestand bevat een sleutel of wachtwoord ($field). Dat mag niet in een schoolbestand. Er is niets veranderd.';
+  }
+
+  @override
+  String get schoolFile_restart_title => 'Start de app opnieuw';
+
+  @override
+  String schoolFile_restart_imported(String school) {
+    return 'Het schoolbestand van $school is bewaard. Sluit de app en start ze opnieuw om je aan te melden.';
+  }
+
+  @override
+  String get schoolFile_restart_left =>
+      'Je hebt de school verlaten. Sluit de app en start ze opnieuw. Dan kies je opnieuw: met een schoolbestand of zonder school.';
+
+  @override
+  String get schoolFile_restart_ok => 'OK';
+
+  @override
+  String get options_school_title => 'School';
+
+  @override
+  String options_school_current(String school) {
+    return 'Je werkt met $school.';
+  }
+
+  @override
+  String get options_school_currentBuild =>
+      'Je werkt met de school die bij deze installatie hoort.';
+
+  @override
+  String get options_school_importOther => 'Ander schoolbestand importeren';
+
+  @override
+  String get options_school_leave => 'School verlaten';
+
+  @override
+  String get options_school_leave_title => 'School verlaten?';
+
+  @override
+  String get options_school_leave_text =>
+      'Je gegevens bij de school blijven bij de school. Om terug te keren heb je het schoolbestand nodig.';
+
+  @override
+  String get options_school_leave_confirm => 'Verlaten';
+
+  @override
+  String get options_school_leave_cancel => 'Annuleren';
+
+  @override
+  String get options_school_standalone =>
+      'Zit je op een school? Importeer het bestand van je school. Wat je hier deed, blijft op deze pc.';
+
+  @override
+  String get options_school_import => 'Schoolbestand importeren';
+
+  @override
+  String get auth_localKey_schoolEscape =>
+      'Zit je op een school? Importeer het bestand van je school.';
 }

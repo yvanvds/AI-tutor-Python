@@ -26,6 +26,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
@@ -66,6 +67,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/memory_school_file_store.dart';
 import '../../helpers/test_app_mode.dart';
 
 const _uid = 'u1';
@@ -254,6 +256,8 @@ void main() {
   late List<http.Request> githubRequests;
   late _FakeArchiveIo archiveIo;
   late _FakeProbe probe;
+  late MemorySchoolFileStore schoolStore;
+  late String? schoolFileToPick;
 
   // #57 — the device flow's two moving parts, as a test can steer them:
   // whether the student has approved the code yet, and whether GitHub is
@@ -305,6 +309,8 @@ void main() {
     githubRequests = [];
     archiveIo = _FakeArchiveIo();
     probe = _FakeProbe();
+    schoolStore = MemorySchoolFileStore();
+    schoolFileToPick = null;
     githubApproved = false;
     githubPollError = null;
     browserLaunches = [];
@@ -394,6 +400,8 @@ void main() {
         ),
       ),
       progressArchiveIoProvider.overrideWithValue(archiveIo),
+      schoolFileStoreProvider.overrideWithValue(schoolStore),
+      schoolFilePickerProvider.overrideWithValue(() async => schoolFileToPick),
       modelProbeConnectorProvider.overrideWithValue(probe),
       authServiceProvider.overrideWith(
         () => _SignedInAuth(isTeacher ? _teacherIdentity : _identity),
@@ -680,6 +688,115 @@ void main() {
         tester.element(find.byType(OptionsPage)),
       );
       expect(container.read(authServiceProvider)?.firstName, 'Alex');
+
+      await unmount(tester);
+    });
+  });
+
+  // #307: the school the app works with, and the way to another one or to
+  // none. Switching takes a restart, and never touches the other mode's data.
+  group('school', () {
+    final exampleSchool = parseSchoolFile(exampleSchoolFile());
+
+    testWidgets("school mode names the school and offers another file or "
+        "leaving", (tester) async {
+      await mount(tester, mode: SchoolMode(exampleSchool));
+
+      expect(find.text('You work with Example School.'), findsOneWidget);
+      expect(find.text('Import another school file'), findsOneWidget);
+      expect(find.text('Leave the school'), findsOneWidget);
+
+      await unmount(tester);
+    });
+
+    testWidgets("the build's own school has no name to show", (tester) async {
+      await mount(tester);
+
+      expect(
+        find.text('You work with the school this installation came with.'),
+        findsOneWidget,
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('leaving asks first, forgets the school and asks for a '
+        'restart', (tester) async {
+      schoolStore = MemorySchoolFileStore(exampleSchool);
+      SharedPreferences.setMockInitialValues({
+        'local_api_key': 'sk-old',
+        'azure_auth_tokens_v1': 'tokens',
+        'standalone.local_profile_v1': 'profile',
+      });
+      await mount(tester, mode: SchoolMode(exampleSchool));
+
+      await tester.tap(find.byKey(const Key('options-school-leave')));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave the school?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(schoolStore.stored, exampleSchool);
+
+      await tester.tap(find.byKey(const Key('options-school-leave')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('options-school-leave-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('school-file-restart')), findsOneWidget);
+      expect(
+        find.textContaining('Close the app and start it again'),
+        findsOneWidget,
+      );
+      expect(schoolStore.stored, isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('school_left_v1'), isTrue);
+      // The other data stays where it was.
+      expect(prefs.getString('azure_auth_tokens_v1'), 'tokens');
+      expect(prefs.getString('standalone.local_profile_v1'), 'profile');
+      expect(prefs.getString('local_api_key'), 'sk-old');
+
+      await unmount(tester);
+    });
+
+    testWidgets('stand-alone: importing a school file asks for a restart', (
+      tester,
+    ) async {
+      schoolFileToPick = exampleSchoolFile();
+      await mount(tester, mode: const StandaloneMode());
+
+      expect(find.text('Leave the school'), findsNothing);
+      await tester.tap(find.byKey(const Key('options-school-import')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'The school file of Example School is saved. Close the app and '
+          'start it again to sign in.',
+        ),
+        findsOneWidget,
+      );
+      expect(schoolStore.stored, exampleSchool);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a refused file says why and changes nothing', (tester) async {
+      schoolStore = MemorySchoolFileStore(exampleSchool);
+      schoolFileToPick = exampleSchoolFile(
+        formatVersion: 2,
+        schoolName: 'Newer School',
+      );
+      await mount(tester, mode: SchoolMode(exampleSchool));
+
+      await tester.tap(find.byKey(const Key('options-school-import')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('school-file-refused')), findsOneWidget);
+      expect(
+        find.textContaining('for a newer version of the app'),
+        findsOneWidget,
+      );
+      expect(schoolStore.stored, exampleSchool);
 
       await unmount(tester);
     });

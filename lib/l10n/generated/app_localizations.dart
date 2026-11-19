@@ -6156,6 +6156,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name saved.'**
   String get options_profile_saved;
+
+  /// No description provided for @firstStart_title.
+  ///
+  /// In en, this message translates to:
+  /// **'How do you want to use the app?'**
+  String get firstStart_title;
+
+  /// No description provided for @firstStart_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'Using the app at school? Then your teacher gives you a school file.'**
+  String get firstStart_intro;
+
+  /// No description provided for @firstStart_school.
+  ///
+  /// In en, this message translates to:
+  /// **'I have a file from my school'**
+  String get firstStart_school;
+
+  /// No description provided for @firstStart_schoolHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Then you sign in with your school account.'**
+  String get firstStart_schoolHint;
+
+  /// No description provided for @firstStart_without.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue without a school'**
+  String get firstStart_without;
+
+  /// No description provided for @firstStart_withoutHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You practise on your own, with your own OpenAI key. Everything stays on this pc.'**
+  String get firstStart_withoutHint;
+
+  /// No description provided for @schoolFile_error_unreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'The file could not be read. Nothing has changed.'**
+  String get schoolFile_error_unreadable;
+
+  /// No description provided for @schoolFile_error_notASchoolFile.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a school file. Nothing has changed.'**
+  String get schoolFile_error_notASchoolFile;
+
+  /// No description provided for @schoolFile_error_newerFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'This school file is for a newer version of the app. Update the app and try again. Nothing has changed.'**
+  String get schoolFile_error_newerFormat;
+
+  /// No description provided for @schoolFile_error_invalidField.
+  ///
+  /// In en, this message translates to:
+  /// **'This school file is incomplete or invalid ({field}). Ask your teacher for a new one. Nothing has changed.'**
+  String schoolFile_error_invalidField(String field);
+
+  /// No description provided for @schoolFile_error_containsSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'This file contains a key or password ({field}). A school file must not. Nothing has changed.'**
+  String schoolFile_error_containsSecret(String field);
+
+  /// No description provided for @schoolFile_restart_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart the app'**
+  String get schoolFile_restart_title;
+
+  /// No description provided for @schoolFile_restart_imported.
+  ///
+  /// In en, this message translates to:
+  /// **'The school file of {school} is saved. Close the app and start it again to sign in.'**
+  String schoolFile_restart_imported(String school);
+
+  /// No description provided for @schoolFile_restart_left.
+  ///
+  /// In en, this message translates to:
+  /// **'You left the school. Close the app and start it again. Then you choose again: with a school file or without a school.'**
+  String get schoolFile_restart_left;
+
+  /// No description provided for @schoolFile_restart_ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get schoolFile_restart_ok;
+
+  /// No description provided for @options_school_title.
+  ///
+  /// In en, this message translates to:
+  /// **'School'**
+  String get options_school_title;
+
+  /// No description provided for @options_school_current.
+  ///
+  /// In en, this message translates to:
+  /// **'You work with {school}.'**
+  String options_school_current(String school);
+
+  /// No description provided for @options_school_currentBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'You work with the school this installation came with.'**
+  String get options_school_currentBuild;
+
+  /// No description provided for @options_school_importOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Import another school file'**
+  String get options_school_importOther;
+
+  /// No description provided for @options_school_leave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the school'**
+  String get options_school_leave;
+
+  /// No description provided for @options_school_leave_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the school?'**
+  String get options_school_leave_title;
+
+  /// No description provided for @options_school_leave_text.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data at the school stays with the school. To come back you need the school file.'**
+  String get options_school_leave_text;
+
+  /// No description provided for @options_school_leave_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get options_school_leave_confirm;
+
+  /// No description provided for @options_school_leave_cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get options_school_leave_cancel;
+
+  /// No description provided for @options_school_standalone.
+  ///
+  /// In en, this message translates to:
+  /// **'At a school? Import your school\'s file. What you did here stays on this pc.'**
+  String get options_school_standalone;
+
+  /// No description provided for @options_school_import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import school file'**
+  String get options_school_import;
+
+  /// No description provided for @auth_localKey_schoolEscape.
+  ///
+  /// In en, this message translates to:
+  /// **'At a school? Import your school\'s file.'**
+  String get auth_localKey_schoolEscape;
 }
 
 class _AppLocalizationsDelegate

@@ -3,6 +3,8 @@
 // popup and the debug dialog:
 //
 //   - the user's name, in stand-alone mode only (#264)
+//   - the school (#307): its name, another school file, leaving it; in
+//     stand-alone mode, importing a school file
 //   - language (moved from the sidebar settings popup)
 //   - appearance: light / dark / follow the system (#32)
 //   - the AI model, on own-key and developer builds (#32) and for teachers
@@ -24,13 +26,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/app_start.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/whats_new_controller.dart';
 import 'package:ai_tutor_python/features/badges/badge_credits.dart';
 import 'package:ai_tutor_python/features/badges/badge_proof_sheet.dart';
+import 'package:ai_tutor_python/features/school/school_file_actions.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
@@ -67,6 +72,7 @@ import 'package:ai_tutor_python/widgets/update_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OptionsPage extends ConsumerWidget {
   const OptionsPage({super.key});
@@ -140,6 +146,8 @@ class OptionsPage extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.lg),
                 const _AnswersKeptCard(),
               ],
+              const SizedBox(height: AppSpacing.lg),
+              const _SchoolCard(),
               if (usesOwnKey) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const _ApiKeyCard(),
@@ -253,6 +261,111 @@ class _AnswersKeptCard extends StatelessWidget {
         l.options_answersKept_text,
         key: const Key('options-answers-kept'),
         style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// School (#307)
+// ---------------------------------------------------------------------------
+
+/// Which school the app works with, and the way to another one or to none.
+/// Switching takes a restart: the mode is decided at start, and the data of
+/// the two modes stays apart.
+class _SchoolCard extends ConsumerWidget {
+  const _SchoolCard();
+
+  Future<void> _leave(BuildContext context, WidgetRef ref) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.options_school_leave_title),
+        content: Text(l.options_school_leave_text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l.options_school_leave_cancel),
+          ),
+          FilledButton(
+            key: const Key('options-school-leave-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.options_school_leave_confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await leaveSchool(
+      store: ref.read(schoolFileStoreProvider),
+      prefs: await SharedPreferences.getInstance(),
+    );
+    if (!context.mounted) return;
+    await showSchoolFileMessage(
+      context,
+      title: l.schoolFile_restart_title,
+      text: l.schoolFile_restart_left,
+      key: const Key('school-file-restart'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final school = ref.watch(appModeProvider).school;
+    final text = Theme.of(context).textTheme.bodyMedium;
+    if (school == null) {
+      return _OptionsCard(
+        title: l.options_school_title,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.options_school_standalone, style: text),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              key: const Key('options-school-import'),
+              icon: const Icon(Icons.school_outlined),
+              label: Text(l.options_school_import),
+              onPressed: () => importSchoolFileAndAskRestart(context, ref),
+            ),
+          ],
+        ),
+      );
+    }
+    final name = school.schoolName;
+    return _OptionsCard(
+      title: l.options_school_title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            name == null
+                ? l.options_school_currentBuild
+                : l.options_school_current(name),
+            key: const Key('options-school-name'),
+            style: text,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('options-school-import'),
+                icon: const Icon(Icons.upload_file),
+                label: Text(l.options_school_importOther),
+                onPressed: () => importSchoolFileAndAskRestart(context, ref),
+              ),
+              OutlinedButton.icon(
+                key: const Key('options-school-leave'),
+                icon: const Icon(Icons.logout),
+                label: Text(l.options_school_leave),
+                onPressed: () => _leave(context, ref),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

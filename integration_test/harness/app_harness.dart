@@ -37,9 +37,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/app_start.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/core/update_proxy.dart';
@@ -189,6 +191,10 @@ class AppHarness {
     this.appMode,
     this.localData,
     this.curriculumBundle,
+    this.decideMode = false,
+    this.buildSchool,
+    this.schoolData,
+    this.schoolFilePicker,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -239,6 +245,29 @@ class AppHarness {
   /// own assets, which hold no bundle until the first export. Only with
   /// [localData].
   final CurriculumBundleSource? curriculumBundle;
+
+  /// Starts as `main()` does (#307): the mode follows from the school file
+  /// in [schoolData], an earlier "without a school" in [prefs], or
+  /// [buildSchool] — and when none of those decides, the first-start choice
+  /// asks. [appMode] does not apply. Whatever the mode, the real
+  /// `AuthService` runs, so a school without a stored sign-in shows the
+  /// sign-in screen. Stand-alone needs [localData].
+  final bool decideMode;
+
+  /// The build's own school, for [decideMode]. `null` (the default) is a
+  /// build without one.
+  final SchoolConfig? buildSchool;
+
+  /// The app-data folder the school file is kept in (#307). `null` (the
+  /// default) is a temp folder of the harness's own, gone after the flow.
+  final Directory? schoolData;
+
+  /// What the school-file dialog hands the app (#307). `null` (the default)
+  /// answers as if the dialog was cancelled: never the OS dialog.
+  final SchoolFilePicker? schoolFilePicker;
+
+  /// The mode the app started in, once it has.
+  AppMode? startedMode;
 
   /// Where the shell looks for a published release on launch — GitHub's
   /// `/releases/latest` in production (#50). `null` (the default) switches
@@ -444,7 +473,12 @@ class AppHarness {
 
   late final InMemoryCosmosClient cosmos;
   late final Directory playgroundDir;
+  late final SchoolFileStore _schoolFiles;
+  Directory? _ownSchoolDir;
   ProviderContainer? _container;
+
+  /// The first-start choice's own container (#307), while it is up.
+  ProviderContainer? _choiceContainer;
 
   /// The app's provider container; read services / state the way the
   /// widgets do (e.g. `harness.container.read(codeServiceProvider(mode))`).
@@ -462,8 +496,73 @@ class AppHarness {
     tester.view.physicalSize = windowSize * tester.view.devicePixelRatio;
     addTearDown(tester.view.resetPhysicalSize);
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
+    playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
+    final schoolDir =
+        schoolData ?? Directory.systemTemp.createTempSync('ai_tutor_school_');
+    if (schoolData == null) _ownSchoolDir = schoolDir;
+    _schoolFiles = SchoolFileStore(() async => schoolDir);
+    // Torn down even when the flow fails before its own [dispose] (#235).
+    // Left alive, this container keeps polling the account doc every 5 s
+    // through `CosmosClient.instance` — which the next flow's boot replaces
+    // with its own fake — so it reads the next flow's docs for the same
+    // student, and announces and marks seen what that flow is waiting for.
+    addTearDown(() => dispose(tester));
+
+    if (decideMode) {
+      // As in `main()` (#307).
+      final mode = decideStartMode(
+        stored: await _schoolFiles.read(),
+        build: buildSchool,
+        prefs: await SharedPreferences.getInstance(),
+      );
+      if (mode == null) {
+        // Nothing decided: the first-start choice, which then boots the
+        // chosen mode through [_start].
+        final choice = ProviderContainer(
+          overrides: [
+            ..._schoolFileOverrides(),
+            systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
+            systemBrightnessProvider.overrideWithValue(systemBrightness),
+          ],
+        );
+        _choiceContainer = choice;
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: choice,
+            child: FirstStartApp(boot: _start),
+          ),
+        );
+        return;
+      }
+      await _start(mode);
+    } else {
+      await _start(appMode ?? kTestSchoolMode);
+    }
+
+    // Same root and scope as `main()`.
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const GoalsApp()),
+    );
+    if (waitForShell) {
+      await pumpUntil(
+        tester,
+        () => find.byType(AppShell).evaluate().isNotEmpty,
+      );
+    }
+  }
+
+  /// The app's container for [mode], as `bootApp` in `main.dart` makes it:
+  /// the data behind `CosmosClient.instance`, then the container with every
+  /// fake, then the stored sign-in or profile.
+  Future<ProviderContainer> _start(AppMode mode) async {
+    startedMode = mode;
     final localData = this.localData;
-    if (localData != null) {
+    final useLocal = decideMode ? mode is StandaloneMode : localData != null;
+    final realAuth = decideMode || localData != null;
+    if (useLocal) {
+      if (localData == null) {
+        throw StateError('stand-alone needs localData');
+      }
       final client = LocalCosmosClient.open(localData);
       CosmosClient.overrideInstance(client);
       // The shipped content, as in `main()`.
@@ -484,15 +583,16 @@ class AppHarness {
         }
       }
     }
-    playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
 
     final openaiClient = this.openaiClient;
     _container = ProviderContainer(
       overrides: [
-        // School mode unless the flow is about stand-alone (#262): never the
-        // build's own, which is stand-alone on CI's dummy `.env`.
-        appModeProvider.overrideWithValue(appMode ?? kTestSchoolMode),
-        if (localData == null)
+        // School mode unless the flow is about stand-alone (#262) or lets
+        // the start decide (#307): never the build's own, which is
+        // stand-alone on CI's dummy `.env`.
+        appModeProvider.overrideWithValue(mode),
+        ..._schoolFileOverrides(),
+        if (!realAuth)
           authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
         // Never the build's real key (#126): the school-key account's calls
         // are asserted against this string, and a developer's own key must
@@ -576,31 +676,25 @@ class AppHarness {
         systemBrightnessProvider.overrideWithValue(systemBrightness),
       ],
     );
-    // Torn down even when the flow fails before its own [dispose] (#235).
-    // Left alive, this container keeps polling the account doc every 5 s
-    // through `CosmosClient.instance` — which the next flow's boot replaces
-    // with its own fake — so it reads the next flow's docs for the same
-    // student, and announces and marks seen what that flow is waiting for.
-    addTearDown(() => dispose(tester));
 
-    // The stored local profile, before the first frame, as in `main()`.
-    if (localData != null) {
+    // The stored local profile or sign-in, before the first frame, as in
+    // `main()`.
+    if (realAuth) {
       await container
           .read(authServiceProvider.notifier)
           .tryAcquireTokenSilent();
     }
 
-    // Same root and scope as `main()`.
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const GoalsApp()),
-    );
-    if (waitForShell) {
-      await pumpUntil(
-        tester,
-        () => find.byType(AppShell).evaluate().isNotEmpty,
-      );
-    }
+    return container;
   }
+
+  /// The school file kept in the harness's folder, and the dialog's answer.
+  List<Override> _schoolFileOverrides() => [
+    schoolFileStoreProvider.overrideWithValue(_schoolFiles),
+    schoolFilePickerProvider.overrideWithValue(
+      schoolFilePicker ?? () async => null,
+    ),
+  ];
 
   /// Unmounts the app and tears down services, timers and temp files.
   ///
@@ -608,11 +702,18 @@ class AppHarness {
   /// way leaves nothing running; once done, a second call does nothing.
   Future<void> dispose(WidgetTester tester) async {
     final container = _container;
-    if (container == null) return;
+    final choice = _choiceContainer;
+    if (container == null && choice == null) return;
     _container = null;
+    _choiceContainer = null;
     await tester.pumpWidget(const SizedBox.shrink());
-    container.dispose();
+    container?.dispose();
+    choice?.dispose();
     await _deletePlaygroundDir();
+    final ownSchoolDir = _ownSchoolDir;
+    if (ownSchoolDir != null && ownSchoolDir.existsSync()) {
+      ownSchoolDir.deleteSync(recursive: true);
+    }
   }
 
   /// How long [_deletePlaygroundDir] waits for a write that is still

@@ -124,10 +124,14 @@ abstract class CosmosAuth {
 
 /// Master-key auth: HMAC-SHA256 over the canonical request, base64-encoded,
 /// then URL-encoded as `type=master&ver=1.0&sig=<sig>`.
+///
+/// The key is decoded on the first request, not here: a school mode can
+/// start, and show its sign-in screen, before any key is usable (#307).
 class MasterKeyAuth implements CosmosAuth {
-  MasterKeyAuth(String key) : _key = base64Decode(key);
+  MasterKeyAuth(this._encodedKey);
 
-  final List<int> _key;
+  final String _encodedKey;
+  late final List<int> _key = base64Decode(_encodedKey);
 
   @override
   String authHeader({

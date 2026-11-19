@@ -9,6 +9,7 @@
 import 'dart:convert';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/features/auth/local_key_gate_screen.dart';
 import 'package:ai_tutor_python/features/auth/sign_in_page.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
@@ -21,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/memory_school_file_store.dart';
 
 const _standaloneKeyText =
     "The tutor uses OpenAI's AI. For that you need your own key.\n\n"
@@ -29,10 +31,12 @@ const _standaloneKeyText =
 
 void main() {
   late InMemoryCosmosClient cosmos;
+  late MemorySchoolFileStore schoolStore;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     cosmos = InMemoryCosmosClient()..install();
+    schoolStore = MemorySchoolFileStore();
   });
 
   /// Like `main()`: the container reads the stored profile before the first
@@ -45,6 +49,10 @@ void main() {
       overrides: [
         appModeProvider.overrideWithValue(const StandaloneMode()),
         systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
+        schoolFileStoreProvider.overrideWithValue(schoolStore),
+        schoolFilePickerProvider.overrideWithValue(
+          () async => exampleSchoolFile(),
+        ),
       ],
     );
     await container.read(authServiceProvider.notifier).tryAcquireTokenSilent();
@@ -140,6 +148,35 @@ void main() {
 
     expect(find.byType(StandaloneWelcomePage), findsNothing);
     expect(find.byType(LocalKeyGateScreen), findsOneWidget);
+
+    await unmount(tester, container);
+  });
+
+  // #307: whoever went on without a school by mistake finds the way back on
+  // the key screen.
+  testWidgets('the key screen offers to import the school file', (
+    tester,
+  ) async {
+    final container = await start(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('standalone-welcome-first-name')),
+      'Alex',
+    );
+    await tester.tap(find.byKey(const ValueKey('standalone-welcome-start')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalKeyGateScreen), findsOneWidget);
+
+    await tester.tap(find.text("At a school? Import your school's file."));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'The school file of Example School is saved. Close the app and '
+        'start it again to sign in.',
+      ),
+      findsOneWidget,
+    );
+    expect(schoolStore.stored?.schoolName, 'Example School');
 
     await unmount(tester, container);
   });
