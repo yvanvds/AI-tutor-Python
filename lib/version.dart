@@ -1,2 +1,2 @@
 /// Generated. Do not edit.
-const String kAppVersion = '2.14.0+31';
+const String kAppVersion = '2.15.0+32';
