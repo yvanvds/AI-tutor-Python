@@ -1,6 +1,6 @@
 # Hoe kom je aan je punt?
 
-*Bij versie 1.1.1 van de puntenformule. De app rekent met formule 1.1: dat
+*Bij versie 1.1.2 van de puntenformule. De app rekent met formule 1.1: dat
 nummer staat ook in Mijn rapporten.*
 
 ## Wat telt er voor je punt?

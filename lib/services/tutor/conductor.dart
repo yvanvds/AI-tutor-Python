@@ -2071,6 +2071,8 @@ class Conductor {
         beta: beta,
         alphaDelta: deltas.alphaDelta,
         betaDelta: deltas.betaDelta,
+        // #311: an answer that is not wrong never takes mastery away.
+        mastered: isMastered(snap, existing),
       );
       final hasPositive = sig.kind == LoSignalKind.positive;
       final hasNegative = sig.kind == LoSignalKind.negative;
@@ -2633,6 +2635,8 @@ class Conductor {
         beta: snap.beta,
         alphaDelta: deltas.alphaDelta,
         betaDelta: deltas.betaDelta,
+        // #311: a credit never takes mastery away either.
+        mastered: isMastered(snap, existing),
       );
       // A credit never flags and, since #167, never clears the review
       // flag either: the question an incidental negative raised is

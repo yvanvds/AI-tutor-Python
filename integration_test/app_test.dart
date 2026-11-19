@@ -56,6 +56,7 @@ import 'flows/level_up_gate.dart' as level_up_gate;
 import 'flows/lesson_flow.dart' as lesson_flow;
 import 'flows/lesson_language.dart' as lesson_language;
 import 'flows/lesson_translation.dart' as lesson_translation;
+import 'flows/mastery_guard.dart' as mastery_guard;
 import 'flows/mcq_answer_key.dart' as mcq_answer_key;
 import 'flows/mcq_option_tiles.dart' as mcq_option_tiles;
 import 'flows/multiple_choice_stamp.dart' as multiple_choice_stamp;
@@ -171,6 +172,7 @@ void main() {
   stuck_advance_progress.main();
   stuck_own_questions.main();
   subgoal_segments.main();
+  mastery_guard.main();
   leerpad_demonstrated.main();
   leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();

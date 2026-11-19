@@ -103,9 +103,27 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.1-eval8`
+## Regelversie `1.1-eval9`
 
-PUNTENFORMULE v1.1, herspeeld uit `turn_history`. `eval8` (2026-11-08,
+PUNTENFORMULE v1.1, herspeeld uit `turn_history`. `eval9` (2026-11-19,
+#311) volgt de **bewaking van beheerst** van de app vanaf de build die ze
+bracht (2.15.0, `rules.MASTERY_GUARD_FROM`, `rules.mastery_guard`): krijgt
+een leerdoel dat op dat moment beheerst is een signaal dat niet negatief
+is (de vraag zelf, een vervolgvraag, een signaal van opzij,
+transfer-krediet), dan rekent de herspeling eerst met vergeten; zou het
+leerdoel daardoor onder μ 0,80 of onder bewijs 5,75 komen, dan komt het
+bewijs erbij zonder te vergeten (CONDUCTOR_POLICY §3.4). Een negatief
+signaal vergeet zoals voorheen. De regel werkt alleen op een leerdoel dat
+al beheerst is, en dat heeft zijn stempel al: geen stempel verschuift, dus
+M en P veranderen niet. Wat wel verandert is (α, β) van zo'n leerdoel, en
+dat vergelijkt `validate`. Een oefening van een oudere build herspeelt
+zonder de bewaking, ook met `--regels 1.1`: de documenten die
+`replay-beliefs --regels 1.1` bij de release van 1.1 schreef, en de builds
+2.13 en 2.14, hadden ze niet. `lo_beliefs` hoeft dus niet herschreven te
+worden. Het is variant "C breed" van de herspeling bij #311, de keuze van
+de leerkracht op 2026-11-18.
+
+`eval8` (2026-11-08,
 #278) volgt het **vergeten per antwoord** van de app vanaf de build die het
 bracht (2.13.0, `rules.RULES_11_FROM`): vóór nieuw bewijs krimpt wat een
 leerdoel boven de prior heeft met λ = 0,7 (`rules.FORGET`), bij elk signaal
@@ -317,7 +335,8 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
    in de app net zo.
 
 Verder identiek aan de app: prior (1,1), vergeten per antwoord met λ = 0,7
-voor een oefening van 1.1 (sinds `eval8`), plafond 20 met krimp-dan-optel,
+voor een oefening van 1.1 (sinds `eval8`), de bewaking van beheerst vanaf
+build 2.15.0 (sinds `eval9`), plafond 20 met krimp-dan-optel,
 de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
@@ -665,7 +684,11 @@ build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
   wat de kandidaat met deze antwoorden gedaan zou hebben, niet wat de app
   deed.
 - `as_11`: elke beurt met de regels van 1.1 (`rules.rules_11`), de stempel
-  van #276 inbegrepen, welke build ze ook schreef.
+  van #276 inbegrepen, welke build ze ook schreef. De bewaking van #311
+  zet het niet aan.
+- `mastery_guard` (#311): de bewaking van beheerst bij elke beurt (`True`)
+  of bij geen enkele (`False`), welke build ze ook schreef; zonder waarde
+  per build (`rules.mastery_guard`).
 - `forget` (λ, #278): vóór nieuw bewijs krimpt wat een leerdoel boven de
   prior heeft met die factor, bij elke beurt; met `forget_own_only` alleen
   bij een eigen vraag. Zonder `forget` vergeet een beurt van 1.1 met

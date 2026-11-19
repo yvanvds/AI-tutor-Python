@@ -1543,10 +1543,14 @@ lands, what the LO holds above the prior shrinks by a fixed factor,
 then the evidence is added:
 
 ```
-applyEvidence(α, β, w_α, w_β):
+applyEvidence(α, β, w_α, w_β, mastered):
     if w_α + w_β == 0: return (α, β)        // a neutral forgets nothing
-    α = 1 + (α - 1) × λ                     // forget
-    β = 1 + (β - 1) × λ
+    forgotten = capThenAdd(1 + (α - 1) × λ, 1 + (β - 1) × λ, w_α, w_β)
+    if mastered and w_β == 0 and not meetsMeanAndEvidence(forgotten):
+        return capThenAdd(α, β, w_α, w_β)   // the mastery guard (#311)
+    return forgotten
+
+capThenAdd(α, β, w_α, w_β):
     if α + β + w_α + w_β > CAP:             // the cap, a backstop
         excess_capacity = CAP - 2 - w_α - w_β   // 2 = prior contribution
         existing_excess = α + β - 2
@@ -1586,7 +1590,8 @@ Strong answers on medium at home, μ after the series:
 - **Alternating right and wrong stays around 0.45**: no stamp from
   volume alone.
 - **μ moves more.** The stamp stays (one-way, 4.3), but the conductor
-  asks the LO again when it falls under the bar.
+  asks the LO again when it falls under the bar — which only a wrong
+  answer or decay in time does (the mastery guard, below).
 
 **The evidence stays bounded**: a steady weight `w` converges to
 `α + β = 2 + w / (1 − λ)`, at most 13.7 for the heaviest answer
@@ -1597,6 +1602,50 @@ on medium at home, a transfer credit (0.5). And a small positive on an
 LO with much more evidence lowers the mean: the old answers fade faster
 than the new one adds — a transfer credit on a `(7, 1)` LO leaves it at
 `(5.7, 1)`.
+
+**The mastery guard (#311): an answer that is not wrong never takes
+mastery away.** That last consequence went further than meant on an LO
+just over the bar. Three right answers on medium leave `(5.38, 1)`,
+mastered; a right follow-up (0.5, 6.2) after forgetting leaves
+`(4.07, 1) + 0.5`, evidence 5.57 — under 5.75, not mastered, so the LO
+came back into the selection (2.1), was asked again, and the subgoal's
+share fell after a right answer. In a session of the teacher's, twenty
+right answers on hard gave 4 of 6 LOs, with the progress falling after
+every right follow-up. In the class data of the first week of 1.1
+(1068 oefeningen, 23 students) a mastered LO lost mastery 33 times on
+an answer without a negative signal: 6 times on a follow-up, 20 times
+on a transfer credit (3.7), 7 times on a positive from the side (2.4).
+
+So a write without a negative on an LO that is mastered at that moment
+(`isMastered` on its decayed belief, 4.1) is tried with forgetting
+first. Would that leave it under condition 1 or 2 of 4.1 (the mean or
+the evidence), the evidence is added without forgetting instead:
+`(5.38, 1) + 0.5` = `(5.88, 1)`. It holds for every such write — the
+LO's own question, a follow-up, a side signal, a signal on an earlier
+subgoal's LO, a transfer credit. Everything else is as it was:
+
+- **A negative forgets as ever.** A wrong answer on a mastered LO takes
+  it under the bar as often as before (in the replay 10 or 11 times
+  out of 12).
+- **The road to mastery is unchanged.** The guard only acts on an LO
+  that is mastered, so every answer before that forgets and counts as
+  it did. An LO that is mastered has its stamp (4.3): no stamp moves,
+  and neither does a grade.
+- **Where forgetting leaves the LO mastered, it forgets.** The `(7, 1)`
+  LO above still becomes `(5.7, 1)`. The evidence does not pile up: in
+  the replay the median evidence of the mastered LOs was 9.29 with the
+  guard, 9.43 without.
+
+It is a rule of the belief, not a separate state in the conductor: the
+selection, the progress and the Leerpad read the belief as before. The
+teacher chose it on 2026-11-18 on a replay of the class data ("brede
+C"). Considered and not chosen: a follow-up that never forgets (it
+left 24 of the 33 cases, and moved stamps later for a student who
+started with wrong answers, whose old wrongs then fade less); no
+forgetting on any positive that is not the LO's own question (all 33
+gone, but strong side signals then add up undiminished, the purgatory
+#278 took away); the guard for the two light signals only (8 cases
+left).
 
 λ = 0.7 is the teacher's choice on the replay of #248 (2026-11-08): it
 found 55 of the 68 LOs he had counted by hand in three evaluation
@@ -1791,10 +1840,14 @@ debug recorder with the reason. `alphaDelta` is the credit itself since
 **Forgetting (3.4, #278).** A credit forgets first, like every write
 that carries weight. Its weight (0.5 × s) is under what keeps an LO at
 the evidence bar, so on an LO with much evidence it lowers the mean — a
-`(7, 1)` LO becomes `(5.7, 1)` — and many credits in a row would settle
-at `(2.67, 1)` at home, μ 0.73. What the credit refreshes is the clock:
-`lastUpdatedAt`, which keeps a recurring LO out of the warm-up review.
-The stamp the grade reads stays (4.3).
+`(7, 1)` LO becomes `(5.7, 1)`. Since #311 it never takes mastery away:
+on an LO that is mastered now, where forgetting would leave it under
+the bar, the credit is added without forgetting (the mastery guard,
+3.4). An LO that decay took under the bar forgets as before, and many
+credits in a row on it would settle at `(2.67, 1)` at home, μ 0.73.
+What the credit refreshes is the clock: `lastUpdatedAt`, which keeps a
+recurring LO out of the warm-up review. The stamp the grade reads stays
+(4.3).
 
 **Complement: warm-up review (1.5, #102).** LOs that naturally recur in
 later work are refreshed here for free; LOs that nothing later builds on
@@ -2454,6 +2507,14 @@ as calibrated probes). For weight calculation, treat as `medium`
 (multiplier 1.0). Combined with the `weak` strength cap, this means
 follow-up signals contribute `0.5` to belief — meaningful but
 secondary to a primary probe at medium (`1.0`).
+
+**A right follow-up never takes mastery away (#311).** Like every
+write, a follow-up signal forgets first (3.4), and 0.5 is less than
+forgetting takes from an LO just over the bar. On an LO that the
+question itself just mastered, a follow-up signal without a negative is
+therefore added without forgetting where forgetting would leave the LO
+under the bar (the mastery guard, 3.4). A wrong follow-up forgets and
+counts as before.
 
 **Calibration window: follow-up answers are skipped.** They don't
 have a meaningful `difficulty` to file against, and they're not

@@ -541,6 +541,90 @@ void main() {
       expect(s.beta, 2);
     });
 
+    group('#311: the mastery guard', () {
+      test('a positive on a mastered LO that forgetting would take under '
+          'the bar is added without forgetting', () {
+        // (5.38, 1): three right answers on medium. Forgotten it holds
+        // (4.07, 1), + 0.5 = 5.57 of evidence, under 5.75.
+        final plain = applyEvidence(
+          alpha: 5.38,
+          beta: 1,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+        );
+        expect(meetsMasteryMeanAndEvidence(plain), isFalse);
+        final guarded = applyEvidence(
+          alpha: 5.38,
+          beta: 1,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+          mastered: true,
+        );
+        expect(guarded.alpha, closeTo(5.88, 1e-9));
+        expect(guarded.beta, 1);
+        expect(meetsMasteryMeanAndEvidence(guarded), isTrue);
+      });
+
+      test('the mean counts too: a small positive that forgetting would '
+          'take under 0.80 is added without it', () {
+        // (9, 2.2): μ 0.804. Forgotten (6.6, 1.84) + 0.5: μ 0.794.
+        final plain = applyEvidence(
+          alpha: 9,
+          beta: 2.2,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+        );
+        expect(plain.mean, lessThan(PolicyConstants.masteryMeanThreshold));
+        final guarded = applyEvidence(
+          alpha: 9,
+          beta: 2.2,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+          mastered: true,
+        );
+        expect(guarded.alpha, closeTo(9.5, 1e-9));
+        expect(guarded.beta, closeTo(2.2, 1e-9));
+      });
+
+      test('where forgetting leaves the LO mastered, it forgets as ever', () {
+        final s = applyEvidence(
+          alpha: 8,
+          beta: 1,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+          mastered: true,
+        );
+        expect(s.alpha, closeTo(1 + 7 * 0.7 + 0.5, 1e-9));
+      });
+
+      test('a negative on a mastered LO forgets as ever', () {
+        final s = applyEvidence(
+          alpha: 5.38,
+          beta: 1,
+          alphaDelta: 0,
+          betaDelta: 0.5,
+          mastered: true,
+        );
+        expect(s.alpha, closeTo(1 + 4.38 * 0.7, 1e-9));
+        expect(s.beta, closeTo(1.5, 1e-9));
+      });
+
+      test('the cap still holds without forgetting', () {
+        // An old doc at the cap, (16.05, 3.95), mean 0.8025: forgotten and
+        // + 0.5 its mean is 0.797, so the guard adds without forgetting,
+        // and the cap makes room as before #278.
+        final s = applyEvidence(
+          alpha: 16.05,
+          beta: 3.95,
+          alphaDelta: 0.5,
+          betaDelta: 0,
+          mastered: true,
+        );
+        expect(s.evidence, closeTo(PolicyConstants.evidenceCap, 1e-9));
+        expect(meetsMasteryMeanAndEvidence(s), isTrue);
+      });
+    });
+
     test('#278: the evidence stays bounded at 2 + w / (1 − λ), under the '
         'cap even for the heaviest answer', () {
       // Strong, hard, in the lesson time: 2.0 × 1.4 × 1.25 = 3.5.
