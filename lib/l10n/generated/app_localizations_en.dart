@@ -759,11 +759,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
+      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of this session attached.';
 
   @override
   String get options_bugReport_subtitle_standalone =>
-      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.';
+      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of this session attached.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -845,10 +845,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get options_bugReport_dialog_descriptionField => 'What went wrong?';
 
   @override
-  String get options_bugReport_dialog_turnField => 'Attach tutor turn';
+  String get options_bugReport_dialog_turnField => 'Attach debug data';
 
   @override
-  String get options_bugReport_dialog_turnNone => 'No turn';
+  String options_bugReport_dialog_turnSession(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Whole session ($count exercises)',
+      one: 'Whole session (1 exercise)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'None';
 
   @override
   String options_bugReport_dialog_turnLabel(int id, String type) {
@@ -1628,6 +1639,86 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String goals_editor_language_discard_message(String language, String target) {
     return 'The $language title and description have changes that are not saved. Switching to $target discards them.';
+  }
+
+  @override
+  String get goals_editor_switch_allowChains => 'Follow-up chains';
+
+  @override
+  String get goals_editor_switch_allowChains_subtitle =>
+      'In this subgoal the tutor may ask a follow-up question on a follow-up question.';
+
+  @override
+  String get goals_editor_objectives_label => 'Learning objectives';
+
+  @override
+  String get goals_editor_objectives_empty =>
+      'This subgoal has no learning objectives.';
+
+  @override
+  String get goals_editor_objectives_note =>
+      'The id is fixed: student progress is stored under it. Add, remove or reorder learning objectives in the goal\'s JSON file.';
+
+  @override
+  String get goals_editor_objectives_save => 'Save learning objectives';
+
+  @override
+  String get goals_editor_objectives_saved =>
+      'Learning objectives saved. Change the goal\'s JSON file too: a replace import overwrites what you changed here.';
+
+  @override
+  String goals_editor_objectives_translation_saved(String language) {
+    return '$language learning objectives saved';
+  }
+
+  @override
+  String get goals_editor_objective_statement => 'Text';
+
+  @override
+  String get goals_editor_objective_statement_empty =>
+      'A learning objective needs a text.';
+
+  @override
+  String get goals_editor_objective_kind => 'Kind';
+
+  @override
+  String get goals_editor_objective_kind_recall => 'Recall';
+
+  @override
+  String get goals_editor_objective_kind_apply => 'Apply';
+
+  @override
+  String get goals_editor_objective_kind_predict => 'Predict';
+
+  @override
+  String get goals_editor_objective_kind_reason => 'Reason';
+
+  @override
+  String get goals_editor_objective_weight => 'Weight';
+
+  @override
+  String get goals_editor_objective_weight_invalid =>
+      'The weight is a number above 0.';
+
+  @override
+  String goals_editor_objective_translation_none(String language) {
+    return 'No $language translation yet.';
+  }
+
+  @override
+  String goals_editor_objective_translation_stale(String statement) {
+    return 'Outdated. The Dutch text is now: $statement';
+  }
+
+  @override
+  String get goals_editor_objective_translation_confirm => 'Still correct';
+
+  @override
+  String goals_editor_language_discard_message_objectives(
+    String language,
+    String target,
+  ) {
+    return 'The $language texts, learning objectives included, have changes that are not saved. Switching to $target discards them.';
   }
 
   @override

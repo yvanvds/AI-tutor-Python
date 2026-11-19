@@ -925,7 +925,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.1-eval8", stdout)
+        self.assertIn("1.1-eval9", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1241,7 +1241,7 @@ class Rules11Test(unittest.TestCase):
         return [self.answer(m, "correct" if c == "J" else "wrong", build) for m, c in enumerate(answers)]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval8")
+        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
         self.assertEqual(rules.FORGET, 0.7)
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.0+30"}))
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.1+31"}))
@@ -1317,7 +1317,7 @@ class Rules279Test(unittest.TestCase):
     multiple-choice question weighs ×0.5 — from the key or the grader, on
     the target and from the side, not on a follow-up on one — and the stamp
     wants two own questions right, one of them no multiple choice. Same rule
-    set (`1.1-eval8`), same switch (`rules_11`)."""
+    set (`1.1-eval9`), same switch (`rules_11`)."""
 
     KEY = ("sg-b", "predict_b1")
     NEW = {"clientVersion": "2.13.0+30"}
@@ -1342,7 +1342,7 @@ class Rules279Test(unittest.TestCase):
     def test_the_constants(self):
         self.assertEqual(rules.MCQ_POSITIVE, 0.5)
         self.assertEqual((rules.STAMP_OWN_RIGHT_MIN, rules.STAMP_OWN_RIGHT_NON_MCQ_MIN), (2, 1))
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval8")
+        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
 
     def test_a_pick_of_1_1_weighs_half_on_the_target_and_from_the_side(self):
         side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
@@ -1397,6 +1397,108 @@ class Rules279Test(unittest.TestCase):
         old = [self.pick(m, self.OLD, **hard) for m in range(3)]
         self.assertIsNone(self.lo(old, as_11=True).first_mastered_at)
         self.assertAlmostEqual(self.lo(old[:1], as_11=True).alpha, 1 + 1.75)
+
+
+class MasteryGuard311Test(unittest.TestCase):
+    """#311, rule set `1.1-eval9`: from the build that brought the mastery
+    guard (`mastery_guard`), a write without a negative on an LO that is
+    mastered does not forget where forgetting would take it under the bar.
+    No stamp moves; (α, β) of the mastered LO does."""
+
+    KEY = ("sg-b", "predict_b1")
+    GUARD = {"clientVersion": "2.15.0+32"}
+    BEFORE = {"clientVersion": "2.14.0+31"}
+
+    def answer(self, minute: int, quality: str = "correct", build: dict | None = None, **extra) -> dict:
+        signal = "positive" if quality == "correct" else "negative"
+        t = _turn(f"2026-11-20T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType="completeCodeQuestion", overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", "strong", signal)],
+                  **(self.GUARD if build is None else build))
+        t.update(extra)
+        return t
+
+    def mastered(self, build: dict | None = None, **extra) -> list[dict]:
+        """Three right own questions on medium at home: (5.38, 1), stamped
+        at the third — and 0.5 after forgetting leaves 5.57, under 5.75."""
+        return [self.answer(m, build=build, **extra) for m in range(3)]
+
+    def follow_up(self, minute: int, quality: str = "correct", build: dict | None = None) -> dict:
+        return self.answer(minute, quality, build, isFollowUp=True, chainDepth=1)
+
+    def lo(self, turns: list[dict], key=None, **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[key or self.KEY]
+
+    def test_the_rule_set_and_the_build_it_starts_from(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertTrue(rules.mastery_guard({"clientVersion": "2.15.0+32"}))
+        self.assertFalse(rules.mastery_guard({"clientVersion": "2.14.0+31"}))
+        self.assertFalse(rules.mastery_guard({}))
+
+    def test_a_right_follow_up_leaves_a_mastered_lo_mastered(self):
+        before = self.lo(self.mastered())
+        self.assertTrue(before.mastered_at())
+        self.assertAlmostEqual(before.alpha, 5.38, places=2)
+        after = self.lo(self.mastered() + [self.follow_up(3)])
+        self.assertAlmostEqual(after.alpha, before.alpha + 0.5, places=2)  # added, not forgotten
+        self.assertTrue(after.mastered_at())
+        self.assertEqual(after.first_mastered_at, before.first_mastered_at)
+
+    def test_a_build_before_the_guard_replays_as_it_wrote(self):
+        turns = self.mastered(self.BEFORE) + [self.follow_up(3, build=self.BEFORE)]
+        after = self.lo(turns)
+        self.assertAlmostEqual(after.alpha, 1 + 4.38 * 0.7 + 0.5, places=2)
+        self.assertFalse(after.mastered_at())  # the issue: 5.57 < 5.75
+        self.assertIsNotNone(after.first_mastered_at)  # the stamp stayed, as in the app
+        # `--regels 1.1` (as_11) leaves it so: the docs it wrote had no guard.
+        self.assertAlmostEqual(self.lo(turns, as_11=True).alpha, after.alpha)
+        # A variant can ask for the guard on every turn.
+        self.assertTrue(self.lo(turns, mastery_guard=True).mastered_at())
+        self.assertFalse(self.lo(self.mastered() + [self.follow_up(3)], mastery_guard=False).mastered_at())
+
+    def test_a_transfer_credit_leaves_a_mastered_lo_mastered(self):
+        key = ("sg-a", "recall_a1")
+        mastered = [_turn(f"2026-11-20T08:0{m}:00Z", "sg-a", "recall_a1", uid="u-x",
+                          questionType="completeCodeQuestion", **self.GUARD) for m in range(3)]
+        before = self.lo(mastered, key)
+        self.assertTrue(before.mastered_at())
+        credit = self.answer(0, turnAt="2026-11-20T08:03:00Z",
+                             transferCredits=[{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.5}])
+        after = self.lo(mastered + [credit], key)
+        self.assertAlmostEqual(after.alpha, before.alpha + 0.5, places=2)
+        self.assertTrue(after.mastered_at())
+        credit_before = dict(credit, **self.BEFORE)
+        self.assertFalse(self.lo(mastered + [credit_before], key).mastered_at())
+
+    def test_a_side_signal_leaves_a_mastered_lo_mastered(self):
+        side = _turn("2026-11-20T09:03:00Z", "sg-b", "predict_b2", uid="u-x",
+                     questionType="completeCodeQuestion", **self.GUARD,
+                     loSignals=[_sig("sg-b", "predict_b2"), _sig("sg-b", "predict_b1", "weak")])
+        after = self.lo(self.mastered() + [side])
+        self.assertAlmostEqual(after.alpha, 5.38 + 0.5, places=2)
+        self.assertTrue(after.mastered_at())
+
+    def test_a_negative_forgets_as_before(self):
+        after = self.lo(self.mastered() + [self.follow_up(3, "wrong")])
+        self.assertAlmostEqual(after.alpha, 1 + 4.38 * 0.7, places=2)
+        self.assertAlmostEqual(after.beta, 1.5, places=2)
+        self.assertFalse(after.mastered_at())
+
+    def test_it_forgets_where_the_lo_stays_mastered_anyway(self):
+        # Two more right answers: (6.94, 1). A follow-up after forgetting
+        # leaves 6.66 of evidence — over the bar, so it forgets as ever.
+        turns = [self.answer(m) for m in range(5)]
+        before = self.lo(turns)
+        after = self.lo(turns + [self.follow_up(5)])
+        self.assertAlmostEqual(after.alpha, 1 + (before.alpha - 1) * 0.7 + 0.5, places=2)
+        self.assertTrue(after.mastered_at())
+
+    def test_the_road_to_mastery_forgets_as_before(self):
+        # Two right answers: (4.4, 1), not mastered — a follow-up forgets.
+        turns = [self.answer(0), self.answer(1), self.follow_up(2)]
+        after = self.lo(turns)
+        self.assertAlmostEqual(after.alpha, 1 + 3.4 * 0.7 + 0.5, places=2)
+        self.assertIsNone(after.first_mastered_at)
 
 
 class Rules275Test(unittest.TestCase):

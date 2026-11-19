@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
+import 'package:ai_tutor_python/features/goals/editor/objectives_editor.dart';
 import 'package:ai_tutor_python/features/goals/editor/parent_field.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
@@ -25,8 +26,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// other language the goal's translation (`goal_${id}` in `translations`),
 /// made from the Dutch text as it is stored and saved with its own button.
 /// Saving a translation never writes `goals`. Next to the picker a badge per
-/// language says which translations the goal has and which are stale. The
-/// other fields do not depend on the language.
+/// language says which translations the goal has and which are stale. A
+/// subgoal's learning objectives ([ObjectivesEditor], #313) follow the
+/// picker too: their text in Dutch, or its translation. The other fields do
+/// not depend on the language.
 class GoalForm extends ConsumerStatefulWidget {
   const GoalForm({super.key, required this.goal});
   final Goal goal;
@@ -40,6 +43,15 @@ class GoalFormState extends ConsumerState<GoalForm> {
   late final TextEditingController _desc;
   bool _optional = false;
   bool _isConcept = false;
+  bool _allowChains = false;
+
+  /// The learning objectives block: asked for unsaved translations before
+  /// the language switches, and kept in place while the fields around it
+  /// come and go with the language.
+  final GlobalKey<ObjectivesEditorState> _objectivesKey = GlobalKey();
+
+  bool get _hasObjectiveTranslationEdits =>
+      _objectivesKey.currentState?.hasTranslationEdits ?? false;
 
   /// The language the title and description fields edit (#210).
   String _language = kSourceLanguage;
@@ -87,6 +99,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
     _desc = TextEditingController(text: widget.goal.description ?? '');
     _optional = widget.goal.optional;
     _isConcept = widget.goal.kind == 'concept';
+    _allowChains = widget.goal.allowChains;
   }
 
   @override
@@ -97,6 +110,7 @@ class GoalFormState extends ConsumerState<GoalForm> {
       _desc.text = widget.goal.description ?? '';
       _optional = widget.goal.optional;
       _isConcept = widget.goal.kind == 'concept';
+      _allowChains = widget.goal.allowChains;
       // The language stays: a teacher translating goals goes from one to
       // the next in the same language.
       if (!_isSource) _fillTranslation(_storedTranslation(_language));
@@ -116,7 +130,11 @@ class GoalFormState extends ConsumerState<GoalForm> {
   /// that would throw away an unsaved translation.
   Future<void> _setLanguage(String language) async {
     if (language == _language) return;
-    if (_hasTranslationEdits && !await _confirmDiscard(language)) return;
+    final objectiveEdits = _hasObjectiveTranslationEdits;
+    if ((_hasTranslationEdits || objectiveEdits) &&
+        !await _confirmDiscard(language, objectives: objectiveEdits)) {
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _language = language;
@@ -124,7 +142,12 @@ class GoalFormState extends ConsumerState<GoalForm> {
     });
   }
 
-  Future<bool> _confirmDiscard(String target) async {
+  /// [objectives]: whether the unsaved changes include translations of
+  /// learning objectives.
+  Future<bool> _confirmDiscard(
+    String target, {
+    required bool objectives,
+  }) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -132,10 +155,15 @@ class GoalFormState extends ConsumerState<GoalForm> {
         return AlertDialog(
           title: Text(l.lesson_language_discard_title),
           content: Text(
-            l.goals_editor_language_discard_message(
-              contentLanguageName(l, _language),
-              contentLanguageName(l, target),
-            ),
+            objectives
+                ? l.goals_editor_language_discard_message_objectives(
+                    contentLanguageName(l, _language),
+                    contentLanguageName(l, target),
+                  )
+                : l.goals_editor_language_discard_message(
+                    contentLanguageName(l, _language),
+                    contentLanguageName(l, target),
+                  ),
           ),
           actions: [
             TextButton(
@@ -324,7 +352,9 @@ class GoalFormState extends ConsumerState<GoalForm> {
           if (_isSource)
             TextField(
               controller: _desc,
-              maxLines: 3,
+              // Grows with the text: a long description shows in full.
+              minLines: 3,
+              maxLines: null,
               decoration: InputDecoration(
                 labelText: l.goals_editor_field_description,
                 border: const OutlineInputBorder(),
@@ -336,10 +366,12 @@ class GoalFormState extends ConsumerState<GoalForm> {
             TextField(
               key: const Key('goal-translation-description'),
               controller: _trDesc,
-              maxLines: 3,
+              minLines: 3,
+              maxLines: null,
               decoration: InputDecoration(
                 labelText: l.goals_editor_field_description,
                 hintText: widget.goal.description,
+                hintMaxLines: 12,
                 border: const OutlineInputBorder(),
               ),
               onChanged: (_) => setState(() {}),
@@ -376,6 +408,23 @@ class GoalFormState extends ConsumerState<GoalForm> {
               title: Text(l.goals_editor_switch_concept),
               subtitle: Text(l.goals_editor_switch_concept_subtitle),
               contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              key: const Key('goal-allow-chains'),
+              value: _allowChains,
+              onChanged: (v) {
+                setState(() => _allowChains = v);
+                svc.updateAllowChains(widget.goal.id, v);
+              },
+              title: Text(l.goals_editor_switch_allowChains),
+              subtitle: Text(l.goals_editor_switch_allowChains_subtitle),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 12),
+            ObjectivesEditor(
+              key: _objectivesKey,
+              goal: widget.goal,
+              language: _language,
             ),
             const SizedBox(height: 12),
             TextListEditor(

@@ -1,6 +1,6 @@
 # How do you get your grade?
 
-*Goes with version 1.1.1 of the grade formula. The app computes with
+*Goes with version 1.1.2 of the grade formula. The app computes with
 formula 1.1: that number is also in My reports.*
 
 ## What counts for your grade?

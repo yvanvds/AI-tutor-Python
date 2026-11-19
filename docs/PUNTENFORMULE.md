@@ -1,7 +1,7 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
-**Versie 1.1.1** — formule 1.1, van kracht sinds 9 november 2026
-(v2.13.0+30). Laatste wijziging: 2026-11-09.
+**Versie 1.1.2** — formule 1.1, van kracht sinds 9 november 2026
+(v2.13.0+30). Laatste wijziging: 2026-11-19.
 
 Dit document legt exact uit hoe de AI-tutor jouw kennis meet en hoe daaruit
 een **puntvoorstel** voor het rapport wordt berekend. Het is de
@@ -193,6 +193,17 @@ transfer-krediet (§2.8). Een neutraal signaal verandert niets. Vergeten
 in de tijd (§1.3) blijft daarnaast zoals het is: dat gaat per dag, dit
 per antwoord.
 
+Eén uitzondering (sinds versie 1.1.2): **een antwoord dat niet fout is,
+maakt een beheerst leerdoel nooit onbeheerst.** Is een leerdoel op dat
+moment beheerst (§1.5) en krijgt het een signaal dat niet negatief is,
+dan rekent de app eerst met vergeten. Zou het leerdoel daardoor onder
+μ 0,80 of onder bewijs 5,75 komen, dan komt het nieuwe bewijs erbij
+zonder te vergeten. Een voorbeeld: drie juiste antwoorden op gemiddeld
+geven (5,38; 1), beheerst. Een juiste vervolgvraag telt 0,5. Met vergeten
+werd dat (4,07; 1) + 0,5, bewijs 5,57: niet meer beheerst, na een juist
+antwoord. Nu wordt het (5,88; 1). Een fout antwoord vergeet zoals altijd,
+en op de weg naar beheerst verandert er niets.
+
 Waarom: μ was in wezen het gemiddelde van al je antwoorden, en dat
 veronderstelt dat je al die tijd even goed was. Wie leert, verandert net.
 Vijf fout en dan vier juist is niet "kan het voor 45%", maar "heeft het
@@ -219,7 +230,8 @@ de goede en de foute. Sterke antwoorden op gemiddeld, thuis:
   maar de tutor vraagt het leerdoel dan opnieuw. Een klein positief
   signaal (zwak, of transfer-krediet) op een leerdoel met veel bewijs kan
   μ zelfs iets doen zakken: het oude bewijs krimpt meer dan het nieuwe
-  erbij doet.
+  erbij doet. Onder de grens van beheerst komt het daardoor niet (de
+  uitzondering hierboven).
 
 Daardoor blijft de bewijsmassa vanzelf begrensd, onder 14. Het
 **bewijsplafond van α + β ≤ 20** blijft als vangnet: zou nieuw bewijs daar
@@ -566,6 +578,7 @@ wanneer de tutor je opnieuw bevraagt:
   klein positief signaal: de decay-klok wordt teruggezet. De overtuiging
   stijgt licht als er weinig bewijs ligt; ligt er veel, dan zakt μ sinds
   v1.1 zelfs iets, omdat ook hier eerst het oude bewijs krimpt (§1.4).
+  Een leerdoel dat op dat moment beheerst is, blijft dat (§1.4).
   Je stempel (§2.2) blijft staan. Dit werkt alleen positief (een foute of half-juiste
   oplossing telt langs deze weg niet tegen het oude leerdoel — en levert
   het ook niets op; wijst de fout wél duidelijk op een gat in dat oude
@@ -873,6 +886,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.0.23 | 2026-10-21 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen. §1.5: een leerdoel is pas beheerst na minstens twee juiste antwoorden. Sinds v1.0.19 telt een antwoord in de les 25% zwaarder, en daardoor was één juist antwoord op een moeilijke vraag in de les al genoeg: μ 0,82 met bewijs 5,5, terwijl hetzelfde antwoord thuis net onder de grens bleef (0,79). Zo was het niet bedoeld. Het bewijsminimum gaat van 4 naar 5,75: hoger dan wat één antwoord kan geven (5,5), lager dan twee juiste antwoorden op gemiddeld (6). Een juiste vervolgvraag telt als tweede antwoord. §1.2: een signaal op een ander leerdoel van het subdoel waaraan je werkt, telt nog mee met het gewicht van de vraag, maar toont dat leerdoel niet aan; daarvoor is een vraag over dat leerdoel zelf nodig. §1.7: vastgelopen vraagt bewijs 10 in plaats van 8, om dezelfde reden: ook een fout in de les weegt 25% zwaarder, en op moeilijk stond je zo al na vier fouten vast, nog voor de tutor de vraag een niveau lager kon stellen. Een stempel van vóór deze versie blijft staan (§2.2). De evaluatie buiten de app herspeelt elke oefening met de regels van de app die ze schreef (#276). |
 | 1.1 | 2026-11-08 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen. §1.4: **vergeten per antwoord**. Bij elk antwoord krimpt het bewijs dat een leerdoel al heeft eerst met 0,7, en dan komt het nieuwe bewijs erbij, voor juiste en foute antwoorden. Je eerste antwoorden wegen zo minder naarmate er meer volgen: wie eerst fouten maakt en het dan doorheeft, staat ook zo in de overtuiging. Het plafond van 20 blijft als vangnet, maar wordt bijna niet meer bereikt. §1.5: thuis op gemiddeld vraagt een nieuw leerdoel daardoor drie juiste antwoorden in plaats van twee; op moeilijk of in de les blijven het er twee. §1.7: **vastgelopen** betekent minstens 6 eigen vragen en μ onder 0,6, in plaats van een bewijsmassa van 10 (of 18 bij het plafond). Reden: in drie rapportrondes paste de leerkracht 41 punten aan, allemaal naar boven, door leerdoelen mee te tellen die niet meer te halen waren. 47 van de 73 kernleerdoelen zonder stempel met μ tussen 0,70 en 0,80 stonden op het plafond, waar μ nog maar weinig bewoog. En de oude regel voor vastgelopen schoof leerlingen door terwijl hun laatste antwoorden juist waren (#245). Op de herspeling van alle oefeningen vond 0,7 er 55 van de 68 leerdoelen die de leerkracht met de hand meetelde, zonder de punten op te drijven die hij liet staan. §1.2: een **juist antwoord op een meerkeuzevraag weegt de helft**, of de sleutel van de vragenbank het beoordeelde of het taalmodel, en ook voor een signaal van opzij in die oefening; een fout antwoord weegt zoals voorheen. §1.5: een **vierde voorwaarde** voor beheerst: minstens twee vragen over het leerdoel zelf juist, waarvan minstens één geen meerkeuzevraag. Een signaal van opzij telt daar niet voor, en ontbreekt alleen nog de vraag die geen meerkeuzevraag is, dan stelt de tutor er zo een (§2.8 ook voor de controlevraag). Reden: van 201 stempels sinds 21 oktober vielen er 71 na één vraag over het leerdoel zelf, en 83 steunden daarvoor alleen op meerkeuzevragen; een aangeklikte optie woog even zwaar als een programma dat de leerling zelf schreef. Op de herspeling kost het minstens 17% meer oefeningen dan v1.0.23 als elke extra vraag juist is, eerder 23%; de leerlingen bij wie de leerkracht niets aanpaste, blijven gemiddeld op +0,5. Een leerdoel van vóór deze versie telt zijn juiste vragen vanaf nul, tenzij ze bij de invoering uit de oefeningen aangevuld worden. Een stempel van vóór deze versie blijft staan (§2.2). De evaluatie buiten de app herspeelt elke oefening met de regels van de app die ze schreef (#278, #279). §2.8: **er komt meer terug**. Vastgelopen leerdoelen krijgen een controlevraag, eerst een niveau lager; open kernleerdoelen van een mijlpaal ook, ook uit eerdere hoofddoelen en wat μ ook is; en een stempel van vóór deze versie op minder dan twee juiste vragen over het leerdoel zelf krijgt na een week één controlevraag, en de stempel blijft staan. Eerst de mijlpaal waarvan de deadline nog niet voorbij is. Na een juist antwoord op zo'n leerdoel volgt de volgende vraag erover in dezelfde sessie; na een antwoord dat niet juist is, ook op een opfrisvraag, komt het in de volgende sessie terug in plaats van na 7 of 30 dagen. De rem blijft: hoogstens één opfrisvraag bij de start van een sessie, en een controlevraag hoogstens om de 5 gewone oefeningen, alleen als je recente werk goed gaat. De deadline (§5) verandert niet. Reden: in de week van 13 tot 21 oktober stonden er bij 22 van de 60 afgeronde subdoelen 35 leerdoelen op vastgelopen, en zodra een leerling naar een volgend hoofddoel ging, kwam er niets van het vorige meer terug; op 23 september stonden er voor de mijlpaal van doel 1 nog 70 kernleerdoelen zonder stempel (#275, #247). |
 | 1.1.1 | 2026-11-09 | Geen wijziging aan de formule of aan de metingen eronder: de app rekent nog altijd met formule 1.1, en voorstellen en rapporten dragen dat nummer. De kop zegt dat formule 1.1 van kracht is sinds 9 november 2026 (v2.13.0+30), en §4 dat de schaduwrun voorbij is; welke getallen nog voorlopig zijn, blijft in de tabel van §4 staan (§2.3 volgt). Dit document is de specificatie, voor de leerkracht, de app en wie het precies wil weten. Voor leerlingen is er een korte uitleg in gewone taal, in het Nederlands en het Engels (`docs/puntenformule-leerlingen.nl.md` en `.en.md`, met de formule van §2.3 en één rekenvoorbeeld); het tabblad Puntenformule toont die in de taal van de app, met onderaan de weg naar dit document. §5: dit document en de formule hebben elk een versienummer, en wat een leerling merkt, past ook de korte uitleg aan. Bijlage A noemt het nummer op een voorstel daarom het nummer van de formule. De log staat op volgorde (#301). |
+| 1.1.2 | 2026-11-19 | Geen wijziging aan M of P, en geen stempel verandert: de formule houdt haar nummer 1.1. §1.4: **een antwoord dat niet fout is, maakt een beheerst leerdoel nooit onbeheerst.** Krijgt een leerdoel dat op dat moment beheerst is een signaal dat niet negatief is (de vraag zelf, een vervolgvraag, een signaal van opzij, transfer-krediet) en zou het door het vergeten van §1.4 onder μ 0,80 of onder bewijs 5,75 komen, dan komt het nieuwe bewijs erbij zonder te vergeten. Een fout antwoord vergeet zoals altijd, en op de weg naar beheerst verandert er niets. Reden: een juiste vervolgvraag telt 0,5, minder dan het vergeten wegneemt bij een leerdoel dat net beheerst is. Het leerdoel was dan na een juist antwoord niet meer beheerst, de voortgang zakte en de tutor vroeg het opnieuw. In de eerste week van formule 1.1 gebeurde dat 33 keer in de klas, het vaakst na transfer-krediet (20 keer) en na een vervolgvraag (6 keer). De leerkracht koos deze regel op 2026-11-18 op een herspeling van de klasdata: ze haalt alle 33 gevallen weg en verandert geen enkele stempel en dus geen punt, want ze werkt alleen op een leerdoel dat al beheerst is, en dat heeft zijn stempel al (§2.2). Wat wel verandert is de overtuiging van zo'n leerdoel (α, β en μ), en daardoor welke vraag de tutor stelt. De app past de regel toe vanaf de eerste build na v2.14.0; §2.8 en bijlage A volgen. De korte uitleg voor leerlingen noemt het nieuwe versienummer; aan haar tekst verandert niets (#311). |
 
 ---
 
@@ -909,6 +923,7 @@ in de code staan. Eén bronmodule bevat ze allemaal:
 | controlevraag boven de grens | μ ≥ 0,8 en α + β ≥ 5,75 met decay, zonder positief op gekalibreerd niveau of zonder trapinformatie; klok als hierboven, of meteen als nooit rechtstreeks bevraagd; geen voorwaarde op recent werk (voorlopig, §4) | "gekend" volgens de overtuiging, maar niet rechtstreeks bevestigd (§2.8, sinds v1.0.18); na de controlevragen net onder de grens aan de beurt |
 | halveringstijd decay | 60 dagen | vergeten, lazy bij lezing (§1.3) |
 | vergeten per antwoord (λ) | 0,7 (sinds v1.1) | vóór elk signaal met gewicht krimpt het bewijs boven de start (§1.4) |
+| bewaking van beheerst | sinds versie 1.1.2 | een signaal dat niet negatief is, vergeet niet waar een beheerst leerdoel daardoor onder de grens zou komen (§1.4) |
 | bewijsplafond | α + β ≤ 20 | krimp-dan-toevoegen, sinds v1.1 een vangnet (§1.4) |
 | beheersing: μ-drempel | 0,8 | voorwaarde 1 (§1.5) |
 | beheersing: bewijsminimum | α + β ≥ 5,75 (tot v1.0.22: 4) | voorwaarde 2 (§1.5) |

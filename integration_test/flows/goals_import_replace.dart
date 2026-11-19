@@ -3,6 +3,10 @@
 // matches each root entry to an existing root, previews the removal count
 // before writing, and never touches a set the user has not seen named.
 //
+// The concept marking of a subgoal (`kind`, #315) survives a Replace: the
+// file's own `kind` is written, and a subgoal the file gives no `kind` keeps
+// the one the teacher set in the goal editor.
+//
 // Driven against the real app — shell navigation, the real GoalsPage, the
 // real GoalsService over the harness's in-memory Cosmos — with only the file
 // picker faked (an OS-owned dialog no test can click); the picked file is
@@ -16,7 +20,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/features/goals/editor/goal_form.dart';
 import 'package:ai_tutor_python/features/goals/goals_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -50,9 +56,11 @@ void main() {
     _seedExtraSet(harness);
     final goals = harness.cosmos['goals'];
     final extraBefore = {'r2': goals.read('r2'), 'x1': goals.read('x1')};
+    // The teacher marked "Print" as a concept goal in the goal editor (#315).
+    goals.upsert({...goals.read('s1')!, 'kind': 'concept'});
 
     // A new version of "Basics": same root id, keeps Print, drops Variables,
-    // adds Loops.
+    // adds Loops. The file names no kind for Print and marks Loops a concept.
     FakeFilePicker(
       _writeImportFile([
         {
@@ -65,7 +73,7 @@ void main() {
           },
           'subgoals': [
             {'id': 's1', 'title': 'Print', 'order': 1000},
-            {'id': 's3', 'title': 'Loops', 'order': 2000},
+            {'id': 's3', 'title': 'Loops', 'order': 2000, 'kind': 'concept'},
           ],
         },
       ]),
@@ -108,6 +116,35 @@ void main() {
     expect(goals['s3'], isNotNull);
     expect(goals['r1']!['title'], 'Basics v2');
     expect(goals['s1']!['contentId'], 's1');
+    // The concept marking (#315): Print keeps the one set in the app, Loops
+    // gets the one the file names, the root has none.
+    expect(goals['s1']!['kind'], 'concept');
+    expect(goals['s3']!['kind'], 'concept');
+    expect(goals['r1']!.containsKey('kind'), isFalse);
+
+    // And the teacher sees it: the goal editor of "Print" still has the
+    // "Concept goal" switch on.
+    await pumpUntilFound(tester, find.text('Print'));
+    await tester.tap(find.text('Print').first);
+    await pumpUntil(
+      tester,
+      () =>
+          find.byType(GoalForm).evaluate().isNotEmpty &&
+          tester.widget<GoalForm>(find.byType(GoalForm)).goal.id == 's1',
+      reason: 'the goal editor never opened on "Print"',
+    );
+    final concept = find.widgetWithText(SwitchListTile, 'Concept goal');
+    await tester.scrollUntilVisible(
+      concept,
+      120,
+      scrollable: find
+          .descendant(
+            of: find.byType(GoalForm),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.widget<SwitchListTile>(concept).value, isTrue);
 
     await harness.dispose(tester);
   });

@@ -122,10 +122,13 @@ means belief mean ≥ threshold AND evidence count ≥ minimum (exact
 numbers in section 4). Same rule as cold start, with mastered LOs
 skipped.
 
-**Last-question-type reset.** The variety rule "don't ask the same
-type as last time" is not applied on the first question of a session.
-The previously-stored `lastQuestionType` may be from weeks ago and
-shouldn't constrain a fresh session.
+**The type rotation carries over (#312).** The variety rule "don't ask
+the same type as last time on this LO" (2.2) reads the stored
+`lastQuestionType` of the LO, so it also holds on the first question of
+a session: an `apply` LO that last got `completeCode`, however long ago,
+now gets `writeCode`. (Until #312 the rule read the question before this
+one in memory, which a new session cleared — and which was seldom on the
+same LO, so the rotation hardly ever happened.)
 
 **No automatic session greeting from the conductor.** The conductor's
 job is to ask good questions; greetings, if wanted, belong in the
@@ -543,8 +546,9 @@ question-type instruction prompts.
 1. Take the acceptable types for the target LO's kind.
    (#279) Without mcQuestion when a right pick can no longer bring an
    unmastered LO to its stamp, and the kind has another type (below).
-2. Exclude the type used in the immediately previous question on this LO,
-   if other types remain.
+2. Exclude the type of the previous question on this LO, if other types
+   remain. That is the LO's stored `lastQuestionType` (#312), whatever
+   was asked on other LOs in between and in whichever session.
 3. If LO belief is weak (mean < 0.5), pick the gentlest remaining type
    (gentleness order from section 1.1).
 4. Otherwise pick the type least-recently-used for this LO.
@@ -576,9 +580,31 @@ pick is the gentle way in, as it was), when
 
 An LO without a doc, or with no right own question yet, keeps every type;
 so does a mastered LO in the top-up of a mastered subgoal (1.3), with no
-stamp at stake. The rule is `belief_math.needsNonMcqQuestion`. The same
+stamp at stake. Keeping every type is not "a pick every time": step 2
+still rotates on the LO's previous type (#312), so a `recall` LO whose
+last question was a pick — right or wrong — gets `socraticQuestion` next,
+and a pick again after that while this rule allows one. The rule is `belief_math.needsNonMcqQuestion`. The same
 filter applies to the recheck (2.6), and not to the warm-up review (1.5),
 whose LO has its stamp.
+
+**Where the previous type comes from (#312).** Step 2 reads
+`lastQuestionType` on the LO's belief doc: the type of the last question
+that had this LO as its target, written with the answer (part 2 §3), also
+by a top-up (1.3), a warm-up review (1.5) or a recheck (2.6), and read
+whether the LO is mastered now or not. It is not the type of the question
+before this one: the recency guard (2.1) seldom asks an LO twice in a
+row, so that question is nearly always on another LO. Reading it from
+memory (as the code did until #312) left step 2 with nothing to exclude,
+and every LO got the first type of its kind — an `apply` LO `completeCode`
+every time. An LO without a doc, or with a doc no question ever targeted,
+has no previous type: nothing is excluded. Steps 2 and 3 together mean an
+`apply` LO under 0.5 that just got `completeCode` gets `writeCode`: the
+gentlest of what remains.
+
+Step 4 is approximated: only the last type is stored, so "least recently
+used" is the first acceptable type that is not the last one. A kind with
+two types left alternates (`apply`: `completeCode` ↔ `writeCode`;
+`predict` once the pick is dropped: `explainCode` ↔ `socraticQuestion`).
 
 The `mean < 0.5` threshold is the prior midpoint: the student has
 shown net-negative evidence on this LO. That's the right moment to be
@@ -849,7 +875,7 @@ now, single-target keeps evidence clean.
 After belief has been updated from the previous answer:
 
 ```
-nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
+nextQuestion(subgoal, student, lastQuestionLOId):
     if recheck slot open:                          # 2.6
         recheck = pickRecheck(root, subgoal, student)
         if recheck: return recheck
@@ -870,12 +896,14 @@ nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
 
 pickType(lo, belief):
     acceptable = acceptableTypes(lo.kind)    # from table
-    candidates = acceptable \ {previous type used on this LO}
+    # the LO's own previous type, from its doc (#312) — not the type of
+    # the question before this one, which was mostly on another LO
+    candidates = acceptable \ {belief.lastQuestionType}
     if candidates is empty:
         candidates = acceptable
     if belief.mean < 0.5:
         return gentlest(candidates)
-    return leastRecentlyUsed(candidates, lo)
+    return first(candidates)    # least recently used, approximated (2.2)
 
 shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
     if calibration is easy: return []               # no lower level
@@ -888,10 +916,11 @@ shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
     return rules
 ```
 
-The pseudocode glosses several details (how "previous answer on lo"
-is tracked, how recency-of-types-on-this-LO is stored). Those are
-storage concerns: the per-LO recent activity in the student model
-(part 2 §3) carries the data we need.
+The previous type of an LO is `lastQuestionType` on its belief doc
+(part 2 §3), written when the LO is the target of an answered question;
+`lastQuestionLOId` is the conductor's in-memory recency guard (2.1). The
+pseudocode glosses the per-type recency behind "least recently used":
+only the last type is stored.
 
 ### 2.6 The recheck slot (#187, #188, #275)
 
@@ -1514,10 +1543,14 @@ lands, what the LO holds above the prior shrinks by a fixed factor,
 then the evidence is added:
 
 ```
-applyEvidence(α, β, w_α, w_β):
+applyEvidence(α, β, w_α, w_β, mastered):
     if w_α + w_β == 0: return (α, β)        // a neutral forgets nothing
-    α = 1 + (α - 1) × λ                     // forget
-    β = 1 + (β - 1) × λ
+    forgotten = capThenAdd(1 + (α - 1) × λ, 1 + (β - 1) × λ, w_α, w_β)
+    if mastered and w_β == 0 and not meetsMeanAndEvidence(forgotten):
+        return capThenAdd(α, β, w_α, w_β)   // the mastery guard (#311)
+    return forgotten
+
+capThenAdd(α, β, w_α, w_β):
     if α + β + w_α + w_β > CAP:             // the cap, a backstop
         excess_capacity = CAP - 2 - w_α - w_β   // 2 = prior contribution
         existing_excess = α + β - 2
@@ -1557,7 +1590,8 @@ Strong answers on medium at home, μ after the series:
 - **Alternating right and wrong stays around 0.45**: no stamp from
   volume alone.
 - **μ moves more.** The stamp stays (one-way, 4.3), but the conductor
-  asks the LO again when it falls under the bar.
+  asks the LO again when it falls under the bar — which only a wrong
+  answer or decay in time does (the mastery guard, below).
 
 **The evidence stays bounded**: a steady weight `w` converges to
 `α + β = 2 + w / (1 − λ)`, at most 13.7 for the heaviest answer
@@ -1568,6 +1602,50 @@ on medium at home, a transfer credit (0.5). And a small positive on an
 LO with much more evidence lowers the mean: the old answers fade faster
 than the new one adds — a transfer credit on a `(7, 1)` LO leaves it at
 `(5.7, 1)`.
+
+**The mastery guard (#311): an answer that is not wrong never takes
+mastery away.** That last consequence went further than meant on an LO
+just over the bar. Three right answers on medium leave `(5.38, 1)`,
+mastered; a right follow-up (0.5, 6.2) after forgetting leaves
+`(4.07, 1) + 0.5`, evidence 5.57 — under 5.75, not mastered, so the LO
+came back into the selection (2.1), was asked again, and the subgoal's
+share fell after a right answer. In a session of the teacher's, twenty
+right answers on hard gave 4 of 6 LOs, with the progress falling after
+every right follow-up. In the class data of the first week of 1.1
+(1068 oefeningen, 23 students) a mastered LO lost mastery 33 times on
+an answer without a negative signal: 6 times on a follow-up, 20 times
+on a transfer credit (3.7), 7 times on a positive from the side (2.4).
+
+So a write without a negative on an LO that is mastered at that moment
+(`isMastered` on its decayed belief, 4.1) is tried with forgetting
+first. Would that leave it under condition 1 or 2 of 4.1 (the mean or
+the evidence), the evidence is added without forgetting instead:
+`(5.38, 1) + 0.5` = `(5.88, 1)`. It holds for every such write — the
+LO's own question, a follow-up, a side signal, a signal on an earlier
+subgoal's LO, a transfer credit. Everything else is as it was:
+
+- **A negative forgets as ever.** A wrong answer on a mastered LO takes
+  it under the bar as often as before (in the replay 10 or 11 times
+  out of 12).
+- **The road to mastery is unchanged.** The guard only acts on an LO
+  that is mastered, so every answer before that forgets and counts as
+  it did. An LO that is mastered has its stamp (4.3): no stamp moves,
+  and neither does a grade.
+- **Where forgetting leaves the LO mastered, it forgets.** The `(7, 1)`
+  LO above still becomes `(5.7, 1)`. The evidence does not pile up: in
+  the replay the median evidence of the mastered LOs was 9.29 with the
+  guard, 9.43 without.
+
+It is a rule of the belief, not a separate state in the conductor: the
+selection, the progress and the Leerpad read the belief as before. The
+teacher chose it on 2026-11-18 on a replay of the class data ("brede
+C"). Considered and not chosen: a follow-up that never forgets (it
+left 24 of the 33 cases, and moved stamps later for a student who
+started with wrong answers, whose old wrongs then fade less); no
+forgetting on any positive that is not the LO's own question (all 33
+gone, but strong side signals then add up undiminished, the purgatory
+#278 took away); the guard for the two light signals only (8 cases
+left).
 
 λ = 0.7 is the teacher's choice on the replay of #248 (2026-11-08): it
 found 55 of the 68 LOs he had counted by hand in three evaluation
@@ -1762,10 +1840,14 @@ debug recorder with the reason. `alphaDelta` is the credit itself since
 **Forgetting (3.4, #278).** A credit forgets first, like every write
 that carries weight. Its weight (0.5 × s) is under what keeps an LO at
 the evidence bar, so on an LO with much evidence it lowers the mean — a
-`(7, 1)` LO becomes `(5.7, 1)` — and many credits in a row would settle
-at `(2.67, 1)` at home, μ 0.73. What the credit refreshes is the clock:
-`lastUpdatedAt`, which keeps a recurring LO out of the warm-up review.
-The stamp the grade reads stays (4.3).
+`(7, 1)` LO becomes `(5.7, 1)`. Since #311 it never takes mastery away:
+on an LO that is mastered now, where forgetting would leave it under
+the bar, the credit is added without forgetting (the mastery guard,
+3.4). An LO that decay took under the bar forgets as before, and many
+credits in a row on it would settle at `(2.67, 1)` at home, μ 0.73.
+What the credit refreshes is the clock: `lastUpdatedAt`, which keeps a
+recurring LO out of the warm-up review. The stamp the grade reads stays
+(4.3).
 
 **Complement: warm-up review (1.5, #102).** LOs that naturally recur in
 later work are refreshed here for free; LOs that nothing later builds on
@@ -2425,6 +2507,14 @@ as calibrated probes). For weight calculation, treat as `medium`
 (multiplier 1.0). Combined with the `weak` strength cap, this means
 follow-up signals contribute `0.5` to belief — meaningful but
 secondary to a primary probe at medium (`1.0`).
+
+**A right follow-up never takes mastery away (#311).** Like every
+write, a follow-up signal forgets first (3.4), and 0.5 is less than
+forgetting takes from an LO just over the bar. On an LO that the
+question itself just mastered, a follow-up signal without a negative is
+therefore added without forgetting where forgetting would leave the LO
+under the bar (the mastery guard, 3.4). A wrong follow-up forgets and
+counts as before.
 
 **Calibration window: follow-up answers are skipped.** They don't
 have a meaningful `difficulty` to file against, and they're not

@@ -16,6 +16,16 @@ import 'editor/edit_goal_panel.dart';
 import 'goal_import_plan.dart';
 import 'root_pane.dart';
 
+/// The folder the goals export is written to: the user's Downloads, else the
+/// app's documents folder. A provider so a test can hand the export a folder
+/// of its own instead of writing into the real Downloads (#320).
+final goalsExportDirectoryProvider = Provider<Future<Directory> Function()>(
+  (ref) =>
+      () async =>
+          await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory(),
+);
+
 class GoalsPage extends ConsumerStatefulWidget {
   const GoalsPage({super.key});
 
@@ -111,9 +121,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
       };
       final json = const JsonEncoder.withIndent('  ').convert(payload);
 
-      final dir =
-          await getDownloadsDirectory() ??
-          await getApplicationDocumentsDirectory();
+      final dir = await ref.read(goalsExportDirectoryProvider)();
       final stamp = DateTime.now().toIso8601String().split('T').first;
       final file = File(p.join(dir.path, 'goals-export-$stamp.json'));
       await file.writeAsString(json);
@@ -502,6 +510,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
           allowChains: sg['allowChains'] as bool? ?? false,
           objectives: _objectiveList(sg['objectives']),
           contentId: sg['contentId'] as String?,
+          kind: _kindOf(sg['kind']),
         );
       }
     }
@@ -552,6 +561,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
           allowChains: sg['allowChains'] as bool? ?? false,
           objectives: _objectiveList(sg['objectives']),
           contentId: sg['contentId'] as String?,
+          kind: _kindOf(sg['kind']),
         );
       }
     }
@@ -609,6 +619,8 @@ List<Map<String, dynamic>> _buildExportEntries(List<Goal> goals) {
     'teachingTips': g.teachingTips,
     'allowChains': g.allowChains,
     'objectives': g.objectives.map((o) => o.toMap()).toList(),
+    // The concept marking (#320), only when set — as `Goal.toMap` writes it.
+    if (g.kind != null) 'kind': g.kind,
   };
 
   final roots = byParent[null] ?? const <Goal>[];
@@ -630,6 +642,10 @@ int _countNodes(List<Map<String, dynamic>> entries) {
   }
   return n;
 }
+
+/// The `kind` an imported subgoal names (`'concept'`), or null when the file
+/// has none: a Replace then keeps the kind the stored subgoal has (#315).
+String? _kindOf(dynamic v) => v is String && v.trim().isNotEmpty ? v : null;
 
 List<String> _stringList(dynamic v) {
   if (v is List) return v.map((e) => e?.toString() ?? '').toList();

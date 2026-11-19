@@ -136,6 +136,13 @@ class DebugSessionRecorder {
   /// Read-only view of the buffer for the debug dialog.
   List<TurnRecord> get buffer => List.unmodifiable(_buffer);
 
+  /// The id every turn of the running session carries. A bug report names
+  /// the session by it (#314).
+  String get sessionId => _sessionId;
+
+  /// When the running session began (UTC).
+  DateTime get sessionStartedAt => _sessionStartedAt;
+
   void resetSession({String? uid, String? email, String? modelName}) {
     try {
       _buffer.clear();

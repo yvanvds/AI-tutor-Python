@@ -1490,15 +1490,10 @@ void main() {
 
         final after = printAfter(s.f);
         // 1e-3: the fixture sits a minute in the past (see masteredPrint).
-        // The credit lands after forgetting, like every write (#278):
-        // (1 + 4 × 0.7, 1) + 0.5 — on this much evidence it lowers μ.
-        expect(
-          after.alpha,
-          closeTo(
-            1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
-            1e-3,
-          ),
-        );
+        // The mastery guard (#311): after forgetting the credit would
+        // leave (1 + 4 × 0.7, 1) + 0.5, evidence 5.3 under the bar of
+        // 5.75 — so it is added without forgetting.
+        expect(after.alpha, closeTo(5.0 + PolicyConstants.weightWeak, 1e-3));
         expect(after.beta, closeTo(1.0, 1e-6));
         expect(after.lastUpdatedAt.isAfter(before.lastUpdatedAt), isTrue);
         // Not a probe of this LO: no ratchet, no counter, no type rotation.
@@ -2355,7 +2350,8 @@ void main() {
     /// A doc written [at] (an hour ago by default), right at calibration
     /// unless [atCalibration] is false. [right] and [nonMcq]: its right
     /// own questions, and those no pick; missing by default, a doc from
-    /// before 1.1.
+    /// before 1.1. [lastQuestionType]: what its last question was — the
+    /// type §2.2 does not ask again (#312).
     LoBelief seeded(
       String loId,
       double alpha,
@@ -2367,6 +2363,7 @@ void main() {
       int? nonMcq,
       DateTime? at,
       DateTime? probedAt,
+      String? lastQuestionType = 'mcQuestion',
     }) {
       final written = at ?? hourAgo;
       return LoBelief(
@@ -2375,7 +2372,7 @@ void main() {
         alpha: alpha,
         beta: beta,
         lastUpdatedAt: written,
-        lastQuestionType: 'mcQuestion',
+        lastQuestionType: lastQuestionType,
         lastPositiveAtCalibratedAt: atCalibration ? written : null,
         highestPositiveDifficulty: atCalibration
             ? QuestionDifficulty.medium
@@ -2602,16 +2599,27 @@ void main() {
         )).type,
         ChatRequestType.socraticQuestion,
       );
-      // Nothing right yet, μ 0.25: the gentlest, a pick.
+      // Nothing right yet, μ 0.25: the gentlest, a pick — when the
+      // question before on it was the other type (the rotation, #312).
       expect(
         (await planFor(
-          seeded('lo-r', 1, 3, atCalibration: false, right: 0, nonMcq: 0),
+          seeded(
+            'lo-r',
+            1,
+            3,
+            atCalibration: false,
+            right: 0,
+            nonMcq: 0,
+            lastQuestionType: 'socraticQuestion',
+          ),
         )).type,
         ChatRequestType.mcQuestion,
       );
       // A doc from before 1.1 reads 0: a pick.
       expect(
-        (await planFor(seeded('lo-r', 2, 1))).type,
+        (await planFor(
+          seeded('lo-r', 2, 1, lastQuestionType: 'socraticQuestion'),
+        )).type,
         ChatRequestType.mcQuestion,
       );
     });
@@ -2634,10 +2642,18 @@ void main() {
         (await planFor(seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1))).type,
         ChatRequestType.socraticQuestion,
       );
-      // Hard, far from the bar: picks can get there, the rotation's pick.
+      // Hard, far from the bar: picks can get there, the rotation's pick
+      // after an open question.
       expect(
         (await planFor(
-          seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1),
+          seeded(
+            'lo-r',
+            2,
+            1.5,
+            right: 2,
+            nonMcq: 1,
+            lastQuestionType: 'socraticQuestion',
+          ),
           calibration: QuestionDifficulty.hard,
         )).type,
         ChatRequestType.mcQuestion,
@@ -2659,7 +2675,15 @@ void main() {
 
     test('a top-up of a mastered subgoal keeps every type', () async {
       final s = await setup([
-        seeded('lo-r', 7, 1, firstMasteredAt: hourAgo, right: 3, nonMcq: 0),
+        seeded(
+          'lo-r',
+          7,
+          1,
+          firstMasteredAt: hourAgo,
+          right: 3,
+          nonMcq: 0,
+          lastQuestionType: 'socraticQuestion',
+        ),
         done('lo-p'),
         done('lo-a'),
       ]);
@@ -2669,31 +2693,126 @@ void main() {
       expect(plan.type, ChatRequestType.mcQuestion);
     });
 
-    test('#278 with #279: a weak side positive drops a just-stamped LO under '
-        'the bar; it is asked again — no pick on medium, where picks cannot '
-        'get back — and one right answer takes it over; the stamp never '
-        'moved', () async {
+    test(
+      '#311: a weak side positive leaves a just-stamped LO mastered — the '
+      'evidence is added without forgetting; the stamp never moved',
+      () async {
+        final stamp = hourAgo;
+        final s = await setup([
+          // (5.38, 1): stamped at its third right answer on medium (#278).
+          seeded('lo-r', 5.38, 1, firstMasteredAt: stamp, right: 3, nonMcq: 1),
+          done('lo-p'),
+          done('lo-a'),
+        ]);
+        // A question on lo-a (a top-up) with a weak positive on lo-r from the
+        // side. Forgotten to (4.07, 1), + 0.5 it would hold 5.57, under 5.75.
+        final side = await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+          on('lo-r', LoSignalKind.positive, strength: LoSignalStrength.weak),
+        ]);
+        final after = stored(s.f, 'lo-r');
+        expect(after.alpha, closeTo(5.38 + 0.5, 1e-2));
+        expect(after.beta, closeTo(1.0, 1e-2));
+        expect(
+          side.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+          isTrue,
+        );
+        expect(after.firstMasteredAt, stamp);
+      },
+    );
+
+    test('#311: own question right → mastered → follow-up right → still '
+        'mastered, and the conductor moves on to the next LO', () async {
+      final s = await setup([
+        // Two right own questions on medium: one more masters it.
+        seeded('lo-r', 4.4, 1, right: 2, nonMcq: 1),
+        seeded('lo-p', 2, 1),
+        done('lo-a'),
+      ]);
+      final own = await answer(
+        s.c,
+        planOn(recallLo, type: ChatRequestType.socraticQuestion),
+        AnswerQuality.correct,
+        [on('lo-r', LoSignalKind.positive)],
+      );
+      // (1 + 3.4 × 0.7, 1) + 2 = (5.38, 1): mastered and stamped.
+      expect(stored(s.f, 'lo-r').alpha, closeTo(5.38, 1e-2));
+      expect(
+        own.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+        isTrue,
+      );
+      final stamp = stored(s.f, 'lo-r').firstMasteredAt;
+      expect(stamp, isNotNull);
+
+      // The follow-up, right: capped at weak on medium, 0.5 (§6.2). After
+      // forgetting that is 5.57 of evidence, under 5.75 — the issue.
+      final followUp = await answer(
+        s.c,
+        planOn(recallLo, type: ChatRequestType.socraticQuestion),
+        AnswerQuality.correct,
+        [on('lo-r', LoSignalKind.positive)],
+        isFollowUp: true,
+      );
+      final after = stored(s.f, 'lo-r');
+      expect(after.alpha, closeTo(5.38 + 0.5, 1e-2));
+      expect(
+        followUp.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+        isTrue,
+      );
+      expect(
+        followUp.subgoalProgressAfter,
+        greaterThanOrEqualTo(own.subgoalProgressAfter),
+      );
+      expect(after.firstMasteredAt, stamp);
+      // Not asked again: the selection reads the belief (§2.1).
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.targetLOs.single.id, 'lo-p');
+    });
+
+    test('#311: a wrong follow-up on a just-mastered LO forgets as ever and '
+        'takes it under the bar; where forgetting leaves it mastered, a right '
+        'one forgets too', () async {
+      final s = await setup([
+        seeded('lo-r', 5.38, 1, firstMasteredAt: hourAgo, right: 3, nonMcq: 1),
+        // Well over the bar: (1 + 7 × 0.7, 1) + 0.5 = (6.4, 1) is mastered.
+        seeded('lo-p', 8, 1, firstMasteredAt: hourAgo, right: 4, nonMcq: 2),
+        done('lo-a'),
+      ]);
+      final wrong = await answer(
+        s.c,
+        planOn(recallLo, type: ChatRequestType.socraticQuestion),
+        AnswerQuality.wrong,
+        [on('lo-r', LoSignalKind.negative)],
+        isFollowUp: true,
+      );
+      final r = stored(s.f, 'lo-r');
+      expect(r.alpha, closeTo(1 + 4.38 * 0.7, 1e-2));
+      expect(r.beta, closeTo(1.5, 1e-2));
+      expect(
+        wrong.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
+        isFalse,
+      );
+
+      await answer(
+        s.c,
+        planOn(predictLo, type: ChatRequestType.socraticQuestion),
+        AnswerQuality.correct,
+        [on('lo-p', LoSignalKind.positive)],
+        isFollowUp: true,
+      );
+      expect(stored(s.f, 'lo-p').alpha, closeTo(1 + 7 * 0.7 + 0.5, 1e-2));
+    });
+
+    test('#278 with #279: a stamped LO that fell under the bar is asked '
+        'again — no pick on medium, where picks cannot get back — and one '
+        'right answer takes it over; the stamp never moved', () async {
       final stamp = hourAgo;
       final s = await setup([
-        // (5.38, 1): stamped at its third right answer on medium (#278).
-        seeded('lo-r', 5.38, 1, firstMasteredAt: stamp, right: 3, nonMcq: 1),
+        // Stamped at (5.38, 1), then a dip: evidence 5.57, under 5.75.
+        seeded('lo-r', 4.57, 1, firstMasteredAt: stamp, right: 3, nonMcq: 1),
         done('lo-p'),
         done('lo-a'),
       ]);
-      // A question on lo-a (a top-up) with a weak positive on lo-r from the
-      // side: forgotten to (4.07, 1), + 0.5 — evidence 5.57, under 5.75.
-      final side = await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
-        on('lo-a', LoSignalKind.positive),
-        on('lo-r', LoSignalKind.positive, strength: LoSignalStrength.weak),
-      ]);
-      final dipped = stored(s.f, 'lo-r');
-      expect(dipped.alpha + dipped.beta, lessThan(5.75));
-      expect(
-        side.loStatusAfter.firstWhere((l) => l.loId == 'lo-r').mastered,
-        isFalse,
-      );
-      expect(dipped.firstMasteredAt, stamp);
-
       final plan = _expectQuestion(await s.c.planNext());
       expect(plan.targetLOs.single.id, 'lo-r');
       expect(plan.type, ChatRequestType.socraticQuestion);
@@ -2840,6 +2959,225 @@ void main() {
       ]);
       final twice = stored(s.f, 'lo-old', subgoalId: 's0');
       expect(twice.firstMasteredAt, twice.lastUpdatedAt);
+    });
+  });
+
+  group("#312 the type rotates on the LO's own previous type (§2.2)", () {
+    const applyA = LearningObjective(
+      id: 'lo-a',
+      statement: 'a',
+      kind: LoKind.apply,
+    );
+    const applyB = LearningObjective(
+      id: 'lo-b',
+      statement: 'b',
+      kind: LoKind.apply,
+    );
+    const predictLo = LearningObjective(
+      id: 'lo-p',
+      statement: 'p',
+      kind: LoKind.predict,
+    );
+    const recallLo = LearningObjective(
+      id: 'lo-r',
+      statement: 'r',
+      kind: LoKind.recall,
+    );
+    final hourAgo = DateTime.now().toUtc().subtract(const Duration(hours: 1));
+
+    /// The student on a subgoal with [objectives], at medium.
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LearningObjective> objectives,
+      List<LoBelief> beliefs,
+    ) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 1,
+        objectives: objectives,
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+        recentAnswers: const [],
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    /// A doc written an hour ago; [last] the type of its last question,
+    /// `null` for a doc no question ever targeted.
+    LoBelief doc(
+      String loId,
+      double alpha,
+      double beta, {
+      String? last,
+      int? right,
+      int? nonMcq,
+      bool stamped = false,
+    }) => LoBelief(
+      subgoalId: 's',
+      loId: loId,
+      alpha: alpha,
+      beta: beta,
+      lastUpdatedAt: hourAgo,
+      lastQuestionType: last,
+      lastPositiveAtCalibratedAt: stamped ? hourAgo : null,
+      highestPositiveDifficulty: stamped ? QuestionDifficulty.medium : null,
+      firstMasteredAt: stamped ? hourAgo : null,
+      lastProbedAt: last == null ? null : hourAgo,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+
+    /// Plans the next question, checks it is on [loId], and answers it
+    /// wrong with a strong negative on that LO: no LO gets near its stamp.
+    Future<QuestionPlan> askWrong(Conductor c, String loId) async {
+      final plan = _expectQuestion(await c.planNext());
+      expect(plan.isOffSubgoal, isFalse);
+      expect(plan.targetLOs.single.id, loId);
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.wrong,
+          signals: [
+            GradedSignal(
+              subgoalId: 's',
+              loId: loId,
+              kind: LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+          isFollowUp: false,
+          chainDepth: 0,
+          provenance: EvidenceProvenance.home,
+        ),
+      );
+      expect(outcome.subgoalAdvanced, isFalse);
+      return plan;
+    }
+
+    test('apply LO A gets completeCode, then LO B, then A again: writeCode — '
+        'and completeCode the time after', () async {
+      // Neither was ever the target of a question; A the lower.
+      final s = await setup(
+        [applyA, applyB],
+        [doc('lo-a', 3, 2.5), doc('lo-b', 3, 2)],
+      );
+      final types = <String, List<ChatRequestType>>{'lo-a': [], 'lo-b': []};
+      for (final loId in ['lo-a', 'lo-b', 'lo-a', 'lo-b', 'lo-a']) {
+        types[loId]!.add((await askWrong(s.c, loId)).type);
+      }
+      expect(types['lo-a'], [
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.writeCodeQuestion,
+        ChatRequestType.completeCodeQuestion,
+      ]);
+      expect(types['lo-b'], [
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.writeCodeQuestion,
+      ]);
+      expect(
+        s.f.beliefs[s.f._key('s', 'lo-a')]!.lastQuestionType,
+        'completeCodeQuestion',
+      );
+    });
+
+    test("the previous type is the doc's, also in a new session, over and "
+        'under μ 0.5: an apply LO that last got completeCode gets writeCode, '
+        'and the other way round', () async {
+      for (final beta in [1.5, 3.0]) {
+        final afterComplete = await setup(
+          [applyA],
+          [doc('lo-a', 2, beta, last: 'completeCodeQuestion')],
+        );
+        expect(
+          _expectQuestion(await afterComplete.c.planNext()).type,
+          ChatRequestType.writeCodeQuestion,
+        );
+        final afterWrite = await setup(
+          [applyA],
+          [doc('lo-a', 2, beta, last: 'writeCodeQuestion')],
+        );
+        expect(
+          _expectQuestion(await afterWrite.c.planNext()).type,
+          ChatRequestType.completeCodeQuestion,
+        );
+      }
+    });
+
+    test('no doc, or a doc no question ever targeted: nothing is excluded — '
+        'the first type of the kind', () async {
+      final fresh = await setup([applyA], []);
+      expect(
+        _expectQuestion(await fresh.c.planNext()).type,
+        ChatRequestType.completeCodeQuestion,
+      );
+      // Evidence from the side only, over and under 0.5.
+      for (final beta in [1.5, 3.0]) {
+        final side = await setup([applyA], [doc('lo-a', 2, beta)]);
+        expect(
+          _expectQuestion(await side.c.planNext()).type,
+          ChatRequestType.completeCodeQuestion,
+        );
+      }
+    });
+
+    test('a predict LO after a right own answer alternates between '
+        'explainCode and a socratic question, with another LO asked in '
+        'between', () async {
+      // lo-p: one right pick on record, so no more picks (#279).
+      final s = await setup(
+        [predictLo, recallLo],
+        [
+          doc('lo-p', 2, 2, last: 'mcQuestion', right: 1, nonMcq: 0),
+          doc('lo-r', 2, 1.5, last: 'socraticQuestion', right: 0, nonMcq: 0),
+        ],
+      );
+      final types = <ChatRequestType>[];
+      for (var i = 0; i < 4; i++) {
+        types.add((await askWrong(s.c, 'lo-p')).type);
+        await askWrong(s.c, 'lo-r');
+      }
+      expect(types, [
+        ChatRequestType.explainCodeQuestion,
+        ChatRequestType.socraticQuestion,
+        ChatRequestType.explainCodeQuestion,
+        ChatRequestType.socraticQuestion,
+      ]);
+    });
+
+    test('a mastered LO in a top-up reads its doc as well', () async {
+      final s = await setup(
+        [applyA],
+        [
+          doc(
+            'lo-a',
+            9,
+            1,
+            last: 'completeCodeQuestion',
+            right: 2,
+            nonMcq: 2,
+            stamped: true,
+          ),
+        ],
+      );
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.reason.chosenReason, 'all mastered: lowest mean');
+      expect(plan.type, ChatRequestType.writeCodeQuestion);
     });
   });
 
@@ -4272,10 +4610,8 @@ void main() {
       );
       expect(
         printAfter(s.f).alpha,
-        closeTo(
-          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
-          1e-3,
-        ),
+        // On a mastered (5, 1) without forgetting: the guard of #311.
+        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
       );
     });
 
@@ -4346,10 +4682,8 @@ void main() {
       expect(outcome.transferCredits, isEmpty);
       expect(
         printAfter(s.f).alpha,
-        closeTo(
-          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
-          1e-3,
-        ),
+        // On a mastered (5, 1) without forgetting: the guard of #311.
+        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
       );
     });
 
@@ -4710,13 +5044,10 @@ void main() {
         transferLOs: const [GradedTransfer(subgoalId: 's0', loId: 'lo-print')],
       );
       final after = stored(flagged.f, 'lo-print');
-      // Forgetting first (#278): (1 + 4 × 0.7, 1) + 0.5.
       expect(
         after.alpha,
-        closeTo(
-          1 + 4.0 * PolicyConstants.forgetFactor + PolicyConstants.weightWeak,
-          1e-3,
-        ),
+        // On a mastered (5, 1) without forgetting: the guard of #311.
+        closeTo(5.0 + PolicyConstants.weightWeak, 1e-3),
       );
       expect(after.regressedAt, aMinuteAgo);
       await flagged.c.setTarget();
@@ -5684,9 +6015,9 @@ void main() {
       const credit = [GradedTransfer(subgoalId: 's0', loId: 'lo-input')];
       final s = await setup([mastered.copyWith(lastProbedAt: daysAgo(20))]);
       await grade(s, varProbe(), transferLOs: credit);
-      // Credited after forgetting (#278): on this much evidence the weak
-      // credit takes α down, not up.
-      expect(stored(s.f, 'lo-input').alpha, lessThan(5.0));
+      // Mastered, and forgetting would take it under the bar: the credit
+      // is added without it (#311).
+      expect(stored(s.f, 'lo-input').alpha, greaterThan(5.0));
       expect(stored(s.f, 'lo-input').lastProbedAt, daysAgo(20));
 
       final legacy = await setup([mastered]);

@@ -685,20 +685,64 @@ void main() {
       skip: Platform.isWindows ? false : 'WinHTTP is Windows-only',
     );
 
+    // WinHTTP keeps a script by its URL, for every process on the machine
+    // and for longer than a test run, and Windows hands loopback ports out
+    // again — so a server that was only told apart by its port was, now and
+    // then, never fetched: WinHTTP answered from the script (or the failed
+    // download) an earlier server had left at that port (#319). The second
+    // server here sits on the very port of the first and must still be the
+    // one that is asked.
+    test(
+      'the real WinHTTP fetches a script on a port it has seen before',
+      () async {
+        final LoopbackPacServer first = await LoopbackPacServer.start(
+          script: pacScript(proxy: '127.0.0.1:8080'),
+        );
+        final int port = first.url.port;
+        try {
+          expect(
+            (await resolveAutoProxy(Uri.parse('https://api.github.com/'), (
+              autoDetect: false,
+              configUrl: first.url.toString(),
+            ))).proxy,
+            '127.0.0.1:8080',
+          );
+        } finally {
+          await first.close();
+        }
+
+        final LoopbackPacServer second = await LoopbackPacServer.start(
+          script: pacScript(proxy: '127.0.0.1:8081'),
+          port: port,
+        );
+        addTearDown(second.close);
+        expect(second.url.port, port);
+        expect(
+          (await resolveAutoProxy(Uri.parse('https://api.github.com/'), (
+            autoDetect: false,
+            configUrl: second.url.toString(),
+          ))).proxy,
+          '127.0.0.1:8081',
+        );
+        expect(second.fetches, greaterThanOrEqualTo(1));
+      },
+      skip: Platform.isWindows ? false : 'WinHTTP is Windows-only',
+    );
+
     // A script URL nobody serves: WinHTTP must say so, not hang, and must
     // say so as an error the resolver surfaces rather than a proxy of none.
+    //
+    // Port 1, which no test listens on and Windows never hands out, and not
+    // a port that was free a moment ago: WinHTTP does not let a failed
+    // download rest. It comes back for the script by itself — seconds and
+    // minutes after this test is over — and whoever has been given that port
+    // by then gets its `GET`: a black hole that counts connections, the
+    // test runner's own socket (#319).
     test('the real WinHTTP reports a script it cannot download', () async {
-      // A port that was listening a moment ago and is not any more.
-      final ServerSocket gone = await ServerSocket.bind(
-        InternetAddress.loopbackIPv4,
-        0,
-      );
-      final int port = gone.port;
-      await gone.close();
       await expectLater(
         resolveAutoProxy(Uri.parse('https://api.github.com/'), (
           autoDetect: false,
-          configUrl: 'http://127.0.0.1:$port/proxy.pac',
+          configUrl: 'http://127.0.0.1:1/proxy.pac',
         )),
         throwsA(
           isA<StateError>().having(

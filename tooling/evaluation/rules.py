@@ -20,7 +20,21 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.1-eval8` = PUNTENFORMULE v1.1, replayed from the turn log.
+Rule set `1.1-eval9` = PUNTENFORMULE v1.1, replayed from the turn log.
+`eval9` (#311) follows the app's mastery guard from the build that brought
+it (`MASTERY_GUARD_FROM`, by the turn's `clientVersion`, `mastery_guard`):
+a write without a negative on an LO that is mastered at that moment — the
+question's signal, a follow-up, a side signal, a transfer credit — is tried
+with forgetting first, and where that would leave the LO under the mean or
+the evidence bar, the evidence is added without forgetting
+(CONDUCTOR_POLICY §3.4). A negative forgets as before, and so does every
+write on the way to mastery. The guard only acts on an LO that is mastered,
+and that one has its stamp: no stamp moves, so M and P do not. What moves is
+(α, β) of such an LO, which `validate` compares. A turn from an earlier
+build replays as that build wrote it, `--regels 1.1` included: the docs it
+wrote had no guard. It is variant "C breed" of the replay on #311, the
+teacher's choice of 2026-11-18.
+
 `eval8` (#278) follows the app's forgetting per answer from the build that
 brought it (`RULES_11_FROM`, by the turn's `clientVersion`, `rules_11`):
 before evidence lands on an LO, what it holds above the prior shrinks by
@@ -141,7 +155,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.1-eval8"
+RULES_VERSION = "1.1-eval9"
 
 PRIOR = 1.0
 # A backstop since #278: forgetting keeps the evidence under 14.
@@ -151,6 +165,10 @@ EVIDENCE_CAP = 20.0
 # that brought it (`rules_11`); the teacher chose 0.7 on the replay of #248.
 FORGET = 0.7
 RULES_11_FROM = (2, 13, 0)
+# The mastery guard (#311, `belief_math.applyEvidence`): from the build that
+# brought it, a write without a negative on a mastered LO does not forget
+# where forgetting would take the LO under the bar (`mastery_guard`).
+MASTERY_GUARD_FROM = (2, 15, 0)
 # #279, from the same build: a right pick weighs half
 # (`PolicyConstants.multipleChoicePositiveFactor`), and the stamp wants two
 # own questions answered right, one of them no multiple choice
@@ -341,6 +359,14 @@ def rules_11(turn: dict) -> bool:
     return v is not None and v >= RULES_11_FROM
 
 
+def mastery_guard(turn: dict) -> bool:
+    """Whether the build that wrote [turn] has the mastery guard (#311):
+    an answer that is not wrong never takes mastery away. Older builds, and
+    turns without `clientVersion`, forgot on every write of 1.1."""
+    v = build_version(turn)
+    return v is not None and v >= MASTERY_GUARD_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -513,6 +539,11 @@ class Variant:
     # a follow-up on one. Set, it holds for every turn; unset, a turn of
     # 1.1 weighs `MCQ_POSITIVE`.
     mcq_positive: float | None = None
+    # #311: the mastery guard on every turn (True) or on none (False),
+    # whatever build wrote it; unset, a turn of a build that has it
+    # (`mastery_guard`). `as_11` does not set it: the docs `--regels 1.1`
+    # wrote, and the builds of 1.1 before the guard, had none.
+    mastery_guard: bool | None = None
 
 
 CURRENT = Variant()
@@ -520,6 +551,31 @@ CURRENT = Variant()
 
 def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
     return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
+
+
+def _mastered_now(lo: LoState, a: float, b: float, min_right: int, min_open: int) -> bool:
+    """`belief_math.isMastered` on the decayed belief `(a, b)`: mean and
+    evidence at today's bar, a positive at calibration, and the stamp or
+    the right own questions the stamp wants."""
+    return (
+        a / (a + b) >= MASTERY_MEAN
+        and a + b >= MASTERY_EVIDENCE
+        and lo.positive_at_calibrated_at is not None
+        and (lo.demonstrated or (lo.own_right >= min_right and lo.own_right_open >= min_open))
+    )
+
+
+def _add_positive(a: float, b: float, da: float, forget: float | None, guarded: bool) -> tuple[float, float]:
+    """A positive of weight [da] on the decayed `(a, b)`: forget, then
+    cap-then-add. [guarded] (#311): the LO is mastered now and the turn's
+    build has the mastery guard — where forgetting would leave it under the
+    mean or the evidence bar, the weight is added without forgetting."""
+    if forget is None:
+        return _apply(a, b, da, 0.0)
+    na, nb = _apply(*_shrink(a, b, forget), da, 0.0)
+    if guarded and da > 0 and not (na / (na + nb) >= MASTERY_MEAN and na + nb >= MASTERY_EVIDENCE):
+        return _apply(a, b, da, 0.0)
+    return na, nb
 
 
 def _stamps(lo: LoState, evidence_min: float, v: Variant, min_right: int, min_open: int) -> bool:
@@ -657,6 +713,7 @@ def replay(
             STAMP_OWN_RIGHT_MIN if r11 else 0)
         min_open = variant.min_open_right if variant.min_open_right is not None else (
             STAMP_OWN_RIGHT_NON_MCQ_MIN if r11 else 0)
+        guard = variant.mastery_guard if variant.mastery_guard is not None else mastery_guard(t)
         own_counted = False
         mcq = t.get("questionType") == "mcQuestion"
         # #279: a pick weighs half; a follow-up on one is free text (§6.2).
@@ -698,11 +755,13 @@ def replay(
             own = target and not follow_up and not incidental
             if kind == "positive" and pick:
                 base *= mcq_factor
-            if forget is not None and kind != "neutral" and (own or not variant.forget_own_only):
-                a, b = _shrink(a, b, forget)
+            forgets = forget if (own or not variant.forget_own_only) else None
             if kind == "positive":
-                a, b = _apply(a, b, base * POS_FACTOR[eff_diff], 0.0)
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                a, b = _add_positive(a, b, base * POS_FACTOR[eff_diff], forgets, guarded)
             elif kind == "negative":
+                if forgets is not None:
+                    a, b = _shrink(a, b, forgets)
                 factor = NEG_FACTOR if asymmetric else POS_FACTOR
                 a, b = _apply(a, b, 0.0, base * factor[eff_diff])
             # A direct neutral adds nothing, and is written all the same:
@@ -769,9 +828,9 @@ def replay(
             for c in t.get("transferCredits") or []:
                 lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
-                if forget is not None and not variant.forget_own_only:
-                    a, b = _shrink(a, b, forget)
-                lo.alpha, lo.beta = _apply(a, b, TRANSFER_CREDIT_ALPHA * s_factor, 0.0)
+                forgets = None if variant.forget_own_only else forget
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                lo.alpha, lo.beta = _add_positive(a, b, TRANSFER_CREDIT_ALPHA * s_factor, forgets, guarded)
                 lo.last_at = now
                 lo.n_transfer += 1
                 if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):

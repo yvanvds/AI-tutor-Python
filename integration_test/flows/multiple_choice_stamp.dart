@@ -13,7 +13,9 @@
 // `lo-quote` still starts with a pick, the gentle way in; and the next
 // question on `lo-print` is a question in the chat, not a quiz. Answered
 // right, it counts as the right non-pick, but the belief is not over the
-// bar yet, so no stamp. A second test seeds `lo-print` over the bar on four
+// bar yet, so no stamp. `lo-quote`, whose pick was wrong, then gets an open
+// question too: not by this rule, but because the type rotates on what the
+// LO got the last time (#312). A second test seeds `lo-print` over the bar on four
 // right picks — the stamp of before — and shows that it is not mastered: the
 // session asks it a socratic question, whose right answer stamps it, and
 // "Print" is reached.
@@ -50,6 +52,8 @@ const String kPrintWrong = 'Het slaat tekst op';
 const String kQuoteKey = 'Zodat Python weet dat het tekst is';
 const String kQuoteWrong = 'Zodat het mooier staat';
 const String kOpenQuestion = 'Leg in je eigen woorden uit wat print() doet.';
+const String kQuoteOpenQuestion =
+    'Leg uit waarom tekst tussen aanhalingstekens staat.';
 const String kNextSubgoal = 'stad = ___\nprint(stad)';
 
 Map<String, String> _signal(String loId, String kind) => {
@@ -222,11 +226,7 @@ void main() {
       _mcqGrade('Nee, het is geen opmaak.', 'wrong', 'lo-quote', 'negative'),
       _openQuestion(kOpenQuestion),
       _openRight('Helemaal juist, in je eigen woorden.', 'lo-print'),
-      _mcqReply('Wat is "3" in Python?', [
-        'Tekst',
-        'Een getal',
-        'Een lijst',
-      ], 'A'),
+      _openQuestion(kQuoteOpenQuestion),
     ]);
     final harness = AppHarness(
       llm: llm,
@@ -284,16 +284,22 @@ void main() {
     expect(print['alpha'], closeTo(3.7, 1e-3));
     expect(print.containsKey('firstMasteredAt'), isFalse);
 
-    // 4. The next exercise: lo-quote, still without a right own question,
-    //    so a pick again.
+    // 4. The next exercise: lo-quote. It has no right own question, so a
+    //    pick is still allowed — but its last question was a pick, and the
+    //    type rotates per LO (#312): an open question, in the chat.
     await pumpUntil(
       tester,
       () => llm.remaining == 0,
       timeout: const Duration(seconds: 30),
       reason: 'the next exercise was never asked for',
     );
-    expect(asked(llm, 6), (type: 'multiple_choice', target: 'lo-quote'));
-    await pumpUntilFound(tester, find.byType(QuizView));
+    expect(asked(llm, 6), (type: 'socratic_question', target: 'lo-quote'));
+    await pumpUntilFound(
+      tester,
+      find.textContaining(kQuoteOpenQuestion, findRichText: true),
+    );
+    await waitForIdle(tester, harness);
+    expect(find.byType(QuizView), findsNothing);
 
     await harness.dispose(tester);
   });

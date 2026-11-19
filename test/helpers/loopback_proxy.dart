@@ -264,26 +264,48 @@ class BlackHole {
 /// [LoopbackProxy]; the app then reaches its release only if it resolved
 /// the script, which is the whole difference #135 makes.
 class LoopbackPacServer {
-  LoopbackPacServer._(this._server, this.script);
+  LoopbackPacServer._(this._server, this.script, this._path);
 
   final HttpServer _server;
 
   /// The JavaScript served, verbatim.
   final String script;
 
+  /// The path of [url]: different for every server (#319).
+  final String _path;
+
+  static int _started = 0;
+
   /// How many times the script was fetched: the proof WinHTTP came for it.
   int fetches = 0;
 
-  /// Where Internet Options would point: `http://127.0.0.1:<port>/proxy.pac`.
+  /// Where Internet Options would point:
+  /// `http://127.0.0.1:<port>/<unique>/proxy.pac`.
+  ///
+  /// The path is unique to this server because WinHTTP remembers a script —
+  /// and a failed download — by its URL, machine-wide and well beyond the
+  /// test that asked, and the loopback port alone does not tell two servers
+  /// apart: Windows hands the same port numbers out again, so a server in a
+  /// later test or a later run lands on a URL WinHTTP already has an answer
+  /// for and is never asked (#319).
   Uri get url =>
-      Uri.parse('http://${_server.address.address}:${_server.port}/proxy.pac');
+      Uri.parse('http://${_server.address.address}:${_server.port}$_path');
 
-  static Future<LoopbackPacServer> start({required String script}) async {
+  /// Serves [script] on a free loopback port, or on [port] for a test that
+  /// needs a server where another one was a moment ago.
+  static Future<LoopbackPacServer> start({
+    required String script,
+    int port = 0,
+  }) async {
     final HttpServer server = await HttpServer.bind(
       InternetAddress.loopbackIPv4,
-      0,
+      port,
     );
-    final LoopbackPacServer pac = LoopbackPacServer._(server, script);
+    final LoopbackPacServer pac = LoopbackPacServer._(
+      server,
+      script,
+      '/$pid-${DateTime.now().microsecondsSinceEpoch}-${_started++}/proxy.pac',
+    );
     server.listen((HttpRequest req) async {
       pac.fetches++;
       req.response.headers.contentType = ContentType(

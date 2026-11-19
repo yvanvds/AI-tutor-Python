@@ -247,18 +247,46 @@ DateTime? nextRegressedAt({
 /// Then the cap, a backstop since #278: when the resulting `α + β` would
 /// exceed `PolicyConstants.evidenceCap`, existing evidence-above-prior is
 /// shrunk proportionally to make room.
+///
+/// The mastery guard (#311): [mastered] says the LO is mastered now
+/// ([isMastered] on its decayed belief, the caller's reading). A write
+/// without a negative on such an LO is tried with forgetting first; would
+/// that leave it under conditions 1 and 2 of §4.1
+/// ([meetsMasteryMeanAndEvidence]), the evidence is added without
+/// forgetting instead. So an answer that is not wrong never takes mastery
+/// away: a follow-up or a transfer credit of 0.5 adds less than forgetting
+/// takes from an LO just over the bar. A negative forgets as ever, and so
+/// does every write on the way to mastery.
 BeliefSnapshot applyEvidence({
   required double alpha,
   required double beta,
   required double alphaDelta,
   required double betaDelta,
+  bool mastered = false,
 }) {
   if (alphaDelta == 0 && betaDelta == 0) {
     return BeliefSnapshot(alpha, beta);
   }
-  final forgotten = forgetBeforeEvidence(BeliefSnapshot(alpha, beta));
-  alpha = forgotten.alpha;
-  beta = forgotten.beta;
+  final before = BeliefSnapshot(alpha, beta);
+  final forgetting = _capThenAdd(
+    forgetBeforeEvidence(before),
+    alphaDelta: alphaDelta,
+    betaDelta: betaDelta,
+  );
+  if (!mastered || betaDelta > 0 || meetsMasteryMeanAndEvidence(forgetting)) {
+    return forgetting;
+  }
+  return _capThenAdd(before, alphaDelta: alphaDelta, betaDelta: betaDelta);
+}
+
+/// The cap step of [applyEvidence], then the new evidence.
+BeliefSnapshot _capThenAdd(
+  BeliefSnapshot snap, {
+  required double alphaDelta,
+  required double betaDelta,
+}) {
+  var alpha = snap.alpha;
+  var beta = snap.beta;
   final cap = PolicyConstants.evidenceCap;
   final priorMass = 2 * PolicyConstants.prior;
   final newDelta = alphaDelta + betaDelta;

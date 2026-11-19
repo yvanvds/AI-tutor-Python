@@ -764,11 +764,11 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
+      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van deze sessie erbij.';
 
   @override
   String get options_bugReport_subtitle_standalone =>
-      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente oefening erbij.';
+      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van deze sessie erbij.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -851,10 +851,21 @@ class AppLocalizationsNl extends AppLocalizations {
   String get options_bugReport_dialog_descriptionField => 'Wat ging er mis?';
 
   @override
-  String get options_bugReport_dialog_turnField => 'Tutorbeurt bijvoegen';
+  String get options_bugReport_dialog_turnField => 'Debuggegevens bijvoegen';
 
   @override
-  String get options_bugReport_dialog_turnNone => 'Geen beurt';
+  String options_bugReport_dialog_turnSession(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hele sessie ($count oefeningen)',
+      one: 'Hele sessie (1 oefening)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'Geen';
 
   @override
   String options_bugReport_dialog_turnLabel(int id, String type) {
@@ -1641,6 +1652,86 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String goals_editor_language_discard_message(String language, String target) {
     return 'De titel en beschrijving ($language) hebben wijzigingen die nog niet opgeslagen zijn. Wisselen naar $target gooit ze weg.';
+  }
+
+  @override
+  String get goals_editor_switch_allowChains => 'Kettingvragen';
+
+  @override
+  String get goals_editor_switch_allowChains_subtitle =>
+      'In dit subdoel mag de tutor een vervolgvraag op een vervolgvraag stellen.';
+
+  @override
+  String get goals_editor_objectives_label => 'Leerdoelen';
+
+  @override
+  String get goals_editor_objectives_empty =>
+      'Dit subdoel heeft geen leerdoelen.';
+
+  @override
+  String get goals_editor_objectives_note =>
+      'De id ligt vast: de voortgang van leerlingen hangt eraan. Leerdoelen toevoegen, verwijderen of herschikken doe je in de JSON van het doel.';
+
+  @override
+  String get goals_editor_objectives_save => 'Leerdoelen opslaan';
+
+  @override
+  String get goals_editor_objectives_saved =>
+      'Leerdoelen opgeslagen. Pas ook de JSON van het doel aan: een vervang-import overschrijft wat je hier wijzigde.';
+
+  @override
+  String goals_editor_objectives_translation_saved(String language) {
+    return 'Leerdoelen ($language) opgeslagen';
+  }
+
+  @override
+  String get goals_editor_objective_statement => 'Tekst';
+
+  @override
+  String get goals_editor_objective_statement_empty =>
+      'Een leerdoel heeft een tekst nodig.';
+
+  @override
+  String get goals_editor_objective_kind => 'Soort';
+
+  @override
+  String get goals_editor_objective_kind_recall => 'Kennen';
+
+  @override
+  String get goals_editor_objective_kind_apply => 'Toepassen';
+
+  @override
+  String get goals_editor_objective_kind_predict => 'Voorspellen';
+
+  @override
+  String get goals_editor_objective_kind_reason => 'Redeneren';
+
+  @override
+  String get goals_editor_objective_weight => 'Gewicht';
+
+  @override
+  String get goals_editor_objective_weight_invalid =>
+      'Het gewicht is een getal boven 0.';
+
+  @override
+  String goals_editor_objective_translation_none(String language) {
+    return 'Nog geen vertaling ($language).';
+  }
+
+  @override
+  String goals_editor_objective_translation_stale(String statement) {
+    return 'Verouderd. De Nederlandse tekst is nu: $statement';
+  }
+
+  @override
+  String get goals_editor_objective_translation_confirm => 'Klopt nog';
+
+  @override
+  String goals_editor_language_discard_message_objectives(
+    String language,
+    String target,
+  ) {
+    return 'De teksten ($language), ook die van de leerdoelen, hebben wijzigingen die nog niet opgeslagen zijn. Wisselen naar $target gooit ze weg.';
   }
 
   @override

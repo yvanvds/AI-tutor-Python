@@ -96,6 +96,13 @@ now", not 45%. The mass stays bounded by itself, at `2 + w / (1 − λ)`
 for a steady weight `w` (under 14). The cap stays as a backstop that is
 hardly reached; decay over time (below) is unchanged.
 
+One exception since #311, the mastery guard: an update without a
+negative on an LO that is mastered at that moment does not forget where
+forgetting would take the LO under the mastery bar (mean or evidence).
+A right follow-up or a transfer credit weighs 0.5, less than forgetting
+takes from an LO just over the bar, and a right answer should never
+take mastery away. A negative forgets as ever.
+
 Exact values are policy (part 4, conductor policy 3.4); the model
 commits to a bounded, responsive belief.
 
@@ -533,7 +540,9 @@ release pressed again for reports nobody touched rewrites nothing.
   A right pick also weighs half (conductor policy 3.1).
 - **Forgetting per answer** (#278): before every update that carries
   weight the evidence above the prior shrinks by λ = 0.7. The evidence
-  cap (20) stays as a backstop (conductor policy 3.4).
+  cap (20) stays as a backstop (conductor policy 3.4). An update without
+  a negative never takes mastery away: where forgetting would, the
+  evidence is added without it (#311).
 - **Stuck counts own questions** (#278): at least six direct questions
   with the LO as target (`ownQuestions` on the belief doc) and mean
   under 0.6 (conductor policy 4.4).

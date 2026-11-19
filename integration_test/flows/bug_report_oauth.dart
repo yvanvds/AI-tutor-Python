@@ -253,7 +253,7 @@ void main() {
 
     // Attached with no dropdown, no turn to attach, and no host alive.
     expect(body, contains('Python runner state'));
-    expect(body, isNot(contains('Turn debug payload')));
+    expect(body, isNot(contains('debug payload')));
     expect(body, contains('PyRunnerNotInstalled'));
     expect(body, contains('python.exe'));
     expect(body, contains('(no host has started this session)'));
@@ -278,8 +278,8 @@ void main() {
   // turn, the recorder has to be the one the report dialog reads, and the
   // numbers have to survive in that recorder afterwards — Developer tools is
   // the teacher's own machine and keeps them.
-  testWidgets('Bug reports: the attached turn keeps the plan and drops the '
-      "student's mastery estimates", (tester) async {
+  testWidgets('Bug reports: the attached session keeps the plan and drops '
+      "the student's mastery estimates", (tester) async {
     final github = await FakeGitHubServer.start();
     final llm = ScriptedLlm([
       completeCodeReply(text: 'Vul de ontbrekende invoer in.', code: _exercise),
@@ -330,10 +330,12 @@ void main() {
       find.text('Connected to GitHub as $kFakeGitHubLogin.'),
     );
 
-    // The dialog offers the newest turn by default — the one just planned.
+    // The dialog attaches the whole session by default (#314) — which holds
+    // the turn just planned.
     await _clearSnacks(tester);
     await _tap(tester, find.text('Report a bug…'));
     await pumpUntilFound(tester, find.text('Report a bug'));
+    expect(find.textContaining('Whole session ('), findsOneWidget);
     await tester.enterText(
       find.widgetWithText(TextField, 'Title'),
       'the exercise looks wrong',
@@ -348,7 +350,9 @@ void main() {
     final body = github.issues.single['body'] as String;
 
     // Attached, and still worth attaching.
-    expect(body, contains('Turn debug payload'));
+    expect(body, contains('Session debug payload'));
+    expect(body, contains('"sessionId": "${recorder.sessionId}"'));
+    expect(body, isNot(contains('omitted')));
     expect(body, contains('conductor.planned'));
     expect(body, contains('"chosenReason"'));
     expect(body, contains('"targetLO"'));
@@ -380,6 +384,101 @@ void main() {
             .cast<Map<String, dynamic>>();
     expect(after.first['mean'], candidates.first['mean']);
     expect(after.first['evidence'], candidates.first['evidence']);
+
+    await harness.dispose(tester);
+    await github.close();
+  });
+
+  // #314. GitHub refuses an issue body over 65,536 characters with a 422,
+  // which the student would only see as "Posting failed" — and a whole
+  // session passes that easily. So the issue carries the most recent
+  // exercises that fit and says how many it left out.
+  //
+  // End-to-end because the length that counts is the one of the body the app
+  // really posts: the recorder's session through the dialog's default choice,
+  // the body builder, the runner section and the real HTTP call.
+  testWidgets('Bug reports: a long session is posted with its most recent '
+      'exercises, under the length GitHub accepts', (tester) async {
+    final github = await FakeGitHubServer.start();
+    final harness = AppHarness(github: github, githubOAuthClientId: _clientId);
+    await harness.boot(tester);
+
+    // A session far longer than one issue has room for.
+    final recorder = harness.container.read(debugServiceProvider);
+    const exercises = 50;
+    for (var i = 1; i <= exercises; i++) {
+      recorder
+        ..beginTurn(
+          requestType: 'submitCode',
+          currentExerciseTypeAtStart: 'completeCodeQuestion',
+          tutorStateAtStart: 'idle',
+          selectedRootGoalId: null,
+          selectedChildGoalId: null,
+          preferredRootGoalId: null,
+          preferredChildGoalId: null,
+          streamable: true,
+          previousInputsMode: 'includeSession',
+        )
+        ..recordRequestPayload(
+          userInput: 'answer-$i',
+          instructions: 'SYSTEM PROMPT — must not be posted',
+          instructionsDocId: 'submitCode',
+        )
+        ..recordRawOutput('feedback ' * 400)
+        ..endTurn();
+    }
+    final session = recorder.buffer;
+    expect(session, hasLength(exercises));
+
+    await _openOptions(tester);
+    github.approved = true;
+    await _scrollTo(tester, find.text('Not connected to GitHub.'));
+    await _tap(tester, find.text('Connect GitHub'));
+    await pumpUntilFound(
+      tester,
+      find.text('Connected to GitHub as $kFakeGitHubLogin.'),
+    );
+
+    await _clearSnacks(tester);
+    await _tap(tester, find.text('Report a bug…'));
+    await pumpUntilFound(tester, find.text('Report a bug'));
+    expect(find.text('Whole session ($exercises exercises)'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Title'),
+      'the questions keep coming',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
+    await pumpUntil(
+      tester,
+      () => github.issues.isNotEmpty,
+      reason: 'the issue never reached GitHub',
+    );
+    await pumpUntilFound(tester, find.textContaining('Issue posted: '));
+    expect(find.textContaining('Posting failed'), findsNothing);
+
+    final body = github.issues.single['body'] as String;
+    expect(body.length, lessThanOrEqualTo(65536));
+
+    final omitted = int.parse(
+      RegExp(r'_(\d+) older exercises omitted').firstMatch(body)![1]!,
+    );
+    expect(omitted, inInclusiveRange(1, exercises - 1));
+    expect(body, contains('save the report as a file for the whole session'));
+    expect(
+      body,
+      contains(
+        'Session debug payload (${exercises - omitted} of $exercises '
+        'exercises)',
+      ),
+    );
+    // The most recent ones are in, the oldest are not.
+    expect(body, contains('"userInput": "answer-$exercises"'));
+    expect(body, contains('"userInput": "answer-${omitted + 1}"'));
+    expect(body, isNot(contains('"userInput": "answer-$omitted"')));
+    expect(body, isNot(contains('"userInput": "answer-1"')));
+    expect(body, isNot(contains('SYSTEM PROMPT')));
+    // The runner section is not what gave way.
+    expect(body, contains('Python runner state'));
 
     await harness.dispose(tester);
     await github.close();
