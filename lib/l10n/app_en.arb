@@ -296,6 +296,8 @@
   "@options_model_followGlobal": {
     "placeholders": { "model": { "type": "String" } }
   },
+  "options_model_followDefault": "Default ({model})",
+  "@options_model_followDefault": { "placeholders": { "model": { "type": "String" } } },
 
   "options_globalModel_title": "School-wide AI model",
   "options_globalModel_subtitle": "Which model every student's tutor asks. Teachers only. A device that picked its own model above keeps it; the rest follow within a few seconds.",
@@ -412,6 +414,7 @@
 
   "options_bugReport_title": "Bug reports",
   "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.",
+  "options_bugReport_subtitle_standalone": "Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.",
   "options_bugReport_github_notConnected": "Not connected to GitHub.",
   "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
   "@options_bugReport_github_connectedAs": {
@@ -468,6 +471,8 @@
   "@options_bugReport_saved": {
     "placeholders": { "path": { "type": "String" } }
   },
+  "options_bugReport_saved_standalone": "Report saved as {path}.",
+  "@options_bugReport_saved_standalone": { "placeholders": { "path": { "type": "String" } } },
   "options_bugReport_saveFailed": "Saving failed: {error}",
   "@options_bugReport_saveFailed": {
     "placeholders": { "error": { "type": "String" } }
@@ -745,6 +750,7 @@
   "@session_questionId_tooltip": {
     "description": "Hover text on the question's short ID (#3fa91c) in the header of an exercise (#216)"
   },
+  "session_questionId_tooltip_standalone": "The ID of this question. Mention it when you report a mistake in the question.",
   "questionId_copy_tooltip": "Copy the ID",
   "@questionId_copy_tooltip": {
     "description": "Hover text on the small copy button next to a question's short ID (#304)"
@@ -1588,8 +1594,10 @@
   "chat_notice_exerciseWithoutBlank": "That exercise had nothing left to fill in. Fetching a new one.",
   "chat_notice_optionsLookAlike": "Two answers in that question looked the same. Fetching a new one.",
   "chat_notice_subgoalDeletedRedirect": "Your previous topic was removed by your teacher. Continuing with the next one.",
+  "chat_notice_subgoalDeletedRedirect_standalone": "Your previous topic no longer exists. Continuing with the next one.",
   "chat_notice_noGoalsLeft": "There are no goals left to work on. Congratulations!",
   "chat_notice_emptyObjectives": "This subgoal isn't quite finished yet — ask your teacher to complete it, or pick another subgoal.",
+  "chat_notice_emptyObjectives_standalone": "This subgoal isn't quite finished yet. Pick another subgoal.",
   "chat_notice_preparingExercise": "Preparing your next exercise...",
   "chat_notice_feedbackDegraded": "Something is wrong with the feedback. Try again in a few minutes.",
   "chat_notice_newGoalSelected": "New goal selected: {title}",
@@ -1773,6 +1781,7 @@
   "sidebar_section_trophies": "Trophy case",
   "badges_page_title": "Trophy case",
   "badges_page_subtitle": "Badges for what you've done. They give no XP and don't count towards your grade.",
+  "badges_page_subtitle_standalone": "Badges for what you've done. They give no XP.",
   "badges_page_count": "{earned} of {total} badges earned",
   "@badges_page_count": {
     "placeholders": { "earned": { "type": "int" }, "total": { "type": "int" } }
@@ -1988,5 +1997,52 @@
   "options_profile_title": "Your name",
   "options_profile_subtitle": "How the app addresses you.",
   "options_profile_save": "Save",
-  "options_profile_saved": "Name saved."
+  "options_profile_saved": "Name saved.",
+  "firstStart_title": "How do you want to use the app?",
+  "firstStart_intro": "Using the app at school? Then your teacher gives you a school file.",
+  "firstStart_school": "I have a file from my school",
+  "firstStart_schoolHint": "Then you sign in with your school account.",
+  "firstStart_without": "Continue without a school",
+  "firstStart_withoutHint": "You practise on your own, with your own OpenAI key. Everything stays on this pc.",
+  "schoolFile_error_unreadable": "The file could not be read. Nothing has changed.",
+  "schoolFile_error_notASchoolFile": "This is not a school file. Nothing has changed.",
+  "schoolFile_error_newerFormat": "This school file is for a newer version of the app. Update the app and try again. Nothing has changed.",
+  "schoolFile_error_invalidField": "This school file is incomplete or invalid ({field}). Ask your teacher for a new one. Nothing has changed.",
+  "@schoolFile_error_invalidField": {
+    "placeholders": {
+      "field": {"type": "String"}
+    }
+  },
+  "schoolFile_error_containsSecret": "This file contains a key or password ({field}). A school file must not. Nothing has changed.",
+  "@schoolFile_error_containsSecret": {
+    "placeholders": {
+      "field": {"type": "String"}
+    }
+  },
+  "schoolFile_restart_title": "Restart the app",
+  "schoolFile_restart_imported": "The school file of {school} is saved. Close the app and start it again to sign in.",
+  "@schoolFile_restart_imported": {
+    "placeholders": {
+      "school": {"type": "String"}
+    }
+  },
+  "schoolFile_restart_left": "You left the school. Close the app and start it again. Then you choose again: with a school file or without a school.",
+  "schoolFile_restart_ok": "OK",
+  "options_school_title": "School",
+  "options_school_current": "You work with {school}.",
+  "@options_school_current": {
+    "placeholders": {
+      "school": {"type": "String"}
+    }
+  },
+  "options_school_currentBuild": "You work with the school this installation came with.",
+  "options_school_importOther": "Import another school file",
+  "options_school_leave": "Leave the school",
+  "options_school_leave_title": "Leave the school?",
+  "options_school_leave_text": "Your data at the school stays with the school. To come back you need the school file.",
+  "options_school_leave_confirm": "Leave",
+  "options_school_leave_cancel": "Cancel",
+  "options_school_standalone": "At a school? Import your school's file. What you did here stays on this pc.",
+  "options_school_import": "Import school file",
+  "auth_localKey_schoolEscape": "At a school? Import your school's file."
 }

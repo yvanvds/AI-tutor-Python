@@ -1,0 +1,13 @@
+{
+  "container": "config",
+  "docs": [
+    {
+      "Model": "gpt-test",
+      "QuestionBankMinimum": 3,
+      "QuestionBankShare": 0.5,
+      "id": "global",
+      "type": "config"
+    }
+  ],
+  "partitionKeyField": "type"
+}

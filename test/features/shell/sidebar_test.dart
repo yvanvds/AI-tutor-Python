@@ -197,6 +197,91 @@ void main() {
     expect(find.byTooltip('Sign out'), findsNothing);
   });
 
+  // The student's rail, top to bottom, in each mode (#267): the school
+  // keeps every entry it has today; stand-alone leaves out what needs one.
+  const schoolStudentEntries = [
+    'Session',
+    'Learning path',
+    'Trophy case',
+    'Grade formula',
+    'My reports',
+  ];
+  const standaloneEntries = ['Session', 'Learning path', 'Trophy case'];
+
+  List<String> railOrder(WidgetTester tester, List<String> candidates) {
+    final shown = [
+      for (final t in candidates)
+        if (find.byTooltip(t).evaluate().isNotEmpty) t,
+    ];
+    shown.sort(
+      (a, b) => tester
+          .getTopLeft(find.byTooltip(a))
+          .dy
+          .compareTo(tester.getTopLeft(find.byTooltip(b)).dy),
+    );
+    return shown;
+  }
+
+  testWidgets('school mode: a student keeps every entry, the grade formula '
+      'and My reports included (#267)', (tester) async {
+    await mount(tester, profile: _student, devTools: false);
+
+    expect(railOrder(tester, schoolStudentEntries), schoolStudentEntries);
+  });
+
+  testWidgets('stand-alone: no grade formula, no My reports (#267)', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      profile: _student,
+      devTools: true,
+      mode: const StandaloneMode(),
+    );
+
+    expect(railOrder(tester, schoolStudentEntries), standaloneEntries);
+    expect(find.byTooltip('Grade formula'), findsNothing);
+    expect(find.byTooltip('My reports'), findsNothing);
+    expect(find.byTooltip('Options'), findsOneWidget);
+  });
+
+  testWidgets('stand-alone: no Teacher group, even for a teacher profile '
+      '(#267)', (tester) async {
+    await mount(
+      tester,
+      profile: _teacher,
+      devTools: true,
+      mode: const StandaloneMode(),
+    );
+
+    expect(find.text('TEACHER'), findsNothing);
+    for (final entry in [
+      'Goals',
+      'Lesson content',
+      'Questions',
+      'Instructions',
+      'Students',
+      'Classes',
+      'Milestones',
+      'Reports',
+      'Grade formula',
+    ]) {
+      expect(find.byTooltip(entry), findsNothing, reason: entry);
+    }
+  });
+
+  test('the sections that need a school (#267)', () {
+    expect(Section.values.where((s) => s.isSchoolOnly).toSet(), {
+      Section.puntenformule,
+      Section.myReports,
+      ...Section.values.where((s) => s.isTeacherOnly),
+    });
+    expect(Section.session.isSchoolOnly, isFalse);
+    expect(Section.map.isSchoolOnly, isFalse);
+    expect(Section.trophies.isSchoolOnly, isFalse);
+    expect(Section.options.isSchoolOnly, isFalse);
+  });
+
   testWidgets('teacher also gets the Options entry', (tester) async {
     await mount(tester, profile: _teacher, devTools: false);
 

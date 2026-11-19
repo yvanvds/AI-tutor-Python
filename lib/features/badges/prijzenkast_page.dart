@@ -53,7 +53,14 @@ class PrijzenkastView extends StatelessWidget {
             children: [
               Text(l.badges_page_title, style: text.headlineMedium),
               const SizedBox(height: AppSpacing.xxs),
-              Text(l.badges_page_subtitle, style: text.bodySmall),
+              // Stand-alone (#267): no grade, so no word about one.
+              Text(
+                board?.standalone == true
+                    ? l.badges_page_subtitle_standalone
+                    : l.badges_page_subtitle,
+                key: const ValueKey('badges-subtitle'),
+                style: text.bodySmall,
+              ),
               const SizedBox(height: AppSpacing.lg),
               if (board == null)
                 Row(
@@ -94,22 +101,25 @@ class PrijzenkastView extends StatelessWidget {
                     tiles: board.experts,
                   ),
                 // A student without a class does not take part, and is told
-                // so; one who moved out of a class keeps their medals.
-                _Section(
-                  key: const ValueKey('badges-section-podium'),
-                  title: l.badges_section_podium,
-                  hint: l.badges_section_podium_hint,
-                  tiles: board.podium,
-                  empty: board.inClass
-                      ? l.badges_podium_none
-                      : l.badges_podium_noClass,
-                ),
-                _Section(
-                  key: const ValueKey('badges-section-teacher'),
-                  title: l.badges_section_teacher,
-                  hint: l.badges_section_teacher_hint,
-                  tiles: board.teacher,
-                ),
+                // so; one who moved out of a class keeps their medals. The
+                // stand-alone mode has neither podium nor teacher (#267).
+                if (!board.standalone) ...[
+                  _Section(
+                    key: const ValueKey('badges-section-podium'),
+                    title: l.badges_section_podium,
+                    hint: l.badges_section_podium_hint,
+                    tiles: board.podium,
+                    empty: board.inClass
+                        ? l.badges_podium_none
+                        : l.badges_podium_noClass,
+                  ),
+                  _Section(
+                    key: const ValueKey('badges-section-teacher'),
+                    title: l.badges_section_teacher,
+                    hint: l.badges_section_teacher_hint,
+                    tiles: board.teacher,
+                  ),
+                ],
                 _Section(
                   title: l.badges_section_fun,
                   hint: l.badges_section_fun_hint,

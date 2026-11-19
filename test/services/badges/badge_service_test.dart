@@ -17,6 +17,7 @@
 import 'dart:async';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
@@ -35,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/test_app_mode.dart';
 
 const _uid = 'u1';
 
@@ -209,9 +211,10 @@ void main() {
     history = _History(turns);
   }
 
-  ProviderContainer start({bool teacher = false}) {
+  ProviderContainer start({bool teacher = false, AppMode? mode}) {
     pc = ProviderContainer(
       overrides: [
+        appModeProvider.overrideWithValue(mode ?? kTestSchoolMode),
         authServiceProvider.overrideWith(
           () => _Auth(_identity(teacher: teacher)),
         ),
@@ -346,6 +349,32 @@ void main() {
     history.gate!.complete();
     await until(() => pc.read(badgeServiceProvider)?.facts != null);
     expect(pc.read(badgeServiceProvider)!.facts!.oefeningen, 10);
+  });
+
+  test('stand-alone (#267): the board leaves out the lesson badges, the '
+      'podium and the teacher\'s badges; school mode keeps them', () async {
+    seedTurns([for (var i = 0; i < 12; i++) _turn(i)]);
+    start(mode: const StandaloneMode());
+    await until(() => pc.read(badgeServiceProvider)?.facts != null);
+    var board = pc.read(badgeBoardProvider)!;
+    expect(board.standalone, isTrue);
+    expect(
+      board.tiers.map((t) => t.badge.id),
+      isNot(anyOf(contains('homeWork'), contains('lessonWeeks'))),
+    );
+    expect(board.tiers.map((t) => t.badge.id), contains('effort'));
+    expect(board.podium, isEmpty);
+    expect(board.teacher, isEmpty);
+
+    start();
+    await until(() => pc.read(badgeServiceProvider)?.facts != null);
+    board = pc.read(badgeBoardProvider)!;
+    expect(board.standalone, isFalse);
+    expect(
+      board.tiers.map((t) => t.badge.id),
+      containsAll(['homeWork', 'lessonWeeks']),
+    );
+    expect(board.teacher, hasLength(BadgeCatalog.teacher.length));
   });
 
   group('the lesson badges (#219)', () {

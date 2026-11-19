@@ -1,0 +1,15 @@
+{
+  "container": "instructions",
+  "docs": [
+    {
+      "id": "tutor",
+      "sections": {
+        "mcQuestion": "Maak een meerkeuzevraag.",
+        "role": "Je bent een tutor."
+      },
+      "type": "instruction",
+      "updatedAt": "2026-10-08T08:00:00.000Z"
+    }
+  ],
+  "partitionKeyField": "type"
+}

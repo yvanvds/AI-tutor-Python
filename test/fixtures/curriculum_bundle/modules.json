@@ -1,0 +1,13 @@
+{
+  "container": "modules",
+  "docs": [
+    {
+      "id": "python-basics",
+      "order": 0,
+      "title": "Python",
+      "type": "module",
+      "updatedAt": "2026-09-01T08:00:00.000Z"
+    }
+  ],
+  "partitionKeyField": "type"
+}

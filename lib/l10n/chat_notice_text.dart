@@ -4,14 +4,17 @@ import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 
 /// Resolves a [ChatNotice] emitted by the service layer to the text shown in
 /// a chat system pill (issue #23). The only place these strings are chosen.
+///
+/// [standalone]: the stand-alone mode (#267), which has no teacher — a notice
+/// that would send the student to one says something else there.
 extension ChatNoticeText on AppLocalizations {
-  String chatNotice(ChatNotice n) {
+  String chatNotice(ChatNotice n, {bool standalone = false}) {
     String arg(int i) => i < n.args.length ? n.args[i] : '';
     switch (n.kind) {
       case ChatNoticeKind.tutorFailed:
-        return chat_notice_tutorFailed(_causeText(n));
+        return chat_notice_tutorFailed(_causeText(n, standalone));
       case ChatNoticeKind.sessionStartFailed:
-        return chat_notice_sessionStartFailed(_causeText(n));
+        return chat_notice_sessionStartFailed(_causeText(n, standalone));
       case ChatNoticeKind.databaseUnavailable:
         return chat_notice_databaseUnavailable;
       case ChatNoticeKind.tutorTimeout:
@@ -43,11 +46,15 @@ extension ChatNoticeText on AppLocalizations {
       case ChatNoticeKind.optionsLookAlike:
         return chat_notice_optionsLookAlike;
       case ChatNoticeKind.subgoalDeletedRedirect:
-        return chat_notice_subgoalDeletedRedirect;
+        return standalone
+            ? chat_notice_subgoalDeletedRedirect_standalone
+            : chat_notice_subgoalDeletedRedirect;
       case ChatNoticeKind.noGoalsLeft:
         return chat_notice_noGoalsLeft;
       case ChatNoticeKind.emptyObjectives:
-        return chat_notice_emptyObjectives;
+        return standalone
+            ? chat_notice_emptyObjectives_standalone
+            : chat_notice_emptyObjectives;
       case ChatNoticeKind.preparingExercise:
         return chat_notice_preparingExercise;
       case ChatNoticeKind.feedbackDegraded:
@@ -74,9 +81,9 @@ extension ChatNoticeText on AppLocalizations {
     }
   }
 
-  String _causeText(ChatNotice n) {
+  String _causeText(ChatNotice n, bool standalone) {
     final cause = n.cause;
-    if (cause != null) return chatNotice(cause);
+    if (cause != null) return chatNotice(cause, standalone: standalone);
     return n.args.isEmpty ? '' : n.args.first;
   }
 

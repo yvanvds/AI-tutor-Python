@@ -532,6 +532,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String options_model_followDefault(String model) {
+    return 'Standaard ($model)';
+  }
+
+  @override
   String get options_globalModel_title => 'AI-model voor de hele school';
 
   @override
@@ -762,6 +767,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
 
   @override
+  String get options_bugReport_subtitle_standalone =>
+      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente oefening erbij.';
+
+  @override
   String get options_bugReport_github_notConnected =>
       'Niet verbonden met GitHub.';
 
@@ -871,6 +880,11 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String options_bugReport_saved(String path) {
     return 'Melding bewaard als $path. Stuur dit bestand naar je leerkracht.';
+  }
+
+  @override
+  String options_bugReport_saved_standalone(String path) {
+    return 'Melding bewaard als $path.';
   }
 
   @override
@@ -1272,6 +1286,10 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get session_questionId_tooltip =>
       'De ID van deze vraag. Je leerkracht kan de vraag ermee terugvinden.';
+
+  @override
+  String get session_questionId_tooltip_standalone =>
+      'De ID van deze vraag. Noem hem als je een fout in de vraag meldt.';
 
   @override
   String get questionId_copy_tooltip => 'Kopieer de ID';
@@ -2759,12 +2777,20 @@ class AppLocalizationsNl extends AppLocalizations {
       'Je vorige onderwerp is verwijderd door je leerkracht. Ga verder met het volgende.';
 
   @override
+  String get chat_notice_subgoalDeletedRedirect_standalone =>
+      'Je vorige onderwerp bestaat niet meer. Je gaat verder met het volgende.';
+
+  @override
   String get chat_notice_noGoalsLeft =>
       'Er zijn geen doelen meer om aan te werken. Gefeliciteerd!';
 
   @override
   String get chat_notice_emptyObjectives =>
       'Dit subdoel is nog niet helemaal klaar — vraag je leerkracht om het af te ronden, of kies een ander subdoel.';
+
+  @override
+  String get chat_notice_emptyObjectives_standalone =>
+      'Dit subdoel is nog niet helemaal klaar. Kies een ander subdoel.';
 
   @override
   String get chat_notice_preparingExercise =>
@@ -3146,6 +3172,10 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get badges_page_subtitle =>
       'Badges voor wat je gedaan hebt. Ze leveren geen XP op en tellen niet mee voor je punten.';
+
+  @override
+  String get badges_page_subtitle_standalone =>
+      'Badges voor wat je gedaan hebt. Ze leveren geen XP op.';
 
   @override
   String badges_page_count(int earned, int total) {
@@ -3729,4 +3759,104 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_profile_saved => 'Naam opgeslagen.';
+
+  @override
+  String get firstStart_title => 'Hoe wil je de app gebruiken?';
+
+  @override
+  String get firstStart_intro =>
+      'Gebruik je de app op school? Dan geeft je leerkracht je een schoolbestand.';
+
+  @override
+  String get firstStart_school => 'Ik heb een bestand van mijn school';
+
+  @override
+  String get firstStart_schoolHint =>
+      'Daarna meld je je aan met je schoolaccount.';
+
+  @override
+  String get firstStart_without => 'Zonder school verder';
+
+  @override
+  String get firstStart_withoutHint =>
+      'Je oefent alleen, met je eigen OpenAI-sleutel. Alles blijft op deze pc.';
+
+  @override
+  String get schoolFile_error_unreadable =>
+      'Het bestand kon niet gelezen worden. Er is niets veranderd.';
+
+  @override
+  String get schoolFile_error_notASchoolFile =>
+      'Dit is geen schoolbestand. Er is niets veranderd.';
+
+  @override
+  String get schoolFile_error_newerFormat =>
+      'Dit schoolbestand is voor een nieuwere versie van de app. Werk de app bij en probeer opnieuw. Er is niets veranderd.';
+
+  @override
+  String schoolFile_error_invalidField(String field) {
+    return 'Dit schoolbestand is onvolledig of ongeldig ($field). Vraag je leerkracht om een nieuw. Er is niets veranderd.';
+  }
+
+  @override
+  String schoolFile_error_containsSecret(String field) {
+    return 'Dit bestand bevat een sleutel of wachtwoord ($field). Dat mag niet in een schoolbestand. Er is niets veranderd.';
+  }
+
+  @override
+  String get schoolFile_restart_title => 'Start de app opnieuw';
+
+  @override
+  String schoolFile_restart_imported(String school) {
+    return 'Het schoolbestand van $school is bewaard. Sluit de app en start ze opnieuw om je aan te melden.';
+  }
+
+  @override
+  String get schoolFile_restart_left =>
+      'Je hebt de school verlaten. Sluit de app en start ze opnieuw. Dan kies je opnieuw: met een schoolbestand of zonder school.';
+
+  @override
+  String get schoolFile_restart_ok => 'OK';
+
+  @override
+  String get options_school_title => 'School';
+
+  @override
+  String options_school_current(String school) {
+    return 'Je werkt met $school.';
+  }
+
+  @override
+  String get options_school_currentBuild =>
+      'Je werkt met de school die bij deze installatie hoort.';
+
+  @override
+  String get options_school_importOther => 'Ander schoolbestand importeren';
+
+  @override
+  String get options_school_leave => 'School verlaten';
+
+  @override
+  String get options_school_leave_title => 'School verlaten?';
+
+  @override
+  String get options_school_leave_text =>
+      'Je gegevens bij de school blijven bij de school. Om terug te keren heb je het schoolbestand nodig.';
+
+  @override
+  String get options_school_leave_confirm => 'Verlaten';
+
+  @override
+  String get options_school_leave_cancel => 'Annuleren';
+
+  @override
+  String get options_school_standalone =>
+      'Zit je op een school? Importeer het bestand van je school. Wat je hier deed, blijft op deze pc.';
+
+  @override
+  String get options_school_import => 'Schoolbestand importeren';
+
+  @override
+  String get auth_localKey_schoolEscape =>
+      'Zit je op een school? Importeer het bestand van je school.';
 }

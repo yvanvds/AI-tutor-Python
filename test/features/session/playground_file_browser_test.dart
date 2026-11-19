@@ -37,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:py_runner/py_runner.dart';
 
+import '../../helpers/delete_dir.dart';
 import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/localization.dart';
 
@@ -81,9 +82,9 @@ void main() {
     chat = ChatService();
   });
 
-  tearDown(() {
+  tearDown(() async {
     chat.dispose();
-    if (root.existsSync()) root.deleteSync(recursive: true);
+    await deleteDirRetrying(root);
   });
 
   Widget buildApp() => ProviderScope(

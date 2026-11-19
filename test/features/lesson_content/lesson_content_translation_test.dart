@@ -30,6 +30,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/delete_dir.dart';
 import '../../helpers/fake_file_picker.dart';
 import '../../helpers/fake_lesson_code_runner.dart';
 import '../../helpers/fake_webview_platform.dart';
@@ -234,7 +235,7 @@ void main() {
 
   String writeHtml(String html) {
     final dir = Directory.systemTemp.createTempSync('lesson_upload_');
-    addTearDown(() => dir.deleteSync(recursive: true));
+    addTearDown(() => deleteDirRetrying(dir));
     final file = File('${dir.path}${Platform.pathSeparator}lesson.html');
     file.writeAsStringSync(html);
     return file.path;

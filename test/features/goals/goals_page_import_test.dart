@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/delete_dir.dart';
 import '../../helpers/fake_file_picker.dart';
 import '../../helpers/in_memory_cosmos.dart';
 import '../../helpers/localization.dart';
@@ -129,9 +130,9 @@ void main() {
     );
   });
 
-  tearDown(() {
+  tearDown(() async {
     container.dispose();
-    dir.deleteSync(recursive: true);
+    await deleteDirRetrying(dir);
   });
 
   String writeImportFile(Map<String, dynamic> payload) {

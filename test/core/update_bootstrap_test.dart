@@ -42,6 +42,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import '../helpers/delete_dir.dart';
 import '../helpers/loopback_proxy.dart';
 import '../helpers/loopback_tls.dart';
 
@@ -127,7 +128,7 @@ void main() {
       curl = File('${tmp.path}${Platform.pathSeparator}curl.exe')
         ..writeAsBytesSync(const <int>[]);
     });
-    tearDown(() => tmp.deleteSync(recursive: true));
+    tearDown(() => deleteDirRetrying(tmp));
 
     // Windows 10 before 1803, or a machine somebody stripped: keep today's
     // behaviour and today's error text rather than fail differently.

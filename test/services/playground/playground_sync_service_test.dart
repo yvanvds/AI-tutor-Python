@@ -16,6 +16,7 @@ import 'package:ai_tutor_python/services/playground/playground_files_service.dar
 import 'package:ai_tutor_python/services/playground/playground_sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/delete_dir.dart';
 import '../../helpers/in_memory_cosmos.dart';
 
 const _uid = 'student-1';
@@ -43,9 +44,7 @@ void main() {
     );
   });
 
-  tearDown(() {
-    if (root.existsSync()) root.deleteSync(recursive: true);
-  });
+  tearDown(() => deleteDirRetrying(root));
 
   /// Writes a doc the way the student's *other* machine would have left it.
   void onOtherMachine(

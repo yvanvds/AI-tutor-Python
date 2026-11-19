@@ -1,0 +1,72 @@
+{
+  "container": "questions",
+  "docs": [
+    {
+      "createdAt": "2026-10-01T08:00:00.000Z",
+      "difficulty": "easy",
+      "id": "toekennen_aaaa",
+      "language": "nl",
+      "model": "gpt-test",
+      "optionFeedback": [
+        {
+          "option": "x",
+          "quality": "wrong",
+          "text": "x is de naam, niet de waarde.",
+          "version": 1
+        }
+      ],
+      "payload": {
+        "correct": "3",
+        "options": [
+          "3",
+          "x",
+          "0"
+        ],
+        "question": "Wat is de waarde van x na `x = 3`?",
+        "type": "multiple_choice"
+      },
+      "questionType": "multiple_choice",
+      "rootGoalId": "variabelen",
+      "status": "active",
+      "subgoalId": "toekennen",
+      "targetLOIds": [
+        "lo_toekennen"
+      ],
+      "type": "question"
+    },
+    {
+      "createdAt": "2026-10-01T08:00:00.000Z",
+      "difficulty": "medium",
+      "id": "toekennen_bbbb",
+      "language": "nl",
+      "model": "gpt-test",
+      "optionFeedback": [
+        {
+          "option": "x",
+          "quality": "wrong",
+          "text": "x is de naam, niet de waarde.",
+          "version": 1
+        }
+      ],
+      "payload": {
+        "correct": "3",
+        "options": [
+          "3",
+          "x",
+          "0"
+        ],
+        "question": "Wat is de waarde van x na `x = 3`?",
+        "type": "multiple_choice"
+      },
+      "questionType": "multiple_choice",
+      "rootGoalId": "variabelen",
+      "status": "active",
+      "subgoalId": "toekennen",
+      "targetLOIds": [
+        "lo_toekennen"
+      ],
+      "type": "question"
+    }
+  ],
+  "partitionKeyField": "subgoalId"
+}

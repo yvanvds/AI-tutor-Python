@@ -1,0 +1,25 @@
+{
+  "container": "translations",
+  "docs": [
+    {
+      "body": "<p>With <code>=</code> you give a name a value.</p>",
+      "id": "content_toekennen",
+      "kind": "content",
+      "language": "en",
+      "refId": "toekennen",
+      "sourceHash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "title": "Assignment"
+    },
+    {
+      "description": "Give a name a value.",
+      "id": "goal_toekennen",
+      "kind": "goal",
+      "language": "en",
+      "refId": "toekennen",
+      "sourceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "title": "Assignment",
+      "updatedAt": "2026-10-02T08:00:00.000Z"
+    }
+  ],
+  "partitionKeyField": "language"
+}

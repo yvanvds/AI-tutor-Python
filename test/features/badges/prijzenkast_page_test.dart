@@ -418,4 +418,87 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   });
+
+  // #267: the stand-alone mode has no class and no teacher. What needs one is
+  // left out, rather than shown as out of reach; the school keeps it all.
+  group('stand-alone', () {
+    BadgeBoard board({required bool standalone}) => BadgeBoard.from(
+      BadgeSnapshot(facts: const BadgeFacts(oefeningen: 152), roots: [_root]),
+      EarnedBadges({
+        'effort': const EarnedBadge(tier: 2),
+        // Brought along from a school, say, by importing progress.
+        podiumBadgeId('s2'): const EarnedBadge(
+          tier: 1,
+          awardedBy: kAwardedByPodium,
+        ),
+        'teacher:helpingHand': const EarnedBadge(
+          tier: 1,
+          awardedBy: kAwardedByTeacher,
+          extra: {'count': 1, 'seen': 1},
+        ),
+      }),
+      standalone: standalone,
+    );
+
+    testWidgets(
+      'no lesson badges, no podium, no badges from the teacher, and no '
+      'word about a grade',
+      (tester) async {
+        final b = board(standalone: true);
+        await mount(tester, PrijzenkastView(board: b));
+
+        expect(
+          find.text("Badges for what you've done. They give no XP."),
+          findsOneWidget,
+        );
+        expect(find.textContaining('towards your grade'), findsNothing);
+        expect(tile('homeWork'), findsNothing);
+        expect(tile('lessonWeeks'), findsNothing);
+        expect(tile('effort'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('badges-section-podium')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('badges-section-teacher')),
+          findsNothing,
+        );
+        expect(tile(podiumBadgeId('s2')), findsNothing);
+        expect(tile('teacher:helpingHand'), findsNothing);
+        expect(b.podium, isEmpty);
+        expect(b.teacher, isEmpty);
+        // The count is of what can be earned here: 19 in tiers minus the two
+        // lesson badges, and the 14 single ones.
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('badges-count'))).data,
+          '3 of 31 badges earned',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('the school keeps every part', (tester) async {
+      final b = board(standalone: false);
+      await mount(tester, PrijzenkastView(board: b));
+
+      expect(find.textContaining('towards your grade'), findsOneWidget);
+      expect(tile('homeWork'), findsOneWidget);
+      expect(tile('lessonWeeks'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('badges-section-podium')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('badges-section-teacher')),
+        findsOneWidget,
+      );
+      expect(tile(podiumBadgeId('s2')), findsOneWidget);
+      // 19 in tiers, 14 single ones, the teacher's 3 and the medal.
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('badges-count'))).data,
+        '5 of 37 badges earned',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 }

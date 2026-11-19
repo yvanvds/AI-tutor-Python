@@ -530,6 +530,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String options_model_followDefault(String model) {
+    return 'Default ($model)';
+  }
+
+  @override
   String get options_globalModel_title => 'School-wide AI model';
 
   @override
@@ -757,6 +762,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
 
   @override
+  String get options_bugReport_subtitle_standalone =>
+      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.';
+
+  @override
   String get options_bugReport_github_notConnected =>
       'Not connected to GitHub.';
 
@@ -865,6 +874,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String options_bugReport_saved(String path) {
     return 'Report saved as $path. Send this file to your teacher.';
+  }
+
+  @override
+  String options_bugReport_saved_standalone(String path) {
+    return 'Report saved as $path.';
   }
 
   @override
@@ -1262,6 +1276,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get session_questionId_tooltip =>
       'The ID of this question. Your teacher can use it to find the question.';
+
+  @override
+  String get session_questionId_tooltip_standalone =>
+      'The ID of this question. Mention it when you report a mistake in the question.';
 
   @override
   String get questionId_copy_tooltip => 'Copy the ID';
@@ -2730,12 +2748,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your previous topic was removed by your teacher. Continuing with the next one.';
 
   @override
+  String get chat_notice_subgoalDeletedRedirect_standalone =>
+      'Your previous topic no longer exists. Continuing with the next one.';
+
+  @override
   String get chat_notice_noGoalsLeft =>
       'There are no goals left to work on. Congratulations!';
 
   @override
   String get chat_notice_emptyObjectives =>
       'This subgoal isn\'t quite finished yet — ask your teacher to complete it, or pick another subgoal.';
+
+  @override
+  String get chat_notice_emptyObjectives_standalone =>
+      'This subgoal isn\'t quite finished yet. Pick another subgoal.';
 
   @override
   String get chat_notice_preparingExercise => 'Preparing your next exercise...';
@@ -3116,6 +3142,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get badges_page_subtitle =>
       'Badges for what you\'ve done. They give no XP and don\'t count towards your grade.';
+
+  @override
+  String get badges_page_subtitle_standalone =>
+      'Badges for what you\'ve done. They give no XP.';
 
   @override
   String badges_page_count(int earned, int total) {
@@ -3701,4 +3731,104 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_profile_saved => 'Name saved.';
+
+  @override
+  String get firstStart_title => 'How do you want to use the app?';
+
+  @override
+  String get firstStart_intro =>
+      'Using the app at school? Then your teacher gives you a school file.';
+
+  @override
+  String get firstStart_school => 'I have a file from my school';
+
+  @override
+  String get firstStart_schoolHint =>
+      'Then you sign in with your school account.';
+
+  @override
+  String get firstStart_without => 'Continue without a school';
+
+  @override
+  String get firstStart_withoutHint =>
+      'You practise on your own, with your own OpenAI key. Everything stays on this pc.';
+
+  @override
+  String get schoolFile_error_unreadable =>
+      'The file could not be read. Nothing has changed.';
+
+  @override
+  String get schoolFile_error_notASchoolFile =>
+      'This is not a school file. Nothing has changed.';
+
+  @override
+  String get schoolFile_error_newerFormat =>
+      'This school file is for a newer version of the app. Update the app and try again. Nothing has changed.';
+
+  @override
+  String schoolFile_error_invalidField(String field) {
+    return 'This school file is incomplete or invalid ($field). Ask your teacher for a new one. Nothing has changed.';
+  }
+
+  @override
+  String schoolFile_error_containsSecret(String field) {
+    return 'This file contains a key or password ($field). A school file must not. Nothing has changed.';
+  }
+
+  @override
+  String get schoolFile_restart_title => 'Restart the app';
+
+  @override
+  String schoolFile_restart_imported(String school) {
+    return 'The school file of $school is saved. Close the app and start it again to sign in.';
+  }
+
+  @override
+  String get schoolFile_restart_left =>
+      'You left the school. Close the app and start it again. Then you choose again: with a school file or without a school.';
+
+  @override
+  String get schoolFile_restart_ok => 'OK';
+
+  @override
+  String get options_school_title => 'School';
+
+  @override
+  String options_school_current(String school) {
+    return 'You work with $school.';
+  }
+
+  @override
+  String get options_school_currentBuild =>
+      'You work with the school this installation came with.';
+
+  @override
+  String get options_school_importOther => 'Import another school file';
+
+  @override
+  String get options_school_leave => 'Leave the school';
+
+  @override
+  String get options_school_leave_title => 'Leave the school?';
+
+  @override
+  String get options_school_leave_text =>
+      'Your data at the school stays with the school. To come back you need the school file.';
+
+  @override
+  String get options_school_leave_confirm => 'Leave';
+
+  @override
+  String get options_school_leave_cancel => 'Cancel';
+
+  @override
+  String get options_school_standalone =>
+      'At a school? Import your school\'s file. What you did here stays on this pc.';
+
+  @override
+  String get options_school_import => 'Import school file';
+
+  @override
+  String get auth_localKey_schoolEscape =>
+      'At a school? Import your school\'s file.';
 }

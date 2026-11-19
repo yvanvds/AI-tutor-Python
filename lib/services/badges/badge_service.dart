@@ -36,6 +36,7 @@
 
 import 'dart:async';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/services/account/account.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -601,6 +602,7 @@ class BadgeBoard {
     this.podium = const [],
     this.teacher = const [],
     this.inClass = false,
+    this.standalone = false,
   });
 
   final List<BadgeTile> tiers;
@@ -621,6 +623,11 @@ class BadgeBoard {
   /// stored, without progress.
   final bool progressKnown;
 
+  /// The stand-alone mode (#267): no class and no teacher, so no lesson
+  /// badges ([BadgeCatalog.needsLessons]), no podium and no teacher's
+  /// badges — left out rather than shown as out of reach.
+  final bool standalone;
+
   List<BadgeTile> get all => [
     ...tiers,
     ...experts,
@@ -637,6 +644,7 @@ class BadgeBoard {
     BadgeSnapshot snapshot,
     EarnedBadges earned, {
     bool inClass = false,
+    bool standalone = false,
   }) {
     final facts = snapshot.facts;
     BadgeTile tile(BadgeDefinition badge, {Goal? goal, EarnedBadge? held}) {
@@ -683,6 +691,8 @@ class BadgeBoard {
           return at.compareTo(bt);
         });
 
+    if (standalone) podium.clear();
+
     final experts = <BadgeTile>[
       for (final root in snapshot.roots)
         if (facts?.experts?.containsKey(root.id) == true ||
@@ -690,13 +700,19 @@ class BadgeBoard {
           tile(BadgeCatalog.expert(root.id), goal: root),
     ];
     return BadgeBoard(
-      tiers: [for (final b in BadgeCatalog.tiered) tile(b)],
+      tiers: [
+        for (final b in BadgeCatalog.tiered)
+          if (!standalone || !BadgeCatalog.needsLessons(b)) tile(b),
+      ],
       experts: experts,
       fun: [for (final b in BadgeCatalog.fun) tile(b)],
       podium: podium,
-      teacher: [for (final b in BadgeCatalog.teacher) tile(b)],
+      teacher: standalone
+          ? const []
+          : [for (final b in BadgeCatalog.teacher) tile(b)],
       inClass: inClass,
       progressKnown: facts != null,
+      standalone: standalone,
     );
   }
 }
@@ -716,5 +732,6 @@ final badgeBoardProvider = Provider<BadgeBoard?>((ref) {
     snapshot,
     earned ?? EarnedBadges.none,
     inClass: inClass,
+    standalone: ref.watch(appModeProvider) is StandaloneMode,
   );
 });

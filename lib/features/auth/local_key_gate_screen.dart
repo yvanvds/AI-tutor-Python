@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/features/school/school_file_actions.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/config/local_api_key_storage.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// In stand-alone mode (#264) there is no school key at all: the text says
 /// where to make a key, that the user pays for it, and that it stays on this
-/// pc.
+/// pc. It also offers the way to a school (#307): a student who went on
+/// without a school by mistake imports the school's file here.
 class LocalKeyGateScreen extends ConsumerStatefulWidget {
   const LocalKeyGateScreen({super.key});
 
@@ -139,6 +141,19 @@ class _LocalKeyGateScreenState extends ConsumerState<LocalKeyGateScreen> {
                     l.auth_localKey_footnote,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
+                  if (standalone) ...[
+                    const SizedBox(height: 24),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        key: const Key('local-key-school-file'),
+                        icon: const Icon(Icons.school_outlined),
+                        label: Text(l.auth_localKey_schoolEscape),
+                        onPressed: () =>
+                            importSchoolFileAndAskRestart(context, ref),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

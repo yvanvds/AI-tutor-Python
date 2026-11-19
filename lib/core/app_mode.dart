@@ -7,11 +7,13 @@
 //     tenant and work in the school's database, as students always have;
 //   - none → [StandaloneMode]: no account, no server.
 //
-// Today the school configuration still comes from the build (`.env`, through
-// `AzureConfig`). A build whose `.env` carries no school data — empty values,
-// the all-zero GUID or a `dummy` placeholder, as CI generates — comes out in
-// stand-alone mode. Later the configuration comes from a school file (#307)
-// as the same [SchoolConfig] value, and leaves the build (#308).
+// The school configuration comes from a school file the user imported
+// (#307, lib/core/school_file.dart) or, until it leaves the build (#308),
+// from the build (`.env`, through `AzureConfig`). A build whose `.env`
+// carries no school data — empty values, the all-zero GUID or a `dummy`
+// placeholder, as CI generates — has none. Which one applies, and when the
+// app asks at first start, is decided in lib/core/app_start.dart; `main()`
+// then overrides [appModeProvider] with the result.
 //
 // `AzureConfig` is read here and nowhere else
 // (test/core/app_mode_single_reader_test.dart). The rest of the app asks
@@ -27,6 +29,28 @@ import 'package:path/path.dart' as p;
 /// The database every school configuration from the build uses.
 const String kDefaultSchoolDatabaseName = 'python-tutor';
 
+/// The name of the school whose configuration the build carries. Only SMA
+/// Arcadia's setup exists (README), and the build's `.env` has no name of its
+/// own. It names the school file the transitional release writes from the
+/// build (#308), and the build's school carries it too, so the school from
+/// that file is the very same configuration. Goes with the build's school
+/// configuration (#308, step 3).
+const String kBuildSchoolName = 'SMA Arcadia';
+
+/// How the app reaches a school's database (#306).
+enum DatabaseAccess {
+  /// With the database key the build carries ([buildSchoolDatabaseKey]).
+  /// The default, and the only access a build's own school configuration
+  /// uses.
+  masterKey,
+
+  /// With the user's own Entra sign-in: an access token for the database
+  /// account, obtained silently with the stored refresh token. Needs roles
+  /// in the database and consent for the database scope in the tenant; a
+  /// school file turns it on with `"databaseAccess": "signIn"`.
+  signIn,
+}
+
 /// What the app needs to know about a school: where to sign in and where its
 /// database lives. Holds no secrets, so a school file (#307) can carry it.
 @immutable
@@ -38,6 +62,7 @@ class SchoolConfig {
     required this.databaseEndpoint,
     this.databaseName = kDefaultSchoolDatabaseName,
     this.schoolName,
+    this.databaseAccess = DatabaseAccess.masterKey,
   });
 
   /// Entra tenant (directory) id of the school.
@@ -55,8 +80,33 @@ class SchoolConfig {
   /// Cosmos DB database id inside that account.
   final String databaseName;
 
-  /// Shown to the user where it helps; the build's own school has none.
+  /// Shown to the user where it helps; `null` when it is not known.
   final String? schoolName;
+
+  /// How the app reaches the database. [DatabaseAccess.masterKey] unless the
+  /// school file asks for [DatabaseAccess.signIn] (#306).
+  final DatabaseAccess databaseAccess;
+
+  /// The build's own school configuration, or `null` when the build has none.
+  /// Named [kBuildSchoolName] (#308).
+  static SchoolConfig? get fromBuild => fromBuildValues(
+    tenantId: AzureConfig.tenantId,
+    clientId: AzureConfig.clientId,
+    redirectUri: AzureConfig.redirectUri,
+    databaseEndpoint: AzureConfig.cosmosEndpoint,
+    schoolName: kBuildSchoolName,
+  );
+
+  /// This configuration with [name] as the school's name.
+  SchoolConfig named(String name) => SchoolConfig(
+    tenantId: tenantId,
+    clientId: clientId,
+    redirectUri: redirectUri,
+    databaseEndpoint: databaseEndpoint,
+    databaseName: databaseName,
+    schoolName: name,
+    databaseAccess: databaseAccess,
+  );
 
   /// The build's school configuration, or `null` when the build's values are
   /// not a school's (see [isMissingValue]).
@@ -65,6 +115,7 @@ class SchoolConfig {
     required String clientId,
     required String redirectUri,
     required String databaseEndpoint,
+    String? schoolName,
   }) {
     if (isMissingValue(tenantId) ||
         isMissingValue(clientId) ||
@@ -80,6 +131,7 @@ class SchoolConfig {
       clientId: clientId.trim(),
       redirectUri: redirectUri.trim(),
       databaseEndpoint: endpoint,
+      schoolName: schoolName,
     );
   }
 
@@ -100,7 +152,8 @@ class SchoolConfig {
       other.redirectUri == redirectUri &&
       other.databaseEndpoint == databaseEndpoint &&
       other.databaseName == databaseName &&
-      other.schoolName == schoolName;
+      other.schoolName == schoolName &&
+      other.databaseAccess == databaseAccess;
 
   @override
   int get hashCode => Object.hash(
@@ -110,6 +163,7 @@ class SchoolConfig {
     databaseEndpoint,
     databaseName,
     schoolName,
+    databaseAccess,
   );
 }
 
@@ -118,15 +172,11 @@ class SchoolConfig {
 sealed class AppMode {
   const AppMode();
 
-  /// The mode of this build, decided once.
-  static AppMode get fromBuild => _fromBuild ??= fromSchoolConfig(
-    SchoolConfig.fromBuildValues(
-      tenantId: AzureConfig.tenantId,
-      clientId: AzureConfig.clientId,
-      redirectUri: AzureConfig.redirectUri,
-      databaseEndpoint: AzureConfig.cosmosEndpoint,
-    ),
-  );
+  /// The mode of this build alone, decided once: what tests and the
+  /// default [appModeProvider] see. The app itself starts in the mode
+  /// `decideStartMode` (lib/core/app_start.dart) picks.
+  static AppMode get fromBuild =>
+      _fromBuild ??= fromSchoolConfig(SchoolConfig.fromBuild);
   static AppMode? _fromBuild;
 
   /// [SchoolMode] with a school configuration, [StandaloneMode] without.
@@ -196,10 +246,12 @@ final class StandaloneMode extends AppMode {
 
 /// The master key for the build's school database.
 ///
-/// Only `CosmosClient.instance` asks for it, and only in school mode. It is
-/// not part of [SchoolConfig]: a school file carries no secrets, and #306
-/// replaces it with the user's own sign-in.
+/// Only `CosmosClient.forMode` asks for it, and only for a school with
+/// [DatabaseAccess.masterKey]. It is not part of [SchoolConfig]: a school
+/// file carries no secrets. A school with [DatabaseAccess.signIn] (#306)
+/// never asks for it, so it works with a build that has no key.
 String buildSchoolDatabaseKey() => AzureConfig.cosmosKey;
 
-/// The mode the app runs in. Tests override it; the app reads the build.
+/// The mode the app runs in. `main()` overrides it with the mode decided at
+/// start (#307); tests override it too. Unoverridden it reads the build.
 final appModeProvider = Provider<AppMode>((ref) => AppMode.fromBuild);

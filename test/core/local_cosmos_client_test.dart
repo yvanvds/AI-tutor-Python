@@ -11,6 +11,8 @@ import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../helpers/delete_dir.dart';
+
 Matcher _status(int code) => throwsA(
   isA<CosmosException>().having((e) => e.statusCode, 'statusCode', code),
 );
@@ -26,9 +28,7 @@ void main() {
     now = DateTime.utc(2026, 11, 18, 12);
   });
 
-  tearDown(() {
-    if (root.existsSync()) root.deleteSync(recursive: true);
-  });
+  tearDown(() => deleteDirRetrying(root));
 
   Map<String, Object?> belief(String id, {String uid = 'u1', int n = 0}) => {
     'id': id,

@@ -368,6 +368,35 @@ working; the card offers **Disconnect** to clear it.
 
 ---
 
+## The school file
+
+A school file lets students point the app at their school without a build of its own ([#307](https://github.com/yvanvds/AI-tutor-Python/issues/307)). It is a small JSON file with no keys or passwords in it, so the teacher can share it freely — on the learning platform, by mail, on a USB stick:
+
+```json
+{
+  "formatVersion": 1,
+  "schoolName": "Example School",
+  "tenantId": "<Directory (tenant) ID from Step 2>",
+  "clientId": "<Application (client) ID from Step 2>",
+  "databaseEndpoint": "https://<your-account>.documents.azure.com:443/",
+  "databaseName": "python-tutor"
+}
+```
+
+`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). `"signIn"` is not in use yet: it needs roles on the database and admin consent in the tenant first (see the issue). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
+
+How the app uses it:
+
+- **First start.** When the app has no school yet, it asks: *I have a file from my school* (pick the file, then sign in) or *Continue without a school* (the stand-alone mode, [#261](https://github.com/yvanvds/AI-tutor-Python/issues/261)). Nothing is chosen for the student.
+- **Kept.** The imported file is stored as `school.json` in the app's data folder, and the next start goes straight to that school.
+- **Options.** The *School* card shows the school's name, imports another school file, or leaves the school. In the stand-alone mode it imports a school file. Switching asks for a restart; the data of the stand-alone mode and of the school stay apart.
+
+A build that has a school configuration in its `.env` (Step 4) starts in that school as before, without asking.
+
+Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
+
+---
+
 ## Running the tests
 
 Two layers, both without an Entra tenant or a live Cosmos DB:

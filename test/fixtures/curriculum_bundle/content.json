@@ -1,0 +1,13 @@
+{
+  "container": "content",
+  "docs": [
+    {
+      "body": "<p>Met <code>=</code> geef je een naam een waarde.</p>",
+      "id": "toekennen",
+      "title": "Toekennen",
+      "type": "content",
+      "updatedAt": "2026-10-01T08:00:00.000Z"
+    }
+  ],
+  "partitionKeyField": "type"
+}

@@ -345,4 +345,12 @@ extension SectionLabel on Section {
 
   /// Sections that are hidden unless [developerToolsProvider] is true.
   bool get isDeveloperOnly => this == Section.instructions;
+
+  /// Sections that need a school (#267): the grade formula and the reports,
+  /// which a teacher grades, and the teacher's own sections. The stand-alone
+  /// mode leaves them out.
+  bool get isSchoolOnly =>
+      isTeacherOnly ||
+      this == Section.puntenformule ||
+      this == Section.myReports;
 }

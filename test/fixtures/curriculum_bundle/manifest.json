@@ -1,0 +1,35 @@
+{
+  "containers": {
+    "config": {
+      "count": 1,
+      "file": "config.json"
+    },
+    "content": {
+      "count": 1,
+      "file": "content.json"
+    },
+    "goals": {
+      "count": 2,
+      "file": "goals.json"
+    },
+    "instructions": {
+      "count": 1,
+      "file": "instructions.json"
+    },
+    "modules": {
+      "count": 1,
+      "file": "modules.json"
+    },
+    "questions": {
+      "count": 2,
+      "file": "questions.json"
+    },
+    "translations": {
+      "count": 2,
+      "file": "translations.json"
+    }
+  },
+  "contentVersion": "f53750da6ada824fc5bc53d772bb293ca044a9194191556d90fe913c11bc1d0b",
+  "exportedAt": "2026-11-19T00:00:00.000000Z",
+  "format": 1
+}

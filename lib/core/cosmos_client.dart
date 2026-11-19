@@ -6,9 +6,9 @@
 // transactional batch — so a hand-rolled client is the safest long-term bet.
 //
 // Auth is pluggable via [CosmosAuth]. [CosmosClient.instance] uses a
-// [MasterKeyAuth] on the school configuration of the app mode (#262). The
-// user's own sign-in ([AadTokenAuth], #306) swaps in without touching call
-// sites. In stand-alone mode the same interface sits on local files instead
+// [MasterKeyAuth] on the school configuration of the app mode (#262), or,
+// when the school asks for [DatabaseAccess.signIn], the user's own sign-in
+// ([AadTokenAuth], #306) — without touching call sites. In stand-alone mode the same interface sits on local files instead
 // (`LocalCosmosClient`, #263).
 
 import 'dart:async';
@@ -17,8 +17,9 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
+import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:http/http.dart' as http;
 
 const String _apiVersion = '2018-12-31';
@@ -107,6 +108,8 @@ class CosmosException implements Exception {
 
 /// Produces the `Authorization` header for a Cosmos REST request.
 abstract class CosmosAuth {
+  const CosmosAuth();
+
   /// [verb] is the HTTP method (`GET`, `POST`, etc.).
   /// [resourceType] is the Cosmos resource type (`docs`, `colls`, `dbs`).
   /// [resourceLink] is the path WITHOUT a leading slash to the resource the
@@ -114,20 +117,31 @@ abstract class CosmosAuth {
   /// `dbs/{db}/colls/{coll}/docs/{id}`; for collection-level ops (POST a new
   /// doc, query) it is `dbs/{db}/colls/{coll}`.
   /// [date] is the value sent in `x-ms-date` (RFC 1123, mixed case).
-  String authHeader({
+  ///
+  /// May be async: a token can need renewing first.
+  FutureOr<String> authHeader({
     required String verb,
     required String resourceType,
     required String resourceLink,
     required String date,
   });
+
+  /// Cosmos answered 401. Returns whether this auth renewed what it sends,
+  /// so the request is worth one more try. The client asks once per
+  /// request.
+  Future<bool> renewAfterUnauthorized() async => false;
 }
 
 /// Master-key auth: HMAC-SHA256 over the canonical request, base64-encoded,
 /// then URL-encoded as `type=master&ver=1.0&sig=<sig>`.
-class MasterKeyAuth implements CosmosAuth {
-  MasterKeyAuth(String key) : _key = base64Decode(key);
+///
+/// The key is decoded on the first request, not here: a school mode can
+/// start, and show its sign-in screen, before any key is usable (#307).
+class MasterKeyAuth extends CosmosAuth {
+  MasterKeyAuth(this._encodedKey);
 
-  final List<int> _key;
+  final String _encodedKey;
+  late final List<int> _key = base64Decode(_encodedKey);
 
   @override
   String authHeader({
@@ -148,22 +162,37 @@ class MasterKeyAuth implements CosmosAuth {
   }
 }
 
-/// AAD bearer-token auth (Step 3). Token provider returns a fresh access
-/// token for the Cosmos resource (`https://<account>.documents.azure.com`).
-/// Caching/refresh is the provider's responsibility.
-class AadTokenAuth implements CosmosAuth {
-  AadTokenAuth(this._tokenProvider);
+/// Entra token auth (#306): `type=aad&ver=1.0&sig=<token>`, URL-encoded.
+///
+/// [_token] returns an access token for the database account
+/// (`CosmosTokenSource.token`); keeping it and renewing it before it expires
+/// is its job. On a 401 this asks it once for a fresh token, so a token
+/// revoked or expired early costs one retry, not an error.
+class AadTokenAuth extends CosmosAuth {
+  AadTokenAuth(this._token);
 
-  final String Function() _tokenProvider;
+  final Future<String> Function({bool forceRefresh}) _token;
 
   @override
-  String authHeader({
+  Future<String> authHeader({
     required String verb,
     required String resourceType,
     required String resourceLink,
     required String date,
-  }) {
-    return Uri.encodeComponent('type=aad&ver=1.0&sig=${_tokenProvider()}');
+  }) async {
+    final token = await _token();
+    return Uri.encodeComponent('type=aad&ver=1.0&sig=$token');
+  }
+
+  @override
+  Future<bool> renewAfterUnauthorized() async {
+    try {
+      await _token(forceRefresh: true);
+      return true;
+    } on CosmosException catch (e) {
+      debugPrint('AadTokenAuth: no fresh token after a 401: $e');
+      return false;
+    }
   }
 }
 
@@ -200,8 +229,11 @@ class CosmosClient {
 
   /// The client for [mode]'s data.
   ///
-  /// School mode: the school's database. [databaseKey] is the build's key
-  /// unless a test passes its own.
+  /// School mode: the school's database. With [DatabaseAccess.masterKey]
+  /// through [databaseKey], the build's key unless a test passes its own.
+  /// With [DatabaseAccess.signIn] (#306) through the user's own sign-in
+  /// ([tokenSource], by default the one `AuthService` keeps); [databaseKey]
+  /// is then never asked for, so a build without a key works.
   ///
   /// Stand-alone mode: the local storage under [localDataRoot] (#263), read
   /// from disk here. Finding that folder is async, so `main` opens it
@@ -212,6 +244,7 @@ class CosmosClient {
     AppMode mode, {
     String Function() databaseKey = buildSchoolDatabaseKey,
     Directory? localDataRoot,
+    CosmosTokenSource? tokenSource,
   }) {
     final school = mode.school;
     if (school == null) {
@@ -223,10 +256,16 @@ class CosmosClient {
       }
       return LocalCosmosClient.open(localDataRoot);
     }
+    final CosmosAuth auth = switch (school.databaseAccess) {
+      DatabaseAccess.masterKey => MasterKeyAuth(databaseKey()),
+      DatabaseAccess.signIn => AadTokenAuth(
+        (tokenSource ?? CosmosTokenSource.forMode(mode as SchoolMode)).token,
+      ),
+    };
     return CosmosClient._(
       endpoint: school.databaseEndpoint,
       databaseId: school.databaseName,
-      auth: MasterKeyAuth(databaseKey()),
+      auth: auth,
     );
   }
 
@@ -292,17 +331,19 @@ class CosmosClient {
 
     int throttleAttempt = 0;
     int transientAttempt = 0;
+    bool authRenewed = false;
     while (true) {
       final date = HttpDate.format(DateTime.now().toUtc());
+      final header = _auth.authHeader(
+        verb: verb,
+        resourceType: resourceType,
+        resourceLink: resourceLink,
+        date: date,
+      );
       final headers = <String, String>{
         'x-ms-version': _apiVersion,
         'x-ms-date': date,
-        'Authorization': _auth.authHeader(
-          verb: verb,
-          resourceType: resourceType,
-          resourceLink: resourceLink,
-          date: date,
-        ),
+        'Authorization': header is Future<String> ? await header : header,
         if (encodedBody != null) 'Content-Type': 'application/json',
         ...?extraHeaders,
       };
@@ -326,6 +367,16 @@ class CosmosClient {
           'No response from Cosmos after ${transientAttempt + 1} attempts: $e',
           code: 'NetworkError',
         );
+      }
+
+      // A token can expire or be revoked before its time (#306): renew it
+      // once and try again. A key never renews, so with a key a 401
+      // surfaces as it always did.
+      if (response.statusCode == 401 &&
+          !authRenewed &&
+          await _auth.renewAfterUnauthorized()) {
+        authRenewed = true;
+        continue;
       }
 
       if (response.statusCode == 429 && throttleAttempt < _maxThrottleRetries) {
