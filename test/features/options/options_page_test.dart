@@ -698,12 +698,23 @@ void main() {
   group('school', () {
     final exampleSchool = parseSchoolFile(exampleSchoolFile());
 
-    testWidgets("school mode names the school and offers another file or "
-        "leaving", (tester) async {
+    testWidgets('a student sees the school and another file, but cannot '
+        'leave it', (tester) async {
       await mount(tester, mode: SchoolMode(exampleSchool));
 
       expect(find.text('You work with Example School.'), findsOneWidget);
       expect(find.text('Import another school file'), findsOneWidget);
+      expect(find.byKey(const Key('options-school-leave')), findsNothing);
+      expect(find.text('Leave the school'), findsNothing);
+
+      await unmount(tester);
+    });
+
+    testWidgets('a teacher can leave the school', (tester) async {
+      await mount(tester, mode: SchoolMode(exampleSchool), isTeacher: true);
+
+      expect(find.text('You work with Example School.'), findsOneWidget);
+      expect(find.byKey(const Key('options-school-leave')), findsOneWidget);
       expect(find.text('Leave the school'), findsOneWidget);
 
       await unmount(tester);
@@ -720,15 +731,15 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('leaving asks first, forgets the school and asks for a '
-        'restart', (tester) async {
+    testWidgets('leaving (a teacher) asks first, forgets the school and asks '
+        'for a restart', (tester) async {
       schoolStore = MemorySchoolFileStore(exampleSchool);
       SharedPreferences.setMockInitialValues({
         'local_api_key': 'sk-old',
         'azure_auth_tokens_v1': 'tokens',
         'standalone.local_profile_v1': 'profile',
       });
-      await mount(tester, mode: SchoolMode(exampleSchool));
+      await mount(tester, mode: SchoolMode(exampleSchool), isTeacher: true);
 
       await tester.tap(find.byKey(const Key('options-school-leave')));
       await tester.pumpAndSettle();

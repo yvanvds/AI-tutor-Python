@@ -583,13 +583,32 @@ void main() {
     await harness.dispose(tester);
   });
 
-  testWidgets('Options names the school; leaving it asks for a restart, and '
-      'the next start asks again', (tester) async {
+  testWidgets('Options names the school; a student cannot leave it, a '
+      'teacher can: a restart, and the next start asks again', (tester) async {
     final appData = tempDir('ai_tutor_appdata_');
     File('${appData.path}/school.json')
         .writeAsStringSync(encodeSchoolFile(exampleSchool));
 
+    // A student: the school's name, no way to leave it.
     var harness = AppHarness(
+      appMode: SchoolMode(exampleSchool),
+      schoolData: appData,
+    );
+    await harness.boot(tester);
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('options-school-import')),
+      200,
+      scrollable: optionsScrollable(),
+    );
+    expect(find.text('You work with Example School.'), findsOneWidget);
+    expect(find.byKey(const Key('options-school-leave')), findsNothing);
+    await harness.dispose(tester);
+
+    // A teacher leaves the school.
+    harness = AppHarness(
+      identity: teacherIdentity,
       appMode: SchoolMode(exampleSchool),
       schoolData: appData,
     );
@@ -602,6 +621,10 @@ void main() {
       200,
       scrollable: optionsScrollable(),
     );
+    // Scrolled into view, not just to its edge: the card sits lower for a
+    // teacher, below the school-wide model card.
+    await tester.ensureVisible(find.byKey(const Key('options-school-leave')));
+    await tester.pump();
     expect(find.text('You work with Example School.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('options-school-leave')));
     await pumpUntilFound(

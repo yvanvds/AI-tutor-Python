@@ -3,8 +3,8 @@
 // popup and the debug dialog:
 //
 //   - the user's name, in stand-alone mode only (#264)
-//   - the school (#307): its name, another school file, leaving it; in
-//     stand-alone mode, importing a school file
+//   - the school (#307): its name, another school file, leaving it (a
+//     teacher only); in stand-alone mode, importing a school file
 //   - language (moved from the sidebar settings popup)
 //   - appearance: light / dark / follow the system (#32)
 //   - the AI model, on own-key and developer builds (#32) and for teachers
@@ -272,7 +272,9 @@ class _AnswersKeptCard extends StatelessWidget {
 
 /// Which school the app works with, and the way to another one or to none.
 /// Switching takes a restart: the mode is decided at start, and the data of
-/// the two modes stays apart.
+/// the two modes stays apart. Leaving the school is for a teacher only: a
+/// student who leaves by mistake would be locked out of the school until
+/// they get the file again.
 class _SchoolCard extends ConsumerWidget {
   const _SchoolCard();
 
@@ -357,12 +359,13 @@ class _SchoolCard extends ConsumerWidget {
                 label: Text(l.options_school_importOther),
                 onPressed: () => importSchoolFileAndAskRestart(context, ref),
               ),
-              OutlinedButton.icon(
-                key: const Key('options-school-leave'),
-                icon: const Icon(Icons.logout),
-                label: Text(l.options_school_leave),
-                onPressed: () => _leave(context, ref),
-              ),
+              if (ref.watch(isTeacherProvider))
+                OutlinedButton.icon(
+                  key: const Key('options-school-leave'),
+                  icon: const Icon(Icons.logout),
+                  label: Text(l.options_school_leave),
+                  onPressed: () => _leave(context, ref),
+                ),
             ],
           ),
         ],
