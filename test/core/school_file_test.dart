@@ -8,6 +8,7 @@ import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/delete_dir.dart';
 import '../helpers/memory_school_file_store.dart';
 
 Matcher _refused(SchoolFileProblem problem, {String? field, int? version}) =>
@@ -240,7 +241,7 @@ void main() {
       dir = Directory.systemTemp.createTempSync('school_file_');
       store = SchoolFileStore(() async => dir);
     });
-    tearDown(() => dir.deleteSync(recursive: true));
+    tearDown(() => deleteDirRetrying(dir));
 
     test(
       'none until one is written; then that one; gone after delete',

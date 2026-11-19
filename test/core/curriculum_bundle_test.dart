@@ -9,6 +9,8 @@ import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../helpers/delete_dir.dart';
+
 final Directory _fixture = Directory('test/fixtures/curriculum_bundle');
 
 void main() {
@@ -25,9 +27,9 @@ void main() {
     }
   });
 
-  tearDown(() {
+  tearDown(() async {
     for (final d in [data, bundleDir]) {
-      if (d.existsSync()) d.deleteSync(recursive: true);
+      await deleteDirRetrying(d);
     }
   });
 
@@ -206,7 +208,7 @@ void main() {
 
   test('no bundle: nothing is written and the app starts empty', () async {
     final empty = Directory.systemTemp.createTempSync('bundle_empty_');
-    addTearDown(() => empty.deleteSync(recursive: true));
+    addTearDown(() => deleteDirRetrying(empty));
     File(p.join(empty.path, 'README.md')).writeAsStringSync('placeholder');
     final client = open();
     expect(

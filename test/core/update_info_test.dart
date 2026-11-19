@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../helpers/delete_dir.dart';
 import '../helpers/loopback_proxy.dart';
 import '../helpers/loopback_tls.dart';
 
@@ -568,7 +569,7 @@ void main() {
     late Directory tmp;
 
     setUp(() => tmp = Directory.systemTemp.createTempSync('update_test_'));
-    tearDown(() => tmp.deleteSync(recursive: true));
+    tearDown(() => deleteDirRetrying(tmp));
 
     test('returns true for matching hash', () async {
       final content = Uint8List.fromList([1, 2, 3, 4, 5]);

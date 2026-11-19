@@ -11,6 +11,7 @@ import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../helpers/delete_dir.dart';
 import '../helpers/memory_school_file_store.dart';
 import '../helpers/test_app_mode.dart';
 
@@ -121,7 +122,7 @@ void main() {
 
     test("neither leaves the other mode's data", () async {
       final dir = Directory.systemTemp.createTempSync('app_start_');
-      addTearDown(() => dir.deleteSync(recursive: true));
+      addTearDown(() => deleteDirRetrying(dir));
       final store = SchoolFileStore(() async => dir);
       final standaloneData = const StandaloneMode().localDataDir(dir);
       File('${standaloneData.path}/data/accounts/local-1.json')
@@ -169,7 +170,7 @@ void main() {
     test('a signed-in install without a file gets one, as the very same '
         'school, and keeps its sign-in', () async {
       final dir = Directory.systemTemp.createTempSync('app_start_');
-      addTearDown(() => dir.deleteSync(recursive: true));
+      addTearDown(() => deleteDirRetrying(dir));
       final store = SchoolFileStore(() async => dir);
       final kept = <String, Object>{
         'azure_auth_tokens_v1': '{"refresh_token": "r"}',
@@ -220,7 +221,7 @@ void main() {
       'an existing file is never overwritten, even one it cannot read',
       () async {
         final dir = Directory.systemTemp.createTempSync('app_start_');
-        addTearDown(() => dir.deleteSync(recursive: true));
+        addTearDown(() => deleteDirRetrying(dir));
         final file = File('${dir.path}/school.json')..writeAsStringSync('{}');
         final store = SchoolFileStore(() async => dir);
 

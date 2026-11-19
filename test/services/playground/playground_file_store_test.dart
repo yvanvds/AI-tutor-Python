@@ -4,6 +4,8 @@ import 'package:ai_tutor_python/services/playground/playground_file_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../../helpers/delete_dir.dart';
+
 void main() {
   late Directory root;
   late PlaygroundFileStore store;
@@ -13,9 +15,7 @@ void main() {
     store = PlaygroundFileStore(rootDir: () async => root);
   });
 
-  tearDown(() {
-    if (root.existsSync()) root.deleteSync(recursive: true);
-  });
+  tearDown(() => deleteDirRetrying(root));
 
   group('normalizeName', () {
     test('trims and strips a trailing .py', () {
