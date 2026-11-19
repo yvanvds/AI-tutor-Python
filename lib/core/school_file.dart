@@ -14,7 +14,9 @@
 //
 // `databaseName` is optional (default `python-tutor`), and so is
 // `redirectUri` (default `http://localhost`; the sign-in binds its own
-// loopback port anyway). Nothing in it is secret. A file that carries a
+// loopback port anyway). So is `databaseAccess` (#306): `"signIn"` reaches
+// the database with the user's own sign-in, `"masterKey"` (the default)
+// with the database key of the build. Nothing in it is secret. A file that carries a
 // field that looks like a key, a token or a password is refused, so such a
 // value is never read, let alone kept.
 //
@@ -156,6 +158,16 @@ SchoolConfig parseSchoolFile(String text) {
       field: 'databaseEndpoint',
     );
   }
+  final accessName = optional('databaseAccess', DatabaseAccess.masterKey.name);
+  final access = DatabaseAccess.values
+      .where((a) => a.name == accessName)
+      .firstOrNull;
+  if (access == null) {
+    throw const SchoolFileException(
+      SchoolFileProblem.invalidField,
+      field: 'databaseAccess',
+    );
+  }
   return SchoolConfig(
     tenantId: tenantId,
     clientId: clientId,
@@ -163,6 +175,7 @@ SchoolConfig parseSchoolFile(String text) {
     databaseEndpoint: endpoint,
     databaseName: optional('databaseName', kDefaultSchoolDatabaseName),
     schoolName: schoolName,
+    databaseAccess: access,
   );
 }
 
@@ -182,6 +195,10 @@ String encodeSchoolFile(SchoolConfig config) {
     'redirectUri': config.redirectUri,
     'databaseEndpoint': config.databaseEndpoint.toString(),
     'databaseName': config.databaseName,
+    // Only when it is not the default, so a file for a school on the
+    // database key reads exactly as before #306.
+    if (config.databaseAccess != DatabaseAccess.masterKey)
+      'databaseAccess': config.databaseAccess.name,
   });
 }
 

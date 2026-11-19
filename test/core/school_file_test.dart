@@ -156,6 +156,70 @@ void main() {
     expect(text.toLowerCase(), isNot(contains('key')));
   });
 
+  group("databaseAccess, the switch to the user's own sign-in (#306)", () {
+    test('is the database key when the file does not say', () {
+      expect(
+        parseSchoolFile(exampleSchoolFile()).databaseAccess,
+        DatabaseAccess.masterKey,
+      );
+    });
+
+    test('"signIn" turns it on; "masterKey" says the default', () {
+      expect(
+        parseSchoolFile(exampleSchoolFile(extra: {'databaseAccess': 'signIn'}))
+            .databaseAccess,
+        DatabaseAccess.signIn,
+      );
+      expect(
+        parseSchoolFile(
+          exampleSchoolFile(extra: {'databaseAccess': 'masterKey'}),
+        ).databaseAccess,
+        DatabaseAccess.masterKey,
+      );
+    });
+
+    test('anything else is refused', () {
+      for (final value in <Object>['SignIn', 'aad', 1, true]) {
+        expect(
+          () => parseSchoolFile(
+            exampleSchoolFile(extra: {'databaseAccess': value}),
+          ),
+          throwsA(
+            _refused(SchoolFileProblem.invalidField, field: 'databaseAccess'),
+          ),
+          reason: '$value',
+        );
+      }
+    });
+
+    test('is written only when on, and read back the same', () {
+      final off = parseSchoolFile(exampleSchoolFile());
+      expect(
+        jsonDecode(encodeSchoolFile(off)),
+        isNot(contains('databaseAccess')),
+      );
+
+      final on = parseSchoolFile(
+        exampleSchoolFile(extra: {'databaseAccess': 'signIn'}),
+      );
+      final text = encodeSchoolFile(on);
+      expect(jsonDecode(text)['databaseAccess'], 'signIn');
+      expect(parseSchoolFile(text), on);
+      expect(on, isNot(off));
+      expect(on.named('Other').databaseAccess, DatabaseAccess.signIn);
+    });
+
+    test("the build's own school stays on the database key", () {
+      final build = SchoolConfig.fromBuildValues(
+        tenantId: '33333333-3333-3333-3333-333333333333',
+        clientId: '44444444-4444-4444-4444-444444444444',
+        redirectUri: 'http://localhost',
+        databaseEndpoint: 'https://school.documents.azure.com:443/',
+      );
+      expect(build!.databaseAccess, DatabaseAccess.masterKey);
+    });
+  });
+
   test("the build's school needs a name to become a file (#308)", () {
     final build = SchoolConfig(
       tenantId: '33333333-3333-3333-3333-333333333333',

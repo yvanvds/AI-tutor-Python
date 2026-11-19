@@ -37,6 +37,20 @@ const String kDefaultSchoolDatabaseName = 'python-tutor';
 /// configuration (#308, step 3).
 const String kBuildSchoolName = 'SMA Arcadia';
 
+/// How the app reaches a school's database (#306).
+enum DatabaseAccess {
+  /// With the database key the build carries ([buildSchoolDatabaseKey]).
+  /// The default, and the only access a build's own school configuration
+  /// uses.
+  masterKey,
+
+  /// With the user's own Entra sign-in: an access token for the database
+  /// account, obtained silently with the stored refresh token. Needs roles
+  /// in the database and consent for the database scope in the tenant; a
+  /// school file turns it on with `"databaseAccess": "signIn"`.
+  signIn,
+}
+
 /// What the app needs to know about a school: where to sign in and where its
 /// database lives. Holds no secrets, so a school file (#307) can carry it.
 @immutable
@@ -48,6 +62,7 @@ class SchoolConfig {
     required this.databaseEndpoint,
     this.databaseName = kDefaultSchoolDatabaseName,
     this.schoolName,
+    this.databaseAccess = DatabaseAccess.masterKey,
   });
 
   /// Entra tenant (directory) id of the school.
@@ -68,6 +83,10 @@ class SchoolConfig {
   /// Shown to the user where it helps; `null` when it is not known.
   final String? schoolName;
 
+  /// How the app reaches the database. [DatabaseAccess.masterKey] unless the
+  /// school file asks for [DatabaseAccess.signIn] (#306).
+  final DatabaseAccess databaseAccess;
+
   /// The build's own school configuration, or `null` when the build has none.
   /// Named [kBuildSchoolName] (#308).
   static SchoolConfig? get fromBuild => fromBuildValues(
@@ -86,6 +105,7 @@ class SchoolConfig {
     databaseEndpoint: databaseEndpoint,
     databaseName: databaseName,
     schoolName: name,
+    databaseAccess: databaseAccess,
   );
 
   /// The build's school configuration, or `null` when the build's values are
@@ -132,7 +152,8 @@ class SchoolConfig {
       other.redirectUri == redirectUri &&
       other.databaseEndpoint == databaseEndpoint &&
       other.databaseName == databaseName &&
-      other.schoolName == schoolName;
+      other.schoolName == schoolName &&
+      other.databaseAccess == databaseAccess;
 
   @override
   int get hashCode => Object.hash(
@@ -142,6 +163,7 @@ class SchoolConfig {
     databaseEndpoint,
     databaseName,
     schoolName,
+    databaseAccess,
   );
 }
 
@@ -224,9 +246,10 @@ final class StandaloneMode extends AppMode {
 
 /// The master key for the build's school database.
 ///
-/// Only `CosmosClient.instance` asks for it, and only in school mode. It is
-/// not part of [SchoolConfig]: a school file carries no secrets, and #306
-/// replaces it with the user's own sign-in.
+/// Only `CosmosClient.forMode` asks for it, and only for a school with
+/// [DatabaseAccess.masterKey]. It is not part of [SchoolConfig]: a school
+/// file carries no secrets. A school with [DatabaseAccess.signIn] (#306)
+/// never asks for it, so it works with a build that has no key.
 String buildSchoolDatabaseKey() => AzureConfig.cosmosKey;
 
 /// The mode the app runs in. `main()` overrides it with the mode decided at

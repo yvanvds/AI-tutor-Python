@@ -383,7 +383,7 @@ A school file lets students point the app at their school without a build of its
 }
 ```
 
-`databaseName` is optional (default `python-tutor`). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
+`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). `"signIn"` is not in use yet: it needs roles on the database and admin consent in the tenant first (see the issue). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
 
 How the app uses it:
 
@@ -393,7 +393,7 @@ How the app uses it:
 
 A build that has a school configuration in its `.env` (Step 4) starts in that school as before, without asking.
 
-Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in lands ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
+Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
 
 ---
 
