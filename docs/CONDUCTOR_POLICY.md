@@ -122,10 +122,13 @@ means belief mean ≥ threshold AND evidence count ≥ minimum (exact
 numbers in section 4). Same rule as cold start, with mastered LOs
 skipped.
 
-**Last-question-type reset.** The variety rule "don't ask the same
-type as last time" is not applied on the first question of a session.
-The previously-stored `lastQuestionType` may be from weeks ago and
-shouldn't constrain a fresh session.
+**The type rotation carries over (#312).** The variety rule "don't ask
+the same type as last time on this LO" (2.2) reads the stored
+`lastQuestionType` of the LO, so it also holds on the first question of
+a session: an `apply` LO that last got `completeCode`, however long ago,
+now gets `writeCode`. (Until #312 the rule read the question before this
+one in memory, which a new session cleared — and which was seldom on the
+same LO, so the rotation hardly ever happened.)
 
 **No automatic session greeting from the conductor.** The conductor's
 job is to ask good questions; greetings, if wanted, belong in the
@@ -543,8 +546,9 @@ question-type instruction prompts.
 1. Take the acceptable types for the target LO's kind.
    (#279) Without mcQuestion when a right pick can no longer bring an
    unmastered LO to its stamp, and the kind has another type (below).
-2. Exclude the type used in the immediately previous question on this LO,
-   if other types remain.
+2. Exclude the type of the previous question on this LO, if other types
+   remain. That is the LO's stored `lastQuestionType` (#312), whatever
+   was asked on other LOs in between and in whichever session.
 3. If LO belief is weak (mean < 0.5), pick the gentlest remaining type
    (gentleness order from section 1.1).
 4. Otherwise pick the type least-recently-used for this LO.
@@ -576,9 +580,31 @@ pick is the gentle way in, as it was), when
 
 An LO without a doc, or with no right own question yet, keeps every type;
 so does a mastered LO in the top-up of a mastered subgoal (1.3), with no
-stamp at stake. The rule is `belief_math.needsNonMcqQuestion`. The same
+stamp at stake. Keeping every type is not "a pick every time": step 2
+still rotates on the LO's previous type (#312), so a `recall` LO whose
+last question was a pick — right or wrong — gets `socraticQuestion` next,
+and a pick again after that while this rule allows one. The rule is `belief_math.needsNonMcqQuestion`. The same
 filter applies to the recheck (2.6), and not to the warm-up review (1.5),
 whose LO has its stamp.
+
+**Where the previous type comes from (#312).** Step 2 reads
+`lastQuestionType` on the LO's belief doc: the type of the last question
+that had this LO as its target, written with the answer (part 2 §3), also
+by a top-up (1.3), a warm-up review (1.5) or a recheck (2.6), and read
+whether the LO is mastered now or not. It is not the type of the question
+before this one: the recency guard (2.1) seldom asks an LO twice in a
+row, so that question is nearly always on another LO. Reading it from
+memory (as the code did until #312) left step 2 with nothing to exclude,
+and every LO got the first type of its kind — an `apply` LO `completeCode`
+every time. An LO without a doc, or with a doc no question ever targeted,
+has no previous type: nothing is excluded. Steps 2 and 3 together mean an
+`apply` LO under 0.5 that just got `completeCode` gets `writeCode`: the
+gentlest of what remains.
+
+Step 4 is approximated: only the last type is stored, so "least recently
+used" is the first acceptable type that is not the last one. A kind with
+two types left alternates (`apply`: `completeCode` ↔ `writeCode`;
+`predict` once the pick is dropped: `explainCode` ↔ `socraticQuestion`).
 
 The `mean < 0.5` threshold is the prior midpoint: the student has
 shown net-negative evidence on this LO. That's the right moment to be
@@ -849,7 +875,7 @@ now, single-target keeps evidence clean.
 After belief has been updated from the previous answer:
 
 ```
-nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
+nextQuestion(subgoal, student, lastQuestionLOId):
     if recheck slot open:                          # 2.6
         recheck = pickRecheck(root, subgoal, student)
         if recheck: return recheck
@@ -870,12 +896,14 @@ nextQuestion(subgoal, student, lastQuestionLOId, lastQuestionType):
 
 pickType(lo, belief):
     acceptable = acceptableTypes(lo.kind)    # from table
-    candidates = acceptable \ {previous type used on this LO}
+    # the LO's own previous type, from its doc (#312) — not the type of
+    # the question before this one, which was mostly on another LO
+    candidates = acceptable \ {belief.lastQuestionType}
     if candidates is empty:
         candidates = acceptable
     if belief.mean < 0.5:
         return gentlest(candidates)
-    return leastRecentlyUsed(candidates, lo)
+    return first(candidates)    # least recently used, approximated (2.2)
 
 shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
     if calibration is easy: return []               # no lower level
@@ -888,10 +916,11 @@ shouldDropNotch(lo, belief):                       # 2.3; the rules that fire
     return rules
 ```
 
-The pseudocode glosses several details (how "previous answer on lo"
-is tracked, how recency-of-types-on-this-LO is stored). Those are
-storage concerns: the per-LO recent activity in the student model
-(part 2 §3) carries the data we need.
+The previous type of an LO is `lastQuestionType` on its belief doc
+(part 2 §3), written when the LO is the target of an answered question;
+`lastQuestionLOId` is the conductor's in-memory recency guard (2.1). The
+pseudocode glosses the per-type recency behind "least recently used":
+only the last type is stored.
 
 ### 2.6 The recheck slot (#187, #188, #275)
 

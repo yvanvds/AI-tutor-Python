@@ -529,7 +529,6 @@ class Conductor {
 
   // Per-subgoal in-flight state. Reset on every advance.
   String? _lastTargetLoId;
-  ChatRequestType? _lastQuestionType;
 
   // Sustained-failure counter (CONDUCTOR_POLICY §7.3). Per-session, not
   // persisted: a fresh `setTarget()` clears it.
@@ -647,7 +646,6 @@ class Conductor {
     }
     final goal = _activeChildGoal;
     _lastTargetLoId = null;
-    _lastQuestionType = null;
     _recentFallbacks.clear();
     _degraded = false;
     _cascadeDepth = 0;
@@ -819,6 +817,7 @@ class Conductor {
       // pick can no longer bring it to its stamp; a top-up of a mastered
       // subgoal (§1.3) has no stamp at stake.
       belief: unmastered.isNotEmpty ? byId[target.id] : null,
+      previousType: byId[target.id]?.lastQuestionType,
       calibration: calibration,
     );
     final notchDropRules = await _shouldDropNotch(
@@ -931,6 +930,7 @@ class Conductor {
       // #279: no pick when one can no longer bring the LO to its stamp —
       // only while it is not mastered now.
       belief: belief == null || isMastered(snap, belief) ? null : belief,
+      previousType: belief?.lastQuestionType,
       calibration: calibration,
     );
     final notchDropRules = await _shouldDropNotch(
@@ -1607,10 +1607,18 @@ class Conductor {
   /// The type of the next question on [lo] (§2.2). [belief] is its doc
   /// when it is not mastered now (`null` otherwise), for the rule of #279
   /// ([_acceptableFor]); [calibration] the student's level.
-  ChatRequestType _pickType(
+  ///
+  /// [previousType] is the type of the last question that had [lo] as its
+  /// target: `LoBelief.lastQuestionType` of its doc, mastered or not (#312).
+  /// It comes from the doc, not from the question before this one — the
+  /// recency guard of §2.1 seldom asks an LO twice in a row, so the
+  /// question before is nearly always on another LO. `null` without a doc
+  /// or without the field: nothing is excluded then.
+  static ChatRequestType _pickType(
     LearningObjective lo,
     BeliefSnapshot snap, {
     LoBelief? belief,
+    required String? previousType,
     required QuestionDifficulty calibration,
   }) {
     final acceptable = _acceptableFor(
@@ -1633,7 +1641,7 @@ class Conductor {
       );
     }
     final candidates = acceptable
-        .where((t) => t.name != _lastQuestionTypeForLo(lo.id))
+        .where((t) => t.name != previousType)
         .toList(growable: false);
     final pool = candidates.isEmpty ? acceptable : candidates;
     if (snap.mean < 0.5) {
@@ -1648,11 +1656,6 @@ class Conductor {
     // The exclusion already handled that, so just take the first in the
     // acceptable set (deterministic).
     return pool.first;
-  }
-
-  String? _lastQuestionTypeForLo(String loId) {
-    if (_lastTargetLoId != loId) return null;
-    return _lastQuestionType?.name;
   }
 
   /// The §2.3 rules that ask the next question on [lo] one notch below
@@ -1722,7 +1725,6 @@ class Conductor {
     }
     _questionsSinceOffSubgoal += 1;
     _lastTargetLoId = plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
-    _lastQuestionType = plan.type;
   }
 
   /// Integrate a graded answer (CONDUCTOR_POLICY §3 + §4 + §5).
@@ -2797,7 +2799,6 @@ class Conductor {
       }
       if (!allDone) {
         _lastTargetLoId = null;
-        _lastQuestionType = null;
         return;
       }
       // Auto-skip a mastered subgoal up to the cascade cap.
@@ -2814,7 +2815,6 @@ class Conductor {
           details: {'haltedAtSubgoalId': next.id, 'depth': _cascadeDepth},
         );
         _lastTargetLoId = null;
-        _lastQuestionType = null;
         return;
       }
       // Every non-optional LO is mastered, so 1.0 is the honest fraction;

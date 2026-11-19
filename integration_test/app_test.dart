@@ -75,6 +75,7 @@ import 'flows/puntenformule_tab.dart' as puntenformule_tab;
 import 'flows/question_bank.dart' as question_bank;
 import 'flows/question_bank_serving.dart' as question_bank_serving;
 import 'flows/question_id.dart' as question_id;
+import 'flows/question_type_rotation.dart' as question_type_rotation;
 import 'flows/quiz_chat.dart' as quiz_chat;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
@@ -152,6 +153,7 @@ void main() {
   question_bank.main();
   question_bank_serving.main();
   question_id.main();
+  question_type_rotation.main();
   mcq_answer_key.main();
   mcq_option_tiles.main();
   multiple_choice_stamp.main();

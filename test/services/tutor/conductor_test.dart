@@ -2355,7 +2355,8 @@ void main() {
     /// A doc written [at] (an hour ago by default), right at calibration
     /// unless [atCalibration] is false. [right] and [nonMcq]: its right
     /// own questions, and those no pick; missing by default, a doc from
-    /// before 1.1.
+    /// before 1.1. [lastQuestionType]: what its last question was — the
+    /// type §2.2 does not ask again (#312).
     LoBelief seeded(
       String loId,
       double alpha,
@@ -2367,6 +2368,7 @@ void main() {
       int? nonMcq,
       DateTime? at,
       DateTime? probedAt,
+      String? lastQuestionType = 'mcQuestion',
     }) {
       final written = at ?? hourAgo;
       return LoBelief(
@@ -2375,7 +2377,7 @@ void main() {
         alpha: alpha,
         beta: beta,
         lastUpdatedAt: written,
-        lastQuestionType: 'mcQuestion',
+        lastQuestionType: lastQuestionType,
         lastPositiveAtCalibratedAt: atCalibration ? written : null,
         highestPositiveDifficulty: atCalibration
             ? QuestionDifficulty.medium
@@ -2602,16 +2604,27 @@ void main() {
         )).type,
         ChatRequestType.socraticQuestion,
       );
-      // Nothing right yet, μ 0.25: the gentlest, a pick.
+      // Nothing right yet, μ 0.25: the gentlest, a pick — when the
+      // question before on it was the other type (the rotation, #312).
       expect(
         (await planFor(
-          seeded('lo-r', 1, 3, atCalibration: false, right: 0, nonMcq: 0),
+          seeded(
+            'lo-r',
+            1,
+            3,
+            atCalibration: false,
+            right: 0,
+            nonMcq: 0,
+            lastQuestionType: 'socraticQuestion',
+          ),
         )).type,
         ChatRequestType.mcQuestion,
       );
       // A doc from before 1.1 reads 0: a pick.
       expect(
-        (await planFor(seeded('lo-r', 2, 1))).type,
+        (await planFor(
+          seeded('lo-r', 2, 1, lastQuestionType: 'socraticQuestion'),
+        )).type,
         ChatRequestType.mcQuestion,
       );
     });
@@ -2634,10 +2647,18 @@ void main() {
         (await planFor(seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1))).type,
         ChatRequestType.socraticQuestion,
       );
-      // Hard, far from the bar: picks can get there, the rotation's pick.
+      // Hard, far from the bar: picks can get there, the rotation's pick
+      // after an open question.
       expect(
         (await planFor(
-          seeded('lo-r', 2, 1.5, right: 2, nonMcq: 1),
+          seeded(
+            'lo-r',
+            2,
+            1.5,
+            right: 2,
+            nonMcq: 1,
+            lastQuestionType: 'socraticQuestion',
+          ),
           calibration: QuestionDifficulty.hard,
         )).type,
         ChatRequestType.mcQuestion,
@@ -2659,7 +2680,15 @@ void main() {
 
     test('a top-up of a mastered subgoal keeps every type', () async {
       final s = await setup([
-        seeded('lo-r', 7, 1, firstMasteredAt: hourAgo, right: 3, nonMcq: 0),
+        seeded(
+          'lo-r',
+          7,
+          1,
+          firstMasteredAt: hourAgo,
+          right: 3,
+          nonMcq: 0,
+          lastQuestionType: 'socraticQuestion',
+        ),
         done('lo-p'),
         done('lo-a'),
       ]);
@@ -2840,6 +2869,225 @@ void main() {
       ]);
       final twice = stored(s.f, 'lo-old', subgoalId: 's0');
       expect(twice.firstMasteredAt, twice.lastUpdatedAt);
+    });
+  });
+
+  group("#312 the type rotates on the LO's own previous type (§2.2)", () {
+    const applyA = LearningObjective(
+      id: 'lo-a',
+      statement: 'a',
+      kind: LoKind.apply,
+    );
+    const applyB = LearningObjective(
+      id: 'lo-b',
+      statement: 'b',
+      kind: LoKind.apply,
+    );
+    const predictLo = LearningObjective(
+      id: 'lo-p',
+      statement: 'p',
+      kind: LoKind.predict,
+    );
+    const recallLo = LearningObjective(
+      id: 'lo-r',
+      statement: 'r',
+      kind: LoKind.recall,
+    );
+    final hourAgo = DateTime.now().toUtc().subtract(const Duration(hours: 1));
+
+    /// The student on a subgoal with [objectives], at medium.
+    Future<({Conductor c, _Fakes f})> setup(
+      List<LearningObjective> objectives,
+      List<LoBelief> beliefs,
+    ) async {
+      final f = _Fakes();
+      final root = Goal(id: 'r', title: 'r', order: 0);
+      final subgoal = Goal(
+        id: 's',
+        title: 's',
+        parentId: 'r',
+        order: 1,
+        objectives: objectives,
+      );
+      f.roots.add(root);
+      f.children[root.id] = [subgoal];
+      f.selection = GoalSelectionState(
+        selectedRoot: root,
+        selectedChild: subgoal,
+      );
+      f.calibration = StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+        recentAnswers: const [],
+      );
+      for (final b in beliefs) {
+        f.beliefs[f._key(b.subgoalId, b.loId)] = b;
+      }
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      return (c: c, f: f);
+    }
+
+    /// A doc written an hour ago; [last] the type of its last question,
+    /// `null` for a doc no question ever targeted.
+    LoBelief doc(
+      String loId,
+      double alpha,
+      double beta, {
+      String? last,
+      int? right,
+      int? nonMcq,
+      bool stamped = false,
+    }) => LoBelief(
+      subgoalId: 's',
+      loId: loId,
+      alpha: alpha,
+      beta: beta,
+      lastUpdatedAt: hourAgo,
+      lastQuestionType: last,
+      lastPositiveAtCalibratedAt: stamped ? hourAgo : null,
+      highestPositiveDifficulty: stamped ? QuestionDifficulty.medium : null,
+      firstMasteredAt: stamped ? hourAgo : null,
+      lastProbedAt: last == null ? null : hourAgo,
+      ownQuestionsRight: right,
+      ownQuestionsRightNonMcq: nonMcq,
+    );
+
+    /// Plans the next question, checks it is on [loId], and answers it
+    /// wrong with a strong negative on that LO: no LO gets near its stamp.
+    Future<QuestionPlan> askWrong(Conductor c, String loId) async {
+      final plan = _expectQuestion(await c.planNext());
+      expect(plan.isOffSubgoal, isFalse);
+      expect(plan.targetLOs.single.id, loId);
+      c.notePlannedQuestion(plan);
+      final outcome = await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.wrong,
+          signals: [
+            GradedSignal(
+              subgoalId: 's',
+              loId: loId,
+              kind: LoSignalKind.negative,
+              strength: LoSignalStrength.strong,
+            ),
+          ],
+          isFollowUp: false,
+          chainDepth: 0,
+          provenance: EvidenceProvenance.home,
+        ),
+      );
+      expect(outcome.subgoalAdvanced, isFalse);
+      return plan;
+    }
+
+    test('apply LO A gets completeCode, then LO B, then A again: writeCode — '
+        'and completeCode the time after', () async {
+      // Neither was ever the target of a question; A the lower.
+      final s = await setup(
+        [applyA, applyB],
+        [doc('lo-a', 3, 2.5), doc('lo-b', 3, 2)],
+      );
+      final types = <String, List<ChatRequestType>>{'lo-a': [], 'lo-b': []};
+      for (final loId in ['lo-a', 'lo-b', 'lo-a', 'lo-b', 'lo-a']) {
+        types[loId]!.add((await askWrong(s.c, loId)).type);
+      }
+      expect(types['lo-a'], [
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.writeCodeQuestion,
+        ChatRequestType.completeCodeQuestion,
+      ]);
+      expect(types['lo-b'], [
+        ChatRequestType.completeCodeQuestion,
+        ChatRequestType.writeCodeQuestion,
+      ]);
+      expect(
+        s.f.beliefs[s.f._key('s', 'lo-a')]!.lastQuestionType,
+        'completeCodeQuestion',
+      );
+    });
+
+    test("the previous type is the doc's, also in a new session, over and "
+        'under μ 0.5: an apply LO that last got completeCode gets writeCode, '
+        'and the other way round', () async {
+      for (final beta in [1.5, 3.0]) {
+        final afterComplete = await setup(
+          [applyA],
+          [doc('lo-a', 2, beta, last: 'completeCodeQuestion')],
+        );
+        expect(
+          _expectQuestion(await afterComplete.c.planNext()).type,
+          ChatRequestType.writeCodeQuestion,
+        );
+        final afterWrite = await setup(
+          [applyA],
+          [doc('lo-a', 2, beta, last: 'writeCodeQuestion')],
+        );
+        expect(
+          _expectQuestion(await afterWrite.c.planNext()).type,
+          ChatRequestType.completeCodeQuestion,
+        );
+      }
+    });
+
+    test('no doc, or a doc no question ever targeted: nothing is excluded — '
+        'the first type of the kind', () async {
+      final fresh = await setup([applyA], []);
+      expect(
+        _expectQuestion(await fresh.c.planNext()).type,
+        ChatRequestType.completeCodeQuestion,
+      );
+      // Evidence from the side only, over and under 0.5.
+      for (final beta in [1.5, 3.0]) {
+        final side = await setup([applyA], [doc('lo-a', 2, beta)]);
+        expect(
+          _expectQuestion(await side.c.planNext()).type,
+          ChatRequestType.completeCodeQuestion,
+        );
+      }
+    });
+
+    test('a predict LO after a right own answer alternates between '
+        'explainCode and a socratic question, with another LO asked in '
+        'between', () async {
+      // lo-p: one right pick on record, so no more picks (#279).
+      final s = await setup(
+        [predictLo, recallLo],
+        [
+          doc('lo-p', 2, 2, last: 'mcQuestion', right: 1, nonMcq: 0),
+          doc('lo-r', 2, 1.5, last: 'socraticQuestion', right: 0, nonMcq: 0),
+        ],
+      );
+      final types = <ChatRequestType>[];
+      for (var i = 0; i < 4; i++) {
+        types.add((await askWrong(s.c, 'lo-p')).type);
+        await askWrong(s.c, 'lo-r');
+      }
+      expect(types, [
+        ChatRequestType.explainCodeQuestion,
+        ChatRequestType.socraticQuestion,
+        ChatRequestType.explainCodeQuestion,
+        ChatRequestType.socraticQuestion,
+      ]);
+    });
+
+    test('a mastered LO in a top-up reads its doc as well', () async {
+      final s = await setup(
+        [applyA],
+        [
+          doc(
+            'lo-a',
+            9,
+            1,
+            last: 'completeCodeQuestion',
+            right: 2,
+            nonMcq: 2,
+            stamped: true,
+          ),
+        ],
+      );
+      final plan = _expectQuestion(await s.c.planNext());
+      expect(plan.reason.chosenReason, 'all mastered: lowest mean');
+      expect(plan.type, ChatRequestType.writeCodeQuestion);
     });
   });
 
