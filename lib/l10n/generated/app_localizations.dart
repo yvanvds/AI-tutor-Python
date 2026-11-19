@@ -1324,13 +1324,13 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_subtitle.
   ///
   /// In en, this message translates to:
-  /// **'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.'**
+  /// **'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of this session attached.'**
   String get options_bugReport_subtitle;
 
   /// No description provided for @options_bugReport_subtitle_standalone.
   ///
   /// In en, this message translates to:
-  /// **'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.'**
+  /// **'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of this session attached.'**
   String get options_bugReport_subtitle_standalone;
 
   /// No description provided for @options_bugReport_github_notConnected.
@@ -1462,13 +1462,19 @@ abstract class AppLocalizations {
   /// No description provided for @options_bugReport_dialog_turnField.
   ///
   /// In en, this message translates to:
-  /// **'Attach tutor turn'**
+  /// **'Attach debug data'**
   String get options_bugReport_dialog_turnField;
+
+  /// No description provided for @options_bugReport_dialog_turnSession.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Whole session (1 exercise)} other{Whole session ({count} exercises)}}'**
+  String options_bugReport_dialog_turnSession(int count);
 
   /// No description provided for @options_bugReport_dialog_turnNone.
   ///
   /// In en, this message translates to:
-  /// **'No turn'**
+  /// **'None'**
   String get options_bugReport_dialog_turnNone;
 
   /// No description provided for @options_bugReport_dialog_turnLabel.

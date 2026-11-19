@@ -8,8 +8,10 @@
 //   - the report is assembled from three things only the running app has:
 //     the runner behind the Run button (here genuinely absent, #74), a turn
 //     the real conductor planned (with the belief numbers #79 strips), and
-//     the recorder the dialog reads. A widget test can only assert on a
-//     body it assembled itself.
+//     the recorder the dialog reads — whose whole session is what the dialog
+//     attaches by default (#314), started by the real tutor for a signed-in
+//     account whose uid and e-mail must stay out. A widget test can only
+//     assert on a body it assembled itself.
 //   - the file goes through the same save seam as the progress export, and
 //     ends up on the real disk: what is asserted on is what the teacher
 //     would open, not what a fake was handed.
@@ -38,6 +40,7 @@ import 'package:py_runner/py_runner.dart';
 
 import '../harness/app_harness.dart';
 import '../harness/scripted_llm.dart';
+import '../harness/seed.dart';
 
 /// A perfectly ordinary code-completion exercise — this flow is about what
 /// the *file* carries, not about the exercise.
@@ -80,7 +83,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('Bug reports: with no GitHub account the report is saved as a '
-      'text file — runner, turn, no names', (tester) async {
+      'text file — runner, whole session, no names', (tester) async {
     final dir = Directory.systemTemp.createTempSync('ai_tutor_bugreport_');
     final file = File('${dir.path}/report.txt');
     final llm = ScriptedLlm([
@@ -138,6 +141,23 @@ void main() {
     // No token, so no posting — and no need for it.
     expect(find.text('Post on GitHub'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
+    // The whole session is what gets attached unless the student says
+    // otherwise (#314) — every exercise the recorder holds, not just the last.
+    final session = recorder.buffer;
+    expect(session, isNotEmpty);
+    expect(
+      find.text(
+        session.length == 1
+            ? 'Whole session (1 exercise)'
+            : 'Whole session (${session.length} exercises)',
+      ),
+      findsOneWidget,
+    );
+    // What the session carries that a report must not: the system prompt on
+    // the exercises, and — on the session itself — who is signed in.
+    expect(session.any((t) => (t.instructions ?? '').isNotEmpty), isTrue);
+    expect(recorder.exportJson()['uid'], studentIdentity.oid);
+    expect(recorder.exportJson()['email'], studentIdentity.email);
 
     await tester.enterText(
       find.widgetWithText(TextField, 'Title'),
@@ -194,8 +214,22 @@ void main() {
     expect(text, contains('PyRunnerNotInstalled'));
     expect(text, contains('(no host has started this session)'));
 
-    // …the planned turn (#79)…
-    expect(text, contains('Turn debug payload'));
+    // …the whole session (#314), with the planned turn in it (#79)…
+    expect(text, contains('Session debug payload'));
+    expect(text, isNot(contains('Turn debug payload')));
+    expect(text, contains('"sessionId": "${recorder.sessionId}"'));
+    expect(
+      text,
+      contains(
+        '"sessionStartedAt": '
+        '"${recorder.sessionStartedAt.toUtc().toIso8601String()}"',
+      ),
+    );
+    expect(text, contains('"turnCount": ${session.length}'));
+    for (final turn in session) {
+      expect(text, contains('"turnId": ${turn.turnId},'));
+    }
+    expect(text, isNot(contains('omitted')));
     expect(text, contains('conductor.planned'));
     expect(text, contains('"loId": "${candidates.first['loId']}"'));
 
@@ -206,6 +240,17 @@ void main() {
     expect(text, contains(r'C:\Users\<user>\'));
     expect(text, isNot(matches(RegExp(r'"(mean|evidence)":\s*[0-9]'))));
     expect(text, contains('"mean": "<redacted>"'));
+    // Nor the system prompt, nor the account the session belongs to.
+    expect(text, isNot(contains('"instructions"')));
+    for (final turn in session) {
+      final prompt = turn.instructions ?? '';
+      if (prompt.length >= 80) {
+        expect(text, isNot(contains(prompt.substring(0, 80))));
+      }
+    }
+    expect(text, isNot(contains(studentIdentity.oid)));
+    expect(text, isNot(contains(studentIdentity.email)));
+    expect(text, isNot(contains('"email"')));
 
     await harness.dispose(tester);
     dir.deleteSync(recursive: true);

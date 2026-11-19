@@ -413,8 +413,8 @@
   "options_apiKey_removed": "API key removed.",
 
   "options_bugReport_title": "Bug reports",
-  "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.",
-  "options_bugReport_subtitle_standalone": "Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.",
+  "options_bugReport_subtitle": "Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of this session attached.",
+  "options_bugReport_subtitle_standalone": "Save a report as a text file, or post it on GitHub straight from the app — with the debug data of this session attached.",
   "options_bugReport_github_notConnected": "Not connected to GitHub.",
   "options_bugReport_github_connectedAs": "Connected to GitHub as {login}.",
   "@options_bugReport_github_connectedAs": {
@@ -451,8 +451,10 @@
   "options_bugReport_dialog_titleField": "Title",
   "options_bugReport_dialog_titleRequired": "Please enter a title.",
   "options_bugReport_dialog_descriptionField": "What went wrong?",
-  "options_bugReport_dialog_turnField": "Attach tutor turn",
-  "options_bugReport_dialog_turnNone": "No turn",
+  "options_bugReport_dialog_turnField": "Attach debug data",
+  "options_bugReport_dialog_turnSession": "{count, plural, =1{Whole session (1 exercise)} other{Whole session ({count} exercises)}}",
+  "@options_bugReport_dialog_turnSession": { "placeholders": { "count": { "type": "int" } } },
+  "options_bugReport_dialog_turnNone": "None",
   "options_bugReport_dialog_turnLabel": "#{id} {type}",
   "@options_bugReport_dialog_turnLabel": {
     "placeholders": { "id": { "type": "int" }, "type": { "type": "String" } }

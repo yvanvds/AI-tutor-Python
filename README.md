@@ -267,7 +267,7 @@ need auto-updates, you can ignore this entirely; the app still works.
 ## Step 8 (optional) — In-app bug reports (GitHub OAuth app)
 
 **Options → Bug reports** lets a student file a GitHub issue from inside the
-app, with the debug payload of a recent tutor turn attached. Signing in uses
+app, with the debug payload of the running session attached. Signing in uses
 GitHub's **OAuth device flow**: the app shows an eight-character code, the
 student approves it at `https://github.com/login/device` in a browser they are
 already signed into, and the app receives a token. No personal access token,

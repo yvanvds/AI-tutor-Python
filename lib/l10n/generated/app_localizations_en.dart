@@ -759,11 +759,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of a recent tutor turn attached.';
+      'Save a report as a text file to send to your teacher, or post it on GitHub straight from the app — with the debug data of this session attached.';
 
   @override
   String get options_bugReport_subtitle_standalone =>
-      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of a recent exercise attached.';
+      'Save a report as a text file, or post it on GitHub straight from the app — with the debug data of this session attached.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -845,10 +845,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get options_bugReport_dialog_descriptionField => 'What went wrong?';
 
   @override
-  String get options_bugReport_dialog_turnField => 'Attach tutor turn';
+  String get options_bugReport_dialog_turnField => 'Attach debug data';
 
   @override
-  String get options_bugReport_dialog_turnNone => 'No turn';
+  String options_bugReport_dialog_turnSession(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Whole session ($count exercises)',
+      one: 'Whole session (1 exercise)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'None';
 
   @override
   String options_bugReport_dialog_turnLabel(int id, String type) {

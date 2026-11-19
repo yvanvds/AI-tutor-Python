@@ -818,11 +818,11 @@ void main() {
   group('school or stand-alone', () {
     const bugReportSchool =
         'Save a report as a text file to send to your teacher, or post it on '
-        'GitHub straight from the app — with the debug data of a recent tutor '
-        'turn attached.';
+        'GitHub straight from the app — with the debug data of this session '
+        'attached.';
     const bugReportStandalone =
         'Save a report as a text file, or post it on GitHub straight from the '
-        'app — with the debug data of a recent exercise attached.';
+        'app — with the debug data of this session attached.';
 
     Future<void> saveReport(WidgetTester tester) async {
       await tester.tap(find.text('Report a bug…'));
@@ -956,7 +956,7 @@ void main() {
     }
 
     testWidgets('sign in with the device flow, then post an issue with the '
-        'latest turn attached', (tester) async {
+        'whole session attached', (tester) async {
       await mount(tester);
       expect(find.text('Not connected to GitHub.'), findsOneWidget);
       // Reporting no longer waits for the sign-in (#127); posting does.
@@ -1019,8 +1019,9 @@ void main() {
       await tester.tap(find.text('Report a bug…'));
       await tester.pumpAndSettle();
       expect(find.text('Report a bug'), findsOneWidget);
-      // Latest turn is preselected.
-      expect(find.text('#1 submitCode'), findsOneWidget);
+      // The whole session is preselected (#314).
+      expect(find.text('Whole session (1 exercise)'), findsOneWidget);
+      expect(find.text('#1 submitCode'), findsNothing);
       // Connected: both ways out are on offer (#127).
       expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
       expect(
@@ -1053,6 +1054,8 @@ void main() {
       final text = body['body'] as String;
       expect(text, contains('It stopped after my answer.'));
       expect(text, contains('App version: `$kAppVersion`'));
+      expect(text, contains('Session debug payload (1 exercise)'));
+      expect(text, contains('"sessionId": "${recorder.sessionId}"'));
       expect(text, contains('"turnId": 1'));
       expect(text, contains('"userInput": "print(1)"'));
       expect(text, isNot(contains('SYSTEM PROMPT')));
@@ -1293,8 +1296,8 @@ void main() {
       // Not connected: no posting, but the file is right there.
       expect(find.widgetWithText(FilledButton, 'Save as file'), findsOneWidget);
       expect(find.text('Post on GitHub'), findsNothing);
-      // The newest turn — the one with the path — is preselected.
-      expect(find.text('#2 submitCode'), findsOneWidget);
+      // The whole session — both exercises — is preselected (#314).
+      expect(find.text('Whole session (2 exercises)'), findsOneWidget);
 
       // Title is required here too.
       await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
@@ -1339,9 +1342,15 @@ void main() {
       expect(text, contains('It stopped after my answer.'));
       expect(text, contains('App version: `$kAppVersion`'));
       expect(text, contains('Python runner state'));
-      expect(text, contains('Turn debug payload'));
+      expect(text, contains('Session debug payload (2 exercises)'));
+      expect(text, contains('"sessionId": "${recorder.sessionId}"'));
+      expect(text, contains('"turnCount": 2'));
+      expect(text, contains('"turnId": 1'));
       expect(text, contains('"turnId": 2'));
       expect(text, isNot(contains('SYSTEM PROMPT')));
+      // Who is signed in is not part of a session report.
+      expect(text, isNot(contains(_uid)));
+      expect(text, isNot(contains('"email"')));
       // The student's name is not in it; the path otherwise is.
       expect(text, isNot(contains('sam.student')));
       expect(text, contains(r'C:\\Users\\<user>\\Desktop\\data.txt'));
@@ -1361,6 +1370,186 @@ void main() {
       );
 
       await unmount(tester);
+    });
+
+    // #314 — the dropdown still offers one exercise, or nothing at all.
+    group('what is attached', () {
+      /// A second, later exercise, so "one" and "the session" differ.
+      void recordSecondExercise() {
+        recorder
+          ..beginTurn(
+            requestType: 'requestExercise',
+            currentExerciseTypeAtStart: '',
+            tutorStateAtStart: 'working',
+            selectedRootGoalId: 'r1',
+            selectedChildGoalId: 's1',
+            preferredRootGoalId: null,
+            preferredChildGoalId: null,
+            streamable: true,
+            previousInputsMode: 'includeSession',
+          )
+          ..recordRequestPayload(
+            userInput: 'print(2)',
+            instructions: 'SYSTEM PROMPT — must not be saved',
+            instructionsDocId: 'requestExercise',
+          )
+          ..endTurn();
+      }
+
+      Future<void> openDialog(WidgetTester tester) async {
+        await tester.tap(find.text('Report a bug…'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Title'),
+          'Tutor crashed',
+        );
+      }
+
+      Future<void> pick(WidgetTester tester, String option) async {
+        await tester.tap(find.byKey(const ValueKey('bug-report-attachment')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(option).last);
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('the whole session comes first and is the default; one '
+          'exercise can still be picked', (tester) async {
+        recordSecondExercise();
+        await mount(tester);
+        await openDialog(tester);
+        expect(find.text('Attach debug data'), findsOneWidget);
+        expect(find.text('Whole session (2 exercises)'), findsOneWidget);
+
+        // Open the list: the session, none, then the exercises newest first.
+        await tester.tap(find.byKey(const ValueKey('bug-report-attachment')));
+        await tester.pumpAndSettle();
+        final tops = [
+          for (final label in [
+            'Whole session (2 exercises)',
+            'None',
+            '#2 requestExercise',
+            '#1 submitCode',
+          ])
+            tester.getTopLeft(find.text(label).last).dy,
+        ];
+        expect(tops, orderedEquals([...tops]..sort()));
+        expect(tops.toSet(), hasLength(4));
+
+        await tester.tap(find.text('#1 submitCode').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+        await tester.pumpAndSettle();
+
+        final text = archiveIo.savedContents!;
+        expect(text, contains('Turn debug payload'));
+        expect(text, isNot(contains('Session debug payload')));
+        expect(text, contains('"userInput": "print(1)"'));
+        expect(text, isNot(contains('print(2)')));
+        expect(text, isNot(contains('SYSTEM PROMPT')));
+
+        await unmount(tester);
+      });
+
+      testWidgets('"None" attaches no exercise at all', (tester) async {
+        await mount(tester);
+        await openDialog(tester);
+        await pick(tester, 'None');
+        await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+        await tester.pumpAndSettle();
+
+        final text = archiveIo.savedContents!;
+        expect(text, contains('Python runner state'));
+        expect(text, isNot(contains('debug payload')));
+        expect(text, isNot(contains('print(1)')));
+
+        await unmount(tester);
+      });
+
+      testWidgets('with nothing recorded there is no session to offer', (
+        tester,
+      ) async {
+        recorder.resetSession();
+        await mount(tester);
+        await openDialog(tester);
+        expect(find.text('None'), findsOneWidget);
+        expect(find.textContaining('Whole session'), findsNothing);
+        await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+        await tester.pumpAndSettle();
+
+        expect(archiveIo.savedContents, isNot(contains('debug payload')));
+
+        await unmount(tester);
+      });
+
+      // GitHub refuses an issue body over 65,536 characters; the file has no
+      // such limit. Same session, both ways out.
+      testWidgets('a long session is saved whole, and posted with the oldest '
+          'exercises left out', (tester) async {
+        SharedPreferences.setMockInitialValues({'github_token': 'ghp_valid'});
+        for (var i = 0; i < 40; i++) {
+          recorder
+            ..beginTurn(
+              requestType: 'submitCode',
+              currentExerciseTypeAtStart: '',
+              tutorStateAtStart: 'working',
+              selectedRootGoalId: 'r1',
+              selectedChildGoalId: 's1',
+              preferredRootGoalId: null,
+              preferredChildGoalId: null,
+              streamable: true,
+              previousInputsMode: 'includeSession',
+            )
+            ..recordRawOutput('y' * 4000)
+            ..endTurn();
+        }
+        await mount(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Connected to GitHub as yvan.'), findsOneWidget);
+
+        await openDialog(tester);
+        expect(find.text('Whole session (41 exercises)'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Save as file'));
+        await tester.pumpAndSettle();
+        final file = archiveIo.savedContents!;
+        expect(file.length, greaterThan(kGitHubIssueBodyLimit));
+        expect(file, contains('Session debug payload (41 exercises)'));
+        expect(file, contains('"turnId": 1,'));
+        expect(file, contains('"turnId": 41,'));
+        expect(file, isNot(contains('omitted')));
+
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+        await openDialog(tester);
+        await tester.tap(find.widgetWithText(FilledButton, 'Post on GitHub'));
+        await tester.pumpAndSettle();
+        final post = githubRequests.singleWhere(
+          (r) => r.url.path == '/repos/$kBugReportRepo/issues',
+        );
+        final issue =
+            (jsonDecode(post.body) as Map<String, dynamic>)['body'] as String;
+        expect(issue.length, lessThanOrEqualTo(kGitHubIssueBodyLimit));
+        final omitted = int.parse(
+          RegExp(r'_(\d+) older exercises omitted').firstMatch(issue)![1]!,
+        );
+        expect(omitted, inInclusiveRange(1, 40));
+        expect(
+          issue,
+          contains('Session debug payload (${41 - omitted} of 41 exercises)'),
+        );
+        expect(issue, contains('save the report as a file'));
+        // The newest exercise is in, the oldest is not.
+        expect(issue, contains('"turnId": 41,'));
+        expect(issue, isNot(contains('"turnId": 1,')));
+        expect(issue, isNot(contains('print(1)')));
+        expect(
+          find.text(
+            'Issue posted: https://github.com/$kBugReportRepo/issues/42',
+          ),
+          findsOneWidget,
+        );
+
+        await unmount(tester);
+      });
     });
 
     // A fork with no OAuth app cannot sign in — which used to mean it could

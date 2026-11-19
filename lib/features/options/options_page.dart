@@ -15,7 +15,7 @@
 //   - the user's own OpenAI key (only when the account is not on the
 //     bundled key)
 //   - bug reports, saved as a file for the teacher or posted to GitHub,
-//     with a recent tutor turn's debug payload (#127)
+//     with the session's debug payload (#127, #314)
 //   - developer tools (former DebugDialog), behind [developerToolsProvider]
 //   - the badge proof sheet (#220), for a teacher or a developer build
 //   - about / version, with the manual update check (#48), the
@@ -1608,7 +1608,10 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
   /// the report itself, and saving it as a file, need no account.
   Future<void> _report(String? token) async {
     final l = AppLocalizations.of(context);
-    final turns = ref.read(debugServiceProvider).buffer;
+    final recorder = ref.read(debugServiceProvider);
+    final turns = recorder.buffer;
+    final sessionId = recorder.sessionId;
+    final sessionStartedAt = recorder.sessionStartedAt;
     // Read before the dialog, so the async gaps below never touch `ref`.
     final pyRunner = ref.read(pyRunnerProvider);
     final issues = ref.read(githubIssueServiceProvider);
@@ -1625,13 +1628,26 @@ class _BugReportCardState extends ConsumerState<_BugReportCard> {
       // tutor, and "it didn't run" is a question about the runner (#74).
       final runner = await RunnerDiagnostics.collect(pyRunner);
       // The same body whichever way it leaves — same runner section, same
-      // turn payload, same redaction. The teacher may paste the file into a
+      // payload, same redaction. The teacher may paste the file into a
       // public issue, so it must be as clean as the issue would have been.
+      // Only the length differs (#314): a file holds the whole session, an
+      // issue the most recent exercises GitHub has room for.
       final body = buildBugReportBody(
         description: draft.description,
         appVersion: kAppVersion,
         runner: runner,
         turn: draft.turn?.toJson(),
+        session: draft.wholeSession
+            ? BugReportSession(
+                sessionId: sessionId,
+                startedAt: sessionStartedAt,
+                // The dialog's own snapshot: what "N exercises" counted.
+                turns: [for (final t in turns) t.toJson()],
+              )
+            : null,
+        maxLength: draft.destination == _BugReportDestination.github
+            ? kGitHubIssueBodyLimit
+            : null,
       );
       switch (draft.destination) {
         case _BugReportDestination.github:
@@ -1887,15 +1903,26 @@ class _BugReportDraft {
     required this.description,
     required this.destination,
     this.turn,
+    this.wholeSession = false,
   });
   final String title;
   final String description;
   final _BugReportDestination destination;
+
+  /// The one exercise to attach, when the student picked one.
   final TurnRecord? turn;
+
+  /// Attach every exercise of the session (#314) — the default.
+  final bool wholeSession;
 }
 
-/// Title, description and an optional turn — the same form for both
-/// outcomes. `Save as file` is always there and is the primary action;
+/// What the attachment dropdown holds besides a single [TurnRecord].
+enum _BugReportAttachment { session, none }
+
+/// Title, description and what to attach — the same form for both
+/// outcomes. The whole session is the default (#314): most problems are in
+/// the sequence of exercises, not in one of them. One exercise, or nothing,
+/// can still be picked. `Save as file` is always there and is the primary action;
 /// `Post on GitHub` only appears with [canPost], i.e. a stored token.
 class _BugReportDialog extends StatefulWidget {
   const _BugReportDialog({required this.turns, required this.canPost});
@@ -1910,14 +1937,13 @@ class _BugReportDialog extends StatefulWidget {
 class _BugReportDialogState extends State<_BugReportDialog> {
   final _title = TextEditingController();
   final _description = TextEditingController();
-  TurnRecord? _turn;
-  bool _titleMissing = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _turn = widget.turns.isEmpty ? null : widget.turns.last;
-  }
+  /// A [_BugReportAttachment] or the single [TurnRecord] to attach. With
+  /// nothing recorded there is no session to offer.
+  late Object _attachment = widget.turns.isEmpty
+      ? _BugReportAttachment.none
+      : _BugReportAttachment.session;
+  bool _titleMissing = false;
 
   @override
   void dispose() {
@@ -1937,7 +1963,11 @@ class _BugReportDialogState extends State<_BugReportDialog> {
         title: title,
         description: _description.text,
         destination: destination,
-        turn: _turn,
+        turn: switch (_attachment) {
+          final TurnRecord t => t,
+          _ => null,
+        },
+        wholeSession: _attachment == _BugReportAttachment.session,
       ),
     );
   }
@@ -1980,19 +2010,29 @@ class _BugReportDialogState extends State<_BugReportDialog> {
               ),
             ),
             const SizedBox(height: AppSpacing.m),
-            DropdownButtonFormField<TurnRecord?>(
-              initialValue: _turn,
+            DropdownButtonFormField<Object>(
+              key: const ValueKey('bug-report-attachment'),
+              initialValue: _attachment,
               decoration: InputDecoration(
                 labelText: l.options_bugReport_dialog_turnField,
                 border: const OutlineInputBorder(),
               ),
               items: [
-                DropdownMenuItem<TurnRecord?>(
-                  value: null,
+                if (widget.turns.isNotEmpty)
+                  DropdownMenuItem<Object>(
+                    value: _BugReportAttachment.session,
+                    child: Text(
+                      l.options_bugReport_dialog_turnSession(
+                        widget.turns.length,
+                      ),
+                    ),
+                  ),
+                DropdownMenuItem<Object>(
+                  value: _BugReportAttachment.none,
                   child: Text(l.options_bugReport_dialog_turnNone),
                 ),
                 for (final t in newestFirst)
-                  DropdownMenuItem<TurnRecord?>(
+                  DropdownMenuItem<Object>(
                     value: t,
                     child: Text(
                       l.options_bugReport_dialog_turnLabel(
@@ -2002,7 +2042,8 @@ class _BugReportDialogState extends State<_BugReportDialog> {
                     ),
                   ),
               ],
-              onChanged: (v) => setState(() => _turn = v),
+              onChanged: (v) =>
+                  setState(() => _attachment = v ?? _BugReportAttachment.none),
             ),
           ],
         ),

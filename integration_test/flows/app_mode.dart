@@ -120,7 +120,7 @@ final Map<String, Finder> _optionsParts = {
   'teacherInBugReport': find.textContaining('to send to your teacher'),
   'bugReportStandalone': find.text(
     'Save a report as a text file, or post it on GitHub straight from the '
-    'app — with the debug data of a recent exercise attached.',
+    'app — with the debug data of this session attached.',
   ),
 };
 

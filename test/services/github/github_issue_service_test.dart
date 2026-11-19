@@ -255,6 +255,235 @@ void main() {
       expect(again, contains('0.5677'));
     });
 
+    // #314 — the whole session instead of one exercise.
+    group('with the whole session', () {
+      Map<String, dynamic> exercise(int id, {String filler = ''}) => {
+        'turnId': id,
+        'sessionId': 'session-1',
+        'instructions': 'SECRET PROMPT $id',
+        'userInput': 'answer $id $filler',
+        'events': [
+          {
+            'atMs': 12,
+            'name': 'conductor.planned',
+            'data': {
+              'targetLO': 'lo_$id',
+              'candidateLOs': [
+                {'loId': 'lo_$id', 'mean': 0.5677, 'evidence': 6.144},
+              ],
+            },
+          },
+        ],
+        'persisted': {
+          'uid': '',
+          'subgoalProgressAfter': 0.42,
+          'loStatusAfter': [
+            {'loId': 'lo_$id', 'mean': 0.5677, 'mastered': false},
+          ],
+        },
+      };
+
+      BugReportSession session(List<Map<String, dynamic>> turns) =>
+          BugReportSession(
+            sessionId: 'session-1',
+            startedAt: DateTime.utc(2026, 11, 19, 8, 30),
+            turns: turns,
+          );
+
+      /// The JSON inside the collapsed block, as a reader would paste it.
+      Map<String, dynamic> payloadOf(String body) {
+        final start = body.indexOf('```json\n') + '```json\n'.length;
+        final end = body.indexOf('\n```', start);
+        return jsonDecode(body.substring(start, end)) as Map<String, dynamic>;
+      }
+
+      test('attaches every exercise, each one redacted', () {
+        final body = buildBugReportBody(
+          description: 'the questions keep coming',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session([
+            exercise(1),
+            exercise(2, filler: r'C:\Users\sam.student\Desktop\a.py'),
+            exercise(3),
+          ]),
+        );
+
+        expect(body, contains('Session debug payload (3 exercises)'));
+        expect(body, isNot(contains('Turn debug payload')));
+        expect(body, isNot(contains('omitted')));
+        expect(body, contains('Python runner state'));
+
+        final payload = payloadOf(body);
+        expect(payload['sessionId'], 'session-1');
+        expect(payload['sessionStartedAt'], '2026-11-19T08:30:00.000Z');
+        expect(payload['turnCount'], 3);
+        expect(payload.containsKey('omittedOlderTurns'), isFalse);
+        final turns = (payload['turns'] as List).cast<Map<String, dynamic>>();
+        expect(turns.map((t) => t['turnId']), [1, 2, 3]);
+
+        // No system prompt, in any exercise.
+        expect(body, isNot(contains('SECRET PROMPT')));
+        expect(turns.any((t) => t.containsKey('instructions')), isFalse);
+        // No belief number, in any exercise.
+        expect(body, isNot(contains('0.5677')));
+        expect(body, isNot(contains('6.144')));
+        expect(body, isNot(contains('0.42')));
+        expect(
+          body,
+          isNot(matches(RegExp(r'"(mean|evidence|mastered)":\s*[0-9tf]'))),
+        );
+        expect('"mean": "<redacted>"'.allMatches(body), hasLength(6));
+        // No account name out of a path, wherever in the session it was.
+        expect(body, isNot(contains('sam.student')));
+        expect(body, contains(r'C:\\Users\\<user>\\Desktop\\a.py'));
+        // …and what a report is diagnosed from is still there.
+        expect(body, contains('"targetLO": "lo_2"'));
+      });
+
+      // The recorder knows who is signed in, and its own `exportJson()` says
+      // so. A report is built from the turns and the session id only.
+      test('carries neither the uid nor the e-mail of the student', () {
+        final recorder = DebugSessionRecorder()
+          ..resetSession(
+            uid: 'uid-of-the-student',
+            email: 'sam.student@school.example',
+            modelName: 'model-x',
+          );
+        for (var i = 0; i < 2; i++) {
+          recorder
+            ..beginTurn(
+              requestType: 'submitCode',
+              currentExerciseTypeAtStart: null,
+              tutorStateAtStart: 'idle',
+              selectedRootGoalId: null,
+              selectedChildGoalId: null,
+              preferredRootGoalId: null,
+              preferredChildGoalId: null,
+              streamable: true,
+              previousInputsMode: 'includeSession',
+            )
+            ..endTurn();
+        }
+        // What must not be reused as-is.
+        expect(recorder.exportJson()['uid'], 'uid-of-the-student');
+
+        final body = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: BugReportSession(
+            sessionId: recorder.sessionId,
+            startedAt: recorder.sessionStartedAt,
+            turns: [for (final t in recorder.buffer) t.toJson()],
+          ),
+        );
+
+        expect(body, contains('"sessionId": "${recorder.sessionId}"'));
+        expect(body, contains('"turnCount": 2'));
+        expect(body, isNot(contains('uid-of-the-student')));
+        expect(body, isNot(contains('sam.student')));
+        expect(body, isNot(contains('school.example')));
+        expect(body, isNot(contains('"email"')));
+      });
+
+      test('a file gets the whole session however long it is', () {
+        final turns = [
+          for (var i = 1; i <= 60; i++) exercise(i, filler: 'x' * 3000),
+        ];
+        final body = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session(turns),
+        );
+
+        expect(body.length, greaterThan(kGitHubIssueBodyLimit));
+        expect(payloadOf(body)['turns'], hasLength(60));
+        expect(body, isNot(contains('omitted')));
+      });
+
+      test('an issue keeps the most recent exercises that fit and says how '
+          'many were left out', () {
+        final turns = [
+          for (var i = 1; i <= 60; i++) exercise(i, filler: 'x' * 3000),
+        ];
+        final body = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session(turns),
+          maxLength: kGitHubIssueBodyLimit,
+        );
+
+        expect(body.length, lessThanOrEqualTo(kGitHubIssueBodyLimit));
+        final payload = payloadOf(body);
+        final kept = (payload['turns'] as List).cast<Map<String, dynamic>>();
+        final omitted = 60 - kept.length;
+        expect(kept, isNotEmpty);
+        expect(omitted, greaterThan(0));
+        // The newest ones, in order, ending at the last exercise.
+        expect(kept.map((t) => t['turnId']), [
+          for (var i = omitted + 1; i <= 60; i++) i,
+        ]);
+        expect(payload['turnCount'], 60);
+        expect(payload['omittedOlderTurns'], omitted);
+        expect(
+          body,
+          contains(
+            '_$omitted older exercises omitted to fit a GitHub issue — save '
+            'the report as a file for the whole session._',
+          ),
+        );
+        expect(
+          body,
+          contains('Session debug payload (${kept.length} of 60 exercises)'),
+        );
+        // As many as fit: one more would have been over the limit.
+        final oneMore = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session(turns.sublist(omitted - 1)),
+        );
+        expect(oneMore.length, greaterThan(kGitHubIssueBodyLimit));
+        // Still redacted.
+        expect(body, isNot(contains('SECRET PROMPT')));
+        expect(body, isNot(contains('0.5677')));
+      });
+
+      test('an issue whose newest exercise alone is too long still posts, '
+          'with none attached', () {
+        final body = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session([
+            exercise(1),
+            exercise(2, filler: 'x' * (kGitHubIssueBodyLimit + 1)),
+          ]),
+          maxLength: kGitHubIssueBodyLimit,
+        );
+
+        expect(body.length, lessThanOrEqualTo(kGitHubIssueBodyLimit));
+        expect(payloadOf(body)['turns'], isEmpty);
+        expect(body, contains('_2 older exercises omitted'));
+      });
+
+      test('a session that fits an issue is not shortened', () {
+        final body = buildBugReportBody(
+          description: 'x',
+          appVersion: '1.0.0',
+          runner: runner,
+          session: session([exercise(1), exercise(2)]),
+          maxLength: kGitHubIssueBodyLimit,
+        );
+
+        expect(payloadOf(body)['turns'], hasLength(2));
+        expect(body, isNot(contains('omitted')));
+      });
+    });
+
     test('omits the payload block when no turn is attached', () {
       final body = buildBugReportBody(
         description: '',
@@ -262,6 +491,7 @@ void main() {
         runner: runner,
       );
       expect(body, contains('_(no description)_'));
+      expect(body, isNot(contains('debug payload')));
     });
   });
 

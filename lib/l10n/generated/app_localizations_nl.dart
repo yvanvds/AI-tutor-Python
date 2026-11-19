@@ -764,11 +764,11 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get options_bugReport_subtitle =>
-      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente tutorbeurt erbij.';
+      'Bewaar een melding als tekstbestand om naar je leerkracht te sturen, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van deze sessie erbij.';
 
   @override
   String get options_bugReport_subtitle_standalone =>
-      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van een recente oefening erbij.';
+      'Bewaar een melding als tekstbestand, of plaats ze rechtstreeks vanuit de app op GitHub — met de debuggegevens van deze sessie erbij.';
 
   @override
   String get options_bugReport_github_notConnected =>
@@ -851,10 +851,21 @@ class AppLocalizationsNl extends AppLocalizations {
   String get options_bugReport_dialog_descriptionField => 'Wat ging er mis?';
 
   @override
-  String get options_bugReport_dialog_turnField => 'Tutorbeurt bijvoegen';
+  String get options_bugReport_dialog_turnField => 'Debuggegevens bijvoegen';
 
   @override
-  String get options_bugReport_dialog_turnNone => 'Geen beurt';
+  String options_bugReport_dialog_turnSession(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hele sessie ($count oefeningen)',
+      one: 'Hele sessie (1 oefening)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get options_bugReport_dialog_turnNone => 'Geen';
 
   @override
   String options_bugReport_dialog_turnLabel(int id, String type) {
