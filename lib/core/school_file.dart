@@ -212,6 +212,9 @@ class SchoolFileStore {
     }
   }
 
+  /// Whether a school file is kept, readable or not.
+  Future<bool> exists() async => (await _file).existsSync();
+
   /// Stores [config] as the school, replacing any earlier one. Written to a
   /// temporary file first, so an interrupted write leaves the old one.
   Future<void> write(SchoolConfig config) async {

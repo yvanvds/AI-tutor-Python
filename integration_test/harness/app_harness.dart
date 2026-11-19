@@ -509,11 +509,18 @@ class AppHarness {
     addTearDown(() => dispose(tester));
 
     if (decideMode) {
-      // As in `main()` (#307).
+      // As in `main()` (#307), with the build's school kept as the school
+      // file (#308).
+      final prefs = await SharedPreferences.getInstance();
       final mode = decideStartMode(
-        stored: await _schoolFiles.read(),
+        stored: await keepBuildSchoolAsFile(
+          stored: await _schoolFiles.read(),
+          build: buildSchool,
+          prefs: prefs,
+          store: _schoolFiles,
+        ),
         build: buildSchool,
-        prefs: await SharedPreferences.getInstance(),
+        prefs: prefs,
       );
       if (mode == null) {
         // Nothing decided: the first-start choice, which then boots the

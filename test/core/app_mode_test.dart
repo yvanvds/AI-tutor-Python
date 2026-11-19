@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -54,6 +55,25 @@ void main() {
       expect(school.databaseName, kDefaultSchoolDatabaseName);
       expect(school.schoolName, isNull);
       expect(AppMode.fromSchoolConfig(school), SchoolMode(school));
+    });
+
+    // #308: the build's school carries its name, so the school file written
+    // from it is the very same configuration.
+    test("the build's school is named, and a school file of it is equal", () {
+      final school = SchoolConfig.fromBuildValues(
+        tenantId: 't',
+        clientId: 'c',
+        redirectUri: 'http://localhost',
+        databaseEndpoint: _endpoint,
+        schoolName: kBuildSchoolName,
+      )!;
+      expect(school.schoolName, 'SMA Arcadia');
+      expect(parseSchoolFile(encodeSchoolFile(school)), school);
+      final build = SchoolConfig.fromBuild;
+      if (build != null) {
+        expect(build.schoolName, kBuildSchoolName);
+        expect(parseSchoolFile(encodeSchoolFile(build)), build);
+      }
     });
 
     const nilGuid = '00000000-0000-0000-0000-000000000000';

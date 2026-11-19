@@ -29,6 +29,14 @@ import 'package:path/path.dart' as p;
 /// The database every school configuration from the build uses.
 const String kDefaultSchoolDatabaseName = 'python-tutor';
 
+/// The name of the school whose configuration the build carries. Only SMA
+/// Arcadia's setup exists (README), and the build's `.env` has no name of its
+/// own. It names the school file the transitional release writes from the
+/// build (#308), and the build's school carries it too, so the school from
+/// that file is the very same configuration. Goes with the build's school
+/// configuration (#308, step 3).
+const String kBuildSchoolName = 'SMA Arcadia';
+
 /// What the app needs to know about a school: where to sign in and where its
 /// database lives. Holds no secrets, so a school file (#307) can carry it.
 @immutable
@@ -57,15 +65,17 @@ class SchoolConfig {
   /// Cosmos DB database id inside that account.
   final String databaseName;
 
-  /// Shown to the user where it helps; the build's own school has none.
+  /// Shown to the user where it helps; `null` when it is not known.
   final String? schoolName;
 
   /// The build's own school configuration, or `null` when the build has none.
+  /// Named [kBuildSchoolName] (#308).
   static SchoolConfig? get fromBuild => fromBuildValues(
     tenantId: AzureConfig.tenantId,
     clientId: AzureConfig.clientId,
     redirectUri: AzureConfig.redirectUri,
     databaseEndpoint: AzureConfig.cosmosEndpoint,
+    schoolName: kBuildSchoolName,
   );
 
   /// This configuration with [name] as the school's name.
@@ -85,6 +95,7 @@ class SchoolConfig {
     required String clientId,
     required String redirectUri,
     required String databaseEndpoint,
+    String? schoolName,
   }) {
     if (isMissingValue(tenantId) ||
         isMissingValue(clientId) ||
@@ -100,6 +111,7 @@ class SchoolConfig {
       clientId: clientId.trim(),
       redirectUri: redirectUri.trim(),
       databaseEndpoint: endpoint,
+      schoolName: schoolName,
     );
   }
 

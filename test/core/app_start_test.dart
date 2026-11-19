@@ -153,6 +153,146 @@ void main() {
     });
   });
 
+  // #308, step 1: the transitional release keeps the build's school as the
+  // school file, so a later build without one still finds the school.
+  group("the build's school becomes the school file", () {
+    final build = kTestSchool.named(kBuildSchoolName);
+
+    Future<SchoolConfig?> keep(SchoolFileStore store, {SchoolConfig? stored}) =>
+        keepBuildSchoolAsFile(
+          stored: stored,
+          build: build,
+          prefs: prefs,
+          store: store,
+        );
+
+    test('a signed-in install without a file gets one, as the very same '
+        'school, and keeps its sign-in', () async {
+      final dir = Directory.systemTemp.createTempSync('app_start_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final store = SchoolFileStore(() async => dir);
+      final kept = <String, Object>{
+        'azure_auth_tokens_v1': '{"refresh_token": "r"}',
+        'app_locale': 'nl',
+      };
+      await withPrefs(kept);
+
+      final written = await keep(store);
+
+      expect(written, build);
+      expect(File('${dir.path}/school.json').existsSync(), isTrue);
+      final stored = await store.read();
+      expect(stored, build);
+      expect(stored!.schoolName, 'SMA Arcadia');
+      // This start and the next decide the same school mode as the build.
+      expect(
+        decideStartMode(stored: written, build: build, prefs: prefs),
+        SchoolMode(build),
+      );
+      expect(
+        decideStartMode(stored: stored, build: null, prefs: prefs),
+        SchoolMode(build),
+      );
+      for (final e in kept.entries) {
+        expect(prefs.get(e.key), e.value, reason: e.key);
+      }
+    });
+
+    test('a build school without a name is kept as SMA Arcadia', () async {
+      final store = MemorySchoolFileStore();
+      final written = await keepBuildSchoolAsFile(
+        stored: null,
+        build: kTestSchool,
+        prefs: prefs,
+        store: store,
+      );
+      expect(written, kTestSchool.named('SMA Arcadia'));
+      expect(store.stored, kTestSchool.named('SMA Arcadia'));
+    });
+
+    test('a second start writes nothing', () async {
+      final store = _CountingStore(build);
+      expect(await keep(store, stored: await store.read()), build);
+      expect(store.writes, 0);
+    });
+
+    test(
+      'an existing file is never overwritten, even one it cannot read',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('app_start_');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final file = File('${dir.path}/school.json')..writeAsStringSync('{}');
+        final store = SchoolFileStore(() async => dir);
+
+        expect(await keep(store, stored: await store.read()), isNull);
+        expect(file.readAsStringSync(), '{}');
+        // The start then goes on with the build's school, as before.
+        expect(
+          decideStartMode(stored: null, build: build, prefs: prefs),
+          SchoolMode(build),
+        );
+      },
+    );
+
+    test('"school left" writes nothing', () async {
+      final store = _CountingStore();
+      await leaveSchool(store: store, prefs: prefs);
+      expect(await keep(store), isNull);
+      expect(store.writes, 0);
+      expect(store.stored, isNull);
+    });
+
+    test('stand-alone writes nothing', () async {
+      final store = _CountingStore();
+      await chooseWithoutSchool(prefs);
+      expect(await keep(store), isNull);
+      // A build without a school: stand-alone or the choice.
+      expect(
+        await keepBuildSchoolAsFile(
+          stored: null,
+          build: null,
+          prefs: prefs,
+          store: store,
+        ),
+        isNull,
+      );
+      expect(store.writes, 0);
+    });
+
+    test('a failing write does not stop the start', () async {
+      final store = _FailingStore();
+      expect(await keep(store), isNull);
+      expect(
+        decideStartMode(stored: null, build: build, prefs: prefs),
+        SchoolMode(build),
+      );
+    });
+
+    test(
+      'a build school that would not read back the same is not written',
+      () async {
+        final store = _CountingStore();
+        final http = SchoolConfig(
+          tenantId: build.tenantId,
+          clientId: build.clientId,
+          redirectUri: build.redirectUri,
+          databaseEndpoint: Uri.parse('http://localhost:8081/'),
+          schoolName: kBuildSchoolName,
+        );
+        expect(
+          await keepBuildSchoolAsFile(
+            stored: null,
+            build: http,
+            prefs: prefs,
+            store: store,
+          ),
+          isNull,
+        );
+        expect(store.writes, 0);
+      },
+    );
+  });
+
   // A build without a school has no usable database key; a school from a
   // file must still start, and reach its sign-in screen.
   test('a school from a file starts on a build without a usable key', () {
@@ -164,4 +304,22 @@ void main() {
       returnsNormally,
     );
   });
+}
+
+class _CountingStore extends MemorySchoolFileStore {
+  _CountingStore([super.stored]);
+
+  int writes = 0;
+
+  @override
+  Future<void> write(SchoolConfig config) {
+    writes++;
+    return super.write(config);
+  }
+}
+
+class _FailingStore extends MemorySchoolFileStore {
+  @override
+  Future<void> write(SchoolConfig config) async =>
+      throw const FileSystemException('disk full');
 }

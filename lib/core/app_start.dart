@@ -10,6 +10,13 @@
 //      silent default, so a student who clicks too fast does not end up
 //      practising on their own without noticing.
 //
+// The transitional release (#308, step 1): an install that runs on the
+// build's school and has no school file gets one at start, written from the
+// build's school configuration as if the student had imported it
+// ([keepBuildSchoolAsFile]). The configuration is the same, so the student
+// stays signed in and keeps every preference; once the build no longer
+// carries a school (#308, step 3), the file decides.
+//
 // Switching mode — importing a school file, or leaving the school — only
 // changes what the next start decides; the app asks for a restart. The two
 // modes keep their own data (`AppMode.scopedPrefsKey`, `localDataDir`) and
@@ -17,6 +24,7 @@
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/school_file.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Set once the user chose to go on without a school; kept with the
@@ -44,6 +52,44 @@ AppMode? decideStartMode({
     return SchoolMode(build);
   }
   return null;
+}
+
+/// The transitional release (#308, step 1): when the start would use the
+/// build's school ([build]) and no school file is kept, writes [build] to
+/// [store] as the school file, as if the user had imported it. Returns the
+/// school file to decide the start with: [stored], or the one just written.
+///
+/// Writes nothing when a school file exists (even one it cannot read: that
+/// is never overwritten), when the build has no school, after "without a
+/// school" or after leaving the school. A write that fails, or a file that
+/// would not read back as exactly [build], is logged and left: the start
+/// goes on with the build's school as before, and the next start tries again.
+Future<SchoolConfig?> keepBuildSchoolAsFile({
+  required SchoolConfig? stored,
+  required SchoolConfig? build,
+  required SharedPreferences prefs,
+  required SchoolFileStore store,
+}) async {
+  if (stored != null || build == null) return stored;
+  if (prefs.getBool(kStartWithoutSchoolPrefsKey) ?? false) return null;
+  if (prefs.getBool(kLeftSchoolPrefsKey) ?? false) return null;
+  try {
+    if (await store.exists()) return null;
+    final school = build.schoolName == null
+        ? build.named(kBuildSchoolName)
+        : build;
+    // The file must give back this very configuration, or the next start
+    // would differ from this one.
+    if (parseSchoolFile(encodeSchoolFile(school)) != school) {
+      debugPrint('keepBuildSchoolAsFile: the build school does not round-trip');
+      return null;
+    }
+    await store.write(school);
+    return school;
+  } catch (e) {
+    debugPrint('keepBuildSchoolAsFile: not written: $e');
+    return null;
+  }
 }
 
 /// The user goes on without a school: stand-alone, now and at every start

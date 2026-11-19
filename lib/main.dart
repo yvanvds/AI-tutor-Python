@@ -46,10 +46,19 @@ Future<void> main() async {
 
   // Which mode to start in (#307): a stored school file, an earlier "without
   // a school", or the build's own school — else the first-start choice asks.
+  // An install on the build's school gets that school as its file (#308).
+  final schoolFiles = SchoolFileStore.appData();
+  final prefs = await SharedPreferences.getInstance();
+  final build = SchoolConfig.fromBuild;
   final mode = decideStartMode(
-    stored: await SchoolFileStore.appData().read(),
-    build: SchoolConfig.fromBuild,
-    prefs: await SharedPreferences.getInstance(),
+    stored: await keepBuildSchoolAsFile(
+      stored: await schoolFiles.read(),
+      build: build,
+      prefs: prefs,
+      store: schoolFiles,
+    ),
+    build: build,
+    prefs: prefs,
   );
   if (mode != null) {
     final container = await bootApp(mode);

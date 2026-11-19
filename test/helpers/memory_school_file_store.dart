@@ -22,6 +22,9 @@ class MemorySchoolFileStore extends SchoolFileStore {
   Future<SchoolConfig?> read() async => stored;
 
   @override
+  Future<bool> exists() async => _text != null;
+
+  @override
   Future<void> write(SchoolConfig config) async =>
       _text = encodeSchoolFile(config);
 

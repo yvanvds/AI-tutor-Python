@@ -26,6 +26,11 @@
 // mode later (Options, the key screen) takes a restart, and the next start
 // follows the file.
 //
+// The transitional release (#308, step 1) keeps the build's school as the
+// school file at start: a signed-in student gets the file and stays signed
+// in, the next start writes nothing, and nothing is written after leaving
+// the school or without a school.
+//
 // Every other flow runs in school mode (the harness default); this one boots
 // the real app in both.
 //
@@ -34,6 +39,7 @@
 // Run just this flow:
 //   flutter test integration_test/flows/app_mode.dart -d windows
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
@@ -51,12 +57,22 @@ import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../test/helpers/memory_school_file_store.dart';
 import '../../test/helpers/test_app_mode.dart';
 import '../harness/app_harness.dart';
+import '../harness/seed.dart';
+
+/// An unsigned id token with [claims], as Entra's token endpoint returns it.
+String _jwt(Map<String, Object?> claims) {
+  String part(Object o) =>
+      base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
+  return '${part({'alg': 'none'})}.${part(claims)}.sig';
+}
 
 /// Which of [finders] show up anywhere on [page]'s list, scrolled from top
 /// to bottom: a `ListView` builds only what is near the screen, so a section
@@ -454,8 +470,116 @@ void main() {
 
     await pumpUntilFound(tester, find.byType(SignInPage));
     expect(find.byType(FirstStartPage), findsNothing);
-    expect(harness.startedMode, kTestSchoolMode);
+    // The build's school, kept as the school file (#308) under its name.
+    expect(
+      harness.startedMode,
+      SchoolMode(kTestSchool.named(kBuildSchoolName)),
+    );
 
+    await harness.dispose(tester);
+  });
+
+  // #308, step 1 ----------------------------------------------------------
+
+  testWidgets("the transitional release: a signed-in student on the build's "
+      'school gets the school file and stays signed in; the next start '
+      'writes nothing', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    // As the app's own build school: named, so the file is the same school.
+    final build = kTestSchool.named(kBuildSchoolName);
+    final refreshes = <http.Request>[];
+    final entra = MockClient((request) async {
+      refreshes.add(request);
+      return http.Response(
+        jsonEncode({
+          'access_token': 'new-access',
+          'refresh_token': 'new-refresh',
+          'id_token': _jwt({
+            'oid': studentIdentity.oid,
+            'name': studentIdentity.displayName,
+            'email': studentIdentity.email,
+          }),
+          'expires_in': 3600,
+        }),
+        200,
+      );
+    });
+    // An install from before #307: signed in, no school file.
+    var prefs = <String, Object>{
+      'azure_auth_tokens_v1': jsonEncode({
+        'access_token': 'old-access',
+        'refresh_token': 'stored-refresh',
+        'id_token': null,
+        'access_token_expiry': null,
+      }),
+    };
+    expect(school.existsSync(), isFalse);
+
+    DateTime? writtenAt;
+    for (final start in ['after the update', 'the next start']) {
+      final harness = AppHarness(
+        decideMode: true,
+        buildSchool: build,
+        schoolData: appData,
+        prefs: prefs,
+      );
+      await http.runWithClient(
+        () => harness.boot(tester, waitForShell: false),
+        () => entra,
+      );
+      await pumpUntilFound(tester, find.byType(AppShell));
+      expect(find.byType(SignInPage), findsNothing, reason: start);
+      expect(find.byType(FirstStartPage), findsNothing, reason: start);
+      expect(find.byTooltip('Sign out'), findsOneWidget, reason: start);
+      expect(harness.startedMode, SchoolMode(build), reason: start);
+      expect(tester.takeException(), isNull, reason: start);
+      // The file, as if the student had imported it: the build's school.
+      expect(school.existsSync(), isTrue, reason: start);
+      expect(parseSchoolFile(school.readAsStringSync()), build);
+      // The next start leaves the file from the update as it is.
+      writtenAt ??= school.lastModifiedSync();
+      expect(school.lastModifiedSync(), writtenAt, reason: start);
+      // Signed in with the school the file names.
+      expect(refreshes.last.url.path, contains(build.tenantId));
+      expect(refreshes.last.bodyFields['client_id'], build.clientId);
+
+      final kept = await SharedPreferences.getInstance();
+      prefs = {for (final key in kept.getKeys()) key: kept.get(key)!};
+      await harness.dispose(tester);
+    }
+    expect(refreshes, hasLength(2));
+    expect(File('${school.path}.tmp').existsSync(), isFalse);
+  });
+
+  testWidgets('the transitional release writes nothing after leaving the '
+      'school, nor without a school', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    final build = kTestSchool.named(kBuildSchoolName);
+
+    var harness = AppHarness(
+      decideMode: true,
+      buildSchool: build,
+      schoolData: appData,
+      prefs: const {'school_left_v1': true},
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(FirstStartPage));
+    expect(school.existsSync(), isFalse);
+    await harness.dispose(tester);
+
+    harness = AppHarness(
+      decideMode: true,
+      buildSchool: build,
+      schoolData: appData,
+      localData: tempDir('ai_tutor_standalone_'),
+      prefs: const {'standalone.start_without_school_v1': true},
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
+    expect(harness.startedMode, const StandaloneMode());
+    expect(school.existsSync(), isFalse);
     await harness.dispose(tester);
   });
 
