@@ -2747,6 +2747,135 @@ abstract class AppLocalizations {
   /// **'The {language} title and description have changes that are not saved. Switching to {target} discards them.'**
   String goals_editor_language_discard_message(String language, String target);
 
+  /// No description provided for @goals_editor_switch_allowChains.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up chains'**
+  String get goals_editor_switch_allowChains;
+
+  /// No description provided for @goals_editor_switch_allowChains_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In this subgoal the tutor may ask a follow-up question on a follow-up question.'**
+  String get goals_editor_switch_allowChains_subtitle;
+
+  /// No description provided for @goals_editor_objectives_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning objectives'**
+  String get goals_editor_objectives_label;
+
+  /// No description provided for @goals_editor_objectives_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'This subgoal has no learning objectives.'**
+  String get goals_editor_objectives_empty;
+
+  /// No description provided for @goals_editor_objectives_note.
+  ///
+  /// In en, this message translates to:
+  /// **'The id is fixed: student progress is stored under it. Add, remove or reorder learning objectives in the goal\'s JSON file.'**
+  String get goals_editor_objectives_note;
+
+  /// No description provided for @goals_editor_objectives_save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save learning objectives'**
+  String get goals_editor_objectives_save;
+
+  /// No description provided for @goals_editor_objectives_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning objectives saved. Change the goal\'s JSON file too: a replace import overwrites what you changed here.'**
+  String get goals_editor_objectives_saved;
+
+  /// No description provided for @goals_editor_objectives_translation_saved.
+  ///
+  /// In en, this message translates to:
+  /// **'{language} learning objectives saved'**
+  String goals_editor_objectives_translation_saved(String language);
+
+  /// No description provided for @goals_editor_objective_statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get goals_editor_objective_statement;
+
+  /// No description provided for @goals_editor_objective_statement_empty.
+  ///
+  /// In en, this message translates to:
+  /// **'A learning objective needs a text.'**
+  String get goals_editor_objective_statement_empty;
+
+  /// No description provided for @goals_editor_objective_kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get goals_editor_objective_kind;
+
+  /// No description provided for @goals_editor_objective_kind_recall.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall'**
+  String get goals_editor_objective_kind_recall;
+
+  /// No description provided for @goals_editor_objective_kind_apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get goals_editor_objective_kind_apply;
+
+  /// No description provided for @goals_editor_objective_kind_predict.
+  ///
+  /// In en, this message translates to:
+  /// **'Predict'**
+  String get goals_editor_objective_kind_predict;
+
+  /// No description provided for @goals_editor_objective_kind_reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get goals_editor_objective_kind_reason;
+
+  /// No description provided for @goals_editor_objective_weight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get goals_editor_objective_weight;
+
+  /// No description provided for @goals_editor_objective_weight_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The weight is a number above 0.'**
+  String get goals_editor_objective_weight_invalid;
+
+  /// No description provided for @goals_editor_objective_translation_none.
+  ///
+  /// In en, this message translates to:
+  /// **'No {language} translation yet.'**
+  String goals_editor_objective_translation_none(String language);
+
+  /// Under the translation of a learning objective in the goal editor when the Dutch statement changed after the translation was made
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated. The Dutch text is now: {statement}'**
+  String goals_editor_objective_translation_stale(String statement);
+
+  /// No description provided for @goals_editor_objective_translation_confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Still correct'**
+  String get goals_editor_objective_translation_confirm;
+
+  /// No description provided for @goals_editor_language_discard_message_objectives.
+  ///
+  /// In en, this message translates to:
+  /// **'The {language} texts, learning objectives included, have changes that are not saved. Switching to {target} discards them.'**
+  String goals_editor_language_discard_message_objectives(
+    String language,
+    String target,
+  );
+
   /// No description provided for @goals_editor_delete_dialog_title.
   ///
   /// In en, this message translates to:

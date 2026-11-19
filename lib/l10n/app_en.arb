@@ -962,6 +962,40 @@
   "@goals_editor_language_discard_message": {
     "placeholders": { "language": { "type": "String" }, "target": { "type": "String" } }
   },
+  "goals_editor_switch_allowChains": "Follow-up chains",
+  "goals_editor_switch_allowChains_subtitle": "In this subgoal the tutor may ask a follow-up question on a follow-up question.",
+  "goals_editor_objectives_label": "Learning objectives",
+  "goals_editor_objectives_empty": "This subgoal has no learning objectives.",
+  "goals_editor_objectives_note": "The id is fixed: student progress is stored under it. Add, remove or reorder learning objectives in the goal's JSON file.",
+  "goals_editor_objectives_save": "Save learning objectives",
+  "goals_editor_objectives_saved": "Learning objectives saved. Change the goal's JSON file too: a replace import overwrites what you changed here.",
+  "goals_editor_objectives_translation_saved": "{language} learning objectives saved",
+  "@goals_editor_objectives_translation_saved": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_objective_statement": "Text",
+  "goals_editor_objective_statement_empty": "A learning objective needs a text.",
+  "goals_editor_objective_kind": "Kind",
+  "goals_editor_objective_kind_recall": "Recall",
+  "goals_editor_objective_kind_apply": "Apply",
+  "goals_editor_objective_kind_predict": "Predict",
+  "goals_editor_objective_kind_reason": "Reason",
+  "goals_editor_objective_weight": "Weight",
+  "goals_editor_objective_weight_invalid": "The weight is a number above 0.",
+  "goals_editor_objective_translation_none": "No {language} translation yet.",
+  "@goals_editor_objective_translation_none": {
+    "placeholders": { "language": { "type": "String" } }
+  },
+  "goals_editor_objective_translation_stale": "Outdated. The Dutch text is now: {statement}",
+  "@goals_editor_objective_translation_stale": {
+    "description": "Under the translation of a learning objective in the goal editor when the Dutch statement changed after the translation was made",
+    "placeholders": { "statement": { "type": "String" } }
+  },
+  "goals_editor_objective_translation_confirm": "Still correct",
+  "goals_editor_language_discard_message_objectives": "The {language} texts, learning objectives included, have changes that are not saved. Switching to {target} discards them.",
+  "@goals_editor_language_discard_message_objectives": {
+    "placeholders": { "language": { "type": "String" }, "target": { "type": "String" } }
+  },
   "goals_editor_delete_dialog_title": "Delete goal",
   "goals_editor_delete_dialog_message_single": "Delete \"{title}\"?",
   "@goals_editor_delete_dialog_message_single": {

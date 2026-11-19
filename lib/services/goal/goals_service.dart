@@ -183,6 +183,42 @@ class GoalsService {
   Future<void> updateAllowChains(String id, bool allowChains) =>
       _patch(id, {'allowChains': allowChains});
 
+  /// Stores the edited text, kind, weight and optional flag of the learning
+  /// objectives of the subgoal [id] (#313). Returns whether the doc was
+  /// written.
+  ///
+  /// An objective is matched on its id. The stored list keeps its ids and
+  /// its order: student beliefs, stamps, `turn_history`, milestones and
+  /// translations are keyed on the id, so an entry of [objectives] whose id
+  /// the subgoal does not have is ignored, and a stored objective that is
+  /// not in [objectives] stays as it is. Fields of an objective this does
+  /// not edit stay too, as does the rest of the doc.
+  Future<bool> updateObjectives(
+    String id,
+    List<LearningObjective> objectives,
+  ) async {
+    final doc = await safeCosmos(() => _container.read(id, partitionKey: _pk));
+    if (doc == null) return false;
+    final edits = {for (final o in objectives) o.id: o};
+    final stored = doc['objectives'];
+    doc['objectives'] = [
+      if (stored is List)
+        for (final raw in stored)
+          if (raw is Map && edits[raw['id']] != null)
+            {
+              ...raw,
+              'statement': edits[raw['id']]!.statement,
+              'kind': edits[raw['id']]!.kind.name,
+              'weight': edits[raw['id']]!.weight,
+              'optional': edits[raw['id']]!.optional,
+            }
+          else
+            raw,
+    ];
+    await safeCosmos(() => _container.replace(id, doc, partitionKey: _pk));
+    return true;
+  }
+
   Future<void> setContentId(String id, String? contentId) =>
       _patch(id, {'contentId': contentId});
 
