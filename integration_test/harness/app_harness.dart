@@ -45,6 +45,7 @@ import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
 import 'package:ai_tutor_python/core/update_proxy.dart';
+import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
@@ -473,6 +474,10 @@ class AppHarness {
 
   late final InMemoryCosmosClient cosmos;
   late final Directory playgroundDir;
+
+  /// Where the goals export lands (#320): a temp folder of the harness's
+  /// own, never the real Downloads. Gone after the flow.
+  late final Directory exportDir;
   late final SchoolFileStore _schoolFiles;
   Directory? _ownSchoolDir;
   ProviderContainer? _container;
@@ -497,6 +502,7 @@ class AppHarness {
     addTearDown(tester.view.resetPhysicalSize);
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
     playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
+    exportDir = Directory.systemTemp.createTempSync('ai_tutor_export_');
     final schoolDir =
         schoolData ?? Directory.systemTemp.createTempSync('ai_tutor_school_');
     if (schoolData == null) _ownSchoolDir = schoolDir;
@@ -628,6 +634,7 @@ class AppHarness {
         playgroundFileStoreProvider.overrideWithValue(
           PlaygroundFileStore(rootDir: () async => playgroundDir),
         ),
+        goalsExportDirectoryProvider.overrideWithValue(() async => exportDir),
         if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
         if (archiveFile != null)
           progressArchiveIoProvider.overrideWithValue(
@@ -717,6 +724,7 @@ class AppHarness {
     container?.dispose();
     choice?.dispose();
     await _deletePlaygroundDir();
+    if (exportDir.existsSync()) exportDir.deleteSync(recursive: true);
     final ownSchoolDir = _ownSchoolDir;
     if (ownSchoolDir != null && ownSchoolDir.existsSync()) {
       ownSchoolDir.deleteSync(recursive: true);

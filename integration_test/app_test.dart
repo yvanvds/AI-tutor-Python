@@ -45,6 +45,7 @@ import 'flows/goal_delete_undo.dart' as goal_delete_undo;
 import 'flows/goal_language.dart' as goal_language;
 import 'flows/goal_notice_language.dart' as goal_notice_language;
 import 'flows/goal_objectives.dart' as goal_objectives;
+import 'flows/goals_export_roundtrip.dart' as goals_export_roundtrip;
 import 'flows/goals_import_replace.dart' as goals_import_replace;
 import 'flows/goals_row_highlight.dart' as goals_row_highlight;
 import 'flows/grade_proposal.dart' as grade_proposal;
@@ -193,6 +194,7 @@ void main() {
   bug_report_oauth.main();
   bug_report_file.main();
   goals_import_replace.main();
+  goals_export_roundtrip.main();
   students_class_filter.main();
   students_bulk_class.main();
   classes_tab.main();
