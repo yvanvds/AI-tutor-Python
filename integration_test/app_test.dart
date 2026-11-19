@@ -41,6 +41,7 @@ import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
+import 'flows/goal_delete_undo.dart' as goal_delete_undo;
 import 'flows/goal_language.dart' as goal_language;
 import 'flows/goal_notice_language.dart' as goal_notice_language;
 import 'flows/goal_objectives.dart' as goal_objectives;
@@ -130,6 +131,7 @@ void main() {
   lesson_translation.main();
   goal_language.main();
   goal_objectives.main();
+  goal_delete_undo.main();
   goal_notice_language.main();
   language_switch.main();
   tutor_language.main();

@@ -83,6 +83,7 @@ class GoalsService {
     List<Map<String, dynamic>> objectives = const [],
     String? contentId,
     String moduleId = '',
+    String? kind,
   }) async {
     final goal = Goal(
       id: id ?? _uuid.v4(),
@@ -98,6 +99,7 @@ class GoalsService {
           .toList(growable: false),
       contentId: contentId,
       moduleId: moduleId,
+      kind: kind,
     );
     await safeCosmos(() => _container.create(_docMap(goal), partitionKey: _pk));
     return goal.id;
@@ -108,6 +110,11 @@ class GoalsService {
   /// over unless the caller passes a non-null [contentId] explicitly. Used by
   /// the "Replace" import path so authored lesson content survives a re-import
   /// of the goal tree.
+  ///
+  /// The same goes for `kind` (the concept marking, #315): a non-null [kind]
+  /// is written, and without one the stored doc keeps the kind it has, so a
+  /// marking set in the goal editor survives an import whose file does not
+  /// name it.
   Future<void> upsertGoalWithFields({
     required String id,
     required String title,
@@ -120,15 +127,25 @@ class GoalsService {
     List<Map<String, dynamic>> objectives = const [],
     String? contentId,
     String moduleId = '',
+    String? kind,
   }) async {
     String? finalContentId = contentId;
-    if (finalContentId == null) {
+    String? finalKind = kind;
+    if (finalContentId == null || finalKind == null) {
       final existing = await safeCosmos(
         () => _container.read(id, partitionKey: _pk),
       );
       final existingCid = existing?['contentId'];
-      if (existingCid is String && existingCid.isNotEmpty) {
+      if (finalContentId == null &&
+          existingCid is String &&
+          existingCid.isNotEmpty) {
         finalContentId = existingCid;
+      }
+      final existingKind = existing?['kind'];
+      if (finalKind == null &&
+          existingKind is String &&
+          existingKind.isNotEmpty) {
+        finalKind = existingKind;
       }
     }
 
@@ -146,6 +163,7 @@ class GoalsService {
           .toList(growable: false),
       contentId: finalContentId,
       moduleId: moduleId,
+      kind: finalKind,
     );
     await safeCosmos(() => _container.upsert(_docMap(goal), partitionKey: _pk));
   }
@@ -286,6 +304,7 @@ class GoalsService {
           'objectives': g.objectives.map((o) => o.toMap()).toList(),
           'contentId': g.contentId,
           'moduleId': g.moduleId,
+          if (g.kind != null) 'kind': g.kind,
         },
       ));
     }
@@ -398,6 +417,7 @@ class GoalsService {
     'objectives': goal.objectives.map((o) => o.toMap()).toList(),
     'contentId': goal.contentId,
     'moduleId': goal.moduleId,
+    if (goal.kind != null) 'kind': goal.kind,
   };
 
   Future<Map<String, Goal>> _getAllGoalsMap() async {

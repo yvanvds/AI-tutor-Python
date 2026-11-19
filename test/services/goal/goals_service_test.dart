@@ -315,6 +315,7 @@ void main() {
         'teachingTips': const ['x', 'y'],
         'allowChains': true,
         'objectives': const <Map<String, dynamic>>[],
+        'kind': 'concept',
       },
     };
 
@@ -363,6 +364,30 @@ void main() {
       for (final op in captured) {
         expect((op.toJson()['resourceBody'] as Map)['type'], _pk);
       }
+    });
+
+    test('backup then restore keeps the concept marking of a subgoal, and '
+        'gives a goal without one none (#315)', () async {
+      final svc = build();
+      final backup = await svc.backupSubtree('root');
+      await svc.restoreSubtree(backup);
+
+      final captured =
+          verify(
+                () => container.executeBatch(
+                  captureAny<List<BatchOperation>>(),
+                  partitionKey: any<Object>(named: 'partitionKey'),
+                ),
+              ).captured.single
+              as List<BatchOperation>;
+      final docs = {
+        for (final op in captured)
+          (op.toJson()['resourceBody'] as Map)['id']:
+              op.toJson()['resourceBody'] as Map,
+      };
+      expect(docs['child-b']!['kind'], 'concept');
+      expect(docs['child-a']!.containsKey('kind'), isFalse);
+      expect(docs['root']!.containsKey('kind'), isFalse);
     });
 
     test(
@@ -589,6 +614,141 @@ void main() {
       expect(captured['allowChains'], true);
       expect(captured['objectives'], isEmpty);
       expect(captured['type'], _pk);
+    });
+  });
+
+  group('kind, the concept marking (#315)', () {
+    void stubWrites() {
+      when(
+        () => container.create(
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+      when(
+        () => container.upsert(
+          any<Map<String, Object?>>(),
+          partitionKey: any<Object>(named: 'partitionKey'),
+        ),
+      ).thenAnswer((_) async => <String, dynamic>{});
+    }
+
+    Map<String, Object?> created() =>
+        verify(
+              () => container.create(
+                captureAny<Map<String, Object?>>(),
+                partitionKey: any<Object>(named: 'partitionKey'),
+              ),
+            ).captured.single
+            as Map<String, Object?>;
+
+    Map<String, Object?> upserted() =>
+        verify(
+              () => container.upsert(
+                captureAny<Map<String, Object?>>(),
+                partitionKey: any<Object>(named: 'partitionKey'),
+              ),
+            ).captured.single
+            as Map<String, Object?>;
+
+    Map<String, dynamic> stored({String? kind, String? contentId}) => {
+      'id': 'sg',
+      'type': _pk,
+      'title': 'Lussen',
+      'parentId': 'root',
+      'order': 1000,
+      'contentId': contentId,
+      if (kind != null) 'kind': kind,
+    };
+
+    test('createGoalWithFields writes the kind it is given', () async {
+      stubWrites();
+      await build().createGoalWithFields(
+        title: 'Lussen',
+        parentId: 'root',
+        order: 1000,
+        kind: 'concept',
+      );
+      expect(created()['kind'], 'concept');
+    });
+
+    test('createGoalWithFields writes no kind when it is given none', () async {
+      stubWrites();
+      await build().createGoalWithFields(title: 'Lussen', order: 1000);
+      expect(created().containsKey('kind'), isFalse);
+    });
+
+    test('upsertGoalWithFields without a kind keeps the kind of the stored '
+        'doc', () async {
+      stubWrites();
+      stubReadReturns({'sg': stored(kind: 'concept', contentId: 'les-1')});
+      await build().upsertGoalWithFields(
+        id: 'sg',
+        title: 'Lussen v2',
+        parentId: 'root',
+        order: 1000,
+      );
+      final doc = upserted();
+      expect(doc['kind'], 'concept');
+      expect(doc['title'], 'Lussen v2');
+      expect(doc['contentId'], 'les-1', reason: 'the lesson link stays too');
+    });
+
+    test('upsertGoalWithFields keeps the stored kind when the caller passes '
+        'a contentId', () async {
+      stubWrites();
+      stubReadReturns({'sg': stored(kind: 'concept', contentId: 'les-1')});
+      await build().upsertGoalWithFields(
+        id: 'sg',
+        title: 'Lussen',
+        parentId: 'root',
+        order: 1000,
+        contentId: 'les-2',
+      );
+      final doc = upserted();
+      expect(doc['kind'], 'concept');
+      expect(doc['contentId'], 'les-2');
+    });
+
+    test('upsertGoalWithFields writes the kind it is given on a stored doc '
+        'without one', () async {
+      stubWrites();
+      stubReadReturns({'sg': stored()});
+      await build().upsertGoalWithFields(
+        id: 'sg',
+        title: 'Lussen',
+        parentId: 'root',
+        order: 1000,
+        kind: 'concept',
+      );
+      expect(upserted()['kind'], 'concept');
+    });
+
+    test('upsertGoalWithFields writes the kind it is given on a new '
+        'doc', () async {
+      stubWrites();
+      stubReadReturns({});
+      await build().upsertGoalWithFields(
+        id: 'new',
+        title: 'Nieuw',
+        parentId: 'root',
+        order: 2000,
+        kind: 'concept',
+      );
+      expect(upserted()['kind'], 'concept');
+    });
+
+    test('upsertGoalWithFields writes no kind when neither the caller nor '
+        'the stored doc has one', () async {
+      stubWrites();
+      stubReadReturns({'sg': stored()});
+      await build().upsertGoalWithFields(
+        id: 'sg',
+        title: 'Lussen',
+        parentId: 'root',
+        order: 1000,
+      );
+      expect(upserted().containsKey('kind'), isFalse);
     });
   });
 

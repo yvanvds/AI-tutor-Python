@@ -502,6 +502,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
           allowChains: sg['allowChains'] as bool? ?? false,
           objectives: _objectiveList(sg['objectives']),
           contentId: sg['contentId'] as String?,
+          kind: _kindOf(sg['kind']),
         );
       }
     }
@@ -552,6 +553,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
           allowChains: sg['allowChains'] as bool? ?? false,
           objectives: _objectiveList(sg['objectives']),
           contentId: sg['contentId'] as String?,
+          kind: _kindOf(sg['kind']),
         );
       }
     }
@@ -630,6 +632,10 @@ int _countNodes(List<Map<String, dynamic>> entries) {
   }
   return n;
 }
+
+/// The `kind` an imported subgoal names (`'concept'`), or null when the file
+/// has none: a Replace then keeps the kind the stored subgoal has (#315).
+String? _kindOf(dynamic v) => v is String && v.trim().isNotEmpty ? v : null;
 
 List<String> _stringList(dynamic v) {
   if (v is List) return v.map((e) => e?.toString() ?? '').toList();
