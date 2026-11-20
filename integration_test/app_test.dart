@@ -36,6 +36,7 @@ import 'flows/difficulty_ratchet.dart' as difficulty_ratchet;
 import 'flows/earlier_root_recheck.dart' as earlier_root_recheck;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
+import 'flows/editor_member_dropdown.dart' as editor_member_dropdown;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
@@ -139,6 +140,7 @@ void main() {
   playground_files.main();
   editor_comment_space.main();
   editor_gutter_alignment.main();
+  editor_member_dropdown.main();
   practice_complete_code.main();
   garbled_reply_retry.main();
   exercise_history.main();

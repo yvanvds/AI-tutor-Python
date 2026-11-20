@@ -1,16 +1,15 @@
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/code/python_code_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:highlight/languages/python.dart';
 
 class CodeService {
   /// Placeholder a fresh editor buffer starts with.
   static const String starterText = '# Start coding here';
 
-  late CodeController controller;
+  late PythonCodeController controller;
   CodeService() {
-    controller = CodeController(text: starterText, language: python);
+    controller = PythonCodeController(text: starterText);
   }
 
   void setText(String code) {

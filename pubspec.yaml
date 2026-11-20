@@ -90,6 +90,9 @@ flutter:
     - assets/sounds/question.mp3
     - assets/sounds/chime.mp3
     - assets/lesson/lesson.css
+    # The functions, methods and classes the course uses (#322, #323): the
+    # editor's dropdown after a dot and the reference panel read this file.
+    - assets/reference/
     # The grade formula inside the app (#129): the specification, and the
     # short explanation for students in both app languages that the tab
     # opens on (#301). The repository documents are bundled as-is — declared

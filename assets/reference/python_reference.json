@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "builtins",
+      "kind": "builtins",
+      "title": { "nl": "Ingebouwde functies", "en": "Built-in functions" },
+      "items": [
+        { "name": "print", "kind": "function", "signature": "print(value, ..., sep=' ', end='\\n')" },
+        { "name": "input", "kind": "function", "signature": "input(prompt)", "returns": "str" },
+        { "name": "int", "kind": "function", "signature": "int(x)", "returns": "int" },
+        { "name": "float", "kind": "function", "signature": "float(x)", "returns": "float" },
+        { "name": "len", "kind": "function", "signature": "len(s)", "returns": "int" },
+        { "name": "range", "kind": "function", "signature": "range(start, stop, step)" },
+        { "name": "round", "kind": "function", "signature": "round(number, ndigits)" },
+        { "name": "abs", "kind": "function", "signature": "abs(x)" },
+        { "name": "min", "kind": "function", "signature": "min(a, b, ...)" },
+        { "name": "max", "kind": "function", "signature": "max(a, b, ...)" },
+        { "name": "sum", "kind": "function", "signature": "sum(values)" },
+        { "name": "sorted", "kind": "function", "signature": "sorted(values, reverse=False)", "returns": "list" }
+      ]
+    },
+    {
+      "id": "str",
+      "kind": "type",
+      "title": { "nl": "Tekst (str)", "en": "Text (str)" },
+      "items": [
+        { "name": "upper", "kind": "method", "signature": "upper()", "returns": "str" },
+        { "name": "lower", "kind": "method", "signature": "lower()", "returns": "str" },
+        { "name": "strip", "kind": "method", "signature": "strip()", "returns": "str" },
+        { "name": "split", "kind": "method", "signature": "split(sep)", "returns": "list" },
+        { "name": "replace", "kind": "method", "signature": "replace(old, new)", "returns": "str" },
+        { "name": "join", "kind": "method", "signature": "join(values)", "returns": "str" },
+        { "name": "count", "kind": "method", "signature": "count(sub)", "returns": "int" },
+        { "name": "find", "kind": "method", "signature": "find(sub)", "returns": "int" },
+        { "name": "startswith", "kind": "method", "signature": "startswith(prefix)", "returns": "bool" },
+        { "name": "endswith", "kind": "method", "signature": "endswith(suffix)", "returns": "bool" },
+        { "name": "isdigit", "kind": "method", "signature": "isdigit()", "returns": "bool" }
+      ]
+    },
+    {
+      "id": "list",
+      "kind": "type",
+      "title": { "nl": "Lijsten (list)", "en": "Lists (list)" },
+      "items": [
+        { "name": "append", "kind": "method", "signature": "append(x)" },
+        { "name": "insert", "kind": "method", "signature": "insert(i, x)" },
+        { "name": "pop", "kind": "method", "signature": "pop(i)" },
+        { "name": "remove", "kind": "method", "signature": "remove(x)" },
+        { "name": "sort", "kind": "method", "signature": "sort(reverse=False)" }
+      ]
+    },
+    {
+      "id": "dict",
+      "kind": "type",
+      "title": { "nl": "Woordenboeken (dict)", "en": "Dictionaries (dict)" },
+      "items": [
+        { "name": "keys", "kind": "method", "signature": "keys()" },
+        { "name": "values", "kind": "method", "signature": "values()" },
+        { "name": "items", "kind": "method", "signature": "items()" },
+        { "name": "get", "kind": "method", "signature": "get(key, default)" },
+        { "name": "pop", "kind": "method", "signature": "pop(key)" }
+      ]
+    },
+    {
+      "id": "turtle",
+      "kind": "module",
+      "title": { "nl": "turtle", "en": "turtle" },
+      "items": [
+        { "name": "Turtle", "kind": "class", "signature": "Turtle()", "returns": "turtle.Turtle" },
+        { "name": "done", "kind": "function", "signature": "done()" }
+      ]
+    },
+    {
+      "id": "turtle.Turtle",
+      "kind": "type",
+      "title": { "nl": "Een turtle (turtle.Turtle)", "en": "A turtle (turtle.Turtle)" },
+      "items": [
+        { "name": "forward", "kind": "method", "signature": "forward(distance)" },
+        { "name": "backward", "kind": "method", "signature": "backward(distance)" },
+        { "name": "left", "kind": "method", "signature": "left(angle)" },
+        { "name": "right", "kind": "method", "signature": "right(angle)" },
+        { "name": "penup", "kind": "method", "signature": "penup()" },
+        { "name": "pendown", "kind": "method", "signature": "pendown()" },
+        { "name": "pencolor", "kind": "method", "signature": "pencolor(color)" }
+      ]
+    },
+    {
+      "id": "math",
+      "kind": "module",
+      "title": { "nl": "math", "en": "math" },
+      "items": [
+        { "name": "sqrt", "kind": "function", "signature": "sqrt(x)", "returns": "float" },
+        { "name": "sin", "kind": "function", "signature": "sin(x)", "returns": "float" },
+        { "name": "cos", "kind": "function", "signature": "cos(x)", "returns": "float" },
+        { "name": "pi", "kind": "constant", "signature": "pi", "returns": "float" }
+      ]
+    },
+    {
+      "id": "random",
+      "kind": "module",
+      "title": { "nl": "random", "en": "random" },
+      "items": [
+        { "name": "randint", "kind": "function", "signature": "randint(a, b)", "returns": "int" },
+        { "name": "random", "kind": "function", "signature": "random()", "returns": "float" },
+        { "name": "uniform", "kind": "function", "signature": "uniform(a, b)", "returns": "float" },
+        { "name": "choice", "kind": "function", "signature": "choice(values)" }
+      ]
+    },
+    {
+      "id": "matplotlib.pyplot",
+      "kind": "module",
+      "title": { "nl": "Grafieken (matplotlib.pyplot)", "en": "Charts (matplotlib.pyplot)" },
+      "items": [
+        { "name": "plot", "kind": "function", "signature": "plot(x, y, label=..., color=...)" },
+        { "name": "scatter", "kind": "function", "signature": "scatter(x, y)" },
+        { "name": "bar", "kind": "function", "signature": "bar(x, height)" },
+        { "name": "hist", "kind": "function", "signature": "hist(values, bins=...)" },
+        { "name": "title", "kind": "function", "signature": "title(text)" },
+        { "name": "xlabel", "kind": "function", "signature": "xlabel(text)" },
+        { "name": "ylabel", "kind": "function", "signature": "ylabel(text)" },
+        { "name": "legend", "kind": "function", "signature": "legend()" },
+        { "name": "grid", "kind": "function", "signature": "grid()" },
+        { "name": "show", "kind": "function", "signature": "show()" }
+      ]
+    },
+    {
+      "id": "numpy",
+      "kind": "module",
+      "title": { "nl": "numpy", "en": "numpy" },
+      "items": [
+        { "name": "array", "kind": "function", "signature": "array(values)", "returns": "numpy.ndarray" },
+        { "name": "linspace", "kind": "function", "signature": "linspace(start, stop, num)", "returns": "numpy.ndarray" },
+        { "name": "sqrt", "kind": "function", "signature": "sqrt(x)" },
+        { "name": "sin", "kind": "function", "signature": "sin(x)" },
+        { "name": "cos", "kind": "function", "signature": "cos(x)" },
+        { "name": "pi", "kind": "constant", "signature": "pi", "returns": "float" }
+      ]
+    }
+  ]
+}
