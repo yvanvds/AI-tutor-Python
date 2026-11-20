@@ -1,27 +1,35 @@
-// End-to-end (#230): the subgoal bar a student watches while practising is
-// one segment per LO, and it moves from the first right answer instead of
-// sitting on 0 until LOs are mastered.
+// End-to-end (#230, #325): the subgoal bar a student watches while
+// practising is one segment per LO, and it shows the real state of each.
 //
-// The teacher saw students get frustrated at the start of a new subgoal:
-// the bar stayed on 0 for a long time and then jumped. One right answer on
-// hard leaves an LO at μ 0.79, just under the mastery bar (§4.1), and the
-// tutor asks every LO once before it asks one twice (§2.1) — so every LO
-// sat at 0.79 until the second round, when they fell over one after the
-// other. Now each non-optional LO is a segment: empty, half (one right
-// answer away) or full (mastered or stuck); a half segment empties only
-// after a question on that LO itself that is not right, not on a negative
-// from the side. Only the display: the `progress` doc keeps the mastered
-// share.
+// #230 made the bar a segment per LO, empty, half or full, so it moved from
+// the first right answer. In the lesson of 2026-11-20 a student answered
+// right and the bar did not move: one LO was stuck and so already full
+// ("stuck looks full"), the app kept asking it, and a full segment stayed
+// full. Now each segment counts down the right answers its LO still needs,
+// at the level the app asks it, and fills along with that number — a new
+// LO empty, a mastered one full. A stuck LO shows its real count, a
+// segment goes down after a wrong answer or a negative from the side, and
+// says why in its popup; the mastery stamp gets a tick of its own that
+// stays when the fill drops. The segment of the exercise on screen is
+// framed. Only the display: the `progress` doc keeps the mastered share.
 //
-// The student here is on hard, on "Print" with two LOs and an optional one
-// (already mastered, so no question goes to it). The flow:
-//   1. lo-a right               → [half, empty]  (cached share still 0)
-//   2. lo-b right, lo-a debited from the side
-//                               → [half, half]   (lo-a held)
-//   3. lo-a wrong               → [empty, half]
-//   4. lo-b right               → [empty, full]  (cached share 0.5)
-// checked on the segments in the objective banner, their tooltip, and the
-// 2px ambient line at the top of the window.
+// The student is on hard, on "Print" with two LOs and an optional one
+// (already mastered, so no question goes to it). lo-b is stuck: six own
+// questions, μ 0.27. A new LO on hard needs two right answers.
+//   0. start                     → lo-a 2, lo-b 4 (stuck, not full); the
+//                                  first question is on lo-b, framed
+//   1. lo-b right                → lo-b 3
+//   2. lo-a right                → lo-a 1, half filled; framed
+//   3. lo-b right                → lo-b 2
+//   4. lo-a right                → lo-a 0, full, ticked (cached share 0.5)
+//   5. lo-b wrong, and a mistake on lo-a from the side
+//                                → lo-b 3 "after an answer that was not
+//                                  right"; lo-a 2 "after a mistake on this in
+//                                  a question about something else", its
+//                                  tick still there (cached share 0)
+// checked on the segments in the objective banner, their popups (hover
+// and tap), the bar's tooltip, the 2px ambient line at the top of the
+// window — and at a narrow window.
 //
 // Real app, real navigation, real practice view, editor, banner and top
 // bar, real TutorService → conductor → Cosmos services. Only the model is
@@ -40,6 +48,7 @@ import 'package:ai_tutor_python/features/shell/top_bar.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,7 +64,15 @@ const List<String> _exercises = [
   'print(___ + "!")',
   'print(1, ___)',
   'print("klaar", ___)',
+  'print("nog", ___)',
 ];
+
+const _sentence = 'Print a sentence';
+const _values = 'Print several values at once';
+
+/// A window narrower than the harness's 1280 px, as on a small laptop with
+/// the chat open.
+const double _narrow = 700;
 
 Map<String, String> _signal(String loId, String kind) => {
   'subgoalId': 's1',
@@ -85,6 +102,22 @@ Map<String, dynamic> _hardStudent() {
   };
 }
 
+/// lo-b, stuck: six own questions, none right, μ 0.27 (§4.4).
+Map<String, dynamic> _stuck() {
+  final at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+  return LoBelief(
+    subgoalId: 's1',
+    loId: 'lo-b',
+    alpha: 1.5,
+    beta: 4,
+    lastUpdatedAt: at,
+    lastProbedAt: at,
+    ownQuestions: 6,
+    ownQuestionsRight: 0,
+    ownQuestionsRightNonMcq: 0,
+  ).toMap(uid: kStudentUid);
+}
+
 /// The optional LO, mastered a while ago: no question goes to it.
 Map<String, dynamic> _optionalMastered() {
   final at = DateTime.now().toUtc().subtract(const Duration(days: 1));
@@ -112,20 +145,49 @@ void main() {
     reason: 'exercise ${i + 1} never reached the editor',
   );
 
-  List<LoDisplayState> segments(WidgetTester tester) => [
-    for (final s in tester.widgetList<LoSegment>(find.byType(LoSegment)))
-      s.state,
+  List<LoSegment> segmentWidgets(WidgetTester tester) =>
+      tester.widgetList<LoSegment>(find.byType(LoSegment)).toList();
+
+  /// The right answers to go in each segment.
+  List<int> counts(WidgetTester tester) => [
+    for (final s in segmentWidgets(tester)) s.entry.toGo,
   ];
 
-  Future<void> waitForSegments(
-    WidgetTester tester,
-    List<LoDisplayState> expected,
-  ) => pumpUntil(
-    tester,
-    () => listEquals(segments(tester), expected),
-    timeout: const Duration(seconds: 30),
-    reason: 'the bar never showed $expected (last: ${segments(tester)})',
-  );
+  /// The LO of the framed segment, if any.
+  String? framed(WidgetTester tester) =>
+      segmentWidgets(tester)
+          .where((s) => s.current)
+          .map((s) => s.entry.loId)
+          .singleOrNull;
+
+  Future<void> waitForCounts(WidgetTester tester, List<int> expected) =>
+      pumpUntil(
+        tester,
+        () => listEquals(counts(tester), expected),
+        timeout: const Duration(seconds: 30),
+        reason: 'the bar never showed $expected (last: ${counts(tester)})',
+      );
+
+  Finder segment(String loId) => find.byKey(ValueKey('lo-segment-$loId'));
+
+  /// The number drawn in [loId]'s segment, or `null` when it shows none.
+  /// Its open popup is in the segment's subtree too (an overlay portal),
+  /// as rich text: only plain texts are the number.
+  String? numberIn(WidgetTester tester, String loId) {
+    final texts = tester
+        .widgetList<Text>(
+          find.descendant(of: segment(loId), matching: find.byType(Text)),
+        )
+        .map((t) => t.data)
+        .nonNulls
+        .toSet();
+    return texts.isEmpty ? null : texts.single;
+  }
+
+  bool tickIn(String loId) => find
+      .descendant(of: segment(loId), matching: find.byIcon(Icons.check_rounded))
+      .evaluate()
+      .isNotEmpty;
 
   /// The share the 2px line at the top of the window fills.
   double ambientShare(WidgetTester tester) => tester
@@ -137,35 +199,44 @@ void main() {
       )
       .widthFactor!;
 
-  testWidgets('the subgoal bar is a segment per LO: half after the first '
-      'right answer on hard, held against a negative from the side, emptied '
-      'by a wrong answer on the LO itself, full when mastered', (tester) async {
+  testWidgets('each segment counts down the right answers its LO still '
+      'needs: a stuck LO is not full, a wrong answer or a mistake from the '
+      'side takes a segment down and its popup says why, the tick of a '
+      'demonstrated LO stays, and the LO of the exercise is framed', (
+    tester,
+  ) async {
     final llm = ScriptedLlm([
-      completeCodeReply(text: 'Print een zin.', code: _exercises[0]),
-      codeFeedbackReply(
-        text: 'Helemaal juist.',
-        quality: 'correct',
-        loSignals: [_signal('lo-a', 'positive')],
-      ),
-      completeCodeReply(text: 'Print twee waarden.', code: _exercises[1]),
-      codeFeedbackReply(
-        text: 'Juist, al liep de zin zelf mis.',
-        quality: 'correct',
-        loSignals: [_signal('lo-b', 'positive'), _signal('lo-a', 'negative')],
-      ),
-      completeCodeReply(text: 'Nog een zin.', code: _exercises[2]),
-      codeFeedbackReply(
-        text: 'Niet juist: er komt geen tekst op het scherm.',
-        quality: 'wrong',
-        loSignals: [_signal('lo-a', 'negative')],
-      ),
-      completeCodeReply(text: 'Weer twee waarden.', code: _exercises[3]),
+      completeCodeReply(text: 'Print twee waarden.', code: _exercises[0]),
       codeFeedbackReply(
         text: 'Helemaal juist.',
         quality: 'correct',
         loSignals: [_signal('lo-b', 'positive')],
       ),
-      completeCodeReply(text: 'Nog eens een zin.', code: _exercises[4]),
+      completeCodeReply(text: 'Print een zin.', code: _exercises[1]),
+      codeFeedbackReply(
+        text: 'Helemaal juist.',
+        quality: 'correct',
+        loSignals: [_signal('lo-a', 'positive')],
+      ),
+      completeCodeReply(text: 'Weer twee waarden.', code: _exercises[2]),
+      codeFeedbackReply(
+        text: 'Juist.',
+        quality: 'correct',
+        loSignals: [_signal('lo-b', 'positive')],
+      ),
+      completeCodeReply(text: 'Nog een zin.', code: _exercises[3]),
+      codeFeedbackReply(
+        text: 'Helemaal juist.',
+        quality: 'correct',
+        loSignals: [_signal('lo-a', 'positive')],
+      ),
+      completeCodeReply(text: 'Nog eens twee waarden.', code: _exercises[4]),
+      codeFeedbackReply(
+        text: 'Niet juist: er komt geen tekst op het scherm.',
+        quality: 'wrong',
+        loSignals: [_signal('lo-b', 'negative'), _signal('lo-a', 'negative')],
+      ),
+      completeCodeReply(text: 'Weer een zin.', code: _exercises[5]),
     ]);
     final harness = AppHarness(
       llm: llm,
@@ -179,13 +250,13 @@ void main() {
             parentId: 'r1',
             order: 1000,
             objectives: [
-              objective('lo-a', 'Print a sentence'),
-              objective('lo-b', 'Print several values at once'),
+              objective('lo-a', _sentence),
+              objective('lo-b', _values),
               {...objective('lo-c', 'Choose the separator'), 'optional': true},
             ],
           ),
         ],
-        'lo_beliefs': [_optionalMastered()],
+        'lo_beliefs': [_stuck(), _optionalMastered()],
       },
     );
     await harness.boot(tester);
@@ -195,68 +266,143 @@ void main() {
     await tester.tap(find.text('Continue'));
     await pumpUntilFound(tester, find.byType(PracticeView));
 
-    const empty = LoDisplayState.empty;
-    const half = LoDisplayState.half;
-    const full = LoDisplayState.full;
-
-    // Two segments — the optional LO has none — both empty.
-    await waitForExercise(tester, 0);
-    await waitForSegments(tester, [empty, empty]);
-    expect(
-      find.byTooltip('0 parts mastered, 0 almost, 2 still to do'),
-      findsOneWidget,
-    );
-
     double cachedShare() =>
-        (harness.cosmos['progress'].docs['${kStudentUid}_s1']!['progress']
-                as num)
+        ((harness.cosmos['progress'].docs['${kStudentUid}_s1']?['progress']
+                    as num?) ??
+                0)
             .toDouble();
 
-    // 1. The first right answer on hard: μ 0.79, not mastered — and the
-    //    bar moves anyway. The cached share does not.
-    await tester.tap(find.byTooltip('Send to tutor'));
-    await waitForExercise(tester, 1);
-    await waitForSegments(tester, [half, empty]);
+    // 0. Two segments — the optional LO has none. lo-a new: two right
+    //    answers on hard. lo-b stuck: its real count, not full. The app
+    //    asks the stuck LO first, and its segment is framed.
+    await waitForExercise(tester, 0);
+    await waitForCounts(tester, [2, 4]);
+    expect(numberIn(tester, 'lo-a'), '2');
+    expect(numberIn(tester, 'lo-b'), '4');
+    expect(segmentWidgets(tester).map((s) => s.entry.fill).toList(), [
+      0.0,
+      0.0,
+    ]);
+    expect(framed(tester), 'lo-b');
     expect(
-      find.byTooltip('0 parts mastered, 1 almost, 1 still to do'),
+      find.byTooltip('0 of 2 parts mastered, 6 more right answers to go'),
       findsOneWidget,
     );
+    expect(ambientShare(tester), 0.0);
+
+    // 1. lo-b right: one fewer.
+    await tester.tap(find.byTooltip('Send to tutor'));
+    await waitForExercise(tester, 1);
+    await waitForCounts(tester, [2, 3]);
+    expect(framed(tester), 'lo-a');
+
+    // 2. lo-a right: one right answer away, half filled. The cached share
+    //    does not move.
+    await tester.tap(find.byTooltip('Send to tutor'));
+    await waitForExercise(tester, 2);
+    await waitForCounts(tester, [1, 3]);
+    expect(segmentWidgets(tester).first.entry.fill, 0.5);
     expect(cachedShare(), 0.0);
     expect(ambientShare(tester), closeTo(0.25, 1e-9));
 
-    // 2. A right answer on lo-b, with a negative on lo-a from the side:
-    //    lo-a is out of reach of one answer now, but its segment holds.
-    await tester.tap(find.byTooltip('Send to tutor'));
-    await waitForExercise(tester, 2);
-    await waitForSegments(tester, [half, half]);
-    expect(
-      find.byTooltip('0 parts mastered, 2 almost, 0 still to do'),
-      findsOneWidget,
-    );
-    expect(cachedShare(), 0.0);
-    expect(ambientShare(tester), closeTo(0.5, 1e-9));
-
-    // 3. A wrong answer on lo-a itself empties it.
+    // 3. lo-b right again.
     await tester.tap(find.byTooltip('Send to tutor'));
     await waitForExercise(tester, 3);
-    await waitForSegments(tester, [empty, half]);
+    await waitForCounts(tester, [1, 2]);
 
-    // 4. lo-b right again: mastered, full.
+    // 4. lo-a right: mastered — full, no number, the tick of its stamp.
     await tester.tap(find.byTooltip('Send to tutor'));
     await waitForExercise(tester, 4);
-    await waitForSegments(tester, [empty, full]);
-    expect(
-      find.byTooltip('1 part mastered, 0 almost, 1 still to do'),
-      findsOneWidget,
-    );
+    await waitForCounts(tester, [0, 2]);
+    expect(numberIn(tester, 'lo-a'), isNull);
+    expect(tickIn('lo-a'), isTrue);
+    expect(tickIn('lo-b'), isFalse);
     expect(cachedShare(), 0.5);
     expect(ambientShare(tester), closeTo(0.5, 1e-9));
+    expect(
+      find.byTooltip('1 of 2 parts mastered, 2 more right answers to go'),
+      findsOneWidget,
+    );
+
+    // 5. lo-b wrong, with a mistake on lo-a from the side: both go up, and
+    //    lo-a keeps its tick. The next question is on lo-a, framed.
+    await tester.tap(find.byTooltip('Send to tutor'));
+    await waitForExercise(tester, 5);
+    await waitForCounts(tester, [2, 3]);
+    expect(tickIn('lo-a'), isTrue);
+    expect(numberIn(tester, 'lo-a'), '2');
+    expect(framed(tester), 'lo-a');
+    expect(
+      segmentWidgets(tester).first.entry.rose,
+      LoDisplayRise.otherQuestion,
+    );
+    expect(segmentWidgets(tester).last.entry.rose, LoDisplayRise.notRight);
+    await pumpUntil(
+      tester,
+      () => cachedShare() == 0.0,
+      reason: 'the cached share never followed lo-a back under the bar',
+    );
+    expect(ambientShare(tester), 0.0);
+
+    // The popups, by hover: the sentence, the state, why it went up, and
+    // the exercise on screen.
+    const lowerPopup =
+        '$_values\n3 more right answers\n'
+        'Went up after an answer that was not right.';
+    const framedPopup =
+        '$_sentence\n2 more right answers · demonstrated\n'
+        'Went up after a mistake on this in a question about something '
+        'else.\nYour current exercise is about this.';
+    expect(find.byTooltip(lowerPopup), findsOneWidget);
+    expect(find.byTooltip(framedPopup), findsOneWidget);
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(segment('lo-b')));
+    await pumpUntilFound(tester, find.text(lowerPopup));
+
+    // ... and by tap.
+    await mouse.moveTo(Offset.zero);
+    await pumpUntil(
+      tester,
+      () => find.text(lowerPopup).evaluate().isEmpty,
+      reason: 'the popup never closed',
+    );
+    await tester.tap(segment('lo-a'));
+    await pumpUntilFound(tester, find.text(framedPopup));
 
     // The bar sits in the objective banner, above the editor.
     expect(
       tester.getRect(find.byType(SubgoalProgressBar)).bottom,
       lessThan(tester.getRect(find.byType(CodeField)).top),
     );
+
+    // A narrow window: both segments keep their number and tick, side by
+    // side inside the banner, without overflow.
+    // (No pumpAndSettle: the practice view never settles — the editor's
+    // cursor blinks.)
+    tester.view.physicalSize =
+        Size(_narrow, kRunnerWindowSize.height) * tester.view.devicePixelRatio;
+    await pumpUntil(
+      tester,
+      () => tester.getRect(find.byType(SubgoalProgressBar)).right <= _narrow,
+      reason: 'the bar never fit the narrow window',
+    );
+    // Whatever slides on a resize (the chat panel) comes to rest.
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
+    final bar = tester.getRect(find.byType(SubgoalProgressBar));
+    expect(bar.right, lessThanOrEqualTo(_narrow));
+    for (final lo in ['lo-a', 'lo-b']) {
+      final rect = tester.getRect(segment(lo));
+      expect(rect.width, greaterThan(40), reason: lo);
+      expect(rect.left, greaterThanOrEqualTo(bar.left - 0.01), reason: lo);
+      expect(rect.right, lessThanOrEqualTo(bar.right + 0.01), reason: lo);
+    }
+    expect(numberIn(tester, 'lo-a'), '2');
+    expect(numberIn(tester, 'lo-b'), '3');
+    expect(tickIn('lo-a'), isTrue);
 
     expect(llm.remaining, 0);
     await harness.dispose(tester);

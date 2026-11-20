@@ -1,7 +1,7 @@
 # Hoe kom je aan je punt?
 
-*Bij versie 1.1.2 van de puntenformule. De app rekent met formule 1.1: dat
-nummer staat ook in Mijn rapporten.*
+*Bij versie 1.1.4 van de puntenformule. De app rekent met formule 1.1.3:
+dat nummer staat ook in Mijn rapporten.*
 
 ## Wat telt er voor je punt?
 
@@ -49,7 +49,8 @@ De volledige formule schrijft C(k), w_u en w_d. Vandaag zijn dat k, 0,6 en
 
 Als de tutor zeker genoeg is dat je het kan:
 
-- je beantwoordde minstens twee vragen over dat leerdoel helemaal juist;
+- je beantwoordde minstens twee vragen over dat leerdoel helemaal juist,
+  of half juist en de vervolgvraag erop juist;
 - minstens één daarvan was geen meerkeuzevraag;
 - minstens één goed antwoord kwam op jouw niveau of hoger;
 - je antwoorden erover zijn vooral juist, zeker de laatste.
@@ -95,10 +96,11 @@ app kondigt die vragen aan.
 
 ## Wat zie ik, en wanneer?
 
-Tijdens het werk zie je je voortgang, geen punt. Je punt komt op het
-rapportmoment: dan geeft je leerkracht het vrij in **Mijn rapporten**, met
-een uitleg. Onder "Hoe dit punt berekend is" staan M, k, u en d, en de dag
-van de berekening: wat je tot dan aantoonde, telt mee.
+Tijdens het werk zie je voortgang, geen punt: de juiste antwoorden die elk
+leerdoel nog nodig heeft, en een vinkje als het aangetoond is. Je punt komt
+wanneer je leerkracht het vrijgeeft in **Mijn rapporten**, met een uitleg.
+Onder "Hoe dit punt berekend is" staan M, k, u en d, en de dag van de
+berekening: wat je tot dan aantoonde, telt mee.
 
 ## Wie beslist over mijn punt?
 

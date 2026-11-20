@@ -178,6 +178,39 @@ const Set<ChatRequestType> openCodeExerciseGuardedTypes = {
   ChatRequestType.contentQuestion,
 };
 
+/// What the model is told when the student asks about the theory page
+/// while a question they answer in the chat waits for that answer (#324,
+/// LLM_CONTRACT "A page question while an open question waits"): an
+/// `explain_code` or socratic exercise, or a follow-up the grader asked.
+/// Appended after the teacher-authored body of the one turn such a message
+/// starts, a question about the page ([ChatRequestType.contentQuestion]) —
+/// [openChatQuestionGuardedTypes].
+///
+/// The chat next to the theory is the same chat the open question is in,
+/// so a student who read up and then types their answer there means it as
+/// the answer. It goes out as a question about the page (#132) and is not
+/// graded; the chat says so under the reply, with a way back to the
+/// question. The open question is in the exercise's history the call
+/// carries, and the page may well hold its answer: like
+/// [openQuizDirective] and [openCodeExerciseDirective], this keeps the
+/// model from giving it away or grading it here.
+const String openChatQuestionDirective = '''
+OPEN QUESTION — STRICT. This is part of the app's contract and holds whatever the instructions above say.
+The student has a question open in the app that they answer by typing in the chat: a question about code (`explain_code`), a question to think about (`socratic_question`) or a follow-up question. It is the last question in the conversation above. They are reading the theory page now, and what they type here is a question about the page: it is not their answer to that open question, and it is not graded. They answer it at the question itself.
+- Answer the question about the page as the instructions above say. Explaining what the page says is fine, and so is a short example on a different problem.
+- Never give the open question's answer away: do not answer it, do not work out what its code does or prints, and do not say what a right answer to it contains — not even when the student asks for it outright.
+- If the message reads like an answer to the open question, do not say whether it is right or wrong and do not correct or complete it. Tell the student that it did not count as their answer and that they answer at the question itself.
+''';
+
+/// The turns [openChatQuestionDirective] is appended to while a question
+/// the student answers in the chat waits: only a question about the theory
+/// page. Next to the question itself a message is that answer and goes to
+/// its grader, which never gets it; and the `?` hint's own doc says not to
+/// reveal the answer.
+const Set<ChatRequestType> openChatQuestionGuardedTypes = {
+  ChatRequestType.contentQuestion,
+};
+
 /// What the model is told on a `contentQuestion` turn (#132) until the
 /// teacher authors an instruction doc with that id — the seed text, and the
 /// one request type that ships with a default. The other types have always
@@ -224,6 +257,7 @@ class InstructionGenerator {
     Goal? goalOverride,
     bool quizOpen = false,
     bool codeExerciseOpen = false,
+    bool chatQuestionOpen = false,
   }) async {
     // A subgoal the student picked back up (#280) is what they work on:
     // both sections describe it and its root, not the goal in progress
@@ -315,10 +349,17 @@ class InstructionGenerator {
         ? '\n$openCodeExerciseDirective'
         : '';
 
+    // And a page question while a question answered in the chat waits:
+    // not to give that answer away, nor grade it there (#324).
+    final openChat =
+        chatQuestionOpen && openChatQuestionGuardedTypes.contains(type)
+        ? '\n$openChatQuestionDirective'
+        : '';
+
     // The language directive goes last, after the teacher-authored bodies it
     // has to override (#117).
     return '$envelopeContract\n$alwaysInclude$typeSpecific$answerKey$openQuiz'
-        '$openCode\n${languageDirective(languageCode)}';
+        '$openCode$openChat\n${languageDirective(languageCode)}';
   }
 
   String _chatRequestTypeToString(ChatRequestType type) =>

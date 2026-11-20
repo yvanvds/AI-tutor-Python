@@ -282,7 +282,9 @@ StudentLOBelief {
                                         // 0.
   ownQuestionsRight: number?            // #279: own questions answered
                                         // right (`correct`, positive on
-                                        // the LO), once per question.
+                                        // the LO), once per question;
+                                        // since #326 also a `partial`
+                                        // one with a right follow-up.
                                         // Mastery condition 4 wants 2
                                         // (conductor policy 4.1).
   ownQuestionsRightNonMcq: number?      // #279: of those, the ones that

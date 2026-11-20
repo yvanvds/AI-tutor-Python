@@ -29,7 +29,8 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
   oefent, raakt het voorstel niet.
   `replay-beliefs` leest alleen, behalve met `--apply`: dan eerst een
   back-up, niet in de lestijd, met `If-Match`, en alleen de velden van
-  `lo_beliefs` die de herspeling herstelt (`BELIEF_FIELDS`, #242, #281).
+  `lo_beliefs` die de herspeling herstelt (`BELIEF_FIELDS`, #242, #281,
+  #328).
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
   repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek:
   ook een issue, PR of commit noemt geen echte leerling (#190).
@@ -103,9 +104,64 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.1-eval9`
+## Regelversie `1.1.3-eval11`
 
-PUNTENFORMULE v1.1, herspeeld uit `turn_history`. `eval9` (2026-11-19,
+PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval11` (2026-11-21,
+#327) laat de **bewaking van beheerst** (`eval9`, hieronder) de stempel
+van het document lezen, zoals de app: `isMastered` leest
+`everMasteredBelief`, de stempel op het document. `validate` en
+`replay-beliefs` geven die stempels mee aan de herspeling
+(`rules.replay(stamps=...)`, `evaluate.doc_stamps`). Een stempel telt
+vanaf het moment erna: de app stempelt een seconde of zo na `turnAt`.
+
+Tot `eval10` keek de bewaking alleen naar de stempel van de herspeling.
+Met `--regels 1.1` heeft die geen dunne stempel van vóór 1.1 (minder dan
+twee juiste eigen vragen): 1.1 geeft hem niet, het document houdt hem
+(#168). Op build 2.15.0 bewaakte de app zo'n leerdoel en vergat de
+herspeling: vier documenten in 6WEWI weken af in μ (2026-11-20). Met de
+stempels van de documenten toont `validate --regels 1.1` geen afwijking
+in μ meer, in 6EWI (579 documenten) noch in 6WEWI (1658). Geen stempel
+en geen punt verschuift, en `lo_beliefs` hoeft niet herschreven te
+worden: de documenten zijn wat de app rekende. De droge run van
+`replay-beliefs --regels 1.1` wil op 21-11 nog 13 documenten herschrijven
+(3 in 6EWI, 10 in 6WEWI), alleen α/β en met |Δμ| < 0,01. Dat komt niet
+van de bewaking: de herschrijving van 09-11 liet `lastUpdatedAt` staan,
+en de app liet daarna vervallen vanaf een andere klok dan de herspeling
+(#328; *De klok van α en β*, onder `replay-beliefs`).
+
+`draft` en `what-if` geven geen stempels mee: het concept herspeelt per
+build, alleen uit de log. Ook die herspeling mist stempels die op het
+document staan (55 documenten in 6WEWI, 24 in 6EWI op 20-11). Op 52 en 24
+daarvan zijn het stempels van 1.1: `replay-beliefs --regels 1.1` schreef
+ze op 09-11 (*stempel erbij*, *stempel vroeger*), of de app zette ze
+sindsdien op documenten die van die herschrijving afstammen. De
+herspeling met 1.1 geeft elk ervan op hetzelfde moment. De andere drie
+in 6WEWI zijn stempels van september van een build zonder
+`clientVersion`, met de oude rekenregels (`replay(asymmetric=False,
+drop_incidental_negatives=False)` geeft ze op hetzelfde moment). Het
+concept telt zulke stempels niet (*stempel erbij met --regels 1.1*,
+hieronder). De stempels van de documenten in de bewaking van het concept
+veranderden op 21-11 geen stempel en geen μ.
+
+`eval10` (2026-11-20,
+#326) telt een **juiste vervolgvraag na een half juist antwoord** zoals de
+app vanaf de build die het bracht (2.16.0, `rules.FOLLOW_UP_RIGHT_FROM`,
+`rules.follow_up_counts`): was het antwoord op een eigen vraag `partial`,
+en is een vervolgvraag erop `correct` met als eerste signaal op dat
+leerdoel een positief, dan telt die eigen vraag als juist
+(`LoState.own_right` + 1, en `own_right_open` + 1 als ze geen
+meerkeuzevraag was). Eén keer per eigen vraag, ook in een keten van twee
+vervolgvragen; zonder beperking per leerdoel. Het gewicht van de
+vervolgvraag verandert niet. De leerkracht koos op 2026-11-20 dat de
+regel alleen vooruit geldt: een oefening van een oudere build herspeelt
+zonder, ook met `--regels 1.1`, dus `lo_beliefs` hoeft niet herschreven
+te worden. `Variant(follow_up_after_partial=True)` zet de regel op elke
+beurt aan, `False` op geen enkele. Op de klasdata van builds ≥ 2.13.0
+(stand 20-11 's avonds) telt hij 69 vervolgvragen mee en vallen 17
+stempels vroeger, geen enkele later; `validate` geeft hetzelfde als met
+`eval9`, want er is nog geen oefening van 2.16.0.
+
+`eval9` (2026-11-19,
 #311) volgt de **bewaking van beheerst** van de app vanaf de build die ze
 bracht (2.15.0, `rules.MASTERY_GUARD_FROM`, `rules.mastery_guard`): krijgt
 een leerdoel dat op dat moment beheerst is een signaal dat niet negatief
@@ -336,7 +392,10 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
 
 Verder identiek aan de app: prior (1,1), vergeten per antwoord met λ = 0,7
 voor een oefening van 1.1 (sinds `eval8`), de bewaking van beheerst vanaf
-build 2.15.0 (sinds `eval9`), plafond 20 met krimp-dan-optel,
+build 2.15.0 (sinds `eval9`; in `validate` en `replay-beliefs` ook op de
+stempel van het document, sinds `eval11`), een juiste vervolgvraag na een half juiste
+eigen vraag als juiste eigen vraag vanaf build 2.16.0 (sinds `eval10`),
+plafond 20 met krimp-dan-optel,
 de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
@@ -532,6 +591,9 @@ Een afwijking betekent dus:
   anders las dan `eval3` (#195) en neutrale signalen oversloeg (#202).
   Zulke documenten kunnen afwijken tot de herspeling na de release, met
   `eval4` of later (hierboven);
+- een document waarvan `lastUpdatedAt` niet bij α en β past: de
+  herschrijving van 09-11 liet de klok van de app staan bij de getallen
+  van de herspeling (#328, *De klok van α en β* hieronder);
 - iets wat de log niet draagt: een signaal meer of minder dan gelogd.
 
 **`--regels 1.1`** (#281) herspeelt elke oefening met de regels van 1.1,
@@ -547,6 +609,14 @@ elk rechtstreeks signaal, 1.1 alleen op het doel van de vraag, en
 `replay-beliefs` verlaagt het nooit. Op 6EWI en 6WEWI (2026-11-08) gaf
 een herschrijving in het geheugen zo geen enkele afwijking in μ, en in het
 hoogste niveau dezelfde twee als per build.
+
+**Op één klok** (sinds #328, `evaluate.mean_deviation`). `validate`
+vergelijkt μ van het document en van de herspeling, elk vervallen tot de
+laatste van de twee klokken: `lastUpdatedAt` van het document en de
+laatste schrijving van de herspeling (`LoState.last_at`). Daar begint de
+volgende schrijving van de app, en daar zet `replay-beliefs` α en β
+(hieronder). Tot #328 vergeleek het de getallen zoals ze opgeslagen
+waren, alsof de twee klokken samenvielen.
 
 ## `replay-beliefs`: `lo_beliefs` herstellen uit de herspeling
 
@@ -570,11 +640,14 @@ bewaarde. Zo toont `validate` daarna geen afwijking meer op die
 documenten. Op elk document in `lo_beliefs` dat de herspeling bereikt,
 schrijft het deze velden (`BELIEF_FIELDS`), en niets anders:
 
-- `alpha` en `beta`: die van de herspeling. Liggen ze binnen 1e-4 van de
-  opgeslagen, dan blijven die staan: het zijn dezelfde getallen, twee keer
-  berekend (de app laat vervallen tot het moment waarop ze schrijft, een
-  seconde of zo na `turnAt`). Op 6EWI bleef dat onder 1e-5, en lag elke
-  echte afwijking boven 1e-2;
+- `alpha` en `beta`: die van de herspeling, op de klok van het document
+  (sinds #328, *De klok van α en β* hieronder). Liggen ze daar binnen
+  1e-4 van de opgeslagen, dan blijven die staan: het zijn dezelfde
+  getallen, twee keer berekend (Dart en Python ronden anders af in de
+  laatste cijfers). Op 6EWI bleef dat onder 1e-5, en lag elke echte
+  afwijking boven 1e-2;
+- `lastUpdatedAt` (sinds #328): alleen met nieuwe α en β, en alleen waar
+  de herspeling het leerdoel later schreef dan de app;
 - `firstMasteredAt`: de vroegste van de opgeslagen en de herspeelde
   stempel, per oefening. De herspeling stempelt op `turnAt`, de app
   wanneer ze schrijft: op dezelfde oefening blijft de stempel van de app.
@@ -582,8 +655,9 @@ schrijft het deze velden (`BELIEF_FIELDS`), en niets anders:
   oud document zonder het veld dat de app als aangetoond leest
   (`belief_math.everMasteredBelief`), krijgt bij haar volgende schrijving
   de stempel op `lastUpdatedAt`. Zouden de tellingen hieronder of de
-  nieuwe α en β die lezing beëindigen, dan schrijft `replay-beliefs` die
-  stempel zelf, zoals de app (*stempel vastgelegd* in de uitvoer);
+  nieuwe α en β die lezing beëindigen, of een latere `lastUpdatedAt` die
+  stempel verschuiven, dan schrijft `replay-beliefs` hem zelf, zoals de
+  app (*stempel vastgelegd* in de uitvoer);
 - `highestPositiveDifficulty`: het hoogste van opgeslagen en herspeeld,
   nooit lager;
 - `lastProbedAt` (sinds #275): de laatste rechtstreekse vraag van de
@@ -601,12 +675,58 @@ schrijft het deze velden (`BELIEF_FIELDS`), en niets anders:
 Stempel, hoogste niveau en tellingen zijn ook in de app eenrichting
 (#168, #279): dit vult aan wat een oude build nooit schreef, en neemt niets
 weg. Alle andere velden blijven zoals de app ze schreef, ook
-`lastUpdatedAt`, een `lastProbedAt` dat er al stond, en `returnWrongAt` en
+`lastUpdatedAt` waar de app het leerdoel het laatst schreef, een
+`lastProbedAt` dat er al stond, en `returnWrongAt` en
 `thinCheckedAt` (#275): wat de app met een controlevraag deed, geen
 overtuiging die een herspeling uitrekent. Een document dat de herspeling niet bereikt (een neutraal
 signaal van opzij, geschreven door een build van vóór #204) blijft staan;
 een herspeeld leerdoel zonder document krijgt er geen, dat maakt de app
 bij de volgende schrijving.
+
+**De klok van α en β** (#328). Bij haar volgende schrijving laat de app α
+en β vervallen vanaf `lastUpdatedAt`; de herspeling vanaf haar eigen
+laatste schrijving. Die twee klokken verschillen waar een build iets
+schreef wat de herspeling niet schrijft (een incidenteel negatief van een
+build zonder `clientVersion`, #167), of iets liet vallen wat de
+herspeling wel leest. Tot #328 schreef `replay-beliefs` α en β van de
+herspeling op haar eigen klok en liet `lastUpdatedAt` staan: de app liet
+daarna over te weinig of te veel dagen vervallen. Nu:
+
+- is de klok van het document later, dan schrijft het α en β van de
+  herspeling vervallen tot die klok, en blijft `lastUpdatedAt` staan;
+- is ze vroeger (of ontbreekt ze), dan schrijft het α en β van de
+  herspeling met haar klok als `lastUpdatedAt`: de schrijving die de app
+  gedaan zou hebben (in de uitvoer onder *α/β anders*; *klok erbij* is
+  `lastProbedAt`). Een stempel die de app op een oud document op de
+  oude klok zou zetten, schrijft het dan zelf (*stempel vastgelegd*).
+
+Vervallen is samenstelbaar: wat tot een moment vervalt en van daar
+verder, komt uit waar het in één keer vervalt. Zo komt de volgende
+schrijving van de app uit waar de herspeling uitkomt, en vergelijkt
+`validate` op diezelfde klok (hierboven).
+
+Op de klasdata van 21-11 (`--regels 1.1`, droog) wil `replay-beliefs`
+daarom 50 documenten herschrijven in 6EWI en 38 in 6WEWI, alleen α/β
+(waarvan 40 met de klok in 6EWI), zonder stempel, niveau, tellingen,
+plafond, vastgelopen of dun:
+
+- 13 (3 in 6EWI, 10 in 6WEWI) schreef de app na de herschrijving van
+  09-11 op build 2.14.0, vervallend vanaf de klok die die herschrijving
+  liet staan. Hun klok klopt nu; een herschrijving zet ze op de waarden
+  van de herspeling (|Δα| tot 0,1, |Δμ| < 0,01);
+- 75 (47 in 6EWI, 28 in 6WEWI) schreef de app sinds die herschrijving
+  niet meer: α en β van de herspeling, met een klok die tot 14 dagen
+  vroeger of later ligt. Bij de volgende schrijving van de app worden het
+  documenten als de 13 hierboven. Op 8 ervan (5 in 6EWI, 3 in 6WEWI) is
+  het verschil op één klok groter dan 0,01 (tot 0,016): die toont
+  `validate --regels 1.1` nu als afwijking in μ.
+
+Geen stempel verschuift: elke stempel die de app na de herschrijving van
+09-11 zette (83 in 6EWI, 336 in 6WEWI), valt op dezelfde oefening als die
+van de herspeling, en de herschrijving zelf zet er geen bij of vroeger.
+Een herschrijving is dus niet nodig. Wie `validate --regels 1.1` weer op
+0 wil, herschrijft buiten de lesuren met `replay-beliefs --klas <klas>
+--regels 1.1 --apply`.
 
 De droge run toont per leerling de documenten, hoeveel de herspeling er
 bereikt en hoeveel er zouden veranderen: stempel erbij, stempel vroeger,
@@ -689,6 +809,10 @@ build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
 - `mastery_guard` (#311): de bewaking van beheerst bij elke beurt (`True`)
   of bij geen enkele (`False`), welke build ze ook schreef; zonder waarde
   per build (`rules.mastery_guard`).
+- `follow_up_after_partial` (#326): een juiste vervolgvraag na een half
+  juiste eigen vraag telt die eigen vraag als juist, bij elke beurt
+  (`True`) of bij geen enkele (`False`); zonder waarde per build
+  (`rules.follow_up_counts`). `as_11` zet het niet aan.
 - `forget` (λ, #278): vóór nieuw bewijs krimpt wat een leerdoel boven de
   prior heeft met die factor, bij elke beurt; met `forget_own_only` alleen
   bij een eigen vraag. Zonder `forget` vergeet een beurt van 1.1 met
@@ -702,7 +826,9 @@ build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
   beurt van 1.1 er 2 en 1, en weegt ze ×0,5.
 
 Een *eigen vraag* is een rechtstreekse vraag met het leerdoel als doel,
-geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal.
+geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal,
+en vanaf build 2.16.0 ook bij `partial` met een juiste vervolgvraag erop
+(#326).
 De vergelijking zelf draaide één keer, buiten de repo
 (`~/ai-tutor-evaluaties/analyse-2026-11-08`): een herspeling voegt geen
 vragen toe, dus een strengere regel toont daar alleen wat ze tegenhoudt, en

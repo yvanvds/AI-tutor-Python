@@ -281,6 +281,21 @@ ze meeschaalt en de kleuren van de app volgt.
    (#294). Het script schrijft niets zolang een Engelse tekst uit stap 3
    ontbreekt. Commit en push: dat raakt alleen `public/` en `tooling/`, dus
    rechtstreeks op main.
+7. De naslag (#323): hetzelfde script schrijft ook "Naslag" op beide
+   startpagina's, uit `assets/reference/python_reference.json`, het bestand
+   dat het naslagpaneel en de keuzelijst na een punt in de app lezen. Het
+   leest eerst de code van de Nederlandse lessen van elk live doel en
+   schrijft niets zolang de naslag iets mist: een functie, methode of
+   module die een les gebruikt, een uitleg in het Nederlands of het Engels,
+   een voorbeeld, of een les bij een item dat een live les gebruikt (het
+   script stelt de eerste les voor die het gebruikt). Alleen de controle:
+   `python tooling/site/curriculum.py --check-reference`. Vul wat ontbreekt
+   aan in het naslagbestand: per item één of twee zinnen per taal, een kort
+   voorbeeld (een functie in een voorbeeld geeft haar resultaat terug), en
+   de id van het subdoel waarvan de les het uitlegt. De tests
+   (`python -m unittest discover -s tooling/site/tests`) voeren elk
+   voorbeeld uit. Het naslagbestand zit in de app: die wijziging gaat via
+   een PR en bereikt de leerlingen met de volgende release, de site meteen.
 
 Een doel dat al live staat wijzig je via de import in de app. De id's van
 subdoelen en LO's dragen de voortgang van de leerlingen.

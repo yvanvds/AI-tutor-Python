@@ -18,7 +18,9 @@ nor by `replay-beliefs` without `--apply`.
 
 `replay-beliefs` (#242) replays `lo_beliefs` from `turn_history` with the
 replay `validate` compares them to, and restores the fields of
-`BELIEF_FIELDS` on the docs there: α and β, the stamp `firstMasteredAt`
+`BELIEF_FIELDS` on the docs there: α and β on the doc's clock
+`lastUpdatedAt`, or with the replay's clock where that is later (#328),
+the stamp `firstMasteredAt`
 (the earliest of stored and replayed by oefening, never cleared),
 `highestPositiveDifficulty` (the highest of the two, never lowered),
 `lastProbedAt` where the doc has none (#275), and the own-question counts
@@ -513,9 +515,18 @@ def _replay_student(uid: str, goals: dict, variant: rules.Variant = rules.CURREN
     compares them to: `rules.replay` with the provenance the app recorded,
     so with the weight the app wrote the docs with, and with [variant]
     (`--regels`). `replay-beliefs` writes this same replay (#242), so
-    `validate` with the same `--regels` reads its docs back as matching."""
-    turns = cosmos.turns(uid)
-    return turns, cosmos.beliefs(uid), rules.replay(turns, goals, variant=variant)
+    `validate` with the same `--regels` reads its docs back as matching.
+
+    The mastery guard reads the docs' stamps (`doc_stamps`, #327), as the
+    app does: a stamp the replay does not give still guards there."""
+    turns, stored = cosmos.turns(uid), cosmos.beliefs(uid)
+    return turns, stored, rules.replay(turns, goals, variant=variant, stamps=doc_stamps(stored))
+
+
+def doc_stamps(stored: dict) -> dict[tuple[str, str], dt.datetime]:
+    """The stamp the app reads on each of [stored] that has one
+    (`app_stamp`): what its mastery guard decides on (#327)."""
+    return {key: at for key, doc in stored.items() if (at := app_stamp(doc)) is not None}
 
 
 def _last_build(turns: list[dict]) -> str:
@@ -552,7 +563,12 @@ def cmd_validate(args) -> None:
     --regels 1.1` writes. After that rewrite this is the comparison that
     matches; without the flag every doc it rewrote reads as a deviation.
     The highest level is compared to the higher of that replay's and the
-    replay by build (`_kept_level`): a rewrite never lowers it."""
+    replay by build (`_kept_level`): a rewrite never lowers it.
+
+    μ is compared on one clock (`mean_deviation`, #328): the doc's and the
+    replay's, each decayed to the later of the doc's `lastUpdatedAt` and
+    the replay's last write. That is where the app's next write starts, and
+    where `replay-beliefs` puts α and β."""
     goals = cosmos.goals()
     students = cosmos.accounts(args.klas)
     variant = _variant(args)
@@ -566,7 +582,7 @@ def cmd_validate(args) -> None:
             if not s:
                 continue
             n += 1
-            if abs(s.mean - b["alpha"] / (b["alpha"] + b["beta"])) > 0.01:
+            if mean_deviation(b, s) > 0.01:
                 off += 1
             if b.get("highestPositiveDifficulty") and b["highestPositiveDifficulty"] != _kept_level(s, by_build.get(key)):
                 rat += 1
@@ -717,26 +733,26 @@ def cmd_apply(args) -> None:
 
 # ---- replay-beliefs (#242) ---------------------------------------------------
 
-# What `replay-beliefs` writes on a `lo_beliefs` doc; `lastProbedAt` only
-# where the doc has none (#275: "neem het mee"); the own-question counts of
-# formula 1.1 (#278, #279) as the larger of stored and replayed (#281).
-# Every other field — `lastUpdatedAt`, `regressedAt`, the calibration
-# clock, and the session state of #275, `returnWrongAt` and `thinCheckedAt`
-# (what the app did with a return, no belief a replay recomputes) — stays
-# as the app wrote it.
+# What `replay-beliefs` writes on a `lo_beliefs` doc; `lastUpdatedAt` only
+# with new α and β, where the replay wrote the LO later than the app did
+# (#328, `_on_one_clock`); `lastProbedAt` only where the doc has none (#275:
+# "neem het mee"); the own-question counts of formula 1.1 (#278, #279) as
+# the larger of stored and replayed (#281). Every other field —
+# `regressedAt`, the calibration clock, and the session state of #275,
+# `returnWrongAt` and `thinCheckedAt` (what the app did with a return, no
+# belief a replay recomputes) — stays as the app wrote it.
 BELIEF_FIELDS = (
-    "alpha", "beta", "firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt",
+    "alpha", "beta", "lastUpdatedAt", "firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt",
     "ownQuestions", "ownQuestionsRight", "ownQuestionsRightNonMcq",
 )
 # α + β from which an LO was "on the cap" until formula 1.1: not
 # practiceable any more (CONDUCTOR_POLICY §2.1, §3.4 before #278). The dry
 # run counts the docs a rewrite takes under it (#281).
 SATURATED_EVIDENCE = 18.0
-# α and β within this of the stored ones are the same numbers computed
-# twice: the app decays to the moment it writes, a second or so after
-# `turnAt`, and Dart and Python round apart in the last bits. On 6EWI
-# (2026-10-07) that stayed under 1e-5, and every real deviation was over
-# 1e-2. The doc keeps its own.
+# α and β within this of the stored ones, on one clock (`_on_one_clock`),
+# are the same numbers computed twice: Dart and Python round apart in the
+# last bits. On 6EWI (2026-10-07) that stayed under 1e-5, and every real
+# deviation was over 1e-2. The doc keeps its own.
 BELIEF_TOLERANCE = 1e-4
 
 
@@ -791,6 +807,37 @@ def _app_state(doc: dict) -> rules.LoState:
         own_right=_stored_count(doc.get("ownQuestionsRight")) or 0,
         own_right_open=_stored_count(doc.get("ownQuestionsRightNonMcq")) or 0,
     )
+
+
+def _on_one_clock(
+    stored: dict, state: rules.LoState
+) -> tuple[tuple[float, float], tuple[float, float], dt.datetime | None]:
+    """(α, β) of [stored] and of [state] on one clock (#328), and that
+    clock: each decayed to the later of the doc's `lastUpdatedAt` and the
+    replay's last write (`LoState.last_at`). The app decays from the doc's
+    clock at its next write, the replay from its own, and the two differ
+    where a build wrote what the replay does not (an incidental negative,
+    #167) or dropped what it reads. Decay is composable, so two pairs equal
+    here stay equal at every later write.
+
+    Without a clock on one side, that side reads as it is: a replay without
+    one (a state built by hand) on the doc's clock, and a doc without a
+    readable `lastUpdatedAt` (none in the class data, 2026-11-21) on the
+    replay's — not from 1970, as the app would read it."""
+    clock = _stored_at(stored.get("lastUpdatedAt"))
+    doc = rules.LoState(alpha=_stored_number(stored.get("alpha")), beta=_stored_number(stored.get("beta")), last_at=clock)
+    at = max((c for c in (clock, state.last_at) if c is not None), default=None)
+    if at is None:
+        return (doc.alpha, doc.beta), (state.alpha, state.beta), None
+    return rules.decayed(doc, at), rules.decayed(state, at), at
+
+
+def mean_deviation(stored: dict, state: rules.LoState) -> float:
+    """|Δμ| between [stored] and [state] on one clock (`_on_one_clock`):
+    what `validate` counts over 0.01. A doc `replay-beliefs` wrote reads 0
+    here, whatever its clock (#328)."""
+    (a, b), (ra, rb), _ = _on_one_clock(stored, state)
+    return abs(ra / (ra + rb) - a / (a + b))
 
 
 def _has_right_counts(doc: dict) -> bool:
@@ -858,8 +905,16 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
     and nothing else changed. [oefening_times] are the student's oefeningen, by
     `turnAt`, sorted.
 
-    - α and β: the replay's, unless they are the stored ones to within
-      `BELIEF_TOLERANCE`;
+    - α and β: the replay's on the doc's clock (#328), unless they are the
+      stored ones to within `BELIEF_TOLERANCE` there (`_on_one_clock`).
+      The app decays from `lastUpdatedAt` at its next write, so they must
+      fit that clock: where the doc's is later than the replay's last write
+      (a build wrote what the replay does not, an incidental negative,
+      #167), the replay's α and β decayed to it, and the clock stays; where
+      it is earlier (the replay reads what the build dropped) or missing,
+      the replay's α and β with its clock as `lastUpdatedAt`: the write
+      the app would have made. Decay is composable, so the app's next
+      write comes out where the replay does;
     - `firstMasteredAt`: the earliest of the stored and the replayed stamp,
       by oefening — on the same oefening the app's own stamp stays
       (`_on_a_later_oefening`). Never cleared: a stamp the replay does not
@@ -867,8 +922,8 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
       stamp is the one the app reads (`app_stamp`): on an old doc without
       the field that reads as mastered, its `lastUpdatedAt`, which the app
       writes as the stamp at its next write. Where the counts below, or new
-      α and β, would end that reading, it is written here, as the app
-      would;
+      α and β, would end that reading, or a later clock would move it, it
+      is written here, as the app would;
     - `highestPositiveDifficulty`: the highest of the stored and the
       replayed level. Never lowered; an unknown stored level reads as none,
       as the app reads it;
@@ -892,9 +947,11 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
     stamp on a doc without them is no thin stamp (#275), and with them it
     can be (`app_thin_stamp`)."""
     doc = dict(stored)
-    alpha, beta = _stored_number(stored.get("alpha")), _stored_number(stored.get("beta"))
-    if abs(state.alpha - alpha) > BELIEF_TOLERANCE or abs(state.beta - beta) > BELIEF_TOLERANCE:
-        doc["alpha"], doc["beta"] = state.alpha, state.beta
+    (alpha, beta), (new_alpha, new_beta), at = _on_one_clock(stored, state)
+    if abs(new_alpha - alpha) > BELIEF_TOLERANCE or abs(new_beta - beta) > BELIEF_TOLERANCE:
+        doc["alpha"], doc["beta"] = new_alpha, new_beta
+        if at is not None and at != _stored_at(stored.get("lastUpdatedAt")):
+            doc["lastUpdatedAt"] = _app_iso(at)
     replayed, stamp = state.first_mastered_at, app_stamp(stored)
     if replayed is not None and (
         stamp is None or (replayed < stamp and _on_a_later_oefening(replayed, stamp, oefening_times))
@@ -913,19 +970,22 @@ def replayed_belief(stored: dict, state: rules.LoState, oefening_times: list[dt.
         doc["highestPositiveDifficulty"] = state.ratchet
     if _stored_at(stored.get("lastProbedAt")) is None and state.last_direct_at is not None:
         doc["lastProbedAt"] = _app_iso(state.last_direct_at)
-    if stamp is not None and app_stamp(doc) is None:
-        # The stamp the app read on the old doc, which this write would end.
+    after = app_stamp(doc)
+    if stamp is not None and (after is None or after > stamp):
+        # The stamp the app read on the old doc, which this write would end,
+        # or move to the later clock (#328).
         doc["firstMasteredAt"] = _app_iso(stamp)
     return doc
 
 
 def belief_changes(stored: dict, new: dict) -> set[str]:
-    """What [new] changes on [stored]: `alpha/beta`, `stamp gained` (the app
-    read none), `stamp earlier`, `stamp kept` (the stamp the app read on an
-    old doc without the field, now written, `app_stamp`), `level raised`,
+    """What [new] changes on [stored]: `alpha/beta` (with their clock
+    `lastUpdatedAt`, where it moves, #328), `stamp gained` (the app read
+    none), `stamp earlier`, `stamp kept` (the stamp the app read on an old
+    doc without the field, now written, `app_stamp`), `level raised`,
     `clock filled` (#275), `counts` (#281). Empty: nothing to write."""
     changes = set()
-    if new.get("alpha") != stored.get("alpha") or new.get("beta") != stored.get("beta"):
+    if any(new.get(f) != stored.get(f) for f in ("alpha", "beta", "lastUpdatedAt")):
         changes.add("alpha/beta")
     if new.get("firstMasteredAt") != stored.get("firstMasteredAt"):
         before = app_stamp(stored)
@@ -982,11 +1042,13 @@ def cmd_replay_beliefs(args) -> None:
 
     The replay is the one `validate` compares to (`_replay_student`), so
     `validate` with the same `--regels` shows no deviation on a doc this
-    wrote. `--regels 1.1` replays every oefening with formula 1.1 (#281):
-    the one-time rewrite the teacher can choose at the release, which takes
-    LOs off the cap at once (#278). It only updates docs
-    that exist: a replayed LO without a doc gets none (the app creates it on
-    the next write), and a doc the replay does not reach stays as it is.
+    wrote, and α and β fit the doc's clock (#328), so neither does it after
+    the app's next write. `--regels 1.1` replays every oefening with
+    formula 1.1 (#281): the one-time rewrite the teacher can choose at the
+    release, which takes LOs off the cap at once (#278). It only updates
+    docs that exist: a replayed LO without a doc gets none (the app creates
+    it on the next write), and a doc the replay does not reach stays as it
+    is.
 
     The dry run also says what the app reads differently afterwards
     (`belief_effects`): LOs off the cap, LOs stuck and stamps thin — the
@@ -1084,7 +1146,8 @@ def cmd_replay_beliefs(args) -> None:
     )
     print(
         f"Herspeeld met {rules.RULES_VERSION}, zoals validate{_rules_flag(args)}: een oefening weegt alleen als"
-        " 'onder toezicht' als de app ze zo bewaarde. Alleen alpha, beta, firstMasteredAt (de vroegste, nooit"
+        " 'onder toezicht' als de app ze zo bewaarde. Alleen alpha en beta (op de klok van het document,"
+        " lastUpdatedAt, of met die van de herspeling als die later is), firstMasteredAt (de vroegste, nooit"
         " leeg), highestPositiveDifficulty (het hoogste), lastProbedAt (alleen waar het ontbreekt) en de"
         " tellingen ownQuestions, ownQuestionsRight en ownQuestionsRightNonMcq (de grootste van opgeslagen en"
         " herspeeld) veranderen; een leerdoel zonder document krijgt er geen."

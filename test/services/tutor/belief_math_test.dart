@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
@@ -917,6 +918,56 @@ void main() {
       expect(meets(1, 1), isFalse);
       expect(meets(4, 0), isFalse);
       expect(meets(null, null), isFalse);
+    });
+
+    test('what counts as a right own question: the own question correct '
+        'with a positive (#279), or a follow-up on a partial one correct '
+        'with a positive (#326); nothing else', () {
+      bool counts(
+        AnswerQuality quality,
+        LoSignalKind kind, {
+        bool own = false,
+        bool followUpOnPartial = false,
+      }) => countsAsRightOwnQuestion(
+        quality: quality,
+        kind: kind,
+        ownQuestion: own,
+        followUpOnPartial: followUpOnPartial,
+      );
+      const right = AnswerQuality.correct;
+      const positive = LoSignalKind.positive;
+      expect(counts(right, positive, own: true), isTrue);
+      expect(counts(right, positive, followUpOnPartial: true), isTrue);
+      // Neither the own question nor a follow-up on a partial one: a side
+      // signal, a follow-up after a right or wrong answer, one that counted.
+      expect(counts(right, positive), isFalse);
+      for (final ctx in [
+        (own: true, followUpOnPartial: false),
+        (own: false, followUpOnPartial: true),
+      ]) {
+        for (final quality in [AnswerQuality.partial, AnswerQuality.wrong]) {
+          expect(
+            counts(
+              quality,
+              positive,
+              own: ctx.own,
+              followUpOnPartial: ctx.followUpOnPartial,
+            ),
+            isFalse,
+          );
+        }
+        for (final kind in [LoSignalKind.negative, LoSignalKind.neutral]) {
+          expect(
+            counts(
+              right,
+              kind,
+              own: ctx.own,
+              followUpOnPartial: ctx.followUpOnPartial,
+            ),
+            isFalse,
+          );
+        }
+      }
     });
 
     test('mastered now: the four conditions, the fourth only without a '

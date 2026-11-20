@@ -2275,6 +2275,54 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get session_runControls_button_stop;
 
+  /// Hover text on the book button above the editor and in the quiz header that opens and closes the reference panel (#323)
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get reference_button_tooltip;
+
+  /// Heading of the reference panel next to the exercise: every function and class of the course (#323)
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get reference_title;
+
+  /// No description provided for @reference_close_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the reference'**
+  String get reference_close_tooltip;
+
+  /// Hint in the reference panel's search field; it finds names and words in the explanations
+  ///
+  /// In en, this message translates to:
+  /// **'Search: a name or a word'**
+  String get reference_search_hint;
+
+  /// No description provided for @reference_search_clear_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the search'**
+  String get reference_search_clear_tooltip;
+
+  /// No description provided for @reference_noResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found for \"{query}\".'**
+  String reference_noResults(String query);
+
+  /// Link under a reference item to the lesson that explains it; opens the lesson in a window over the exercise
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson: {title}'**
+  String reference_lessonLink(String title);
+
+  /// No description provided for @reference_lesson_close_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the lesson'**
+  String get reference_lesson_close_tooltip;
+
   /// Banner header pill at the top of practice view — displayed uppercase
   ///
   /// In en, this message translates to:
@@ -2287,11 +2335,53 @@ abstract class AppLocalizations {
   /// **'Your choice'**
   String get session_objectiveBanner_pillSelfChosen;
 
-  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.
+  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230, #325) when every segment is mastered: one segment per learning objective of the subgoal.
   ///
   /// In en, this message translates to:
-  /// **'{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do'**
-  String session_objectiveBanner_segments(int mastered, int almost, int todo);
+  /// **'{mastered} of {total} parts mastered'**
+  String session_objectiveBanner_summary(int mastered, int total);
+
+  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#325): how many learning objectives are mastered, and the right answers the others still need, added up.
+  ///
+  /// In en, this message translates to:
+  /// **'{mastered} of {total} parts mastered, {toGo, plural, =1{1 more right answer to go} other{{toGo} more right answers to go}}'**
+  String session_objectiveBanner_summaryToGo(int mastered, int total, int toGo);
+
+  /// In the popup of one segment of the subgoal bar (#325): the right answers this learning objective still needs to be mastered. The same number is in the segment.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more right answer} other{{count} more right answers}}'**
+  String session_lo_toGo(int count);
+
+  /// In the popup of one segment of the subgoal bar (#325): this learning objective needs no more right answers. Followed by ' · demonstrated' when it carries the mark that counts for the grade.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastered'**
+  String get session_lo_mastered;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number of right answers still needed went up — a question on this learning objective was not answered right.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up after an answer that was not right.'**
+  String get session_lo_rose_notRight;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number went up — the tutor now asks easier questions, where a right answer weighs less.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up: your questions are easier now, and a right answer counts for less there.'**
+  String get session_lo_rose_lowerLevel;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number went up — a question about another learning objective showed a mistake on this one.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up after a mistake on this in a question about something else.'**
+  String get session_lo_rose_otherQuestion;
+
+  /// In the popup of the marked segment of the subgoal bar (#325): the exercise on screen is about this learning objective.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current exercise is about this.'**
+  String get session_lo_current;
 
   /// No description provided for @chat_tutorName.
   ///
@@ -4779,6 +4869,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Adjust your code in the editor on the left and press Run to submit your solution.'**
   String get chat_notice_submitViaEditor;
+
+  /// No description provided for @chat_notice_pageQuestionNotAnAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'This was a question about the explanation, so it does not count as an answer to your exercise. Answer at the question itself.'**
+  String get chat_notice_pageQuestionNotAnAnswer;
+
+  /// No description provided for @chat_notice_toQuestion_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the question'**
+  String get chat_notice_toQuestion_button;
 
   /// No description provided for @questions_page_title.
   ///

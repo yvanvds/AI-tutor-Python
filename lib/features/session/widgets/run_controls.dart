@@ -1,3 +1,4 @@
+import 'package:ai_tutor_python/features/reference/reference_panel_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
@@ -14,7 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Strip above the editor: Run/Stop primary button, Reset (ghost), and on the
-/// right hint + send-to-tutor (both ghost). Used by Practice and Playground modes.
+/// right the reference (#323), hint and send-to-tutor (all ghost). Used by Practice and Playground modes.
 /// In Practice it is the header of the code exercise, and carries the
 /// question's short ID (#216) as the quiz header does.
 class RunControls extends ConsumerWidget {
@@ -36,7 +37,9 @@ class RunControls extends ConsumerWidget {
         children: [
           // Run and Reset on the left, in what the right side leaves. When
           // that is short — a narrow window with the chat open — Run drops
-          // its shortcut hint first (#304), which its tooltip keeps.
+          // its shortcut hint first (#304), which its tooltip keeps, and
+          // then its play icon, so the word stays next to the question ID
+          // and the reference button (#323) in a 700 px window.
           Expanded(
             child: Row(
               children: [
@@ -53,12 +56,18 @@ class RunControls extends ConsumerWidget {
                                 mode: mode,
                                 showShortcut: false,
                               ),
+                              _RunButton(
+                                ref: ref,
+                                mode: mode,
+                                showShortcut: false,
+                                showIcon: false,
+                              ),
                             ],
                           ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.s),
-                _GhostIconButton(
+                GhostIconButton(
                   tooltip: l.session_runControls_tooltip_resetOutput,
                   icon: Icons.refresh_rounded,
                   onTap: output.clear,
@@ -67,7 +76,9 @@ class RunControls extends ConsumerWidget {
             ),
           ),
           if (mode == SessionMode.practice) const _QuestionId(),
-          _GhostIconButton(
+          const ReferenceButton(),
+          const SizedBox(width: AppSpacing.xxs),
+          GhostIconButton(
             tooltip: l.session_runControls_tooltip_askHint,
             icon: Icons.lightbulb_outline,
             onTap: () async {
@@ -79,7 +90,7 @@ class RunControls extends ConsumerWidget {
             },
           ),
           const SizedBox(width: AppSpacing.xxs),
-          _GhostIconButton(
+          GhostIconButton(
             tooltip: l.session_runControls_tooltip_sendToTutor,
             icon: Icons.send_outlined,
             onTap: () async {
@@ -130,6 +141,7 @@ class _RunButton extends StatelessWidget {
     required this.ref,
     required this.mode,
     this.showShortcut = true,
+    this.showIcon = true,
   });
   final WidgetRef ref;
   final SessionMode mode;
@@ -137,6 +149,10 @@ class _RunButton extends StatelessWidget {
   /// Whether the shortcut is spelled out on the button; without it, it is
   /// in the tooltip.
   final bool showShortcut;
+
+  /// Whether the play icon goes before the word: the last thing the
+  /// narrowest strip gives up (#323).
+  final bool showIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +163,10 @@ class _RunButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ink0),
-          const SizedBox(width: 4),
+          if (showIcon) ...[
+            Icon(Icons.play_arrow_rounded, size: 16, color: AppColors.ink0),
+            const SizedBox(width: 4),
+          ],
           Text(
             AppLocalizations.of(context).session_runControls_button_run,
             style: TextStyle(
@@ -263,22 +281,43 @@ class _PillButtonState extends State<_PillButton> {
   }
 }
 
-class _GhostIconButton extends StatefulWidget {
-  const _GhostIconButton({
+/// Opens and closes the reference panel (#323): above the editor, and in
+/// the quiz header, where the row above the editor is not.
+class ReferenceButton extends ConsumerWidget {
+  const ReferenceButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GhostIconButton(
+      tooltip: AppLocalizations.of(context).reference_button_tooltip,
+      icon: Icons.menu_book_outlined,
+      active: ref.watch(referencePanelOpenProvider),
+      onTap: () => ref.read(referencePanelOpenProvider.notifier).toggle(),
+    );
+  }
+}
+
+/// A 32 px icon button without a background until hovered; [active] lights
+/// it up while what it opens is open.
+class GhostIconButton extends StatefulWidget {
+  const GhostIconButton({
+    super.key,
     required this.tooltip,
     required this.icon,
     required this.onTap,
+    this.active = false,
   });
 
   final String tooltip;
   final IconData icon;
   final VoidCallback onTap;
+  final bool active;
 
   @override
-  State<_GhostIconButton> createState() => _GhostIconButtonState();
+  State<GhostIconButton> createState() => _GhostIconButtonState();
 }
 
-class _GhostIconButtonState extends State<_GhostIconButton> {
+class _GhostIconButtonState extends State<GhostIconButton> {
   bool _hovering = false;
 
   @override
@@ -298,13 +337,17 @@ class _GhostIconButtonState extends State<_GhostIconButton> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: _hovering ? AppColors.ink2 : Colors.transparent,
+              color: _hovering || widget.active
+                  ? AppColors.ink2
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.inputSmall),
             ),
             child: Icon(
               widget.icon,
               size: 18,
-              color: _hovering ? AppColors.fg : AppColors.fgMute,
+              color: widget.active
+                  ? AppColors.accent
+                  : (_hovering ? AppColors.fg : AppColors.fgMute),
             ),
           ),
         ),

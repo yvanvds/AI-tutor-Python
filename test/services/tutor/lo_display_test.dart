@@ -1,21 +1,51 @@
-// #230 — the segments of the student's subgoal bar: the state of one LO's
-// segment from its belief (`loDisplayStateOf`), the session's hold on it
-// (`heldLoDisplayState`), and the bar's counts and share. The conductor's
-// side — which LOs get a segment, when it publishes, what counts as asked —
-// is in conductor_test.dart.
+// #230, #325 — the segments of the student's subgoal bar: the right answers
+// an LO still needs (`rightAnswersToGo`), the fill that goes with them
+// (`loSegmentFill`), the session's readings and why a number went up
+// (`nextLoDisplayReading`), and the bar's counts and share. The conductor's
+// side — which LOs get a segment, the level each is counted at, what a turn
+// did to an LO, the marker — is in conductor_test.dart.
 
+import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
 import 'package:ai_tutor_python/services/tutor/belief_math.dart';
 import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/policy_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _prior = BeliefSnapshot(PolicyConstants.prior, PolicyConstants.prior);
+const _easy = QuestionDifficulty.easy;
+const _medium = QuestionDifficulty.medium;
+const _hard = QuestionDifficulty.hard;
 
-/// [snap] after one strong right answer at [level], from home.
-BeliefSnapshot _afterRight(BeliefSnapshot snap, QuestionDifficulty level) {
+final _at = DateTime.utc(2026, 10, 1);
+
+/// [snap] after one right answer at [level]: strong unless [strength] says
+/// otherwise, from home unless [provenance] does.
+BeliefSnapshot _afterRight(
+  BeliefSnapshot snap,
+  QuestionDifficulty level, {
+  LoSignalStrength strength = LoSignalStrength.strong,
+  EvidenceProvenance provenance = EvidenceProvenance.home,
+}) {
   final d = signalDeltas(
     kind: LoSignalKind.positive,
+    strength: strength,
+    difficulty: level,
+    provenance: provenance,
+  );
+  return applyEvidence(
+    alpha: snap.alpha,
+    beta: snap.beta,
+    alphaDelta: d.alphaDelta,
+    betaDelta: d.betaDelta,
+  );
+}
+
+/// [snap] after one wrong answer at [level].
+BeliefSnapshot _afterWrong(BeliefSnapshot snap, QuestionDifficulty level) {
+  final d = signalDeltas(
+    kind: LoSignalKind.negative,
     strength: LoSignalStrength.strong,
     difficulty: level,
   );
@@ -27,239 +57,330 @@ BeliefSnapshot _afterRight(BeliefSnapshot snap, QuestionDifficulty level) {
   );
 }
 
-/// The segment of [snap]. [right] and [nonMcq]: the doc's right own
-/// questions, and those of them no multiple choice (#279) — by default
-/// one, the answer that set [atCalibration].
-LoDisplayState _state(
+/// The doc of an LO at [snap]: by default one right own question, no pick,
+/// that set [atCalibration].
+LoBelief _doc(
   BeliefSnapshot snap, {
-  QuestionDifficulty calibration = QuestionDifficulty.hard,
   bool atCalibration = true,
   DateTime? firstMasteredAt,
-  int ownQuestions = 0,
+  int ownQuestions = 1,
   int? right = 1,
   int? nonMcq = 1,
-}) => loDisplayStateOf(
-  snap: snap,
-  lastPositiveAtCalibratedAt: atCalibration ? DateTime.utc(2026, 10, 1) : null,
+}) => LoBelief(
+  subgoalId: 's1',
+  loId: 'lo-a',
+  alpha: snap.alpha,
+  beta: snap.beta,
+  lastUpdatedAt: _at,
+  lastPositiveAtCalibratedAt: atCalibration ? _at : null,
   firstMasteredAt: firstMasteredAt,
-  calibration: calibration,
   ownQuestions: ownQuestions,
   ownQuestionsRight: right,
   ownQuestionsRightNonMcq: nonMcq,
 );
 
-void main() {
-  group('the state of a segment from the belief', () {
-    test('the prior is empty: one right answer on hard leaves μ at 0.79 and '
-        'the evidence under 5.75', () {
-      expect(_state(_prior, atCalibration: false), LoDisplayState.empty);
-      expect(
-        oneRightAnswerMasters(
-          snap: _prior,
-          calibration: QuestionDifficulty.hard,
-          ownQuestionsRight: 0,
+/// The right answers to go for [snap] with its doc as in [_doc].
+int _toGo(
+  BeliefSnapshot snap, {
+  QuestionDifficulty calibration = _hard,
+  QuestionDifficulty? askedAt,
+  bool atCalibration = true,
+  DateTime? firstMasteredAt,
+  int ownQuestions = 1,
+  int? right = 1,
+  int? nonMcq = 1,
+  bool noDoc = false,
+}) => rightAnswersToGo(
+  snap: snap,
+  belief: noDoc
+      ? null
+      : _doc(
+          snap,
+          atCalibration: atCalibration,
+          firstMasteredAt: firstMasteredAt,
+          ownQuestions: ownQuestions,
+          right: right,
+          nonMcq: nonMcq,
         ),
-        isFalse,
-      );
+  calibration: calibration,
+  askedAt: askedAt,
+);
+
+void main() {
+  group('the right answers to go, from the belief', () {
+    test('from the prior: two on hard, three on medium, eight on easy — '
+        'forgetting shrinks each answer before the next lands (#278)', () {
+      expect(_toGo(_prior, noDoc: true), 2);
+      expect(_toGo(_prior, calibration: _medium, noDoc: true), 3);
+      expect(_toGo(_prior, calibration: _easy, noDoc: true), 8);
     });
 
-    test('the first right answer on hard gives half', () {
-      final once = _afterRight(_prior, QuestionDifficulty.hard);
-      expect(once.mean, closeTo(3.8 / 4.8, 1e-9));
-      expect(meetsMasteryMeanAndEvidence(once), isFalse);
-
-      expect(_state(once), LoDisplayState.half);
-    });
-
-    test('#278: on medium at home it takes two right answers for half, on '
-        'easy seven: forgetting shrinks each answer before the next lands', () {
-      const medium = QuestionDifficulty.medium;
-      final once = _afterRight(_prior, medium);
-      // (3, 1); a second right answer takes it to (4.4, 1), evidence 5.4.
-      expect(_state(once, calibration: medium), LoDisplayState.empty);
-      expect(
-        _state(_afterRight(once, medium), calibration: medium, right: 2),
-        LoDisplayState.half,
-      );
-
-      // On easy a strong right answer weighs 1.2 at home: α climbs toward
-      // 1 + 1.2 / 0.3 = 5, and the evidence bar of 5.75 needs α ≥ 4.75.
-      const easy = QuestionDifficulty.easy;
-      var snap = _prior;
-      for (var i = 0; i < 6; i++) {
-        snap = _afterRight(snap, easy);
+    test('climbing from a low mean counts down: every strong right answer '
+        'at the level asked takes one off, to 0 when mastered', () {
+      for (final level in QuestionDifficulty.values) {
+        // μ 0.19, the LO of the issue: well under 0.6 after six oefeningen.
+        var snap = const BeliefSnapshot(1.5, 6.5);
+        var right = 0;
+        var toGo = _toGo(
+          snap,
+          calibration: level,
+          atCalibration: false,
+          right: right,
+          nonMcq: right,
+        );
+        expect(toGo, greaterThan(2), reason: '$level');
+        while (toGo > 0) {
+          snap = _afterRight(snap, level);
+          right += 1;
+          final next = _toGo(
+            snap,
+            calibration: level,
+            right: right,
+            nonMcq: right,
+          );
+          expect(next, toGo - 1, reason: '$level after $right right');
+          toGo = next;
+        }
+        expect(isMastered(snap, _doc(snap, right: right, nonMcq: right)), true);
       }
-      expect(
-        _state(snap, calibration: easy, right: 6, nonMcq: 6),
-        LoDisplayState.empty,
-      );
-      expect(
-        _state(_afterRight(snap, easy), calibration: easy, right: 7, nonMcq: 7),
-        LoDisplayState.half,
-      );
     });
 
-    test('the right answer is weighed at the student\'s calibration: the '
-        'same belief is half on hard and empty on easy', () {
+    test('one right answer away is the old half: after the first right '
+        'answer on hard', () {
+      final once = _afterRight(_prior, _hard);
+      expect(once.mean, closeTo(3.8 / 4.8, 1e-9));
+      expect(_toGo(once), 1);
+    });
+
+    test('the same belief needs more right answers at a lower level', () {
       // μ 0.71: one strong right answer takes it to 0.81 on hard (+2.8),
       // 0.75 on easy (+1.2), forgetting first (#278).
       const snap = BeliefSnapshot(3.7, 1.5);
-      expect(_state(snap), LoDisplayState.half);
+      expect(_toGo(snap), 1);
+      expect(_toGo(snap, calibration: _easy), greaterThan(1));
+    });
+
+    test('counted at the level the LO is asked at: a notch lower, the first '
+        'right answer weighs less and cannot give condition 3', () {
+      const snap = BeliefSnapshot(5, 1);
+      expect(_toGo(snap, calibration: _medium, atCalibration: false), 1);
       expect(
-        _state(snap, calibration: QuestionDifficulty.easy),
-        LoDisplayState.empty,
+        _toGo(snap, calibration: _medium, askedAt: _easy, atCalibration: false),
+        2,
+      );
+      // With condition 3 already met, only the weight differs.
+      const low = BeliefSnapshot(2, 2);
+      expect(
+        _toGo(low, calibration: _hard, askedAt: _medium),
+        greaterThanOrEqualTo(_toGo(low, calibration: _hard)),
       );
     });
 
     test('a belief over the bar without a right answer at the student\'s '
-        'level is half: that answer is the one missing condition', () {
+        'level needs that answer', () {
       const snap = BeliefSnapshot(5, 1);
       expect(meetsMasteryMeanAndEvidence(snap), isTrue);
-      expect(_state(snap, atCalibration: false), LoDisplayState.half);
-      expect(_state(snap, right: 2), LoDisplayState.full);
+      expect(_toGo(snap, atCalibration: false), 1);
+      expect(_toGo(snap, right: 2), 0);
     });
 
-    test('mastered is full', () {
-      final twice = _afterRight(
-        _afterRight(_prior, QuestionDifficulty.hard),
-        QuestionDifficulty.hard,
-      );
-      expect(_state(twice, right: 2, nonMcq: 2), LoDisplayState.full);
-    });
-
-    test('#279: over the bar on one right own question, or on picks alone, '
-        'is half — the next right answer is the stamp, if it is no pick — '
-        'and full once two are right, one of them no pick', () {
+    test('#279: the right own questions count — one more when one is '
+        'missing, or the non-pick, two without any', () {
       const snap = BeliefSnapshot(5, 1);
-      expect(_state(snap, right: 1, nonMcq: 1), LoDisplayState.half);
-      expect(_state(snap, right: 1, nonMcq: 0), LoDisplayState.half);
-      expect(_state(snap, right: 3, nonMcq: 0), LoDisplayState.half);
-      expect(_state(snap, right: 2, nonMcq: 1), LoDisplayState.full);
+      expect(_toGo(snap, right: 1, nonMcq: 1), 1);
+      expect(_toGo(snap, right: 1, nonMcq: 0), 1);
+      expect(_toGo(snap, right: 3, nonMcq: 0), 1);
+      expect(_toGo(snap, right: 2, nonMcq: 1), 0);
+      expect(_toGo(snap, atCalibration: false, right: 0, nonMcq: 0), 2);
+      // A doc without the counts reads 0 ...
+      expect(_toGo(snap, atCalibration: false, right: null, nonMcq: null), 2);
+      // ... but one over the bar, right at calibration, is a stamp an old
+      // build gave and did not write: mastered, as before 1.1.
+      expect(_toGo(snap, right: null, nonMcq: null), 0);
     });
 
-    test('#279: without a right own question one answer cannot master it, '
-        'however high side signals took the belief; a doc without the '
-        'counts reads 0', () {
+    test('a stamp waives condition 4, as in isMastered: mastered again on '
+        'conditions 1–3', () {
       const snap = BeliefSnapshot(5, 1);
       expect(
-        _state(snap, atCalibration: false, right: 0, nonMcq: 0),
-        LoDisplayState.empty,
-      );
-      expect(
-        _state(snap, atCalibration: false, right: null, nonMcq: null),
-        LoDisplayState.empty,
-      );
-      expect(
-        oneRightAnswerMasters(
-          snap: snap,
-          calibration: QuestionDifficulty.hard,
-          ownQuestionsRight: null,
-        ),
-        isFalse,
-      );
-      // A doc without the counts over the bar, right at calibration: a stamp
-      // an old build gave and did not write — full, as before 1.1.
-      expect(_state(snap, right: null, nonMcq: null), LoDisplayState.full);
-      // A stamp that is there stays full, counts or not.
-      expect(
-        _state(
-          snap,
-          right: null,
-          nonMcq: null,
-          firstMasteredAt: DateTime.utc(2026, 9, 1),
-        ),
-        LoDisplayState.full,
+        _toGo(snap, right: 0, nonMcq: 0, firstMasteredAt: DateTime.utc(2026)),
+        0,
       );
     });
 
-    test('stuck is full: six own questions and μ under 0.6 (#278)', () {
+    test('a wrong answer after mastery takes it down; the stamp stays on the '
+        'doc and is no reason to show it full', () {
+      final stamped = DateTime.utc(2026, 9, 1);
+      final mastered = _afterRight(_afterRight(_prior, _hard), _hard);
+      expect(_toGo(mastered, right: 2, nonMcq: 2, firstMasteredAt: stamped), 0);
+      final dropped = _afterWrong(mastered, _hard);
+      expect(
+        _toGo(dropped, right: 2, nonMcq: 2, firstMasteredAt: stamped),
+        greaterThan(0),
+      );
+      // Mastered once, fallen far since.
+      expect(
+        _toGo(const BeliefSnapshot(1.5, 4), firstMasteredAt: stamped),
+        greaterThan(2),
+      );
+    });
+
+    test('stuck is not full: it shows the right answers it still needs', () {
       const low = BeliefSnapshot(2.4, 5);
       expect(isStuck(low, ownQuestions: 6), isTrue);
       expect(
-        _state(low, atCalibration: false, ownQuestions: 6),
-        LoDisplayState.full,
-      );
-      // Five own questions: not yet stuck, and far from mastery.
-      expect(
-        _state(low, atCalibration: false, ownQuestions: 5),
-        LoDisplayState.empty,
-      );
-      // The saturated branch is gone: evidence 19 and μ 0.68 is no longer
-      // stuck, and one right answer on hard does not master it either.
-      expect(
-        _state(const BeliefSnapshot(13, 6), ownQuestions: 20),
-        LoDisplayState.empty,
+        _toGo(low, atCalibration: false, ownQuestions: 6, right: 0, nonMcq: 0),
+        greaterThan(2),
       );
     });
 
-    test('an LO ever mastered is full, however far it fell since', () {
-      expect(
-        _state(
-          const BeliefSnapshot(1.5, 4),
-          firstMasteredAt: DateTime.utc(2026, 9, 1),
-        ),
-        LoDisplayState.full,
+    test('a strong right answer at the level asked never raises the count, '
+        'nor does one in the lesson time', () {
+      for (final level in QuestionDifficulty.values) {
+        for (var a = 1.0; a < 12; a += 0.5) {
+          for (var b = 1.0; b < 12; b += 0.5) {
+            final snap = BeliefSnapshot(a, b);
+            final before = _toGo(snap, calibration: level);
+            for (final where in EvidenceProvenance.values) {
+              final after = _toGo(
+                _afterRight(snap, level, provenance: where),
+                calibration: level,
+                right: 2,
+                nonMcq: 2,
+              );
+              expect(
+                after,
+                lessThanOrEqualTo(before),
+                reason: '($a, $b) on $level, ${where.name}',
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('a light right answer can: forgetting takes more than it adds — '
+        'the reason the readings never let the count rise without a cause', () {
+      // One right answer away on medium (it lands on evidence 5.75). A
+      // right follow-up weighs 0.5 at medium (§6.2): it forgets 0.75 of α.
+      const snap = BeliefSnapshot(3.5, 1);
+      expect(_toGo(snap, calibration: _medium, right: 2), 1);
+      final followUp = _afterRight(
+        snap,
+        _medium,
+        strength: LoSignalStrength.weak,
       );
+      expect(followUp.alpha, closeTo(3.25, 1e-9));
+      expect(_toGo(followUp, calibration: _medium, right: 2), 2);
     });
   });
 
-  group('the hold over a session', () {
-    LoDisplayState held(
-      LoDisplayState? before,
-      LoDisplayState now, {
-      bool asked = false,
-    }) => heldLoDisplayState(held: before, fresh: now, askedAndNotRight: asked);
-
-    test('the first reading follows the belief', () {
-      for (final s in LoDisplayState.values) {
-        expect(held(null, s), s);
-      }
+  group('the fill', () {
+    test('a new LO needs 2 right answers on hard, 3 on medium, 8 on easy', () {
+      expect(newLoRightAnswersToGo(_hard), 2);
+      expect(newLoRightAnswersToGo(_medium), 3);
+      expect(newLoRightAnswersToGo(_easy), 8);
     });
 
-    test('a negative from the side leaves half', () {
-      expect(
-        held(LoDisplayState.half, LoDisplayState.empty),
-        LoDisplayState.half,
-      );
+    test('full at 0, empty where a new LO starts: every right answer on the '
+        'way fills a step', () {
+      // Medium: 3, 2, 1, 0 to go.
+      expect(loSegmentFill(3, newLoToGo: 3), 0.0);
+      expect(loSegmentFill(2, newLoToGo: 3), closeTo(1 / 3, 1e-9));
+      expect(loSegmentFill(1, newLoToGo: 3), closeTo(2 / 3, 1e-9));
+      expect(loSegmentFill(0, newLoToGo: 3), 1.0);
+      // Hard: a new LO is 2 away, so it starts empty too.
+      expect(loSegmentFill(2, newLoToGo: 2), 0.0);
+      expect(loSegmentFill(1, newLoToGo: 2), 0.5);
+      // Further than a new LO — after wrong answers — is empty, not less.
+      expect(loSegmentFill(9, newLoToGo: 3), 0.0);
+      // Easy: an eighth per right answer.
+      expect(loSegmentFill(4, newLoToGo: 8), 0.5);
+    });
+  });
+
+  group('the readings over a session', () {
+    LoDisplayReading read(
+      LoDisplayReading? previous,
+      int toGo, {
+      QuestionDifficulty askedAt = _medium,
+      QuestionDifficulty calibration = _medium,
+      LoDisplayRise? turn,
+    }) => nextLoDisplayReading(
+      previous: previous,
+      toGo: toGo,
+      askedAt: askedAt,
+      calibration: calibration,
+      turnRise: turn,
+    );
+
+    test('the first reading follows the belief, without a reason', () {
+      final r = read(null, 4);
+      expect(r.toGo, 4);
+      expect(r.rose, isNull);
     });
 
-    test('a not-right answer on the question itself empties half', () {
-      expect(
-        held(LoDisplayState.half, LoDisplayState.empty, asked: true),
-        LoDisplayState.empty,
-      );
+    test('down always follows the belief, and clears the reason', () {
+      final up = read(read(null, 1), 3, turn: LoDisplayRise.notRight);
+      expect(up.rose, LoDisplayRise.notRight);
+      final down = read(up, 2);
+      expect(down.toGo, 2);
+      expect(down.rose, isNull);
     });
 
-    test('a not-right answer that keeps the LO one answer away keeps half', () {
-      expect(
-        held(LoDisplayState.half, LoDisplayState.half, asked: true),
-        LoDisplayState.half,
-      );
+    test('a full segment drops after a wrong answer on it', () {
+      final r = read(read(null, 0), 1, turn: LoDisplayRise.notRight);
+      expect(r.toGo, 1);
+      expect(r.rose, LoDisplayRise.notRight);
     });
 
-    test('full stays full after a later wrong answer', () {
-      for (final now in LoDisplayState.values) {
-        expect(held(LoDisplayState.full, now), LoDisplayState.full);
-        expect(
-          held(LoDisplayState.full, now, asked: true),
-          LoDisplayState.full,
-        );
-      }
+    test('up after a negative from a question about another LO', () {
+      final r = read(read(null, 1), 2, turn: LoDisplayRise.otherQuestion);
+      expect(r.toGo, 2);
+      expect(r.rose, LoDisplayRise.otherQuestion);
     });
 
-    test('up is always allowed', () {
-      expect(
-        held(LoDisplayState.empty, LoDisplayState.half),
-        LoDisplayState.half,
+    test('up at a lower level: the student\'s, or a notch drop on the LO', () {
+      final demoted = read(
+        read(null, 2, askedAt: _hard, calibration: _hard),
+        3,
       );
-      expect(
-        held(LoDisplayState.empty, LoDisplayState.full),
-        LoDisplayState.full,
+      expect(demoted.toGo, 3);
+      expect(demoted.rose, LoDisplayRise.lowerLevel);
+
+      final dropped = read(read(null, 2), 3, askedAt: _easy);
+      expect(dropped.toGo, 3);
+      expect(dropped.rose, LoDisplayRise.lowerLevel);
+    });
+
+    test('the turn\'s reason goes before the level', () {
+      final r = read(
+        read(null, 1),
+        3,
+        askedAt: _easy,
+        calibration: _easy,
+        turn: LoDisplayRise.notRight,
       );
-      expect(
-        held(LoDisplayState.half, LoDisplayState.full, asked: true),
-        LoDisplayState.full,
-      );
+      expect(r.rose, LoDisplayRise.notRight);
+    });
+
+    test('without a reason the number does not go up: an answer that is not '
+        'wrong never sets it back', () {
+      final r = read(read(null, 1), 2);
+      expect(r.toGo, 1);
+      expect(r.rose, isNull);
+      // ... and comes down with the belief once it is under the reading.
+      expect(read(r, 1).toGo, 1);
+      expect(read(r, 0).toGo, 0);
+    });
+
+    test('the reason stays while the number does', () {
+      final up = read(read(null, 1), 2, turn: LoDisplayRise.otherQuestion);
+      final again = read(up, 2);
+      expect(again.rose, LoDisplayRise.otherQuestion);
+      final held = read(up, 3);
+      expect(held.toGo, 2);
+      expect(held.rose, LoDisplayRise.otherQuestion);
     });
   });
 
@@ -267,28 +388,31 @@ void main() {
     const bar = SubgoalLoDisplay(
       subgoalId: 's1',
       los: [
-        LoDisplayEntry(loId: 'a', state: LoDisplayState.full),
-        LoDisplayEntry(loId: 'b', state: LoDisplayState.full),
-        LoDisplayEntry(loId: 'c', state: LoDisplayState.half),
-        LoDisplayEntry(loId: 'd', state: LoDisplayState.empty),
-        LoDisplayEntry(loId: 'e', state: LoDisplayState.empty),
+        LoDisplayEntry(loId: 'a', toGo: 0, newLoToGo: 3, demonstrated: true),
+        LoDisplayEntry(loId: 'b', toGo: 1, newLoToGo: 3, demonstrated: true),
+        LoDisplayEntry(loId: 'c', toGo: 2, newLoToGo: 3),
+        LoDisplayEntry(loId: 'd', toGo: 3, newLoToGo: 3),
+        LoDisplayEntry(loId: 'e', toGo: 5, newLoToGo: 3),
       ],
     );
 
-    test('counts its segments and the share they fill', () {
-      expect(bar.fullCount, 2);
-      expect(bar.halfCount, 1);
-      expect(bar.emptyCount, 2);
-      expect(bar.fraction, closeTo(2.5 / 5, 1e-9));
+    test('counts its mastered segments, the answers to go and the share '
+        'they fill', () {
+      expect(bar.masteredCount, 1);
+      expect(bar.toGoTotal, 11);
+      expect(bar.fraction, closeTo((1 + 2 / 3 + 1 / 3) / 5, 1e-9));
       expect(const SubgoalLoDisplay(subgoalId: 's1', los: []).fraction, 0.0);
     });
 
-    test('two readings with the same segments are equal', () {
+    test('two readings with the same segments and marker are equal', () {
       expect(SubgoalLoDisplay(subgoalId: 's1', los: [...bar.los]), equals(bar));
       expect(
         SubgoalLoDisplay(subgoalId: 's2', los: [...bar.los]),
         isNot(equals(bar)),
       );
+      expect(bar.withCurrent('c'), isNot(equals(bar)));
+      expect(bar.withCurrent('c').currentLoId, 'c');
+      expect(bar.withCurrent('c').withCurrent(null), equals(bar));
     });
   });
 }

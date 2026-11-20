@@ -925,7 +925,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.1-eval9", stdout)
+        self.assertIn("1.1.3-eval11", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1241,7 +1241,7 @@ class Rules11Test(unittest.TestCase):
         return [self.answer(m, "correct" if c == "J" else "wrong", build) for m, c in enumerate(answers)]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
         self.assertEqual(rules.FORGET, 0.7)
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.0+30"}))
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.1+31"}))
@@ -1317,7 +1317,7 @@ class Rules279Test(unittest.TestCase):
     multiple-choice question weighs ×0.5 — from the key or the grader, on
     the target and from the side, not on a follow-up on one — and the stamp
     wants two own questions right, one of them no multiple choice. Same rule
-    set (`1.1-eval9`), same switch (`rules_11`)."""
+    set (`1.1.3-eval11`), same switch (`rules_11`)."""
 
     KEY = ("sg-b", "predict_b1")
     NEW = {"clientVersion": "2.13.0+30"}
@@ -1342,7 +1342,7 @@ class Rules279Test(unittest.TestCase):
     def test_the_constants(self):
         self.assertEqual(rules.MCQ_POSITIVE, 0.5)
         self.assertEqual((rules.STAMP_OWN_RIGHT_MIN, rules.STAMP_OWN_RIGHT_NON_MCQ_MIN), (2, 1))
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
 
     def test_a_pick_of_1_1_weighs_half_on_the_target_and_from_the_side(self):
         side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
@@ -1430,7 +1430,7 @@ class MasteryGuard311Test(unittest.TestCase):
         return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[key or self.KEY]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
         self.assertTrue(rules.mastery_guard({"clientVersion": "2.15.0+32"}))
         self.assertFalse(rules.mastery_guard({"clientVersion": "2.14.0+31"}))
         self.assertFalse(rules.mastery_guard({}))
@@ -1499,6 +1499,111 @@ class MasteryGuard311Test(unittest.TestCase):
         after = self.lo(turns)
         self.assertAlmostEqual(after.alpha, 1 + 3.4 * 0.7 + 0.5, places=2)
         self.assertIsNone(after.first_mastered_at)
+
+
+class FollowUp326Test(unittest.TestCase):
+    """#326, rule set `1.1.3-eval10`: from the build that brought it
+    (`follow_up_counts`), a right follow-up on an own question answered
+    `partial` counts that own question as right — once, in a chain too —
+    as the conductor counts it (`belief_math.countsAsRightOwnQuestion`).
+    Forward only: a turn of an earlier build counts as it did."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.16.0+33"}
+    BEFORE = {"clientVersion": "2.15.0+32"}
+
+    def answer(self, minute: int, quality: str = "correct", build: dict | None = None,
+               signal: str | None = None, strength: str | None = None, **extra) -> dict:
+        kind = signal or ("negative" if quality == "wrong" else "positive")
+        t = _turn(f"2026-11-23T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType="completeCodeQuestion", overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", strength or ("moderate" if quality == "partial" else "strong"), kind)],
+                  **(self.NEW if build is None else build))
+        t.update(extra)
+        return t
+
+    def follow_up(self, minute: int, quality: str = "correct", depth: int = 1, **kw) -> dict:
+        return self.answer(minute, quality, isFollowUp=True, chainDepth=depth, **kw)
+
+    def lo(self, turns: list[dict], **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[self.KEY]
+
+    def test_the_rule_set_and_the_build_it_starts_from(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertTrue(rules.follow_up_counts({"clientVersion": "2.16.0+33"}))
+        self.assertTrue(rules.follow_up_counts({"clientVersion": "2.17.1+40"}))
+        self.assertFalse(rules.follow_up_counts({"clientVersion": "2.15.0+32"}))
+        self.assertFalse(rules.follow_up_counts({}))
+
+    def test_partial_then_a_right_follow_up_counts_once(self):
+        lo = self.lo([self.answer(0, "partial"), self.follow_up(1)])
+        self.assertEqual((lo.own_questions, lo.own_right, lo.own_right_open), (1, 1, 1))
+        # The follow-up's weight is a follow-up's: 0.5 after forgetting.
+        self.assertAlmostEqual(lo.alpha, 1 + 1.0 * 0.7 + 0.5, places=4)
+        # The chain's second follow-up, right again, does not count it again.
+        lo = self.lo([self.answer(0, "partial"), self.follow_up(1), self.follow_up(2, depth=2)])
+        self.assertEqual((lo.own_right, lo.own_right_open), (1, 1))
+
+    def test_in_a_chain_the_second_follow_up_can_finish_it(self):
+        turns = [self.answer(0, "partial"), self.follow_up(1, "partial"), self.follow_up(2, depth=2)]
+        self.assertEqual(self.lo(turns).own_right, 1)
+
+    def test_a_partial_pick_finished_right_is_no_open_question(self):
+        turns = [self.answer(0, "partial", questionType="mcQuestion"),
+                 self.follow_up(1, questionType="mcQuestion")]
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_right, lo.own_right_open), (1, 0))
+
+    def test_nothing_else_counts(self):
+        turns = [
+            self.answer(0), self.follow_up(1),                 # right: the own question
+            self.answer(2, "wrong"), self.follow_up(3),        # wrong
+            self.answer(4, "partial"), self.follow_up(5, "partial"),
+            self.answer(6, "partial"), self.follow_up(7, "wrong"),
+            # Right, but its first signal on the LO is neutral.
+            self.answer(8, "partial"),
+            self.follow_up(9, loSignals=[_sig("sg-b", "predict_b1", "weak", "neutral"),
+                                          _sig("sg-b", "predict_b1")]),
+        ]
+        self.assertEqual(self.lo(turns).own_right, 1)
+
+    def test_a_new_question_ends_the_chain(self):
+        # A wrong own question after the partial one: its follow-up finishes
+        # nothing.
+        turns = [self.answer(0, "partial"), self.answer(1, "wrong"), self.follow_up(2)]
+        self.assertEqual(self.lo(turns).own_right, 0)
+        # Nor after a question whose grade named no signal on its target —
+        # no own question (#278), but a new chain all the same.
+        no_own = self.answer(1, loSignals=[_sig("sg-b", "predict_b2")])
+        lo = self.lo([self.answer(0, "partial"), no_own, self.follow_up(2)])
+        self.assertEqual((lo.own_questions, lo.own_right), (1, 0))
+
+    def test_forward_only_an_earlier_build_counts_as_it_did(self):
+        before = [self.answer(0, "partial", self.BEFORE), self.follow_up(1, build=self.BEFORE)]
+        self.assertEqual(self.lo(before).own_right, 0)
+        # `--regels 1.1` (as_11) leaves it so: the rule applies forward only.
+        self.assertEqual(self.lo(before, as_11=True).own_right, 0)
+        # A variant can ask for it on every turn, or on none.
+        self.assertEqual(self.lo(before, follow_up_after_partial=True).own_right, 1)
+        now = [self.answer(0, "partial"), self.follow_up(1)]
+        self.assertEqual(self.lo(now, follow_up_after_partial=False).own_right, 0)
+
+    def test_twice_partial_with_a_right_follow_up_stamps_on_the_second_follow_up(self):
+        # Hard, in the lesson: a strong positive on the partial weighs 3.5,
+        # the follow-up 0.625. (6.65, 1) after the second partial is over
+        # the bar, but with one right own question; the follow-up makes two.
+        lesson = {"difficulty": "hard", "calibrationBefore": "hard", "provenance": "supervised"}
+        turns = [
+            self.answer(0, "partial", strength="strong", **lesson), self.follow_up(1, **lesson),
+            self.answer(2, "partial", strength="strong", **lesson), self.follow_up(3, **lesson),
+        ]
+        self.assertIsNone(self.lo(turns[:3]).first_mastered_at)
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_right, lo.own_right_open), (2, 2))
+        self.assertTrue(lo.mastered_at())
+        self.assertEqual(lo.first_mastered_at, rules.parse_at(turns[3]["turnAt"]))
+        # Before the build of #326: the same answers stamp nothing.
+        self.assertIsNone(self.lo(turns, follow_up_after_partial=False).first_mastered_at)
 
 
 class Rules275Test(unittest.TestCase):
@@ -2293,18 +2398,21 @@ class ReplayedBeliefTest(unittest.TestCase):
                              returnWrongAt="2026-09-21T09:00:00.000Z", thinCheckedAt="2026-09-21T09:00:00.000Z")
         new = self.merged(stored, stamp=self.AT, level="hard", alpha=10.0, beta=3.8)
         self.assertEqual(set(new), set(stored))
-        # The stored clock is the app's: it stays (#275); so do counts the
+        # The stored probe clock is the app's: it stays (#275); so does
+        # `lastUpdatedAt` where the replay wrote no later (#328), counts the
         # replay does not exceed (#281), and the session state of #275.
         self.assertEqual(
             {k for k in new if new[k] != stored[k]},
-            set(evaluate.BELIEF_FIELDS) - {"lastProbedAt", *self.COUNTS},
+            set(evaluate.BELIEF_FIELDS) - {"lastUpdatedAt", "lastProbedAt", *self.COUNTS},
         )
         self.assertEqual(stored["firstMasteredAt"], "2026-09-22T09:15:01.250Z")  # the stored doc is not touched
         # Every field of BELIEF_FIELDS, and nothing else, on a doc from
-        # before 1.1 without the probe clock.
+        # before 1.1 without the probe clock, which the replay wrote a day
+        # after the app last did.
         bare = {k: v for k, v in self.before_11(firstMasteredAt="2026-09-22T09:15:01.250Z").items()
                 if k != "lastProbedAt"}
         state = rules.LoState(alpha=10.0, beta=3.8, first_mastered_at=self.AT, ratchet="hard",
+                              last_at=dt.datetime(2026, 9, 23, 9, tzinfo=dt.timezone.utc),
                               last_direct_at=self.AT, own_questions=4, own_right=3, own_right_open=1)
         new = evaluate.replayed_belief(bare, state, self.OEFENINGEN)
         self.assertEqual({k for k in new if new.get(k) != bare.get(k)}, set(evaluate.BELIEF_FIELDS))
@@ -2499,7 +2607,11 @@ class ReplayBeliefsTest(_CommandTest):
             self.assertLessEqual({k for k in doc if doc[k] != before.get(k)}, set(evaluate.BELIEF_FIELDS))
         replay = rules.replay(TURNS["u-rik"], GOALS)
         predict = written["predict_b1"]
-        self.assertEqual((predict["alpha"], predict["beta"]), (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+        # The replay's, on the doc's clock: the app wrote a second after
+        # `turnAt` (#328).
+        on_its_clock = rules.decayed(replay[("sg-b", "predict_b1")], rules.parse_at(predict["lastUpdatedAt"]))
+        self.assertEqual(predict["lastUpdatedAt"], stored[("sg-b", "predict_b1")]["lastUpdatedAt"])
+        self.assertEqual((predict["alpha"], predict["beta"]), on_its_clock)
         self.assertEqual(predict["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
         self.assertEqual(predict["highestPositiveDifficulty"], "hard")
         self.assertEqual(written["recall_a1"]["firstMasteredAt"], "2026-09-10T09:01:00.000Z")
@@ -2634,7 +2746,8 @@ class ReplayBeliefsRules11Test(_CommandTest):
         self.assertEqual(sorted(written), ["fix_a3", "predict_b1", "recall_a1", "write_a2"])
         predict = written["predict_b1"]
         self.assertEqual((predict["alpha"], predict["beta"]),
-                         (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+                         rules.decayed(replay[("sg-b", "predict_b1")], rules.parse_at(predict["lastUpdatedAt"])))
+        self.assertEqual(predict["lastUpdatedAt"], WIM_STORED[("sg-b", "predict_b1")]["lastUpdatedAt"])
         self.assertFalse(evaluate.on_the_cap(predict))
         self.assertEqual(predict["firstMasteredAt"], "2026-09-16T09:16:00.000Z")
         counts = lambda d: (d["ownQuestions"], d["ownQuestionsRight"], d["ownQuestionsRightNonMcq"])  # noqa: E731
@@ -2673,6 +2786,332 @@ class ReplayBeliefsRules11Test(_CommandTest):
             with self.subTest(command=command), self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
                 self.run_cli(command, "--klas", KLAS_REGELS, "--regels", "1.0")
             self.assertIn("argument --regels: invalid choice: '1.0'", err.getvalue())
+
+
+# #327: a class of one made-up student. recall_a1 got its stamp from a
+# build before 1.1 (2.11.0) on one right own question, at `hard` in the
+# lesson: evidence 5.5 was enough then. Two right side signals on it the
+# same morning (questions on write_a2) take it over the bar of today, but
+# 1.1 wants two right own questions for a stamp, so `--regels 1.1` replays
+# no stamp. The rewrite at the release of 1.1 left the doc's stamp (#168).
+# Five weeks on, on 2.15.0, a weak side signal: the app reads the doc's
+# stamp, finds the LO mastered and adds 0.625 without forgetting (#311).
+KLAS_STEMPEL = "6STEMPEL"
+ACCOUNTS += [
+    {"uid": "u-lien", "firstName": "Lien", "lastName": "Stempel", "className": KLAS_STEMPEL,
+     "updatedAt": "2026-11-20T10:00:00Z", "calibration": {"difficulty": "hard"}},
+]
+_LIEN_KEY = ("sg-a", "recall_a1")
+_LIEN_STAMP = dt.datetime(2026, 10, 14, 9, 0, 1, tzinfo=dt.timezone.utc)  # the app's, a second after the oefening
+_LIEN_GUARD_AT = dt.datetime(2026, 11, 20, 9, 0, tzinfo=dt.timezone.utc)
+
+
+def _lien_turn(at: str, lo: str, build: str, signals: list[dict], **extra) -> dict:
+    return _turn(at, "sg-a", lo, uid="u-lien", questionType="completeCodeQuestion", provenance="supervised",
+                 clientVersion=build, loSignals=signals, **extra)
+
+
+def _lien_turns(guard_build: str = "2.15.0+32", guard_signals: list[dict] | None = None, **guard_turn) -> list[dict]:
+    side = lambda strength: [_sig("sg-a", "write_a2"), _sig("sg-a", "recall_a1", strength)]  # noqa: E731
+    return [
+        _lien_turn("2026-10-14T09:00:00.000Z", "recall_a1", "2.11.0+28", [_sig("sg-a", "recall_a1")], **_HARD),
+        _lien_turn("2026-10-14T09:05:00.000Z", "write_a2", "2.11.0+28", side("strong")),
+        _lien_turn("2026-10-14T09:10:00.000Z", "write_a2", "2.11.0+28", side("strong")),
+        _lien_turn("2026-11-20T09:00:00.000Z", "write_a2", guard_build,
+                   side("weak") if guard_signals is None else guard_signals, **guard_turn),
+    ]
+
+
+TURNS["u-lien"] = _lien_turns()
+
+
+def _lien_as_the_app_wrote() -> dict:
+    """recall_a1 as the app on 2.15.0 wrote it: the doc the rewrite with 1.1
+    left — the replay of 1.1 before the last oefening, the old stamp kept,
+    the counts filled — decayed to the oefening, and 0.625 added without
+    forgetting."""
+    before = rules.replay(TURNS["u-lien"][:-1], GOALS, variant=rules.Variant(as_11=True))[_LIEN_KEY]
+    a, b = rules._decay(before.alpha, before.beta, before.last_at, _LIEN_GUARD_AT)
+    at = lambda t: evaluate._app_iso(t + dt.timedelta(seconds=1))  # noqa: E731
+    return _belief_doc(
+        "u-lien", _LIEN_KEY, a + 0.5 * rules.SUPERVISED_WEIGHT_FACTOR, b,
+        lastUpdatedAt=at(_LIEN_GUARD_AT), lastProbedAt=at(before.last_direct_at),
+        lastPositiveAtCalibratedAt=at(before.positive_at_calibrated_at), firstMasteredAt=evaluate._app_iso(_LIEN_STAMP),
+        highestPositiveDifficulty="hard", ownQuestions=1, ownQuestionsRight=1, ownQuestionsRightNonMcq=1,
+    )
+
+
+class DocStamp327Test(unittest.TestCase):
+    """#327, rule set `1.1.3-eval11`: the mastery guard reads the stamp on
+    the doc, as the app does (`isMastered` → `everMasteredBelief`), not
+    only the replay's own: a thin stamp from before 1.1, which `--regels
+    1.1` does not replay, guards there too."""
+
+    def lo(self, turns: list[dict], stamps=None, **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant), stamps=stamps)[_LIEN_KEY]
+
+    def test_the_rule_set(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+
+    def test_a_doc_stamp_the_replay_does_not_give_guards_as_in_the_app(self):
+        turns = _lien_turns()
+        before = self.lo(turns[:-1], as_11=True)
+        self.assertIsNone(before.first_mastered_at)  # 1.1 does not replay the thin stamp
+        self.assertEqual(before.own_right, 1)
+        a, b = rules._decay(before.alpha, before.beta, before.last_at, _LIEN_GUARD_AT)
+        self.assertTrue(a / (a + b) >= rules.MASTERY_MEAN and a + b >= rules.MASTERY_EVIDENCE)
+        side = 0.5 * rules.SUPERVISED_WEIGHT_FACTOR
+
+        guarded = self.lo(turns, {_LIEN_KEY: _LIEN_STAMP}, as_11=True)
+        self.assertAlmostEqual(guarded.alpha, a + side, places=9)  # added, not forgotten
+        self.assertTrue(guarded.mastered_at())
+        self.assertIsNone(guarded.first_mastered_at)  # only the guard reads the doc's stamp
+
+        # Without the doc's stamp the replay forgets, and takes the LO under
+        # the bar: what `validate --regels 1.1` read as a deviation.
+        forgot = self.lo(turns, as_11=True)
+        self.assertAlmostEqual(forgot.alpha, 1 + (a - 1) * rules.FORGET + side, places=9)
+        self.assertFalse(forgot.mastered_at())
+
+    def test_by_build_the_replay_has_the_stamp_itself(self):
+        turns = _lien_turns()
+        self.assertEqual(self.lo(turns[:1]).first_mastered_at, rules.parse_at(turns[0]["turnAt"]))
+        self.assertAlmostEqual(self.lo(turns, {_LIEN_KEY: _LIEN_STAMP}).alpha, self.lo(turns).alpha, places=12)
+
+    def test_a_transfer_credit_reads_the_doc_stamp_too(self):
+        credit = [{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.625}]
+        turns = _lien_turns(guard_signals=[_sig("sg-a", "write_a2")], transferCredits=credit)
+        guarded = self.lo(turns, {_LIEN_KEY: _LIEN_STAMP}, as_11=True)
+        self.assertAlmostEqual(guarded.alpha, self.lo(_lien_turns(), {_LIEN_KEY: _LIEN_STAMP}, as_11=True).alpha, places=9)
+        self.assertFalse(self.lo(turns, as_11=True).mastered_at())
+
+    def test_only_a_stamp_from_before_the_write_counts(self):
+        turns = _lien_turns()
+        forgot = self.lo(turns, as_11=True).alpha
+        # `replay-beliefs` writes a replayed stamp at `turnAt`: the doc had
+        # none before that oefening's write.
+        self.assertAlmostEqual(self.lo(turns, {_LIEN_KEY: _LIEN_GUARD_AT}, as_11=True).alpha, forgot, places=12)
+        self.assertAlmostEqual(
+            self.lo(turns, {_LIEN_KEY: _LIEN_GUARD_AT - dt.timedelta(seconds=1)}, as_11=True).alpha,
+            self.lo(turns, {_LIEN_KEY: _LIEN_STAMP}, as_11=True).alpha, places=12)
+
+    def test_a_build_before_the_guard_ignores_it(self):
+        turns = _lien_turns("2.14.0+31")
+        self.assertAlmostEqual(self.lo(turns, {_LIEN_KEY: _LIEN_STAMP}, as_11=True).alpha,
+                               self.lo(turns, as_11=True).alpha, places=12)
+
+    def test_doc_stamps_are_the_stamps_the_app_reads(self):
+        doc = _lien_as_the_app_wrote()
+        old = dict(doc)
+        del old["firstMasteredAt"], old["ownQuestionsRight"], old["ownQuestionsRightNonMcq"]
+        none = _belief_doc("u-lien", ("sg-a", "write_a2"), 2.0, 2.0, lastUpdatedAt="2026-10-14T09:10:01.000Z")
+        stamps = evaluate.doc_stamps({_LIEN_KEY: doc, ("sg-a", "write_a2"): none})
+        self.assertEqual(stamps, {_LIEN_KEY: _LIEN_STAMP})
+        # An old doc without the field that reads as mastered: its clock,
+        # the stamp the app writes at its next write (`app_stamp`).
+        self.assertEqual(evaluate.doc_stamps({_LIEN_KEY: old}), {_LIEN_KEY: _LIEN_GUARD_AT + dt.timedelta(seconds=1)})
+
+
+class DocStamp327CommandTest(_CommandTest):
+    """`validate --regels 1.1` and `replay-beliefs --regels 1.1` replay the
+    guard with the docs' stamps (#327): the doc the app wrote matches, and
+    there is nothing to rewrite."""
+
+    def setUp(self):
+        super().setUp()
+        self.cosmos.beliefs = lambda uid: {_LIEN_KEY: _lien_as_the_app_wrote()} if uid == "u-lien" else {}
+
+    def row(self, stdout: str, columns: int) -> list[str]:
+        line = next(line for line in stdout.splitlines() if line.startswith("Lien Stempel"))
+        return line.split()[-columns:]
+
+    def test_validate_with_1_1_matches_the_doc_the_app_guarded(self):
+        stdout = self.run_cli("validate", "--klas", KLAS_STEMPEL, "--regels", "1.1")
+        self.assertEqual(self.row(stdout, 5), ["1", "1", "0", "0", "2.15.0+32"])
+
+    def test_replay_beliefs_with_1_1_has_nothing_to_write(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_STEMPEL, "--regels", "1.1")
+        self.assertIn("te schrijven: 0 documenten", stdout)
+        self.assertEqual(self.cosmos.upserts, [])
+
+
+class DocClock328Test(unittest.TestCase):
+    """#328: `replay-beliefs` writes α and β that fit the doc's clock
+    `lastUpdatedAt`, from which the app decays at its next write, and
+    `validate` compares on that clock (`evaluate._on_one_clock`)."""
+
+    KEY = ("sg-a", "recall_a1")
+    # The replay's last write on the LO, and its numbers then.
+    REPLAYED_AT = dt.datetime(2026, 9, 4, 9, 29, tzinfo=dt.timezone.utc)
+    STATE = rules.LoState(alpha=6.2, beta=1.4, last_at=REPLAYED_AT)
+
+    def doc(self, at: dt.datetime, alpha: float = 6.2, beta: float = 1.4, **fields) -> dict:
+        counts = {"ownQuestionsRight": 0, "ownQuestionsRightNonMcq": 0}  # those of 1.1, so none to fill
+        return _belief_doc("u-x", self.KEY, alpha, beta, lastUpdatedAt=evaluate._app_iso(at),
+                           lastProbedAt="2026-09-04T09:29:01.000Z", **{**counts, **fields})
+
+    def merged(self, stored: dict) -> dict:
+        return evaluate.replayed_belief(stored, self.STATE, [self.REPLAYED_AT])
+
+    def test_on_a_later_doc_clock_the_replays_numbers_decayed_to_it(self):
+        # What the rewrite of 09-11 left: the replay's numbers, and the clock
+        # of an incidental negative an old build wrote a week later (#167).
+        later = self.REPLAYED_AT + dt.timedelta(days=7, minutes=22)
+        stored = self.doc(later)
+        new = self.merged(stored)
+        self.assertEqual((new["alpha"], new["beta"]), rules.decayed(self.STATE, later))
+        self.assertEqual(new["lastUpdatedAt"], stored["lastUpdatedAt"])  # the app's clock stays
+        self.assertEqual(evaluate.belief_changes(stored, new), {"alpha/beta"})
+        self.assertEqual(self.merged(new), new)  # and a second run has nothing to write
+
+    def test_on_an_earlier_doc_clock_the_replays_clock_is_written(self):
+        # The replay read a signal on 09-04 that the build dropped: the doc
+        # was last written a week before. Same numbers, but the app would
+        # decay them from the doc's clock: a week too long.
+        earlier = self.REPLAYED_AT - dt.timedelta(days=7)
+        stored = self.doc(earlier)
+        new = self.merged(stored)
+        self.assertEqual((new["alpha"], new["beta"]), (6.2, 1.4))
+        self.assertEqual(new["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+        self.assertEqual(evaluate.belief_changes(stored, new), {"alpha/beta"})
+        self.assertEqual(self.merged(new), new)
+        # A doc without a readable clock gets the replay's with new numbers.
+        bare = {k: v for k, v in self.doc(earlier, alpha=5.0).items() if k != "lastUpdatedAt"}
+        self.assertEqual(self.merged(bare)["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+
+    def test_within_the_tolerance_on_one_clock_nothing_moves(self):
+        # The app's own write, a second after `turnAt`, on the same numbers.
+        at = self.REPLAYED_AT + dt.timedelta(seconds=1)
+        a, b = rules.decayed(self.STATE, at)
+        stored = self.doc(at, a + 4e-6, b)
+        self.assertEqual(self.merged(stored), stored)
+
+    def test_a_stamp_the_app_reads_on_the_old_clock_stays_there(self):
+        # An old doc without `firstMasteredAt` over the bar, with the counts
+        # the stamp wants: the app stamps it at `lastUpdatedAt` at its next
+        # write. A later clock would move that stamp, so it is written as
+        # the app would.
+        earlier = self.REPLAYED_AT - dt.timedelta(days=7)
+        old = self.doc(earlier, 9.4, 1.2, lastPositiveAtCalibratedAt="2026-08-28T09:00:01.000Z",
+                       ownQuestions=2, ownQuestionsRight=2, ownQuestionsRightNonMcq=1)
+        self.assertTrue(evaluate.app_ever_mastered(old))
+        state = dataclasses.replace(self.STATE, alpha=9.6, beta=1.2)
+        new = evaluate.replayed_belief(old, state, [self.REPLAYED_AT])
+        self.assertEqual(new["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+        self.assertEqual(new["firstMasteredAt"], old["lastUpdatedAt"])
+        self.assertEqual(evaluate.belief_changes(old, new), {"alpha/beta", "stamp kept"})
+
+    def test_validate_reads_a_rewritten_doc_on_its_clock(self):
+        # Two weeks between the replay's write and the doc's clock: the raw
+        # means are more than 0.01 apart, the same belief on one clock not.
+        later = self.REPLAYED_AT + dt.timedelta(days=14)
+        rewritten = self.merged(self.doc(later))
+        self.assertGreater(abs(self.STATE.mean - rewritten["alpha"] / (rewritten["alpha"] + rewritten["beta"])), 0.01)
+        self.assertLess(evaluate.mean_deviation(rewritten, self.STATE), 1e-12)
+        # A real deviation still reads as one: an extra negative on the doc.
+        self.assertGreater(evaluate.mean_deviation({**rewritten, "beta": rewritten["beta"] + 1.0}, self.STATE), 0.01)
+
+
+# #328: a class of one made-up student. Kees answered recall_a1 right three
+# times on 09-04 on a build from before #108 (no stamp, no level, no probe
+# clock). On 09-11 the grader of a question on predict_b1 named recall_a1
+# wrong from the side: that build wrote it as evidence, with its clock;
+# the replay drops it (#167) and has its last write on 09-04. The rewrite
+# with 1.1 puts the replay on the doc; on 11-13, on 2.14.0, the app writes
+# a right own question on recall_a1, decaying from the doc's clock.
+KLAS_KLOK = "6KLOK"
+ACCOUNTS += [
+    {"uid": "u-kees", "firstName": "Kees", "lastName": "Klok", "className": KLAS_KLOK,
+     "updatedAt": "2026-11-13T09:00:05Z", "calibration": {"difficulty": "medium"}},
+]
+_KEES_KEY = ("sg-a", "recall_a1")
+
+
+def _kees_turn(at: str, subgoal: str, lo: str, signals: list[dict], **extra) -> dict:
+    return _turn(at, subgoal, lo, uid="u-kees", questionType="completeCodeQuestion", loSignals=signals, **extra)
+
+
+_KEES_SEPTEMBER = [
+    *[_kees_turn(f"2026-09-04T09:{m}:00.000Z", "sg-a", "recall_a1", [_sig("sg-a", "recall_a1", "moderate")])
+      for m in ("20", "25", "29")],
+    _kees_turn("2026-09-11T09:51:00.000Z", "sg-b", "predict_b1",
+               [_sig("sg-b", "predict_b1", "moderate"), _sig("sg-a", "recall_a1", "moderate", "negative")]),
+]
+_KEES_NOVEMBER = _kees_turn("2026-11-13T09:00:00.000Z", "sg-a", "recall_a1", [_sig("sg-a", "recall_a1", "moderate")],
+                            clientVersion="2.14.0+31")
+
+
+def _kees_as_the_old_build_wrote() -> dict:
+    """recall_a1 as that build wrote it on 09-11: the old arithmetic, the
+    incidental negative as evidence, its clock a second after; no stamp,
+    level or probe clock (#108, #187)."""
+    old = rules.replay(_KEES_SEPTEMBER, GOALS, asymmetric=False, drop_incidental_negatives=False)[_KEES_KEY]
+    doc = _as_the_app_wrote("u-kees", _KEES_KEY, old)
+    for f in ("firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt"):
+        doc.pop(f, None)
+    return doc
+
+
+def _the_app_writes(doc: dict, turn: dict) -> dict:
+    """[doc] after the app's write of [turn], a right own question on it at
+    `medium`, at home, on 2.14.0 (forgetting, no mastery guard): decayed
+    from the doc's own clock to the moment it writes, a second after
+    `turnAt`, forgotten, then the weight added; the counts and the clocks
+    as the app keeps them."""
+    at = rules.parse_at(turn["turnAt"]) + dt.timedelta(seconds=1)
+    clock = rules.parse_at(doc["lastUpdatedAt"])
+    a, b = rules.decayed(rules.LoState(alpha=doc["alpha"], beta=doc["beta"], last_at=clock), at)
+    a, b = rules._add_positive(a, b, rules.WEIGHT["moderate"] * rules.POS_FACTOR["medium"], rules.FORGET, False)
+    written = evaluate._app_iso(at)
+    return {
+        **doc, "alpha": a, "beta": b, "lastUpdatedAt": written, "lastProbedAt": written,
+        "lastPositiveAtCalibratedAt": written, "ownQuestions": doc["ownQuestions"] + 1,
+        "ownQuestionsRight": doc["ownQuestionsRight"] + 1, "ownQuestionsRightNonMcq": doc["ownQuestionsRightNonMcq"] + 1,
+        "_etag": '"etag-u-kees-recall_a1-2"',
+    }
+
+
+class DocClock328CommandTest(_CommandTest):
+    """#328 end to end: a doc with a later clock than the replay, rewritten
+    with `replay-beliefs --regels 1.1`, then a write of the app: `validate
+    --regels 1.1` and the dry run show nothing, as right after the rewrite."""
+
+    def setUp(self):
+        super().setUp()
+        patch = mock.patch.object(evaluate, "_now", lambda: dt.datetime(2026, 11, 20, 12, tzinfo=dt.timezone.utc))
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.log(_KEES_SEPTEMBER, _kees_as_the_old_build_wrote())
+
+    def log(self, turns: list[dict], doc: dict) -> None:
+        """What the fake Cosmos holds for Kees: [turns] and the doc [doc]."""
+        self.cosmos.turns = lambda uid: list(turns) if uid == "u-kees" else []
+        self.cosmos.beliefs = lambda uid: {_KEES_KEY: dict(doc)} if uid == "u-kees" else {}
+
+    def nothing_to_show(self) -> None:
+        dry = self.run_cli("replay-beliefs", "--klas", KLAS_KLOK, "--regels", "1.1")
+        self.assertIn("te schrijven: 0 documenten", dry)
+        checked = self.run_cli("validate", "--klas", KLAS_KLOK, "--regels", "1.1")
+        row = next(line for line in checked.splitlines() if line.startswith("Kees Klok")).split()
+        self.assertEqual(row[-4:-1], ["1", "0", "0"])  # compared, |Δμ| > 0.01, level
+
+    def test_after_the_rewrite_the_apps_next_write_matches_the_replay(self):
+        self.run_cli("replay-beliefs", "--klas", KLAS_KLOK, "--regels", "1.1", "--apply")
+        (_, rewritten, _, _), = self.cosmos.upserts
+        replay = rules.replay(_KEES_SEPTEMBER, GOALS, variant=rules.Variant(as_11=True))[_KEES_KEY]
+        clock = _kees_as_the_old_build_wrote()["lastUpdatedAt"]
+        self.assertEqual(replay.last_at, rules.parse_at("2026-09-04T09:29:00Z"))  # the negative is no write
+        self.assertEqual(rewritten["lastUpdatedAt"], clock)
+        self.assertEqual((rewritten["alpha"], rewritten["beta"]), rules.decayed(replay, rules.parse_at(clock)))
+        self.log(_KEES_SEPTEMBER, rewritten)
+        self.nothing_to_show()
+
+        # The app's next write decays from the doc's clock; the replay from
+        # its own last write. They meet.
+        turns = [*_KEES_SEPTEMBER, _KEES_NOVEMBER]
+        self.log(turns, _the_app_writes(rewritten, _KEES_NOVEMBER))
+        self.assertIsNone(rules.replay(turns, GOALS, variant=rules.Variant(as_11=True))[_KEES_KEY].first_mastered_at)
+        self.nothing_to_show()
 
 
 if __name__ == "__main__":

@@ -791,6 +791,31 @@
   "session_runControls_button_run": "Run",
   "session_runControls_button_stop": "Stop",
 
+  "reference_button_tooltip": "Reference",
+  "@reference_button_tooltip": {
+    "description": "Hover text on the book button above the editor and in the quiz header that opens and closes the reference panel (#323)"
+  },
+  "reference_title": "Reference",
+  "@reference_title": {
+    "description": "Heading of the reference panel next to the exercise: every function and class of the course (#323)"
+  },
+  "reference_close_tooltip": "Close the reference",
+  "reference_search_hint": "Search: a name or a word",
+  "@reference_search_hint": {
+    "description": "Hint in the reference panel's search field; it finds names and words in the explanations"
+  },
+  "reference_search_clear_tooltip": "Clear the search",
+  "reference_noResults": "Nothing found for \"{query}\".",
+  "@reference_noResults": {
+    "placeholders": { "query": { "type": "String" } }
+  },
+  "reference_lessonLink": "Lesson: {title}",
+  "@reference_lessonLink": {
+    "description": "Link under a reference item to the lesson that explains it; opens the lesson in a window over the exercise",
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "reference_lesson_close_tooltip": "Close the lesson",
+
   "session_objectiveBanner_pill": "Current goal",
   "@session_objectiveBanner_pill": {
     "description": "Banner header pill at the top of practice view — displayed uppercase"
@@ -799,14 +824,49 @@
   "@session_objectiveBanner_pillSelfChosen": {
     "description": "Banner header pill when the student picked the subgoal back up from the learning path (#280) — displayed uppercase"
   },
-  "session_objectiveBanner_segments": "{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do",
-  "@session_objectiveBanner_segments": {
-    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.",
+  "session_objectiveBanner_summary": "{mastered} of {total} parts mastered",
+  "@session_objectiveBanner_summary": {
+    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230, #325) when every segment is mastered: one segment per learning objective of the subgoal.",
     "placeholders": {
       "mastered": {"type": "int"},
-      "almost": {"type": "int"},
-      "todo": {"type": "int"}
+      "total": {"type": "int"}
     }
+  },
+  "session_objectiveBanner_summaryToGo": "{mastered} of {total} parts mastered, {toGo, plural, =1{1 more right answer to go} other{{toGo} more right answers to go}}",
+  "@session_objectiveBanner_summaryToGo": {
+    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#325): how many learning objectives are mastered, and the right answers the others still need, added up.",
+    "placeholders": {
+      "mastered": {"type": "int"},
+      "total": {"type": "int"},
+      "toGo": {"type": "int"}
+    }
+  },
+  "session_lo_toGo": "{count, plural, =1{1 more right answer} other{{count} more right answers}}",
+  "@session_lo_toGo": {
+    "description": "In the popup of one segment of the subgoal bar (#325): the right answers this learning objective still needs to be mastered. The same number is in the segment.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "session_lo_mastered": "Mastered",
+  "@session_lo_mastered": {
+    "description": "In the popup of one segment of the subgoal bar (#325): this learning objective needs no more right answers. Followed by ' · demonstrated' when it carries the mark that counts for the grade."
+  },
+  "session_lo_rose_notRight": "Went up after an answer that was not right.",
+  "@session_lo_rose_notRight": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number of right answers still needed went up — a question on this learning objective was not answered right."
+  },
+  "session_lo_rose_lowerLevel": "Went up: your questions are easier now, and a right answer counts for less there.",
+  "@session_lo_rose_lowerLevel": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number went up — the tutor now asks easier questions, where a right answer weighs less."
+  },
+  "session_lo_rose_otherQuestion": "Went up after a mistake on this in a question about something else.",
+  "@session_lo_rose_otherQuestion": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number went up — a question about another learning objective showed a mistake on this one."
+  },
+  "session_lo_current": "Your current exercise is about this.",
+  "@session_lo_current": {
+    "description": "In the popup of the marked segment of the subgoal bar (#325): the exercise on screen is about this learning objective."
   },
 
   "chat_tutorName": "Tutor",
@@ -1661,6 +1721,8 @@
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
   },
   "chat_notice_submitViaEditor": "Adjust your code in the editor on the left and press Run to submit your solution.",
+  "chat_notice_pageQuestionNotAnAnswer": "This was a question about the explanation, so it does not count as an answer to your exercise. Answer at the question itself.",
+  "chat_notice_toQuestion_button": "Go to the question",
 
   "questions_page_title": "Questions",
   "questions_page_subtitle": "A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.",

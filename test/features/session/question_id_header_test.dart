@@ -272,6 +272,12 @@ void main() {
         tester.getRect(find.text('Run')).right,
         lessThanOrEqualTo(tester.getRect(find.byTooltip('Reset output')).left),
       );
+      // The reference button (#323) fits too: Run gives up its play icon
+      // before its word.
+      final reference = tester.getRect(find.byTooltip('Reference'));
+      expect(reference.left, greaterThanOrEqualTo(tester.getRect(copy).right));
+      expect(reference.right, lessThanOrEqualTo(strip.right));
+      expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
     });
 
     testWidgets('with room, Run spells out its shortcut', (tester) async {

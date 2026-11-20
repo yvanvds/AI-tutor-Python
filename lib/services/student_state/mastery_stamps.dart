@@ -6,7 +6,8 @@
 //
 // Display only. Nothing here writes, and the belief itself, the tutor and
 // the cached `progress` doc are neither read for this nor changed by it.
-// The practice bar of #230 (`lo_display.dart`) keeps its own reading.
+// The practice bar of #230 (`lo_display.dart`) counts down from the belief
+// and marks the same stamp on its segments (#325).
 
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';

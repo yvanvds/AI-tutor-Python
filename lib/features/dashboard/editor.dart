@@ -13,23 +13,62 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Mac) runs the code, as the Run button above it does (#300). The
 /// package's own Enter binding matches a plain Enter only, so the two do not
 /// meet; the chat composer has its own focus and keeps Ctrl+Enter for send.
-class Editor extends ConsumerWidget {
+///
+/// Each editor stays on the buffer of the mode whose page it is on (#322).
+/// The session view fades the old mode's page out while the new one fades
+/// in, so for a moment both editors are mounted; one that followed
+/// `modeProvider` would switch to the new mode's buffer in that moment, and
+/// two fields would share one buffer and its dropdown.
+class Editor extends ConsumerStatefulWidget {
   const Editor({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(modeProvider);
+  ConsumerState<Editor> createState() => _EditorState();
+}
+
+class _EditorState extends ConsumerState<Editor> {
+  /// The mode of the page this editor is on: the current one when the page
+  /// mounts, which it does because the mode switched to it.
+  late final SessionMode _mode = ref.read(modeProvider);
+
+  late final CodeController _controller = ref
+      .read(codeServiceProvider(_mode))
+      .controller;
+
+  /// The dropdown after a dot (#322) keeps its open state on the controller,
+  /// which outlives this editor: left open, it would still take Enter, Tab
+  /// and the arrow keys when the page comes back, with nothing on screen.
+  /// So it closes when the editor goes — a mode switch, or a multiple-choice
+  /// question taking the editor's place.
+  void _closeDropdown() => _controller.popupController.hide();
+
+  @override
+  void dispose() {
+    // The field has already taken the dropdown off the screen; only the
+    // open state is left. Not through `hide()`: its notification would
+    // rebuild the dropdown's widget while the tree is being torn down.
+    _controller.popupController.shouldShow = false;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // At the switch itself, not when the fade ends: the dropdown is drawn in
+    // the app's overlay and would not fade with the page.
+    ref.listen<SessionMode>(modeProvider, (_, next) {
+      if (next != _mode) _closeDropdown();
+    });
     return CallbackShortcuts(
-      bindings: submitShortcutBindings(() => runEditorCode(ref, mode)),
-      child: _codeField(ref, mode),
+      bindings: submitShortcutBindings(() => runEditorCode(ref, _mode)),
+      child: _codeField(),
     );
   }
 
-  Widget _codeField(WidgetRef ref, SessionMode mode) {
+  Widget _codeField() {
     return CodeTheme(
       data: CodeThemeData(styles: tutorCodeTheme),
       child: CodeField(
-        controller: ref.read(codeServiceProvider(mode)).controller,
+        controller: _controller,
         textStyle: AppMono.code(),
         background: AppColors.ink0,
         gutterStyle: GutterStyle(

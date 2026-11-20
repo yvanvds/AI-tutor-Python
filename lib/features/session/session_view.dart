@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_avatar.dart';
+import 'package:ai_tutor_python/features/reference/reference_panel.dart';
+import 'package:ai_tutor_python/features/reference/reference_panel_state.dart';
 import 'package:ai_tutor_python/features/session/chat_panel_state.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
@@ -43,6 +45,12 @@ const double chatCollapsedWidth = 32;
 /// re-folds the chat in the theory view, and the slide starts from where the
 /// panel was, which the cap holds to half the area instead of squeezing the
 /// lesson under its own footer.
+///
+/// The reference panel (#323) slides open next to the exercise in Practice
+/// and the Playground: in a column of its own between the exercise and the
+/// chat when the session has room for three, else over the chat, so the
+/// editor keeps its width ([referencePlacement]). It slides with the chat's
+/// duration and curve, so the two move together on a mode switch.
 class SessionView extends ConsumerWidget {
   const SessionView({super.key});
 
@@ -54,6 +62,9 @@ class SessionView extends ConsumerWidget {
     // and counting — from the first frame of the workspace, not from the
     // first frame the strip happens to be on screen.
     final unread = ref.watch(chatUnreadProvider);
+    // Next to an exercise only; the theory view is the explanation itself.
+    final referenceOpen =
+        ref.watch(referencePanelOpenProvider) && mode != SessionMode.explain;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -63,7 +74,11 @@ class SessionView extends ConsumerWidget {
           ChatPanelLayout.collapsed => chatCollapsedWidth,
           ChatPanelLayout.full => full,
         };
-        return Row(
+        final reference = referencePlacement(
+          sessionWidth: constraints.maxWidth,
+          chatWidth: width,
+        );
+        final row = Row(
           children: [
             Expanded(
               child: AnimatedSwitcher(
@@ -73,6 +88,24 @@ class SessionView extends ConsumerWidget {
                 transitionBuilder: (child, animation) =>
                     FadeTransition(opacity: animation, child: child),
                 child: KeyedSubtree(key: ValueKey(mode), child: _viewFor(mode)),
+              ),
+            ),
+            // The room the reference panel takes beside the exercise. Capped
+            // to what the exercise can spare next to the chat: a window made
+            // narrow moves the panel over the chat at once, rather than
+            // squeezing the exercise while the room slides shut.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.max(
+                  0,
+                  constraints.maxWidth - width - referenceExerciseMinWidth,
+                ),
+              ),
+              child: AnimatedContainer(
+                key: const Key('reference-room'),
+                duration: AppDurations.chatSlide,
+                curve: AppCurves.layout,
+                width: referenceOpen && reference.beside ? reference.width : 0,
               ),
             ),
             // The cap: a slide that starts from a wider panel than the
@@ -108,6 +141,17 @@ class SessionView extends ConsumerWidget {
                   ),
                 ),
               ),
+            ),
+          ],
+        );
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            row,
+            ReferencePanelSlot(
+              open: referenceOpen,
+              placement: reference,
+              right: reference.beside ? width : 0,
             ),
           ],
         );

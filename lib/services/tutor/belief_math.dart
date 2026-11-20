@@ -7,6 +7,7 @@
 
 import 'dart:math' as math;
 
+import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
@@ -353,10 +354,10 @@ bool meetsMasteryMeanAndEvidence(BeliefSnapshot snap) {
 /// at least `masteryRightOwnQuestionsMin` own questions answered right
 /// ([ownQuestionsRight], `LoBelief.ownQuestionsRight`), of which at least
 /// `masteryRightNonMcqQuestionsMin` no multiple choice
-/// ([ownQuestionsRightNonMcq]). A side signal, a follow-up and a transfer
-/// credit move `(α, β)` but count for neither. A count the doc does not
-/// have reads 0 — the teacher's choice: a doc from before 1.1 earns them
-/// anew, unless the release fills them from `turn_history` (#281).
+/// ([ownQuestionsRightNonMcq]). Which answers count is
+/// [countsAsRightOwnQuestion]. A count the doc does not have reads 0 — the
+/// teacher's choice: a doc from before 1.1 earns them anew, unless the
+/// release fills them from `turn_history` (#281).
 bool meetsOwnQuestionsCondition({
   required int? ownQuestionsRight,
   required int? ownQuestionsRightNonMcq,
@@ -366,6 +367,38 @@ bool meetsOwnQuestionsCondition({
       (ownQuestionsRightNonMcq ?? 0) >=
           PolicyConstants.masteryRightNonMcqQuestionsMin;
 }
+
+/// Whether an answer counts as one of an LO's own questions answered right:
+/// what condition 4 of §4.1 counts (`LoBelief.ownQuestionsRight`, and
+/// `ownQuestionsRightNonMcq` when that own question was no multiple
+/// choice). The one rule for it — the conductor counts with it, and a
+/// display of the right answers an LO still needs can ask it what an
+/// answer would count.
+///
+/// [quality] is the answer's grade, [kind] its first signal on the LO.
+/// Two answers count, each `correct` with a positive on the LO:
+///
+///   - **the own question** ([ownQuestion], #279): a direct question with
+///     the LO as its target, once per question (#278). A `partial` with a
+///     positive is not right.
+///   - **a follow-up on an own question that was `partial`**
+///     ([followUpOnPartial], #326, formula 1.1.3): the student finished the
+///     answer in the follow-up, so the own question counts as answered
+///     right after all. Once per own question, in a chain too (§6.4): the
+///     caller passes it only while that own question has not counted.
+///
+/// Nothing else counts — a side signal (§2.4), a follow-up on an own
+/// question that was right or wrong, a transfer credit (§3.7). Those move
+/// `(α, β)` and leave the counts alone.
+bool countsAsRightOwnQuestion({
+  required AnswerQuality quality,
+  required LoSignalKind kind,
+  bool ownQuestion = false,
+  bool followUpOnPartial = false,
+}) =>
+    (ownQuestion || followUpOnPartial) &&
+    kind == LoSignalKind.positive &&
+    quality == AnswerQuality.correct;
 
 /// Whether an LO is mastered now (CONDUCTOR_POLICY §4.1): [snap] is its
 /// decayed belief, [belief] its doc (`null`: never written, not mastered).
@@ -381,7 +414,7 @@ bool meetsOwnQuestionsCondition({
 ///
 /// What every live reading of mastery uses: the selection (§2.1), the
 /// subgoal's advance and its cached share (§4.2, §4.5), the cascade skip,
-/// the bar's full segment (§4.5).
+/// the bar's segment at 0 to go (§4.5, `lo_display.rightAnswersToGo`).
 bool isMastered(BeliefSnapshot snap, LoBelief? belief) {
   if (belief == null) return false;
   if (belief.lastPositiveAtCalibratedAt == null) return false;
@@ -458,7 +491,7 @@ bool picksAloneCanMaster(QuestionDifficulty difficulty) {
 ///      mastered, at home.
 ///   3. **the next right answer decides** — one right answer of another
 ///      type would master it, a right pick would not: the bar shows that
-///      segment half (§4.5), and the answer should count.
+///      LO's segment at 1 to go (§4.5), and the answer should count.
 ///
 /// An LO without a doc gets no rule, and one whose kind has no other type
 /// is the caller's.

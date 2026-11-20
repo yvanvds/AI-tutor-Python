@@ -20,7 +20,32 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.1-eval9` = PUNTENFORMULE v1.1, replayed from the turn log.
+Rule set `1.1.3-eval11` = PUNTENFORMULE v1.1.3, replayed from the turn
+log. `eval11` (#327) lets the mastery guard of `eval9` read the stamp on
+the LO's doc, as the app does (`isMastered` → `everMasteredBelief`), where
+`validate` and `replay-beliefs` replay (`replay(stamps=...)`). The guard
+read only the replay's own stamp, and with `--regels 1.1` that has no thin
+stamp from before 1.1 (fewer than two right own questions): 1.1 does not
+give it, and the doc keeps it (#168). On build 2.15.0 the app guarded such
+an LO and the replay forgot — four docs in 6WEWI read as a deviation
+(2026-11-20). With the docs' stamps, `validate --regels 1.1` shows none in
+6EWI or 6WEWI. `draft` and `what-if` pass no stamps: they replay by build,
+from the log alone, and feeding them the docs' stamps moved no stamp and no
+μ on the class data (2026-11-21). No grade moves; `lo_beliefs` needs no
+rewrite: the docs are what the app computed.
+
+`eval10` (#326) follows the app's count of a right follow-up from the
+build that brought it (`FOLLOW_UP_RIGHT_FROM`, by the turn's
+`clientVersion`, `follow_up_counts`): an own question answered `partial`
+counts as answered right when a follow-up on it — at either depth of a
+chain — is `correct` with a positive first signal on its LO, once per own
+question: `own_right` + 1, and `own_right_open` + 1 when the own question
+was no multiple choice. The follow-up's weight does not change. A turn
+from an earlier build replays as that build wrote it, `--regels 1.1`
+included: the teacher chose to apply the rule forward only (2026-11-20),
+so `lo_beliefs` needs no rewrite. The variant "na deels juist, onbeperkt"
+of the replay on #326.
+
 `eval9` (#311) follows the app's mastery guard from the build that brought
 it (`MASTERY_GUARD_FROM`, by the turn's `clientVersion`, `mastery_guard`):
 a write without a negative on an LO that is mastered at that moment — the
@@ -151,11 +176,11 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.1-eval9"
+RULES_VERSION = "1.1.3-eval11"
 
 PRIOR = 1.0
 # A backstop since #278: forgetting keeps the evidence under 14.
@@ -169,6 +194,10 @@ RULES_11_FROM = (2, 13, 0)
 # brought it, a write without a negative on a mastered LO does not forget
 # where forgetting would take the LO under the bar (`mastery_guard`).
 MASTERY_GUARD_FROM = (2, 15, 0)
+# #326 (`belief_math.countsAsRightOwnQuestion`): from the build that brought
+# it, a right follow-up on an own question answered `partial` counts that
+# own question as right (`follow_up_counts`).
+FOLLOW_UP_RIGHT_FROM = (2, 16, 0)
 # #279, from the same build: a right pick weighs half
 # (`PolicyConstants.multipleChoicePositiveFactor`), and the stamp wants two
 # own questions answered right, one of them no multiple choice
@@ -367,6 +396,15 @@ def mastery_guard(turn: dict) -> bool:
     return v is not None and v >= MASTERY_GUARD_FROM
 
 
+def follow_up_counts(turn: dict) -> bool:
+    """Whether the build that wrote [turn] counts a right follow-up on an
+    own question answered `partial` as that own question answered right
+    (#326). Older builds, and turns without `clientVersion`, counted no
+    follow-up."""
+    v = build_version(turn)
+    return v is not None and v >= FOLLOW_UP_RIGHT_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -438,8 +476,9 @@ class LoState:
     # the app counts as `ownQuestions` for the stuck rule.
     own_questions: int = 0
     # The LO's own questions answered right — a `correct` answer with a
-    # positive signal on it, once per question — all of them and those that
-    # were no multiple choice: the app's `ownQuestionsRight` and
+    # positive signal on it, once per question, or from 2.16.0 one answered
+    # `partial` and finished right in a follow-up (#326) — all of them and
+    # those that were no multiple choice: the app's `ownQuestionsRight` and
     # `ownQuestionsRightNonMcq`, the stamp's fourth condition since 1.1
     # (#279). And the run of the streak, for a `Variant` (#246).
     own_right: int = 0
@@ -481,6 +520,13 @@ def _decay(a: float, b: float, last: dt.datetime | None, now: dt.datetime) -> tu
     return PRIOR + (a - PRIOR) * d, PRIOR + (b - PRIOR) * d
 
 
+def decayed(lo: LoState, now: dt.datetime) -> tuple[float, float]:
+    """(α, β) of [lo] decayed from its clock to [now], as the app decays at
+    its next write; as they are at or before the clock. Composable: decayed
+    to a moment and on from there is decayed in one go (#328)."""
+    return _decay(lo.alpha, lo.beta, lo.last_at, now)
+
+
 def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
     """Cap-then-add, as `belief_math.applyEvidence`."""
     nd = da + db
@@ -507,7 +553,8 @@ class Variant:
 
     An *own question* is a direct question with the LO as its target, no
     follow-up; it is *right* when the answer was `correct` and the signal on
-    the LO positive. A `partial` with a positive signal is not right."""
+    the LO positive. A `partial` with a positive signal is not right — until
+    a follow-up on it is, from the build of #326 (`follow_up_after_partial`)."""
 
     # Every turn replays with the stamp rules of #276, whatever build wrote
     # it: what the candidate would have done on these answers, not what the
@@ -544,6 +591,12 @@ class Variant:
     # (`mastery_guard`). `as_11` does not set it: the docs `--regels 1.1`
     # wrote, and the builds of 1.1 before the guard, had none.
     mastery_guard: bool | None = None
+    # #326: a right follow-up on an own question answered `partial` counts
+    # that own question as right, on every turn (True) or on none (False),
+    # whatever build wrote it; unset, a turn of a build that does
+    # (`follow_up_counts`). `as_11` does not set it: the rule applies
+    # forward only.
+    follow_up_after_partial: bool | None = None
 
 
 CURRENT = Variant()
@@ -553,16 +606,26 @@ def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
     return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
 
 
-def _mastered_now(lo: LoState, a: float, b: float, min_right: int, min_open: int) -> bool:
+def _mastered_now(lo: LoState, a: float, b: float, min_right: int, min_open: int, doc_stamped: bool = False) -> bool:
     """`belief_math.isMastered` on the decayed belief `(a, b)`: mean and
     evidence at today's bar, a positive at calibration, and the stamp or
-    the right own questions the stamp wants."""
+    the right own questions the stamp wants. The stamp is the replay's, or
+    [doc_stamped]: the doc's, which the app reads (#327)."""
     return (
         a / (a + b) >= MASTERY_MEAN
         and a + b >= MASTERY_EVIDENCE
         and lo.positive_at_calibrated_at is not None
-        and (lo.demonstrated or (lo.own_right >= min_right and lo.own_right_open >= min_open))
+        and (lo.demonstrated or doc_stamped or (lo.own_right >= min_right and lo.own_right_open >= min_open))
     )
+
+
+def _doc_stamped(stamps: Mapping[tuple[str, str], dt.datetime], key: tuple[str, str], now: dt.datetime) -> bool:
+    """Whether the doc of [key] had its stamp before the write at [now]:
+    one strictly earlier. The app stamps when it writes, a second or so
+    after `turnAt`; `replay-beliefs` writes a replayed stamp at `turnAt`,
+    and before that oefening's write the doc had none."""
+    at = stamps.get(key)
+    return at is not None and at < now
 
 
 def _add_positive(a: float, b: float, da: float, forget: float | None, guarded: bool) -> tuple[float, float]:
@@ -670,11 +733,26 @@ def replay(
     apply_transfer_credits: bool = True,
     supervised: Callable[[dict], bool] = recorded_supervised,
     variant: Variant = CURRENT,
+    stamps: Mapping[tuple[str, str], dt.datetime] | None = None,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
 
     [variant] replays a candidate rule for 1.1 instead (#248); the default
     is the rule of now.
+
+    [stamps] are the stamps on the student's `lo_beliefs` docs, per LO (the
+    stamp the app reads, `evaluate.app_stamp`), for the mastery guard
+    (#311, #327). The app decides the guard on the doc (`isMastered` reads
+    `everMasteredBelief`), so with them an LO counts as stamped there from
+    its doc's stamp on (`_doc_stamped`), whether the replay gives that stamp
+    or not: a stamp from before 1.1 on fewer than two right own questions,
+    which `--regels 1.1` does not replay and no rewrite clears (#168), or a
+    stamp only 1.1 gives on a replay by build. `validate` and
+    `replay-beliefs` pass them, to compare to and write what the app
+    computed. Only the guard reads them: the replay's own stamp, which the
+    grade reads, comes from the log alone. None, as `draft` and `what-if`
+    replay: the replay's own stamps only, a model by build of its own
+    (README, `eval11`).
 
     [supervised] says which turns weigh ×`SUPERVISED_WEIGHT_FACTOR`, every
     signal and transfer credit of the turn (PUNTENFORMULE §2.7). The default
@@ -698,9 +776,25 @@ def replay(
     builds before #204 wrote that neutral, but it moves neither M nor P.
     """
     st: dict[tuple[str, str], LoState] = {}
+    stamps = stamps or {}
+    # #326: the own question of the follow-up chain under way, while its
+    # answer was `partial` and it has not counted as right — its LO's key.
+    # A follow-up only ever comes right after its own question (§6.5); any
+    # turn that is no follow-up starts a new chain, as in the conductor
+    # (`Conductor._partialOwnQuestion`).
+    partial_own: tuple[str, str] | None = None
     for t in turns:
         now = parse_at(t["turnAt"])
         follow_up = t.get("isFollowUp") is True
+        if not follow_up:
+            partial_own = None
+        counts_follow_up = (
+            variant.follow_up_after_partial if variant.follow_up_after_partial is not None
+            else follow_up_counts(t)
+        )
+        # The follow-up's first signal on the target is the one that may
+        # count, as the own question's first signal is (#278).
+        follow_up_target_seen = False
         diff = t.get("difficulty") or "medium"
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
@@ -757,7 +851,7 @@ def replay(
                 base *= mcq_factor
             forgets = forget if (own or not variant.forget_own_only) else None
             if kind == "positive":
-                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open, _doc_stamped(stamps, key, now))
                 a, b = _add_positive(a, b, base * POS_FACTOR[eff_diff], forgets, guarded)
             elif kind == "negative":
                 if forgets is not None:
@@ -794,6 +888,19 @@ def replay(
                     lo.own_streak += 1
             elif first_own and kind != "neutral":
                 lo.own_streak = 0
+            if first_own and t.get("overallQuality") == "partial":
+                partial_own = key
+            # #326: a right follow-up finishes the `partial` own question —
+            # once, at either depth of a chain. The follow-up's record
+            # carries its own question's type.
+            first_follow_up = follow_up and target and not incidental and not follow_up_target_seen
+            if first_follow_up:
+                follow_up_target_seen = True
+                if counts_follow_up and partial_own == key and kind == "positive" and right:
+                    partial_own = None
+                    lo.own_right += 1
+                    if not mcq:
+                        lo.own_right_open += 1
             if direct:
                 lo.n_direct += 1
                 lo.last_direct_at = now
@@ -826,10 +933,11 @@ def replay(
             # file, not the conductor's `firstMasteredAt ?? lastUpdatedAt`
             # fallback for pre-#101 docs.
             for c in t.get("transferCredits") or []:
-                lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
+                credited = (c["subgoalId"], c["loId"])
+                lo = st.setdefault(credited, LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
                 forgets = None if variant.forget_own_only else forget
-                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open, _doc_stamped(stamps, credited, now))
                 lo.alpha, lo.beta = _add_positive(a, b, TRANSFER_CREDIT_ALPHA * s_factor, forgets, guarded)
                 lo.last_at = now
                 lo.n_transfer += 1

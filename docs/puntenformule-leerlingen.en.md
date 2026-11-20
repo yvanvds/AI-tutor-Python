@@ -1,7 +1,7 @@
 # How do you get your grade?
 
-*Goes with version 1.1.2 of the grade formula. The app computes with
-formula 1.1: that number is also in My reports.*
+*Goes with version 1.1.4 of the grade formula. The app computes with
+formula 1.1.3: that number is also in My reports.*
 
 ## What counts for your grade?
 
@@ -42,14 +42,15 @@ M = 50 · 0.8 + 50 · 0.8 · (0.6 · 0.5 + 0.4 · 0.3)
   = 40 + 16.8 = 56.8   →   your grade is 57
 ```
 
-The full formula writes C(k), w_u and w_d. Today those are k, 0.6 and 0.4,
-still provisional.
+The full formula writes C(k), w_u and w_d. Today: k, 0.6 and 0.4, still
+provisional.
 
 ## When have I demonstrated a learning objective?
 
-When the tutor is sure enough that you can do it:
+When the tutor is sure enough you can do it:
 
-- you answered at least two questions about it fully right;
+- you answered at least two questions about it fully right, or half
+  right and the follow-up question right;
 - at least one of them was not a multiple-choice question;
 - at least one good answer came at your level or higher;
 - your answers about it are mostly right, especially the latest.
@@ -66,39 +67,40 @@ lowers your grade.
 ## What if I make mistakes?
 
 Mistakes are part of learning. With every new answer, older answers count
-a little less, so the latest weigh the most. Make mistakes first and then
+a little less, so the latest weigh most. Make mistakes first, then
 get it, and you still demonstrate it. If you are stuck, you may move on and
 it comes back later.
 
 ## Do hard questions count more?
 
 Yes. A right answer to a hard question shows more than to an easy one. A
-mistake on a hard question weighs less, though. So a higher level doesn't
+mistake on one weighs less, though. So a higher level doesn't
 make demonstrating harder.
 
-The tutor finds your level by itself: when it goes well, the questions get
+The tutor finds your level itself: when it goes well, the questions get
 harder; when it often doesn't, easier. At the top you see how hard your
 exercise is.
 
 ## Does class work count differently from homework?
 
-An answer in class counts a little more: × 1.25. That holds from 10 minutes
-before to 10 minutes after a lesson of your class, wherever you are.
+An answer in class counts a little more: × 1.25. From 10 minutes before to
+10 minutes after a lesson of your class, wherever you are.
 Homework counts normally, never less.
 
 ## Does old material come back?
 
 Yes. A session can start with a **review question** about something you
 demonstrated long ago. In between, a **check question** may come about an
-earlier learning objective you haven't demonstrated yet, so you can still
-show it. The app announces these questions.
+earlier learning objective you haven't demonstrated yet, to still show it.
+The app announces these questions.
 
 ## What do I see, and when?
 
-While you work, you see your progress, not a grade. Your grade comes at the
-report moment, when your teacher releases it in **My reports**, with an
-explanation. Under "How this grade was computed" you find M, k, u and d,
-and the day of the calculation: what you had demonstrated by then counts.
+While you work, you see progress, not a grade: the right answers each
+learning objective still needs, and a tick once demonstrated. Your grade
+comes when your teacher releases it in **My reports**, with an explanation.
+Under "How this grade was computed" you find M, k, u and d, and the day of
+the calculation: what you had demonstrated by then counts.
 
 ## Who decides on my grade?
 
@@ -122,5 +124,5 @@ report never changes.
 
 ## Where is everything, exactly?
 
-Below this text is the button to the full grade formula, in Dutch, with
-every rule down to the decimal.
+Below this text, a button opens the full grade formula, in Dutch, down to
+the decimal.
