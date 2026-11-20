@@ -13,7 +13,7 @@
 //   1. lo-a answered "partial", with a follow-up  → still one right own
 //      question, not mastered, the share 0
 //   2. the follow-up, right                       → two: mastered, stamped,
-//      the share 0.5, its segment full
+//      the share 0.5, its segment full (0 to go)
 //   3. the next question is on lo-b, not on lo-a again
 //
 // Real app, real navigation, real practice view, editor and chat, real
@@ -34,7 +34,6 @@ import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/session/widgets/subgoal_progress_bar.dart';
 import 'package:ai_tutor_python/services/student_state/lo_belief.dart';
-import 'package:ai_tutor_python/services/tutor/lo_display.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
@@ -102,9 +101,10 @@ void main() {
           )['mastered']
           as bool;
 
-  List<LoDisplayState> segments(WidgetTester tester) => [
+  /// The right answers to go in each segment of the bar (#325).
+  List<int> segments(WidgetTester tester) => [
     for (final s in tester.widgetList<LoSegment>(find.byType(LoSegment)))
-      s.state,
+      s.entry.toGo,
   ];
 
   testWidgets('a "partial" own question finished right in its follow-up '
@@ -206,7 +206,7 @@ void main() {
     expect(storedA()['ownQuestions'], 2);
     expect(storedA()['ownQuestionsRight'], 1);
     expect(storedA()['firstMasteredAt'], isNull);
-    expect(segments(tester).first, isNot(LoDisplayState.full));
+    expect(segments(tester).first, greaterThan(0));
 
     // 2. The follow-up comes in the chat; the student finishes the answer.
     await pumpUntilFound(
@@ -248,10 +248,10 @@ void main() {
       () => cachedShare() == 0.5,
       reason: 'the mastered LO never reached the cached share',
     );
-    // The student sees it: lo-a's segment is full.
+    // The student sees it: lo-a's segment is full, 0 to go.
     await pumpUntil(tester, () {
       final s = segments(tester);
-      return s.isNotEmpty && s.first == LoDisplayState.full;
+      return s.isNotEmpty && s.first == 0;
     }, reason: 'lo-a\'s segment never filled');
 
     // 3. The next question is on lo-b: lo-a is not asked again.

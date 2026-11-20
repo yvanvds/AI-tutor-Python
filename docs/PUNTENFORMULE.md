@@ -1,6 +1,6 @@
 # Puntenformule — hoe je rapportcijfer tot stand komt
 
-**Versie 1.1.3** — formule 1.1.3, van kracht vanaf de eerste build na
+**Versie 1.1.4** — formule 1.1.3, van kracht vanaf de eerste build na
 v2.15.0; formule 1.1 sinds 9 november 2026 (v2.13.0+30).
 Laatste wijziging: 2026-11-20.
 
@@ -351,22 +351,38 @@ leerdoel later terug met een controlevraag, eerst een niveau lager
 (§2.8).
 
 **Tijdens het oefenen** (sinds v1.0.21) bestaat het balkje onder je
-huidige subdoel uit één stuk per niet-optioneel leerdoel. Een stuk is
-leeg, half of vol: **half** betekent dat één goed antwoord op jouw
-niveau genoeg is om het leerdoel te beheersen (sinds v1.1 een antwoord
-dat geen meerkeuzevraag is, en pas als je al één vraag over het leerdoel
-juist had, §1.5), **vol** dat je het
-beheerst (of beheerst hebt), of dat je erop vastliep. Zo beweegt het
-balkje vanaf je eerste goede antwoord, ook al is één goed antwoord
-nog net niet genoeg voor "beheerst". Een half stuk wordt pas weer leeg
-na een fout of half juist antwoord op een vraag over dat leerdoel zelf,
-niet door wat de tutor zag in een vraag over iets anders; een vol stuk
-blijft vol. Wanneer je een nieuwe sessie begint, volgen de stukken
-weer je overtuigingen zoals ze dan zijn. Wil je weten hoe het staat,
-ga dan met je muis over het balkje: "2 onderdelen beheerst, 1 bijna,
-2 nog te doen". Het overzicht van je leerkracht toont nog altijd het
-aandeel beheerste leerdoelen van hierboven, het leerpad sinds v1.0.22
-de aangetoonde (hieronder), en aan het punt verandert dit niets.
+huidige subdoel uit één stuk per niet-optioneel leerdoel. Sinds v1.1.4
+toont elk stuk **hoeveel juiste antwoorden je nog nodig hebt** om dat
+leerdoel te beheersen (§1.5): het getal staat in het stuk. Geteld zoals
+je ze zou krijgen: sterk juist, thuis, geen meerkeuzevraag, met het
+vergeten van §1.4, op het niveau waarop de tutor het leerdoel nu vraagt
+(een niveau lager als §1.6 dat zo beslist; dan moet er nog één juist
+antwoord op jouw niveau bij). Een nieuw leerdoel vraagt er zo 2 op
+moeilijk, 3 op gemiddeld en 8 op makkelijk. De vulling volgt het getal:
+een nieuw leerdoel is leeg, elk juist antwoord vult een stap (op
+gemiddeld een derde), en bij 0 is het stuk vol. Een leerdoel waarop je
+vastliep, toont gewoon zijn getal; het is niet meer vol. Heb je het
+leerdoel **aangetoond** (de stempel van §1.5), dan staat er een vinkje
+in het stuk, en dat blijft staan als de vulling zakt. Het stuk van het
+leerdoel van je huidige oefening heeft een kader. Het getal volgt je
+overtuiging, ook naar beneden: na een fout of half juist antwoord op
+dat leerdoel, na een fout die de tutor erop zag in een vraag over iets
+anders, of als je vragen makkelijker worden, kan het stijgen, ook als
+het stuk vol was. Zonder zo'n reden stijgt het niet: een antwoord dat
+niet fout is, zet je nooit terug, ook al kan het vergeten van §1.4
+een licht juist antwoord (een vervolgvraag, een zwak signaal) minder
+laten toevoegen dan het wegneemt. Ga je met je muis over een stuk (of
+tik je erop), dan zie je de "Je kan …"-zin van het leerdoel, het getal
+in woorden, of het aangetoond is, en waarom het getal steeg; tussen de
+stukken zie je het hele subdoel: "2 van 5 onderdelen beheerst, nog 6
+juiste antwoorden". Wanneer je een nieuwe sessie begint, volgen de
+stukken weer je overtuigingen zoals ze dan zijn, ook na het verval
+sinds je vorige sessie. Schuif je door met een vastgelopen leerdoel,
+dan sluit het subdoel af met een stuk dat niet vol is, zonder melding;
+het leerdoel komt terug met een controlevraag (§2.8). Het overzicht van
+je leerkracht toont nog altijd het aandeel beheerste leerdoelen van
+hierboven, het leerpad sinds v1.0.22 de aangetoonde (hieronder), en aan
+het punt verandert dit niets.
 
 **Op het leerpad** (sinds v1.0.22) telt elk balkje de leerdoelen die
 je **aangetoond** hebt: die met de stempel van §1.5, dezelfde die het
@@ -899,6 +915,7 @@ waarden uit de app; bijlage A somt ze op met hun vindplaats in de code.
 | 1.1.1 | 2026-11-09 | Geen wijziging aan de formule of aan de metingen eronder: de app rekent nog altijd met formule 1.1, en voorstellen en rapporten dragen dat nummer. De kop zegt dat formule 1.1 van kracht is sinds 9 november 2026 (v2.13.0+30), en §4 dat de schaduwrun voorbij is; welke getallen nog voorlopig zijn, blijft in de tabel van §4 staan (§2.3 volgt). Dit document is de specificatie, voor de leerkracht, de app en wie het precies wil weten. Voor leerlingen is er een korte uitleg in gewone taal, in het Nederlands en het Engels (`docs/puntenformule-leerlingen.nl.md` en `.en.md`, met de formule van §2.3 en één rekenvoorbeeld); het tabblad Puntenformule toont die in de taal van de app, met onderaan de weg naar dit document. §5: dit document en de formule hebben elk een versienummer, en wat een leerling merkt, past ook de korte uitleg aan. Bijlage A noemt het nummer op een voorstel daarom het nummer van de formule. De log staat op volgorde (#301). |
 | 1.1.2 | 2026-11-19 | Geen wijziging aan M of P, en geen stempel verandert: de formule houdt haar nummer 1.1. §1.4: **een antwoord dat niet fout is, maakt een beheerst leerdoel nooit onbeheerst.** Krijgt een leerdoel dat op dat moment beheerst is een signaal dat niet negatief is (de vraag zelf, een vervolgvraag, een signaal van opzij, transfer-krediet) en zou het door het vergeten van §1.4 onder μ 0,80 of onder bewijs 5,75 komen, dan komt het nieuwe bewijs erbij zonder te vergeten. Een fout antwoord vergeet zoals altijd, en op de weg naar beheerst verandert er niets. Reden: een juiste vervolgvraag telt 0,5, minder dan het vergeten wegneemt bij een leerdoel dat net beheerst is. Het leerdoel was dan na een juist antwoord niet meer beheerst, de voortgang zakte en de tutor vroeg het opnieuw. In de eerste week van formule 1.1 gebeurde dat 33 keer in de klas, het vaakst na transfer-krediet (20 keer) en na een vervolgvraag (6 keer). De leerkracht koos deze regel op 2026-11-18 op een herspeling van de klasdata: ze haalt alle 33 gevallen weg en verandert geen enkele stempel en dus geen punt, want ze werkt alleen op een leerdoel dat al beheerst is, en dat heeft zijn stempel al (§2.2). Wat wel verandert is de overtuiging van zo'n leerdoel (α, β en μ), en daardoor welke vraag de tutor stelt. De app past de regel toe vanaf de eerste build na v2.14.0; §2.8 en bijlage A volgen. De korte uitleg voor leerlingen noemt het nieuwe versienummer; aan haar tekst verandert niets (#311). |
 | 1.1.3 | 2026-11-20 | Geen structuurwijziging aan M of P, maar de metingen eronder veranderen: formule 1.1.3. §1.5, voorwaarde 4: **een half juist antwoord met een juiste vervolgvraag erop telt als een juist beantwoorde vraag over het leerdoel zelf**, en als geen meerkeuzevraag als de vraag er geen was. Eén keer per vraag, ook als er twee vervolgvragen na elkaar komen; zonder beperking per leerdoel. Het gewicht van de vervolgvraag (0,5, §1.2), het vergeten van §1.4 en de bewaking van v1.1.2, een vervolgvraag na een juist of fout antwoord en de lat van twee juiste vragen waarvan één geen meerkeuzevraag veranderen niet. Reden: een vervolgvraag na "deels juist" is er net om je antwoord te laten afmaken, maar ze kon een leerdoel nooit opleveren, terwijl een foute vervolgvraag een leerdoel wel onder de grens kon duwen. In de klasdata van 10 tot 20 november kreeg 71% van de half juiste antwoorden een vervolgvraag, en daarvan was 79% juist. Op de herspeling van die oefeningen tellen 68 vervolgvragen mee; 17 stempels vallen vroeger, geen enkele later of niet meer. De leerkracht koos op 2026-11-20 de regel zonder beperking per leerdoel: met hoogstens één per leerdoel veranderde er niets, want de lat blijft twee en μ ≥ 0,80 blijft de rem. De regel geldt vanaf de build die hem brengt (de eerste na v2.15.0); bestaande tellingen worden niet herrekend, een stempel van vóór deze versie blijft staan (§2.2). De evaluatie buiten de app herspeelt elke oefening met de regels van de app die ze schreef. De korte uitleg voor leerlingen zegt het bij de voorwaarden voor aangetoond (#326). |
+| 1.1.4 | 2026-11-20 | Geen wijziging aan M, P of de metingen eronder: de formule houdt haar nummer 1.1.3. §1.7: het balkje tijdens het oefenen toont per leerdoel **hoeveel juiste antwoorden je nog nodig hebt** om het te beheersen, als getal in het stuk, geteld op het niveau waarop de tutor het leerdoel vraagt; de vulling volgt dat getal (een nieuw leerdoel leeg, 0 vol). Een vastgelopen leerdoel is niet langer vol, een vol stuk blijft niet langer vol en een half stuk wordt niet langer vastgehouden: het getal volgt je overtuiging, en stijgt na een fout of half juist antwoord op het leerdoel, na een fout erop in een vraag over iets anders of bij makkelijkere vragen — nooit na een antwoord dat niet fout is. De stempel van §1.5 krijgt een eigen vinkje dat blijft als de vulling zakt, het leerdoel van je huidige oefening een kader, en elk stuk een uitleg met de "Je kan …"-zin, het getal in woorden en waarom het steeg. Doorschuiven met een vastgelopen leerdoel gebeurt nog altijd zonder melding. Reden: in de les van 20 november zag een leerling een bijna vol balkje dat niet meer bewoog terwijl hij juist antwoordde — een vastgelopen leerdoel stond vol, de tutor bleef het vragen (12 van de 26 oefeningen), en vol bleef vol. Juiste informatie frustreert minder dan een balkje dat niet klopt met de vragen; op het Leerpad zie je de stempels al (#325). |
 
 ---
 

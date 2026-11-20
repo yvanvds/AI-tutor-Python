@@ -1402,15 +1402,53 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_objectiveBanner_pillSelfChosen => 'Zelf gekozen';
 
   @override
-  String session_objectiveBanner_segments(int mastered, int almost, int todo) {
-    String _temp0 = intl.Intl.pluralLogic(
-      mastered,
-      locale: localeName,
-      other: '$mastered onderdelen beheerst',
-      one: '1 onderdeel beheerst',
-    );
-    return '$_temp0, $almost bijna, $todo nog te doen';
+  String session_objectiveBanner_summary(int mastered, int total) {
+    return '$mastered van $total onderdelen beheerst';
   }
+
+  @override
+  String session_objectiveBanner_summaryToGo(
+    int mastered,
+    int total,
+    int toGo,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      toGo,
+      locale: localeName,
+      other: '$toGo juiste antwoorden',
+      one: '1 juist antwoord',
+    );
+    return '$mastered van $total onderdelen beheerst, nog $_temp0';
+  }
+
+  @override
+  String session_lo_toGo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Nog $count juiste antwoorden',
+      one: 'Nog 1 juist antwoord',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get session_lo_mastered => 'Beheerst';
+
+  @override
+  String get session_lo_rose_notRight =>
+      'Gestegen na een antwoord dat niet juist was.';
+
+  @override
+  String get session_lo_rose_lowerLevel =>
+      'Gestegen: je vragen zijn nu makkelijker, en daar telt een juist antwoord minder.';
+
+  @override
+  String get session_lo_rose_otherQuestion =>
+      'Gestegen na een fout hierop in een vraag over iets anders.';
+
+  @override
+  String get session_lo_current => 'Je huidige oefening gaat hierover.';
 
   @override
   String get chat_tutorName => 'Tutor';

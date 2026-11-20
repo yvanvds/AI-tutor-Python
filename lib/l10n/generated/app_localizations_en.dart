@@ -1391,15 +1391,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_objectiveBanner_pillSelfChosen => 'Your choice';
 
   @override
-  String session_objectiveBanner_segments(int mastered, int almost, int todo) {
-    String _temp0 = intl.Intl.pluralLogic(
-      mastered,
-      locale: localeName,
-      other: '$mastered parts mastered',
-      one: '1 part mastered',
-    );
-    return '$_temp0, $almost almost, $todo still to do';
+  String session_objectiveBanner_summary(int mastered, int total) {
+    return '$mastered of $total parts mastered';
   }
+
+  @override
+  String session_objectiveBanner_summaryToGo(
+    int mastered,
+    int total,
+    int toGo,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      toGo,
+      locale: localeName,
+      other: '$toGo more right answers to go',
+      one: '1 more right answer to go',
+    );
+    return '$mastered of $total parts mastered, $_temp0';
+  }
+
+  @override
+  String session_lo_toGo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more right answers',
+      one: '1 more right answer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get session_lo_mastered => 'Mastered';
+
+  @override
+  String get session_lo_rose_notRight =>
+      'Went up after an answer that was not right.';
+
+  @override
+  String get session_lo_rose_lowerLevel =>
+      'Went up: your questions are easier now, and a right answer counts for less there.';
+
+  @override
+  String get session_lo_rose_otherQuestion =>
+      'Went up after a mistake on this in a question about something else.';
+
+  @override
+  String get session_lo_current => 'Your current exercise is about this.';
 
   @override
   String get chat_tutorName => 'Tutor';

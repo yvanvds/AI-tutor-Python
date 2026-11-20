@@ -2335,11 +2335,53 @@ abstract class AppLocalizations {
   /// **'Your choice'**
   String get session_objectiveBanner_pillSelfChosen;
 
-  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.
+  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#230, #325) when every segment is mastered: one segment per learning objective of the subgoal.
   ///
   /// In en, this message translates to:
-  /// **'{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do'**
-  String session_objectiveBanner_segments(int mastered, int almost, int todo);
+  /// **'{mastered} of {total} parts mastered'**
+  String session_objectiveBanner_summary(int mastered, int total);
+
+  /// Tooltip and screen-reader label of the subgoal bar in the practice view (#325): how many learning objectives are mastered, and the right answers the others still need, added up.
+  ///
+  /// In en, this message translates to:
+  /// **'{mastered} of {total} parts mastered, {toGo, plural, =1{1 more right answer to go} other{{toGo} more right answers to go}}'**
+  String session_objectiveBanner_summaryToGo(int mastered, int total, int toGo);
+
+  /// In the popup of one segment of the subgoal bar (#325): the right answers this learning objective still needs to be mastered. The same number is in the segment.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more right answer} other{{count} more right answers}}'**
+  String session_lo_toGo(int count);
+
+  /// In the popup of one segment of the subgoal bar (#325): this learning objective needs no more right answers. Followed by ' · demonstrated' when it carries the mark that counts for the grade.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastered'**
+  String get session_lo_mastered;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number of right answers still needed went up — a question on this learning objective was not answered right.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up after an answer that was not right.'**
+  String get session_lo_rose_notRight;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number went up — the tutor now asks easier questions, where a right answer weighs less.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up: your questions are easier now, and a right answer counts for less there.'**
+  String get session_lo_rose_lowerLevel;
+
+  /// In the popup of one segment of the subgoal bar (#325): why the number went up — a question about another learning objective showed a mistake on this one.
+  ///
+  /// In en, this message translates to:
+  /// **'Went up after a mistake on this in a question about something else.'**
+  String get session_lo_rose_otherQuestion;
+
+  /// In the popup of the marked segment of the subgoal bar (#325): the exercise on screen is about this learning objective.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current exercise is about this.'**
+  String get session_lo_current;
 
   /// No description provided for @chat_tutorName.
   ///

@@ -408,7 +408,14 @@
 
   "session_objectiveBanner_pill": "Huidig doel",
   "session_objectiveBanner_pillSelfChosen": "Zelf gekozen",
-  "session_objectiveBanner_segments": "{mastered, plural, =1{1 onderdeel beheerst} other{{mastered} onderdelen beheerst}}, {almost} bijna, {todo} nog te doen",
+  "session_objectiveBanner_summary": "{mastered} van {total} onderdelen beheerst",
+  "session_objectiveBanner_summaryToGo": "{mastered} van {total} onderdelen beheerst, nog {toGo, plural, =1{1 juist antwoord} other{{toGo} juiste antwoorden}}",
+  "session_lo_toGo": "{count, plural, =1{Nog 1 juist antwoord} other{Nog {count} juiste antwoorden}}",
+  "session_lo_mastered": "Beheerst",
+  "session_lo_rose_notRight": "Gestegen na een antwoord dat niet juist was.",
+  "session_lo_rose_lowerLevel": "Gestegen: je vragen zijn nu makkelijker, en daar telt een juist antwoord minder.",
+  "session_lo_rose_otherQuestion": "Gestegen na een fout hierop in een vraag over iets anders.",
+  "session_lo_current": "Je huidige oefening gaat hierover.",
 
   "chat_tutorName": "Tutor",
   "chat_userName_you": "Jij",

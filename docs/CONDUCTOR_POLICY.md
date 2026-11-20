@@ -576,7 +576,7 @@ pick is the gentle way in, as it was), when
    `(5.38, 1)` — would otherwise be asked picks that never take it back;
 3. **the next right answer decides**: one right answer of another type
    would master the LO and a right pick would not. The bar shows that
-   segment half (4.5); the answer must count.
+   segment at 1 to go (4.5); the answer must count.
 
 An LO without a doc, or with no right own question yet, keeps every type;
 so does a mastered LO in the top-up of a mastered subgoal (1.3), with no
@@ -2100,10 +2100,23 @@ calibration, a wrong one brings it back at the next session. Until #275
 nothing brought it back: a stuck LO stood under the near goal's window
 for good.
 
-**Student-side invisibility.** The advance feels normal to the
-student. No "you didn't really master this but we're moving on"
-message — that's demoralizing and counterproductive. Internally the
-data is intact; teacher-side surfacing is for section 8.
+**No message at the advance; the real state in the bar (#325).** The
+advance itself says nothing to the student: no "you didn't really master
+this but we're moving on" message. But the state is not hidden. Until
+#325 a stuck LO looked full in the bar (4.5), as the advance it allows
+looks normal; the teacher (2026-11-20) reversed that. In the lesson of
+that day a student answered right and the bar did not move: one LO was
+stuck at the session start, so its segment was full, the subgoal could
+not advance on four other open LOs, and the app asked the stuck LO 12 of
+26 oefeningen — climbing from μ 0.19 past 0.6, where it was no longer
+stuck — while its segment, full, stayed full. Correct information
+frustrates less than a bar that disagrees with the questions, the
+student already sees the stamps per subgoal in the Leerpad (#243), and
+demotivation by a goal not reached does not show in practice. So a
+stuck LO's segment shows the right answers it still needs, like any
+other, and a subgoal that advances with one closes on a segment that is
+not full; the LO comes back as a recheck (2.6, #275). Teacher-side
+surfacing is for section 8.
 
 **Teacher visibility (see section 8).** A subgoal advancing
 with one or more stuck LOs is a real gap in the student's
@@ -2164,61 +2177,107 @@ looks weird, teacher might want to know" event, not "student in
 trouble." Log to the student's record for teacher audit. Passive
 surfacing — the student experience is fine. (Section 8 details.)
 
-**The bar in the session shows a display state, not the cached share
-(#230).** The cached fraction above is what the teacher's overview, the
-report and the XP read, and it stays exactly that. The Leerpad counts
-the `firstMasteredAt` stamps instead, the reading the grade uses (#243):
-"3 of 4 demonstrated" per subgoal, its bar that share, the root's the
-average over its non-optional subgoals; the check marks and the active
-root still come from the progress docs. The
-bar the student watches while practising — under the subgoal in the
-objective banner, and the 2px line at the top of the window — shows
-instead one segment per non-optional LO of the active subgoal (an
-optional LO gets none), each in one of three states:
+**The bar in the session shows the real state per LO, not the cached
+share (#230, #325).** The cached fraction above is what the teacher's
+overview, the report and the XP read, and it stays exactly that. The
+Leerpad counts the `firstMasteredAt` stamps instead, the reading the
+grade uses (#243): "3 of 4 demonstrated" per subgoal, its bar that
+share, the root's the average over its non-optional subgoals; the check
+marks and the active root still come from the progress docs. The bar the
+student watches while practising — under the subgoal in the objective
+banner, and the 2px line at the top of the window — shows instead one
+segment per non-optional LO of the active subgoal (an optional LO gets
+none). It is only the display: the belief, the selection, the formula
+and the grade read none of it.
 
-- **empty**;
-- **half**: one right answer would master the LO. A `(positive,
-  strong)` signal at the student's calibration, with the home factor
-  (×1.0), applied to the current decayed `(α, β)` as every answer is —
-  forgetting, then the cap (3.4) — meets conditions 1 and 2 of 4.1;
-  condition 3 that answer meets itself, and condition 4 (#279) when the
-  LO already has a right own question and the answer is no pick — the
-  type 2.2 then asks. Without a right own question one answer cannot
-  master an LO, whatever its belief. Since #278 on medium at home that
-  is after the second right answer, not the first;
-- **full**: mastered now (the four conditions of 4.1), mastered once
-  (`firstMasteredAt`, the one-way reading the grade uses), or stuck
-  (4.4). Stuck looks full to
-  the student, as the advance it allows looks normal (4.4,
-  "student-side invisibility").
+- **The count.** Each segment shows how many right answers its LO still
+  needs to be mastered (`lo_display.rightAnswersToGo`): 0 when it is
+  mastered now (the four conditions of 4.1, `belief_math.isMastered`).
+  Counted as the student would get them: each a `(positive, strong)`
+  at the home factor (×1.0, the lower bound), no pick, applied to the
+  decayed `(α, β)` as every answer is — forgetting, then the cap (3.4)
+  — and counting as a right own question (condition 4, #279). The first
+  at the level the app would ask the LO at now — a notch lower while a
+  rule of 2.3 drops it — every next one at the calibration, since a
+  right answer releases the drop; condition 3 wants one of them at the
+  calibration. A stamp waives condition 4, as in `isMastered`. From the
+  prior that is 2 right answers on hard, 3 on medium and 8 on easy
+  (#278). One to go is what #230 showed as half.
+- **The fill** follows the count: the share of the way a new LO has to
+  go at the student's level that is behind it (`loSegmentFill`), so a
+  new LO starts empty and every right answer fills a step — on medium
+  ⅓ per answer, on hard ½, on easy ⅛ — and 0 to go is full. Further than
+  a new LO, after wrong answers, is empty. The number stands in the
+  segment, drawn so it reads on the fill and on the empty part. The 2px
+  line is the mean of the fills, without numbers.
+- **Stuck is not full** (4.4): a stuck LO shows its count like any
+  other.
+- **The stamp apart.** An LO with `firstMasteredAt` carries a tick of
+  its own, which stays when its fill drops: the stamp the grade and the
+  Leerpad read never goes away, the belief can.
+- **The marker.** The segment of the LO of the question on screen is
+  framed, from the moment the question is fired (`notePlannedQuestion`)
+  until the next one; a follow-up keeps it. A warm-up review or a
+  recheck (1.5, 2.6) is about another subgoal: no frame.
+- **The popup.** Hovering or tapping a segment shows the LO's "Je kan
+  …" sentence in the app language (the Dutch one when it has no
+  translation), the count in words ("nog 2 juiste antwoorden",
+  "beheerst"), "aangetoond" when it carries the stamp, why the count
+  went up when it did, and that the exercise on screen is about it.
+  Hovering between the segments, and the screen-reader label of the bar,
+  give the whole subgoal: "2 van 5 onderdelen beheerst, nog 6 juiste
+  antwoorden". Each segment has its own screen-reader label, the popup's
+  text.
 
-The shape it replaces: from the prior one strong positive on hard
+**The count follows the belief, both ways.** Nothing holds a segment any
+more (until #325 full stayed full, and half was held against a negative
+from the side). After a wrong answer, a negative from the side or decay
+between two sessions the segment shows what the belief says, also when
+it was full. It goes up for a reason, and the popup names it:
+
+- **not right**: the question on the LO itself — or a follow-up on it —
+  was not answered right (a `partial` included), or carried a negative
+  on it;
+- **another question**: a negative on the LO from a question about
+  another one (2.4), a warm-up review or a recheck included;
+- **a lower level**: the student's calibration went down (5.2), or a
+  rule of 2.3 now asks the LO a notch lower. A right answer weighs less
+  there.
+
+Without one of them the count does not go up: an answer that is not
+wrong never sets it back. Forgetting can do that on its own — a light
+right answer (a weak signal, a follow-up at 0.5, a pick at easy) adds
+less than forgetting takes from an LO with much evidence, as it could
+take away mastery before the guard of #311 (3.4). On medium, an LO one
+right answer away at `(3.55, 1)` is two away after a right follow-up, on
+the belief; the segment stays at one. A strong right answer at the level
+asked never raises the count, at home or in the lesson time. The reason
+stays while the count does and goes when it drops; at session start
+(`setTarget`) every segment follows the beliefs afresh, without reasons.
+
+**No message at the advance** (4.4). A subgoal that advances with a
+stuck LO closes on a segment that is not full; the LO comes back as a
+recheck (2.6, #275), as before.
+
+The shape #230 replaced: from the prior one strong positive on hard
 leaves μ at 0.79, just under 0.8 (and since #276 the evidence under
-5.75 in the lesson time too), and 2.1 asks every LO once before
-it asks one twice — so the cached share sat on 0 for the first round
-and then jumped. In the class data of 2026-10-04 half the subgoals
-started from cold kept the bar on 0 for at least 41% of their
-oefeningen; with segments it moves from the first right answer.
-
-**Hold.** A segment does not go back on what the student did not
-answer themselves. Full stays full. Half becomes empty only after a
-question on that LO itself — or a follow-up on it — whose answer was
-not right; a negative from the side (the grader's signal on this LO
-from a question about another) leaves it half, as does a not-right
-answer that still leaves the LO one right answer away. The hold lives
-in the session: at session start (`setTarget`) every segment follows
-the beliefs as they are. A warm-up review or a recheck (1.5, 2.6) is
-not a question on an LO of the active subgoal and empties nothing.
+5.75 in the lesson time too), and 2.1 asks every LO once before it asks
+one twice — so the cached share sat on 0 for the first round and then
+jumped. In the class data of 2026-10-04 half the subgoals started from
+cold kept the bar on 0 for at least 41% of their oefeningen; with
+segments it moves from the first right answer. The shape #325 replaced:
+empty, half or full, with stuck full and a hold, which left a student
+who climbed from μ 0.19 on a stuck LO watching a bar that did not move
+(4.4).
 
 The conductor publishes the segments next to the cached share — at
-session start, at every planned question on the active subgoal, and
-after every graded answer (at the calibration of the next question;
-after an advance, the next subgoal's, read afresh) — in
-`subgoalLoDisplayProvider` (`lib/services/tutor/lo_display.dart`). A
-tooltip and the screen-reader label say it in the app language: "2
-parts mastered, 1 almost, 2 still to do". Until the active subgoal's
-segments are published — and for a subgoal without LOs — the bar is
-the plain bar of the cached share.
+session start, at every planned question on the active subgoal, when a
+question is fired (the marker), and after every graded answer (at the
+calibration of the next question; after an advance, the next subgoal's,
+read afresh) — in `subgoalLoDisplayProvider`
+(`lib/services/tutor/lo_display.dart`). Until the active subgoal's
+segments are published — and for a subgoal without LOs — the bar is the
+plain bar of the cached share.
 
 ### 4.6 Worked example
 

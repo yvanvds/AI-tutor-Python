@@ -1,6 +1,6 @@
 # Hoe kom je aan je punt?
 
-*Bij versie 1.1.3 van de puntenformule. De app rekent met formule 1.1.3:
+*Bij versie 1.1.4 van de puntenformule. De app rekent met formule 1.1.3:
 dat nummer staat ook in Mijn rapporten.*
 
 ## Wat telt er voor je punt?
@@ -96,10 +96,11 @@ app kondigt die vragen aan.
 
 ## Wat zie ik, en wanneer?
 
-Tijdens het werk zie je je voortgang, geen punt. Je punt komt op het
-rapportmoment: dan geeft je leerkracht het vrij in **Mijn rapporten**, met
-een uitleg. Onder "Hoe dit punt berekend is" staan M, k, u en d, en de dag
-van de berekening: wat je tot dan aantoonde, telt mee.
+Tijdens het werk zie je voortgang, geen punt: de juiste antwoorden die elk
+leerdoel nog nodig heeft, en een vinkje als het aangetoond is. Je punt komt
+wanneer je leerkracht het vrijgeeft in **Mijn rapporten**, met een uitleg.
+Onder "Hoe dit punt berekend is" staan M, k, u en d, en de dag van de
+berekening: wat je tot dan aantoonde, telt mee.
 
 ## Wie beslist over mijn punt?
 

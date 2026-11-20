@@ -1,6 +1,6 @@
 # How do you get your grade?
 
-*Goes with version 1.1.3 of the grade formula. The app computes with
+*Goes with version 1.1.4 of the grade formula. The app computes with
 formula 1.1.3: that number is also in My reports.*
 
 ## What counts for your grade?
@@ -83,23 +83,24 @@ exercise is.
 
 ## Does class work count differently from homework?
 
-An answer in class counts a little more: × 1.25. That holds from 10 minutes
-before to 10 minutes after a lesson of your class, wherever you are.
+An answer in class counts a little more: × 1.25. From 10 minutes before to
+10 minutes after a lesson of your class, wherever you are.
 Homework counts normally, never less.
 
 ## Does old material come back?
 
 Yes. A session can start with a **review question** about something you
 demonstrated long ago. In between, a **check question** may come about an
-earlier learning objective you haven't demonstrated yet, so you can still
-show it. The app announces these questions.
+earlier learning objective you haven't demonstrated yet, to still show it.
+The app announces these questions.
 
 ## What do I see, and when?
 
-While you work, you see your progress, not a grade. Your grade comes at the
-report moment, when your teacher releases it in **My reports**, with an
-explanation. Under "How this grade was computed" you find M, k, u and d,
-and the day of the calculation: what you had demonstrated by then counts.
+While you work, you see progress, not a grade: the right answers each
+learning objective still needs, and a tick once demonstrated. Your grade
+comes when your teacher releases it in **My reports**, with an explanation.
+Under "How this grade was computed" you find M, k, u and d, and the day of
+the calculation: what you had demonstrated by then counts.
 
 ## Who decides on my grade?
 
@@ -123,5 +124,5 @@ report never changes.
 
 ## Where is everything, exactly?
 
-Below this text is the button to the full grade formula, in Dutch, with
-every rule down to the decimal.
+Below this text, a button opens the full grade formula, in Dutch, down to
+the decimal.

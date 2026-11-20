@@ -414,7 +414,7 @@ bool countsAsRightOwnQuestion({
 ///
 /// What every live reading of mastery uses: the selection (§2.1), the
 /// subgoal's advance and its cached share (§4.2, §4.5), the cascade skip,
-/// the bar's full segment (§4.5).
+/// the bar's segment at 0 to go (§4.5, `lo_display.rightAnswersToGo`).
 bool isMastered(BeliefSnapshot snap, LoBelief? belief) {
   if (belief == null) return false;
   if (belief.lastPositiveAtCalibratedAt == null) return false;
@@ -491,7 +491,7 @@ bool picksAloneCanMaster(QuestionDifficulty difficulty) {
 ///      mastered, at home.
 ///   3. **the next right answer decides** — one right answer of another
 ///      type would master it, a right pick would not: the bar shows that
-///      segment half (§4.5), and the answer should count.
+///      LO's segment at 1 to go (§4.5), and the answer should count.
 ///
 /// An LO without a doc gets no rule, and one whose kind has no other type
 /// is the caller's.

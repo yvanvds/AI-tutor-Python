@@ -824,14 +824,49 @@
   "@session_objectiveBanner_pillSelfChosen": {
     "description": "Banner header pill when the student picked the subgoal back up from the learning path (#280) — displayed uppercase"
   },
-  "session_objectiveBanner_segments": "{mastered, plural, =1{1 part mastered} other{{mastered} parts mastered}}, {almost} almost, {todo} still to do",
-  "@session_objectiveBanner_segments": {
-    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230): one segment per learning objective of the subgoal. 'mastered' segments are full, 'almost' ones half (one right answer away), 'todo' ones empty.",
+  "session_objectiveBanner_summary": "{mastered} of {total} parts mastered",
+  "@session_objectiveBanner_summary": {
+    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#230, #325) when every segment is mastered: one segment per learning objective of the subgoal.",
     "placeholders": {
       "mastered": {"type": "int"},
-      "almost": {"type": "int"},
-      "todo": {"type": "int"}
+      "total": {"type": "int"}
     }
+  },
+  "session_objectiveBanner_summaryToGo": "{mastered} of {total} parts mastered, {toGo, plural, =1{1 more right answer to go} other{{toGo} more right answers to go}}",
+  "@session_objectiveBanner_summaryToGo": {
+    "description": "Tooltip and screen-reader label of the subgoal bar in the practice view (#325): how many learning objectives are mastered, and the right answers the others still need, added up.",
+    "placeholders": {
+      "mastered": {"type": "int"},
+      "total": {"type": "int"},
+      "toGo": {"type": "int"}
+    }
+  },
+  "session_lo_toGo": "{count, plural, =1{1 more right answer} other{{count} more right answers}}",
+  "@session_lo_toGo": {
+    "description": "In the popup of one segment of the subgoal bar (#325): the right answers this learning objective still needs to be mastered. The same number is in the segment.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "session_lo_mastered": "Mastered",
+  "@session_lo_mastered": {
+    "description": "In the popup of one segment of the subgoal bar (#325): this learning objective needs no more right answers. Followed by ' · demonstrated' when it carries the mark that counts for the grade."
+  },
+  "session_lo_rose_notRight": "Went up after an answer that was not right.",
+  "@session_lo_rose_notRight": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number of right answers still needed went up — a question on this learning objective was not answered right."
+  },
+  "session_lo_rose_lowerLevel": "Went up: your questions are easier now, and a right answer counts for less there.",
+  "@session_lo_rose_lowerLevel": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number went up — the tutor now asks easier questions, where a right answer weighs less."
+  },
+  "session_lo_rose_otherQuestion": "Went up after a mistake on this in a question about something else.",
+  "@session_lo_rose_otherQuestion": {
+    "description": "In the popup of one segment of the subgoal bar (#325): why the number went up — a question about another learning objective showed a mistake on this one."
+  },
+  "session_lo_current": "Your current exercise is about this.",
+  "@session_lo_current": {
+    "description": "In the popup of the marked segment of the subgoal bar (#325): the exercise on screen is about this learning objective."
   },
 
   "chat_tutorName": "Tutor",

@@ -2877,17 +2877,14 @@ void main() {
       );
       // Hard, one right answer from the bar — (3.6, 1): a socratic answer
       // takes it to (5.62, 1), a pick to (4.22, 1), evidence 5.22 — and
-      // the bar shows that segment half, so the answer must count.
+      // the bar shows that segment at 1 to go, so the answer must count.
       final s = await setup(
         onlyOpen(seeded('lo-r', 3.6, 1, right: 2, nonMcq: 1)),
         calibration: QuestionDifficulty.hard,
       );
       final plan = _expectQuestion(await s.c.planNext());
       expect(plan.type, ChatRequestType.socraticQuestion);
-      expect(
-        {for (final e in s.f.loDisplay!.los) e.loId: e.state}['lo-r'],
-        LoDisplayState.half,
-      );
+      expect({for (final e in s.f.loDisplay!.los) e.loId: e.toGo}['lo-r'], 1);
     });
 
     test('a top-up of a mastered subgoal keeps every type', () async {
@@ -6860,7 +6857,7 @@ void main() {
     },
   );
 
-  group("#230 the segments of the student's subgoal bar (§4.5)", () {
+  group("#230, #325 the segments of the student's subgoal bar (§4.5)", () {
     // "Print" with two LOs that gate it and one optional one; a student on
     // hard. The optional LO is mastered, so no question goes to it; every
     // other belief starts at the prior unless the test seeds one.
@@ -6974,39 +6971,43 @@ void main() {
       return plan;
     }
 
-    Map<String, LoDisplayState> states(_Fakes f) => {
-      for (final e in f.loDisplay!.los) e.loId: e.state,
+    Map<String, int> toGo(_Fakes f) => {
+      for (final e in f.loDisplay!.los) e.loId: e.toGo,
     };
 
-    /// What the belief alone says about [loId] now, without the hold.
-    LoDisplayState fresh(_Fakes f, String loId) {
+    LoDisplayEntry entry(_Fakes f, String loId) =>
+        f.loDisplay!.los.firstWhere((e) => e.loId == loId);
+
+    /// What the belief alone says about [loId] now, at the student's level.
+    int fresh(_Fakes f, String loId) {
       final b = f.beliefs[f._key('s1', loId)]!;
-      return loDisplayStateOf(
+      return rightAnswersToGo(
         snap: BeliefSnapshot(b.alpha, b.beta),
-        lastPositiveAtCalibratedAt: b.lastPositiveAtCalibratedAt,
-        firstMasteredAt: b.firstMasteredAt,
+        belief: b,
         calibration: f.calibration.difficulty,
-        ownQuestions: b.ownQuestions,
-        ownQuestionsRight: b.ownQuestionsRight,
-        ownQuestionsRightNonMcq: b.ownQuestionsRightNonMcq,
       );
     }
 
-    test('at session start every segment follows the prior: empty, and the '
+    test('at session start every segment counts down from the prior: 2 right '
+        'answers on hard, empty, nothing demonstrated, no marker — and the '
         'optional LO gets no segment', () async {
       final f = onHard();
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
 
       expect(f.loDisplay!.subgoalId, 's1');
-      expect(states(f), {
-        'lo-a': LoDisplayState.empty,
-        'lo-b': LoDisplayState.empty,
-      });
+      expect(toGo(f), {'lo-a': 2, 'lo-b': 2});
+      for (final e in f.loDisplay!.los) {
+        expect(e.newLoToGo, 2);
+        expect(e.fill, 0.0);
+        expect(e.demonstrated, isFalse);
+        expect(e.rose, isNull);
+      }
+      expect(f.loDisplay!.currentLoId, isNull);
     });
 
-    test('the first right answer on hard makes its segment half; the cached '
-        'share stays 0', () async {
+    test('the first right answer on hard takes one off and fills half the '
+        'segment; the cached share stays 0', () async {
       final f = onHard();
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -7017,14 +7018,59 @@ void main() {
 
       // μ = 3.8 / 4.8 = 0.79: not mastered, one right answer away.
       expect(f.beliefs[f._key('s1', 'lo-a')]!.alpha, closeTo(3.8, 1e-9));
-      expect(states(f), {
-        'lo-a': LoDisplayState.half,
-        'lo-b': LoDisplayState.empty,
-      });
+      expect(toGo(f), {'lo-a': 1, 'lo-b': 2});
+      expect(entry(f, 'lo-a').fill, 0.5);
+      expect(entry(f, 'lo-a').rose, isNull);
       expect(f.progressById['s1']!.progress, 0.0);
     });
 
-    test('a negative from the side leaves a half segment half', () async {
+    test('the marker is on the LO of the question fired, and a question '
+        'about another subgoal has none', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+
+      // Planning alone moves nothing: at session start the host plans once
+      // to check for blocks and drops that plan.
+      final plan = _expectQuestion(await c.planNext());
+      expect(f.loDisplay!.currentLoId, isNull);
+
+      c.notePlannedQuestion(plan);
+      expect(f.loDisplay!.currentLoId, 'lo-a');
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          signals: [sig('lo-a', LoSignalKind.positive)],
+        ),
+      );
+      // The answered question keeps it until the next one is fired.
+      expect(f.loDisplay!.currentLoId, 'lo-a');
+
+      final next = _expectQuestion(await c.planNext());
+      expect(next.targetLOs.single.id, 'lo-b');
+      c.notePlannedQuestion(next);
+      expect(f.loDisplay!.currentLoId, 'lo-b');
+
+      // A warm-up review of another subgoal: no segment is its LO.
+      c.notePlannedQuestion(
+        QuestionPlan(
+          type: ChatRequestType.socraticQuestion,
+          difficulty: QuestionDifficulty.hard,
+          targetLOs: variables.objectives,
+          reason: const TurnSelectionReason(
+            candidateLOs: [],
+            chosenReason: 'warm-up',
+            notchDropFired: false,
+          ),
+          warmUp: WarmUpReview(subgoal: variables),
+        ),
+      );
+      expect(f.loDisplay!.currentLoId, isNull);
+      expect(toGo(f), {'lo-a': 1, 'lo-b': 2});
+    });
+
+    test('a negative from the side raises the count, and says why', () async {
       final f = onHard();
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -7039,144 +7085,13 @@ void main() {
         sig('lo-a', LoSignalKind.negative),
       ]);
 
-      // The belief alone would empty lo-a's segment; the hold keeps it.
-      expect(fresh(f, 'lo-a'), LoDisplayState.empty);
-      expect(states(f), {
-        'lo-a': LoDisplayState.half,
-        'lo-b': LoDisplayState.half,
-      });
+      expect(fresh(f, 'lo-a'), 2);
+      expect(toGo(f), {'lo-a': 2, 'lo-b': 1});
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.otherQuestion);
+      expect(entry(f, 'lo-b').rose, isNull);
     });
 
-    test(
-      'a wrong answer on the question itself empties a half segment',
-      () async {
-        final f = onHard();
-        final c = Conductor(deps: _buildDeps(f));
-        await c.setTarget();
-        await ask(c, 'lo-a', AnswerQuality.correct, [
-          sig('lo-a', LoSignalKind.positive),
-        ]);
-        await ask(c, 'lo-b', AnswerQuality.correct, [
-          sig('lo-b', LoSignalKind.positive),
-          sig('lo-a', LoSignalKind.negative),
-        ]);
-
-        await ask(c, 'lo-a', AnswerQuality.wrong, [
-          sig('lo-a', LoSignalKind.negative),
-        ]);
-
-        expect(states(f), {
-          'lo-a': LoDisplayState.empty,
-          'lo-b': LoDisplayState.half,
-        });
-      },
-    );
-
-    test('a not-right answer that leaves the LO one answer away keeps it '
-        'half; a follow-up on it that is not right empties it', () async {
-      final f = onHard();
-      // lo-a one right answer away (6.5 ≥ 4 × 1.5), with one right own
-      // question on record (#279); lo-b mastered, so the question is on
-      // lo-a.
-      seed(f, 'lo-a', 3.7, 1.5, right: 1, nonMcq: 1);
-      seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      expect(states(f)['lo-a'], LoDisplayState.half);
-
-      final plan = await ask(c, 'lo-a', AnswerQuality.partial, [
-        sig('lo-a', LoSignalKind.neutral),
-      ]);
-      expect(states(f)['lo-a'], LoDisplayState.half);
-
-      // The follow-up's weak negative (§6.2) is enough to take it out of
-      // reach of one answer.
-      await c.integrateAnswer(
-        plan: plan,
-        answer: GradedAnswer(
-          overallQuality: AnswerQuality.partial,
-          isFollowUp: true,
-          chainDepth: 1,
-          signals: [sig('lo-a', LoSignalKind.negative, LoSignalStrength.weak)],
-        ),
-      );
-
-      expect(states(f), {
-        'lo-a': LoDisplayState.empty,
-        'lo-b': LoDisplayState.full,
-      });
-    });
-
-    test('a segment mastered in the session is full and stays full after a '
-        'negative on it from the side', () async {
-      final f = onHard();
-      // lo-a one right answer away, its first right own question on record
-      // (#279); lo-b higher (μ 0.82, clear of the bar at 0.8) but never
-      // right at the student's level, so unmastered and the question goes
-      // to lo-a.
-      seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
-      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-
-      await ask(c, 'lo-a', AnswerQuality.correct, [
-        sig('lo-a', LoSignalKind.positive),
-      ]);
-      expect(states(f)['lo-a'], LoDisplayState.full);
-
-      await ask(c, 'lo-b', AnswerQuality.wrong, [
-        sig('lo-b', LoSignalKind.negative),
-        sig('lo-a', LoSignalKind.negative),
-      ]);
-      expect(states(f)['lo-a'], LoDisplayState.full);
-    });
-
-    test('a full segment stays full after a later wrong answer on its own '
-        'LO', () async {
-      final f = onHard();
-      // Mastered once, decayed and debited since: μ 0.44.
-      seed(f, 'lo-a', 2, 2.5, firstMasteredAt: DateTime.utc(2026, 9, 1));
-      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      expect(states(f)['lo-a'], LoDisplayState.full);
-
-      await ask(c, 'lo-a', AnswerQuality.wrong, [
-        sig('lo-a', LoSignalKind.negative),
-      ]);
-
-      expect(states(f)['lo-a'], LoDisplayState.full);
-    });
-
-    test('stuck is full, and stays full when a right answer lifts the LO off '
-        'the stuck rule without mastering it', () async {
-      final f = onHard();
-      // Six own questions, μ 0.36: stuck (§4.4, #278), and under lo-b's
-      // 0.5, so the question goes to lo-a.
-      seed(f, 'lo-a', 2, 3.5, atCalibration: false, ownQuestions: 6);
-      final c = Conductor(deps: _buildDeps(f));
-      await c.setTarget();
-      expect(states(f)['lo-a'], LoDisplayState.full);
-
-      await ask(c, 'lo-a', AnswerQuality.correct, [
-        sig('lo-a', LoSignalKind.positive),
-      ]);
-
-      // μ 0.62: off the stuck rule (≥ 0.6), not mastered, and not one
-      // answer from mastery either (+2.8 after forgetting makes 0.74).
-      final b = f.beliefs[f._key('s1', 'lo-a')]!;
-      final after = BeliefSnapshot(b.alpha, b.beta);
-      expect(after.mean, closeTo(0.621, 0.005));
-      expect(b.ownQuestions, 7);
-      expect(isStuck(after, ownQuestions: b.ownQuestions), isFalse);
-      expect(meetsMasteryMeanAndEvidence(after), isFalse);
-      expect(fresh(f, 'lo-a'), LoDisplayState.empty);
-      // The hold keeps it full.
-      expect(states(f)['lo-a'], LoDisplayState.full);
-    });
-
-    test('a new session reads the beliefs afresh; an LO ever mastered is '
-        'full', () async {
+    test('a wrong answer on the LO itself raises it, and says why', () async {
       final f = onHard();
       final c = Conductor(deps: _buildDeps(f));
       await c.setTarget();
@@ -7187,36 +7102,262 @@ void main() {
         sig('lo-b', LoSignalKind.positive),
         sig('lo-a', LoSignalKind.negative),
       ]);
-      expect(states(f)['lo-a'], LoDisplayState.half);
+
+      await ask(c, 'lo-a', AnswerQuality.wrong, [
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+
+      expect(toGo(f), {'lo-a': 3, 'lo-b': 1});
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.notRight);
+      expect(f.loDisplay!.currentLoId, 'lo-a');
+    });
+
+    test('a segment mastered in the session drops after a wrong follow-up '
+        'on it; its tick stays', () async {
+      final f = onHard();
+      // lo-a one right answer away, its first right own question on record
+      // (#279); lo-b higher but never right at the student's level, so the
+      // question goes to lo-a.
+      seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
+      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(toGo(f)['lo-a'], 1);
+
+      final plan = await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+      expect(toGo(f)['lo-a'], 0);
+      expect(entry(f, 'lo-a').fill, 1.0);
+      expect(entry(f, 'lo-a').demonstrated, isTrue);
+
+      // The follow-up's weak negative (§6.2) takes it under the bar.
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.wrong,
+          isFollowUp: true,
+          chainDepth: 1,
+          signals: [sig('lo-a', LoSignalKind.negative, LoSignalStrength.weak)],
+        ),
+      );
+
+      expect(toGo(f)['lo-a'], 1);
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.notRight);
+      expect(entry(f, 'lo-a').demonstrated, isTrue);
+    });
+
+    test('a mastered segment drops after a negative on it from the side; its '
+        'tick stays', () async {
+      final f = onHard();
+      seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
+      // lo-b higher (μ 0.82, clear of the bar at 0.8) but never right at the
+      // student's level, so unmastered and the first question goes to lo-a.
+      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+      expect(toGo(f)['lo-a'], 0);
+
+      await ask(c, 'lo-b', AnswerQuality.wrong, [
+        sig('lo-b', LoSignalKind.negative),
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+
+      expect(toGo(f)['lo-a'], 2);
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.otherQuestion);
+      expect(entry(f, 'lo-a').demonstrated, isTrue);
+    });
+
+    test('an LO demonstrated once and fallen since shows what it needs now, '
+        'with its tick, also after a wrong answer on it', () async {
+      final f = onHard();
+      // Mastered once, decayed and debited since: μ 0.44.
+      seed(f, 'lo-a', 2, 2.5, firstMasteredAt: DateTime.utc(2026, 9, 1));
+      seed(f, 'lo-b', 4.5, 1, atCalibration: false);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final before = toGo(f)['lo-a']!;
+      expect(before, greaterThan(0));
+      expect(before, fresh(f, 'lo-a'));
+      expect(entry(f, 'lo-a').demonstrated, isTrue);
+
+      await ask(c, 'lo-a', AnswerQuality.wrong, [
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+
+      // On hard a wrong answer weighs 0.6 and forgetting takes some of it
+      // back: here it leaves the count where it was. The segment says what
+      // the belief says.
+      expect(toGo(f)['lo-a'], greaterThanOrEqualTo(before));
+      expect(toGo(f)['lo-a'], fresh(f, 'lo-a'));
+      expect(entry(f, 'lo-a').demonstrated, isTrue);
+    });
+
+    test('stuck is not full: it shows the right answers it needs, and a '
+        'right answer counts it down', () async {
+      final f = onHard();
+      // Six own questions, μ 0.36: stuck (§4.4, #278), and under lo-b's
+      // 0.5, so the question goes to lo-a.
+      seed(f, 'lo-a', 2, 3.5, atCalibration: false, ownQuestions: 6);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      final b = f.beliefs[f._key('s1', 'lo-a')]!;
+      expect(isStuck(BeliefSnapshot(b.alpha, b.beta), ownQuestions: 6), isTrue);
+      final before = toGo(f)['lo-a']!;
+      expect(before, greaterThanOrEqualTo(2));
+      expect(entry(f, 'lo-a').fill, 0.0);
+
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+
+      expect(toGo(f)['lo-a'], before - 1);
+      expect(toGo(f)['lo-a'], fresh(f, 'lo-a'));
+    });
+
+    test('a not-right answer that leaves the count keeps it; a follow-up on '
+        'it that is not right raises it', () async {
+      final f = onHard();
+      // lo-a one right answer away (μ 0.71: +2.8 after forgetting makes
+      // 0.81), with one right own question on record; lo-b mastered, so
+      // the question is on lo-a.
+      seed(f, 'lo-a', 3.7, 1.5, right: 1, nonMcq: 1);
+      seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(toGo(f)['lo-a'], 1);
+
+      final plan = await ask(c, 'lo-a', AnswerQuality.partial, [
+        sig('lo-a', LoSignalKind.neutral),
+      ]);
+      expect(toGo(f)['lo-a'], 1);
+      expect(entry(f, 'lo-a').rose, isNull);
+
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.partial,
+          isFollowUp: true,
+          chainDepth: 1,
+          signals: [sig('lo-a', LoSignalKind.negative, LoSignalStrength.weak)],
+        ),
+      );
+
+      expect(toGo(f), {'lo-a': 2, 'lo-b': 0});
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.notRight);
+    });
+
+    test('an answer that is not wrong never raises the count: a right '
+        'follow-up that forgets more than it adds leaves it', () async {
+      final f = onHard();
+      f.calibration = const StudentCalibration(
+        difficulty: QuestionDifficulty.medium,
+      );
+      // One right answer away on medium: a strong right answer lands on
+      // evidence 5.78. A right follow-up weighs 0.5 (§6.2) and forgets
+      // 0.76 of α (§3.4): two away after it, on the belief.
+      seed(f, 'lo-a', 3.55, 1, right: 2, nonMcq: 2);
+      seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(toGo(f)['lo-a'], 1);
+
+      final plan = await ask(c, 'lo-a', AnswerQuality.partial, [
+        sig('lo-a', LoSignalKind.neutral),
+      ]);
+      expect(toGo(f)['lo-a'], 1);
+
+      await c.integrateAnswer(
+        plan: plan,
+        answer: GradedAnswer(
+          overallQuality: AnswerQuality.correct,
+          isFollowUp: true,
+          chainDepth: 1,
+          signals: [sig('lo-a', LoSignalKind.positive, LoSignalStrength.weak)],
+        ),
+      );
+
+      expect(fresh(f, 'lo-a'), 2);
+      expect(toGo(f)['lo-a'], 1);
+      expect(entry(f, 'lo-a').rose, isNull);
+    });
+
+    test('a lower level raises the count, and says why', () async {
+      final f = onHard();
+      // lo-a one right answer away on hard, two on medium; lo-b at the
+      // prior, so the question goes to lo-b.
+      seed(f, 'lo-a', 3.7, 1.5, right: 1, nonMcq: 1);
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      expect(toGo(f)['lo-a'], 1);
+
+      final plan = _expectQuestion(await c.planNext());
+      expect(plan.targetLOs.single.id, 'lo-b');
+      c.notePlannedQuestion(plan);
+      // Three wrong answers at hard demote the student to medium (§5.2).
+      for (var i = 0; i < 3; i++) {
+        await c.integrateAnswer(
+          plan: plan,
+          answer: GradedAnswer(
+            overallQuality: AnswerQuality.wrong,
+            signals: [sig('lo-b', LoSignalKind.negative)],
+          ),
+        );
+      }
+
+      expect(f.calibration.difficulty, QuestionDifficulty.medium);
+      expect(toGo(f)['lo-a'], 2);
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.lowerLevel);
+      expect(entry(f, 'lo-a').newLoToGo, 3);
+      expect(entry(f, 'lo-b').rose, LoDisplayRise.notRight);
+    });
+
+    test('a new session reads the beliefs afresh, and forgets why a number '
+        'went up', () async {
+      final f = onHard();
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
+      await ask(c, 'lo-b', AnswerQuality.correct, [
+        sig('lo-b', LoSignalKind.positive),
+        sig('lo-a', LoSignalKind.negative),
+      ]);
+      expect(entry(f, 'lo-a').rose, LoDisplayRise.otherQuestion);
       // lo-b once mastered, now well under the bar.
       seed(f, 'lo-b', 2, 4, firstMasteredAt: DateTime.utc(2026, 9, 1));
 
       await c.setTarget();
 
-      expect(states(f), {
-        'lo-a': LoDisplayState.empty,
-        'lo-b': LoDisplayState.full,
-      });
+      expect(toGo(f), {'lo-a': fresh(f, 'lo-a'), 'lo-b': fresh(f, 'lo-b')});
+      expect(toGo(f)['lo-b'], greaterThan(0));
+      expect(entry(f, 'lo-b').demonstrated, isTrue);
+      expect(entry(f, 'lo-a').rose, isNull);
+      expect(f.loDisplay!.currentLoId, isNull);
     });
 
-    test(
-      "after an advance the bar is the next subgoal's, read afresh",
-      () async {
-        final f = onHard();
-        seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
-        seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
-        final c = Conductor(deps: _buildDeps(f));
-        await c.setTarget();
+    test("after an advance the bar is the next subgoal's, read afresh, without "
+        'a marker', () async {
+      final f = onHard();
+      seed(f, 'lo-a', 3.8, 1, right: 1, nonMcq: 1);
+      seed(f, 'lo-b', 9, 1, firstMasteredAt: DateTime.now().toUtc());
+      final c = Conductor(deps: _buildDeps(f));
+      await c.setTarget();
 
-        await ask(c, 'lo-a', AnswerQuality.correct, [
-          sig('lo-a', LoSignalKind.positive),
-        ]);
+      await ask(c, 'lo-a', AnswerQuality.correct, [
+        sig('lo-a', LoSignalKind.positive),
+      ]);
 
-        expect(f.selection.activeChildGoal?.id, 's2');
-        expect(f.loDisplay!.subgoalId, 's2');
-        expect(states(f), {'lo-v': LoDisplayState.empty});
-      },
-    );
+      expect(f.selection.activeChildGoal?.id, 's2');
+      expect(f.loDisplay!.subgoalId, 's2');
+      expect(toGo(f), {'lo-v': 2});
+      expect(f.loDisplay!.currentLoId, isNull);
+    });
   });
 
   // ---- #275 what comes back: stuck, open and thin -------------------------

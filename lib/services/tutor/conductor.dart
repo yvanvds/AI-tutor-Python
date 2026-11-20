@@ -466,9 +466,9 @@ class ConductorDeps {
   final Future<List<Progress>> Function() getProgressAll;
   final Future<Progress?> Function(String goalId) getProgressByGoalId;
 
-  /// Publishes the segments of the student's subgoal bar (#230, §4.5): one
-  /// per non-optional LO of the active subgoal, held for the session.
-  /// `null` when there is no active subgoal.
+  /// Publishes the segments of the student's subgoal bar (#230, #325,
+  /// §4.5): one per non-optional LO of the active subgoal, counting down the
+  /// right answers it still needs. `null` when there is no active subgoal.
   final void Function(SubgoalLoDisplay?) setLoDisplay;
 
   /// Post a system pill in chat. Takes a [ChatNotice], not text — the
@@ -579,10 +579,20 @@ class Conductor {
   final Map<String, int> _attemptsWithoutCorrect = {};
 
   /// What each segment of the student's subgoal bar showed so far this
-  /// session (#230, §4.5), keyed by [_attemptKey]. Holds a segment against
-  /// what the student did not answer themselves ([heldLoDisplayState]); a
-  /// new session reads the beliefs afresh.
-  final Map<String, LoDisplayState> _loDisplay = {};
+  /// session (#230, #325, §4.5), keyed by [_attemptKey], with the levels it
+  /// was counted at: the next reading says why its number went up
+  /// ([nextLoDisplayReading]). A new session reads the beliefs afresh.
+  final Map<String, LoDisplayReading> _loDisplay = {};
+
+  /// The bar as last published, to move its marker when a question is
+  /// fired ([notePlannedQuestion]) without reading the beliefs again.
+  SubgoalLoDisplay? _lastLoDisplay;
+
+  /// The LO of the question on screen, for the marker on its segment
+  /// (#325): set when a question on the active subgoal is fired, cleared by
+  /// a warm-up review or a recheck (a question about another subgoal) and
+  /// at [setTarget]. A follow-up keeps it.
+  ({String subgoalId, String loId})? _questionLo;
 
   /// Pending audit event — populated when `_advanceWithCascadeCap` halts.
   /// Consumed by the next call to `integrateAnswer` so the cascade-halt
@@ -671,8 +681,10 @@ class Conductor {
     _returnChain = null;
     _missedThisSession.clear();
     _deps.recordDebugEvent('conductor.subgoal_set', {'subgoalId': goal?.id});
-    // #230: the session's bar starts from the beliefs as they are.
+    // #230: the session's bar starts from the beliefs as they are, without
+    // a marker until a question is fired (#325).
     _loDisplay.clear();
+    _questionLo = null;
     await _publishActiveLoDisplay();
   }
 
@@ -1677,6 +1689,22 @@ class Conductor {
     required QuestionDifficulty calibration,
   }) async {
     if (calibration == QuestionDifficulty.easy) return const [];
+    return _notchDropRulesFor(
+      belief: await _deps.getLoBelief(subgoalId: subgoalId, loId: lo.id),
+      subgoalId: subgoalId,
+      loId: lo.id,
+      calibration: calibration,
+    );
+  }
+
+  /// [_shouldDropNotch] on the LO's doc [belief] as the caller has it.
+  List<NotchDropRule> _notchDropRulesFor({
+    required LoBelief? belief,
+    required String subgoalId,
+    required String loId,
+    required QuestionDifficulty calibration,
+  }) {
+    if (calibration == QuestionDifficulty.easy) return const [];
     final rules = <NotchDropRule>[];
     // Two strikes at calibrated difficulty on this LO trigger a one-notch
     // drop. The literal rule is implemented via the
@@ -1686,7 +1714,6 @@ class Conductor {
     // this LO, hence the `lastPositiveAtCalibratedAt is null` guard — once
     // the student has demonstrated this LO at calibration, we no longer
     // gate it back to easy.
-    final belief = await _deps.getLoBelief(subgoalId: subgoalId, loId: lo.id);
     if (belief != null &&
         belief.lastPositiveAtCalibratedAt == null &&
         belief.recentNegativesAtCalibrated >= 2) {
@@ -1696,7 +1723,7 @@ class Conductor {
     // the grader gave with them — a "partial" often comes with a positive,
     // which resets the strike counter and closes the guard above. No such
     // guard here: the run is this session's, and a correct answer ends it.
-    final attempts = _attemptsWithoutCorrect[_attemptKey(subgoalId, lo.id)];
+    final attempts = _attemptsWithoutCorrect[_attemptKey(subgoalId, loId)];
     if ((attempts ?? 0) >= PolicyConstants.notchDropAfterAttempts) {
       rules.add(NotchDropRule.attemptsWithoutCorrect);
     }
@@ -1731,10 +1758,18 @@ class Conductor {
       // A fired recheck spends the question that was to follow a right
       // answer (#275); its own answer decides whether another follows.
       if (plan.isRecheck) _returnChain = null;
+      // #325: no segment of the bar is this question's.
+      _moveLoDisplayMarker(null);
       return;
     }
     _questionsSinceOffSubgoal += 1;
     _lastTargetLoId = plan.targetLOs.isEmpty ? null : plan.targetLOs.first.id;
+    final subgoalId = _activeChildGoal?.id;
+    _moveLoDisplayMarker(
+      _lastTargetLoId == null || subgoalId == null
+          ? null
+          : (subgoalId: subgoalId, loId: _lastTargetLoId!),
+    );
   }
 
   /// Integrate a graded answer (CONDUCTOR_POLICY §3 + §4 + §5).
@@ -2499,21 +2534,29 @@ class Conductor {
             questionTypeName: plan.type.name,
           );
     final calibrationAfter = updatedCal.difficulty;
-    // #230: the bar after this answer, at the level of the next question.
-    // A segment empties only on a question on its own LO — or a follow-up
-    // on it — that was not right; after an advance it is the next
-    // subgoal's bar, read afresh.
+    // #230, #325: the bar after this answer, at the level of the next
+    // question; after an advance it is the next subgoal's bar, read
+    // afresh. A segment's number goes up for what this turn did to its LO:
+    // a question on it — or a follow-up on it — not answered right, or a
+    // negative on it from a question about another LO.
     if (advanced) {
       await _publishActiveLoDisplay(calibration: calibrationAfter);
     } else {
+      final askedLoId = plan.isOffSubgoal ? null : targetLo?.id;
+      final turnRises = <String, LoDisplayRise>{
+        for (final sig in answer.signals)
+          if (sig.subgoalId == subgoal.id && sig.kind == LoSignalKind.negative)
+            sig.loId: sig.loId == askedLoId
+                ? LoDisplayRise.notRight
+                : LoDisplayRise.otherQuestion,
+        if (askedLoId != null && !answeredRight)
+          askedLoId: LoDisplayRise.notRight,
+      };
       _publishLoDisplay(
         subgoal,
         freshById,
         calibration: calibrationAfter,
-        askedAndNotRight:
-            !plan.isOffSubgoal && answer.overallQuality != AnswerQuality.correct
-            ? {for (final lo in plan.targetLOs) lo.id}
-            : const {},
+        turnRises: turnRises,
       );
     }
     if (cal.difficulty != calibrationAfter) {
@@ -2937,7 +2980,7 @@ class Conductor {
     _deps.recordDebugEvent('conductor.hint_provided');
   }
 
-  // ---- The student's subgoal bar (#230, §4.5) -----------------------------
+  // ---- The student's subgoal bar (#230, #325, §4.5) -----------------------
 
   /// Reads the active subgoal's beliefs and publishes its bar; `null` when
   /// there is no active subgoal. [calibration] defaults to the student's.
@@ -2946,6 +2989,7 @@ class Conductor {
   }) async {
     final subgoal = _activeChildGoal;
     if (subgoal == null) {
+      _lastLoDisplay = null;
       _deps.setLoDisplay(null);
       return;
     }
@@ -2956,17 +3000,19 @@ class Conductor {
   }
 
   /// Publishes [subgoal]'s bar from its beliefs [byId]: a segment per
-  /// non-optional LO, from the decayed belief at [calibration]
-  /// ([loDisplayStateOf]), held against this session's earlier reading
-  /// ([heldLoDisplayState]). [askedAndNotRight] are the LOs this turn asked
-  /// about directly and did not get right.
+  /// non-optional LO, counting down the right answers it still needs from
+  /// its decayed belief ([rightAnswersToGo]) — at [calibration], the first
+  /// a notch lower while a rule of §2.3 asks it so — next to this session's
+  /// reading before ([nextLoDisplayReading]). [turnRises] says what this
+  /// turn did to an LO that may raise its number.
   void _publishLoDisplay(
     Goal subgoal,
     Map<String, LoBelief> byId, {
     required QuestionDifficulty calibration,
-    Set<String> askedAndNotRight = const {},
+    Map<String, LoDisplayRise> turnRises = const {},
   }) {
     final now = DateTime.now().toUtc();
+    final newLoToGo = newLoRightAnswersToGo(calibration);
     final los = <LoDisplayEntry>[];
     for (final lo in subgoal.objectives) {
       if (lo.optional) continue;
@@ -2979,26 +3025,64 @@ class Conductor {
               lastUpdatedAt: b.lastUpdatedAt,
               now: now,
             );
+      final askedAt =
+          _notchDropRulesFor(
+            belief: b,
+            subgoalId: subgoal.id,
+            loId: lo.id,
+            calibration: calibration,
+          ).isEmpty
+          ? calibration
+          : _stepDown(calibration);
       final key = _attemptKey(subgoal.id, lo.id);
-      final state = heldLoDisplayState(
-        held: _loDisplay[key],
-        fresh: loDisplayStateOf(
+      final reading = nextLoDisplayReading(
+        previous: _loDisplay[key],
+        toGo: rightAnswersToGo(
           snap: snap,
-          lastPositiveAtCalibratedAt: b?.lastPositiveAtCalibratedAt,
-          firstMasteredAt: b?.firstMasteredAt,
+          belief: b,
           calibration: calibration,
-          ownQuestions: b?.ownQuestions ?? 0,
-          ownQuestionsRight: b?.ownQuestionsRight,
-          ownQuestionsRightNonMcq: b?.ownQuestionsRightNonMcq,
+          askedAt: askedAt,
         ),
-        askedAndNotRight: askedAndNotRight.contains(lo.id),
+        askedAt: askedAt,
+        calibration: calibration,
+        turnRise: turnRises[lo.id],
       );
-      _loDisplay[key] = state;
-      los.add(LoDisplayEntry(loId: lo.id, state: state));
+      _loDisplay[key] = reading;
+      los.add(
+        LoDisplayEntry(
+          loId: lo.id,
+          toGo: reading.toGo,
+          newLoToGo: newLoToGo,
+          demonstrated: b?.firstMasteredAt != null,
+          rose: reading.rose,
+        ),
+      );
     }
-    _deps.setLoDisplay(
-      SubgoalLoDisplay(subgoalId: subgoal.id, los: List.unmodifiable(los)),
+    final question = _questionLo;
+    _setLoDisplay(
+      SubgoalLoDisplay(
+        subgoalId: subgoal.id,
+        los: List.unmodifiable(los),
+        currentLoId: question?.subgoalId == subgoal.id ? question!.loId : null,
+      ),
     );
+  }
+
+  /// Moves the bar's marker to [question]'s LO (#325), on the bar as last
+  /// published: only when it is that LO's subgoal's.
+  void _moveLoDisplayMarker(({String subgoalId, String loId})? question) {
+    _questionLo = question;
+    final last = _lastLoDisplay;
+    if (last == null) return;
+    final current = question?.subgoalId == last.subgoalId
+        ? question!.loId
+        : null;
+    if (current != last.currentLoId) _setLoDisplay(last.withCurrent(current));
+  }
+
+  void _setLoDisplay(SubgoalLoDisplay display) {
+    _lastLoDisplay = display;
+    _deps.setLoDisplay(display);
   }
 
   // ---- Persistence helpers ------------------------------------------------
