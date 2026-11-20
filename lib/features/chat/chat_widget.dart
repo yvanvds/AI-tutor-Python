@@ -1,5 +1,6 @@
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/features/chat/mcq_options_widget.dart';
+import 'package:ai_tutor_python/features/chat/widgets/chat_action_notice.dart';
 import 'package:ai_tutor_python/features/chat/widgets/chat_header.dart';
 import 'package:ai_tutor_python/features/chat/widgets/chat_system_pill.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_continue.dart';
@@ -9,6 +10,7 @@ import 'package:ai_tutor_python/features/chat/widgets/composer_thinking.dart';
 import 'package:ai_tutor_python/features/chat/widgets/role_chip.dart';
 import 'package:ai_tutor_python/features/chat/widgets/student_bubble.dart';
 import 'package:ai_tutor_python/features/chat/widgets/tutor_bubble.dart';
+import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/chat_notice_text.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
@@ -219,6 +221,18 @@ class _NoticePill extends ConsumerWidget {
       message.metadata?[ChatNotice.metadataKey],
     );
     if (notice == null) return ChatSystemPill(text: message.text);
+    final l = AppLocalizations.of(context);
+    // A page question that did not count as the answer to the question
+    // waiting in the chat (#324): the way back to that question is one
+    // click, right under the reply.
+    if (notice.kind == ChatNoticeKind.pageQuestionNotAnAnswer) {
+      return ChatActionNotice(
+        text: l.chatNotice(notice),
+        actionLabel: l.chat_notice_toQuestion_button,
+        onAction: () =>
+            ref.read(modeProvider.notifier).state = SessionMode.practice,
+      );
+    }
     final goalId = notice.goalId;
     final shown = goalId == null || notice.args.isEmpty
         ? notice
@@ -228,7 +242,7 @@ class _NoticePill extends ConsumerWidget {
                 .title,
           );
     return ChatSystemPill(
-      text: AppLocalizations.of(context).chatNotice(
+      text: l.chatNotice(
         shown,
         standalone: ref.watch(appModeProvider) is StandaloneMode,
       ),

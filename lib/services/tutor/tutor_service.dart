@@ -752,6 +752,9 @@ class TutorService extends Notifier<TutorState> {
         // Nor a question asked during a code exercise, or while it waits
         // behind the theory, hand over its solution (#273).
         codeExerciseOpen: _codeExerciseOpen,
+        // Nor a question about the page give away the answer to a question
+        // that waits for it in the chat (#324).
+        chatQuestionOpen: _chatAnswerAwaited,
       );
 
       final request = await _buildRequestInput(
@@ -1888,15 +1891,11 @@ class TutorService extends Notifier<TutorState> {
     );
   }
 
-  Future<void> handleStudentMessage(String message) async {
-    // A question typed while a theory page is on screen is about that page
-    // (#132). It goes out with the page and comes back as a plain answer;
-    // nothing else moves — the follow-up, plan and exercise type in flight
-    // are still there when the student returns to practice and answers.
-    if (_pageOnScreen() != null) {
-      await queryTutor(type: ChatRequestType.contentQuestion, prompt: message);
-      return;
-    }
+  /// What a message typed in practice goes out as: the answer to the
+  /// question in flight when the student answers that one in the chat, a
+  /// question otherwise. [handleStudentMessage] routes on it when no theory
+  /// page is on screen, and [_chatAnswerAwaited] reads it next to one.
+  ChatRequestType get _practiceMessageType {
     // A quiz is answered by the option the student picks, never by what
     // they type (#271): next to a quiz that waits for its pick, a message
     // is a question about it, as during any other exercise — with the quiz
@@ -1906,32 +1905,62 @@ class TutorService extends Notifier<TutorState> {
     // quiz is the question in front of the student, so a follow-up still
     // in flight is one of an exercise before it.
     if (_currentExerciseType == 'multiple_choice' && _quizAwaitingPick) {
-      await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
-      return;
+      return ChatRequestType.studentQuestion;
     }
     // A pending follow-up takes precedence: the next student utterance is
     // the answer to the chained follow-up question, regardless of the
     // exercise type that produced the original probe. After a quiz that is
     // the follow-up its grader asked under the feedback.
-    if (_followUpInFlight != null) {
-      // Synthetic plan so the grader landing reuses the original probe's
-      // target LO and gets the difficulty field. Conductor will treat the
-      // grading as follow-up via the `_followUpInFlight != null` flag.
-      _inFlightPlan = _followUpInFlight!.originalPlan;
-      await queryTutor(type: ChatRequestType.followUpAnswer, prompt: message);
-      return;
-    }
-    if (_currentExerciseType == 'socratic_question') {
-      await queryTutor(type: ChatRequestType.socraticFeedback, prompt: message);
-    } else if (_currentExerciseType == 'explain_code') {
-      await queryTutor(type: ChatRequestType.explainAnswer, prompt: message);
-    } else {
+    if (_followUpInFlight != null) return ChatRequestType.followUpAnswer;
+    return switch (_currentExerciseType) {
+      'socratic_question' => ChatRequestType.socraticFeedback,
+      'explain_code' => ChatRequestType.explainAnswer,
       // A code exercise — its answer is the code handed in through the
       // editor, and the question is told not to give that away (#273) — or
       // a quiz already answered, whose answer was the pick (#271): a
       // question.
-      await queryTutor(type: ChatRequestType.studentQuestion, prompt: message);
+      _ => ChatRequestType.studentQuestion,
+    };
+  }
+
+  /// Whether a question the student answers by typing in the chat waits
+  /// for that answer (#324): an `explain_code` or socratic exercise, or a
+  /// follow-up — what they would type in practice goes to a grader. Next
+  /// to the theory page that same chat takes a question about the page
+  /// instead (#132), so a page question asked then is told not to give
+  /// that answer away, and the chat says it did not count as one.
+  bool get _chatAnswerAwaited =>
+      _practiceMessageType != ChatRequestType.studentQuestion;
+
+  Future<void> handleStudentMessage(String message) async {
+    // A question typed while a theory page is on screen is about that page
+    // (#132). It goes out with the page and comes back as a plain answer;
+    // nothing else moves — the follow-up, plan and exercise type in flight
+    // are still there when the student returns to practice and answers.
+    if (_pageOnScreen() != null) {
+      // With a question waiting for its answer in this same chat, the
+      // student may well have meant the message as that answer (#324). It
+      // is still a page question — a real question about the page must not
+      // be graded — but the chat says, under the reply, that it did not
+      // count, with the way back to the question — while it still waits:
+      // a turn that failed may have let go of a follow-up.
+      final notAnAnswer = state == TutorState.idle && _chatAnswerAwaited;
+      await queryTutor(type: ChatRequestType.contentQuestion, prompt: message);
+      if (notAnAnswer && _chatAnswerAwaited) {
+        _chat.addSystemNotice(
+          const ChatNotice(ChatNoticeKind.pageQuestionNotAnAnswer),
+        );
+      }
+      return;
     }
+    final type = _practiceMessageType;
+    if (type == ChatRequestType.followUpAnswer) {
+      // Synthetic plan so the grader landing reuses the original probe's
+      // target LO and gets the difficulty field. Conductor will treat the
+      // grading as follow-up via the `_followUpInFlight != null` flag.
+      _inFlightPlan = _followUpInFlight!.originalPlan;
+    }
+    await queryTutor(type: type, prompt: message);
   }
 
   Future<void> requestHint(String? code) async {

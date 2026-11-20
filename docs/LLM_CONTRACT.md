@@ -426,6 +426,44 @@ exercise, which is what the student types in the chat there:
 and output are unchanged: the plain `answer` envelope, no `turn_history`
 record, no belief, calibration or XP change.
 
+### A page question while an open question waits (#324)
+
+An `explain_code` or socratic exercise, and a follow-up the grader asked,
+is answered by what the student types in the chat. The chat next to the
+theory page is the same chat, but there a message is a question about the
+page (`content_question`, #132), so a student who read up and typed their
+answer there got a reply about the page, no grade and no next question.
+It stays a question about the page — a real question about the lesson must
+never count as the answer — and two things are added
+(`TutorService._chatAnswerAwaited`: what the student types in practice
+would go to a grader — `explain_answer`, `socratic_feedback` or
+`follow_up_answer`; not next to a code exercise, answered in the editor,
+nor a quiz that waits for its pick):
+
+- System prompt: `openChatQuestionDirective` (`instruction_generator.dart`),
+  appended after the teacher-authored body (and after the open-quiz and
+  open-code-exercise directives when those are there too — a follow-up
+  after a code exercise gets both) and before the output-language
+  directive, to the page question only (`openChatQuestionGuardedTypes`).
+  It says the message is a question about the page and not the answer to
+  the open question, which is the last question in the conversation the
+  call carries and is not graded here; that the model may explain the page
+  and give a short example on a different problem; that it never gives the
+  open question's answer away — does not answer it, work out what its code
+  does or prints, or say what a right answer contains, not even on
+  request; and that a message that reads like an answer is neither judged
+  nor corrected: the student is told it did not count and that they answer
+  at the question itself. Like the other two it lives in code, so it holds
+  whatever the teacher's `contentQuestion` doc says.
+- In the chat, under the reply: `ChatNoticeKind.pageQuestionNotAnAnswer`,
+  drawn as a plain notice with a button "Naar de vraag" that switches to
+  the practice view, where the question is.
+
+Inputs and output are unchanged: the plain `answer` envelope, no
+`turn_history` record, no belief, calibration or XP change, and the
+question still waits: back in practice what the student types is graded
+against it as before.
+
 ### Output language (#117)
 
 Both calls end with a fixed output-language directive, appended by

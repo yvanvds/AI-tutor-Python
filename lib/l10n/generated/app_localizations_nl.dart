@@ -2926,6 +2926,13 @@ class AppLocalizationsNl extends AppLocalizations {
       'Pas je code aan in de editor links en druk op Run om je oplossing in te sturen.';
 
   @override
+  String get chat_notice_pageQuestionNotAnAnswer =>
+      'Dit was een vraag over de uitleg, dus het telt niet als antwoord op je oefening. Antwoord bij de vraag zelf.';
+
+  @override
+  String get chat_notice_toQuestion_button => 'Naar de vraag';
+
+  @override
   String get questions_page_title => 'Vragen';
 
   @override

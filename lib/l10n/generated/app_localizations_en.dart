@@ -2896,6 +2896,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Adjust your code in the editor on the left and press Run to submit your solution.';
 
   @override
+  String get chat_notice_pageQuestionNotAnAnswer =>
+      'This was a question about the explanation, so it does not count as an answer to your exercise. Answer at the question itself.';
+
+  @override
+  String get chat_notice_toQuestion_button => 'Go to the question';
+
+  @override
   String get questions_page_title => 'Questions';
 
   @override

@@ -8,6 +8,12 @@
 // next thing Sam types is graded against it exactly as before. The
 // composer says so: its hint names the page while the page is in scope.
 //
+// #324: Sam may well have meant that message as the answer — the probe is
+// in the same chat. The chat says under the reply that it did not count,
+// with a button that goes back to the question, and the page question is
+// told not to give the probe's answer away. Without a question waiting
+// (the second test) neither appears.
+//
 // The second test pages back (#115): the page sent is the one on screen,
 // not the active subgoal's, and the prompt is written for that older
 // subgoal.
@@ -24,12 +30,16 @@
 
 import 'dart:convert';
 
+import 'package:ai_tutor_python/features/chat/widgets/chat_action_notice.dart';
 import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/services/chat/chat_notice.dart';
+import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
 import 'package:ai_tutor_python/services/lesson/lesson_code_runner.dart';
+import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +51,18 @@ import '../harness/seed.dart';
 
 const String kPageHint = 'Ask a question about this explanation…';
 const String kPlainHint = 'Type your question or answer…';
+
+/// What the chat says under the reply to a page question that the student
+/// may have meant as the answer to the question waiting in the chat (#324),
+/// and its button.
+const String kNotAnAnswer =
+    'This was a question about the explanation, so it does not count as an '
+    'answer to your exercise. Answer at the question itself.';
+const String kToQuestion = 'Go to the question';
+
+/// The opening line of the instruction a page question gets while a
+/// question waits for its answer in the chat (#324).
+const String kOpenQuestionGuard = 'OPEN QUESTION — STRICT.';
 
 const String kProbeCode = 'naam = "Mira"\nprint("Hallo", naam)';
 const String kNextProbeCode = 'print(1, 2)';
@@ -199,6 +221,19 @@ void main() {
   Map<String, dynamic> request(ScriptedLlm llm, int i) =>
       jsonDecode(llm.sentInputs[i]) as Map<String, dynamic>;
 
+  /// The chat's notices that a page question did not count as the answer
+  /// to the question waiting in the chat (#324) — on screen or scrolled
+  /// out of it.
+  Iterable<Object> notAnAnswerNotices(AppHarness harness) => harness.container
+      .read(chatServiceProvider)
+      .controller
+      .messages
+      .where(
+        (m) =>
+            ChatNotice.fromJson(m.metadata?[ChatNotice.metadataKey])?.kind ==
+            ChatNoticeKind.pageQuestionNotAnAnswer,
+      );
+
   testWidgets('a question typed on the theory page goes out with the page '
       'and comes back as an answer; the pending practice question is still '
       'graded when the student comes back and answers it', (tester) async {
@@ -275,6 +310,11 @@ void main() {
       contains('belongs to the subgoal "Print" of the goal "Basics"'),
     );
 
+    // The probe waits for its answer in this chat (#324): the page
+    // question is told not to give it away.
+    expect(llm.sentInstructions[1], contains(kOpenQuestionGuard));
+    expect(llm.sentInstructions[0], isNot(contains(kOpenQuestionGuard)));
+
     // The answer is in the chat; nothing was graded.
     await pumpUntilFound(
       tester,
@@ -283,9 +323,29 @@ void main() {
     expect(harness.cosmos['turn_history'].docs, isEmpty);
     expect(harness.cosmos['lo_beliefs'].docs, isEmpty);
 
-    // Back in practice the probe is still the one in flight: same code in
-    // the editor, and what Sam types now is graded against it.
-    await tester.tap(find.text('Try it yourself'));
+    // Under it, the chat says the message did not count as the answer,
+    // with the way back to the question (#324).
+    await pumpUntilFound(tester, find.text(kNotAnAnswer));
+    expect(find.byType(ChatActionNotice), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text(kNotAnAnswer)).dy,
+      greaterThan(
+        tester
+            .getTopLeft(
+              find.textContaining(
+                'makes print show both values',
+                findRichText: true,
+              ),
+            )
+            .dy,
+      ),
+      reason: 'the notice belongs under the reply',
+    );
+
+    // Back in practice with one click on it: the probe is still the one in
+    // flight — same code in the editor, and what Sam types now is graded
+    // against it.
+    await tester.tap(find.text(kToQuestion));
     await pumpUntilFound(tester, find.byType(PracticeView));
     await pumpUntilGone(tester, find.byType(ExplainView));
     expect(llm.sends, 2, reason: 'practice asked for a new exercise');
@@ -310,6 +370,8 @@ void main() {
     );
     expect(llm.remaining, 0);
     expect(harness.cosmos['turn_history'].docs, hasLength(1));
+    // An answer given at the question gets no notice: still only the one.
+    expect(notAnAnswerNotices(harness), hasLength(1));
 
     await harness.dispose(tester);
   });
@@ -356,6 +418,18 @@ void main() {
       tester,
       find.textContaining('shows the text on screen', findRichText: true),
     );
+    // No question waits for an answer in the chat (#324): no notice once
+    // the turn is over, and no instruction about one.
+    await pumpUntil(
+      tester,
+      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+      reason: 'the page question never finished',
+    );
+    await tester.pump();
+    expect(llm.sentInstructions.single, isNot(contains(kOpenQuestionGuard)));
+    expect(notAnAnswerNotices(harness), isEmpty);
+    expect(find.text(kNotAnAnswer), findsNothing);
+    expect(find.byType(ChatActionNotice), findsNothing);
     // The tutor never moved.
     expect(
       harness.container.read(goalSelectionProvider).activeChildGoal?.id,

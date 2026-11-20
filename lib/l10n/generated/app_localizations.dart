@@ -4780,6 +4780,18 @@ abstract class AppLocalizations {
   /// **'Adjust your code in the editor on the left and press Run to submit your solution.'**
   String get chat_notice_submitViaEditor;
 
+  /// No description provided for @chat_notice_pageQuestionNotAnAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'This was a question about the explanation, so it does not count as an answer to your exercise. Answer at the question itself.'**
+  String get chat_notice_pageQuestionNotAnAnswer;
+
+  /// No description provided for @chat_notice_toQuestion_button.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the question'**
+  String get chat_notice_toQuestion_button;
+
   /// No description provided for @questions_page_title.
   ///
   /// In en, this message translates to:

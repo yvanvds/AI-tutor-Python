@@ -107,6 +107,12 @@ enum ChatNoticeKind {
 
   submitViaEditor,
 
+  /// A message typed next to the theory page went out as a question about
+  /// the page (#132) while a question the student answers in the chat
+  /// waited (#324): it did not count as that answer. The chat draws it
+  /// with a button that goes back to the question.
+  pageQuestionNotAnAnswer,
+
   /// Verbatim text authored elsewhere (an LLM `error` reply, an unknown
   /// exception's `toString()`). `args[0]` is the text.
   raw,

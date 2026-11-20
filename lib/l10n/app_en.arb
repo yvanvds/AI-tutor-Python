@@ -1661,6 +1661,8 @@
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
   },
   "chat_notice_submitViaEditor": "Adjust your code in the editor on the left and press Run to submit your solution.",
+  "chat_notice_pageQuestionNotAnAnswer": "This was a question about the explanation, so it does not count as an answer to your exercise. Answer at the question itself.",
+  "chat_notice_toQuestion_button": "Go to the question",
 
   "questions_page_title": "Questions",
   "questions_page_subtitle": "A new question only lands here when the first student answers it correctly, and the app hides a question that is answered wrong too often by itself. Hide or delete what is still wrong or unclear: a hidden question is not asked again.",

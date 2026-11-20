@@ -76,6 +76,8 @@ extension ChatNoticeText on AppLocalizations {
         );
       case ChatNoticeKind.submitViaEditor:
         return chat_notice_submitViaEditor;
+      case ChatNoticeKind.pageQuestionNotAnAnswer:
+        return chat_notice_pageQuestionNotAnAnswer;
       case ChatNoticeKind.raw:
         return arg(0);
     }

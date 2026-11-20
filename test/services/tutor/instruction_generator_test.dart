@@ -729,6 +729,137 @@ void main() {
     });
   });
 
+  // #324 — a student with an `explain_code` or socratic question, or a
+  // follow-up, waiting for its answer in the chat reads up on the theory
+  // page and types there. The message is a question about the page and is
+  // not graded; the page may hold the open question's answer, and the
+  // question is in the history the call carries. The guard is the app's,
+  // whatever the teacher's `contentQuestion` doc says.
+  group('open-chat-question directive (#324)', () {
+    Future<String> generate(
+      ChatRequestType type, {
+      required bool chatQuestionOpen,
+      bool codeExerciseOpen = false,
+      List<Instruction> docs = const [],
+    }) => InstructionGenerator().generateInstructions(
+      type,
+      goalSelection: GoalSelectionState(
+        selectedRoot: root(),
+        selectedChild: subgoal(),
+      ),
+      cachedInstructions: [
+        ...docs,
+        makeInstruction('socraticFeedback', {'main': 'Beoordeel het.'}),
+      ],
+      fetchInstructions: () async => const [],
+      fetchRootGoals: () async => const [],
+      languageCode: 'nl',
+      codeExerciseOpen: codeExerciseOpen,
+      chatQuestionOpen: chatQuestionOpen,
+    );
+
+    const guard = 'OPEN QUESTION — STRICT.';
+
+    test('a question about the page while a question waits for its answer '
+        'in the chat is told not to give that answer away, after the '
+        'page-question body and before the language directive', () async {
+      final out = await generate(
+        ChatRequestType.contentQuestion,
+        chatQuestionOpen: true,
+      );
+      expect(out, contains(openChatQuestionDirective));
+      final at = out.indexOf(guard);
+      expect(at, greaterThan(out.indexOf('### CONTENT QUESTION')));
+      expect(at, lessThan(out.indexOf('OUTPUT LANGUAGE')));
+      expect(out, isNot(contains('OPEN QUIZ')));
+      expect(out, isNot(contains('OPEN CODE EXERCISE')));
+    });
+
+    test('it holds after a teacher-authored page-question doc too', () async {
+      final out = await generate(
+        ChatRequestType.contentQuestion,
+        chatQuestionOpen: true,
+        docs: [
+          makeInstruction('contentQuestion', {
+            'main': 'Leg de pagina uit, met voorbeelden.',
+          }),
+        ],
+      );
+      expect(out, isNot(contains('### CONTENT QUESTION')));
+      expect(out.indexOf(guard), greaterThan(out.indexOf('Leg de pagina uit')));
+    });
+
+    test('no page question without a question waiting, and no other turn '
+        'with one', () async {
+      expect(
+        await generate(
+          ChatRequestType.contentQuestion,
+          chatQuestionOpen: false,
+        ),
+        isNot(contains(guard)),
+      );
+      expect(openChatQuestionGuardedTypes, {ChatRequestType.contentQuestion});
+      for (final type in ChatRequestType.values) {
+        if (type == ChatRequestType.contentQuestion) continue;
+        expect(
+          await generate(type, chatQuestionOpen: true),
+          isNot(contains(guard)),
+          reason: '${type.name}: the answer itself goes to its grader',
+        );
+      }
+    });
+
+    test('a follow-up after a code exercise: it stands next to the '
+        'open-code-exercise directive rather than replacing it', () async {
+      final out = await generate(
+        ChatRequestType.contentQuestion,
+        chatQuestionOpen: true,
+        codeExerciseOpen: true,
+      );
+      expect(out, contains('OPEN CODE EXERCISE — STRICT.'));
+      expect(out, contains(guard));
+      expect(
+        out.indexOf(guard),
+        greaterThan(out.indexOf('OPEN CODE EXERCISE — STRICT.')),
+      );
+    });
+
+    test('the page may be explained; the open question is never answered, '
+        'graded or corrected here', () {
+      expect(openChatQuestionDirective, contains('`explain_code`'));
+      expect(openChatQuestionDirective, contains('`socratic_question`'));
+      expect(openChatQuestionDirective, contains('follow-up question'));
+      expect(
+        openChatQuestionDirective,
+        contains('it is not their answer to that open question'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('Explaining what the page says is fine'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('Never give the open question\'s answer away'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('do not work out what its code does or prints'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('not even when the student asks for it outright'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('do not say whether it is right or wrong'),
+      );
+      expect(
+        openChatQuestionDirective,
+        contains('they answer at the question itself'),
+      );
+    });
+  });
+
   group('output-language directive (#117)', () {
     Future<String> generate(String languageCode) =>
         InstructionGenerator().generateInstructions(
