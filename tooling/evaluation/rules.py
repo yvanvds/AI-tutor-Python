@@ -20,8 +20,21 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.1.3-eval10` = PUNTENFORMULE v1.1.3, replayed from the turn
-log. `eval10` (#326) follows the app's count of a right follow-up from the
+Rule set `1.1.3-eval11` = PUNTENFORMULE v1.1.3, replayed from the turn
+log. `eval11` (#327) lets the mastery guard of `eval9` read the stamp on
+the LO's doc, as the app does (`isMastered` → `everMasteredBelief`), where
+`validate` and `replay-beliefs` replay (`replay(stamps=...)`). The guard
+read only the replay's own stamp, and with `--regels 1.1` that has no thin
+stamp from before 1.1 (fewer than two right own questions): 1.1 does not
+give it, and the doc keeps it (#168). On build 2.15.0 the app guarded such
+an LO and the replay forgot — four docs in 6WEWI read as a deviation
+(2026-11-20). With the docs' stamps, `validate --regels 1.1` shows none in
+6EWI or 6WEWI. `draft` and `what-if` pass no stamps: they replay by build,
+from the log alone, and feeding them the docs' stamps moved no stamp and no
+μ on the class data (2026-11-21). No grade moves; `lo_beliefs` needs no
+rewrite: the docs are what the app computed.
+
+`eval10` (#326) follows the app's count of a right follow-up from the
 build that brought it (`FOLLOW_UP_RIGHT_FROM`, by the turn's
 `clientVersion`, `follow_up_counts`): an own question answered `partial`
 counts as answered right when a follow-up on it — at either depth of a
@@ -163,11 +176,11 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.1.3-eval10"
+RULES_VERSION = "1.1.3-eval11"
 
 PRIOR = 1.0
 # A backstop since #278: forgetting keeps the evidence under 14.
@@ -586,16 +599,26 @@ def _shrink(a: float, b: float, factor: float) -> tuple[float, float]:
     return PRIOR + (a - PRIOR) * factor, PRIOR + (b - PRIOR) * factor
 
 
-def _mastered_now(lo: LoState, a: float, b: float, min_right: int, min_open: int) -> bool:
+def _mastered_now(lo: LoState, a: float, b: float, min_right: int, min_open: int, doc_stamped: bool = False) -> bool:
     """`belief_math.isMastered` on the decayed belief `(a, b)`: mean and
     evidence at today's bar, a positive at calibration, and the stamp or
-    the right own questions the stamp wants."""
+    the right own questions the stamp wants. The stamp is the replay's, or
+    [doc_stamped]: the doc's, which the app reads (#327)."""
     return (
         a / (a + b) >= MASTERY_MEAN
         and a + b >= MASTERY_EVIDENCE
         and lo.positive_at_calibrated_at is not None
-        and (lo.demonstrated or (lo.own_right >= min_right and lo.own_right_open >= min_open))
+        and (lo.demonstrated or doc_stamped or (lo.own_right >= min_right and lo.own_right_open >= min_open))
     )
+
+
+def _doc_stamped(stamps: Mapping[tuple[str, str], dt.datetime], key: tuple[str, str], now: dt.datetime) -> bool:
+    """Whether the doc of [key] had its stamp before the write at [now]:
+    one strictly earlier. The app stamps when it writes, a second or so
+    after `turnAt`; `replay-beliefs` writes a replayed stamp at `turnAt`,
+    and before that oefening's write the doc had none."""
+    at = stamps.get(key)
+    return at is not None and at < now
 
 
 def _add_positive(a: float, b: float, da: float, forget: float | None, guarded: bool) -> tuple[float, float]:
@@ -703,11 +726,26 @@ def replay(
     apply_transfer_credits: bool = True,
     supervised: Callable[[dict], bool] = recorded_supervised,
     variant: Variant = CURRENT,
+    stamps: Mapping[tuple[str, str], dt.datetime] | None = None,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
 
     [variant] replays a candidate rule for 1.1 instead (#248); the default
     is the rule of now.
+
+    [stamps] are the stamps on the student's `lo_beliefs` docs, per LO (the
+    stamp the app reads, `evaluate.app_stamp`), for the mastery guard
+    (#311, #327). The app decides the guard on the doc (`isMastered` reads
+    `everMasteredBelief`), so with them an LO counts as stamped there from
+    its doc's stamp on (`_doc_stamped`), whether the replay gives that stamp
+    or not: a stamp from before 1.1 on fewer than two right own questions,
+    which `--regels 1.1` does not replay and no rewrite clears (#168), or a
+    stamp only 1.1 gives on a replay by build. `validate` and
+    `replay-beliefs` pass them, to compare to and write what the app
+    computed. Only the guard reads them: the replay's own stamp, which the
+    grade reads, comes from the log alone. None, as `draft` and `what-if`
+    replay: the replay's own stamps only, a model by build of its own
+    (README, `eval11`).
 
     [supervised] says which turns weigh ×`SUPERVISED_WEIGHT_FACTOR`, every
     signal and transfer credit of the turn (PUNTENFORMULE §2.7). The default
@@ -731,6 +769,7 @@ def replay(
     builds before #204 wrote that neutral, but it moves neither M nor P.
     """
     st: dict[tuple[str, str], LoState] = {}
+    stamps = stamps or {}
     # #326: the own question of the follow-up chain under way, while its
     # answer was `partial` and it has not counted as right — its LO's key.
     # A follow-up only ever comes right after its own question (§6.5); any
@@ -805,7 +844,7 @@ def replay(
                 base *= mcq_factor
             forgets = forget if (own or not variant.forget_own_only) else None
             if kind == "positive":
-                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open, _doc_stamped(stamps, key, now))
                 a, b = _add_positive(a, b, base * POS_FACTOR[eff_diff], forgets, guarded)
             elif kind == "negative":
                 if forgets is not None:
@@ -887,10 +926,11 @@ def replay(
             # file, not the conductor's `firstMasteredAt ?? lastUpdatedAt`
             # fallback for pre-#101 docs.
             for c in t.get("transferCredits") or []:
-                lo = st.setdefault((c["subgoalId"], c["loId"]), LoState())
+                credited = (c["subgoalId"], c["loId"])
+                lo = st.setdefault(credited, LoState())
                 a, b = _decay(lo.alpha, lo.beta, lo.last_at, now)
                 forgets = None if variant.forget_own_only else forget
-                guarded = guard and _mastered_now(lo, a, b, min_right, min_open)
+                guarded = guard and _mastered_now(lo, a, b, min_right, min_open, _doc_stamped(stamps, credited, now))
                 lo.alpha, lo.beta = _add_positive(a, b, TRANSFER_CREDIT_ALPHA * s_factor, forgets, guarded)
                 lo.last_at = now
                 lo.n_transfer += 1

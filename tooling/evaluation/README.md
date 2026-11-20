@@ -103,9 +103,46 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.1.3-eval10`
+## Regelversie `1.1.3-eval11`
 
-PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval10` (2026-11-20,
+PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval11` (2026-11-21,
+#327) laat de **bewaking van beheerst** (`eval9`, hieronder) de stempel
+van het document lezen, zoals de app: `isMastered` leest
+`everMasteredBelief`, de stempel op het document. `validate` en
+`replay-beliefs` geven die stempels mee aan de herspeling
+(`rules.replay(stamps=...)`, `evaluate.doc_stamps`). Een stempel telt
+vanaf het moment erna: de app stempelt een seconde of zo na `turnAt`.
+
+Tot `eval10` keek de bewaking alleen naar de stempel van de herspeling.
+Met `--regels 1.1` heeft die geen dunne stempel van vóór 1.1 (minder dan
+twee juiste eigen vragen): 1.1 geeft hem niet, het document houdt hem
+(#168). Op build 2.15.0 bewaakte de app zo'n leerdoel en vergat de
+herspeling: vier documenten in 6WEWI weken af in μ (2026-11-20). Met de
+stempels van de documenten toont `validate --regels 1.1` geen afwijking
+in μ meer, in 6EWI (579 documenten) noch in 6WEWI (1658). Geen stempel
+en geen punt verschuift, en `lo_beliefs` hoeft niet herschreven te
+worden: de documenten zijn wat de app rekende. De droge run van
+`replay-beliefs --regels 1.1` wil op 21-11 nog 13 documenten herschrijven
+(3 in 6EWI, 10 in 6WEWI), alleen α/β en met |Δμ| < 0,01. Dat komt niet
+van de bewaking: de herschrijving van 09-11 liet `lastUpdatedAt` staan,
+en de app liet daarna vervallen vanaf een andere klok dan de herspeling
+(#328).
+
+`draft` en `what-if` geven geen stempels mee: het concept herspeelt per
+build, alleen uit de log. Ook die herspeling mist stempels die op het
+document staan (55 documenten in 6WEWI, 24 in 6EWI op 20-11). Op 52 en 24
+daarvan zijn het stempels van 1.1: `replay-beliefs --regels 1.1` schreef
+ze op 09-11 (*stempel erbij*, *stempel vroeger*), of de app zette ze
+sindsdien op documenten die van die herschrijving afstammen. De
+herspeling met 1.1 geeft elk ervan op hetzelfde moment. De andere drie
+in 6WEWI zijn stempels van september van een build zonder
+`clientVersion`, met de oude rekenregels (`replay(asymmetric=False,
+drop_incidental_negatives=False)` geeft ze op hetzelfde moment). Het
+concept telt zulke stempels niet (*stempel erbij met --regels 1.1*,
+hieronder). De stempels van de documenten in de bewaking van het concept
+veranderden op 21-11 geen stempel en geen μ.
+
+`eval10` (2026-11-20,
 #326) telt een **juiste vervolgvraag na een half juist antwoord** zoals de
 app vanaf de build die het bracht (2.16.0, `rules.FOLLOW_UP_RIGHT_FROM`,
 `rules.follow_up_counts`): was het antwoord op een eigen vraag `partial`,
@@ -354,7 +391,8 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
 
 Verder identiek aan de app: prior (1,1), vergeten per antwoord met λ = 0,7
 voor een oefening van 1.1 (sinds `eval8`), de bewaking van beheerst vanaf
-build 2.15.0 (sinds `eval9`), een juiste vervolgvraag na een half juiste
+build 2.15.0 (sinds `eval9`; in `validate` en `replay-beliefs` ook op de
+stempel van het document, sinds `eval11`), een juiste vervolgvraag na een half juiste
 eigen vraag als juiste eigen vraag vanaf build 2.16.0 (sinds `eval10`),
 plafond 20 met krimp-dan-optel,
 de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),

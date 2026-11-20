@@ -513,9 +513,18 @@ def _replay_student(uid: str, goals: dict, variant: rules.Variant = rules.CURREN
     compares them to: `rules.replay` with the provenance the app recorded,
     so with the weight the app wrote the docs with, and with [variant]
     (`--regels`). `replay-beliefs` writes this same replay (#242), so
-    `validate` with the same `--regels` reads its docs back as matching."""
-    turns = cosmos.turns(uid)
-    return turns, cosmos.beliefs(uid), rules.replay(turns, goals, variant=variant)
+    `validate` with the same `--regels` reads its docs back as matching.
+
+    The mastery guard reads the docs' stamps (`doc_stamps`, #327), as the
+    app does: a stamp the replay does not give still guards there."""
+    turns, stored = cosmos.turns(uid), cosmos.beliefs(uid)
+    return turns, stored, rules.replay(turns, goals, variant=variant, stamps=doc_stamps(stored))
+
+
+def doc_stamps(stored: dict) -> dict[tuple[str, str], dt.datetime]:
+    """The stamp the app reads on each of [stored] that has one
+    (`app_stamp`): what its mastery guard decides on (#327)."""
+    return {key: at for key, doc in stored.items() if (at := app_stamp(doc)) is not None}
 
 
 def _last_build(turns: list[dict]) -> str:
