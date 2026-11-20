@@ -520,6 +520,13 @@ def _decay(a: float, b: float, last: dt.datetime | None, now: dt.datetime) -> tu
     return PRIOR + (a - PRIOR) * d, PRIOR + (b - PRIOR) * d
 
 
+def decayed(lo: LoState, now: dt.datetime) -> tuple[float, float]:
+    """(α, β) of [lo] decayed from its clock to [now], as the app decays at
+    its next write; as they are at or before the clock. Composable: decayed
+    to a moment and on from there is decayed in one go (#328)."""
+    return _decay(lo.alpha, lo.beta, lo.last_at, now)
+
+
 def _apply(a: float, b: float, da: float, db: float) -> tuple[float, float]:
     """Cap-then-add, as `belief_math.applyEvidence`."""
     nd = da + db

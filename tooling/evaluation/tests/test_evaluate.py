@@ -2398,18 +2398,21 @@ class ReplayedBeliefTest(unittest.TestCase):
                              returnWrongAt="2026-09-21T09:00:00.000Z", thinCheckedAt="2026-09-21T09:00:00.000Z")
         new = self.merged(stored, stamp=self.AT, level="hard", alpha=10.0, beta=3.8)
         self.assertEqual(set(new), set(stored))
-        # The stored clock is the app's: it stays (#275); so do counts the
+        # The stored probe clock is the app's: it stays (#275); so does
+        # `lastUpdatedAt` where the replay wrote no later (#328), counts the
         # replay does not exceed (#281), and the session state of #275.
         self.assertEqual(
             {k for k in new if new[k] != stored[k]},
-            set(evaluate.BELIEF_FIELDS) - {"lastProbedAt", *self.COUNTS},
+            set(evaluate.BELIEF_FIELDS) - {"lastUpdatedAt", "lastProbedAt", *self.COUNTS},
         )
         self.assertEqual(stored["firstMasteredAt"], "2026-09-22T09:15:01.250Z")  # the stored doc is not touched
         # Every field of BELIEF_FIELDS, and nothing else, on a doc from
-        # before 1.1 without the probe clock.
+        # before 1.1 without the probe clock, which the replay wrote a day
+        # after the app last did.
         bare = {k: v for k, v in self.before_11(firstMasteredAt="2026-09-22T09:15:01.250Z").items()
                 if k != "lastProbedAt"}
         state = rules.LoState(alpha=10.0, beta=3.8, first_mastered_at=self.AT, ratchet="hard",
+                              last_at=dt.datetime(2026, 9, 23, 9, tzinfo=dt.timezone.utc),
                               last_direct_at=self.AT, own_questions=4, own_right=3, own_right_open=1)
         new = evaluate.replayed_belief(bare, state, self.OEFENINGEN)
         self.assertEqual({k for k in new if new.get(k) != bare.get(k)}, set(evaluate.BELIEF_FIELDS))
@@ -2604,7 +2607,11 @@ class ReplayBeliefsTest(_CommandTest):
             self.assertLessEqual({k for k in doc if doc[k] != before.get(k)}, set(evaluate.BELIEF_FIELDS))
         replay = rules.replay(TURNS["u-rik"], GOALS)
         predict = written["predict_b1"]
-        self.assertEqual((predict["alpha"], predict["beta"]), (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+        # The replay's, on the doc's clock: the app wrote a second after
+        # `turnAt` (#328).
+        on_its_clock = rules.decayed(replay[("sg-b", "predict_b1")], rules.parse_at(predict["lastUpdatedAt"]))
+        self.assertEqual(predict["lastUpdatedAt"], stored[("sg-b", "predict_b1")]["lastUpdatedAt"])
+        self.assertEqual((predict["alpha"], predict["beta"]), on_its_clock)
         self.assertEqual(predict["firstMasteredAt"], "2026-09-15T09:15:00.000Z")
         self.assertEqual(predict["highestPositiveDifficulty"], "hard")
         self.assertEqual(written["recall_a1"]["firstMasteredAt"], "2026-09-10T09:01:00.000Z")
@@ -2739,7 +2746,8 @@ class ReplayBeliefsRules11Test(_CommandTest):
         self.assertEqual(sorted(written), ["fix_a3", "predict_b1", "recall_a1", "write_a2"])
         predict = written["predict_b1"]
         self.assertEqual((predict["alpha"], predict["beta"]),
-                         (replay[("sg-b", "predict_b1")].alpha, replay[("sg-b", "predict_b1")].beta))
+                         rules.decayed(replay[("sg-b", "predict_b1")], rules.parse_at(predict["lastUpdatedAt"])))
+        self.assertEqual(predict["lastUpdatedAt"], WIM_STORED[("sg-b", "predict_b1")]["lastUpdatedAt"])
         self.assertFalse(evaluate.on_the_cap(predict))
         self.assertEqual(predict["firstMasteredAt"], "2026-09-16T09:16:00.000Z")
         counts = lambda d: (d["ownQuestions"], d["ownQuestionsRight"], d["ownQuestionsRightNonMcq"])  # noqa: E731
@@ -2925,6 +2933,185 @@ class DocStamp327CommandTest(_CommandTest):
         stdout = self.run_cli("replay-beliefs", "--klas", KLAS_STEMPEL, "--regels", "1.1")
         self.assertIn("te schrijven: 0 documenten", stdout)
         self.assertEqual(self.cosmos.upserts, [])
+
+
+class DocClock328Test(unittest.TestCase):
+    """#328: `replay-beliefs` writes α and β that fit the doc's clock
+    `lastUpdatedAt`, from which the app decays at its next write, and
+    `validate` compares on that clock (`evaluate._on_one_clock`)."""
+
+    KEY = ("sg-a", "recall_a1")
+    # The replay's last write on the LO, and its numbers then.
+    REPLAYED_AT = dt.datetime(2026, 9, 4, 9, 29, tzinfo=dt.timezone.utc)
+    STATE = rules.LoState(alpha=6.2, beta=1.4, last_at=REPLAYED_AT)
+
+    def doc(self, at: dt.datetime, alpha: float = 6.2, beta: float = 1.4, **fields) -> dict:
+        counts = {"ownQuestionsRight": 0, "ownQuestionsRightNonMcq": 0}  # those of 1.1, so none to fill
+        return _belief_doc("u-x", self.KEY, alpha, beta, lastUpdatedAt=evaluate._app_iso(at),
+                           lastProbedAt="2026-09-04T09:29:01.000Z", **{**counts, **fields})
+
+    def merged(self, stored: dict) -> dict:
+        return evaluate.replayed_belief(stored, self.STATE, [self.REPLAYED_AT])
+
+    def test_on_a_later_doc_clock_the_replays_numbers_decayed_to_it(self):
+        # What the rewrite of 09-11 left: the replay's numbers, and the clock
+        # of an incidental negative an old build wrote a week later (#167).
+        later = self.REPLAYED_AT + dt.timedelta(days=7, minutes=22)
+        stored = self.doc(later)
+        new = self.merged(stored)
+        self.assertEqual((new["alpha"], new["beta"]), rules.decayed(self.STATE, later))
+        self.assertEqual(new["lastUpdatedAt"], stored["lastUpdatedAt"])  # the app's clock stays
+        self.assertEqual(evaluate.belief_changes(stored, new), {"alpha/beta"})
+        self.assertEqual(self.merged(new), new)  # and a second run has nothing to write
+
+    def test_on_an_earlier_doc_clock_the_replays_clock_is_written(self):
+        # The replay read a signal on 09-04 that the build dropped: the doc
+        # was last written a week before. Same numbers, but the app would
+        # decay them from the doc's clock: a week too long.
+        earlier = self.REPLAYED_AT - dt.timedelta(days=7)
+        stored = self.doc(earlier)
+        new = self.merged(stored)
+        self.assertEqual((new["alpha"], new["beta"]), (6.2, 1.4))
+        self.assertEqual(new["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+        self.assertEqual(evaluate.belief_changes(stored, new), {"alpha/beta"})
+        self.assertEqual(self.merged(new), new)
+        # A doc without a readable clock gets the replay's with new numbers.
+        bare = {k: v for k, v in self.doc(earlier, alpha=5.0).items() if k != "lastUpdatedAt"}
+        self.assertEqual(self.merged(bare)["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+
+    def test_within_the_tolerance_on_one_clock_nothing_moves(self):
+        # The app's own write, a second after `turnAt`, on the same numbers.
+        at = self.REPLAYED_AT + dt.timedelta(seconds=1)
+        a, b = rules.decayed(self.STATE, at)
+        stored = self.doc(at, a + 4e-6, b)
+        self.assertEqual(self.merged(stored), stored)
+
+    def test_a_stamp_the_app_reads_on_the_old_clock_stays_there(self):
+        # An old doc without `firstMasteredAt` over the bar, with the counts
+        # the stamp wants: the app stamps it at `lastUpdatedAt` at its next
+        # write. A later clock would move that stamp, so it is written as
+        # the app would.
+        earlier = self.REPLAYED_AT - dt.timedelta(days=7)
+        old = self.doc(earlier, 9.4, 1.2, lastPositiveAtCalibratedAt="2026-08-28T09:00:01.000Z",
+                       ownQuestions=2, ownQuestionsRight=2, ownQuestionsRightNonMcq=1)
+        self.assertTrue(evaluate.app_ever_mastered(old))
+        state = dataclasses.replace(self.STATE, alpha=9.6, beta=1.2)
+        new = evaluate.replayed_belief(old, state, [self.REPLAYED_AT])
+        self.assertEqual(new["lastUpdatedAt"], "2026-09-04T09:29:00.000Z")
+        self.assertEqual(new["firstMasteredAt"], old["lastUpdatedAt"])
+        self.assertEqual(evaluate.belief_changes(old, new), {"alpha/beta", "stamp kept"})
+
+    def test_validate_reads_a_rewritten_doc_on_its_clock(self):
+        # Two weeks between the replay's write and the doc's clock: the raw
+        # means are more than 0.01 apart, the same belief on one clock not.
+        later = self.REPLAYED_AT + dt.timedelta(days=14)
+        rewritten = self.merged(self.doc(later))
+        self.assertGreater(abs(self.STATE.mean - rewritten["alpha"] / (rewritten["alpha"] + rewritten["beta"])), 0.01)
+        self.assertLess(evaluate.mean_deviation(rewritten, self.STATE), 1e-12)
+        # A real deviation still reads as one: an extra negative on the doc.
+        self.assertGreater(evaluate.mean_deviation({**rewritten, "beta": rewritten["beta"] + 1.0}, self.STATE), 0.01)
+
+
+# #328: a class of one made-up student. Kees answered recall_a1 right three
+# times on 09-04 on a build from before #108 (no stamp, no level, no probe
+# clock). On 09-11 the grader of a question on predict_b1 named recall_a1
+# wrong from the side: that build wrote it as evidence, with its clock;
+# the replay drops it (#167) and has its last write on 09-04. The rewrite
+# with 1.1 puts the replay on the doc; on 11-13, on 2.14.0, the app writes
+# a right own question on recall_a1, decaying from the doc's clock.
+KLAS_KLOK = "6KLOK"
+ACCOUNTS += [
+    {"uid": "u-kees", "firstName": "Kees", "lastName": "Klok", "className": KLAS_KLOK,
+     "updatedAt": "2026-11-13T09:00:05Z", "calibration": {"difficulty": "medium"}},
+]
+_KEES_KEY = ("sg-a", "recall_a1")
+
+
+def _kees_turn(at: str, subgoal: str, lo: str, signals: list[dict], **extra) -> dict:
+    return _turn(at, subgoal, lo, uid="u-kees", questionType="completeCodeQuestion", loSignals=signals, **extra)
+
+
+_KEES_SEPTEMBER = [
+    *[_kees_turn(f"2026-09-04T09:{m}:00.000Z", "sg-a", "recall_a1", [_sig("sg-a", "recall_a1", "moderate")])
+      for m in ("20", "25", "29")],
+    _kees_turn("2026-09-11T09:51:00.000Z", "sg-b", "predict_b1",
+               [_sig("sg-b", "predict_b1", "moderate"), _sig("sg-a", "recall_a1", "moderate", "negative")]),
+]
+_KEES_NOVEMBER = _kees_turn("2026-11-13T09:00:00.000Z", "sg-a", "recall_a1", [_sig("sg-a", "recall_a1", "moderate")],
+                            clientVersion="2.14.0+31")
+
+
+def _kees_as_the_old_build_wrote() -> dict:
+    """recall_a1 as that build wrote it on 09-11: the old arithmetic, the
+    incidental negative as evidence, its clock a second after; no stamp,
+    level or probe clock (#108, #187)."""
+    old = rules.replay(_KEES_SEPTEMBER, GOALS, asymmetric=False, drop_incidental_negatives=False)[_KEES_KEY]
+    doc = _as_the_app_wrote("u-kees", _KEES_KEY, old)
+    for f in ("firstMasteredAt", "highestPositiveDifficulty", "lastProbedAt"):
+        doc.pop(f, None)
+    return doc
+
+
+def _the_app_writes(doc: dict, turn: dict) -> dict:
+    """[doc] after the app's write of [turn], a right own question on it at
+    `medium`, at home, on 2.14.0 (forgetting, no mastery guard): decayed
+    from the doc's own clock to the moment it writes, a second after
+    `turnAt`, forgotten, then the weight added; the counts and the clocks
+    as the app keeps them."""
+    at = rules.parse_at(turn["turnAt"]) + dt.timedelta(seconds=1)
+    clock = rules.parse_at(doc["lastUpdatedAt"])
+    a, b = rules.decayed(rules.LoState(alpha=doc["alpha"], beta=doc["beta"], last_at=clock), at)
+    a, b = rules._add_positive(a, b, rules.WEIGHT["moderate"] * rules.POS_FACTOR["medium"], rules.FORGET, False)
+    written = evaluate._app_iso(at)
+    return {
+        **doc, "alpha": a, "beta": b, "lastUpdatedAt": written, "lastProbedAt": written,
+        "lastPositiveAtCalibratedAt": written, "ownQuestions": doc["ownQuestions"] + 1,
+        "ownQuestionsRight": doc["ownQuestionsRight"] + 1, "ownQuestionsRightNonMcq": doc["ownQuestionsRightNonMcq"] + 1,
+        "_etag": '"etag-u-kees-recall_a1-2"',
+    }
+
+
+class DocClock328CommandTest(_CommandTest):
+    """#328 end to end: a doc with a later clock than the replay, rewritten
+    with `replay-beliefs --regels 1.1`, then a write of the app: `validate
+    --regels 1.1` and the dry run show nothing, as right after the rewrite."""
+
+    def setUp(self):
+        super().setUp()
+        patch = mock.patch.object(evaluate, "_now", lambda: dt.datetime(2026, 11, 20, 12, tzinfo=dt.timezone.utc))
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.log(_KEES_SEPTEMBER, _kees_as_the_old_build_wrote())
+
+    def log(self, turns: list[dict], doc: dict) -> None:
+        """What the fake Cosmos holds for Kees: [turns] and the doc [doc]."""
+        self.cosmos.turns = lambda uid: list(turns) if uid == "u-kees" else []
+        self.cosmos.beliefs = lambda uid: {_KEES_KEY: dict(doc)} if uid == "u-kees" else {}
+
+    def nothing_to_show(self) -> None:
+        dry = self.run_cli("replay-beliefs", "--klas", KLAS_KLOK, "--regels", "1.1")
+        self.assertIn("te schrijven: 0 documenten", dry)
+        checked = self.run_cli("validate", "--klas", KLAS_KLOK, "--regels", "1.1")
+        row = next(line for line in checked.splitlines() if line.startswith("Kees Klok")).split()
+        self.assertEqual(row[-4:-1], ["1", "0", "0"])  # compared, |Δμ| > 0.01, level
+
+    def test_after_the_rewrite_the_apps_next_write_matches_the_replay(self):
+        self.run_cli("replay-beliefs", "--klas", KLAS_KLOK, "--regels", "1.1", "--apply")
+        (_, rewritten, _, _), = self.cosmos.upserts
+        replay = rules.replay(_KEES_SEPTEMBER, GOALS, variant=rules.Variant(as_11=True))[_KEES_KEY]
+        clock = _kees_as_the_old_build_wrote()["lastUpdatedAt"]
+        self.assertEqual(replay.last_at, rules.parse_at("2026-09-04T09:29:00Z"))  # the negative is no write
+        self.assertEqual(rewritten["lastUpdatedAt"], clock)
+        self.assertEqual((rewritten["alpha"], rewritten["beta"]), rules.decayed(replay, rules.parse_at(clock)))
+        self.log(_KEES_SEPTEMBER, rewritten)
+        self.nothing_to_show()
+
+        # The app's next write decays from the doc's clock; the replay from
+        # its own last write. They meet.
+        turns = [*_KEES_SEPTEMBER, _KEES_NOVEMBER]
+        self.log(turns, _the_app_writes(rewritten, _KEES_NOVEMBER))
+        self.assertIsNone(rules.replay(turns, GOALS, variant=rules.Variant(as_11=True))[_KEES_KEY].first_mastered_at)
+        self.nothing_to_show()
 
 
 if __name__ == "__main__":
