@@ -1,7 +1,7 @@
 # Hoe kom je aan je punt?
 
-*Bij versie 1.1.2 van de puntenformule. De app rekent met formule 1.1: dat
-nummer staat ook in Mijn rapporten.*
+*Bij versie 1.1.3 van de puntenformule. De app rekent met formule 1.1.3:
+dat nummer staat ook in Mijn rapporten.*
 
 ## Wat telt er voor je punt?
 
@@ -49,7 +49,8 @@ De volledige formule schrijft C(k), w_u en w_d. Vandaag zijn dat k, 0,6 en
 
 Als de tutor zeker genoeg is dat je het kan:
 
-- je beantwoordde minstens twee vragen over dat leerdoel helemaal juist;
+- je beantwoordde minstens twee vragen over dat leerdoel helemaal juist,
+  of half juist en de vervolgvraag erop juist;
 - minstens één daarvan was geen meerkeuzevraag;
 - minstens één goed antwoord kwam op jouw niveau of hoger;
 - je antwoorden erover zijn vooral juist, zeker de laatste.

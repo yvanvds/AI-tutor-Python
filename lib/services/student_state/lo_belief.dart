@@ -102,8 +102,11 @@ class LoBelief {
 
   /// How many own questions ([ownQuestions]) this LO got right (#279): the
   /// answer was `correct` and the signal on the LO positive — a `partial`
-  /// with a positive is not right. Mastery condition 4 (CONDUCTOR_POLICY
-  /// §4.1) wants `PolicyConstants.masteryRightOwnQuestionsMin` of them, and
+  /// with a positive is not right, unless a follow-up on it is `correct`
+  /// with a positive on the LO (#326, once per own question;
+  /// `belief_math.countsAsRightOwnQuestion`). Mastery condition 4
+  /// (CONDUCTOR_POLICY §4.1) wants
+  /// `PolicyConstants.masteryRightOwnQuestionsMin` of them, and
   /// [ownQuestionsRightNonMcq] says how many were no multiple choice.
   ///
   /// `null` when the doc does not have the count — a doc from before

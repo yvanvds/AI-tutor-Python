@@ -21,8 +21,9 @@ class GradingConstants {
   /// Version of PUNTENFORMULE.md these constants implement. Stamped on
   /// every persisted proposal so a later parameter change (which only
   /// applies at a period boundary, §5) can never be mistaken for the one
-  /// a signed grade was computed under.
-  static const String formulaVersion = '1.1';
+  /// a signed grade was computed under. 1.1.3 (#326): a right follow-up
+  /// on an own question answered `partial` counts that own question right.
+  static const String formulaVersion = '1.1.3';
 
   /// Above-50 weights: extension (`u`) vs. hard-level demonstration
   /// (`d`). Sum to 1 (§2.3).

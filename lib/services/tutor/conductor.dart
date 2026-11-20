@@ -9,7 +9,8 @@
 // may emit a `followUp`, TutorService decides whether to present it under
 // the §6.3 conditions, and on the next graded answer flags the call as
 // `isFollowUp: true` so this conductor caps strength at `weak`, treats
-// difficulty as `medium`, and skips calibration.
+// difficulty as `medium`, and skips calibration. A right follow-up on an
+// own question that was `partial` counts that question as right (#326).
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
@@ -618,6 +619,15 @@ class Conductor {
   /// LO's doc says `returnWrongAt`, which makes it due at the *next*
   /// session; this keeps it from coming back in this one.
   final Set<String> _missedThisSession = {};
+
+  /// The own question of the follow-up chain under way, while its answer
+  /// was `partial` and it has not counted as right (#326, §4.1 condition 4,
+  /// §6.2): a right follow-up on it, at either depth of a chain (§6.4),
+  /// counts it as answered right ([countsAsRightOwnQuestion]) and spends
+  /// this. Any answer that is no follow-up starts a new chain. A follow-up
+  /// only ever comes right after its own question (§6.5), whatever happens
+  /// to the session in between, so this is not reset with it.
+  ({String subgoalId, String loId})? _partialOwnQuestion;
 
   /// Called on session entry / when the active subgoal changes externally.
   /// Picks the next subgoal if needed and resets per-subgoal state.
@@ -1740,6 +1750,11 @@ class Conductor {
     final subgoal = selection.activeChildGoal;
     final targetLo = plan.targetLOs.isEmpty ? null : plan.targetLOs.first;
 
+    // #326: a follow-up continues the chain of the own question before it,
+    // which may still count as right; any other answer starts a new chain.
+    final partialOwn = answer.isFollowUp ? _partialOwnQuestion : null;
+    if (!answer.isFollowUp) _partialOwnQuestion = null;
+
     final events = <TurnSignalEvent>[];
     // Every signal of this turn that does not count, with why (#228): the
     // scope check's, then the conductor's own below.
@@ -1921,8 +1936,10 @@ class Conductor {
     final multipleChoice =
         plan.type == ChatRequestType.mcQuestion && !answer.isFollowUp;
     // One own question per question (#278), should the grader name the
-    // target twice against the contract (§3.5).
+    // target twice against the contract (§3.5). A follow-up's first signal
+    // on the target is likewise the one that may count it (#326).
     var ownQuestionCounted = false;
+    var followUpTargetSeen = false;
     // The target's doc as this turn wrote it, for what a return does next
     // (#275).
     LoBelief? targetWritten;
@@ -2095,13 +2112,39 @@ class Conductor {
       final movesRatchets = isCalibratedProbeOfThisLo && isTarget;
       final countsAsOwnQuestion = movesRatchets && !ownQuestionCounted;
       if (countsAsOwnQuestion) ownQuestionCounted = true;
-      // #279, condition 4 of §4.1: the own question answered right — a
-      // `correct` answer with a positive on its target; a `partial` with a
-      // positive is not right — and whether it was no multiple choice.
-      final ownRight =
-          countsAsOwnQuestion &&
-          hasPositive &&
-          answer.overallQuality == AnswerQuality.correct;
+      // #326: the follow-up's first signal on the LO of an own question that
+      // was `partial` and has not counted yet. The follow-up runs on its own
+      // question's plan, so the type below is that question's.
+      final firstOnTargetOfFollowUp =
+          answer.isFollowUp && isTarget && !followUpTargetSeen;
+      if (firstOnTargetOfFollowUp) followUpTargetSeen = true;
+      final followUpOnPartial =
+          firstOnTargetOfFollowUp &&
+          partialOwn != null &&
+          partialOwn.subgoalId == signalSubgoalId &&
+          partialOwn.loId == sig.loId;
+      // Condition 4 of §4.1: the own question answered right (#279), or
+      // finished right in a follow-up (#326) — and whether it was no
+      // multiple choice.
+      final ownRight = countsAsRightOwnQuestion(
+        quality: answer.overallQuality,
+        kind: sig.kind,
+        ownQuestion: countsAsOwnQuestion,
+        followUpOnPartial: followUpOnPartial,
+      );
+      if (countsAsOwnQuestion &&
+          answer.overallQuality == AnswerQuality.partial) {
+        _partialOwnQuestion = (subgoalId: signalSubgoalId, loId: sig.loId);
+      }
+      if (followUpOnPartial && ownRight) {
+        // Once per own question, in a chain too (§6.4).
+        _partialOwnQuestion = null;
+        _deps.recordDebugEvent('conductor.follow_up_counted', {
+          'subgoalId': signalSubgoalId,
+          'loId': sig.loId,
+          'chainDepth': answer.chainDepth,
+        });
+      }
       // A doc with a stamp but without the counts (from before 1.1) keeps
       // them missing — a written stamp, or one an old build gave and did
       // not write (`everMastered`): a count started now would read that

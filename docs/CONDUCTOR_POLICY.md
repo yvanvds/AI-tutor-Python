@@ -1907,11 +1907,16 @@ An LO is mastered when **all four** conditions hold:
    multiple choice (#279, formula 1.1).** An *own question* is a direct
    question with the LO as its target (4.4); *right* is a `correct`
    answer with a positive signal on the LO — a `partial` with a positive
-   is not right — counted once per question. A side signal (2.4), a
-   follow-up (6.2) and a transfer credit (3.7) move `(α, β)` but count
-   for neither. The conductor keeps both counts on the belief doc
-   (`ownQuestionsRight`, `ownQuestionsRightNonMcq`, part 2;
-   `masteryRightOwnQuestionsMin` 2, `masteryRightNonMcqQuestionsMin` 1).
+   is not right — counted once per question. Since formula 1.1.3 (#326)
+   an own question answered `partial` also counts as right when a
+   follow-up on it is `correct` with a positive signal on the LO: the
+   student finished the answer (6.2). A side signal (2.4), any other
+   follow-up and a transfer credit (3.7) move `(α, β)` but count for
+   neither. One rule decides what counts
+   (`belief_math.countsAsRightOwnQuestion`). The conductor keeps both
+   counts on the belief doc (`ownQuestionsRight`,
+   `ownQuestionsRightNonMcq`, part 2; `masteryRightOwnQuestionsMin` 2,
+   `masteryRightNonMcqQuestionsMin` 1).
 
 All four are tunable constants (see the front-matter note on
 constants).
@@ -2515,6 +2520,37 @@ question itself just mastered, a follow-up signal without a negative is
 therefore added without forgetting where forgetting would leave the LO
 under the bar (the mastery guard, 3.4). A wrong follow-up forgets and
 counts as before.
+
+**A right follow-up finishes a `partial` own question (#326, formula
+1.1.3).** When the own question (4.1, 4.4) was answered `partial` and a
+follow-up on it is `correct` with a positive as its first signal on the
+question's LO, that own question counts as answered right for condition
+4 of 4.1: `ownQuestionsRight` + 1, and `ownQuestionsRightNonMcq` + 1 when
+the own question was no multiple choice (a follow-up runs on its
+question's plan, so the type is the question's). Once per own question,
+in a chain too (6.4): a partial or wrong first follow-up leaves the
+second one to finish it; a right one spends it. No cap per LO. Nothing
+else about the follow-up changes: it weighs 0.5, forgets first (3.4)
+with the mastery guard, moves no ratchet, and is no own question itself
+(`ownQuestions` does not move). A follow-up after a `correct` or `wrong`
+own question counts for neither count, as before. The conductor holds
+the own question of the chain under way (`_partialOwnQuestion`); any
+answer that is no follow-up starts a new chain, and the credit is
+logged (`conductor.follow_up_counted`).
+
+Why: a follow-up after "partial" is there to let the student finish the
+answer, yet it could never bring an LO its stamp, while a wrong one could
+take mastery away. In the class data of 10–20 November 71% of the
+`partial` own questions got a follow-up, 79% of those answered right; the
+replay counts 68 follow-ups, 17 stamps fall earlier and none later. The
+teacher chose this without a cap per LO (2026-11-20): with at most one per
+LO nothing changed, since the bar stays two and μ ≥ 0.80 is the brake.
+Without the cap an LO could in theory be stamped without a single fully
+right own question — about four `partial` answers with a right follow-up
+in a row, on hard in the lesson; the data had none. The rule applies
+forward only, from the build that brings it: stored counts are not
+rewritten, and the replay (`tooling/evaluation`, rule set
+`1.1.3-eval10`) follows it by `clientVersion`.
 
 **Calibration window: follow-up answers are skipped.** They don't
 have a meaningful `difficulty` to file against, and they're not

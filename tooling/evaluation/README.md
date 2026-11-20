@@ -103,9 +103,27 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.1-eval9`
+## Regelversie `1.1.3-eval10`
 
-PUNTENFORMULE v1.1, herspeeld uit `turn_history`. `eval9` (2026-11-19,
+PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval10` (2026-11-20,
+#326) telt een **juiste vervolgvraag na een half juist antwoord** zoals de
+app vanaf de build die het bracht (2.16.0, `rules.FOLLOW_UP_RIGHT_FROM`,
+`rules.follow_up_counts`): was het antwoord op een eigen vraag `partial`,
+en is een vervolgvraag erop `correct` met als eerste signaal op dat
+leerdoel een positief, dan telt die eigen vraag als juist
+(`LoState.own_right` + 1, en `own_right_open` + 1 als ze geen
+meerkeuzevraag was). Eén keer per eigen vraag, ook in een keten van twee
+vervolgvragen; zonder beperking per leerdoel. Het gewicht van de
+vervolgvraag verandert niet. De leerkracht koos op 2026-11-20 dat de
+regel alleen vooruit geldt: een oefening van een oudere build herspeelt
+zonder, ook met `--regels 1.1`, dus `lo_beliefs` hoeft niet herschreven
+te worden. `Variant(follow_up_after_partial=True)` zet de regel op elke
+beurt aan, `False` op geen enkele. Op de klasdata van builds ≥ 2.13.0
+(stand 20-11 's avonds) telt hij 69 vervolgvragen mee en vallen 17
+stempels vroeger, geen enkele later; `validate` geeft hetzelfde als met
+`eval9`, want er is nog geen oefening van 2.16.0.
+
+`eval9` (2026-11-19,
 #311) volgt de **bewaking van beheerst** van de app vanaf de build die ze
 bracht (2.15.0, `rules.MASTERY_GUARD_FROM`, `rules.mastery_guard`): krijgt
 een leerdoel dat op dat moment beheerst is een signaal dat niet negatief
@@ -336,7 +354,9 @@ intussen alle vier overgenomen (v1.0.12–v1.0.14 en v1.0.16):
 
 Verder identiek aan de app: prior (1,1), vergeten per antwoord met λ = 0,7
 voor een oefening van 1.1 (sinds `eval8`), de bewaking van beheerst vanaf
-build 2.15.0 (sinds `eval9`), plafond 20 met krimp-dan-optel,
+build 2.15.0 (sinds `eval9`), een juiste vervolgvraag na een half juiste
+eigen vraag als juiste eigen vraag vanaf build 2.16.0 (sinds `eval10`),
+plafond 20 met krimp-dan-optel,
 de toezichtfactor ×1,25 binnen de lestijd van de klas (sinds `eval6`),
 decay bij elke schrijving (halveringstijd 60 d), vervolgvragen afgetopt op
 zwak en gerekend als gemiddeld, incidentele signalen alleen binnen hetzelfde
@@ -689,6 +709,10 @@ build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
 - `mastery_guard` (#311): de bewaking van beheerst bij elke beurt (`True`)
   of bij geen enkele (`False`), welke build ze ook schreef; zonder waarde
   per build (`rules.mastery_guard`).
+- `follow_up_after_partial` (#326): een juiste vervolgvraag na een half
+  juiste eigen vraag telt die eigen vraag als juist, bij elke beurt
+  (`True`) of bij geen enkele (`False`); zonder waarde per build
+  (`rules.follow_up_counts`). `as_11` zet het niet aan.
 - `forget` (λ, #278): vóór nieuw bewijs krimpt wat een leerdoel boven de
   prior heeft met die factor, bij elke beurt; met `forget_own_only` alleen
   bij een eigen vraag. Zonder `forget` vergeet een beurt van 1.1 met
@@ -702,7 +726,9 @@ build die ze schreef. De gekozen kandidaten, `forget=0.7` (#278) en
   beurt van 1.1 er 2 en 1, en weegt ze ×0,5.
 
 Een *eigen vraag* is een rechtstreekse vraag met het leerdoel als doel,
-geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal.
+geen vervolgvraag; ze is *juist* bij `correct` met een positief signaal,
+en vanaf build 2.16.0 ook bij `partial` met een juiste vervolgvraag erop
+(#326).
 De vergelijking zelf draaide één keer, buiten de repo
 (`~/ai-tutor-evaluaties/analyse-2026-11-08`): een herspeling voegt geen
 vragen toe, dus een strengere regel toont daar alleen wat ze tegenhoudt, en

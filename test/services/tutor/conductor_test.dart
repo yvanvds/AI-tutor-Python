@@ -2422,12 +2422,15 @@ void main() {
       ),
     );
 
+    /// An answer to [plan]: its question, or with [isFollowUp] a follow-up
+    /// on it at [chainDepth] (§6.4).
     Future<TurnOutcome> answer(
       Conductor c,
       QuestionPlan plan,
       AnswerQuality quality,
       List<GradedSignal> signals, {
       bool isFollowUp = false,
+      int chainDepth = 1,
       EvidenceProvenance provenance = EvidenceProvenance.home,
     }) {
       c.notePlannedQuestion(plan);
@@ -2437,7 +2440,7 @@ void main() {
           overallQuality: quality,
           signals: signals,
           isFollowUp: isFollowUp,
-          chainDepth: isFollowUp ? 1 : 0,
+          chainDepth: isFollowUp ? chainDepth : 0,
           provenance: provenance,
         ),
       );
@@ -2478,7 +2481,7 @@ void main() {
 
     test('the counts: a right own question counts, a pick not as no pick; a '
         'partial with a positive, a wrong answer, a side signal and a '
-        'follow-up count for neither', () async {
+        'follow-up on a wrong answer count for neither', () async {
       final s = await setup([]);
       await answer(s.c, planOn(applyLo), AnswerQuality.correct, [
         on('lo-a', LoSignalKind.positive),
@@ -2519,6 +2522,220 @@ void main() {
       ]);
       expect(stored(s.f, 'lo-a').ownQuestionsRight, 2);
       expect(stored(s.f, 'lo-a').ownQuestionsRightNonMcq, 2);
+    });
+
+    group('#326 a right follow-up after a partial own question counts it '
+        'right', () {
+      final moderate = LoSignalStrength.moderate;
+
+      test('partial → right follow-up with a positive on the LO: one more '
+          'right own question, no pick so one more non-pick; a second '
+          'follow-up in the chain does not count it again', () async {
+        final s = await setup([]);
+        final plan = planOn(applyLo);
+        await answer(s.c, plan, AnswerQuality.partial, [
+          on('lo-a', LoSignalKind.positive, strength: moderate),
+        ]);
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 0);
+        expect(stored(s.f, 'lo-a').ownQuestions, 1);
+
+        await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        final after = stored(s.f, 'lo-a');
+        expect(after.ownQuestionsRight, 1);
+        expect(after.ownQuestionsRightNonMcq, 1);
+        // Still one own question: the follow-up is no question of its own.
+        expect(after.ownQuestions, 1);
+        // Its weight is a follow-up's (§6.2): weak, as medium, 0.5.
+        expect(
+          after.alpha,
+          closeTo(1 + 1.0 * PolicyConstants.forgetFactor + 0.5, 1e-9),
+        );
+        expect(
+          s.f.debugEvents.where((e) => e.$1 == 'conductor.follow_up_counted'),
+          hasLength(1),
+        );
+
+        // The chain's second follow-up (§6.4), right again: once per own
+        // question.
+        await answer(
+          s.c,
+          plan,
+          AnswerQuality.correct,
+          [on('lo-a', LoSignalKind.positive)],
+          isFollowUp: true,
+          chainDepth: 2,
+        );
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+        expect(stored(s.f, 'lo-a').ownQuestionsRightNonMcq, 1);
+      });
+
+      test('in a chain: partial → follow-up partial → second follow-up right '
+          'counts it, once', () async {
+        final s = await setup([]);
+        final plan = planOn(applyLo);
+        await answer(s.c, plan, AnswerQuality.partial, [
+          on('lo-a', LoSignalKind.positive, strength: moderate),
+        ]);
+        await answer(s.c, plan, AnswerQuality.partial, [
+          on('lo-a', LoSignalKind.positive, strength: LoSignalStrength.weak),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 0);
+        await answer(
+          s.c,
+          plan,
+          AnswerQuality.correct,
+          [on('lo-a', LoSignalKind.positive)],
+          isFollowUp: true,
+          chainDepth: 2,
+        );
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+        expect(stored(s.f, 'lo-a').ownQuestionsRightNonMcq, 1);
+      });
+
+      test('a partial pick finished right counts as a right own question, '
+          'not as a non-pick', () async {
+        final s = await setup([]);
+        final plan = planOn(recallLo, type: ChatRequestType.mcQuestion);
+        await answer(s.c, plan, AnswerQuality.partial, [
+          on('lo-r', LoSignalKind.positive, strength: moderate),
+        ]);
+        await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-r', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-r').ownQuestionsRight, 1);
+        expect(stored(s.f, 'lo-r').ownQuestionsRightNonMcq, 0);
+      });
+
+      test('no count after an own question that was right or wrong, nor for '
+          'a follow-up that is partial or wrong, or right without a positive '
+          'on the LO', () async {
+        final s = await setup([]);
+        final plan = planOn(applyLo);
+
+        // Right, then a right follow-up: the own question counted, once.
+        await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ]);
+        await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+
+        // Wrong, then a right follow-up.
+        await answer(s.c, plan, AnswerQuality.wrong, [
+          on('lo-a', LoSignalKind.negative),
+        ]);
+        await answer(s.c, plan, AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+
+        // Partial, then a follow-up that is partial, or wrong.
+        for (final (quality, kind) in [
+          (AnswerQuality.partial, LoSignalKind.positive),
+          (AnswerQuality.wrong, LoSignalKind.negative),
+        ]) {
+          await answer(s.c, plan, AnswerQuality.partial, [
+            on('lo-a', LoSignalKind.positive, strength: moderate),
+          ]);
+          await answer(s.c, plan, quality, [
+            on('lo-a', kind),
+          ], isFollowUp: true);
+          expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+        }
+
+        // Partial, then a right follow-up whose first signal on the LO is
+        // neutral, or that only names another LO.
+        for (final signals in [
+          [on('lo-a', LoSignalKind.neutral), on('lo-a', LoSignalKind.positive)],
+          [on('lo-r', LoSignalKind.positive)],
+        ]) {
+          await answer(s.c, plan, AnswerQuality.partial, [
+            on('lo-a', LoSignalKind.positive, strength: moderate),
+          ]);
+          await answer(
+            s.c,
+            plan,
+            AnswerQuality.correct,
+            signals,
+            isFollowUp: true,
+          );
+          expect(stored(s.f, 'lo-a').ownQuestionsRight, 1);
+        }
+        expect(stored(s.f, 'lo-r').ownQuestionsRight, 0);
+      });
+
+      test('a new question ends the chain: a partial own question followed by '
+          'another question no longer counts', () async {
+        final s = await setup([]);
+        await answer(s.c, planOn(applyLo), AnswerQuality.partial, [
+          on('lo-a', LoSignalKind.positive, strength: moderate),
+        ]);
+        // The next question, on another LO, and a right follow-up on it.
+        final next = planOn(predictLo);
+        await answer(s.c, next, AnswerQuality.wrong, [
+          on('lo-p', LoSignalKind.negative),
+        ]);
+        await answer(s.c, next, AnswerQuality.correct, [
+          on('lo-p', LoSignalKind.positive),
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s.f, 'lo-a').ownQuestionsRight, 0);
+        expect(stored(s.f, 'lo-p').ownQuestionsRight, 0);
+
+        // A partial own question whose grade named no signal on its target
+        // was no own question (#278): nothing for a follow-up to finish.
+        final s2 = await setup([]);
+        await answer(s2.c, planOn(applyLo), AnswerQuality.partial, [
+          on('lo-r', LoSignalKind.positive, strength: moderate),
+        ]);
+        await answer(s2.c, planOn(applyLo), AnswerQuality.correct, [
+          on('lo-a', LoSignalKind.positive),
+        ], isFollowUp: true);
+        expect(stored(s2.f, 'lo-a').ownQuestions, 0);
+        expect(stored(s2.f, 'lo-a').ownQuestionsRight, 0);
+      });
+
+      test('twice partial with a right follow-up, with μ and evidence over '
+          'the bar: mastered — stamped on the second follow-up, and the '
+          'subgoal advances', () async {
+        // Over the bar on (8, 1) with its positive at calibration, but no
+        // right own question yet: not mastered (condition 4).
+        final s = await setup(
+          onlyOpen(seeded('lo-a', 8, 1, right: 0, nonMcq: 0)),
+          calibration: QuestionDifficulty.hard,
+        );
+        final plan = planOn(applyLo, difficulty: QuestionDifficulty.hard);
+        const lesson = EvidenceProvenance.supervised;
+        late TurnOutcome last;
+        for (var i = 0; i < 2; i++) {
+          await answer(s.c, plan, AnswerQuality.partial, [
+            on('lo-a', LoSignalKind.positive, strength: moderate),
+          ], provenance: lesson);
+          expect(stored(s.f, 'lo-a').firstMasteredAt, isNull);
+          last = await answer(
+            s.c,
+            plan,
+            AnswerQuality.correct,
+            [on('lo-a', LoSignalKind.positive)],
+            isFollowUp: true,
+            provenance: lesson,
+          );
+          expect(stored(s.f, 'lo-a').ownQuestionsRight, i + 1);
+        }
+        final after = stored(s.f, 'lo-a');
+        final snap = BeliefSnapshot(after.alpha, after.beta);
+        expect(meetsMasteryMeanAndEvidence(snap), isTrue);
+        expect(after.ownQuestionsRightNonMcq, 2);
+        expect(after.firstMasteredAt, isNotNull);
+        expect(
+          last.loStatusAfter.firstWhere((l) => l.loId == 'lo-a').mastered,
+          isTrue,
+        );
+        expect(last.subgoalAdvanced, isTrue);
+      });
     });
 
     test(

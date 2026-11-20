@@ -925,7 +925,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.1-eval9", stdout)
+        self.assertIn("1.1.3-eval10", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1241,7 +1241,7 @@ class Rules11Test(unittest.TestCase):
         return [self.answer(m, "correct" if c == "J" else "wrong", build) for m, c in enumerate(answers)]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval10")
         self.assertEqual(rules.FORGET, 0.7)
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.0+30"}))
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.1+31"}))
@@ -1317,7 +1317,7 @@ class Rules279Test(unittest.TestCase):
     multiple-choice question weighs ×0.5 — from the key or the grader, on
     the target and from the side, not on a follow-up on one — and the stamp
     wants two own questions right, one of them no multiple choice. Same rule
-    set (`1.1-eval9`), same switch (`rules_11`)."""
+    set (`1.1.3-eval10`), same switch (`rules_11`)."""
 
     KEY = ("sg-b", "predict_b1")
     NEW = {"clientVersion": "2.13.0+30"}
@@ -1342,7 +1342,7 @@ class Rules279Test(unittest.TestCase):
     def test_the_constants(self):
         self.assertEqual(rules.MCQ_POSITIVE, 0.5)
         self.assertEqual((rules.STAMP_OWN_RIGHT_MIN, rules.STAMP_OWN_RIGHT_NON_MCQ_MIN), (2, 1))
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval10")
 
     def test_a_pick_of_1_1_weighs_half_on_the_target_and_from_the_side(self):
         side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
@@ -1430,7 +1430,7 @@ class MasteryGuard311Test(unittest.TestCase):
         return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[key or self.KEY]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1-eval9")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval10")
         self.assertTrue(rules.mastery_guard({"clientVersion": "2.15.0+32"}))
         self.assertFalse(rules.mastery_guard({"clientVersion": "2.14.0+31"}))
         self.assertFalse(rules.mastery_guard({}))
@@ -1499,6 +1499,111 @@ class MasteryGuard311Test(unittest.TestCase):
         after = self.lo(turns)
         self.assertAlmostEqual(after.alpha, 1 + 3.4 * 0.7 + 0.5, places=2)
         self.assertIsNone(after.first_mastered_at)
+
+
+class FollowUp326Test(unittest.TestCase):
+    """#326, rule set `1.1.3-eval10`: from the build that brought it
+    (`follow_up_counts`), a right follow-up on an own question answered
+    `partial` counts that own question as right — once, in a chain too —
+    as the conductor counts it (`belief_math.countsAsRightOwnQuestion`).
+    Forward only: a turn of an earlier build counts as it did."""
+
+    KEY = ("sg-b", "predict_b1")
+    NEW = {"clientVersion": "2.16.0+33"}
+    BEFORE = {"clientVersion": "2.15.0+32"}
+
+    def answer(self, minute: int, quality: str = "correct", build: dict | None = None,
+               signal: str | None = None, strength: str | None = None, **extra) -> dict:
+        kind = signal or ("negative" if quality == "wrong" else "positive")
+        t = _turn(f"2026-11-23T09:{minute:02d}:00Z", "sg-b", "predict_b1", uid="u-x",
+                  questionType="completeCodeQuestion", overallQuality=quality,
+                  loSignals=[_sig("sg-b", "predict_b1", strength or ("moderate" if quality == "partial" else "strong"), kind)],
+                  **(self.NEW if build is None else build))
+        t.update(extra)
+        return t
+
+    def follow_up(self, minute: int, quality: str = "correct", depth: int = 1, **kw) -> dict:
+        return self.answer(minute, quality, isFollowUp=True, chainDepth=depth, **kw)
+
+    def lo(self, turns: list[dict], **variant) -> rules.LoState:
+        return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[self.KEY]
+
+    def test_the_rule_set_and_the_build_it_starts_from(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval10")
+        self.assertTrue(rules.follow_up_counts({"clientVersion": "2.16.0+33"}))
+        self.assertTrue(rules.follow_up_counts({"clientVersion": "2.17.1+40"}))
+        self.assertFalse(rules.follow_up_counts({"clientVersion": "2.15.0+32"}))
+        self.assertFalse(rules.follow_up_counts({}))
+
+    def test_partial_then_a_right_follow_up_counts_once(self):
+        lo = self.lo([self.answer(0, "partial"), self.follow_up(1)])
+        self.assertEqual((lo.own_questions, lo.own_right, lo.own_right_open), (1, 1, 1))
+        # The follow-up's weight is a follow-up's: 0.5 after forgetting.
+        self.assertAlmostEqual(lo.alpha, 1 + 1.0 * 0.7 + 0.5, places=4)
+        # The chain's second follow-up, right again, does not count it again.
+        lo = self.lo([self.answer(0, "partial"), self.follow_up(1), self.follow_up(2, depth=2)])
+        self.assertEqual((lo.own_right, lo.own_right_open), (1, 1))
+
+    def test_in_a_chain_the_second_follow_up_can_finish_it(self):
+        turns = [self.answer(0, "partial"), self.follow_up(1, "partial"), self.follow_up(2, depth=2)]
+        self.assertEqual(self.lo(turns).own_right, 1)
+
+    def test_a_partial_pick_finished_right_is_no_open_question(self):
+        turns = [self.answer(0, "partial", questionType="mcQuestion"),
+                 self.follow_up(1, questionType="mcQuestion")]
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_right, lo.own_right_open), (1, 0))
+
+    def test_nothing_else_counts(self):
+        turns = [
+            self.answer(0), self.follow_up(1),                 # right: the own question
+            self.answer(2, "wrong"), self.follow_up(3),        # wrong
+            self.answer(4, "partial"), self.follow_up(5, "partial"),
+            self.answer(6, "partial"), self.follow_up(7, "wrong"),
+            # Right, but its first signal on the LO is neutral.
+            self.answer(8, "partial"),
+            self.follow_up(9, loSignals=[_sig("sg-b", "predict_b1", "weak", "neutral"),
+                                          _sig("sg-b", "predict_b1")]),
+        ]
+        self.assertEqual(self.lo(turns).own_right, 1)
+
+    def test_a_new_question_ends_the_chain(self):
+        # A wrong own question after the partial one: its follow-up finishes
+        # nothing.
+        turns = [self.answer(0, "partial"), self.answer(1, "wrong"), self.follow_up(2)]
+        self.assertEqual(self.lo(turns).own_right, 0)
+        # Nor after a question whose grade named no signal on its target —
+        # no own question (#278), but a new chain all the same.
+        no_own = self.answer(1, loSignals=[_sig("sg-b", "predict_b2")])
+        lo = self.lo([self.answer(0, "partial"), no_own, self.follow_up(2)])
+        self.assertEqual((lo.own_questions, lo.own_right), (1, 0))
+
+    def test_forward_only_an_earlier_build_counts_as_it_did(self):
+        before = [self.answer(0, "partial", self.BEFORE), self.follow_up(1, build=self.BEFORE)]
+        self.assertEqual(self.lo(before).own_right, 0)
+        # `--regels 1.1` (as_11) leaves it so: the rule applies forward only.
+        self.assertEqual(self.lo(before, as_11=True).own_right, 0)
+        # A variant can ask for it on every turn, or on none.
+        self.assertEqual(self.lo(before, follow_up_after_partial=True).own_right, 1)
+        now = [self.answer(0, "partial"), self.follow_up(1)]
+        self.assertEqual(self.lo(now, follow_up_after_partial=False).own_right, 0)
+
+    def test_twice_partial_with_a_right_follow_up_stamps_on_the_second_follow_up(self):
+        # Hard, in the lesson: a strong positive on the partial weighs 3.5,
+        # the follow-up 0.625. (6.65, 1) after the second partial is over
+        # the bar, but with one right own question; the follow-up makes two.
+        lesson = {"difficulty": "hard", "calibrationBefore": "hard", "provenance": "supervised"}
+        turns = [
+            self.answer(0, "partial", strength="strong", **lesson), self.follow_up(1, **lesson),
+            self.answer(2, "partial", strength="strong", **lesson), self.follow_up(3, **lesson),
+        ]
+        self.assertIsNone(self.lo(turns[:3]).first_mastered_at)
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_right, lo.own_right_open), (2, 2))
+        self.assertTrue(lo.mastered_at())
+        self.assertEqual(lo.first_mastered_at, rules.parse_at(turns[3]["turnAt"]))
+        # Before the build of #326: the same answers stamp nothing.
+        self.assertIsNone(self.lo(turns, follow_up_after_partial=False).first_mastered_at)
 
 
 class Rules275Test(unittest.TestCase):

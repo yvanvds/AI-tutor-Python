@@ -20,7 +20,19 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.1-eval9` = PUNTENFORMULE v1.1, replayed from the turn log.
+Rule set `1.1.3-eval10` = PUNTENFORMULE v1.1.3, replayed from the turn
+log. `eval10` (#326) follows the app's count of a right follow-up from the
+build that brought it (`FOLLOW_UP_RIGHT_FROM`, by the turn's
+`clientVersion`, `follow_up_counts`): an own question answered `partial`
+counts as answered right when a follow-up on it — at either depth of a
+chain — is `correct` with a positive first signal on its LO, once per own
+question: `own_right` + 1, and `own_right_open` + 1 when the own question
+was no multiple choice. The follow-up's weight does not change. A turn
+from an earlier build replays as that build wrote it, `--regels 1.1`
+included: the teacher chose to apply the rule forward only (2026-11-20),
+so `lo_beliefs` needs no rewrite. The variant "na deels juist, onbeperkt"
+of the replay on #326.
+
 `eval9` (#311) follows the app's mastery guard from the build that brought
 it (`MASTERY_GUARD_FROM`, by the turn's `clientVersion`, `mastery_guard`):
 a write without a negative on an LO that is mastered at that moment — the
@@ -155,7 +167,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.1-eval9"
+RULES_VERSION = "1.1.3-eval10"
 
 PRIOR = 1.0
 # A backstop since #278: forgetting keeps the evidence under 14.
@@ -169,6 +181,10 @@ RULES_11_FROM = (2, 13, 0)
 # brought it, a write without a negative on a mastered LO does not forget
 # where forgetting would take the LO under the bar (`mastery_guard`).
 MASTERY_GUARD_FROM = (2, 15, 0)
+# #326 (`belief_math.countsAsRightOwnQuestion`): from the build that brought
+# it, a right follow-up on an own question answered `partial` counts that
+# own question as right (`follow_up_counts`).
+FOLLOW_UP_RIGHT_FROM = (2, 16, 0)
 # #279, from the same build: a right pick weighs half
 # (`PolicyConstants.multipleChoicePositiveFactor`), and the stamp wants two
 # own questions answered right, one of them no multiple choice
@@ -367,6 +383,15 @@ def mastery_guard(turn: dict) -> bool:
     return v is not None and v >= MASTERY_GUARD_FROM
 
 
+def follow_up_counts(turn: dict) -> bool:
+    """Whether the build that wrote [turn] counts a right follow-up on an
+    own question answered `partial` as that own question answered right
+    (#326). Older builds, and turns without `clientVersion`, counted no
+    follow-up."""
+    v = build_version(turn)
+    return v is not None and v >= FOLLOW_UP_RIGHT_FROM
+
+
 def is_audit(turn: dict) -> bool:
     """An audit record: the stub `TurnHistoryService.appendAudit` writes for
     an empty-objectives block, a redirect after a deleted subgoal or a
@@ -438,8 +463,9 @@ class LoState:
     # the app counts as `ownQuestions` for the stuck rule.
     own_questions: int = 0
     # The LO's own questions answered right — a `correct` answer with a
-    # positive signal on it, once per question — all of them and those that
-    # were no multiple choice: the app's `ownQuestionsRight` and
+    # positive signal on it, once per question, or from 2.16.0 one answered
+    # `partial` and finished right in a follow-up (#326) — all of them and
+    # those that were no multiple choice: the app's `ownQuestionsRight` and
     # `ownQuestionsRightNonMcq`, the stamp's fourth condition since 1.1
     # (#279). And the run of the streak, for a `Variant` (#246).
     own_right: int = 0
@@ -507,7 +533,8 @@ class Variant:
 
     An *own question* is a direct question with the LO as its target, no
     follow-up; it is *right* when the answer was `correct` and the signal on
-    the LO positive. A `partial` with a positive signal is not right."""
+    the LO positive. A `partial` with a positive signal is not right — until
+    a follow-up on it is, from the build of #326 (`follow_up_after_partial`)."""
 
     # Every turn replays with the stamp rules of #276, whatever build wrote
     # it: what the candidate would have done on these answers, not what the
@@ -544,6 +571,12 @@ class Variant:
     # (`mastery_guard`). `as_11` does not set it: the docs `--regels 1.1`
     # wrote, and the builds of 1.1 before the guard, had none.
     mastery_guard: bool | None = None
+    # #326: a right follow-up on an own question answered `partial` counts
+    # that own question as right, on every turn (True) or on none (False),
+    # whatever build wrote it; unset, a turn of a build that does
+    # (`follow_up_counts`). `as_11` does not set it: the rule applies
+    # forward only.
+    follow_up_after_partial: bool | None = None
 
 
 CURRENT = Variant()
@@ -698,9 +731,24 @@ def replay(
     builds before #204 wrote that neutral, but it moves neither M nor P.
     """
     st: dict[tuple[str, str], LoState] = {}
+    # #326: the own question of the follow-up chain under way, while its
+    # answer was `partial` and it has not counted as right — its LO's key.
+    # A follow-up only ever comes right after its own question (§6.5); any
+    # turn that is no follow-up starts a new chain, as in the conductor
+    # (`Conductor._partialOwnQuestion`).
+    partial_own: tuple[str, str] | None = None
     for t in turns:
         now = parse_at(t["turnAt"])
         follow_up = t.get("isFollowUp") is True
+        if not follow_up:
+            partial_own = None
+        counts_follow_up = (
+            variant.follow_up_after_partial if variant.follow_up_after_partial is not None
+            else follow_up_counts(t)
+        )
+        # The follow-up's first signal on the target is the one that may
+        # count, as the own question's first signal is (#278).
+        follow_up_target_seen = False
         diff = t.get("difficulty") or "medium"
         cal = t.get("calibrationBefore") or "medium"
         scope = turn_scope(t, goals)
@@ -794,6 +842,19 @@ def replay(
                     lo.own_streak += 1
             elif first_own and kind != "neutral":
                 lo.own_streak = 0
+            if first_own and t.get("overallQuality") == "partial":
+                partial_own = key
+            # #326: a right follow-up finishes the `partial` own question —
+            # once, at either depth of a chain. The follow-up's record
+            # carries its own question's type.
+            first_follow_up = follow_up and target and not incidental and not follow_up_target_seen
+            if first_follow_up:
+                follow_up_target_seen = True
+                if counts_follow_up and partial_own == key and kind == "positive" and right:
+                    partial_own = None
+                    lo.own_right += 1
+                    if not mcq:
+                        lo.own_right_open += 1
             if direct:
                 lo.n_direct += 1
                 lo.last_direct_at = now

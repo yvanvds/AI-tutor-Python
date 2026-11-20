@@ -171,8 +171,10 @@ class PolicyConstants {
   /// §4.1): at least this many own questions on the LO answered right
   /// (`LoBelief.ownQuestionsRight`) — a direct question with the LO as its
   /// target, not a follow-up, whose answer was `correct` with a positive
-  /// signal on the LO; a `partial` with a positive is not right — and at
-  /// least [masteryRightNonMcqQuestionsMin] of them no multiple choice.
+  /// signal on the LO; a `partial` with a positive is not right, unless a
+  /// follow-up on it is (#326) — and at least
+  /// [masteryRightNonMcqQuestionsMin] of them no multiple choice. What
+  /// counts is `belief_math.countsAsRightOwnQuestion`.
   ///
   /// A side signal (§2.4) still moves `(α, β)` but counts for neither, so
   /// it can no longer give the stamp: of the 201 stamps since 21 October,

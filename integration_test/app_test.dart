@@ -41,6 +41,7 @@ import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
+import 'flows/follow_up_after_partial.dart' as follow_up_after_partial;
 import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
 import 'flows/goal_delete_undo.dart' as goal_delete_undo;
 import 'flows/goal_language.dart' as goal_language;
@@ -182,6 +183,7 @@ void main() {
   stuck_own_questions.main();
   subgoal_segments.main();
   mastery_guard.main();
+  follow_up_after_partial.main();
   leerpad_demonstrated.main();
   leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();
