@@ -397,6 +397,15 @@
   "session_runControls_button_run": "Run",
   "session_runControls_button_stop": "Stop",
 
+  "reference_button_tooltip": "Naslag",
+  "reference_title": "Naslag",
+  "reference_close_tooltip": "Naslag sluiten",
+  "reference_search_hint": "Zoek: een naam of een woord",
+  "reference_search_clear_tooltip": "Zoekopdracht wissen",
+  "reference_noResults": "Niets gevonden voor \"{query}\".",
+  "reference_lessonLink": "Les: {title}",
+  "reference_lesson_close_tooltip": "Les sluiten",
+
   "session_objectiveBanner_pill": "Huidig doel",
   "session_objectiveBanner_pillSelfChosen": "Zelf gekozen",
   "session_objectiveBanner_segments": "{mastered, plural, =1{1 onderdeel beheerst} other{{mastered} onderdelen beheerst}}, {almost} bijna, {todo} nog te doen",

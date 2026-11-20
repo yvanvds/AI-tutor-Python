@@ -19,6 +19,21 @@ markers stay, so a second run with the same files changes nothing:
     <!-- curriculum:start -->
     <!-- curriculum:end -->
 
+The same pages carry the reference ("Naslag", #323): every function,
+method and class the course uses, from assets/reference/python_reference.json
+(the file the app's reference panel and editor read), between its own
+markers:
+
+    <!-- reference:start -->
+    <!-- reference:end -->
+
+Before it writes, the script checks that file against the lessons of the
+live goals (reference.py): something a live lesson uses that the reference
+lacks, an item without a Dutch or English summary or an example, or a
+lesson link that does not hold is an error, and no page is written. So when
+a goal goes live and its lessons use a new function, this step says what to
+add. `--check-reference` runs only the check.
+
 By default it writes both start pages (#294): the Dutch list into
 public/index.html and the English one into public/en/index.html. The English
 titles and descriptions come from goals/en/goal-texts.json; a goal whose
@@ -32,6 +47,7 @@ Run from the repo root:
     python tooling/site/curriculum.py                # both pages
     python tooling/site/curriculum.py --lang nl      # only public/index.html
     python tooling/site/curriculum.py --check-live   # LIVE_GOALS against Cosmos
+    python tooling/site/curriculum.py --check-reference  # the reference against the live lessons
 
 Standard library only; --check-live uses tooling/evaluation/cosmos.py and
 never writes.
@@ -44,6 +60,9 @@ import html
 import json
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import reference  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATOR = ROOT / "Goal Generator Cowork Project" / "AI Tutor for Python Goals Generator"
@@ -71,6 +90,8 @@ PAGES = {
 
 START = "<!-- curriculum:start -->"
 END = "<!-- curriculum:end -->"
+REFERENCE_START = "<!-- reference:start -->"
+REFERENCE_END = "<!-- reference:end -->"
 
 # The app's own words (lib/l10n/app_nl.arb, app_en.arb).
 LABELS = {
@@ -89,8 +110,10 @@ class CurriculumError(Exception):
 
 
 def load_goals(names: list[str], goals_dir: Path = GOALS) -> list[dict]:
-    """The `{goal, subgoals}` entries of the named goal files, in the order
-    of the Leerpad: by the root goal's `order`, subgoals by theirs."""
+    """The `{goal, subgoals, file}` entries of the named goal files, in the
+    order of the Leerpad: by the root goal's `order`, subgoals by theirs.
+    `file` is the name the entry was read from, which is also the folder of
+    its lessons."""
     entries = []
     for name in names:
         path = goals_dir / f"{name}.json"
@@ -102,6 +125,7 @@ def load_goals(names: list[str], goals_dir: Path = GOALS) -> list[dict]:
                 if not (node.get(field) or "").strip():
                     raise CurriculumError(f"{name}: {node.get('id', '?')} has no {field}")
         entry["subgoals"] = sorted(entry["subgoals"], key=lambda s: int(s.get("order") or 0))
+        entry["file"] = name
         entries.append(entry)
     return sorted(entries, key=lambda e: int(e["goal"].get("order") or 0))
 
@@ -138,7 +162,8 @@ def _text(s: str) -> str:
 
 def render(entries: list[dict], texts: dict[str, dict], lang: str) -> list[str]:
     """The lines between the markers, without indentation: one <details> per
-    goal, closed, its subgoals in a <dl>."""
+    goal, closed, its subgoals in a <dl>. Each subgoal has an id, which the
+    reference's lesson links point at."""
     labels = LABELS[lang]
     optional = f' <span class="pill">{labels["optional"]}</span>'
     lines = ['<ol class="curriculum">']
@@ -162,7 +187,7 @@ def render(entries: list[dict], texts: dict[str, dict], lang: str) -> list[str]:
         ]
         for sub in subgoals:
             lines += [
-                "          <div>",
+                f'          <div id="{reference.subgoal_anchor(sub["id"])}">',
                 f'            <dt>{_text(texts[sub["id"]]["title"])}'
                 + (optional if sub.get("optional") else "") + "</dt>",
                 f'            <dd>{_text(texts[sub["id"]]["description"])}</dd>',
@@ -178,19 +203,27 @@ def render(entries: list[dict], texts: dict[str, dict], lang: str) -> list[str]:
     return lines
 
 
-def fill_page(text: str, lines: list[str], name: str) -> str:
+def fill_page(text: str, lines: list[str], name: str, start_marker: str = START,
+              end_marker: str = END) -> str:
     """[text] with [lines] between the markers, indented to the start
     marker's column, in the page's own line endings."""
-    start, end = text.find(START), text.find(END)
-    if start < 0 or end < start or text.find(START, start + 1) >= 0:
-        raise CurriculumError(f"{name}: needs one {START} followed by one {END}")
+    start, end = text.find(start_marker), text.find(end_marker)
+    if start < 0 or end < start or text.find(start_marker, start + 1) >= 0:
+        raise CurriculumError(f"{name}: needs one {start_marker} followed by one {end_marker}")
     newline = "\r\n" if "\r\n" in text else "\n"
     line_start = text.rfind("\n", 0, start) + 1
     indent = text[line_start:start]
     if indent.strip():
-        raise CurriculumError(f"{name}: {START} must be on a line of its own")
+        raise CurriculumError(f"{name}: {start_marker} must be on a line of its own")
     body = "".join(newline + indent + line if line else newline for line in lines)
-    return text[: start + len(START)] + body + newline + indent + text[end:]
+    return text[: start + len(start_marker)] + body + newline + indent + text[end:]
+
+
+def check_reference(entries: list[dict], ref: dict | None = None,
+                    lessons_dir: Path = reference.LESSONS) -> tuple[list[str], list[str]]:
+    """The reference's problems and notes against the lessons of [entries]."""
+    ref = reference.load() if ref is None else ref
+    return reference.check(ref, reference.lesson_files(entries, lessons_dir))
 
 
 # --- Cosmos (read-only) ------------------------------------------------------
@@ -246,6 +279,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="the live goal files, instead of LIVE_GOALS")
     parser.add_argument("--check-live", action="store_true",
                         help="compare the live goals with Cosmos (read-only) and write nothing")
+    parser.add_argument("--check-reference", action="store_true",
+                        help="check the reference against the lessons of the live goals and "
+                             "write nothing")
     args = parser.parse_args(argv)
     if args.page and not args.lang:
         parser.error("--page needs --lang")
@@ -260,14 +296,34 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"live goals match: {', '.join(names)}")
             return 1 if problems else 0
 
-        # Every page filled in memory first; nothing is written on an error.
         entries = load_goals(names)
+        ref = reference.load()
+        problems, notes = check_reference(entries, ref)
+        for n in notes:
+            print(f"note: {n}")
+        if args.check_reference:
+            for p in problems:
+                print(f"missing: {p}", file=sys.stderr)
+            if not problems:
+                items = sum(len(g["items"]) for g in ref["groups"])
+                print(f"reference complete for {', '.join(names)} ({items} items)")
+            return 1 if problems else 0
+        if problems:
+            raise CurriculumError(
+                "the reference (assets/reference/python_reference.json) is not complete: "
+                + "; ".join(problems)
+            )
+
+        # Every page filled in memory first; nothing is written on an error.
         pages = []
         for lang in [args.lang] if args.lang else list(PAGES):
             page = args.page or PAGES[lang]
-            lines = render(entries, texts_for(entries, lang), lang)
+            texts = texts_for(entries, lang)
             text = page.read_bytes().decode("utf-8")
-            pages.append((page, text, fill_page(text, lines, page.name)))
+            filled = fill_page(text, render(entries, texts, lang), page.name)
+            filled = fill_page(filled, reference.render(ref, lang, texts), page.name,
+                               REFERENCE_START, REFERENCE_END)
+            pages.append((page, text, filled))
     except (CurriculumError, OSError, KeyError, ValueError) as e:
         print(f"error: {e}. No page was written.", file=sys.stderr)
         return 1

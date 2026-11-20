@@ -6,18 +6,113 @@
       "kind": "builtins",
       "title": { "nl": "Ingebouwde functies", "en": "Built-in functions" },
       "items": [
-        { "name": "print", "kind": "function", "signature": "print(value, ..., sep=' ', end='\\n')" },
-        { "name": "input", "kind": "function", "signature": "input(prompt)", "returns": "str" },
-        { "name": "int", "kind": "function", "signature": "int(x)", "returns": "int" },
-        { "name": "float", "kind": "function", "signature": "float(x)", "returns": "float" },
-        { "name": "len", "kind": "function", "signature": "len(s)", "returns": "int" },
-        { "name": "range", "kind": "function", "signature": "range(start, stop, step)" },
-        { "name": "round", "kind": "function", "signature": "round(number, ndigits)" },
-        { "name": "abs", "kind": "function", "signature": "abs(x)" },
-        { "name": "min", "kind": "function", "signature": "min(a, b, ...)" },
-        { "name": "max", "kind": "function", "signature": "max(a, b, ...)" },
-        { "name": "sum", "kind": "function", "signature": "sum(values)" },
-        { "name": "sorted", "kind": "function", "signature": "sorted(values, reverse=False)", "returns": "list" }
+        {
+          "name": "print", "kind": "function", "signature": "print(value, ..., sep=' ', end='\\n')",
+          "summary": {
+            "nl": "Toont een of meer waarden op het scherm, met een spatie ertussen. `sep=` kiest wat ertussen komt, `end=` wat erna komt (standaard een nieuwe regel).",
+            "en": "Shows one or more values on the screen, with a space between them. `sep=` chooses what goes between, `end=` what comes after (a new line by default)."
+          },
+          "example": "print(\"x =\", 3)       # x = 3\nprint(1, 2, sep=\"-\")  # 1-2",
+          "lesson": "uitvoer-print"
+        },
+        {
+          "name": "input", "kind": "function", "signature": "input(prompt)", "returns": "str",
+          "summary": {
+            "nl": "Toont `prompt`, wacht tot de gebruiker iets typt en op Enter drukt, en geeft dat terug als tekst (`str`), ook als het een getal is.",
+            "en": "Shows `prompt`, waits until the user types something and presses Enter, and gives it back as text (`str`), even when it is a number."
+          },
+          "example": "n = int(input(\"n = \"))\nprint(2 * n)",
+          "lesson": "invoer-input"
+        },
+        {
+          "name": "int", "kind": "function", "signature": "int(x)", "returns": "int",
+          "summary": {
+            "nl": "Maakt van x een geheel getal: van tekst zoals `\"42\"`, of van een kommagetal door alles na de komma weg te laten.",
+            "en": "Turns x into a whole number: from text such as `\"42\"`, or from a decimal number by dropping everything after the point."
+          },
+          "example": "print(int(\"42\") + 1)  # 43\nprint(int(3.9))       # 3",
+          "lesson": "invoer-input"
+        },
+        {
+          "name": "float", "kind": "function", "signature": "float(x)", "returns": "float",
+          "summary": {
+            "nl": "Maakt van x een kommagetal, bijvoorbeeld van tekst zoals `\"3.5\"`. Python schrijft een punt, geen komma.",
+            "en": "Turns x into a decimal number, for example from text such as `\"3.5\"`. Python writes a point, never a comma."
+          },
+          "example": "print(float(\"3.5\") * 2)  # 7.0",
+          "lesson": "invoer-input"
+        },
+        {
+          "name": "len", "kind": "function", "signature": "len(s)", "returns": "int",
+          "summary": {
+            "nl": "Het aantal elementen van een lijst, of het aantal tekens van een string. De laatste index is `len(s) - 1`.",
+            "en": "The number of elements in a list, or the number of characters in a string. The last index is `len(s) - 1`."
+          },
+          "example": "print(len([4, 7, 1]))  # 3\nprint(len(\"Python\"))  # 6",
+          "lesson": "lijsten-indexeren"
+        },
+        {
+          "name": "range", "kind": "function", "signature": "range(start, stop, step)",
+          "summary": {
+            "nl": "De gehele getallen van `start` tot `stop`, zonder `stop` zelf, in stappen van `step`. `range(n)` gaat van 0 tot n - 1.",
+            "en": "The whole numbers from `start` up to `stop`, without `stop` itself, in steps of `step`. `range(n)` runs from 0 to n - 1."
+          },
+          "example": "for i in range(1, 4):\n    print(i)  # 1 2 3",
+          "lesson": "herhalen-for"
+        },
+        {
+          "name": "round", "kind": "function", "signature": "round(number, ndigits)",
+          "summary": {
+            "nl": "Rondt een getal af op `ndigits` cijfers na de komma. Zonder `ndigits` krijg je een geheel getal.",
+            "en": "Rounds a number to `ndigits` digits after the point. Without `ndigits` you get a whole number."
+          },
+          "example": "print(round(3.14159, 2))  # 3.14\nprint(round(2.7))         # 3",
+          "lesson": "wiskundige-functies"
+        },
+        {
+          "name": "abs", "kind": "function", "signature": "abs(x)",
+          "summary": {
+            "nl": "De absolute waarde |x|: de afstand van x tot 0, zonder teken.",
+            "en": "The absolute value |x|: the distance from x to 0, without its sign."
+          },
+          "example": "print(abs(-4))     # 4\nprint(abs(3 - 5))  # 2",
+          "lesson": "toevalswandeling"
+        },
+        {
+          "name": "min", "kind": "function", "signature": "min(a, b, ...)",
+          "summary": {
+            "nl": "De kleinste van de waarden, of het kleinste element van één lijst.",
+            "en": "The smallest of the values, or the smallest element of one list."
+          },
+          "example": "print(min(4, 9, 2))    # 2\nprint(min([8, 3, 5]))  # 3",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "max", "kind": "function", "signature": "max(a, b, ...)",
+          "summary": {
+            "nl": "De grootste van de waarden, of het grootste element van één lijst.",
+            "en": "The largest of the values, or the largest element of one list."
+          },
+          "example": "print(max(4, 9, 2))    # 9\nprint(max([8, 3, 5]))  # 8",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "sum", "kind": "function", "signature": "sum(values)",
+          "summary": {
+            "nl": "De som van alle getallen in een lijst. Gedeeld door `len` is dat het gemiddelde.",
+            "en": "The sum of all the numbers in a list. Divided by `len`, that is the mean."
+          },
+          "example": "a = [2, 4, 9]\nprint(sum(a))           # 15\nprint(sum(a) / len(a))  # 5.0",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "sorted", "kind": "function", "signature": "sorted(values, reverse=False)", "returns": "list",
+          "summary": {
+            "nl": "Geeft een nieuwe lijst terug, van klein naar groot gesorteerd; de lijst zelf blijft zoals ze was. Met `reverse=True` van groot naar klein.",
+            "en": "Gives back a new list, sorted from small to large; the list itself stays as it was. With `reverse=True` from large to small."
+          },
+          "example": "a = [3, 1, 2]\nprint(sorted(a))  # [1, 2, 3]\nprint(a)          # [3, 1, 2]"
+        }
       ]
     },
     {
@@ -25,17 +120,79 @@
       "kind": "type",
       "title": { "nl": "Tekst (str)", "en": "Text (str)" },
       "items": [
-        { "name": "upper", "kind": "method", "signature": "upper()", "returns": "str" },
-        { "name": "lower", "kind": "method", "signature": "lower()", "returns": "str" },
-        { "name": "strip", "kind": "method", "signature": "strip()", "returns": "str" },
-        { "name": "split", "kind": "method", "signature": "split(sep)", "returns": "list" },
-        { "name": "replace", "kind": "method", "signature": "replace(old, new)", "returns": "str" },
-        { "name": "join", "kind": "method", "signature": "join(values)", "returns": "str" },
-        { "name": "count", "kind": "method", "signature": "count(sub)", "returns": "int" },
-        { "name": "find", "kind": "method", "signature": "find(sub)", "returns": "int" },
-        { "name": "startswith", "kind": "method", "signature": "startswith(prefix)", "returns": "bool" },
-        { "name": "endswith", "kind": "method", "signature": "endswith(suffix)", "returns": "bool" },
-        { "name": "isdigit", "kind": "method", "signature": "isdigit()", "returns": "bool" }
+        {
+          "name": "upper", "kind": "method", "signature": "upper()", "returns": "str",
+          "summary": { "nl": "Geeft de tekst terug in hoofdletters.", "en": "Gives back the text in capital letters." },
+          "example": "print(\"abc\".upper())  # ABC"
+        },
+        {
+          "name": "lower", "kind": "method", "signature": "lower()", "returns": "str",
+          "summary": { "nl": "Geeft de tekst terug in kleine letters.", "en": "Gives back the text in small letters." },
+          "example": "print(\"AbC\".lower())  # abc"
+        },
+        {
+          "name": "strip", "kind": "method", "signature": "strip()", "returns": "str",
+          "summary": {
+            "nl": "Geeft de tekst terug zonder de spaties en nieuwe regels vooraan en achteraan.",
+            "en": "Gives back the text without the spaces and new lines at the start and the end."
+          },
+          "example": "print(\"  42  \".strip() + \"!\")  # 42!"
+        },
+        {
+          "name": "split", "kind": "method", "signature": "split(sep)", "returns": "list",
+          "summary": {
+            "nl": "Knipt de tekst in stukken bij elke `sep` en geeft de stukken terug in een lijst. Zonder `sep` knipt hij bij de spaties.",
+            "en": "Cuts the text into pieces at every `sep` and gives the pieces back in a list. Without `sep` it cuts at the spaces."
+          },
+          "example": "print(\"3,1,4\".split(\",\"))  # ['3', '1', '4']"
+        },
+        {
+          "name": "replace", "kind": "method", "signature": "replace(old, new)", "returns": "str",
+          "summary": {
+            "nl": "Geeft de tekst terug met elke `old` vervangen door `new`.",
+            "en": "Gives back the text with every `old` replaced by `new`."
+          },
+          "example": "print(\"3,14\".replace(\",\", \".\"))  # 3.14"
+        },
+        {
+          "name": "join", "kind": "method", "signature": "join(values)", "returns": "str",
+          "summary": {
+            "nl": "Plakt de strings van een lijst aan elkaar, met deze tekst ertussen.",
+            "en": "Glues the strings of a list together, with this text between them."
+          },
+          "example": "print(\"-\".join([\"a\", \"b\", \"c\"]))  # a-b-c"
+        },
+        {
+          "name": "count", "kind": "method", "signature": "count(sub)", "returns": "int",
+          "summary": { "nl": "Telt hoe vaak `sub` in de tekst voorkomt.", "en": "Counts how often `sub` occurs in the text." },
+          "example": "print(\"abracadabra\".count(\"a\"))  # 5"
+        },
+        {
+          "name": "find", "kind": "method", "signature": "find(sub)", "returns": "int",
+          "summary": {
+            "nl": "De index waar `sub` voor het eerst voorkomt, of -1 als `sub` er niet in staat.",
+            "en": "The index where `sub` first occurs, or -1 when `sub` does not occur."
+          },
+          "example": "print(\"Python\".find(\"t\"))  # 2\nprint(\"Python\".find(\"z\"))  # -1"
+        },
+        {
+          "name": "startswith", "kind": "method", "signature": "startswith(prefix)", "returns": "bool",
+          "summary": { "nl": "`True` als de tekst met `prefix` begint, anders `False`.", "en": "`True` when the text starts with `prefix`, otherwise `False`." },
+          "example": "print(\"x = 3\".startswith(\"x\"))  # True"
+        },
+        {
+          "name": "endswith", "kind": "method", "signature": "endswith(suffix)", "returns": "bool",
+          "summary": { "nl": "`True` als de tekst op `suffix` eindigt, anders `False`.", "en": "`True` when the text ends with `suffix`, otherwise `False`." },
+          "example": "print(\"plot.py\".endswith(\".py\"))  # True"
+        },
+        {
+          "name": "isdigit", "kind": "method", "signature": "isdigit()", "returns": "bool",
+          "summary": {
+            "nl": "`True` als de tekst niet leeg is en alleen uit cijfers bestaat.",
+            "en": "`True` when the text is not empty and has nothing but digits."
+          },
+          "example": "print(\"42\".isdigit())   # True\nprint(\"4.2\".isdigit())  # False"
+        }
       ]
     },
     {
@@ -43,11 +200,51 @@
       "kind": "type",
       "title": { "nl": "Lijsten (list)", "en": "Lists (list)" },
       "items": [
-        { "name": "append", "kind": "method", "signature": "append(x)" },
-        { "name": "insert", "kind": "method", "signature": "insert(i, x)" },
-        { "name": "pop", "kind": "method", "signature": "pop(i)" },
-        { "name": "remove", "kind": "method", "signature": "remove(x)" },
-        { "name": "sort", "kind": "method", "signature": "sort(reverse=False)" }
+        {
+          "name": "append", "kind": "method", "signature": "append(x)",
+          "summary": {
+            "nl": "Zet x achteraan in de lijst. De lijst zelf verandert; `append` geeft niets terug.",
+            "en": "Puts x at the end of the list. The list itself changes; `append` gives nothing back."
+          },
+          "example": "a = [1, 2]\na.append(5)\nprint(a)  # [1, 2, 5]",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "insert", "kind": "method", "signature": "insert(i, x)",
+          "summary": {
+            "nl": "Zet x op positie i; alles wat erna komt, schuift één plaats op.",
+            "en": "Puts x at position i; everything after it moves up one place."
+          },
+          "example": "a = [1, 2]\na.insert(0, 9)\nprint(a)  # [9, 1, 2]",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "pop", "kind": "method", "signature": "pop(i)",
+          "summary": {
+            "nl": "Haalt het element op positie i uit de lijst en geeft het terug. Zonder i is dat het laatste element.",
+            "en": "Takes the element at position i out of the list and gives it back. Without i, that is the last element."
+          },
+          "example": "a = [4, 5, 6]\nx = a.pop()\nprint(x, a)  # 6 [4, 5]",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "remove", "kind": "method", "signature": "remove(x)",
+          "summary": {
+            "nl": "Haalt de eerste x uit de lijst. Staat x er niet in, dan stopt je programma met een `ValueError`.",
+            "en": "Takes the first x out of the list. When x is not in it, your program stops with a `ValueError`."
+          },
+          "example": "a = [5, 2, 8, 2]\na.remove(2)\nprint(a)  # [5, 8, 2]",
+          "lesson": "lijsten-aanpassen"
+        },
+        {
+          "name": "sort", "kind": "method", "signature": "sort(reverse=False)",
+          "summary": {
+            "nl": "Sorteert de lijst zelf van klein naar groot en geeft niets terug. Met `reverse=True` van groot naar klein.",
+            "en": "Sorts the list itself from small to large and gives nothing back. With `reverse=True` from large to small."
+          },
+          "example": "a = [3, 1, 2]\na.sort()\nprint(a)  # [1, 2, 3]",
+          "lesson": "lijsten-aanpassen"
+        }
       ]
     },
     {
@@ -55,86 +252,367 @@
       "kind": "type",
       "title": { "nl": "Woordenboeken (dict)", "en": "Dictionaries (dict)" },
       "items": [
-        { "name": "keys", "kind": "method", "signature": "keys()" },
-        { "name": "values", "kind": "method", "signature": "values()" },
-        { "name": "items", "kind": "method", "signature": "items()" },
-        { "name": "get", "kind": "method", "signature": "get(key, default)" },
-        { "name": "pop", "kind": "method", "signature": "pop(key)" }
+        {
+          "name": "keys", "kind": "method", "signature": "keys()",
+          "summary": { "nl": "Alle sleutels van het woordenboek.", "en": "All the keys of the dictionary." },
+          "example": "d = {\"a\": 1, \"b\": 2}\nfor k in d.keys():\n    print(k)  # a b"
+        },
+        {
+          "name": "values", "kind": "method", "signature": "values()",
+          "summary": { "nl": "Alle waarden van het woordenboek.", "en": "All the values of the dictionary." },
+          "example": "d = {\"a\": 1, \"b\": 2}\nprint(sum(d.values()))  # 3"
+        },
+        {
+          "name": "items", "kind": "method", "signature": "items()",
+          "summary": {
+            "nl": "Alle paren (sleutel, waarde), handig in een `for`-lus.",
+            "en": "All the (key, value) pairs, handy in a `for` loop."
+          },
+          "example": "d = {\"a\": 1, \"b\": 2}\nfor k, v in d.items():\n    print(k, v)  # a 1 b 2"
+        },
+        {
+          "name": "get", "kind": "method", "signature": "get(key, default)",
+          "summary": {
+            "nl": "De waarde bij `key`, of `default` als `key` er niet in staat, zonder fout.",
+            "en": "The value for `key`, or `default` when `key` is not in it, without an error."
+          },
+          "example": "d = {\"a\": 1}\nprint(d.get(\"a\", 0))  # 1\nprint(d.get(\"z\", 0))  # 0"
+        },
+        {
+          "name": "pop", "kind": "method", "signature": "pop(key)",
+          "summary": {
+            "nl": "Haalt `key` uit het woordenboek en geeft zijn waarde terug.",
+            "en": "Takes `key` out of the dictionary and gives back its value."
+          },
+          "example": "d = {\"a\": 1, \"b\": 2}\nprint(d.pop(\"a\"))  # 1\nprint(d)  # {'b': 2}"
+        }
       ]
     },
     {
       "id": "turtle",
       "kind": "module",
       "title": { "nl": "turtle", "en": "turtle" },
+      "setup": "import turtle",
       "items": [
-        { "name": "Turtle", "kind": "class", "signature": "Turtle()", "returns": "turtle.Turtle" },
-        { "name": "done", "kind": "function", "signature": "done()" }
+        {
+          "name": "Turtle", "kind": "class", "signature": "Turtle()", "returns": "turtle.Turtle",
+          "summary": {
+            "nl": "Maakt een schildpad die tekent terwijl hij loopt. Geef hem een naam, zoals `t`, en geef hem daarna opdrachten.",
+            "en": "Makes a turtle that draws as it moves. Give it a name, such as `t`, and then give it commands."
+          },
+          "example": "t = turtle.Turtle()\nt.forward(100)\nturtle.done()",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "done", "kind": "function", "signature": "done()",
+          "summary": {
+            "nl": "Houdt het tekenvenster open tot je het sluit. Het hoort onderaan elk turtle-script.",
+            "en": "Keeps the drawing window open until you close it. It belongs at the bottom of every turtle script."
+          },
+          "example": "t = turtle.Turtle()\nt.left(90)\nt.forward(50)\nturtle.done()",
+          "lesson": "tekenen-turtle"
+        }
       ]
     },
     {
       "id": "turtle.Turtle",
       "kind": "type",
       "title": { "nl": "Een turtle (turtle.Turtle)", "en": "A turtle (turtle.Turtle)" },
+      "setup": "import turtle\nt = turtle.Turtle()",
       "items": [
-        { "name": "forward", "kind": "method", "signature": "forward(distance)" },
-        { "name": "backward", "kind": "method", "signature": "backward(distance)" },
-        { "name": "left", "kind": "method", "signature": "left(angle)" },
-        { "name": "right", "kind": "method", "signature": "right(angle)" },
-        { "name": "penup", "kind": "method", "signature": "penup()" },
-        { "name": "pendown", "kind": "method", "signature": "pendown()" },
-        { "name": "pencolor", "kind": "method", "signature": "pencolor(color)" }
+        {
+          "name": "forward", "kind": "method", "signature": "forward(distance)",
+          "summary": {
+            "nl": "Loopt `distance` stappen vooruit, in de richting waarin de schildpad kijkt.",
+            "en": "Moves `distance` steps forward, in the direction the turtle faces."
+          },
+          "example": "for i in range(4):\n    t.forward(100)\n    t.left(90)",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "backward", "kind": "method", "signature": "backward(distance)",
+          "summary": {
+            "nl": "Loopt `distance` stappen achteruit; de schildpad blijft dezelfde kant op kijken.",
+            "en": "Moves `distance` steps backward; the turtle keeps facing the same way."
+          },
+          "example": "t.forward(100)\nt.backward(50)",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "left", "kind": "method", "signature": "left(angle)",
+          "summary": {
+            "nl": "Draait `angle` graden naar links, gezien vanuit de schildpad.",
+            "en": "Turns `angle` degrees to the left, as the turtle sees it."
+          },
+          "example": "t.left(90)\nt.forward(50)",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "right", "kind": "method", "signature": "right(angle)",
+          "summary": {
+            "nl": "Draait `angle` graden naar rechts, gezien vanuit de schildpad.",
+            "en": "Turns `angle` degrees to the right, as the turtle sees it."
+          },
+          "example": "t.right(120)\nt.forward(50)",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "penup", "kind": "method", "signature": "penup()",
+          "summary": {
+            "nl": "Pen omhoog: de schildpad beweegt daarna zonder te tekenen.",
+            "en": "Pen up: from then on the turtle moves without drawing."
+          },
+          "example": "t.penup()\nt.forward(50)\nt.pendown()",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "pendown", "kind": "method", "signature": "pendown()",
+          "summary": {
+            "nl": "Pen weer omlaag: de schildpad tekent weer terwijl hij loopt.",
+            "en": "Pen down again: the turtle draws again as it moves."
+          },
+          "example": "t.penup()\nt.forward(50)\nt.pendown()\nt.forward(50)",
+          "lesson": "tekenen-turtle"
+        },
+        {
+          "name": "pencolor", "kind": "method", "signature": "pencolor(color)",
+          "summary": {
+            "nl": "Tekent voortaan in de kleur `color`, een Engelse naam zoals `\"red\"` of `\"blue\"`.",
+            "en": "Draws from then on in the colour `color`, a name such as `\"red\"` or `\"blue\"`."
+          },
+          "example": "t.pencolor(\"red\")\nt.forward(100)",
+          "lesson": "tekenen-turtle"
+        }
       ]
     },
     {
       "id": "math",
       "kind": "module",
       "title": { "nl": "math", "en": "math" },
+      "setup": "import math",
       "items": [
-        { "name": "sqrt", "kind": "function", "signature": "sqrt(x)", "returns": "float" },
-        { "name": "sin", "kind": "function", "signature": "sin(x)", "returns": "float" },
-        { "name": "cos", "kind": "function", "signature": "cos(x)", "returns": "float" },
-        { "name": "pi", "kind": "constant", "signature": "pi", "returns": "float" }
+        {
+          "name": "sqrt", "kind": "function", "signature": "sqrt(x)", "returns": "float",
+          "summary": { "nl": "De vierkantswortel √x.", "en": "The square root √x." },
+          "example": "print(math.sqrt(16))  # 4.0",
+          "lesson": "wiskundige-functies"
+        },
+        {
+          "name": "sin", "kind": "function", "signature": "sin(x)", "returns": "float",
+          "summary": { "nl": "sin x, met x in radialen, niet in graden.", "en": "sin x, with x in radians, not in degrees." },
+          "example": "print(math.sin(math.pi / 2))  # 1.0",
+          "lesson": "wiskundige-functies"
+        },
+        {
+          "name": "cos", "kind": "function", "signature": "cos(x)", "returns": "float",
+          "summary": { "nl": "cos x, met x in radialen, niet in graden.", "en": "cos x, with x in radians, not in degrees." },
+          "example": "print(math.cos(0))  # 1.0",
+          "lesson": "wiskundige-functies"
+        },
+        {
+          "name": "pi", "kind": "constant", "signature": "pi", "returns": "float",
+          "summary": { "nl": "Het getal π ≈ 3,14159.", "en": "The number π ≈ 3.14159." },
+          "example": "r = 2\nprint(round(2 * math.pi * r, 2))  # 12.57",
+          "lesson": "wiskundige-functies"
+        }
       ]
     },
     {
       "id": "random",
       "kind": "module",
       "title": { "nl": "random", "en": "random" },
+      "setup": "import random",
       "items": [
-        { "name": "randint", "kind": "function", "signature": "randint(a, b)", "returns": "int" },
-        { "name": "random", "kind": "function", "signature": "random()", "returns": "float" },
-        { "name": "uniform", "kind": "function", "signature": "uniform(a, b)", "returns": "float" },
-        { "name": "choice", "kind": "function", "signature": "choice(values)" }
+        {
+          "name": "randint", "kind": "function", "signature": "randint(a, b)", "returns": "int",
+          "summary": {
+            "nl": "Een toevallig geheel getal van a tot en met b: a en b kunnen allebei vallen.",
+            "en": "A random whole number from a to b: a and b can both come up."
+          },
+          "example": "d = random.randint(1, 6)  # 1, 2, …, 6\nprint(d)",
+          "lesson": "toevalsgetallen"
+        },
+        {
+          "name": "random", "kind": "function", "signature": "random()", "returns": "float",
+          "summary": {
+            "nl": "Een toevallig kommagetal van 0 tot 1: 0.0 kan, 1.0 nooit. `random() < p` is waar met kans p.",
+            "en": "A random decimal number from 0 to 1: 0.0 can come up, 1.0 never. `random() < p` is true with probability p."
+          },
+          "example": "if random.random() < 0.3:\n    print(1)\nelse:\n    print(0)",
+          "lesson": "toevalsgetallen"
+        },
+        {
+          "name": "uniform", "kind": "function", "signature": "uniform(a, b)", "returns": "float",
+          "summary": {
+            "nl": "Een toevallig kommagetal tussen a en b.",
+            "en": "A random decimal number between a and b."
+          },
+          "example": "x = random.uniform(0, 4)  # 0 ≤ x ≤ 4\nprint(x)",
+          "lesson": "oppervlakte-schatten"
+        },
+        {
+          "name": "choice", "kind": "function", "signature": "choice(values)",
+          "summary": {
+            "nl": "Kiest een toevallig element uit een lijst.",
+            "en": "Picks a random element from a list."
+          },
+          "example": "print(random.choice([2, 4, 6]))",
+          "lesson": "toevalsgetallen"
+        }
       ]
     },
     {
       "id": "matplotlib.pyplot",
       "kind": "module",
       "title": { "nl": "Grafieken (matplotlib.pyplot)", "en": "Charts (matplotlib.pyplot)" },
+      "setup": "import matplotlib.pyplot as plt",
       "items": [
-        { "name": "plot", "kind": "function", "signature": "plot(x, y, label=..., color=...)" },
-        { "name": "scatter", "kind": "function", "signature": "scatter(x, y)" },
-        { "name": "bar", "kind": "function", "signature": "bar(x, height)" },
-        { "name": "hist", "kind": "function", "signature": "hist(values, bins=...)" },
-        { "name": "title", "kind": "function", "signature": "title(text)" },
-        { "name": "xlabel", "kind": "function", "signature": "xlabel(text)" },
-        { "name": "ylabel", "kind": "function", "signature": "ylabel(text)" },
-        { "name": "legend", "kind": "function", "signature": "legend()" },
-        { "name": "grid", "kind": "function", "signature": "grid()" },
-        { "name": "show", "kind": "function", "signature": "show()" }
+        {
+          "name": "plot", "kind": "function", "signature": "plot(x, y, label=..., color=...)",
+          "summary": {
+            "nl": "Tekent een lijn door de punten (x, y) van twee even lange lijsten. `label=` geeft de lijn een naam, `color=` een kleur.",
+            "en": "Draws a line through the points (x, y) of two lists of the same length. `label=` gives the line a name, `color=` a colour."
+          },
+          "example": "plt.plot([0, 1, 2], [0, 1, 4])\nplt.show()",
+          "lesson": "eerste-grafiek"
+        },
+        {
+          "name": "scatter", "kind": "function", "signature": "scatter(x, y)",
+          "summary": {
+            "nl": "Tekent alleen de punten (x, y), zonder ze te verbinden.",
+            "en": "Draws only the points (x, y), without joining them."
+          },
+          "example": "plt.scatter([1, 2, 3], [5, 3, 4])\nplt.show()",
+          "lesson": "eerste-grafiek"
+        },
+        {
+          "name": "bar", "kind": "function", "signature": "bar(x, height)",
+          "summary": {
+            "nl": "Tekent een staafdiagram: bij elke x een staaf zo hoog als `height`. Voor aantallen die je al hebt.",
+            "en": "Draws a bar chart: at every x a bar as high as `height`. For counts you already have."
+          },
+          "example": "plt.bar([1, 2, 3], [4, 7, 2])\nplt.show()",
+          "lesson": "staafdiagram-histogram"
+        },
+        {
+          "name": "hist", "kind": "function", "signature": "hist(values, bins=...)",
+          "summary": {
+            "nl": "Telt hoeveel waarden in elke klasse vallen en tekent die aantallen als staven. `bins=` geeft het aantal klassen of hun grenzen.",
+            "en": "Counts how many values fall in each class and draws those counts as bars. `bins=` gives the number of classes or their limits."
+          },
+          "example": "plt.hist([1, 2, 2, 3, 3, 3], bins=3)\nplt.show()",
+          "lesson": "staafdiagram-histogram"
+        },
+        {
+          "name": "title", "kind": "function", "signature": "title(text)",
+          "summary": { "nl": "Zet een titel boven de grafiek.", "en": "Puts a title above the chart." },
+          "example": "plt.title(\"y = x²\")",
+          "lesson": "grafiek-afwerken"
+        },
+        {
+          "name": "xlabel", "kind": "function", "signature": "xlabel(text)",
+          "summary": {
+            "nl": "Zet een tekst onder de horizontale as: de grootheid en haar eenheid.",
+            "en": "Puts a text under the horizontal axis: the quantity and its unit."
+          },
+          "example": "plt.xlabel(\"t (s)\")",
+          "lesson": "grafiek-afwerken"
+        },
+        {
+          "name": "ylabel", "kind": "function", "signature": "ylabel(text)",
+          "summary": {
+            "nl": "Zet een tekst naast de verticale as: de grootheid en haar eenheid.",
+            "en": "Puts a text beside the vertical axis: the quantity and its unit."
+          },
+          "example": "plt.ylabel(\"v (m/s)\")",
+          "lesson": "grafiek-afwerken"
+        },
+        {
+          "name": "legend", "kind": "function", "signature": "legend()",
+          "summary": {
+            "nl": "Toont in een kadertje de namen die je de lijnen met `label=` gaf.",
+            "en": "Shows, in a small box, the names you gave the lines with `label=`."
+          },
+          "example": "plt.plot([0, 1], [0, 1], label=\"x\")\nplt.plot([0, 1], [0, 2], label=\"2x\")\nplt.legend()",
+          "lesson": "grafiek-afwerken"
+        },
+        {
+          "name": "grid", "kind": "function", "signature": "grid()",
+          "summary": {
+            "nl": "Tekent een raster, zodat je de waarden gemakkelijker afleest.",
+            "en": "Draws a grid, so the values are easier to read."
+          },
+          "example": "plt.plot([0, 1, 2], [3, 1, 2])\nplt.grid()",
+          "lesson": "grafiek-afwerken"
+        },
+        {
+          "name": "show", "kind": "function", "signature": "show()",
+          "summary": {
+            "nl": "Toont de figuur in een venster en wacht tot je het sluit. Het hoort op de laatste regel.",
+            "en": "Shows the figure in a window and waits until you close it. It belongs on the last line."
+          },
+          "example": "plt.plot([1, 2, 3], [2, 4, 1])\nplt.show()",
+          "lesson": "eerste-grafiek"
+        }
       ]
     },
     {
       "id": "numpy",
       "kind": "module",
       "title": { "nl": "numpy", "en": "numpy" },
+      "setup": "import numpy as np",
       "items": [
-        { "name": "array", "kind": "function", "signature": "array(values)", "returns": "numpy.ndarray" },
-        { "name": "linspace", "kind": "function", "signature": "linspace(start, stop, num)", "returns": "numpy.ndarray" },
-        { "name": "sqrt", "kind": "function", "signature": "sqrt(x)" },
-        { "name": "sin", "kind": "function", "signature": "sin(x)" },
-        { "name": "cos", "kind": "function", "signature": "cos(x)" },
-        { "name": "pi", "kind": "constant", "signature": "pi", "returns": "float" }
+        {
+          "name": "array", "kind": "function", "signature": "array(values)", "returns": "numpy.ndarray",
+          "summary": {
+            "nl": "Maakt van een lijst een array. Een bewerking op een array rekent met elk element apart.",
+            "en": "Turns a list into an array. An operation on an array computes with every element on its own."
+          },
+          "example": "a = np.array([1, 2, 3])\nprint(a * 2)  # [2 4 6]",
+          "lesson": "rekenen-numpy"
+        },
+        {
+          "name": "linspace", "kind": "function", "signature": "linspace(start, stop, num)", "returns": "numpy.ndarray",
+          "summary": {
+            "nl": "`num` waarden op gelijke afstand van `start` tot en met `stop`. Het derde getal is het aantal, niet de stap.",
+            "en": "`num` evenly spaced values from `start` to `stop`, both included. The third number is the count, not the step."
+          },
+          "example": "x = np.linspace(0, 2, 5)\nprint(x)  # [0.  0.5 1.  1.5 2. ]",
+          "lesson": "rekenen-numpy"
+        },
+        {
+          "name": "sqrt", "kind": "function", "signature": "sqrt(x)",
+          "summary": {
+            "nl": "De vierkantswortel √x van elk element van een array, of van één getal.",
+            "en": "The square root √x of every element of an array, or of one number."
+          },
+          "example": "a = np.array([1, 4, 9])\nprint(np.sqrt(a))  # [1. 2. 3.]",
+          "lesson": "rekenen-numpy"
+        },
+        {
+          "name": "sin", "kind": "function", "signature": "sin(x)",
+          "summary": {
+            "nl": "sin x voor elk element van een array, in radialen.",
+            "en": "sin x for every element of an array, in radians."
+          },
+          "example": "x = np.linspace(0, 2 * np.pi, 100)\ny = np.sin(x)",
+          "lesson": "rekenen-numpy"
+        },
+        {
+          "name": "cos", "kind": "function", "signature": "cos(x)",
+          "summary": {
+            "nl": "cos x voor elk element van een array, in radialen.",
+            "en": "cos x for every element of an array, in radians."
+          },
+          "example": "x = np.linspace(0, 2 * np.pi, 100)\ny = np.cos(x)",
+          "lesson": "rekenen-numpy"
+        },
+        {
+          "name": "pi", "kind": "constant", "signature": "pi", "returns": "float",
+          "summary": { "nl": "Het getal π, zoals `math.pi`.", "en": "The number π, like `math.pi`." },
+          "example": "print(np.pi)  # 3.141592653589793",
+          "lesson": "rekenen-numpy"
+        }
       ]
     }
   ]

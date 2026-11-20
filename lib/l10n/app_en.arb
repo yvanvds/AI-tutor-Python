@@ -791,6 +791,31 @@
   "session_runControls_button_run": "Run",
   "session_runControls_button_stop": "Stop",
 
+  "reference_button_tooltip": "Reference",
+  "@reference_button_tooltip": {
+    "description": "Hover text on the book button above the editor and in the quiz header that opens and closes the reference panel (#323)"
+  },
+  "reference_title": "Reference",
+  "@reference_title": {
+    "description": "Heading of the reference panel next to the exercise: every function and class of the course (#323)"
+  },
+  "reference_close_tooltip": "Close the reference",
+  "reference_search_hint": "Search: a name or a word",
+  "@reference_search_hint": {
+    "description": "Hint in the reference panel's search field; it finds names and words in the explanations"
+  },
+  "reference_search_clear_tooltip": "Clear the search",
+  "reference_noResults": "Nothing found for \"{query}\".",
+  "@reference_noResults": {
+    "placeholders": { "query": { "type": "String" } }
+  },
+  "reference_lessonLink": "Lesson: {title}",
+  "@reference_lessonLink": {
+    "description": "Link under a reference item to the lesson that explains it; opens the lesson in a window over the exercise",
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "reference_lesson_close_tooltip": "Close the lesson",
+
   "session_objectiveBanner_pill": "Current goal",
   "@session_objectiveBanner_pill": {
     "description": "Banner header pill at the top of practice view — displayed uppercase"

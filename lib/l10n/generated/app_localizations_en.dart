@@ -1357,6 +1357,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get session_runControls_button_stop => 'Stop';
 
   @override
+  String get reference_button_tooltip => 'Reference';
+
+  @override
+  String get reference_title => 'Reference';
+
+  @override
+  String get reference_close_tooltip => 'Close the reference';
+
+  @override
+  String get reference_search_hint => 'Search: a name or a word';
+
+  @override
+  String get reference_search_clear_tooltip => 'Clear the search';
+
+  @override
+  String reference_noResults(String query) {
+    return 'Nothing found for \"$query\".';
+  }
+
+  @override
+  String reference_lessonLink(String title) {
+    return 'Lesson: $title';
+  }
+
+  @override
+  String get reference_lesson_close_tooltip => 'Close the lesson';
+
+  @override
   String get session_objectiveBanner_pill => 'Current goal';
 
   @override

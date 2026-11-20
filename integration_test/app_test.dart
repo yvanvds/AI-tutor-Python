@@ -84,6 +84,7 @@ import 'flows/question_type_rotation.dart' as question_type_rotation;
 import 'flows/quiz_chat.dart' as quiz_chat;
 import 'flows/quiz_ligatures.dart' as quiz_ligatures;
 import 'flows/quiz_verdict_colors.dart' as quiz_verdict_colors;
+import 'flows/reference_panel.dart' as reference_panel;
 import 'flows/restart_in_practice.dart' as restart_in_practice;
 import 'flows/run_shortcut.dart' as run_shortcut;
 import 'flows/session_narrow.dart' as session_narrow;
@@ -141,6 +142,7 @@ void main() {
   editor_comment_space.main();
   editor_gutter_alignment.main();
   editor_member_dropdown.main();
+  reference_panel.main();
   practice_complete_code.main();
   garbled_reply_retry.main();
   exercise_history.main();

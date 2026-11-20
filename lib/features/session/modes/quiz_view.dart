@@ -1,4 +1,5 @@
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/shown_question.dart';
@@ -92,7 +93,9 @@ class QuizView extends ConsumerWidget {
 }
 
 /// The pill, and next to it the question's short ID (#216): what the
-/// student reads out to the teacher, who looks the question up with it.
+/// student reads out to the teacher, who looks the question up with it. On
+/// the right the reference button (#323): a quiz takes the place of the row
+/// above the editor, and with it that button.
 class _QuizHeader extends ConsumerWidget {
   const _QuizHeader();
 
@@ -128,6 +131,8 @@ class _QuizHeader extends ConsumerWidget {
             tooltip: questionIdTooltip(context, ref),
           ),
         ],
+        const Spacer(),
+        const ReferenceButton(),
       ],
     );
   }

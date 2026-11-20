@@ -2275,6 +2275,54 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get session_runControls_button_stop;
 
+  /// Hover text on the book button above the editor and in the quiz header that opens and closes the reference panel (#323)
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get reference_button_tooltip;
+
+  /// Heading of the reference panel next to the exercise: every function and class of the course (#323)
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get reference_title;
+
+  /// No description provided for @reference_close_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the reference'**
+  String get reference_close_tooltip;
+
+  /// Hint in the reference panel's search field; it finds names and words in the explanations
+  ///
+  /// In en, this message translates to:
+  /// **'Search: a name or a word'**
+  String get reference_search_hint;
+
+  /// No description provided for @reference_search_clear_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the search'**
+  String get reference_search_clear_tooltip;
+
+  /// No description provided for @reference_noResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found for \"{query}\".'**
+  String reference_noResults(String query);
+
+  /// Link under a reference item to the lesson that explains it; opens the lesson in a window over the exercise
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson: {title}'**
+  String reference_lessonLink(String title);
+
+  /// No description provided for @reference_lesson_close_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the lesson'**
+  String get reference_lesson_close_tooltip;
+
   /// Banner header pill at the top of practice view — displayed uppercase
   ///
   /// In en, this message translates to:

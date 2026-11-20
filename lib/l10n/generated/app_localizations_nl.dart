@@ -1368,6 +1368,34 @@ class AppLocalizationsNl extends AppLocalizations {
   String get session_runControls_button_stop => 'Stop';
 
   @override
+  String get reference_button_tooltip => 'Naslag';
+
+  @override
+  String get reference_title => 'Naslag';
+
+  @override
+  String get reference_close_tooltip => 'Naslag sluiten';
+
+  @override
+  String get reference_search_hint => 'Zoek: een naam of een woord';
+
+  @override
+  String get reference_search_clear_tooltip => 'Zoekopdracht wissen';
+
+  @override
+  String reference_noResults(String query) {
+    return 'Niets gevonden voor \"$query\".';
+  }
+
+  @override
+  String reference_lessonLink(String title) {
+    return 'Les: $title';
+  }
+
+  @override
+  String get reference_lesson_close_tooltip => 'Les sluiten';
+
+  @override
   String get session_objectiveBanner_pill => 'Huidig doel';
 
   @override

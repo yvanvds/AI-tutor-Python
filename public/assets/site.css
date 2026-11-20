@@ -75,7 +75,16 @@
                          <details class="curriculum-goal"> with a <summary>
                          (.curriculum-number, .curriculum-heading >
                          .curriculum-title + .curriculum-count) and a
-                         .curriculum-body (<p>, dl.curriculum-subgoals)
+                         .curriculum-body (<p>, dl.curriculum-subgoals);
+                         each subgoal's <div> has the id a reference
+                         lesson link points at
+   .reference            "Naslag" (#323), written by the same script from
+                         assets/reference/python_reference.json: closed
+                         <details class="reference-group"> with a <summary>
+                         (.reference-title) and a .reference-body (the
+                         group's setup as a .code, then dl.reference-items:
+                         <dt><code>, <dd> with <p>, a .code example and
+                         p.reference-lesson)
    .site-footer          bottom bar; .footer-links
    Helpers: .muted .faint .mono .visually-hidden, inline <code>, <kbd>
    ========================================================================== */
@@ -995,6 +1004,72 @@ kbd {
 }
 .curriculum-subgoals dt { font-weight: 600; }
 .curriculum-subgoals dd { margin: 2px 0 0; color: var(--fg-mute); }
+
+/* --- Reference (#323) ----------------------------------------------------- */
+
+.section-lead + .reference { margin-top: var(--space-xl); }
+
+.reference {
+  display: grid;
+  gap: var(--space-m);
+  max-width: 52rem;
+}
+
+/* A group looks like a goal of the curriculum, without the number. */
+.reference-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card-large);
+}
+.reference-group[open] { border-color: var(--border-strong); }
+
+.reference-group > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card-large);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color var(--dur-hover) ease;
+}
+.reference-group > summary::-webkit-details-marker { display: none; }
+.reference-group > summary:hover { background: var(--raised); }
+.reference-group > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  margin-right: var(--space-xxs);
+  border-right: 2px solid var(--fg-faint);
+  border-bottom: 2px solid var(--fg-faint);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--dur-hover) ease;
+}
+.reference-group[open] > summary::after { transform: translateY(2px) rotate(225deg); }
+
+.reference-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
+
+.reference-body { padding: var(--space-xxs) var(--space-lg) var(--space-lg); }
+.reference-body > .code { margin-bottom: var(--space-lg); }
+
+.reference-items {
+  display: grid;
+  gap: var(--space-lg);
+  margin: 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+.reference-items dt code { color: var(--syntax-fn); font-weight: 500; overflow-wrap: anywhere; }
+.reference-items dd { margin: var(--space-xxs) 0 0; color: var(--fg-mute); }
+.reference-items dd > * + * { margin-top: var(--space-s); }
+.reference-items .code pre { padding: var(--space-s) var(--space-md); font-size: 0.8125rem; }
+.reference-lesson { font-size: 0.875rem; }
+
+/* A lesson link lands on its subgoal with some room above it. */
+.curriculum-subgoals > div { scroll-margin-top: var(--space-xl); }
 
 /* --- Footer ---------------------------------------------------------------- */
 

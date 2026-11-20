@@ -19,6 +19,7 @@ import 'package:flutter/services.dart' show rootBundle;
 ///       "id": "turtle.Turtle",          // unique; see ReferenceGroupKind
 ///       "kind": "type",                 // builtins | type | module
 ///       "title": {"nl": "...", "en": "..."},
+///       "setup": "import turtle\nt = turtle.Turtle()", // optional (#323)
 ///       "items": [
 ///         {
 ///           "name": "forward",          // what is typed after the dot
@@ -38,6 +39,11 @@ import 'package:flutter/services.dart' show rootBundle;
 /// A signature keeps Python's own name for every parameter a student writes
 /// as a keyword (`sep=`, `end=`, `label=`, `bins=`, `reverse=`); the names
 /// of the other parameters only describe them.
+///
+/// The reference panel (#323) shows every group and item, in the app
+/// language, and `tooling/site/curriculum.py` writes the same list on the
+/// site; `curriculum.py --check-reference` reports what a live lesson uses
+/// that is missing here.
 @immutable
 class PythonReference {
   const PythonReference(this.groups);
@@ -76,6 +82,40 @@ class PythonReference {
 
   /// The functions callable by their bare name (`input`, `sorted`, …).
   ReferenceGroup? get builtins => group('builtins');
+
+  /// The items a search for [query] finds (#323), best first: a name that
+  /// starts with it, then a name — or the name as it is written, such as
+  /// `plt.plot(x, y, ...)` — that contains it, then a summary in [language]
+  /// that does. Case is ignored; equal hits keep the file's order. An empty
+  /// [query] finds nothing: the panel then shows the groups.
+  List<ReferenceHit> search(String query, String language) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    final ranked = <(int, ReferenceHit)>[];
+    for (final group in groups) {
+      for (final item in group.items) {
+        final name = item.name.toLowerCase();
+        final int rank;
+        if (name.startsWith(q)) {
+          rank = 0;
+        } else if (name.contains(q) ||
+            item.writtenIn(group).toLowerCase().contains(q)) {
+          rank = 1;
+        } else if (item.summaryIn(language).toLowerCase().contains(q)) {
+          rank = 2;
+        } else {
+          continue;
+        }
+        ranked.add((rank, ReferenceHit(group, item)));
+      }
+    }
+    // A stable sort: `List.sort` is not.
+    return [
+      for (var rank = 0; rank <= 2; rank++)
+        for (final (r, hit) in ranked)
+          if (r == rank) hit,
+    ];
+  }
 
   static PythonReference? _loaded;
 
@@ -124,6 +164,7 @@ class ReferenceGroup {
     required this.kind,
     required this.title,
     required this.items,
+    this.setup,
   });
 
   final String id;
@@ -133,6 +174,11 @@ class ReferenceGroup {
   final Map<String, String> title;
   final List<ReferenceItem> items;
 
+  /// The code the examples of this group take for granted (#323): the
+  /// import of a module, as the course writes it (`import numpy as np`),
+  /// or a turtle to give commands to. Null when the examples need none.
+  final String? setup;
+
   factory ReferenceGroup.fromJson(Map<String, dynamic> json) => ReferenceGroup(
     id: json['id'] as String,
     kind: ReferenceGroupKind.values.byName(json['kind'] as String),
@@ -140,7 +186,23 @@ class ReferenceGroup {
     items: (json['items'] as List<dynamic>? ?? const [])
         .map((i) => ReferenceItem.fromJson(i as Map<String, dynamic>))
         .toList(growable: false),
+    setup: json['setup'] as String?,
   );
+
+  /// The heading in [language], else the Dutch one.
+  String titleIn(String language) => _textIn(title, language) ?? id;
+
+  /// What a module's items are written after: the name [setup] imports the
+  /// module as (`plt` for `import matplotlib.pyplot as plt`), else its id.
+  /// Null for the other groups.
+  String? get prefix {
+    if (kind != ReferenceGroupKind.module) return null;
+    final alias = RegExp(
+      '^import ${RegExp.escape(id)} as (\\w+)\$',
+      multiLine: true,
+    ).firstMatch(setup ?? '');
+    return alias?.group(1) ?? id;
+  }
 
   /// The item called [name], or null.
   ReferenceItem? item(String name) {
@@ -205,6 +267,18 @@ class ReferenceItem {
   /// The id of the subgoal whose lesson explains this item (#323), or null.
   final String? lesson;
 
+  /// The summary in [language], else the Dutch one; empty when unwritten.
+  String summaryIn(String language) => _textIn(summary, language) ?? '';
+
+  /// How the item is written in code (#323): `random.randint(a, b)` and
+  /// `plt.plot(...)` for a module's, `.append(x)` for a method, `print(...)`
+  /// for a built-in.
+  String writtenIn(ReferenceGroup group) => switch (group.kind) {
+    ReferenceGroupKind.module => '${group.prefix}.$signature',
+    ReferenceGroupKind.type => '.$signature',
+    ReferenceGroupKind.builtins => signature,
+  };
+
   factory ReferenceItem.fromJson(Map<String, dynamic> json) => ReferenceItem(
     name: json['name'] as String,
     kind: ReferenceItemKind.parse(json['kind'] as String),
@@ -214,6 +288,20 @@ class ReferenceItem {
     example: json['example'] as String?,
     lesson: json['lesson'] as String?,
   );
+}
+
+/// An item a search found, with the group it belongs to.
+@immutable
+class ReferenceHit {
+  const ReferenceHit(this.group, this.item);
+
+  final ReferenceGroup group;
+  final ReferenceItem item;
+}
+
+String? _textIn(Map<String, String> texts, String language) {
+  final text = texts[language] ?? texts['nl'];
+  return text == null || text.isEmpty ? null : text;
 }
 
 Map<String, String> _texts(Object? raw) => raw is Map
