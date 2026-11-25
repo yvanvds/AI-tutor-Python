@@ -123,6 +123,20 @@ void main() {
       );
     }
 
+    /// Whether the dropdown row [entry] lies wholly inside the dropdown's
+    /// visible part. The dropdown is drawn in the overlay, after the page,
+    /// so its row is the last text [entry] in the tree.
+    bool rowInView(String entry) {
+      final row = find.text(entry);
+      if (row.evaluate().isEmpty) return false;
+      final list = find
+          .ancestor(of: row.last, matching: find.byType(Scrollable))
+          .first;
+      final rect = tester.getRect(row.last);
+      final view = tester.getRect(list);
+      return rect.top >= view.top - 0.5 && rect.bottom <= view.bottom + 0.5;
+    }
+
     // --- Playground ---------------------------------------------------------
     await tester.tap(find.text('Playground'));
     await pumpUntilFound(tester, find.byType(PlaygroundView));
@@ -147,6 +161,29 @@ void main() {
     ]);
     await tester.pump();
     expectAtCaret('forward(distance)', editor, 'playground');
+
+    // The arrow keys walk the whole list (#330). The dropdown shows only a
+    // few rows; a row out of view used to make the package scroll through a
+    // controller its popup never attached, and the app crashed. Up from the
+    // first row wraps to the last.
+    final members = dropdown(editor);
+    expect(rowInView(members.last), isFalse, reason: 'the list fits: no test');
+    for (var i = 1; i < members.length; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(editor.popupController.selectedIndex, i);
+      expect(rowInView(members[i]), isTrue, reason: 'down to ${members[i]}');
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(rowInView(members.first), isTrue, reason: 'down, wrapped');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(editor.popupController.selectedIndex, members.length - 1);
+    expect(rowInView(members.last), isTrue, reason: 'up, wrapped');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(editor.fullText, '${_turtleCode}t.right');
 
     // Typing narrows it; no keyword sneaks in.
     editor = await type(SessionMode.playground, '${_turtleCode}t.', 'f');

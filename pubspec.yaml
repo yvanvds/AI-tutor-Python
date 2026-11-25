@@ -19,6 +19,9 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.5
   flutter_code_editor: ^0.3.5
+  # The editor's dropdown list; its scroll controller is replaced to fix a
+  # crash in flutter_code_editor (#330).
+  scrollable_positioned_list: ^0.3.8
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
   flutter_chat_ui: ^2.9.1

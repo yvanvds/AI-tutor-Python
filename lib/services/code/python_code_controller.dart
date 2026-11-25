@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/services/code/editor_popup_controller.dart';
 import 'package:ai_tutor_python/services/code/python_completion.dart';
 import 'package:ai_tutor_python/services/code/python_reference.dart';
 import 'package:flutter/widgets.dart';
@@ -23,6 +24,11 @@ class PythonCodeController extends CodeController {
   PythonCodeController({super.text, PythonReference? reference})
     : super(language: python) {
     _reference = reference;
+    // The package's own one crashes on an arrow key that scrolls the
+    // dropdown (#330). Set here, before any field listens to it.
+    popupController = EditorPopupController(
+      onCompletionSelected: insertSelectedWord,
+    );
   }
 
   PythonReference? _reference;
