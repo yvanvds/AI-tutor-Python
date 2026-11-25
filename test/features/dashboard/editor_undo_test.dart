@@ -5,6 +5,10 @@
 // the code the exercise opened with — or at the empty editor of an exercise
 // that opens empty — and redo still brings back what was typed in it.
 //
+// #339 — Ctrl+Y, the redo key on Windows, did nothing in the editor: neither
+// Flutter nor the package binds it, only Ctrl+Shift+Z. The `Editor` now
+// binds Ctrl+Y to the same redo, and Ctrl+Shift+Z keeps working.
+//
 // The real `Editor` (the package's `CodeField` with its own undo and redo
 // bindings). The exercises arrive through `setText`, as the tutor's
 // `startNewCode` and a file opened in the Playground do. The end-to-end
@@ -67,6 +71,13 @@ void main() {
     if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
     if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+  }
+
+  Future<void> ctrlY(WidgetTester tester) async {
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
   }
@@ -165,4 +176,33 @@ void main() {
 
     await finish(tester);
   });
+
+  for (final mode in [SessionMode.practice, SessionMode.playground]) {
+    testWidgets('Ctrl+Y brings back what Ctrl+Z undid, as Ctrl+Shift+Z '
+        'does (${mode.name})', (tester) async {
+      final code = await mount(tester, mode);
+
+      code.setText(_exerciseA);
+      await tester.pump();
+      await type(tester, code, _typedInA);
+
+      await undoMany(tester, code, times: 3);
+      expect(code.getText(), _exerciseA);
+
+      await ctrlY(tester);
+      expect(code.getText(), _exerciseA + _typedInA);
+
+      // Nothing left to redo: Ctrl+Y again changes nothing.
+      await ctrlY(tester);
+      expect(code.getText(), _exerciseA + _typedInA);
+
+      // Ctrl+Shift+Z still redoes.
+      await ctrlZ(tester);
+      expect(code.getText(), _exerciseA);
+      await ctrlZ(tester, shift: true);
+      expect(code.getText(), _exerciseA + _typedInA);
+
+      await finish(tester);
+    });
+  }
 }

@@ -11,6 +11,11 @@
 // - in the Playground, Ctrl+Z after opening a file stops at the file and
 //   never brings back the code it replaced.
 //
+// And (#339) Ctrl+Y, the Windows redo key, redoes in the editor of both
+// pages as Ctrl+Shift+Z does — neither Flutter nor the package bound it —
+// while Ctrl+Y in the chat composer beside the editor changes nothing there
+// and does not reach the editor.
+//
 // Real app, real navigation, real practice view and editor with the
 // package's own undo bindings, real TutorService putting each exercise in
 // the editor, real Playground file browser. Only the model is scripted
@@ -25,6 +30,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/features/chat/widgets/composer_idle.dart';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
@@ -56,6 +62,11 @@ Finder get _editable => find.descendant(
   matching: find.byType(EditableText),
 );
 
+Finder get _composerField => find.descendant(
+  of: find.byType(ComposerIdle),
+  matching: find.byType(TextField),
+);
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -81,6 +92,13 @@ void main() {
     if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
     if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+  }
+
+  Future<void> ctrlY(WidgetTester tester) async {
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
   }
@@ -148,7 +166,12 @@ void main() {
       expect(text, isNot(contains(_typedInA)));
     }
 
-    // Redo still gives back what was typed in this exercise.
+    // Redo gives back what was typed in this exercise: Ctrl+Y (#339), and
+    // Ctrl+Shift+Z as before.
+    await ctrlY(tester);
+    expect(editorText(tester), _exerciseB + _typedInB);
+    await ctrlZ(tester);
+    expect(editorText(tester), _exerciseB);
     await ctrlZ(tester, shift: true);
     expect(editorText(tester), _exerciseB + _typedInB);
 
@@ -166,6 +189,30 @@ void main() {
       expect(text, isNot(contains('leeftijd')), reason: 'exercise B came back');
     }
     await ctrlZ(tester, shift: true);
+    expect(editorText(tester), _typedInB);
+
+    // Ctrl+Y in the chat composer changes nothing there, and does not redo
+    // in the editor beside it, which has a step to redo.
+    await ctrlZ(tester);
+    expect(editorText(tester), isEmpty);
+    await tester.tap(_composerField);
+    await tester.pump();
+    const chatDraft = 'mag ik een tip?';
+    await tester.enterText(_composerField, chatDraft);
+    await tester.pump();
+    await ctrlY(tester);
+    expect(
+      tester.widget<TextField>(_composerField).controller!.text,
+      chatDraft,
+    );
+    expect(editorText(tester), isEmpty, reason: 'Ctrl+Y in the chat redid');
+    await tester.enterText(_composerField, '');
+    await tester.pump();
+
+    // Back in the editor — focused without a click, which would move the
+    // caret and so drop the redo step — Ctrl+Y redoes.
+    await tester.showKeyboard(find.byType(CodeField));
+    await ctrlY(tester);
     expect(editorText(tester), _typedInB);
 
     expect(llm.remaining, 0);
@@ -219,6 +266,12 @@ void main() {
       );
       expect(text, isNot(contains(CodeService.starterText)));
     }
+
+    // Ctrl+Y (#339) redoes here too.
+    await ctrlY(tester);
+    expect(editor.getText(), _fileCode + _typedInB);
+    await ctrlZ(tester);
+    expect(editor.getText(), _fileCode);
 
     // The open also writes the file to this machine; the flow ends after
     // that write, not in the middle of it (#104, #143).

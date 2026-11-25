@@ -6,13 +6,27 @@ import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Ctrl+Y redoes, as it does in every Windows program (#339). Neither
+/// Flutter nor flutter_code_editor 0.3.5 binds it — both know only
+/// Ctrl+Shift+Z (Cmd+Shift+Z on a Mac), which keeps working. The intent is
+/// the one the package's Ctrl+Shift+Z sends, so the same redo of the
+/// package's own history handles it: the field's [EditableText] hands
+/// [RedoTextIntent] on to the controller's actions.
+const Map<ShortcutActivator, Intent> _redoShortcuts = {
+  SingleActivator(LogicalKeyboardKey.keyY, control: true): RedoTextIntent(
+    SelectionChangedCause.keyboard,
+  ),
+};
 
 /// The code editor of Practice and Playground. Ctrl+Enter (Cmd+Enter on a
 /// Mac) runs the code, as the Run button above it does (#300). The
 /// package's own Enter binding matches a plain Enter only, so the two do not
 /// meet; the chat composer has its own focus and keeps Ctrl+Enter for send.
+/// Ctrl+Y redoes ([_redoShortcuts]); the composer leaves it alone.
 ///
 /// Each editor stays on the buffer of the mode whose page it is on (#322).
 /// The session view fades the old mode's page out while the new one fades
@@ -60,7 +74,7 @@ class _EditorState extends ConsumerState<Editor> {
     });
     return CallbackShortcuts(
       bindings: submitShortcutBindings(() => runEditorCode(ref, _mode)),
-      child: _codeField(),
+      child: Shortcuts(shortcuts: _redoShortcuts, child: _codeField()),
     );
   }
 
