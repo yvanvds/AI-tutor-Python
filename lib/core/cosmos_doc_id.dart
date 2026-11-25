@@ -52,8 +52,8 @@ class CosmosDocId {
   static const String classes = 'classes';
 
   /// Doc id of [place] (1, 2 or 3) on the class podium of [className] for
-  /// [subgoalId] (#221), in the `podium` partition of the `config`
-  /// container: `podium_6EWI_<subgoal>_1`. The class name is trimmed, and a
+  /// [subgoalId] (#221), in the `podium` container (#338):
+  /// `podium_6EWI_<subgoal>_1`. The class name is trimmed, and a
   /// character Cosmos refuses in an id (`/`, `\`, `?`, `#`) or white space
   /// becomes `-`. `tooling/badges/podium_backfill.py` builds the same id.
   static String podium(String className, String subgoalId, int place) =>

@@ -1413,10 +1413,8 @@ Map<String, List<Map<String, dynamic>>> demoDocs(
         },
     ],
     'translations': _translations(),
-    'config': [
-      _classesDoc(),
-      for (final place in _podiumPlaces(now)) place.toDoc(),
-    ],
+    'config': [_classesDoc()],
+    'podium': [for (final place in _podiumPlaces(now)) place.toDoc()],
     'accounts': [
       _account(
         uid: demoStudent.oid,

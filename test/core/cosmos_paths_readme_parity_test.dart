@@ -10,9 +10,14 @@
 // `test/l10n/arb_parity_test.dart` and `test/tooling/installer_version_test.dart`
 // compare repo files. `cosmos_paths.dart` is the source of truth; the README
 // table must list exactly its containers with exactly its partition keys.
+//
+// The stand-alone storage (#263) mirrors the containers too: its
+// `kCosmosPartitionKeyFields` must name each one's partition key field, or a
+// write there skips the check Cosmos makes (#338 added `podium`).
 
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/local_cosmos_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String _read(String path) {
@@ -92,6 +97,22 @@ void main() {
           'lib/core/cosmos_paths.dart, with the same partition keys. A '
           'container that is live in code but missing from the table means a '
           'fresh deployment never creates it (#58).',
+    );
+  });
+
+  test('the stand-alone storage knows the partition key of every container '
+      'in cosmos_paths.dart', () {
+    final declared = {
+      for (final e in _fromSource(source).entries) e.key: e.value.substring(1),
+    };
+    expect(declared, isNotEmpty);
+    expect(
+      kCosmosPartitionKeyFields,
+      declared,
+      reason:
+          'kCosmosPartitionKeyFields in lib/core/local_cosmos_client.dart '
+          'must name, for exactly the containers in cosmos_paths.dart, the '
+          'doc field each one is partitioned on.',
     );
   });
 }

@@ -129,10 +129,11 @@ PARTITION_FIELD: dict[str, str] = {
 }
 
 # Containers that hold data about students. None of them is ever read.
+# `podium` holds the class podium's places, each with a student's uid (#338).
 STUDENT_CONTAINERS: frozenset[str] = frozenset({
     "accounts", "progress", "progress_history", "status_reports", "lo_beliefs",
     "turn_history", "turn_content", "playground_files", "grade_proposals",
-    "reports",
+    "reports", "podium",
 })
 
 CONTAINERS: tuple[str, ...] = tuple(ALLOWED)

@@ -60,7 +60,7 @@ class AllowList(unittest.TestCase):
         self.assertLessEqual(set(self.db.touched), set(eb.ALLOWED))
         self.assertFalse(set(self.bundle) & eb.STUDENT_CONTAINERS)
         for name in ("accounts", "lo_beliefs", "turn_history", "turn_content", "progress",
-                     "playground_files", "grade_proposals", "reports"):
+                     "playground_files", "grade_proposals", "reports", "podium"):
             self.assertIn(name, eb.STUDENT_CONTAINERS)
             self.assertNotIn(name, eb.ALLOWED)
 

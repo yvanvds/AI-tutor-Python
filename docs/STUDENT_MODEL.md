@@ -372,8 +372,9 @@ A tier only ever goes up, also when a threshold changes later or the
 history is reset. No belief, calibration, XP or grade reads it.
 
 The medals come from the class podium (#221): per class and subgoal three
-docs in the `podium` partition of the `config` container
-(`podium_{class}_{subgoal}_{place}`, with the student's uid), claimed with a
+docs in the `podium` container (`podium_{class}_{subgoal}_{place}`, with
+the student's uid; a container of its own since #338, before the partition
+`podium` of `config`), claimed with a
 `create` that never overwrites on the graded turn that first moves the
 student past the subgoal (`subgoalAdvanced`). The student's own app copies
 the places it holds onto the account doc; only that student ever sees them.

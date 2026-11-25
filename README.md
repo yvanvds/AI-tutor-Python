@@ -114,6 +114,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `questions`      | `/subgoalId`  |
    | `translations`   | `/language`   |
    | `turn_content`   | `/uid`        |
+   | `podium`         | `/type`       |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc
@@ -148,6 +149,19 @@ This stores accounts, goals, progress, instructions, and status reports.
    the school year, but only in a container with TTL on — without it the
    docs are kept forever. From the Azure CLI:
    `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name turn_content --partition-key-path /uid --partition-key-version 2 --ttl -1`
+
+   `podium` (the class podium, #221) is a container of its own since #338;
+   before, it was the partition `podium` of `config`. Students write their
+   places there, so with access through their own sign-in (#306) they need
+   read and write on `podium` but only read on `config`. Until it exists,
+   nobody gets a place on the podium; `tooling/badges/podium_backfill.py`
+   can fill in those places afterwards. Create it before you release the
+   version that moves the podium, then copy the places that are still in
+   `config` with `python tooling/badges/podium_copy.py` (a dry run; add
+   `--apply` to write). Run the copy again once `MinimumVersion` keeps the
+   older builds out, for places they wrote in `config` in the meantime. The
+   old docs stay in `config` until you remove them. From the Azure CLI:
+   `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name podium --partition-key-path /type --partition-key-version 2`
 
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and

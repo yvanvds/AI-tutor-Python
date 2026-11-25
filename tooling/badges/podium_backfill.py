@@ -15,9 +15,11 @@ script hands out those places the way the app would have:
   class does not take part) and subgoal, the first three of those in time;
 - three places, also in a small class.
 
-The places are docs in the `podium` partition of the `config` container,
-`podium_{class}_{subgoal}_{1|2|3}` (`CosmosDocId.podium`), each with the
-student's uid and nothing else about them. The script only ever `create`s:
+The places are docs in the `podium` container (#338; before, the `podium`
+partition of `config`), `podium_{class}_{subgoal}_{1|2|3}`
+(`CosmosDocId.podium`), each with the student's uid and nothing else about
+them. Places an older build still holds in `config` are not seen here: copy
+them over first with `podium_copy.py`. The script only ever `create`s:
 a place already there — claimed live by the app, or by an earlier run — is
 never overwritten. A student who holds a place for a subgoal gets no second
 one; the others move up into the free places in the order they finished.
@@ -35,7 +37,7 @@ notice. This script never touches an account.
 The dry run only reads. It prints counts — per class the subgoals and the
 gold, silver and bronze medals to hand out, and in total how many students
 would get one — never a name or an id. `--apply` writes nothing before it
-saved a backup of the whole `config` container to `~/ai-tutor-backups`
+saved a backup of the whole `podium` container to `~/ai-tutor-backups`
 (outside the public repo). Whether to apply is the teacher's call, after the
 dry run.
 
@@ -58,7 +60,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKUP_DIR = Path.home() / "ai-tutor-backups"
-CONTAINER = "config"
+# Its own container since #338, with the one partition `podium`.
+CONTAINER = "podium"
 PARTITION = "podium"
 
 # `kPodiumPlaces` in lib/services/badges/class_podium.dart; a test keeps them
@@ -228,9 +231,9 @@ def _iso(t: dt.datetime) -> str:
 
 def backup(docs: list[dict], out_dir: Path, at: dt.datetime) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"backup_config_{at.strftime('%Y%m%dT%H%M%S')}.json"
+    path = out_dir / f"backup_{CONTAINER}_{at.strftime('%Y%m%dT%H%M%S')}.json"
     path.write_text(
-        json.dumps({"takenAt": _iso(at), "config": docs}, ensure_ascii=False),
+        json.dumps({"takenAt": _iso(at), CONTAINER: docs}, ensure_ascii=False),
         encoding="utf-8",
     )
     return path

@@ -20,10 +20,11 @@ const String _reportsContainer = 'reports';
 const String _questionsContainer = 'questions';
 const String _translationsContainer = 'translations';
 const String _turnContentContainer = 'turn_content';
+const String _podiumContainer = 'podium';
 
 /// Constant partition-key values for the `/type` containers (`goals`,
-/// `instructions`, `config`, `content`, `modules`, `milestones`). Each doc in
-/// those containers carries a `type` field with this exact value.
+/// `instructions`, `config`, `content`, `modules`, `milestones`, `podium`).
+/// Each doc in those containers carries a `type` field with this exact value.
 class CosmosPartitions {
   static const String goal = 'goal';
   static const String instruction = 'instruction';
@@ -32,7 +33,8 @@ class CosmosPartitions {
   static const String module = 'module';
   static const String milestone = 'milestone';
 
-  /// The class podium (#221), the second partition of `config`.
+  /// The class podium (#221): the one partition of the `podium` container
+  /// (#338). Before, the second partition of `config`.
   static const String podium = 'podium';
 }
 
@@ -64,16 +66,12 @@ class CosmosPaths {
   static CosmosContainer instructions() =>
       _client.container(_instructionsContainer);
 
-  /// `/type` partition. Two partitions:
-  ///
-  ///   - `"config"`: two docs, `global` (the school settings) and `classes`
-  ///     (the classes and their lessons, #218);
-  ///   - `"podium"`: the class podium (#221), three docs per class and
-  ///     subgoal at most, `podium_{class}_{subgoal}_{1|2|3}`
-  ///     (`CosmosDocId.podium`), each claimed with a `create` that never
-  ///     overwrites. Its own partition so the podium never shares one with
-  ///     the settings every app polls; no container of its own, so no step
-  ///     in the README.
+  /// `/type` partition (`"config"`). Two docs, `global` (the school
+  /// settings) and `classes` (the classes and their lessons, #218). Students
+  /// only read it: the class podium, which they write, has its own container
+  /// since #338 ([podium]). An older deployment still has the podium's docs
+  /// here, in the partition `"podium"`, until the teacher removes them after
+  /// `tooling/badges/podium_copy.py` copied them over.
   static CosmosContainer config() => _client.container(_configContainer);
 
   /// `/type` partition (always `"content"`). One doc per authored
@@ -146,4 +144,13 @@ class CosmosPaths {
   /// the teacher's tooling (`evaluate.py trace`).
   static CosmosContainer turnContent() =>
       _client.container(_turnContentContainer);
+
+  /// `/type` partition (always `"podium"`). The class podium (#221): three
+  /// docs per class and subgoal at most, `podium_{class}_{subgoal}_{1|2|3}`
+  /// (`CosmosDocId.podium`), each claimed with a `create` that never
+  /// overwrites, with the student's uid and nothing else about them. Its
+  /// own container (#338), not a partition of `config`: with the user's own
+  /// sign-in (#306) a role reaches a whole container, so students can write
+  /// here and only read `config`.
+  static CosmosContainer podium() => _client.container(_podiumContainer);
 }

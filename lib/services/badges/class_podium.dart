@@ -4,11 +4,17 @@
 // hoofddoel, so there are many chances and not always the same few win.
 //
 // The only badge that looks across students, so it needs a shared place:
-// per class and subgoal three docs with a fixed id in the `podium` partition
-// of the `config` container, `podium_{class}_{subgoal}_1`, `_2` and `_3`
-// (`CosmosDocId.podium`). A student who finishes tries `create` on place 1;
-// a 409 (taken) moves on to place 2, then 3. A `create` never overwrites, so
-// two students can never both get gold — the question bank's pattern (#185).
+// per class and subgoal three docs with a fixed id in the `podium` container
+// (#338), `podium_{class}_{subgoal}_1`, `_2` and `_3` (`CosmosDocId.podium`).
+// A student who finishes tries `create` on place 1; a 409 (taken) moves on
+// to place 2, then 3. A `create` never overwrites, so two students can never
+// both get gold — the question bank's pattern (#185).
+//
+// Its own container, not a partition of `config` as before #338: with the
+// user's own sign-in (#306) a role reaches a whole container, and students
+// must write here but only read `config`. The places an older build wrote in
+// `config` are copied over by `tooling/badges/podium_copy.py`; the app no
+// longer reads them there.
 //
 // Only the winner sees a medal: a doc names the student by uid and nothing
 // else, and nothing in the app lists the podium — no ranking, no other
@@ -159,7 +165,7 @@ class ClassPodium {
 
   final CosmosContainer? _override;
 
-  CosmosContainer get _container => _override ?? CosmosPaths.config();
+  CosmosContainer get _container => _override ?? CosmosPaths.podium();
 
   /// Claims the first free place on the podium of [className] for
   /// [subgoalId] for [uid], who finished it at [at]: `create` on place 1,
