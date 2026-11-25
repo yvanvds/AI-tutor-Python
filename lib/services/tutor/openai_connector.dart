@@ -6,7 +6,6 @@ import 'dart:typed_data';
 import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
-import 'package:ai_tutor_python/services/tutor/env.dart';
 import 'package:ai_tutor_python/services/tutor/responses/ai_response_parser.dart';
 import 'package:ai_tutor_python/services/tutor/responses/chat_response.dart';
 import 'package:ai_tutor_python/services/tutor/responses/envelope_assembler.dart';
@@ -131,10 +130,10 @@ class ModelProbeFailed extends ModelProbe {
 /// Whose OpenAI key an account's calls go out on (#126).
 ///
 /// Decided per account by `tutorApiKeyProvider` and handed to the connector
-/// through its `getApiKey` seam. The connector keeps the *source* and not
-/// just the string because a rejected key has to be reported to the right
-/// person: the student who typed their own, or the teacher who owns the
-/// school's.
+/// through its `getApiKey` seam (`resolveTutorApiKeyProvider`). The
+/// connector keeps the *source* and not just the string because a rejected
+/// key has to be reported to the right person: the student who typed their
+/// own, or the teacher who owns the school's.
 sealed class ApiKeySource {
   const ApiKeySource();
 
@@ -142,8 +141,10 @@ sealed class ApiKeySource {
   String? get key;
 }
 
-/// The school's key, bundled into the build: the account has
-/// `mayUseGlobalKey`. A key the user may also have stored on the device is
+/// The school's key: the account has `mayUseGlobalKey`. In the school mode
+/// it is `ApiKey` on the school's `config/global`, with `OPEN_AI_API_KEY`
+/// from `.env` as the fallback while there is one (#337); empty when
+/// neither has one. A key the user may also have stored on the device is
 /// ignored, consistent with the Options page hiding the own-key card for
 /// such an account.
 final class SchoolKey extends ApiKeySource {
@@ -214,11 +215,17 @@ class OpenaiConnector {
 
   /// Whose key the next call goes out on (#126): the school's for an
   /// account with `mayUseGlobalKey`, the user's own otherwise — see
-  /// `tutorApiKeyProvider`, which every production connector reads through
-  /// this seam. `null` falls back on the school's build-time key, which is
-  /// what the connector did unconditionally before #126; only tests and
-  /// scripted stand-ins leave it unset.
-  final ApiKeySource Function()? _getApiKey;
+  /// `resolveTutorApiKeyProvider`, which every production connector reads
+  /// through this seam. It may answer later, and the call waits for it: the
+  /// school's key can depend on a `config/global` that has not been read yet
+  /// (#337). `null` is no key at all, so a call is refused: the connector
+  /// knows no key of its own. Only tests and scripted stand-ins leave it
+  /// unset.
+  final FutureOr<ApiKeySource> Function()? _getApiKey;
+
+  /// Whose key the latest call went out on, so a refusal (HTTP 401) is
+  /// reported against that key's owner.
+  ApiKeySource _lastApiKeySource = const SchoolKey('');
 
   /// The HTTP transport every call goes out on. `null` (production) lets
   /// `dart_openai` open its own connections with `OpenAI.requestsTimeOut`
@@ -273,7 +280,7 @@ class OpenaiConnector {
     try {
       // Inside the try on purpose: an account with no key to call with
       // fails the turn the same way a refused request does (#126).
-      OpenAI.apiKey = resolveApiKey();
+      OpenAI.apiKey = await resolveApiKey();
       final model = resolveModel();
       final response = await OpenAI.instance.chat
           .create(
@@ -339,7 +346,7 @@ class OpenaiConnector {
     Stream<String> deltas() async* {
       final t = tap = _UsageTap(_client);
       try {
-        OpenAI.apiKey = resolveApiKey();
+        OpenAI.apiKey = await resolveApiKey();
         final m = model = resolveModel();
         final stream = OpenAI.instance.chat.createStream(
           model: m,
@@ -490,7 +497,7 @@ class OpenaiConnector {
   ChatNotice _describeCallError(Object e) {
     if (e is RequestFailedException &&
         e.statusCode == HttpStatus.unauthorized) {
-      return _keyNotice(_apiKeySource(), missing: false);
+      return _keyNotice(_lastApiKeySource, missing: false);
     }
     return describeTransportError(e);
   }
@@ -502,9 +509,14 @@ class OpenaiConnector {
               ? ChatNoticeKind.ownKeyMissing
               : ChatNoticeKind.ownKeyRejected,
         ),
-        // The school's key is nobody's to type in here: absent and refused
-        // come to the same advice.
-        SchoolKey() => const ChatNotice(ChatNoticeKind.schoolKeyInvalid),
+        // The school's key is nobody's to type in here: both point at the
+        // teacher, who can tell a key that is not set (#337) from one that
+        // does not work.
+        SchoolKey() => ChatNotice(
+          missing
+              ? ChatNoticeKind.schoolKeyMissing
+              : ChatNoticeKind.schoolKeyInvalid,
+        ),
       };
 
   /// Whether [notice] is one of the key problems [_keyNotice] reports: the
@@ -516,6 +528,7 @@ class OpenaiConnector {
   static bool isKeyFailure(ChatNotice notice) => switch (notice.kind) {
     ChatNoticeKind.ownKeyMissing ||
     ChatNoticeKind.ownKeyRejected ||
+    ChatNoticeKind.schoolKeyMissing ||
     ChatNoticeKind.schoolKeyInvalid => true,
     _ => false,
   };
@@ -545,7 +558,7 @@ class OpenaiConnector {
     try {
       // The same key the tutor's calls go out on (#126), so on an own-key
       // account the Test button also validates the stored key.
-      OpenAI.apiKey = resolveApiKey();
+      OpenAI.apiKey = await resolveApiKey();
       await OpenAI.instance.chat.create(
         model: model,
         messages: [
@@ -690,19 +703,20 @@ class OpenaiConnector {
   }
 
   /// Key the next call goes out on (#126): whatever the `getApiKey` seam
-  /// says — the school's key for an account with `mayUseGlobalKey`, the
-  /// user's own otherwise. Throws [NoApiKeyException] when that source has
-  /// nothing to offer, so a call never quietly runs on a key the account is
-  /// not entitled to. Without a seam, the school's build-time key.
+  /// says, once it has — the school's key for an account with
+  /// `mayUseGlobalKey`, the user's own otherwise. Throws [NoApiKeyException]
+  /// when that source has nothing to offer, so a call never quietly runs on
+  /// a key the account is not entitled to. Without a seam there is no key:
+  /// the connector reads none of its own (#337).
   @visibleForTesting
-  String resolveApiKey() {
-    final source = _apiKeySource();
+  Future<String> resolveApiKey() async {
+    final getApiKey = _getApiKey;
+    final source = getApiKey == null ? const SchoolKey('') : await getApiKey();
+    _lastApiKeySource = source;
     final key = source.key;
     if (key == null || key.isEmpty) throw NoApiKeyException(source);
     return key;
   }
-
-  ApiKeySource _apiKeySource() => _getApiKey?.call() ?? SchoolKey(Env.apiKey);
 
   /// Model the next call goes to: this device's override (#32) when the user
   /// picked one, else the school-wide `GlobalConfig.Model`, else the

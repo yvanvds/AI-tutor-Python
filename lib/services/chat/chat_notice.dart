@@ -40,9 +40,14 @@ enum ChatNoticeKind {
   /// #126). Points at Options → OpenAI API key.
   ownKeyRejected,
 
-  /// OpenAI refused the school's bundled key, or the build has none (#126).
-  /// Nothing the student can fix: points at the teacher.
+  /// OpenAI refused the school's key (HTTP 401, #126). Nothing the student
+  /// can fix: points at the teacher.
   schoolKeyInvalid,
+
+  /// The account is on the school's key, and the school has none: no
+  /// `ApiKey` on `config/global` and no fallback (#337). The call was not
+  /// made. Points at the teacher.
+  schoolKeyMissing,
 
   /// Retry requested with nothing to retry.
   noPreviousRequest,

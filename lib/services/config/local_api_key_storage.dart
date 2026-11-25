@@ -5,8 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// none.
 ///
 /// The state carries the key itself, not just whether one exists (#126):
-/// `OpenaiConnector.resolveApiKey` runs synchronously on the hot path of
-/// every tutor call, so the key has to be readable without an `await` —
+/// `tutorApiKeyProvider` answers on the hot path of every tutor call, and
+/// for an own-key account without waiting, so the key has to be readable
+/// without an `await` —
 /// hydrated once from SharedPreferences on first read, exactly like
 /// `ModelPreference`, and published by [saveKey] / [clearKey] from then on.
 ///

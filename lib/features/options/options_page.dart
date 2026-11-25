@@ -562,7 +562,7 @@ class _ThemeCard extends ConsumerWidget {
 /// integration harness overrides this with its scripted model.
 final modelProbeConnectorProvider = Provider<OpenaiConnector>(
   (ref) => OpenaiConnector(
-    getApiKey: () => ref.read(tutorApiKeyProvider),
+    getApiKey: () => ref.read(resolveTutorApiKeyProvider)(),
     client: ref.watch(openaiClientProvider),
   ),
 );

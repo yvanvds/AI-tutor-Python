@@ -2909,6 +2909,10 @@ class AppLocalizationsNl extends AppLocalizations {
       'De OpenAI API-sleutel van de school werkt niet. Laat het je leerkracht weten.';
 
   @override
+  String get chat_notice_schoolKeyMissing =>
+      'Je school heeft nog geen OpenAI API-sleutel ingesteld. Laat het je leerkracht weten.';
+
+  @override
   String get chat_notice_noPreviousRequest =>
       'Geen vorige aanvraag om opnieuw te proberen.';
 

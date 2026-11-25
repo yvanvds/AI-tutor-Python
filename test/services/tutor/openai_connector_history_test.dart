@@ -48,7 +48,10 @@ void main() {
 
   setUp(() {
     openai = FakeOpenAi(text: '<TEXT>ok</TEXT><META>{"type":"answer"}</META>');
-    c = OpenaiConnector(client: openai.client);
+    c = OpenaiConnector(
+      getApiKey: () => const SchoolKey('sk-test'),
+      client: openai.client,
+    );
   });
 
   /// One exercise the way the tutor runs it: the question request on

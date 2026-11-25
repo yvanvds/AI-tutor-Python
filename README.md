@@ -51,7 +51,7 @@ You need these tools installed once. All free.
 
 1. Go to <https://platform.openai.com/api-keys>.
 2. Sign in (or create an OpenAI account) and click **Create new secret key**.
-3. Copy the key (`sk-...`). You will paste it as `OPEN_AI_API_KEY` later.
+3. Copy the key (`sk-...`). It goes in your database, as `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)).
 4. Make sure the OpenAI account has billing set up and a usage limit you are comfortable with — every student message costs a few tenths of a cent.
 
 The default model is `gpt-4o`, configurable later from inside the app (Teacher → settings).
@@ -198,6 +198,7 @@ A few things to know:
 - The file is **gitignored** — it will not get committed. Do not paste it into a chat or screenshot.
 - The values are read at build time by the `envied` package. Keep the file private: it holds your own keys.
 - `ENTRA_REDIRECT_URI` must be exactly `http://localhost` to match step 2.4.
+- `OPEN_AI_API_KEY` is only a fallback. The school's key comes from `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)); the app uses this value only while that field is empty. With `dummy` here there is no fallback, and `ApiKey` is the only key.
 - There is a seventh, **optional** line — `GITHUB_OAUTH_CLIENT_ID` — for in-app bug reports. Leave it out and everything else works; the Options panel simply says it cannot sign in to GitHub. [Step 8](#step-8-optional--in-app-bug-reports-github-oauth-app) sets it up.
 
 ---
@@ -250,7 +251,14 @@ When you start the app for the first time:
 
    Placeholders filled in at runtime: `{goal}`, `{subgoal}`, `{teachingTips}`, `{targetLOs}` and `{goalScopeLOs}`. The old name `{suggestions}` still works as `{teachingTips}`; `{known concepts}` is replaced by nothing.
 4. **Goals and lessons.** You do not build the goal tree by hand. The goal files and their lessons are in `Goal Generator Cowork Project/AI Tutor for Python Goals Generator/` (`goals/` and `lessons/`). [tooling/curriculum/push_goal.py](tooling/curriculum/push_goal.py) writes a goal and its Dutch lessons to the database (`plan` first for a dry run, then `push`), and [tooling/translations/translations.py](tooling/translations/translations.py) `push` writes the English texts. Both need Python 3 and read the Cosmos values from your `.env`.
-5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
+5. **The OpenAI key.** In the Cosmos Data Explorer, open the document `global` in the `config` container (partition key `config`), or create it, and set `ApiKey` to the key from Step 1:
+
+   ```json
+   { "id": "global", "type": "config", "Model": "gpt-4o", "ApiKey": "sk-..." }
+   ```
+
+   Every account with the school's key (the **KEY** switch on the **Students** page) calls OpenAI with it; the other accounts use a key of their own, entered in the app. A new key reaches every open app within a few seconds, without a new build. While `ApiKey` is empty, the app falls back on `OPEN_AI_API_KEY` from `.env` (Step 4); without that, the tutor sends nothing and tells the student that the school has not set a key yet. Changing the model in the app leaves `ApiKey` as it is. From a script, `tooling/evaluation/cosmos.py` can read the document and write it back with `ApiKey` filled in (partition key `config`).
+6. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
 
 Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
 
@@ -406,6 +414,8 @@ How the app uses it:
 - **Options.** The *School* card shows the school's name, imports another school file, or leaves the school. In the stand-alone mode it imports a school file. Switching asks for a restart; the data of the stand-alone mode and of the school stay apart.
 
 A build that has a school configuration in its `.env` (Step 4) starts in that school as before, without asking.
+
+The school's OpenAI key is not in the school file either: it is `ApiKey` in the school's own `config/global` (Step 6), so every school pays for its own use.
 
 Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
 

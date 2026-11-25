@@ -82,9 +82,11 @@ import 'fake_release_server.dart';
 import 'scripted_llm.dart';
 import 'seed.dart';
 
-/// The school's OpenAI key as every flow sees it (#126). Pinned in place of
-/// the build's real `Env.apiKey` so a flow can assert on the key a request
-/// carried without the developer's own key ever appearing in a test.
+/// The fallback for the school's key, as every flow sees it (#126): the
+/// school's key while `config/global` has no `ApiKey` (#337), as in the
+/// seed. Pinned in place of the real `Env.apiKey` so a flow can assert on
+/// the key a request carried without the developer's own key ever appearing
+/// in a test.
 const String kSchoolApiKey = 'sk-school-key';
 
 /// A plain school morning (#235): Wednesday 16 September 2026, 10:00 local
@@ -211,6 +213,7 @@ class AppHarness {
     this.githubOAuthClientId,
     this.llm,
     this.openaiClient,
+    this.fallbackSchoolKey = true,
     this.developerTools,
     this.supervision,
     this.turnClockStart,
@@ -401,13 +404,20 @@ class AppHarness {
   /// Where [llm] swaps the connectors for a scripted stand-in, this leaves
   /// the production wiring in place — the tutor's connector, the grade
   /// justification's and the Test button's, each built the way `lib/`
-  /// builds it, resolving its key through `tutorApiKeyProvider` — and only
-  /// replaces the socket underneath, through `openaiClientProvider`. Pass a
-  /// `FakeOpenAi().client` (test/helpers) to read back every request the
-  /// real app made, header and body, and to answer it. Mounting the practice
-  /// editor then really asks the model for an exercise, so the client has to
-  /// be ready to answer one.
+  /// builds it, resolving its key through `resolveTutorApiKeyProvider` — and
+  /// only replaces the socket underneath, through `openaiClientProvider`.
+  /// Pass a `FakeOpenAi().client` (test/helpers) to read back every request
+  /// the real app made, header and body, and to answer it. Mounting the
+  /// practice editor then really asks the model for an exercise, so the
+  /// client has to be ready to answer one.
   final http.Client? openaiClient;
+
+  /// Whether there is a fallback for the school's key (#337):
+  /// [kSchoolApiKey], for a `config/global` without `ApiKey`. `false` is a
+  /// build without school data (#308, step 3), which has none: the school's
+  /// key is `ApiKey` or nothing. Never the developer's real key either
+  /// way.
+  final bool fallbackSchoolKey;
 
   /// Whether developer-only surfaces (the instructions editor, the developer
   /// card and — on its own — the AI model card in Options) are exposed.
@@ -609,8 +619,10 @@ class AppHarness {
           authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
         // Never the build's real key (#126): the school-key account's calls
         // are asserted against this string, and a developer's own key must
-        // not leak into a test.
-        schoolApiKeyProvider.overrideWithValue(kSchoolApiKey),
+        // not leak into a test. `null` is no fallback at all (#337).
+        fallbackSchoolApiKeyProvider.overrideWithValue(
+          fallbackSchoolKey ? kSchoolApiKey : null,
+        ),
         if (openaiClient != null)
           // The production connectors, over a scripted socket.
           openaiClientProvider.overrideWithValue(openaiClient)

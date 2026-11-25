@@ -92,7 +92,10 @@ void main() {
       'a garbled grader reply is a failure the caller can re-send',
       () async {
         final openai = FakeOpenAi(text: _garbled);
-        final c = OpenaiConnector(client: openai.client);
+        final c = OpenaiConnector(
+          getApiKey: () => const SchoolKey('sk-test'),
+          client: openai.client,
+        );
 
         final result = await c.sendRequest(instructions: 'sys', input: 'vraag');
 
@@ -111,7 +114,10 @@ void main() {
 
     test('a clean grader reply is passed through', () async {
       final openai = FakeOpenAi(text: _clean);
-      final c = OpenaiConnector(client: openai.client);
+      final c = OpenaiConnector(
+        getApiKey: () => const SchoolKey('sk-test'),
+        client: openai.client,
+      );
 
       final result = await c.sendRequest(instructions: 'sys', input: 'vraag');
 

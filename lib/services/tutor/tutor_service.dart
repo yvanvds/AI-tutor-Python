@@ -288,7 +288,7 @@ class TutorService extends Notifier<TutorState> {
           onRecordStreamFailure: _debug.recordStreamFailure,
           getConfig: () => ref.read(globalConfigServiceProvider),
           getModelOverride: () => ref.read(modelPreferenceProvider),
-          getApiKey: () => ref.read(tutorApiKeyProvider),
+          getApiKey: () => ref.read(resolveTutorApiKeyProvider)(),
           client: ref.read(openaiClientProvider),
         );
     _conductor = _conductorOverride ?? Conductor(deps: _buildConductorDeps());

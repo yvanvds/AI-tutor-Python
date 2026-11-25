@@ -2881,6 +2881,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The school\'s OpenAI API key is not working. Let your teacher know.';
 
   @override
+  String get chat_notice_schoolKeyMissing =>
+      'Your school has not set an OpenAI API key yet. Let your teacher know.';
+
+  @override
   String get chat_notice_noPreviousRequest => 'No previous request to retry.';
 
   @override

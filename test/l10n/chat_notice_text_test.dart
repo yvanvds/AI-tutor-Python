@@ -28,7 +28,10 @@ void main() {
         for (final kind in ChatNoticeKind.values) {
           // Only ever shown on the school's key; a stand-alone account has
           // no `mayUseGlobalKey`, so it is always on its own key.
-          if (kind == ChatNoticeKind.schoolKeyInvalid) continue;
+          if (kind == ChatNoticeKind.schoolKeyInvalid ||
+              kind == ChatNoticeKind.schoolKeyMissing) {
+            continue;
+          }
           final notice = ChatNotice(kind, args: const ['x', 'y']);
           final text = l.chatNotice(notice, standalone: true);
           expect(
