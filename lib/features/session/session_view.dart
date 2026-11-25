@@ -47,10 +47,11 @@ const double chatCollapsedWidth = 32;
 /// lesson under its own footer.
 ///
 /// The reference panel (#323) slides open next to the exercise in Practice
-/// and the Playground: in a column of its own between the exercise and the
-/// chat when the session has room for three, else over the chat, so the
-/// editor keeps its width ([referencePlacement]). It slides with the chat's
-/// duration and curve, so the two move together on a mode switch.
+/// and the Playground ([referencePlacement]): in Practice over the chat,
+/// exactly in its place, so the editor keeps its width at every window size
+/// (#335); in the Playground, which has no chat, in a column of its own
+/// beside the editor. It slides with the chat's duration and curve, so the
+/// two move together on a mode switch.
 class SessionView extends ConsumerWidget {
   const SessionView({super.key});
 
@@ -90,15 +91,18 @@ class SessionView extends ConsumerWidget {
                 child: KeyedSubtree(key: ValueKey(mode), child: _viewFor(mode)),
               ),
             ),
-            // The room the reference panel takes beside the exercise. Capped
-            // to what the exercise can spare next to the chat: a window made
-            // narrow moves the panel over the chat at once, rather than
-            // squeezing the exercise while the room slides shut.
+            // The room the reference panel takes beside the exercise, in the
+            // Playground only. Capped to what the exercise can spare: a
+            // window made narrow moves the panel over the exercise at once,
+            // rather than squeezing it while the room slides shut. Not
+            // capped by the chat: on a switch to Practice the room slides
+            // shut while the chat slides open in its place, and the exercise
+            // goes smoothly from one width to the other.
             ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: math.max(
                   0,
-                  constraints.maxWidth - width - referenceExerciseMinWidth,
+                  constraints.maxWidth - referenceExerciseMinWidth,
                 ),
               ),
               child: AnimatedContainer(

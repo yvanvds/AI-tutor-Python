@@ -5,6 +5,7 @@
 // the persisted audit trail stay aligned.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/blocked_pastes.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/token_usage.dart';
@@ -458,6 +459,15 @@ class PersistedTurnRecord {
   /// omitted — when unknown, and on every doc written before the field.
   final DateTime? askedAt;
 
+  /// The pastes from outside the app that were blocked since the previous
+  /// record (#334) — in the answer, the chat or the Playground, while this
+  /// oefening was on — and their characters, as `blockedPastes` and
+  /// `blockedPasteChars`; the pasted text is never kept. Written, 0 and 0
+  /// included, whenever the block was on. `null` — and omitted — while the
+  /// school had it switched off, and on every doc written before the field:
+  /// unknown, never 0.
+  final BlockedPastes? blockedPastes;
+
   // Calibration impact
   final QuestionDifficulty calibrationBefore;
   final QuestionDifficulty calibrationAfter;
@@ -510,6 +520,7 @@ class PersistedTurnRecord {
     this.gradedByKey = false,
     this.keyDisputed = false,
     this.askedAt,
+    this.blockedPastes,
   });
 
   bool get hasStrongEvent =>
@@ -544,6 +555,10 @@ class PersistedTurnRecord {
     if (gradedByKey) 'gradedByKey': true,
     if (keyDisputed) 'keyDisputed': true,
     if (askedAt != null) 'askedAt': askedAt!.toUtc().toIso8601String(),
+    if (blockedPastes case final blocked?) ...{
+      'blockedPastes': blocked.count,
+      'blockedPasteChars': blocked.chars,
+    },
     if (transferCredits.isNotEmpty)
       'transferCredits': transferCredits.map((t) => t.toJson()).toList(),
     if (reviewFlags.isNotEmpty)
@@ -640,6 +655,7 @@ class PersistedTurnRecord {
       gradedByKey: (doc['gradedByKey'] as bool?) ?? false,
       keyDisputed: doc['keyDisputed'] == true,
       askedAt: askedAtRaw is String ? DateTime.tryParse(askedAtRaw) : null,
+      blockedPastes: BlockedPastes.tryFromDoc(doc),
       // Read back for the badges (#220): transfer credits ("Oude bekende")
       // and the LO statuses (mastery, stuck).
       transferCredits: [

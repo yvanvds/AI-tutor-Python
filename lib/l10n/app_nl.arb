@@ -426,6 +426,7 @@
   "chat_header_restart_tooltip": "Sessie herstarten",
   "chat_header_collapse_tooltip": "Verberg chat",
   "chat_panel_expand_tooltip": "Toon chat",
+  "pasteGuard_blockedNotice": "Plakken van buiten de app kan hier niet.",
   "chat_composer_idle_hint": "Typ je vraag of antwoord…",
   "chat_composer_idle_pageHint": "Stel een vraag over deze uitleg…",
   "chat_composer_idle_kbd_send": "verstuur",

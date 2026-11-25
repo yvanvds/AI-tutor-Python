@@ -1478,6 +1478,10 @@ class AppLocalizationsNl extends AppLocalizations {
   String get chat_panel_expand_tooltip => 'Toon chat';
 
   @override
+  String get pasteGuard_blockedNotice =>
+      'Plakken van buiten de app kan hier niet.';
+
+  @override
   String get chat_composer_idle_hint => 'Typ je vraag of antwoord…';
 
   @override

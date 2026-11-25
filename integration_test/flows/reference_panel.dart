@@ -8,13 +8,16 @@
 // that explains it, which opens over the exercise and closes back onto it.
 //
 // What only the real app shows: where the panel lands among the real
-// sidebar, editor and chat in the window the runner opens (a column of its
-// own between the exercise and the chat), and in the 700 px window of #259
-// (over the chat, the editor keeping its half), in the real font; that the
-// editor next to it still takes the keyboard; that the lesson opens in the
-// real WebView and closing it leaves the student where they were; and that
-// the whole panel follows the app language. Any overflow on the way fails
-// the flow.
+// sidebar, editor and chat, in the real font. In Practice it lies over the
+// chat, exactly in its place, and the editor keeps its width (#335): in the
+// window the runner opens, in the 700 px window of #259 (over the
+// half-width chat, the editor keeping its half), and next to the quiz. In
+// the Playground, which has no chat, it takes a column of its own beside
+// the editor, and a switch back to Practice moves it over the chat. Also:
+// that the editor next to it still takes the keyboard; that the lesson
+// opens in the real WebView and closing it leaves the student where they
+// were; and that the whole panel follows the app language. Any overflow on
+// the way fails the flow.
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -24,11 +27,14 @@
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/reference/reference_panel.dart';
 import 'package:ai_tutor_python/features/reference/reference_panel_state.dart';
+import 'package:ai_tutor_python/features/session/modes/playground_view.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
+import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
 import 'package:ai_tutor_python/features/session/session_view.dart';
 import 'package:ai_tutor_python/features/session/widgets/run_controls.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
+import 'package:ai_tutor_python/services/tutor/active_mcq.dart';
 import 'package:ai_tutor_python/services/tutor/shown_question.dart';
 import 'package:ai_tutor_python/widgets/lesson_html_view.dart';
 import 'package:flutter/material.dart';
@@ -53,6 +59,13 @@ const _printLesson = {
       '<pre><code>print("Hallo")</code></pre>',
   'updatedAt': '2026-05-01T10:00:00Z',
 };
+
+/// A quiz the panel opens next to, put up as the tutor would.
+const _quiz = ActiveMcq(
+  prompt: 'What does this print?',
+  code: 'print(len([1, 2]))',
+  options: ['2', '3'],
+);
 
 final _panel = find.byKey(const Key('reference-panel'));
 final _chat = find.byKey(const Key('chat-panel'));
@@ -99,11 +112,11 @@ bool _searchHasFocus(WidgetTester tester) => tester
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('the reference opens next to the exercise, finds a function by '
-      'name or by a word, shows its example and opens its lesson over the '
-      'exercise; at 700 px it lies over the chat; in Dutch it is Dutch', (
-    tester,
-  ) async {
+  testWidgets('in Practice the reference lies over the chat and the editor '
+      'keeps its width, at 1280 and at 700 px and next to the quiz; it finds '
+      'a function by name or by a word, shows its example and opens its '
+      'lesson over the exercise; in the Playground it takes a column of its '
+      'own; in Dutch it is Dutch', (tester) async {
     final harness = AppHarness(
       extraDocs: {
         'content': [_printLesson],
@@ -115,10 +128,13 @@ void main() {
     await pumpUntilFound(tester, find.byType(RunControls));
     await tester.pump(const Duration(milliseconds: 400));
     expect(_panel, findsNothing);
+    final session = tester.getRect(find.byType(SessionView));
+    final without = tester.getRect(find.byType(PracticeView));
+    expect(without.width, session.width - chatPanelWidth);
 
-    // --- Open beside the exercise -------------------------------------------
-    // The 1280 px window leaves the session 1208 px: the exercise keeps 408
-    // next to the 340 px panel and the whole 460 px chat.
+    // --- Open over the chat --------------------------------------------------
+    // The 1280 px window leaves the session 1208 px: the panel takes the
+    // 460 px chat's place and the exercise keeps all of its 748 (#335).
     await tester.tap(
       find.descendant(
         of: find.byType(RunControls),
@@ -129,19 +145,13 @@ void main() {
       tester,
       () =>
           _panel.evaluate().isNotEmpty &&
-          tester.getSize(_panel).width == referencePanelWidth &&
-          tester.getRect(_panel).right == tester.getRect(_chat).left,
-      reason: 'the panel never settled beside the exercise',
+          tester.getRect(_panel) == tester.getRect(_chat),
+      reason: 'the panel never settled over the chat',
     );
     await tester.pump(const Duration(milliseconds: 100));
-    final session = tester.getRect(find.byType(SessionView));
     var exercise = tester.getRect(find.byType(PracticeView));
-    expect(tester.getSize(_chat).width, chatPanelWidth);
-    expect(exercise.right, tester.getRect(_panel).left);
-    expect(
-      exercise.width,
-      session.width - chatPanelWidth - referencePanelWidth,
-    );
+    expect(tester.getSize(_panel).width, chatPanelWidth);
+    expect(exercise, without);
     expect(_inside(_window(tester), tester.getRect(_panel)), isTrue);
     expect(_searchHasFocus(tester), isTrue);
     expect(tester.takeException(), isNull);
@@ -230,8 +240,25 @@ void main() {
       of: find.byType(CodeField),
       matching: find.byType(EditableText),
     );
+    // The student types over what is there: Ctrl+A, then the new line. The
+    // editor is as wide as without the panel, so a tap in its middle lands
+    // past the end of the starter line, and flutter_code_editor reads a
+    // shorter text put in with the caret there as backspaces; typed over a
+    // selection it is the replacement it is.
     await tester.tap(find.byType(CodeField));
     await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    final starter = harness.container
+        .read(codeServiceProvider(SessionMode.practice))
+        .controller;
+    expect(
+      starter.selection,
+      TextSelection(baseOffset: 0, extentOffset: starter.text.length),
+      reason: 'Ctrl+A in the editor did not select its code',
+    );
     await tester.enterText(editable, 'print("x =", 3)');
     await tester.pump();
     expect(
@@ -313,8 +340,97 @@ void main() {
     expect(harness.container.read(referencePanelOpenProvider), isFalse);
     expect(tester.getSize(_chat).width, half);
 
-    // --- In Dutch ------------------------------------------------------------
+    // --- The Playground: no chat, a column of its own -----------------------
     _resize(tester, kRunnerWindowSize.width);
+    await tester.tap(find.text('Playground'));
+    await pumpUntilFound(tester, find.byType(PlaygroundView));
+    await pumpUntil(
+      tester,
+      () => find.byType(RunControls).evaluate().length == 1,
+      reason: 'the practice view never faded out',
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PlaygroundView),
+        matching: find.byTooltip('Reference'),
+      ),
+    );
+    final playground = find.byType(PlaygroundView);
+    // Its left edge rides the exercise's right edge all the way, so it has
+    // settled once its right edge is the window's.
+    await pumpUntil(
+      tester,
+      () =>
+          _panel.evaluate().isNotEmpty &&
+          tester.getRect(_panel).right == session.right,
+      reason: 'the panel never settled beside the Playground editor',
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull, reason: 'in the Playground');
+    expect(tester.getSize(_panel).width, referencePanelWidth);
+    expect(tester.getRect(_panel).left, tester.getRect(playground).right);
+    expect(
+      tester.getSize(playground).width,
+      session.width - referencePanelWidth,
+    );
+    _partsInside(
+      tester,
+      find.byType(RunControls),
+      tester.getRect(playground),
+      'Playground run controls',
+    );
+
+    // Back to Practice with the panel open: it moves over the chat, and the
+    // exercise has the width it has without it.
+    await tester.tap(find.text('Practice'));
+    await pumpUntilGone(tester, playground);
+    await pumpUntil(
+      tester,
+      () => tester.getRect(_panel) == tester.getRect(_chat),
+      reason: 'the panel never moved over the chat back in Practice',
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull, reason: 'back in Practice');
+    expect(tester.getRect(find.byType(PracticeView)), without);
+
+    // --- Next to the quiz: over the chat too --------------------------------
+    await tester.tap(
+      find.descendant(
+        of: find.byType(RunControls),
+        matching: find.byTooltip('Reference'),
+      ),
+    );
+    await pumpUntilGone(tester, find.byType(ReferencePanel));
+    harness.container.read(activeMcqProvider.notifier).state = _quiz;
+    await pumpUntilFound(tester, find.byType(QuizView));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(QuizView),
+        matching: find.byTooltip('Reference'),
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () =>
+          _panel.evaluate().isNotEmpty &&
+          tester.getRect(_panel) == tester.getRect(_chat),
+      reason: 'the panel never settled over the chat next to the quiz',
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull, reason: 'next to the quiz');
+    expect(tester.getRect(find.byType(PracticeView)), without);
+    expect(
+      tester.getRect(find.byType(QuizView)).right,
+      lessThanOrEqualTo(tester.getRect(_panel).left),
+      reason: 'the panel lies over the quiz',
+    );
+    await tester.tap(find.byKey(const Key('reference-close')));
+    await pumpUntilGone(tester, find.byType(ReferencePanel));
+    harness.container.read(activeMcqProvider.notifier).state = null;
+    await pumpUntilFound(tester, find.byType(RunControls));
+
+    // --- In Dutch ------------------------------------------------------------
     await tester.tap(find.byTooltip('Options'));
     await pumpUntilFound(tester, find.byType(OptionsPage));
     await tester.tap(find.text('Nederlands'));

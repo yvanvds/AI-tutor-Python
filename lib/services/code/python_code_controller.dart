@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_tutor_python/services/clipboard/in_app_clipboard.dart';
 import 'package:ai_tutor_python/services/code/editor_popup_controller.dart';
 import 'package:ai_tutor_python/services/code/python_completion.dart';
 import 'package:ai_tutor_python/services/code/python_reference.dart';
@@ -18,6 +19,9 @@ import 'package:highlight/languages/python.dart';
 /// members from [PythonReference], each shown with its parameters — and
 /// there are none when the receiver's type is unknown. Without a dot the
 /// package's suggestions stay as they were.
+///
+/// A copy or a cut out of the editor is remembered as a copy made in the
+/// app (#334), so it pastes back where a paste from outside does not.
 class PythonCodeController extends CodeController {
   /// [reference] stands in for the bundled one (tests); without it the
   /// bundled reference is read at the first dot.
@@ -32,6 +36,19 @@ class PythonCodeController extends CodeController {
   }
 
   PythonReference? _reference;
+
+  /// The package's own actions, with its copy — Ctrl+C, Ctrl+Insert, Ctrl+X,
+  /// Shift+Delete and the editor's menu — remembering what it copies (#334).
+  @override
+  Map<Type, Action<Intent>> get actions => _actions ??= {
+    ...super.actions,
+    CopySelectionTextIntent: _RememberingCopyAction(
+      this,
+      super.actions[CopySelectionTextIntent]!
+          as Action<CopySelectionTextIntent>,
+    ),
+  };
+  Map<Type, Action<Intent>>? _actions;
 
   /// The members the open dropdown lists, in its order; null while it lists
   /// the package's own words, or nothing.
@@ -98,5 +115,27 @@ class PythonCodeController extends CodeController {
     final s = selection;
     if (!s.isValid || !s.isCollapsed) return null;
     return code.hiddenRanges.recoverSelection(s).baseOffset;
+  }
+}
+
+/// The package's copy, after noting what it puts on the clipboard: the
+/// selection with the folded lines in it, as the package copies it.
+class _RememberingCopyAction extends Action<CopySelectionTextIntent> {
+  _RememberingCopyAction(this._controller, this._copy);
+
+  final PythonCodeController _controller;
+  final Action<CopySelectionTextIntent> _copy;
+
+  @override
+  Object? invoke(CopySelectionTextIntent intent) {
+    final selection = _controller.code.hiddenRanges.recoverSelection(
+      _controller.value.selection,
+    );
+    if (selection.isValid && !selection.isCollapsed) {
+      InAppClipboard.instance.remember(
+        selection.textInside(_controller.code.text),
+      );
+    }
+    return _copy.invoke(intent);
   }
 }

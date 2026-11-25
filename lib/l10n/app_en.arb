@@ -887,6 +887,10 @@
   "@chat_panel_expand_tooltip": {
     "description": "Tooltip of the one button on the folded chat strip, which brings the full chat panel back"
   },
+  "pasteGuard_blockedNotice": "Pasting from outside the app isn't possible here.",
+  "@pasteGuard_blockedNotice": {
+    "description": "Short neutral notice at the bottom when a paste from outside the app into the answer, the chat or the Playground was blocked (#334). Says nothing of why or of what does work."
+  },
   "chat_composer_idle_hint": "Type your question or answer…",
   "chat_composer_idle_pageHint": "Ask a question about this explanation…",
   "@chat_composer_idle_pageHint": {

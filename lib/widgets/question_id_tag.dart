@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/clipboard/in_app_clipboard.dart';
 import 'package:ai_tutor_python/services/question_bank/bank_question.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The hover text on the ID of the student's own question (#216): what the
@@ -64,10 +64,10 @@ class _QuestionIdTagState extends State<QuestionIdTag> {
   }
 
   /// The ID as it is shown, with `#`: the lookup on the Questions page takes
-  /// it like that.
+  /// it like that. A copy made in the app, so it pastes in the chat (#334).
   Future<void> _copy() async {
     final id = widget.id;
-    await Clipboard.setData(ClipboardData(text: BankQuestion.shortIdOf(id)));
+    await InAppClipboard.instance.copy(BankQuestion.shortIdOf(id));
     if (!mounted || id != widget.id) return;
     setState(() => _copied = true);
     _reset?.cancel();

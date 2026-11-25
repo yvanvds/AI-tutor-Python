@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/blocked_pastes.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
@@ -15,6 +16,8 @@ import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/clipboard/in_app_clipboard.dart';
+import 'package:ai_tutor_python/services/clipboard/paste_policy.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
@@ -295,6 +298,9 @@ class TutorService extends Notifier<TutorState> {
         _initialized = false;
         _recentQuestions.clear();
         _usage.clear();
+        // The next student's oefeningen and pastes are their own (#334).
+        ref.read(blockedPasteLedgerProvider).clear();
+        InAppClipboard.instance.clear();
         _answeredQuestionIds.clear();
         _seenQuestionIds.clear();
         _stopCurriculumWatch();
@@ -1381,6 +1387,9 @@ class TutorService extends Notifier<TutorState> {
       // How long the question was on screen (#220): the follow-up's own
       // moment for a follow-up, else the question's.
       askedAt: isFollowUpGrading ? priorFollowUp.askedAt : _questionAskedAt,
+      // The pastes from outside the app blocked since the last record
+      // (#334), unknown while the school has the block off.
+      blockedPastes: _takeBlockedPastes(),
     );
     _debug.recordPersistedTurn(record, followUp: nextFollowUp);
     unawaited(ref.read(turnHistoryServiceProvider).append(record));
@@ -2517,6 +2526,15 @@ class TutorService extends Notifier<TutorState> {
   GlobalConfig? _globalConfig() => ref.exists(globalConfigServiceProvider)
       ? ref.read(globalConfigServiceProvider)
       : null;
+
+  /// The pastes from outside the app that `PasteGuard` blocked since the
+  /// last record (#334), taken off the ledger for this one. `null` —
+  /// unknown, not 0 — while the school has the block switched off: then
+  /// nothing was blocked, and nothing is known about pasting.
+  BlockedPastes? _takeBlockedPastes() {
+    final taken = ref.read(blockedPasteLedgerProvider).take();
+    return externalPasteBlocked(_globalConfig()) ? taken : null;
+  }
 
   void _setFollowUp({String? message, String? code}) {
     _nextMessage = message;

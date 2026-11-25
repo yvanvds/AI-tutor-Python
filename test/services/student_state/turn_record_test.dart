@@ -1,6 +1,7 @@
 // Round trip of the `turn_history` doc fields added by #100 and since.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/blocked_pastes.dart';
 import 'package:ai_tutor_python/core/evidence_provenance.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/token_usage.dart';
@@ -26,7 +27,9 @@ PersistedTurnRecord _record({
   DateTime? askedAt,
   List<TurnLoStatus> loStatusAfter = const [],
   TurnSelectionReason? selectionReason,
+  BlockedPastes? blockedPastes,
 }) => PersistedTurnRecord(
+  blockedPastes: blockedPastes,
   keyDisputed: keyDisputed,
   askedAt: askedAt,
   clientVersion: clientVersion,
@@ -547,6 +550,53 @@ void main() {
         },
       });
       expect(PersistedTurnRecord.fromCosmos(map).usage, usage);
+    });
+  });
+
+  group('PersistedTurnRecord blockedPastes (#334)', () {
+    test('the blocked pastes and their characters are written and read '
+        'back', () {
+      final map = _record(
+        blockedPastes: const BlockedPastes(count: 2, chars: 340),
+      ).toMap(uid: 'u1');
+      expect(map['blockedPastes'], 2);
+      expect(map['blockedPasteChars'], 340);
+      expect(
+        PersistedTurnRecord.fromCosmos(map).blockedPastes,
+        const BlockedPastes(count: 2, chars: 340),
+      );
+    });
+
+    test('none blocked is written as 0 and 0, and reads back as 0', () {
+      final map = _record(blockedPastes: BlockedPastes.none).toMap(uid: 'u1');
+      expect(map['blockedPastes'], 0);
+      expect(map['blockedPasteChars'], 0);
+      expect(
+        PersistedTurnRecord.fromCosmos(map).blockedPastes,
+        BlockedPastes.none,
+      );
+    });
+
+    test('unknown writes neither field; a doc without them (an older build, '
+        'or the block switched off) reads as unknown, never 0', () {
+      final map = _record().toMap(uid: 'u1');
+      expect(map.containsKey('blockedPastes'), isFalse);
+      expect(map.containsKey('blockedPasteChars'), isFalse);
+      expect(PersistedTurnRecord.fromCosmos(map).blockedPastes, isNull);
+      // Half a pair, or not numbers, is no count either.
+      expect(
+        PersistedTurnRecord.fromCosmos({...map, 'blockedPastes': 1})
+            .blockedPastes,
+        isNull,
+      );
+      expect(
+        PersistedTurnRecord.fromCosmos({
+          ...map,
+          'blockedPastes': '1',
+          'blockedPasteChars': 4,
+        }).blockedPastes,
+        isNull,
+      );
     });
   });
 }

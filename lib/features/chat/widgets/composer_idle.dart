@@ -7,6 +7,7 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/paste_guard.dart';
 import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// newline. Sending a
 /// solo `?` is shorthand for "give me a hint". While a theory page is on
 /// screen the field's hint says a question is about that page (#132).
+///
+/// A paste from outside the app does not reach the field (#334): it lies in
+/// a [PasteGuard], and its right-click menu is [inAppContextMenu]. What the
+/// student copied in the app pastes as before.
 class ComposerIdle extends ConsumerStatefulWidget {
   const ComposerIdle({super.key});
 
@@ -135,28 +140,31 @@ class _Field extends StatelessWidget {
           Expanded(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 140),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                minLines: 2,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: hint,
-                  hintStyle: TextStyle(
-                    color: AppColors.fgFaint,
+              child: PasteGuard(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  contextMenuBuilder: inAppContextMenu,
+                  minLines: 2,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  style: TextStyle(
+                    color: AppColors.fg,
                     fontSize: 14,
                     height: 1.5,
                   ),
-                  contentPadding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: hint,
+                    hintStyle: TextStyle(
+                      color: AppColors.fgFaint,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
             ),

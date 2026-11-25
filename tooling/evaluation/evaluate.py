@@ -198,6 +198,7 @@ def cmd_draft(args) -> None:
                 "fossils": dx.fossils(los, st, turns, now),
                 "cross_root": dx.discarded_cross_root(turns, goals, ms_subgoals),
                 "lost": dx.lost_oefeningen(turns, goals, ms_subgoals),
+                "blocked_pastes": dx.blocked_pastes(turns),
                 "has_data": any(lo.key in st for lo in los),
             }
         )
@@ -326,6 +327,9 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
             sig.append(f"{p['cross_root']['positive']} weggegooide positieven")
         if p["lost"]["total"]:
             sig.append(f"{p['lost']['total']} oefeningen telden niet voor hun leerdoel")
+        pasted = p["blocked_pastes"]["with"]
+        if pasted:
+            sig.append(f"plakken geblokkeerd bij {pasted} {'oefening' if pasted == 1 else 'oefeningen'}")
         L.append(f"| {p['name']} | {sc.core_counted}/{sc.core_total} | {sc.extension_mastered}/{sc.extension_total} | {sc.hard_count}/{sc.mastered_total} | **{sc.proposal}** | {need_s} | {', '.join(sig)} |")
     L.append("")
     for p in sorted(per_student, key=lambda p: p["name"]):
@@ -397,6 +401,10 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
         if pr["by_kind"]:
             L.append(f"- per soort leerdoel: {', '.join(f'{k} {v}' for k, v in pr['by_kind'].items())}")
         L.append("")
+        pasted_line = _blocked_pastes_line(p["blocked_pastes"])
+        if pasted_line:
+            L.append(pasted_line)
+            L.append("")
         if p["fossils"]:
             L.append("**Fossielen** — niet aangetoond, al minstens een week niet meer bevraagd, terwijl recent werk op zijn niveau goed is:")
             L.append("")
@@ -1296,6 +1304,32 @@ def _signal_line(s: dict) -> str:
     return f"{status:<11} {what}" + (f" — {dx.DROP_NL.get(reason, reason)}" if reason else "")
 
 
+def _times_chars(times: int, chars: int) -> str:
+    """`2 keer, 340 tekens` (#334)."""
+    return f"{times} keer, {chars} {'teken' if chars == 1 else 'tekens'}"
+
+
+def _blocked_pastes_line(b: dict) -> str | None:
+    """The concept's line on the pastes from outside the app that were
+    blocked (#334), or None when no record says: the oefeningen with one,
+    out of those whose record says, and those without the fields — an older
+    build, or the block switched off — apart, never as none."""
+    if not b["known"]:
+        return None
+    known = f"{b['known']} {'oefening' if b['known'] == 1 else 'oefeningen'} met gegevens"
+    if b["with"]:
+        line = f"bij {b['with']} van de {known} ({_times_chars(b['attempts'], b['chars'])})"
+    else:
+        line = f"bij geen van de {known}"
+    unknown = b["oefeningen"] - b["known"]
+    if unknown:
+        line += (
+            f"; {unknown} {'oefening' if unknown == 1 else 'oefeningen'} zonder gegevens"
+            " (een oudere build, of het blokkeren stond uit)"
+        )
+    return f"**Plakken van buiten de app geblokkeerd:** {line}."
+
+
 def _render_trace_row(r: dict) -> list[str]:
     kind = " · ".join(
         x
@@ -1347,6 +1381,9 @@ def _render_trace_row(r: dict) -> list[str]:
         out += [f"  {'':<9} {_signal_line(s)}" for s in sigs[1:]]
     else:
         out.append("  signalen  geen")
+    blocked = r.get("blocked_pastes")
+    if blocked and blocked[0] > 0:
+        out.append(f"  plakken   geblokkeerd: {_times_chars(*blocked)}")
     if r["has_content"]:
         ctx = r["context"]
         out.append(
