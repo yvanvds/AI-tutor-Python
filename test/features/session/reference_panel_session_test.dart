@@ -2,13 +2,16 @@
 // the exercise: a panel next to the editor. This mounts the real
 // `ModeSwitcher` over the real `SessionView` (the three mode views and the
 // chat panel), opens the panel from the real button above the editor and in
-// the quiz header, and measures where it lands: in a session with room for
-// three it takes a column of its own between the exercise and the chat, in
-// a narrow one it lies over the chat and the editor keeps its width, in the
-// Playground it has the chat's place, and in the theory view it waits. The
-// panel's own content is pinned in test/features/reference/; the
-// end-to-end version, in the real window, is
+// the quiz header, and measures where it lands. In Practice it lies over the
+// chat, exactly in its place, at every window width, and the editor keeps
+// its width (#335: a column of its own between the exercise and the chat
+// left a student laptop almost no room to write code). In the Playground,
+// with no chat, it takes a column of its own beside the editor; in the
+// theory view it waits. The panel's own content is pinned in
+// test/features/reference/; the end-to-end version, in the real window, is
 // integration_test/flows/reference_panel.dart.
+
+import 'dart:math' as math;
 
 import 'package:ai_tutor_python/features/reference/reference_panel.dart';
 import 'package:ai_tutor_python/features/reference/reference_panel_state.dart';
@@ -60,14 +63,19 @@ const _mcq = ActiveMcq(
   options: ['2', '3'],
 );
 
-/// A session with room for the exercise, the panel and the chat.
+/// A wide session: before #335 the panel took a column of its own here.
 const double _wide = 1400;
+
+/// A 1366 px laptop at 125 % scaling (1093 px) less the 72 px sidebar: the
+/// student laptop of #138 and #335.
+const double _laptop = 1021;
 
 /// A 700 px window less the 72 px sidebar (#259).
 const double _narrow = 628;
 
 final _panel = find.byKey(const Key('reference-panel'));
 final _chat = find.byKey(const Key('chat-panel'));
+final _room = find.byKey(const Key('reference-room'));
 final _button = find.byTooltip('Reference');
 
 void main() {
@@ -145,26 +153,33 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('with room for three, the button above the editor opens the '
-      'panel in a column of its own: the exercise gives up the room, the chat '
-      'stays whole, and the search field has the keyboard', (tester) async {
+  testWidgets('in Practice, even in a wide session, the button above the '
+      'editor opens the panel over the chat, exactly in its place: the '
+      'exercise keeps its width, and the search field has the keyboard', (
+    tester,
+  ) async {
     await mount(tester, width: _wide);
     await tester.tap(find.text('Practice'));
     await settle(tester);
     expect(_panel, findsNothing);
-    expect(rect(tester, find.byType(PracticeView)).width, _wide - 460);
+    final without = rect(tester, find.byType(PracticeView));
+    expect(without.width, _wide - chatPanelWidth);
 
     await open(tester);
 
     expect(pc.read(referencePanelOpenProvider), isTrue);
-    final panel = rect(tester, _panel);
-    final practice = rect(tester, find.byType(PracticeView));
-    final chatRect = rect(tester, _chat);
-    expect(panel.width, referencePanelWidth);
-    expect(chatRect.width, chatPanelWidth);
-    expect(practice.width, _wide - chatPanelWidth - referencePanelWidth);
-    expect(panel.left, practice.right);
-    expect(panel.right, chatRect.left);
+    expect(rect(tester, _panel), rect(tester, _chat));
+    expect(rect(tester, _chat).width, chatPanelWidth);
+    expect(rect(tester, find.byType(PracticeView)), without);
+    expect(rect(tester, _room).width, 0);
+    // Over the chat: a tap there reaches the panel, not the chat.
+    expect(
+      tester
+          .hitTestOnBinding(rect(tester, _chat).center)
+          .path
+          .any((entry) => entry.target == tester.renderObject(_panel)),
+      isTrue,
+    );
     final search = tester.widget<EditableText>(
       find.descendant(
         of: find.byKey(const Key('reference-search')),
@@ -173,11 +188,12 @@ void main() {
     );
     expect(search.focusNode.hasFocus, isTrue);
 
-    // The same button shuts it, and the exercise has its room back.
+    // The same button shuts it; the chat is back and the exercise never
+    // moved.
     await open(tester);
     expect(pc.read(referencePanelOpenProvider), isFalse);
     expect(_panel, findsNothing);
-    expect(rect(tester, find.byType(PracticeView)).width, _wide - 460);
+    expect(rect(tester, find.byType(PracticeView)), without);
     expect(tester.takeException(), isNull);
 
     await unmount(tester);
@@ -214,24 +230,29 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('a window made narrow with the panel open moves it from its '
-      'own column over the chat, without an overflow on the way', (
-    tester,
-  ) async {
+  testWidgets('a window resized with the panel open in Practice keeps it '
+      'over the chat, at the chat\'s width, and the exercise at the width it '
+      'has without it, without an overflow on the way', (tester) async {
     await mount(tester, width: _wide);
     await tester.tap(find.text('Practice'));
     await settle(tester);
     await open(tester);
-    expect(rect(tester, _panel).right, rect(tester, _chat).left);
-
-    tester.view.physicalSize = const Size(_narrow, 900);
-    for (var frame = 0; frame < 30; frame++) {
-      await tester.pump(const Duration(milliseconds: 16));
-      expect(tester.takeException(), isNull, reason: 'frame $frame');
-    }
-    await settle(tester);
     expect(rect(tester, _panel), rect(tester, _chat));
-    expect(rect(tester, find.byType(PracticeView)).width, _narrow / 2);
+
+    for (final width in [_laptop, _narrow, _wide]) {
+      tester.view.physicalSize = Size(width, 900);
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.takeException(), isNull, reason: '$width, frame $frame');
+      }
+      await settle(tester);
+      expect(rect(tester, _panel), rect(tester, _chat), reason: '$width');
+      expect(
+        rect(tester, find.byType(PracticeView)).width,
+        width - chatPanelFullWidth(width),
+        reason: '$width',
+      );
+    }
 
     await unmount(tester);
   });
@@ -266,7 +287,61 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('a quiz has the button in its header', (tester) async {
+  testWidgets('on a student laptop, switching from the Playground to '
+      'Practice with the panel open moves it from its column beside the '
+      'editor over the chat: the exercise slides from one width to the other, '
+      'without a jump or an overflow on the way, and back', (tester) async {
+    await mount(tester, width: _laptop);
+    await tester.tap(find.text('Playground'));
+    await settle(tester);
+    await open(tester);
+
+    final playground = rect(tester, find.byType(PlaygroundView));
+    expect(rect(tester, _panel).width, referencePanelWidth);
+    expect(playground.width, _laptop - referencePanelWidth);
+    expect(rect(tester, _panel).left, playground.right);
+    expect(rect(tester, _panel).right, _laptop);
+
+    // The exercise ends where the room beside it begins.
+    double exercise() => rect(tester, _room).left;
+
+    Future<void> switchTo(String mode, double from, double to) async {
+      await tester.tap(find.text(mode));
+      for (var frame = 0; frame < 40; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.takeException(), isNull, reason: '$mode, frame $frame');
+        expect(
+          exercise(),
+          inInclusiveRange(math.min(from, to), math.max(from, to)),
+          reason: '$mode, frame $frame: a jump',
+        );
+      }
+      await settle(tester);
+      expect(exercise(), to, reason: mode);
+    }
+
+    await switchTo(
+      'Practice',
+      _laptop - referencePanelWidth,
+      _laptop - chatPanelWidth,
+    );
+    expect(rect(tester, _panel), rect(tester, _chat));
+    expect(rect(tester, _room).width, 0);
+
+    await switchTo(
+      'Playground',
+      _laptop - chatPanelWidth,
+      _laptop - referencePanelWidth,
+    );
+    expect(rect(tester, _panel).left, exercise());
+    expect(rect(tester, _panel).right, _laptop);
+    expect(tester.takeException(), isNull);
+
+    await unmount(tester);
+  });
+
+  testWidgets('a quiz has the button in its header, and the panel lies over '
+      'the chat there too: the quiz keeps its width', (tester) async {
     await mount(tester, width: _wide);
     await tester.tap(find.text('Practice'));
     await settle(tester);
@@ -274,6 +349,7 @@ void main() {
     await settle(tester);
     expect(find.byType(QuizView), findsOneWidget);
     expect(find.byType(RunControls), findsNothing);
+    final without = rect(tester, find.byType(PracticeView));
 
     await tester.tap(
       find.descendant(of: find.byType(QuizView), matching: _button),
@@ -282,12 +358,56 @@ void main() {
 
     expect(pc.read(referencePanelOpenProvider), isTrue);
     expect(find.byType(ReferencePanel), findsOneWidget);
-    expect(
-      rect(tester, _panel).left,
-      rect(tester, find.byType(PracticeView)).right,
-    );
+    expect(rect(tester, _panel), rect(tester, _chat));
+    expect(rect(tester, find.byType(PracticeView)), without);
     expect(tester.takeException(), isNull);
 
     await unmount(tester);
+  });
+
+  group('referencePlacement (#335)', () {
+    test('next to a chat it lies over the chat, exactly as wide, at every '
+        'session width — never in a column of its own', () {
+      for (final session in [_narrow, _laptop, 1208.0, _wide, 2400.0]) {
+        final chat = chatPanelFullWidth(session);
+        expect(
+          referencePlacement(sessionWidth: session, chatWidth: chat),
+          ReferencePlacement(width: chat, beside: false),
+          reason: '$session',
+        );
+      }
+    });
+
+    test('with no chat (the Playground) it takes a column of its own beside '
+        'the exercise, while the exercise keeps its minimum', () {
+      expect(
+        referencePlacement(sessionWidth: 1208, chatWidth: 0),
+        const ReferencePlacement(width: referencePanelWidth, beside: true),
+      );
+      expect(
+        referencePlacement(sessionWidth: _narrow, chatWidth: 0),
+        const ReferencePlacement(
+          width: _narrow - referenceExerciseMinWidth,
+          beside: true,
+        ),
+      );
+      // Too little room for the column: over the right of the exercise.
+      expect(
+        referencePlacement(sessionWidth: 600, chatWidth: 0),
+        const ReferencePlacement(width: referencePanelWidth, beside: false),
+      );
+    });
+
+    test('next to a chat narrower than the panel can be, it lies over the '
+        'right of the exercise', () {
+      expect(
+        referencePlacement(sessionWidth: 500, chatWidth: 250),
+        const ReferencePlacement(width: referencePanelWidth, beside: false),
+      );
+      expect(
+        referencePlacement(sessionWidth: 200, chatWidth: 100),
+        const ReferencePlacement(width: 200, beside: false),
+      );
+    });
   });
 }

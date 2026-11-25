@@ -10,9 +10,10 @@
 //     new launch starts with it closed.
 //   - [pythonReferenceProvider] — the bundled reference, the same file the
 //     editor's dropdown after a dot reads (#322).
-//   - [referencePlacement] — where the panel goes: in a column of its own
-//     between the exercise and the chat when the window has room for three,
-//     else over the chat, so the editor keeps its width.
+//   - [referencePlacement] — where the panel goes: over the chat, exactly as
+//     wide as it, so the editor keeps its width at every window size
+//     (#335); in a column of its own beside the editor only where there is
+//     no chat, in the Playground.
 
 import 'dart:math' as math;
 
@@ -47,9 +48,9 @@ const double referencePanelWidth = 340;
 /// field, a signature and a short example still fit on a line.
 const double referencePanelMinWidth = 260;
 
-/// What the exercise keeps next to a panel in a column of its own: the row
-/// above the editor whole, and a line of code. With less, the panel goes
-/// over the chat instead.
+/// What the exercise keeps next to a panel in a column of its own (the
+/// Playground): the row above the editor whole, and a line of code. With
+/// less, the panel lies over the right of the exercise instead.
 const double referenceExerciseMinWidth = 360;
 
 /// Where the reference panel goes in a session area.
@@ -59,9 +60,10 @@ class ReferencePlacement {
 
   final double width;
 
-  /// In a column of its own between the exercise and the chat, which then
-  /// both stay whole. When false it lies over the chat — or, with no chat
-  /// (the Playground in a very small window), over the right of the
+  /// In a column of its own beside the exercise, which gives up the room —
+  /// only where there is no chat (the Playground). When false it lies over
+  /// the chat, exactly as wide as it — or, next to a chat too narrow for it
+  /// or in a Playground too small for the column, over the right of the
   /// exercise.
   final bool beside;
 
@@ -80,29 +82,33 @@ class ReferencePlacement {
 }
 
 /// Where the panel goes in a session area [sessionWidth] wide next to a chat
-/// panel [chatWidth] wide: beside the exercise, at most
-/// [referencePanelWidth], when that leaves the exercise
+/// panel [chatWidth] wide, where a [chatWidth] of zero is no chat (the
+/// Playground): over the chat, exactly as wide as it, when the chat is at
+/// least [referencePanelMinWidth]; with no chat, beside the exercise, at
+/// most [referencePanelWidth], when that leaves the exercise
 /// [referenceExerciseMinWidth] and the panel [referencePanelMinWidth];
-/// otherwise over the chat, exactly as wide as it, when the chat is at least
-/// [referencePanelMinWidth]; otherwise over the right of the exercise.
+/// otherwise over the right of the exercise.
 ///
-/// At the 1280 px window the app opens in, the panel goes beside the
-/// exercise (340 px, the exercise keeps 408). Under 1152 px — a
-/// student laptop at 125 % — it goes over the 460 px chat, and in the
-/// 700 px window of #259 over the half-width chat.
+/// In Practice — the editor and the quiz — the panel so lies over the chat
+/// in every window down to about 600 px: over the 460 px chat, and in the
+/// 700 px window of #259 over the half-width one. The editor never gives up
+/// room to it (#335): a column of its own between the exercise and the chat
+/// left the editor 360 to 700 px on the student laptops. In the Playground
+/// at the 1280 px window the app opens in, the column is 340 px and the
+/// exercise keeps 868.
 ReferencePlacement referencePlacement({
   required double sessionWidth,
   required double chatWidth,
 }) {
-  final room = sessionWidth - chatWidth - referenceExerciseMinWidth;
-  if (room >= referencePanelMinWidth) {
+  if (chatWidth >= referencePanelMinWidth) {
+    return ReferencePlacement(width: chatWidth, beside: false);
+  }
+  final room = sessionWidth - referenceExerciseMinWidth;
+  if (chatWidth <= 0 && room >= referencePanelMinWidth) {
     return ReferencePlacement(
       width: math.min(referencePanelWidth, room),
       beside: true,
     );
-  }
-  if (chatWidth >= referencePanelMinWidth) {
-    return ReferencePlacement(width: chatWidth, beside: false);
   }
   return ReferencePlacement(
     width: math.max(0, math.min(referencePanelWidth, sessionWidth)),
