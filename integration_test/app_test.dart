@@ -37,6 +37,7 @@ import 'flows/earlier_root_recheck.dart' as earlier_root_recheck;
 import 'flows/editor_comment_space.dart' as editor_comment_space;
 import 'flows/editor_gutter_alignment.dart' as editor_gutter_alignment;
 import 'flows/editor_member_dropdown.dart' as editor_member_dropdown;
+import 'flows/editor_undo_start.dart' as editor_undo_start;
 import 'flows/evidence_provenance.dart' as evidence_provenance;
 import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
@@ -143,6 +144,7 @@ void main() {
   editor_comment_space.main();
   editor_gutter_alignment.main();
   editor_member_dropdown.main();
+  editor_undo_start.main();
   reference_panel.main();
   practice_complete_code.main();
   garbled_reply_retry.main();

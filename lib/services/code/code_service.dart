@@ -12,10 +12,19 @@ class CodeService {
     controller = PythonCodeController(text: starterText);
   }
 
+  /// Puts [code] in the editor as a fresh start — a new exercise, its
+  /// follow-up, a file opened in the Playground — with the caret at its end.
+  ///
+  /// Ctrl+Z stops at [code] (#333). Replacing the text keeps the package's
+  /// undo history, so undoing ran on past the start into the code of the
+  /// exercise or file before. The history is cleared after the caret is set:
+  /// setting it is what records [code] in the history, so [code] is all
+  /// that is left in it.
   void setText(String code) {
     controller.fullText = code;
     controller.selection = TextSelection.collapsed(offset: code.length);
     controller.clearComposing();
+    controller.historyController.deleteHistory();
   }
 
   String getText() {
