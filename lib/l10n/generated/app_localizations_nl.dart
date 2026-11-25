@@ -1086,8 +1086,11 @@ class AppLocalizationsNl extends AppLocalizations {
   String get crash_title => 'Er ging iets mis';
 
   @override
-  String get crash_defaultMessage =>
-      'Dit kan gebeuren na wijzigingen aan rechten of regels.\nProbeer de app te resetten. Je wordt afgemeld en de caches worden gewist.';
+  String get crash_errorMessage =>
+      'De app liep tegen een fout aan. Ga terug en werk verder. Blijft het misgaan, sluit de app dan en start hem opnieuw.';
+
+  @override
+  String get crash_backButton => 'Terug naar de app';
 
   @override
   String get crash_resetButton => 'App resetten (rechten herstellen)';

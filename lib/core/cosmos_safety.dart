@@ -35,10 +35,9 @@ Future<T> safeCosmos<T>(Future<T> Function() op) async {
   } on CosmosException catch (e) {
     if (e.isAuthError) {
       debugPrint('safeCosmos: auth error from Cosmos: $e');
-      appNavigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => const CrashRecoveryScreen.permissionDenied(),
-        ),
+      pushCrashScreen(
+        appNavigatorKey.currentState,
+        const CrashRecoveryScreen.permissionDenied(),
       );
     }
     rethrow;

@@ -1078,8 +1078,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crash_title => 'We hit a problem';
 
   @override
-  String get crash_defaultMessage =>
-      'This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.';
+  String get crash_errorMessage =>
+      'The app ran into an error. Go back and carry on. If it keeps happening, close the app and start it again.';
+
+  @override
+  String get crash_backButton => 'Back to the app';
 
   @override
   String get crash_resetButton => 'Reset app (fix permissions)';
