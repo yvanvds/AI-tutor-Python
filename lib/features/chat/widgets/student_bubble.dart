@@ -1,8 +1,10 @@
 import 'package:ai_tutor_python/features/chat/widgets/_chat_time.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/paste_guard.dart';
 import 'package:flutter/material.dart';
 
-/// Sender bubble for the student. Solid accent fill, ink-0 text.
+/// Sender bubble for the student. Solid accent fill, ink-0 text. A copy of
+/// its text is a copy made in the app (#334).
 class StudentBubble extends StatelessWidget {
   const StudentBubble({super.key, required this.text, this.createdAt});
 
@@ -30,13 +32,16 @@ class StudentBubble extends StatelessWidget {
                 color: AppColors.accent,
                 borderRadius: BorderRadius.circular(AppRadius.bubble),
               ),
-              child: SelectableText(
-                text,
-                style: TextStyle(
-                  color: AppColors.ink0,
-                  fontSize: 14,
-                  height: 1.55,
-                  fontWeight: FontWeight.w500,
+              child: RememberCopies(
+                child: SelectableText(
+                  text,
+                  contextMenuBuilder: inAppContextMenu,
+                  style: TextStyle(
+                    color: AppColors.ink0,
+                    fontSize: 14,
+                    height: 1.55,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),

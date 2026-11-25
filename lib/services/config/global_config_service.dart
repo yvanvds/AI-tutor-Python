@@ -68,6 +68,8 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
         questionBankShare: storedConfig.questionBankShare,
         // And how long the content of an oefening is kept (#228).
         turnContentKeepUntil: storedConfig.turnContentKeepUntil,
+        // And whether a paste from outside the app is blocked (#334).
+        blockExternalPaste: storedConfig.blockExternalPaste,
       );
       final base = Map<String, dynamic>.from(stored ?? const {})
         // Cosmos owns `_rid`, `_etag`, `_ts`…; echoing them back is at best

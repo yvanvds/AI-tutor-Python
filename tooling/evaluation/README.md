@@ -54,7 +54,9 @@ zoals de leerling ze zag, het antwoord, de feedback en de signalen van de
 grader — wat telde en wat werd weggegooid, met de reden (buiten de scope,
 gevraagd leerdoel buiten de scope, onbekend leerdoel, later subdoel,
 negatief of neutraal van opzij). Een oefening van vóór #228 heeft geen
-inhoud; dat staat erbij. `--klas` zoekt de leerling in één klas, zonder
+inhoud; dat staat erbij. Werd er op een oefening geplakt van buiten de app
+(#334), dan staat er "plakken geblokkeerd: N keer, M tekens"; de geplakte
+tekst zelf bewaart de app niet. `--klas` zoekt de leerling in één klas, zonder
 zoekt hij in alle. Alleen lezen, alleen naar de terminal: er komt geen
 bestand, want het zijn antwoorden van leerlingen.
 
@@ -73,7 +75,7 @@ tellingen, en pas na een "go" `apply`.
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`); de inhoud van de oefeningen van een leerling (`turn_contents`, #228) |
 | `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
-| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel, het verloop van een dag (`trace`, #228) |
+| `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel, oefeningen met geblokkeerd plakken van buiten de app (#334; een record zonder de velden is onbekend, nooit 0), het verloop van een dag (`trace`, #228) |
 | `evaluate.py` | de zeven commando's; rendert concept, sidecar en `trace` |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 

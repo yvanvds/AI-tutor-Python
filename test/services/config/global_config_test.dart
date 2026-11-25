@@ -164,4 +164,37 @@ void main() {
       );
     });
   });
+
+  group('BlockExternalPaste (#334)', () {
+    test('is on unless the doc says false: absent, true or anything that is '
+        'not a bool keeps the block', () {
+      bool blocked(Map<String, dynamic> map) =>
+          GlobalConfig.fromMap(map).blockExternalPaste;
+      expect(blocked({}), isTrue);
+      expect(blocked({'BlockExternalPaste': true}), isTrue);
+      expect(blocked({'BlockExternalPaste': 'false'}), isTrue);
+      expect(blocked({'BlockExternalPaste': 0}), isTrue);
+      expect(blocked({'BlockExternalPaste': null}), isTrue);
+      expect(blocked({'BlockExternalPaste': false}), isFalse);
+      expect(
+        const GlobalConfig(model: 'm', apiKey: '').blockExternalPaste,
+        isTrue,
+      );
+    });
+
+    test('only the switch turned off is written, and survives a round '
+        'trip', () {
+      final on = const GlobalConfig(model: 'gpt-4o', apiKey: 'k').toMap();
+      expect(on.containsKey('BlockExternalPaste'), isFalse);
+      expect(GlobalConfig.fromMap(on).blockExternalPaste, isTrue);
+
+      const off = GlobalConfig(
+        model: 'gpt-4o',
+        apiKey: 'k',
+        blockExternalPaste: false,
+      );
+      expect(off.toMap()['BlockExternalPaste'], isFalse);
+      expect(GlobalConfig.fromMap(off.toMap()).blockExternalPaste, isFalse);
+    });
+  });
 }

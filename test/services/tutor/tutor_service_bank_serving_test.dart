@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
+import 'package:ai_tutor_python/core/blocked_pastes.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
@@ -23,6 +24,7 @@ import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
+import 'package:ai_tutor_python/services/clipboard/paste_policy.dart';
 import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
@@ -430,6 +432,7 @@ void main() {
     double? share,
     Random? rolls,
     DateTime Function()? clock,
+    bool blockExternalPaste = true,
   }) async {
     for (final d in docs) {
       store.upsert(d);
@@ -470,6 +473,7 @@ void main() {
               apiKey: '',
               questionBankMinimum: minimum,
               questionBankShare: share,
+              blockExternalPaste: blockExternalPaste,
             ),
           ),
         ),
@@ -1464,6 +1468,66 @@ void main() {
 
       expect(connector.sent, hasLength(1));
       expect(pc!.read(activeMcqProvider)!.prompt, 'Vers 1');
+    });
+  });
+
+  group('the pastes blocked on an oefening (#334)', () {
+    BlockedPasteLedger ledger() => pc!.read(blockedPasteLedgerProvider);
+
+    test('go on its record, with their characters, and the ledger starts '
+        'again', () async {
+      final doc = _mcqDoc('q', feedback: const [_feedbackOnWrong]);
+      final bank = await boot(docs: [doc], minimum: 1, share: 1);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      ledger()
+        ..note(120)
+        ..note(30);
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      expect(
+        history.records.single.blockedPastes,
+        const BlockedPastes(count: 2, chars: 150),
+      );
+      expect(ledger().pending, BlockedPastes.none);
+    });
+
+    test('none blocked is written as 0: the block was on, nothing was '
+        'pasted from outside', () async {
+      final doc = _mcqDoc('q', feedback: const [_feedbackOnWrong]);
+      final bank = await boot(docs: [doc], minimum: 1, share: 1);
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      expect(history.records.single.blockedPastes, BlockedPastes.none);
+      expect(history.records.single.toMap(uid: 'u1')['blockedPastes'], 0);
+    });
+
+    test('with the block switched off in config/global the record does not '
+        'say: unknown, not 0', () async {
+      final doc = _mcqDoc('q', feedback: const [_feedbackOnWrong]);
+      final bank = await boot(
+        docs: [doc],
+        minimum: 1,
+        share: 1,
+        blockExternalPaste: false,
+      );
+      planNext(_plan(ChatRequestType.mcQuestion));
+      await tutor().requestExercise();
+
+      ledger().note(40);
+      await tutor().submitMcqAnswer(_wrong);
+      await bank.idle;
+
+      final record = history.records.single;
+      expect(record.blockedPastes, isNull);
+      expect(record.toMap(uid: 'u1').containsKey('blockedPastes'), isFalse);
+      expect(ledger().pending, BlockedPastes.none);
     });
   });
 }

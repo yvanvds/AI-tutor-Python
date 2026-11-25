@@ -34,6 +34,14 @@ class GlobalConfig {
   /// the docs written after it.
   final KeepUntil? turnContentKeepUntil;
 
+  /// Whether a paste from outside the app is blocked in the answer, the
+  /// chat and the Playground (#334), as `BlockExternalPaste` on the doc. On
+  /// unless the doc says `false` — absent, or anything that is not a bool,
+  /// is on — so it can be switched off without a release, and the
+  /// stand-alone mode can switch it off in its own config. Set from the
+  /// Cosmos portal, like `ApiKey`.
+  final bool blockExternalPaste;
+
   const GlobalConfig({
     required this.model,
     required this.apiKey,
@@ -41,6 +49,7 @@ class GlobalConfig {
     this.questionBankMinimum,
     this.questionBankShare,
     this.turnContentKeepUntil,
+    this.blockExternalPaste = true,
   });
 
   factory GlobalConfig.fromMap(Map<String, dynamic> map) {
@@ -59,6 +68,7 @@ class GlobalConfig {
           ? bankShare.toDouble().clamp(0.0, 1.0)
           : null,
       turnContentKeepUntil: KeepUntil.tryParse(map['TurnContentKeepUntil']),
+      blockExternalPaste: map['BlockExternalPaste'] != false,
     );
   }
 
@@ -76,5 +86,7 @@ class GlobalConfig {
     if (questionBankShare != null) 'QuestionBankShare': questionBankShare,
     if (turnContentKeepUntil != null)
       'TurnContentKeepUntil': turnContentKeepUntil.toString(),
+    // Only the switch turned off is written: absent is on.
+    if (!blockExternalPaste) 'BlockExternalPaste': false,
   };
 }

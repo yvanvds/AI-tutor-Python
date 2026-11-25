@@ -74,6 +74,7 @@ import 'flows/notch_drop_attempts.dart' as notch_drop_attempts;
 import 'flows/oefening_xp.dart' as oefening_xp;
 import 'flows/options_panel.dart' as options_panel;
 import 'flows/own_key.dart' as own_key;
+import 'flows/paste_guard.dart' as paste_guard;
 import 'flows/playground_during_mcq.dart' as playground_during_mcq;
 import 'flows/playground_files.dart' as playground_files;
 import 'flows/practice_complete_code.dart' as practice_complete_code;
@@ -173,6 +174,7 @@ void main() {
   quiz_ligatures.main();
   quiz_verdict_colors.main();
   playground_during_mcq.main();
+  paste_guard.main();
   quiz_chat.main();
   code_exercise_chat.main();
   turtle_run_notice.main();

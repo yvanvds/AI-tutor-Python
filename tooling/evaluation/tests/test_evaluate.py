@@ -2171,6 +2171,129 @@ class TraceTest(_CommandTest):
         self.assertEqual(out, "Wout Spoor · woensdag 2026-09-30 · 0 oefeningen\n")
 
 
+# #334: a class of three made-up students whose records say how many
+# pastes from outside the app were blocked. Zara, on Friday 9 October
+# (CEST): three oefeningen from a build that counts — two blocked pastes of
+# 340 characters together, none, one of a single character — and one from
+# an older build without the fields. Pim has the same oefeningen without any
+# of the fields, so his number is hers. Ruth's records all say none.
+KLAS_PLAK = "6PLAK"
+ACCOUNTS += [
+    {"uid": "u-zara", "firstName": "Zara", "lastName": "Plak", "className": KLAS_PLAK,
+     "updatedAt": "2026-10-09T10:00:00Z", "calibration": {"difficulty": "medium"}},
+    {"uid": "u-pim", "firstName": "Pim", "lastName": "Typ", "className": KLAS_PLAK,
+     "updatedAt": "2026-10-09T10:00:00Z", "calibration": {"difficulty": "medium"}},
+    {"uid": "u-ruth", "firstName": "Ruth", "lastName": "Toets", "className": KLAS_PLAK,
+     "updatedAt": "2026-10-09T10:00:00Z", "calibration": {"difficulty": "medium"}},
+]
+
+
+def _paste_log(uid: str, pastes: list[tuple[int, int] | None]) -> list[dict]:
+    log = []
+    for minute, blocked in zip(("00", "05", "10", "15"), pastes):
+        fields = {} if blocked is None else {"blockedPastes": blocked[0], "blockedPasteChars": blocked[1]}
+        log.append(_turn(f"2026-10-09T07:{minute}:00.000Z", "sg-a", "recall_a1", uid=uid, **fields))
+    return log
+
+
+TURNS["u-zara"] = _paste_log("u-zara", [(2, 340), (0, 0), (1, 1), None])
+TURNS["u-pim"] = _paste_log("u-pim", [None] * 4)
+TURNS["u-ruth"] = _paste_log("u-ruth", [(0, 0)] * 4)
+
+
+class BlockedPastesTest(unittest.TestCase):
+    """#334: a record says how many pastes from outside the app were
+    blocked only with both fields as numbers; without them it is unknown."""
+
+    def test_one_record(self):
+        self.assertEqual(dx.blocked_paste({"blockedPastes": 2, "blockedPasteChars": 340}), (2, 340))
+        self.assertEqual(dx.blocked_paste({"blockedPastes": 0, "blockedPasteChars": 0}), (0, 0))
+        self.assertIsNone(dx.blocked_paste({}))
+        self.assertIsNone(dx.blocked_paste(None))
+        self.assertIsNone(dx.blocked_paste({"blockedPastes": 2}))
+        self.assertIsNone(dx.blocked_paste({"blockedPastes": True, "blockedPasteChars": 4}))
+        self.assertIsNone(dx.blocked_paste({"blockedPastes": "2", "blockedPasteChars": 4}))
+
+    def test_over_the_oefeningen(self):
+        self.assertEqual(
+            dx.blocked_pastes(TURNS["u-zara"]),
+            {"oefeningen": 4, "known": 3, "with": 2, "attempts": 3, "chars": 341},
+        )
+        self.assertEqual(
+            dx.blocked_pastes(TURNS["u-pim"]),
+            {"oefeningen": 4, "known": 0, "with": 0, "attempts": 0, "chars": 0},
+        )
+
+
+class BlockedPastesTraceTest(_CommandTest):
+    """#334: `trace` says per oefening how many pastes from outside the app
+    were blocked, and how many characters they held; nothing where none
+    were, or where the record does not say."""
+
+    def block(self, stdout: str, time: str) -> str:
+        lines = stdout.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith(f"{time}  "))
+        end = next((i for i in range(start + 1, len(lines)) if lines[i] == ""), len(lines))
+        return "\n".join(lines[start:end])
+
+    def test_the_oefeningen_with_blocked_pastes_say_so(self):
+        out = self.run_cli("trace", "--leerling", "zara", "--dag", "2026-10-09")
+        self.assertTrue(out.startswith("Zara Plak · vrijdag 2026-10-09 · 4 oefeningen\n"))
+        self.assertEqual(
+            self.block(out, "09:00").splitlines()[-1],
+            "  plakken   geblokkeerd: 2 keer, 340 tekens",
+        )
+        self.assertEqual(
+            self.block(out, "09:10").splitlines()[-1],
+            "  plakken   geblokkeerd: 1 keer, 1 teken",
+        )
+        # None blocked, or not known: no line.
+        self.assertNotIn("plakken", self.block(out, "09:05"))
+        self.assertNotIn("plakken", self.block(out, "09:15"))
+        self.assertEqual(self.cosmos.upserts, [])
+
+
+class BlockedPastesDraftTest(_CommandTest):
+    """#334: the concept counts per student the oefeningen with a blocked
+    paste from outside the app — diagnostics: the number does not change —
+    and keeps the oefeningen whose record does not say apart."""
+
+    def setUp(self):
+        super().setUp()
+        md_path, json_path, _ = self.draft(KLAS_PLAK)
+        self.md = md_path.read_text(encoding="utf-8")
+        self.sidecar = json.loads(json_path.read_text(encoding="utf-8"))
+
+    def row(self, name: str) -> str:
+        return next(line for line in self.md.splitlines() if line.startswith(f"| {name} |"))
+
+    def test_the_overview_flags_them(self):
+        self.assertIn("plakken geblokkeerd bij 2 oefeningen", self.row("Zara Plak"))
+        self.assertNotIn("plakken", self.row("Pim Typ"))
+        self.assertNotIn("plakken", self.row("Ruth Toets"))
+
+    def test_the_diagnostics_count_them_and_keep_the_unknown_apart(self):
+        self.assertIn(
+            "**Plakken van buiten de app geblokkeerd:** bij 2 van de 3 oefeningen met gegevens"
+            " (3 keer, 341 tekens); 1 oefening zonder gegevens (een oudere build, of het"
+            " blokkeren stond uit).",
+            self.section(self.md, "Zara Plak"),
+        )
+        self.assertIn(
+            "**Plakken van buiten de app geblokkeerd:** bij geen van de 4 oefeningen met gegevens.",
+            self.section(self.md, "Ruth Toets"),
+        )
+        # No record says: no line, never "none".
+        self.assertNotIn("Plakken", self.section(self.md, "Pim Typ"))
+
+    def test_the_number_and_the_sidecar_do_not_change(self):
+        zara = self.student(self.sidecar, "u-zara")
+        pim = self.student(self.sidecar, "u-pim")
+        self.assertEqual(zara["computed"], pim["computed"])
+        self.assertNotIn("paste", json.dumps(zara).lower())
+        self.assertEqual(self.sidecar["rulesVersion"], rules.RULES_VERSION)
+
+
 class TraceSignalsTest(unittest.TestCase):
     """What `diagnostics.trace_signals` makes of a turn's signals (#228)."""
 

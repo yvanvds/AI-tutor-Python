@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/paste_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
@@ -33,7 +34,8 @@ class TutorMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = style ?? _defaultStyle;
-    return SelectionArea(
+    // A copy of it is a copy made in the app, to paste in the answer (#334).
+    return InAppSelectionArea(
       child: GptMarkdown(
         text,
         style: base,

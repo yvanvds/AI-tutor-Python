@@ -2437,6 +2437,12 @@ abstract class AppLocalizations {
   /// **'Show chat'**
   String get chat_panel_expand_tooltip;
 
+  /// Short neutral notice at the bottom when a paste from outside the app into the answer, the chat or the Playground was blocked (#334). Says nothing of why or of what does work.
+  ///
+  /// In en, this message translates to:
+  /// **'Pasting from outside the app isn\'t possible here.'**
+  String get pasteGuard_blockedNotice;
+
   /// No description provided for @chat_composer_idle_hint.
   ///
   /// In en, this message translates to:

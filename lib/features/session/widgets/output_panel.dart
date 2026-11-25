@@ -2,6 +2,7 @@ import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/output/output_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/paste_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:py_runner/py_runner.dart';
@@ -240,7 +241,8 @@ class _Body extends StatelessWidget {
     // All lines live in one `SelectableText.rich` (one styled span per line)
     // rather than one `SelectableText` per line: a selection can only span a
     // single selectable, so per-line widgets made it impossible to highlight
-    // a stack trace or a table and ask the tutor about it (#17).
+    // a stack trace or a table and ask the tutor about it (#17). A copy of
+    // the output is a copy made in the app, to paste in the answer (#334).
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.m,
@@ -254,19 +256,22 @@ class _Body extends StatelessWidget {
           controller: scroll,
           child: SizedBox(
             width: double.infinity,
-            child: SelectableText.rich(
-              TextSpan(
-                children: [
-                  for (var i = 0; i < lines.length; i++)
-                    TextSpan(
-                      text: i == lines.length - 1
-                          ? lines[i].text
-                          : '${lines[i].text}\n',
-                      style: AppMono.output(color: _lineColor(lines[i])),
-                    ),
-                ],
+            child: RememberCopies(
+              child: SelectableText.rich(
+                TextSpan(
+                  children: [
+                    for (var i = 0; i < lines.length; i++)
+                      TextSpan(
+                        text: i == lines.length - 1
+                            ? lines[i].text
+                            : '${lines[i].text}\n',
+                        style: AppMono.output(color: _lineColor(lines[i])),
+                      ),
+                  ],
+                ),
+                style: AppMono.output(),
+                contextMenuBuilder: inAppContextMenu,
               ),
-              style: AppMono.output(),
             ),
           ),
         ),

@@ -151,4 +151,24 @@ void main() {
       expect(container.read(provider)?.questionBankShare, 0.3);
     },
   );
+
+  test('setModel carries the paste switch the portal set (#334)', () async {
+    config = InMemoryCosmos([
+      _configDoc(extra: {'BlockExternalPaste': false}),
+    ]);
+    final provider = NotifierProvider<GlobalConfigService, GlobalConfig?>(
+      () => GlobalConfigService(container: config.container),
+    );
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await container.read(provider.notifier).setModel('gpt-4.1');
+
+    expect(config['global']!['BlockExternalPaste'], isFalse);
+    expect(
+      container.read(provider)?.blockExternalPaste,
+      isFalse,
+      reason: 'the published config switched the block back on',
+    );
+  });
 }

@@ -1467,6 +1467,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chat_panel_expand_tooltip => 'Show chat';
 
   @override
+  String get pasteGuard_blockedNotice =>
+      'Pasting from outside the app isn\'t possible here.';
+
+  @override
   String get chat_composer_idle_hint => 'Type your question or answer…';
 
   @override

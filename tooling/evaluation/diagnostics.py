@@ -319,6 +319,44 @@ def lost_oefeningen(turns: list[dict], goals: dict, milestone_subgoals: set[str]
     }
 
 
+# ---- blocked pastes (#334) ---------------------------------------------------
+
+
+def _number(raw) -> int | None:
+    """A count on a record, or None: a bool is no count."""
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    return int(raw)
+
+
+def blocked_paste(turn: dict | None) -> tuple[int, int] | None:
+    """The pastes from outside the app blocked on one oefening (#334), as
+    (times, characters). None when the record does not say — a build from
+    before the field, or the block switched off in `config/global` —
+    which is unknown, never 0."""
+    count = _number((turn or {}).get("blockedPastes"))
+    chars = _number((turn or {}).get("blockedPasteChars"))
+    if count is None or chars is None:
+        return None
+    return count, chars
+
+
+def blocked_pastes(turns: list[dict]) -> dict:
+    """The oefeningen with a blocked paste from outside the app (#334),
+    counted over the records that say: how many say (`known`), how many of
+    them had one (`with`), and how many attempts and characters those were.
+    Diagnostics: the number does not change."""
+    known = [b for b in (blocked_paste(t) for t in turns) if b is not None]
+    with_ = [b for b in known if b[0] > 0]
+    return {
+        "oefeningen": len(turns),
+        "known": len(known),
+        "with": len(with_),
+        "attempts": sum(b[0] for b in with_),
+        "chars": sum(b[1] for b in with_),
+    }
+
+
 # ---- trace (#228) ------------------------------------------------------------
 
 # Why a grader signal did not count, as `SignalDropReason` names it.
@@ -412,6 +450,8 @@ def trace(turns: list[dict], contents: dict[str, dict], goals: dict) -> list[dic
                 # #280: on a subgoal the student picked back up in the Leerpad.
                 "self_chosen": bool((t or {}).get("selfChosen")),
                 "graded_by_key": bool((t or {}).get("gradedByKey")),
+                # #334: (times, characters), None when the record does not say.
+                "blocked_pastes": blocked_paste(t),
                 "has_turn": t is not None,
                 "has_content": c is not None,
                 "question": (c or {}).get("question"),

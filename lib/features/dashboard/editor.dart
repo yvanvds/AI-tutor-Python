@@ -4,6 +4,7 @@ import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/theme/app_theme.dart';
 import 'package:ai_tutor_python/theme/code_theme.dart';
 import 'package:ai_tutor_python/theme/tokens.dart';
+import 'package:ai_tutor_python/widgets/paste_guard.dart';
 import 'package:ai_tutor_python/widgets/submit_shortcut.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,11 @@ const Map<ShortcutActivator, Intent> _redoShortcuts = {
 /// package's own Enter binding matches a plain Enter only, so the two do not
 /// meet; the chat composer has its own focus and keeps Ctrl+Enter for send.
 /// Ctrl+Y redoes ([_redoShortcuts]); the composer leaves it alone.
+///
+/// A paste from outside the app does not reach the editor (#334): Ctrl+V,
+/// Shift+Insert and the right-click menu meet a [PasteGuard], which shows
+/// the editor's menu itself — the package's field takes no menu of the
+/// app's. What the student copied in the app pastes as before.
 ///
 /// Each editor stays on the buffer of the mode whose page it is on (#322).
 /// The session view fades the old mode's page out while the new one fades
@@ -74,7 +80,10 @@ class _EditorState extends ConsumerState<Editor> {
     });
     return CallbackShortcuts(
       bindings: submitShortcutBindings(() => runEditorCode(ref, _mode)),
-      child: Shortcuts(shortcuts: _redoShortcuts, child: _codeField()),
+      child: Shortcuts(
+        shortcuts: _redoShortcuts,
+        child: PasteGuard(takesOverContextMenu: true, child: _codeField()),
+      ),
     );
   }
 
