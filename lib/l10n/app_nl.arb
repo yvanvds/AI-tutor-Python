@@ -314,7 +314,8 @@
   "auth_localKey_footnote": "Opmerking: je kunt deze sleutel later wijzigen of verwijderen in Instellingen.",
 
   "crash_title": "Er ging iets mis",
-  "crash_defaultMessage": "Dit kan gebeuren na wijzigingen aan rechten of regels.\nProbeer de app te resetten. Je wordt afgemeld en de caches worden gewist.",
+  "crash_errorMessage": "De app liep tegen een fout aan. Ga terug en werk verder. Blijft het misgaan, sluit de app dan en start hem opnieuw.",
+  "crash_backButton": "Terug naar de app",
   "crash_resetButton": "App resetten (rechten herstellen)",
 
   "update_status_idle": "Er is nog niet gecontroleerd op updates.",

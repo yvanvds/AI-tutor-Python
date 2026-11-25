@@ -610,7 +610,8 @@
   "auth_localKey_footnote": "Note: You can change or remove this key later in Settings.",
 
   "crash_title": "We hit a problem",
-  "crash_defaultMessage": "This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.",
+  "crash_errorMessage": "The app ran into an error. Go back and carry on. If it keeps happening, close the app and start it again.",
+  "crash_backButton": "Back to the app",
   "crash_resetButton": "Reset app (fix permissions)",
 
   "update_status_idle": "No update check has run yet.",

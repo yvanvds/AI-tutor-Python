@@ -41,6 +41,18 @@ List<String> _dropdown(WidgetTester tester) {
   return popup.shouldShow ? popup.suggestions : const [];
 }
 
+/// Whether [item]'s row lies wholly inside the visible part of the open
+/// dropdown — the list the package draws in the overlay, whose nearest
+/// scrollable is its own.
+bool _rowInView(WidgetTester tester, String item) {
+  final row = find.text(item);
+  if (row.evaluate().isEmpty) return false;
+  final list = find.ancestor(of: row, matching: find.byType(Scrollable)).first;
+  final rect = tester.getRect(row);
+  final view = tester.getRect(list);
+  return rect.top >= view.top - 0.5 && rect.bottom <= view.bottom + 0.5;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -112,6 +124,87 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     expect(_controller(tester).fullText, '${next}t.forward');
+
+    await unmount(tester);
+  });
+
+  // #330 — the dropdown is at most 100 px tall, so a longer list scrolls.
+  // An arrow key that selected a row out of view made the package scroll
+  // through a controller its popup never attached: "Null check operator
+  // used on a null value", and the crash screen. Up from the first row
+  // wraps to the last, so it crashed as well.
+  testWidgets('the arrow keys walk the whole list, which scrolls along', (
+    tester,
+  ) async {
+    await mountEditor(tester);
+
+    Future<void> press(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await tester.pump();
+    }
+
+    await type(tester, _turtleCode, 't.');
+    final popup = _controller(tester).popupController;
+    expect(_dropdown(tester), _turtleMethods);
+    // Only a list taller than the dropdown tests the scrolling.
+    expect(_rowInView(tester, _turtleMethods.last), isFalse);
+
+    for (var i = 1; i < _turtleMethods.length; i++) {
+      await press(LogicalKeyboardKey.arrowDown);
+      expect(popup.selectedIndex, i);
+      expect(_rowInView(tester, _turtleMethods[i]), isTrue, reason: 'down $i');
+    }
+    // Down from the last row wraps to the first, up from the first to the
+    // last.
+    await press(LogicalKeyboardKey.arrowDown);
+    expect(popup.selectedIndex, 0);
+    expect(_rowInView(tester, _turtleMethods.first), isTrue);
+    await press(LogicalKeyboardKey.arrowUp);
+    expect(popup.selectedIndex, _turtleMethods.length - 1);
+    expect(_rowInView(tester, _turtleMethods.last), isTrue);
+    for (var i = _turtleMethods.length - 2; i >= 0; i--) {
+      await press(LogicalKeyboardKey.arrowUp);
+      expect(popup.selectedIndex, i);
+      expect(_rowInView(tester, _turtleMethods[i]), isTrue, reason: 'up $i');
+    }
+
+    // The case from the report: a list's methods, down to the last one,
+    // and Enter writes it.
+    const lijst = 'getallen = [3, 1, 2]\n';
+    await type(tester, lijst, 'getallen.');
+    for (var i = 0; i < 4; i++) {
+      await press(LogicalKeyboardKey.arrowDown);
+    }
+    expect(_rowInView(tester, 'sort(reverse=False)'), isTrue);
+    await press(LogicalKeyboardKey.enter);
+    expect(_controller(tester).fullText, '${lijst}getallen.sort');
+
+    await unmount(tester);
+  });
+
+  // #330 — the package draws each opening of the dropdown in a new overlay
+  // entry. When one closes and the next opens before a frame (two quick
+  // keys), the new list attaches before the old one detaches; on one shared
+  // scroll controller that failed an assertion, and the old list's detach
+  // then left the new one without a scroll controller.
+  testWidgets('a dropdown that closes and opens again in one frame still '
+      'scrolls', (tester) async {
+    await mountEditor(tester);
+
+    await type(tester, _turtleCode, 't.');
+    final popup = _controller(tester).popupController;
+    expect(_dropdown(tester), _turtleMethods);
+
+    popup.hide();
+    popup.show(_turtleMethods);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    for (var i = 1; i < _turtleMethods.length; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(_rowInView(tester, _turtleMethods[i]), isTrue, reason: 'down $i');
+    }
 
     await unmount(tester);
   });

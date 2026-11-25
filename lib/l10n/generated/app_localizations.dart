@@ -1819,11 +1819,17 @@ abstract class AppLocalizations {
   /// **'We hit a problem'**
   String get crash_title;
 
-  /// No description provided for @crash_defaultMessage.
+  /// No description provided for @crash_errorMessage.
   ///
   /// In en, this message translates to:
-  /// **'This can happen after permission or rules changes.\nTry resetting the app. You’ll be signed out and caches will be cleared.'**
-  String get crash_defaultMessage;
+  /// **'The app ran into an error. Go back and carry on. If it keeps happening, close the app and start it again.'**
+  String get crash_errorMessage;
+
+  /// No description provided for @crash_backButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the app'**
+  String get crash_backButton;
 
   /// No description provided for @crash_resetButton.
   ///

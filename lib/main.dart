@@ -35,11 +35,9 @@ Future<void> main() async {
     // phase leave the Navigator `_debugLocked`, and pushing inside that
     // window throws an assertion that masks the original error.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      appNavigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) =>
-              CrashRecoveryScreen(message: details.exceptionAsString()),
-        ),
+      pushCrashScreen(
+        appNavigatorKey.currentState,
+        CrashRecoveryScreen(message: details.exceptionAsString()),
       );
     });
   };
